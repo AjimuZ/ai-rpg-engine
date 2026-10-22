@@ -38,11 +38,11 @@ Stage the roadmap and affected documentation together with their change. Local c
 
 ## Git workflow
 
-The initial solo-work default follows the primary project: small changes on `main`, with commits and pushes controlled by the owner. A future collaborative PR workflow can be adopted explicitly. No tool or contributor should interpret a suggested commit message as authorization to publish.
+Implementation work is integrated on the `develop` branch in small, verified commits. `main` keeps the last owner-reviewed state and advances only when the owner merges `develop`; nothing is pushed directly to `main`. A commit is pushed to `develop` only after its checks pass, and published history is never rewritten or force-pushed. A future collaborative PR workflow can be adopted explicitly. No tool or contributor should interpret a suggested commit message as authorization to publish a release or change `main`.
 
 Suggested initial commit message: `Initialize project documentation and repository setup`.
 
-Commit messages must be in English, use imperative mood, and describe one coherent change with a concise subject. Use neutral wording focused on the result, without assistant/provider/model references, generation notices, or co-author trailers. This applies to the subject, body, and trailers; use `engine` or `project` when product branding would violate the convention. Use the owner's configured Git identity.
+Commit messages must be in English, use imperative mood, and describe one coherent change with a concise subject. Use neutral wording focused on the result, without assistant/provider/model references, generation notices, or co-author trailers. This applies to the subject, body, and trailers; use `engine` or `project` when product branding would violate the convention. Use the owner's configured Git identity. A commit that implements a roadmap item ends its body with a line naming that item, for example `Roadmap: P00.1`.
 
 Before committing, inspect `git status` and `git diff --cached`, then run `git diff --cached --check`. The initial commit contains design documents, decision records, the roadmap, and the labeled UI concept; it does not deliver a runnable application.
 

@@ -2,6 +2,12 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Development branch policy, 22 October 2026
+
+- Integrate verified implementation commits on the `develop` branch; `main` advances only through owner-reviewed merges and is never pushed to directly.
+- Exclude force pushes and published-history rewrites.
+- Require implementation commits to name their roadmap item in a final `Roadmap: <item>` body line.
+
 ## Unreleased — Container deployment design, 22 October 2026
 
 - Record the owner requirement for a fully containerized local application launched through root `start.sh`.
