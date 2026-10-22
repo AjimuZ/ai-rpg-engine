@@ -11,7 +11,7 @@ This changelog records delivered project artifacts. Future functionality belongs
 
 ## Unreleased — Development branch policy, 22 October 2026
 
-- Integrate verified implementation commits on the `develop` branch; `main` advances only through owner-reviewed merges and is never pushed to directly.
+- Use `main` as the single project branch: verified implementation commits are pushed directly to `main`. A `develop` branch used briefly the same day was fast-forwarded into `main` and removed.
 - Exclude force pushes and published-history rewrites.
 - Require implementation commits to name their roadmap item in a final `Roadmap: <item>` body line.
 

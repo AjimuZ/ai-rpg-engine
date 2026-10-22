@@ -38,7 +38,7 @@ Stage the roadmap and affected documentation together with their change. Local c
 
 ## Git workflow
 
-Implementation work is integrated on the `develop` branch in small, verified commits. `main` keeps the last owner-reviewed state and advances only when the owner merges `develop`; nothing is pushed directly to `main`. A commit is pushed to `develop` only after its checks pass, and published history is never rewritten or force-pushed. A future collaborative PR workflow can be adopted explicitly. No tool or contributor should interpret a suggested commit message as authorization to publish a release or change `main`.
+`main` is the project's single branch. Implementation work is committed to `main` in small, verified commits and pushed only after its checks pass. Published history is never rewritten or force-pushed. A future collaborative PR workflow can be adopted explicitly. No tool or contributor should interpret a suggested commit message as authorization to publish a release.
 
 Suggested initial commit message: `Initialize project documentation and repository setup`.
 

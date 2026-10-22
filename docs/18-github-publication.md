@@ -57,7 +57,7 @@ Name, trademark, and any commercial distribution review remain owner publication
 
 ## 6. Contribution model
 
-Start with small coherent changes on the owner's chosen workflow. On 22 October 2026 the owner selected a `develop` integration branch: verified implementation commits are pushed to `develop`, and `main` advances only through owner-reviewed merges. This replaces the single-`main` default inherited from the primary source. Force pushes and history rewrites are excluded. Contributor PRs can be adopted without changing runtime architecture.
+Start with small coherent changes on the owner's chosen workflow. The owner confirmed on 22 October 2026 the single-`main` workflow inherited from the primary source: verified implementation commits are pushed directly to `main`, and no other long-lived branch is used. Force pushes and history rewrites are excluded. Contributor PRs can be adopted without changing runtime architecture.
 
 A change includes its intent, user-visible behavior, affected contracts, relevant tests, documentation changes, and migration implications. A bug report includes engine/content/ruleset/adapter versions and redacted reproduction steps. Do not require sharing private campaign archives publicly.
 
