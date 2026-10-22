@@ -1,0 +1,118 @@
+# Technical Architecture
+
+## 1. Architectural style
+
+Use an Angular frontend and a **modular Spring Boot application**. PostgreSQL is the canonical store. The backend owns command processing, rules, persistence, knowledge filtering, and the Codex integration. Start with one deployable backend rather than separate gameplay, memory, and orchestration services.
+
+The primary project's stack is retained. The initial AI adapter is specific to Codex. An internal boundary keeps protocol details out of the domain; it does not imply a generic multi-provider product.
+
+```mermaid
+flowchart LR
+    UI[Angular RPG interface] -->|REST commands and queries| API[Spring Boot API]
+    API --> APP[Campaign application services]
+    APP --> RULES[Deterministic rules and combat]
+    APP --> MEMORY[Knowledge and context assembly]
+    APP --> AI[Codex orchestration port]
+    AI --> BRIDGE[Java app-server adapter]
+    BRIDGE -->|Private stdio| CODEX[Owned Codex process]
+    CODEX --> SERVICE[Configured Codex service]
+    APP --> DB[(PostgreSQL)]
+    RULES --> APP
+    DB --> OUTBOX[Committed presentation outbox]
+    OUTBOX -->|SSE| UI
+    PACK[Validated adventure files] --> IMPORT[Pack compiler and registry]
+    IMPORT --> DB
+    ASSETS[Registered local assets] --> API
+```
+
+The diagram describes dependencies and data exchange. It does not grant the Codex process database access.
+
+## 2. Stack baseline
+
+| Area | Decision | Version policy |
+| --- | --- | --- |
+| Frontend | Angular, TypeScript, standalone components, signals, SCSS, zoneless style | Angular 22 is the inspected source baseline; lock a supported compatible set before scaffolding |
+| Async UI | Angular HTTP client; RxJS for streams and cancellation; signals for view state | Inherit supported Angular ecosystem versions |
+| Backend | Spring Boot on Java 21 LTS | Select a maintained compatible Boot release in P00 |
+| Build | Maven Wrapper | Commit wrapper and dependency lock policy in implementation |
+| Data access | Spring Data JPA for aggregate persistence; explicit queries for projections | Keep domain calculations independent of entities |
+| Database | PostgreSQL; source roadmap's PostgreSQL 16 is a starting compatibility candidate | Pin and test supported major, patch/image digest, and backup tooling in P00 |
+| Migrations | Flyway | Forward migrations; backup and restore for destructive upgrades |
+| JSON | Jackson with explicit DTOs and strict bounds | Reject unknown operation types and unsafe polymorphic input |
+| Streaming | Server-Sent Events with durable cursor | Polling fallback; no dependency on browser access to Codex |
+| AI | Codex app-server over stdio, managed by Java | Versioned adapter compatibility matrix; no assumed official Java SDK |
+| Environment | Docker Compose database, host Java backend, host Codex | Containerizing Codex is a later deployment decision |
+
+Do not select library versions merely by copying an old README or resolving “latest” during a build. Reproducible build versions and actual compatibility tests are required.
+
+## 3. Backend modules
+
+| Module | Responsibility | Main dependencies |
+| --- | --- | --- |
+| `identity` | Local owner identity and administrative privileges | Configuration and storage |
+| `content` | Parse, validate, compile, register, and version packs | Rules catalog, asset registry |
+| `campaign` | Campaign creation, activation, state revision, lifecycle | Content, persistence |
+| `commands` | Command taxonomy, idempotency, leases, operation state machine | Campaign, rules, orchestration |
+| `rules` | Prerequisites, expressions, legal operations, effects, random-draw protocol | Pinned ruleset definitions |
+| `characters` | Attributes, skills, resources, conditions, ability availability | Rules |
+| `inventory` | Item identity, ownership, stacks, slots, durability, trade | Characters, rules |
+| `quests` | Objective predicates, state transitions, rewards | Domain events, rules |
+| `world` | Locations, clocks, factions, schedules, causal triggers | Rules and domain events |
+| `social` | Relationships, commitments, NPC beliefs and goals | Knowledge and events |
+| `combat` | Encounters, initiative, legal turns, reactions, resolution, settlement | Rules, characters, inventory |
+| `progression` | XP, milestones, purchases, stat caps, reward ledger | Rules and events |
+| `knowledge` | Fact scopes, provenance, public projections, disclosure | Campaign and events |
+| `memory` | Checkpoints, summaries, retrieval, context budgets | Knowledge, events |
+| `ai` | Task profiles, prompt contracts, proposal parsing, model routing | Context and Codex adapter |
+| `codex` | Process ownership, protocol framing, events, cancellation | OS process API; no domain repositories |
+| `presentation` | Narrative records, scene references, safe media cues | Committed events and projections |
+| `operations` | Backups, imports/exports, diagnostics, recovery | All modules through administrative services |
+
+These are logical packages initially, not separate Maven artifacts or services. Split further only when actual complexity warrants it.
+
+## 4. Dependency rules
+
+- The domain rules layer must not depend on HTTP, Angular, prompt templates, or the Codex transport.
+- Controllers validate transport shape and invoke application services; they do not calculate damage or manipulate entity repositories directly.
+- AI returns typed proposals. Only command services can request canonical transitions.
+- Query services return purpose-built projections; serializing JPA entities into player responses is prohibited.
+- Modules communicate using narrow services and typed domain events. A presentation listener cannot award loot.
+- One application transaction coordinates changes spanning a resolved action. Avoid distributed transactions.
+- JSONB is appropriate for namespaced extension values and immutable compiled definitions. Core ownership and balances need constraints and queryable fields.
+
+## 5. Ports
+
+The proposed `CodexGameMasterPort` exposes task-oriented generation: interpret intent, propose content, choose a legal tactic, narrate resolved events, and summarize an event range. Domain services never send raw arbitrary protocol methods.
+
+`RulesetPort` resolves legal actions and effects from a pinned ruleset. `CampaignRepository` loads canonical state and commits revisions. `KnowledgeQueryPort` provides permitted facts for an audience. `PresentationPublisher` emits committed output through an outbox. `RandomSource` produces and records server-owned draws. Tests can replace these boundaries independently.
+
+## 6. Runtime separation
+
+| Boundary | Data allowed across it |
+| --- | --- |
+| Browser → backend | Validated commands, preferences, content imports selected by owner |
+| Backend → browser | Authorized projections, public narration, legal choices, operation status |
+| Backend → Codex | Minimal task instructions, authorized context, supported structured output contract |
+| Codex → backend | Untrusted structured proposals or narrative, never canonical records |
+| Pack → runtime | Compiled, validated content and bounded expressions |
+| Canonical store → summaries | Provenance-linked facts/events; no replacement of the original records |
+
+The player should not see RPC logs, chain-of-thought, command output, unfiltered model commentary, private relationship metrics, or hidden creature tactics. Developer diagnostics must be separately permissioned and redacted.
+
+## 7. Local deployment
+
+The first installation runs PostgreSQL in Docker Compose with a persistent volume. The backend and Codex run on the host, simplifying access to the owner's supported Codex authentication. The Angular development server uses a proxy during development. A release may serve built frontend assets from the backend to provide one loopback origin.
+
+AI conversations have isolated runtime workspaces outside the source checkout and pack directories. The bridge exposes neither database credentials nor database network access to tools. Authentication needed by Codex remains managed by supported Codex mechanisms. Log and credential handling are detailed in [security and operations](14-security-and-operations.md).
+
+The app binds to loopback by default. GitHub publication distributes source; it does not expose a public gameplay server. A public-hosting design needs a separate authentication, tenant isolation, credential, abuse, and deployment review.
+
+## 8. Concurrency and background work
+
+One campaign admits one state-changing operation at a time using a database-backed lease and fencing token. Queries remain available against the last committed revision. No database transaction stays open while waiting for Codex. At commit time the service verifies the state revision, lease token, current actor, and ruleset hash.
+
+Summary generation and media work occur after canonical commit. The outbox retries publication without replaying gameplay. All background jobs have stable identity, source revision, retry policy, and stale-result handling.
+
+## 9. Architectural evolution
+
+Add full-text retrieval before semantic indexing. Add an authoring editor after the pack format stabilizes. Add a separate AI service only when profiling or required libraries make it necessary. Add alternate rules schedulers through explicit versioned extensions. A future generic provider is a separate product decision, not hidden v1 scope.

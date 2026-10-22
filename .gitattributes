@@ -1,0 +1,5 @@
+# Normalize text consistently across Windows, macOS, and Linux.
+* text=auto eol=lf
+
+# Preserve the conceptual UI image as a binary asset.
+*.png binary

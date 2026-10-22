@@ -1,0 +1,21 @@
+# ADR 0007: Knowledge Filtering and Audience-Isolated AI Context
+
+**Status:** Proposed. **Date:** 22 October 2026.
+
+## Context
+
+A planner may require secret canon while the player narrator, guide, or NPC must know less. Filtering only a final response cannot remove hidden facts already present in a reused thread's memory. Media can also reveal secrets indirectly.
+
+## Decision
+
+Model fact truth and observer knowledge separately. Scope every AI session by campaign, role, audience, and policy hash. Feed public narration sanitized resolved events through a separate limited context. NPC tactics use that actor's observations and legal candidates. Player APIs use typed public projections, never raw save/entity serialization.
+
+Apply the same policy to summaries, retrieval, assets, audio, diagnostics, and exports. A full-owner archive is explicitly different from a player-facing journal export.
+
+## Consequences
+
+There may be more than one logical AI thread per campaign, but no thread is authoritative memory. Additional filtering and tests are required. Natural-language leakage still needs adversarial evaluation and cannot be declared solved by schema validation alone.
+
+## Verification
+
+Secret-sentinel tests across all outputs, privileged-to-public handoff scenarios, guide uncertainty, hidden-location tests, and media metadata review. See [security](../14-security-and-operations.md).

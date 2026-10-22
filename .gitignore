@@ -1,0 +1,37 @@
+# Local AI development assistant skills and configuration.
+# Keep these private at every level of the project.
+.agents/
+.claude/
+.codex/
+AGENTS.md
+AGENTS.override.md
+CLAUDE.md
+CLAUDE.local.md
+.mcp.json
+
+# Local credentials. Keep only deliberately sanitized example files.
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Private runtime output and local development data.
+/.local/
+/runtime-data/
+/backups/
+/logs/
+*.log
+
+# Generated frontend and backend output.
+node_modules/
+.angular/
+dist/
+target/
+coverage/
+
+# Local editor and operating-system files.
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+Desktop.ini
