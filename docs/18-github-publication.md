@@ -2,7 +2,7 @@
 
 ## 1. Publication intent
 
-The project is intended for later GitHub publication. This phase prepares English documentation only. No remote repository, issue, pull request, commit, push, or release was created as part of this deliverable.
+The documentation repository exists at [AjimuZ/ai-rpg-engine](https://github.com/AjimuZ/ai-rpg-engine), initially with private visibility and a `main` branch. It contains English design documentation and repository setup, not an executable engine or a runtime release. Making the repository public remains a separate owner visibility decision.
 
 A documentation-only repository can be published honestly after the owner chooses its name, license, and public-content scope. A playable release must additionally satisfy runtime release gates. Do not describe a design repository as a working game engine.
 
@@ -34,11 +34,11 @@ Use English for README, documentation, public prompts, source identifiers, code 
 
 Screenshots must show actual software and neutral content, with no tokens or private identifiers. A concept diagram is labeled as a design diagram. Do not show fictional “build passing” badges, fabricated performance numbers, or a finished-UI mockup as proof of implementation.
 
-## 4. Licensing plan
+## 4. License and content rights
 
-MIT is the recommended software/documentation license because the principal source project uses it. The owner must select and add the new repository's root license; this documentation does not make that decision silently. Retain upstream copyright and permission notices when distributing reused licensed material. [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) preserves the primary source notice.
+Project software and documentation use the [MIT License](../LICENSE), copyright 2026 Azim Ben Othman, consistent with the principal source project. MIT permits private and commercial use, modification, distribution, sublicensing, and sale, provided the copyright and permission notices are retained in copies or substantial portions. The license includes its standard warranty and liability disclaimers. [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) preserves the primary source notice. The [Open Source Initiative's MIT text](https://opensource.org/license/mit) is the reference for the standard terms.
 
-Adventure packs, images, audio, fonts, icons, model-related assets, and external reference material can have different licenses. Their metadata must identify origin, author, license/version, required attribution, modifications, and distribution permission. An MIT code license does not automatically apply to them. The demo's missing standalone license is an explicit reuse question; its private content and implementation are not copied here.
+Authors retain their rights in their own adventure packs and content; running a pack with the engine does not impose MIT on it. Separately supplied images, audio, fonts, icons, model-related assets, and external reference material can have different licenses. Their metadata must identify origin, author, license/version, required attribution, modifications, and distribution permission. The bundled UI concept is a documentation illustration whose provenance and distribution terms are recorded [alongside the image](mockups/advanced-gameplay-ui-v1.prompt.md). The demo's missing standalone license remains a reuse question; its private content and implementation are not copied here.
 
 ## 5. Combat inspiration and rights
 
@@ -72,8 +72,12 @@ Each release records supported dependencies/OS, migration requirements, changed 
 
 ## 9. Publication checklist
 
-- [ ] Verify repository availability and location for the selected name AI RPG Engine and slug `ai-rpg-engine`.
-- [ ] Root license is selected and added; upstream notices retained.
+For the current documentation repository, the remaining practical preparation is a public-content review, a private security-reporting route, and documentation checks in CI. Issue forms and a pull-request template are useful when accepting external contributions. Branch protection becomes useful when collaborators or automated checks are introduced. These items do not require implementing the engine first.
+
+The checklist below also includes gates for a later playable release; those runtime gates do not block sharing an accurately labeled design repository.
+
+- [x] Verify repository availability and location for the selected name AI RPG Engine and slug `ai-rpg-engine`.
+- [x] Root MIT license is added; upstream notices retained.
 - [ ] All bundled content/assets have a rights/provenance record.
 - [ ] No private source-demo campaign, credentials, logs, or machine-specific paths are included.
 - [ ] README accurately states design/MVP/v1 status.

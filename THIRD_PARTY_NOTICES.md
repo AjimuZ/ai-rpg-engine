@@ -1,8 +1,10 @@
 # Third-Party Notices and Heritage
 
+Project software and documentation are distributed under the [MIT License](LICENSE), copyright 2026 Azim Ben Othman. The notices below preserve upstream attribution and do not override separate terms for third-party material.
+
 ## The World I Can Develop
 
-AI RPG Engine's design builds primarily on the architecture and product analysis of [The World I Can Develop](https://github.com/AjimuZ/the-world-i-can-develop), supplied locally by the project owner. Preserve the following notice with distributions that reuse its licensed material. The notice applies to that upstream material; selection of AI RPG Engine's own repository license remains an owner publication decision.
+AI RPG Engine's design builds primarily on the architecture and product analysis of [The World I Can Develop](https://github.com/AjimuZ/the-world-i-can-develop), supplied locally by the project owner. Preserve the following notice with distributions that reuse its licensed material. The notice applies to that upstream material and is retained alongside the project's root MIT license.
 
 ```text
 MIT License

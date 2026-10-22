@@ -2,6 +2,13 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Project licensing, 22 October 2026
+
+- Add the MIT License with copyright 2026 Azim Ben Othman.
+- Document license scope, contribution terms, and separate ownership of adventure packs and third-party assets.
+- Preserve the upstream MIT notice and resolve the pending repository-license decision.
+- Update the publication guide with the private repository status and remaining public-repository preparation.
+
 ## Unreleased — Repository preparation, 22 October 2026
 
 - Add Git exclusions for local assistant configuration, environment files, private runtime output, and generated artifacts.

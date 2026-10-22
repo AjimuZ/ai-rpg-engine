@@ -29,10 +29,11 @@ Owners below are implementation responsibilities, not assigned people. The proje
 
 These are bounded decision records, not missing core specifications. Development can use the documented defaults after the applicable milestone review.
 
+The repository-license decision was resolved on 22 October 2026: project software and documentation use the [MIT License](../LICENSE), with the upstream notice retained in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). Separate adventure-pack and asset rights still require their own provenance records.
+
 | Decision | Working default | Resolve by | Evidence / authority |
 | --- | --- | --- | --- |
 | Publication naming checks | AI RPG Engine selected by the owner; repository slug `ai-rpg-engine` | Before public repository creation | Verify repository availability and applicable name/rights requirements |
-| Repository license | Recommend MIT, consistent with primary source | P02; mandatory before publication | Owner selects license; preserve inherited notice |
 | Exact dependency patches | Angular 22 source baseline, Java 21, maintained compatible stack | P00 | Official compatibility and reproducible dependency matrix |
 | Codex release baseline | App-server stdio, restricted runtime | P01 | Actual contract/isolation tests |
 | Supported OS list | Windows first; others unclaimed | P01 and P19 | Platform-specific verification |

@@ -52,6 +52,8 @@ Critical dependency chain: compatible stack → safe Codex profile → persisten
 
 **Depends on:** P00; can follow P01's scope findings. **Areas:** future root configuration, `frontend/`, `backend/`, `.github/`.
 
+The root MIT license, ignore rules, text line-ending policy, and contribution documentation were delivered during repository preparation on 22 October 2026. P02.1 remains open for the neutral environment examples and review with the implemented workspace.
+
 - [ ] P02.1 Add owner-approved license, ignore rules, formatting/line-ending rules, contribution policy, and neutral environment placeholders.
 - [ ] P02.2 Scaffold Angular and Spring Boot using pinned versions, with no adventure constants.
 - [ ] P02.3 Add Docker Compose PostgreSQL and development proxy; release origin strategy documented.
@@ -255,7 +257,7 @@ Critical dependency chain: compatible stack → safe Codex profile → persisten
 
 **Depends on:** P18 and owner publication decisions. **Areas:** public repository, docs, license/credits, release artifacts.
 
-- [ ] P19.1 Verify publication availability for AI RPG Engine and repository slug `ai-rpg-engine`, add the selected license, and review upstream notices and all bundled rights.
+- [ ] P19.1 Verify the publication location for AI RPG Engine and repository slug `ai-rpg-engine`, retain the root MIT license, and review upstream notices and all bundled rights.
 - [ ] P19.2 Remove private saves, logs, credentials, generated personal content, machine paths, and misleading status/badges.
 - [ ] P19.3 Run fresh-clone installation and sample-play rehearsal; record supported OS/tool versions.
 - [ ] P19.4 Finalize README, screenshots from actual software, author guide, troubleshooting, security policy, contribution guide, changelog, and release notes.

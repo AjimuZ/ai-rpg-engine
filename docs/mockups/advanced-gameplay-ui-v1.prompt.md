@@ -6,6 +6,8 @@ Generated with the built-in ImageGen tool. The selected output is [advanced-game
 
 This is a conceptual interface illustration of a later campaign and a tactical encounter, not a screenshot of implemented software. Ashen Meridian, Mara Vey, the companions, equipment, and encounter are illustrative sample content; they do not establish mandatory engine lore. Mockup numerical values illustrate UI elements and do not supersede the ruleset specification. The portraits and icons are parts of one flattened mockup, not separately generated or registered gameplay assets.
 
+The bundled illustration and this prompt are distributed as project documentation under the repository's [MIT License](../../LICENSE). This records the terms for these files; it does not relicense external assets or future user-created adventure content.
+
 ## Final prompt
 
 ```text

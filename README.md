@@ -61,7 +61,7 @@ The recommended first implementation is a local, single-owner modular applicatio
 
 ## Development and publication
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [the publication guide](docs/18-github-publication.md). Source heritage and the upstream MIT notice are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). MIT is the recommended project license; the owner must select and add the repository license before public release. This design does not silently license third-party adventures or assets.
+See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [the publication guide](docs/18-github-publication.md). Project software and documentation are licensed under the [MIT License](LICENSE), copyright 2026 Azim Ben Othman. MIT permits use, modification, redistribution, and commercial use while requiring preservation of its copyright and permission notices. Source heritage and the upstream notice are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Third-party adventures and assets retain their own terms; using the engine does not relicense user-created content.
 
 The project name **AI RPG Engine** was selected by the owner. It directly describes a reusable engine for AI-powered role-playing adventures. The repository slug is `ai-rpg-engine`. Repository, domain, and trademark availability checks remain publication tasks.
 

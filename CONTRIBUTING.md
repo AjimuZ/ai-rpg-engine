@@ -12,6 +12,10 @@ AI RPG Engine is currently a documentation-only project. Start with [the documen
 - Make small coherent changes with relevant evidence and updated documentation.
 - Preserve attribution and avoid introducing private saves, credentials, or unlicensed assets.
 
+## Licensing contributions
+
+Contributions to project software and documentation must be available under the [MIT License](LICENSE). Preserve existing copyright and permission notices. Identify the origin, license, and redistribution permission of any separately licensed asset or third-party material. Do not submit material you are not authorized to distribute. Using the engine does not require adventure authors to license their own packs under MIT.
+
 ## Changes
 
 Describe the concrete problem, resulting behavior, affected contracts, verification, and any migration requirements. Changes to architecture, content compatibility, rules, AI authority, or security require a corresponding decision record. Distinguish a supported feature from a proposed extension.
