@@ -42,6 +42,7 @@
 | FR-026 | Preview and apply explicit canon corrections with an audit trail | Deferred | Administrative change cannot silently rewrite event history |
 | FR-027 | Offer a structured, responsive RPG interface with keyboard access | Required | Actual browser acceptance and accessibility review |
 | FR-028 | Publish clear status, contribution, security, licensing, and release documentation | Required | Fresh-clone release rehearsal and public-content audit |
+| FR-029 | Deliver the containerized local application through a root `start.sh` launcher | Required | Prerequisite/auth diagnostics, health-based startup, no host build toolchains, persistent restart, and safe stop verified under QA-28 |
 
 ## 3. Nonfunctional requirements
 

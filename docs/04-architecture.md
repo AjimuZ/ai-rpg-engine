@@ -14,7 +14,7 @@ flowchart LR
     APP --> MEMORY[Knowledge and context assembly]
     APP --> AI[Codex orchestration port]
     AI --> BRIDGE[Java app-server adapter]
-    BRIDGE -->|Private stdio| CODEX[Owned Codex process]
+    BRIDGE -->|Private IPC| CODEX[Isolated Codex runtime]
     CODEX --> SERVICE[Configured Codex service]
     APP --> DB[(PostgreSQL)]
     RULES --> APP
@@ -40,8 +40,8 @@ The diagram describes dependencies and data exchange. It does not grant the Code
 | Migrations | Flyway | Forward migrations; backup and restore for destructive upgrades |
 | JSON | Jackson with explicit DTOs and strict bounds | Reject unknown operation types and unsafe polymorphic input |
 | Streaming | Server-Sent Events with durable cursor | Polling fallback; no dependency on browser access to Codex |
-| AI | Codex app-server over stdio, managed by Java | Versioned adapter compatibility matrix; no assumed official Java SDK |
-| Environment | Docker Compose database, host Java backend, host Codex | Containerizing Codex is a later deployment decision |
+| AI | Codex app-server managed by the Java adapter; packaged private IPC and local stdio probe profiles | Versioned adapter/container compatibility matrix; no assumed official Java SDK |
+| Environment | Complete Docker Compose installation with root `start.sh`; backend serves compiled Angular assets | Pin images/toolchains; verify isolated runtime, durable volumes, health checks, and supported shell/host matrix |
 
 Do not select library versions merely by copying an old README or resolving “latest” during a build. Reproducible build versions and actual compatibility tests are required.
 
@@ -64,7 +64,7 @@ Do not select library versions merely by copying an old README or resolving “l
 | `knowledge` | Fact scopes, provenance, public projections, disclosure | Campaign and events |
 | `memory` | Checkpoints, summaries, retrieval, context budgets | Knowledge, events |
 | `ai` | Task profiles, prompt contracts, proposal parsing, model routing | Context and Codex adapter |
-| `codex` | Process ownership, protocol framing, events, cancellation | OS process API; no domain repositories |
+| `codex` | Runtime transport/lifecycle, protocol framing, events, cancellation | Private IPC or local process API according to deployment profile; no domain repositories |
 | `presentation` | Narrative records, scene references, safe media cues | Committed events and projections |
 | `operations` | Backups, imports/exports, diagnostics, recovery | All modules through administrative services |
 
@@ -101,7 +101,9 @@ The player should not see RPC logs, chain-of-thought, command output, unfiltered
 
 ## 7. Local deployment
 
-The first installation runs PostgreSQL in Docker Compose with a persistent volume. The backend and Codex run on the host, simplifying access to the owner's supported Codex authentication. The Angular development server uses a proxy during development. A release may serve built frontend assets from the backend to provide one loopback origin.
+The packaged installation runs the modular backend with compiled Angular assets, PostgreSQL, and an isolated Codex runtime through Docker Compose. A root `start.sh` validates prerequisites, builds or reuses images, starts services, waits for readiness, and reports the loopback URL. It preserves campaign/content/asset volumes and does not require host build toolchains. A frontend development server and host stdio probe are optional development workflows. This replaces the earlier database-only Compose baseline under [ADR 0008](adr/0008-containerized-startup.md).
+
+The proposed packaged transport is a private Unix socket in a Linux IPC volume shared only by engine and runtime. Compose owns the runtime service; the backend owns its RPC connections and turns. P01 must prove the selected container, client, permissions, and authentication profile. See [container deployment and startup](22-container-deployment-and-startup.md) for the launcher contract, storage boundaries, and delivery gates.
 
 AI conversations have isolated runtime workspaces outside the source checkout and pack directories. The bridge exposes neither database credentials nor database network access to tools. Authentication needed by Codex remains managed by supported Codex mechanisms. Log and credential handling are detailed in [security and operations](14-security-and-operations.md).
 

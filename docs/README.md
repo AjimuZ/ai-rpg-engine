@@ -39,6 +39,7 @@ Requirements stated by the project owner are binding for this design. Technical 
 | [19 — Glossary and references](19-glossary-and-references.md) | Shared terminology, primary references, and evidence limits |
 | [20 — Worked scenarios](20-worked-scenarios.md) | Cross-module examples, including a complete combat calculation |
 | [21 — AI task contracts and prompts](21-ai-task-contracts-and-prompts.md) | Structured task envelopes, authority limits, and generic English prompt drafts |
+| [22 — Container deployment and startup](22-container-deployment-and-startup.md) | Dockerized application, root launcher, authentication, persistent data, and startup/recovery gates |
 | [Advanced gameplay UI concept](mockups/advanced-gameplay-ui-v1.png) | Illustrative interface image; [prompt and provenance](mockups/advanced-gameplay-ui-v1.prompt.md) |
 | [Architecture decision records](adr/README.md) | Rationale and consequences of major proposed decisions |
 

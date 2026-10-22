@@ -2,6 +2,8 @@
 
 **Status:** Proposed. **Date:** 22 October 2026.
 
+**Deployment update:** [ADR 0008](0008-containerized-startup.md) supersedes the database-only Compose assumption below with a complete packaged Compose installation. The stack and modular backend decision remain in force.
+
 ## Context
 
 The owner explicitly requests that the new engine primarily follow The World I Can Develop's technology stack. The source has an Angular scaffold and a planned Java/Spring Boot/PostgreSQL backend; the demo's Python application is functional reference material with campaign-specific coupling.

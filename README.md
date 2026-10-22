@@ -31,15 +31,17 @@ The design primarily derives from **The World I Can Develop**: Angular, Spring B
 | Web interface | Angular 22 baseline inherited from the source project; TypeScript; standalone components; signals; SCSS |
 | Authoritative application | Spring Boot; Java 21 LTS; Maven |
 | Persistence | PostgreSQL; Flyway migrations; relational state and JSONB extension data |
-| AI integration | Backend-managed Codex app-server process over local standard input/output |
+| AI integration | Backend-managed Codex app-server integration; isolated packaged runtime with private IPC, subject to compatibility validation |
 | Browser updates | REST commands and resumable Server-Sent Events |
-| Local environment | Docker Compose for PostgreSQL; host backend and Codex initially |
+| Local environment | Docker Compose for the complete packaged application; root `start.sh` entry point; durable storage and isolated runtime |
 | Retrieval | Structured and full-text retrieval first; optional semantic indexing after evidence of need |
 | Verification | JUnit, PostgreSQL integration tests, Angular/Vitest, browser acceptance tests, Codex contract fixtures |
 
 Exact supported dependency patches and the supported Codex protocol baseline must be recorded before scaffolding. The source project's package versions are evidence of its choices, not a claim about the newest supported releases.
 
 Campaign data is stored locally. **Codex inference requires the configured Codex service and account access.** Local hosting does not imply offline AI, unlimited usage, or local model inference. Ollama, generic provider routing, local LLMs, and direct replacement of Codex with a generic chat API are outside the initial release.
+
+**Planned startup:** run `./start.sh` to validate configuration, build/reuse images, start the containerized application and PostgreSQL, and print the local browser URL. The packaged profile will not require host Java, Maven, Node, or npm. Windows requires a compatible shell and Linux-container environment. Initial Codex sign-in remains owner-controlled. See [container deployment and startup](docs/22-container-deployment-and-startup.md). The launcher and container files do not exist yet; this is a documented implementation requirement.
 
 ## Start reading
 

@@ -11,5 +11,6 @@ All records are **proposed for the AI RPG Engine implementation baseline**. Owne
 | [0005](0005-renewable-memory.md) | Canonical memory independent of renewable AI sessions |
 | [0006](0006-original-combat.md) | Original zone-based deterministic combat with constrained AI proposals |
 | [0007](0007-audience-isolation.md) | Knowledge filtering and role/audience thread isolation |
+| [0008](0008-containerized-startup.md) | Containerized packaged installation and root `start.sh`; supersedes the deployment assumptions in 0001 and 0002 |
 
 When a decision changes, preserve this record and create a superseding one with rationale, compatibility implications, and verification. Do not retroactively edit historical status to make a previous decision disappear.

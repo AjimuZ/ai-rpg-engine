@@ -51,6 +51,7 @@ Do not require live inference for ordinary CI. Test fixtures must not contain pr
 | QA-25 | Accessibility | Keyboard-only creation/play/combat, focus return, text zoom, reduced motion, no audio dependency | FR-027 |
 | QA-26 | Publication | Fresh clone, accurate status, rights inventory, no private data or dead local links | FR-028 |
 | QA-27 | Canon correction | Concrete preview, backup, source-linked audit, dependency revalidation, and summary invalidation; historical events preserved | FR-026 |
+| QA-28 | Containerized startup | Fresh clone starts through root `start.sh` without host build toolchains; prerequisites/auth failures are clear; repeated launch, stop, image recreation, and restore preserve campaigns and combat; secrets and runtime access remain isolated | FR-029, FR-024–025 |
 
 ## 4. Long-campaign evaluation
 
@@ -82,7 +83,7 @@ For each fault, define the expected operation state and the safe player message.
 
 ## 8. Release gates
 
-MVP requires QA-01–20 and QA-23–26 at the supported reduced feature scope, a verified safe Codex profile, a complete simple combat flow, and a restart/renewal demonstration. v1 requires every scenario, the long-campaign evaluation, backup/restore rehearsal, actual browser/accessibility review, calibrated default rules, publication review, and all required roadmap tasks complete.
+MVP requires QA-01–20, QA-23–26, and QA-28 at the supported reduced feature scope, a verified safe Codex profile, a complete simple combat flow, and a restart/renewal demonstration. v1 requires every scenario, the long-campaign evaluation, backup/restore rehearsal, actual browser/accessibility review, calibrated default rules, publication review, and all required roadmap tasks complete.
 
 Failures are documented with severity and disposition. Secret leakage, canonical corruption, duplicate rewards, broken restore, or uncontrolled AI host capability block release. Cosmetic or optional-media issues can ship only with explicit scope/limitation notes and usable fallback.
 

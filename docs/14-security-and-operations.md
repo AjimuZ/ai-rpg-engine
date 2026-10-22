@@ -40,7 +40,7 @@ Player DTOs must omit unrevealed lore, private NPC knowledge, relationship inter
 
 ## 7. Data storage and retention
 
-Store application data outside the source checkout in an OS-appropriate owner data directory. The exact path is selected and documented during implementation. Separate PostgreSQL data, pack registry, generated assets, exports, logs, and temporary AI workspaces.
+Store application data outside the source checkout. The packaged profile uses separate Docker-managed persistent volumes for PostgreSQL, registered content/assets, and private runtime state; host development may use an OS-appropriate owner data directory. Separate exports, logs, and temporary workspaces, and record their actual locations and retention during implementation. Never rely on a container's writable layer for durable campaigns. See [container deployment](22-container-deployment-and-startup.md).
 
 Default retention proposal: committed state/events until owner deletion; five rolling recovery snapshots plus daily backups according to configured retention; ordinary diagnostic logs seven days; raw AI prompts/traces off by default; expired temporary workspaces cleaned after task reconciliation. Retention is configurable and recorded in settings. Do not claim deletion from the local disk also deletes provider-side data; account/service policies are separate.
 
@@ -54,9 +54,13 @@ Test restoration into a fresh database and asset directory. Verify sample encoun
 
 ## 9. Startup and shutdown
 
+The packaged entry point is the future root `start.sh`. It orchestrates the Compose stack, validates prerequisites and account readiness, and preserves existing configuration and volumes on repeated start or stop. The backend sequence below runs inside that deployment. Database health and backend readiness must be checked explicitly. Runtime account availability is a separate gameplay-readiness state, not a reason to erase data or a live-inference health probe.
+
 Startup order: load configuration → verify filesystem permissions → connect database → validate/apply supported migrations after required backup policy → reconcile unfinished operations and leases → check content dependencies → start HTTP → lazily connect Codex when requested or when an opted-in readiness check runs.
 
 An unavailable Codex process does not prevent local inspection of a valid saved campaign. A missing database or incompatible schema blocks mutation. Startup never silently resets a campaign.
+
+For the packaged profile, the backend closes owned turns/connections and Compose stops only that installation's services with an appropriate grace period. Direct child-process termination applies only to the local stdio probe/development profile. Stop and restart preserve persistent volumes; destructive reset and independent backup/restore remain separate owner operations.
 
 Shutdown: reject new mutation requests → stop admitting background jobs → request cancellation of live AI tasks → reconcile receipts → persist final operation states → stop or flush bounded jobs → close owned Codex input and wait → terminate only owned child processes if necessary → stop HTTP and close database pools. Closing a browser tab does not necessarily stop the backend. The UI must explain actual application status.
 

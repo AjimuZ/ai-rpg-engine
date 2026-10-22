@@ -16,6 +16,9 @@ ai-rpg-engine/
   CHANGELOG.md
   CONTRIBUTING.md
   SECURITY.md
+  start.sh                  # future packaged local entry point
+  compose.yaml              # future complete containerized installation
+  docker/                   # future engine/runtime image definitions
   frontend/                 # future Angular application
   backend/                  # future Spring Boot application and Codex bridge
   adventures/               # future neutral sample packs
@@ -27,6 +30,8 @@ ai-rpg-engine/
 ```
 
 The repository currently contains design documentation, a labeled UI concept, and repository housekeeping files. Application folders and executable runtime components do not exist yet. Runtime data, private campaigns, generated personal images, local database volumes, credentials, temporary workspaces, and raw traces live outside the tracked source tree and are ignored where applicable.
+
+The intended local installation is the [containerized application with root `start.sh`](22-container-deployment-and-startup.md). Release setup instructions must exercise that packaged profile, including first sign-in, readiness, persistent restart, and safe stop; a host-only development setup does not complete that requirement.
 
 ## 3. Language and presentation
 

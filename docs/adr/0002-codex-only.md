@@ -2,6 +2,8 @@
 
 **Status:** Proposed integration design; Codex-only scope is an owner requirement. **Date:** 22 October 2026.
 
+**Deployment update:** [ADR 0008](0008-containerized-startup.md) supersedes the mandatory child-process/stdio deployment assumption below for the packaged installation. Codex remains the sole initial integration; stdio remains a local compatibility-probe profile.
+
 ## Context
 
 The original project planned local models through Ollama. The owner supersedes that direction and requests the demo's Codex approach for the new engine.

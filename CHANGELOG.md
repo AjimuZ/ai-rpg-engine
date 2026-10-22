@@ -2,6 +2,13 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Container deployment design, 22 October 2026
+
+- Record the owner requirement for a fully containerized local application launched through root `start.sh`.
+- Specify the packaged topology, private runtime transport gate, account setup, durable volumes, readiness, and safe lifecycle behavior.
+- Add FR-029, QA-28, ADR 0008, and corresponding implementation/release roadmap tasks.
+- Align architecture, operations, integration, and publication guidance; no executable container or launcher files are implemented in this milestone.
+
 ## Unreleased — Development workflow, 22 October 2026
 
 - Require immediate roadmap and affected-documentation updates after each completed development item or project change.

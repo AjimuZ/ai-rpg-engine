@@ -2,7 +2,7 @@
 
 ## 1. Integration decision
 
-AI RPG Engine uses **Codex app-server** as its initial AI runtime interface. The Java backend manages an owned local process and communicates through private standard input/output. The browser communicates only with AI RPG Engine. No desktop UI automation, scraping, generic chat wrapper, Ollama endpoint, or separately hosted provider abstraction is part of this design.
+AI RPG Engine uses **Codex app-server** as its initial AI runtime interface. The Java backend manages task-oriented RPC connections. The packaged Docker profile targets an isolated runtime service and a private Unix socket; local protocol probes retain an owned stdio process. The browser communicates only with AI RPG Engine. No desktop UI automation, scraping, generic chat wrapper, Ollama endpoint, or generic provider abstraction is part of this design. [ADR 0008](adr/0008-containerized-startup.md) supersedes the earlier mandatory host-child-process deployment assumption.
 
 Official documentation describes app-server as a product integration surface, with a JSON-RPC-style protocol, threads, turns, streamed items, and an initialization handshake. It documents stdio transport, per-turn configuration and structured output, including restricted read-access policies. These capabilities support the proposed adapter; actual version and platform support must be tested. [OpenAI: Codex app-server](https://learn.chatgpt.com/docs/app-server).
 
@@ -27,6 +27,8 @@ OpenAI documents ChatGPT subscription sign-in and API-key sign-in for local Code
 The local app sends selected campaign context to the configured Codex service for inference. The outbound data inventory must identify task instructions, authorized state, selected lore/events, and generated content. Full saves, unrelated files, personal profiles, other campaigns, and raw credentials are not context inputs.
 
 ## 4. Proposed adapter lifecycle
+
+The steps below describe the local stdio probe. In the packaged profile, Compose starts/stops the pinned runtime container and the backend connects through the validated private IPC transport; it must not invoke the Docker daemon. Executable/version checks become image/runtime compatibility checks, and backend shutdown closes owned connections/turns without killing unrelated services. Handshake, correlation, validation, interruption, renewal, and canonical checkpoint rules apply to both profiles. Container account state and IPC permissions are covered in [the deployment specification](22-container-deployment-and-startup.md).
 
 1. Resolve an owner-configured, allowlisted executable path. Launch an argument array without a shell.
 2. Check executable/version compatibility and process ownership; create an isolated runtime workspace.

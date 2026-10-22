@@ -24,6 +24,7 @@ Owners below are implementation responsibilities, not assigned people. The proje
 | Remote media disappears or tracks requests | Broken presentation/privacy | Optional origins, local fallback, rights registry, no gameplay dependency | Presentation / P17 |
 | Public release includes private demo material | Privacy/rights exposure | Neutral samples, explicit rights inventory, no recursive source copy | Owner / P19 |
 | Stale documentation overstates implementation | Misleading public repository | One status matrix, evidence-linked milestones, docs review in CI | Maintainer / every milestone |
+| Container runtime transport, account state, or socket permissions fail on the target host | Packaged launcher cannot provide playable readiness | Pin Linux image/client combination; verify IPC, supported sign-in, isolation, restart, and clear failure; do not substitute a host process silently | Integration + Operations / P01, P02, QA-28 |
 
 ## 2. Open decisions with safe working defaults
 
@@ -35,8 +36,8 @@ The repository-license decision was resolved on 22 October 2026: project softwar
 | --- | --- | --- | --- |
 | Publication naming checks | AI RPG Engine selected by the owner; repository slug `ai-rpg-engine` | Before public repository creation | Verify repository availability and applicable name/rights requirements |
 | Exact dependency patches | Angular 22 source baseline, Java 21, maintained compatible stack | P00 | Official compatibility and reproducible dependency matrix |
-| Codex release baseline | App-server stdio, restricted runtime | P01 | Actual contract/isolation tests |
-| Supported OS list | Windows first; others unclaimed | P01 and P19 | Platform-specific verification |
+| Codex release baseline | App-server with restricted packaged IPC profile; local stdio probe | P01 | Actual container/client/account contract and isolation tests |
+| Supported OS list | Windows with Linux containers/WSL2 first; other host/shell combinations unclaimed | P01, P02, and P19 | Platform-specific launcher, runtime, and persistence verification |
 | Model IDs and effort mapping | Logical catalog-resolved profiles | P08 | Available account catalog and quality/latency evaluation |
 | Content authoring syntax | YAML for mechanics, Markdown for prose, JSON equivalent support where documented | P04 | Parser safety, diagnostics, author usability |
 | Defeat policy in neutral samples | Recoverable incapacitation; no automatic permanent death | P11 | Rules review and playtest |

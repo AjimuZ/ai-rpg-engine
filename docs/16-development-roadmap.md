@@ -8,6 +8,8 @@ Repository preparation recorded on 22 October 2026 includes the private GitHub r
 
 After each change, update the applicable item or record partial progress before starting the next item. Keep the affected specifications and changelog consistent, and mark a checkbox only when its stated exit checks actually pass. See [the contribution workflow](../CONTRIBUTING.md#documentation-synchronization).
 
+The owner also requires a fully containerized packaged installation and a root `start.sh` entry point. [The deployment specification](22-container-deployment-and-startup.md) and [ADR 0008](adr/0008-containerized-startup.md) document that requirement. Packaging, runtime IPC, account handling, and startup checks remain unimplemented; no roadmap implementation item is completed by this documentation change.
+
 This is an ordered development roadmap, not a claim of committed delivery dates. The work spans architecture, authoring, AI integration, rules, UI, and operations. Estimate each micro-phase after its prerequisites are verified. A credible calendar requires team availability and results from the Codex compatibility and combat prototypes.
 
 Each work package must be split into small reviewable changes with one main objective. For each change record intended behavior, affected modules/files, required checks, documentation update, completion evidence, and a suggested English commit message. Source paths below describe **future** work; they are not folders scaffolded by this documentation phase.
@@ -34,7 +36,7 @@ Critical dependency chain: compatible stack → safe Codex profile → persisten
 
 - [ ] P00.1 Select supported Angular/TypeScript/Node/npm versions using the primary project's Angular 22 baseline and actual compatibility constraints.
 - [ ] P00.2 Select a maintained Spring Boot version supporting Java 21, Maven Wrapper version, PostgreSQL major/image, and Flyway version.
-- [ ] P00.3 Pin initial supported OS/runtime targets; Windows is first to validate.
+- [ ] P00.3 Pin initial supported OS/runtime targets, Linux container images, Compose/engine versions, and shell requirements; Windows with WSL2 is first to validate.
 - [ ] P00.4 Confirm AI RPG Skirmish as the implementable default and record numerical defaults as provisional.
 - [ ] P00.5 Record the selected name AI RPG Engine and confirm v1 boundaries, initial file format, and licensing plan.
 
@@ -44,7 +46,7 @@ Critical dependency chain: compatible stack → safe Codex profile → persisten
 
 **Depends on:** P00. **Areas:** future `backend/.../codex`, isolated verification fixtures, operations docs.
 
-- [ ] P01.1 Establish pinned Codex executable/version, supported stdio launch, handshake, account readiness, paginated catalog, and output contract.
+- [ ] P01.1 Establish pinned Codex executable/image versions, local stdio probe and packaged private IPC transport, handshake, container account readiness, paginated catalog, and output contract.
 - [ ] P01.2 Verify thread creation/resume, explicit per-turn model/effort, notification correlation, terminal status, and interruption.
 - [ ] P01.3 Demonstrate restricted roots, denied canonical writes, unavailable unwanted host tools, and inherited-config isolation.
 - [ ] P01.4 Demonstrate owned-process shutdown, EOF/timeout handling, stderr bounds, and early-event buffering.
@@ -60,9 +62,11 @@ The root MIT license, ignore rules, text line-ending policy, and contribution do
 
 - [ ] P02.1 Add owner-approved license, ignore rules, formatting/line-ending rules, contribution policy, and neutral environment placeholders.
 - [ ] P02.2 Scaffold Angular and Spring Boot using pinned versions, with no adventure constants.
-- [ ] P02.3 Add Docker Compose PostgreSQL and development proxy; release origin strategy documented.
+- [ ] P02.3 Add pinned engine/runtime images, Compose services, durable volumes, private networks/IPC, secret handling, and the single-origin packaged interface; exclude private development data from builds.
 - [ ] P02.4 Add build/test/documentation/secret checks without Codex credentials in ordinary CI.
 - [ ] P02.5 Provide health/readiness contracts and useful startup failure states.
+- [ ] P02.6 Implement root `start.sh` with prerequisite checks, secure configuration initialization, cached builds, health-based startup, supported sign-in, status/log/stop commands, and nonzero failure results.
+- [ ] P02.7 Verify idempotent launch, supported Windows shell behavior, interruption, graceful stop, and campaign preservation across restart/image recreation; record QA-28 evidence.
 
 **Exit:** clean clone builds and runs shells/database with documented commands; no private data tracked. **Checks:** frontend build/default test, backend health test, database connectivity, docs links, ignore/secret checks. **Suggested commit:** `Establish the Angular and Spring Boot workspace`.
 
@@ -263,7 +267,7 @@ The root MIT license, ignore rules, text line-ending policy, and contribution do
 
 - [ ] P19.1 Verify the publication location for AI RPG Engine and repository slug `ai-rpg-engine`, retain the root MIT license, and review upstream notices and all bundled rights.
 - [ ] P19.2 Remove private saves, logs, credentials, generated personal content, machine paths, and misleading status/badges.
-- [ ] P19.3 Run fresh-clone installation and sample-play rehearsal; record supported OS/tool versions.
+- [ ] P19.3 Run fresh-clone `start.sh` installation and sample-play rehearsal without host build toolchains; record supported host/shell/container/runtime versions and persistence/recovery results.
 - [ ] P19.4 Finalize README, screenshots from actual software, author guide, troubleshooting, security policy, contribution guide, changelog, and release notes.
 - [ ] P19.5 Prepare release candidate, known limitations, checksums, and publication checklist for owner review.
 - [ ] P19.6 Publish repository/release only under the owner's explicit publication instruction; verify resulting links and artifacts.
@@ -285,6 +289,7 @@ The root MIT license, ignore rules, text line-ending policy, and contribution do
 | FR-026 | P16 |
 | FR-027 | P05, P12, P17 |
 | FR-028 | P02, P14, P19 |
+| FR-029 | P00–P02, P14, P16, P19 |
 | NFR-001–012 | Cross-cutting gates in P01, P03, P07, P09, P16–P19 |
 
 ## 24. Explicitly later initiatives
