@@ -24,6 +24,7 @@ Owners below are implementation responsibilities, not assigned people. The proje
 | Remote media disappears or tracks requests | Broken presentation/privacy | Optional origins, local fallback, rights registry, no gameplay dependency | Presentation / P17 |
 | Public release includes private demo material | Privacy/rights exposure | Neutral samples, explicit rights inventory, no recursive source copy | Owner / P19 |
 | Stale documentation overstates implementation | Misleading public repository | One status matrix, evidence-linked milestones, docs review in CI | Maintainer / every milestone |
+| Pinned backend line leaves open-source support or misses a dependency security fix | Unpatched framework or migration tooling | Spring Boot 4.1 open-source support ends 31 July 2027 and its patches keep Flyway 12.4; review advisories, plan the move to a supported line, and rerun PostgreSQL integration checks for any override ([ADR 0009](adr/0009-toolchain-baseline.md)) | Backend + Maintainer / every release, before July 2027 |
 | Container runtime transport, account state, or socket permissions fail on the target host | Packaged launcher cannot provide playable readiness | Pin Linux image/client combination; verify IPC, supported sign-in, isolation, restart, and clear failure; do not substitute a host process silently | Integration + Operations / P01, P02, QA-28 |
 
 ## 2. Open decisions with safe working defaults
@@ -35,7 +36,7 @@ The repository-license decision was resolved on 22 October 2026: project softwar
 | Decision | Working default | Resolve by | Evidence / authority |
 | --- | --- | --- | --- |
 | Publication naming checks | AI RPG Engine selected by the owner; repository slug `ai-rpg-engine` | Before public repository creation | Verify repository availability and applicable name/rights requirements |
-| Exact dependency patches | Frontend resolved by [ADR 0009](adr/0009-toolchain-baseline.md): Angular 22.2.3, TypeScript 6.0.3, Node.js 24.22.1 LTS, npm 11.19.1. Backend, database, and container versions: Java 21 with a maintained compatible stack | P00.2–P00.3 for the remaining entries | Official compatibility and reproducible dependency matrix |
+| Exact dependency patches | Resolved by [ADR 0009](adr/0009-toolchain-baseline.md) for the frontend (Angular 22.2.3, TypeScript 6.0.3, Node.js 24.22.1 LTS, npm 11.19.1) and for the backend, build, and database (Spring Boot 4.1.2 on Java 21, Maven 3.10.0 through Maven Wrapper 3.3.4, Flyway 12.4.0, PostgreSQL 18.6 image by digest). JDK, engine/runtime images, Compose, OS, and shell versions remain | P00.3 for the remaining entries | Official compatibility and reproducible dependency matrix |
 | Codex release baseline | App-server with restricted packaged IPC profile; local stdio probe | P01 | Actual container/client/account contract and isolation tests |
 | Supported OS list | Windows with Linux containers/WSL2 first; other host/shell combinations unclaimed | P01, P02, and P19 | Platform-specific launcher, runtime, and persistence verification |
 | Model IDs and effort mapping | Logical catalog-resolved profiles | P08 | Available account catalog and quality/latency evaluation |

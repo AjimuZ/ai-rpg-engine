@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: P00 baseline decisions in progress (P00.1 complete). No AI RPG Engine application code has been implemented.** Runtime implementation work remains pending. Predecessor milestones and repository housekeeping do not complete an engine implementation work package.
+**Current status: P00 baseline decisions in progress (P00.1–P00.2 complete). No AI RPG Engine application code has been implemented.** Runtime implementation work remains pending. Predecessor milestones and repository housekeeping do not complete an engine implementation work package.
 
 Repository preparation recorded on 22 October 2026 includes the private GitHub repository, root MIT license, attribution, ignore rules, text line-ending policy, and contribution guidance. The development workflow requires immediate roadmap and affected-documentation updates after every work item, truthful completion evidence, and neutral commit messages. The owner's checkout also has verified local Git gates; lifecycle-hook activation requires review in the relevant client. These local checks are not distributed in a clone and do not replace P02.4 continuous integration.
 
@@ -35,12 +35,14 @@ Critical dependency chain: compatible stack → safe Codex profile → persisten
 **Depends on:** D0 review. **Areas:** toolchain decisions, architecture, scope.
 
 - [x] P00.1 Select supported Angular/TypeScript/Node/npm versions using the primary project's Angular 22 baseline and actual compatibility constraints.
-- [ ] P00.2 Select a maintained Spring Boot version supporting Java 21, Maven Wrapper version, PostgreSQL major/image, and Flyway version.
+- [x] P00.2 Select a maintained Spring Boot version supporting Java 21, Maven Wrapper version, PostgreSQL major/image, and Flyway version.
 - [ ] P00.3 Pin initial supported OS/runtime targets, Linux container images, Compose/engine versions, and shell requirements; Windows with WSL2 is first to validate.
 - [ ] P00.4 Confirm AI RPG Skirmish as the implementable default and record numerical defaults as provisional.
 - [ ] P00.5 Record the selected name AI RPG Engine and confirm v1 boundaries, initial file format, and licensing plan.
 
-**Progress (22 October 2026):** P00.1 is complete. [ADR 0009](adr/0009-toolchain-baseline.md) pins Angular 22.2.3, TypeScript 6.0.3, Node.js 24.22.1 LTS, npm 11.19.1, RxJS 7.8.2, tslib 2.8.1, and Vitest 5.0.5, and records the workstation tool inventory. Evidence: npm registry engines/peer metadata, Angular and Node.js support schedules, a conflict-free lockfile resolution of the pinned set with npm 11.19.1, and an `ERESOLVE` rejection of TypeScript 7.0.2. P00.2–P00.5 remain open; the package exit is not yet met.
+**Progress (22 October 2026):** P00.1 is complete. [ADR 0009](adr/0009-toolchain-baseline.md) pins Angular 22.2.3, TypeScript 6.0.3, Node.js 24.22.1 LTS, npm 11.19.1, RxJS 7.8.2, tslib 2.8.1, and Vitest 5.0.5, and records the workstation tool inventory. Evidence: npm registry engines/peer metadata, Angular and Node.js support schedules, a conflict-free lockfile resolution of the pinned set with npm 11.19.1, and an `ERESOLVE` rejection of TypeScript 7.0.2.
+
+**Progress (23 October 2026):** P00.2 is complete. [ADR 0009](adr/0009-toolchain-baseline.md) pins Spring Boot 4.1.2 on Java 21 (`release 21`; open-source support until 31 July 2027), with the libraries it manages, including Flyway 12.4.0 (open-source PostgreSQL module) and PostgreSQL JDBC 42.7.14. It also pins Maven 3.10.0 through an `only-script` Maven Wrapper 3.3.4 with a distribution SHA-256, and PostgreSQL 18.6 as `postgres:18.6-trixie` by digest, with `pg_dump`/`pg_restore` from the same image. Evidence: Maven Central, Spring, PostgreSQL, Maven, and Docker Hub support and release metadata. A throwaway probe in an ignored scratch directory ran `./mvnw -B -ntp -C verify` on Eclipse Temurin 21.0.12.1 against the pinned PostgreSQL image. It passed: wrapper checksum, enforcer Java/Maven rules, four integration tests (Java 21 runtime, server major 18, Flyway forward migration, JSONB and unique key), Central-only artifact origins, and a dump/restore round trip into a new database. The probe also found two rules now recorded in the ADR: Linux wrapper runs need `unzip`, and Flyway's parent POM declares extra repositories, so P02.2 must restrict resolution to Maven Central. Probe containers and network were removed; no volume was created. The JDK distribution and image digest belong to P00.3. P00.3–P00.5 remain open; the package exit is not yet met.
 
 **Deliverables:** a concrete version matrix and updated ADR status. **Exit:** no ambiguous “Java 17/21,” implicit latest dependencies, or unowned pre-scaffold decisions. **Checks:** dependency compatibility references and a minimal tool availability inventory. **Suggested commit:** `Record supported toolchain and engine baselines`.
 

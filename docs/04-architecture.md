@@ -33,11 +33,11 @@ The diagram describes dependencies and data exchange. It does not grant the Code
 | --- | --- | --- |
 | Frontend | Angular, TypeScript, standalone components, signals, SCSS, zoneless style | Angular 22.2.3, TypeScript 6.0.3, Node.js 24.22.1 LTS, and npm 11.19.1 pinned by [ADR 0009](adr/0009-toolchain-baseline.md); committed lockfile, no `latest` resolution |
 | Async UI | Angular HTTP client; RxJS for streams and cancellation; signals for view state | RxJS 7.8.2 within Angular's supported peer range ([ADR 0009](adr/0009-toolchain-baseline.md)) |
-| Backend | Spring Boot on Java 21 LTS | Select a maintained compatible Boot release in P00 |
-| Build | Maven Wrapper | Commit wrapper and dependency lock policy in implementation |
+| Backend | Spring Boot on Java 21 LTS | Spring Boot 4.1.2 compiled with `release 21` and run on a JDK 21 ([ADR 0009](adr/0009-toolchain-baseline.md)); libraries take their versions from the Boot BOM; JDK image pinned in P00.3 |
+| Build | Maven Wrapper | Committed `only-script` Maven Wrapper 3.3.4 running Maven 3.10.0, verified by SHA-256; no version ranges or snapshots; Maven Central only with strict checksums ([ADR 0009](adr/0009-toolchain-baseline.md)) |
 | Data access | Spring Data JPA for aggregate persistence; explicit queries for projections | Keep domain calculations independent of entities |
-| Database | PostgreSQL; source roadmap's PostgreSQL 16 is a starting compatibility candidate | Pin and test supported major, patch/image digest, and backup tooling in P00 |
-| Migrations | Flyway | Forward migrations; backup and restore for destructive upgrades |
+| Database | PostgreSQL 18 | `postgres:18.6-trixie` pinned by digest; `pg_dump`/`pg_restore` 18.6 from the same image; major upgrades are explicit migrations with a verified backup ([ADR 0009](adr/0009-toolchain-baseline.md)) |
+| Migrations | Flyway (open-source edition with the PostgreSQL module) | Flyway 12.4.0 managed by Spring Boot 4.1.2; forward migrations; backup and restore for destructive upgrades |
 | JSON | Jackson with explicit DTOs and strict bounds | Reject unknown operation types and unsafe polymorphic input |
 | Streaming | Server-Sent Events with durable cursor | Polling fallback; no dependency on browser access to Codex |
 | AI | Codex app-server managed by the Java adapter; packaged private IPC and local stdio probe profiles | Versioned adapter/container compatibility matrix; no assumed official Java SDK |

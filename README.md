@@ -29,15 +29,15 @@ The design primarily derives from **The World I Can Develop**: Angular, Spring B
 | Area | Proposed baseline |
 | --- | --- |
 | Web interface | Angular 22.2 with TypeScript 6.0 on Node.js 24 LTS ([ADR 0009](docs/adr/0009-toolchain-baseline.md)); standalone components; signals; SCSS |
-| Authoritative application | Spring Boot; Java 21 LTS; Maven |
-| Persistence | PostgreSQL; Flyway migrations; relational state and JSONB extension data |
+| Authoritative application | Spring Boot 4.1 on Java 21 LTS; Maven 3.10 through the Maven Wrapper ([ADR 0009](docs/adr/0009-toolchain-baseline.md)) |
+| Persistence | PostgreSQL 18; Flyway 12.4 migrations; relational state and JSONB extension data |
 | AI integration | Backend-managed Codex app-server integration; isolated packaged runtime with private IPC, subject to compatibility validation |
 | Browser updates | REST commands and resumable Server-Sent Events |
 | Local environment | Docker Compose for the complete packaged application; root `start.sh` entry point; durable storage and isolated runtime |
 | Retrieval | Structured and full-text retrieval first; optional semantic indexing after evidence of need |
 | Verification | JUnit, PostgreSQL integration tests, Angular/Vitest, browser acceptance tests, Codex contract fixtures |
 
-The frontend toolchain versions are recorded in [ADR 0009](docs/adr/0009-toolchain-baseline.md). Backend, database, and container versions and the supported Codex protocol baseline must still be recorded before scaffolding. The source project's package versions are evidence of its choices, not a claim about the newest supported releases.
+The frontend, backend, build, and database versions are recorded in [ADR 0009](docs/adr/0009-toolchain-baseline.md). Container images, supported host environments, and the supported Codex protocol baseline must still be recorded before scaffolding. The source project's package versions are evidence of its choices, not a claim about the newest supported releases.
 
 Campaign data is stored locally. **Codex inference requires the configured Codex service and account access.** Local hosting does not imply offline AI, unlimited usage, or local model inference. Ollama, generic provider routing, local LLMs, and direct replacement of Codex with a generic chat API are outside the initial release.
 
