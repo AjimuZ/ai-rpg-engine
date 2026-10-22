@@ -2,7 +2,11 @@
 
 ## 1. Status and planning rules
 
-**Current status: D0 documentation baseline. No AI RPG Engine application code has been implemented.** Every implementation checkbox below is intentionally unchecked. Predecessor milestones do not complete a AI RPG Engine work package.
+**Current status: D0 documentation baseline. No AI RPG Engine application code has been implemented.** Runtime implementation work remains pending. Predecessor milestones and repository housekeeping do not complete an engine implementation work package.
+
+Repository preparation recorded on 22 October 2026 includes the private GitHub repository, root MIT license, attribution, ignore rules, text line-ending policy, and contribution guidance. The development workflow requires immediate roadmap and affected-documentation updates after every work item, truthful completion evidence, and neutral commit messages. The owner's checkout also has verified local Git gates; lifecycle-hook activation requires review in the relevant client. These local checks are not distributed in a clone and do not replace P02.4 continuous integration.
+
+After each change, update the applicable item or record partial progress before starting the next item. Keep the affected specifications and changelog consistent, and mark a checkbox only when its stated exit checks actually pass. See [the contribution workflow](../CONTRIBUTING.md#documentation-synchronization).
 
 This is an ordered development roadmap, not a claim of committed delivery dates. The work spans architecture, authoring, AI integration, rules, UI, and operations. Estimate each micro-phase after its prerequisites are verified. A credible calendar requires team availability and results from the Codex compatibility and combat prototypes.
 
@@ -46,7 +50,7 @@ Critical dependency chain: compatible stack → safe Codex profile → persisten
 - [ ] P01.4 Demonstrate owned-process shutdown, EOF/timeout handling, stderr bounds, and early-event buffering.
 - [ ] P01.5 Save neutral protocol fixtures and a supported-version matrix; record service maturity and platform limitations.
 
-**Deliverables:** isolated compatibility probe and evidence, later retained as adapter tests when authorized implementation begins. **Exit:** no unreviewed broad write/tool privileges and no dependency on undocumented launch assumptions. Failure blocks real gameplay integration; it does not authorize a generic AI replacement. **Checks:** one opt-in real neutral task plus deterministic protocol fixtures. **Suggested commit:** `Verify Codex app-server compatibility and isolation`.
+**Deliverables:** isolated compatibility probe and evidence, later retained as adapter tests when authorized implementation begins. **Exit:** no unreviewed broad write/tool privileges and no dependency on undocumented launch assumptions. Failure blocks real gameplay integration; it does not authorize a generic AI replacement. **Checks:** one opt-in real neutral task plus deterministic protocol fixtures. **Suggested commit:** `Verify narration runtime compatibility and isolation`.
 
 ## 5. P02 — Establish repository and quality infrastructure
 
@@ -130,7 +134,7 @@ The root MIT license, ignore rules, text line-ending policy, and contribution do
 - [ ] P08.4 Resolve logical model profiles against the available catalog and set effective settings on every turn.
 - [ ] P08.5 Publish only validated final narration; add deterministic receipt fallback and narration-only retry.
 
-**Exit:** an action runs through Codex interpretation when needed, deterministic resolution, save, and grounded narration without raw tool logs. **Checks:** protocol fixtures, invalid output corpus, no-secret projection tests, opt-in neutral real smoke. **Suggested commit:** `Integrate Codex for validated RPG orchestration`.
+**Exit:** an action runs through Codex interpretation when needed, deterministic resolution, save, and grounded narration without raw tool logs. **Checks:** protocol fixtures, invalid output corpus, no-secret projection tests, opt-in neutral real smoke. **Suggested commit:** `Integrate validated narrative orchestration`.
 
 ## 12. P09 — Layered memory and renewable AI context
 
@@ -142,7 +146,7 @@ The root MIT license, ignore rules, text line-ending policy, and contribution do
 - [ ] P09.4 Implement count/context/error-triggered renewal and manual idle renewal, preserving transcript and campaign.
 - [ ] P09.5 Reconcile restart, committed narration pending, missing dependencies, and stale summaries.
 
-**Exit:** a fresh AI thread resumes the correct pending decision with no invented history or replayed prologue. **Checks:** QA-08, QA-16–19, delayed promises, correction invalidation, input-budget limits. **Suggested commit:** `Add persistent memory and renewable Codex sessions`.
+**Exit:** a fresh AI thread resumes the correct pending decision with no invented history or replayed prologue. **Checks:** QA-08, QA-16–19, delayed promises, correction invalidation, input-budget limits. **Suggested commit:** `Add persistent memory and renewable narration sessions`.
 
 ## 13. P10 — Inventory, skills, quests, and time
 
@@ -179,7 +183,7 @@ The root MIT license, ignore rules, text line-ending policy, and contribution do
 - [ ] P12.4 Add deterministic tactic fallback, interruption messages, and outcome narration.
 - [ ] P12.5 Verify mobile/keyboard play and session renewal inside a fight.
 
-**Exit:** the complete fight is playable through the actual UI, including reconnect and resume. **Checks:** real-browser combat path, QA-07, QA-09, QA-16, tactic-invalid/provider-unavailable fallback. **Suggested commit:** `Add tactical combat UI and constrained Codex tactics`.
+**Exit:** the complete fight is playable through the actual UI, including reconnect and resume. **Checks:** real-browser combat path, QA-07, QA-09, QA-16, tactic-invalid/provider-unavailable fallback. **Suggested commit:** `Add tactical combat UI and constrained opponent tactics`.
 
 ## 16. P13 — Dynamic encounter and advancement pipeline
 
@@ -203,7 +207,7 @@ The root MIT license, ignore rules, text line-ending policy, and contribution do
 - [ ] P14.4 Measure baseline latency/context use and list unresolved defects honestly.
 - [ ] P14.5 Write reproducible setup and an accurate MVP capability table.
 
-**Exit:** a fresh installation can play, fight, save, resume, and change adventure files without editing engine source. Critical integrity/security failures block the milestone. **Suggested commit:** `Validate the first playable AI RPG Engine milestone`.
+**Exit:** a fresh installation can play, fight, save, resume, and change adventure files without editing engine source. Critical integrity/security failures block the milestone. **Suggested commit:** `Validate the first playable engine milestone`.
 
 ## 18. P15 — Complete supported world and optional modules
 
@@ -264,7 +268,7 @@ The root MIT license, ignore rules, text line-ending policy, and contribution do
 - [ ] P19.5 Prepare release candidate, known limitations, checksums, and publication checklist for owner review.
 - [ ] P19.6 Publish repository/release only under the owner's explicit publication instruction; verify resulting links and artifacts.
 
-**Exit:** the published material accurately represents a tested engine and includes no private predecessor campaign. **Suggested commit:** `Prepare AI RPG Engine v1 documentation and release assets`.
+**Exit:** the published material accurately represents a tested engine and includes no private predecessor campaign. **Suggested commit:** `Prepare engine v1 documentation and release assets`.
 
 ## 23. Requirement coverage
 

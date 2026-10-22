@@ -2,6 +2,12 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Development workflow, 22 October 2026
+
+- Require immediate roadmap and affected-documentation updates after each completed development item or project change.
+- Define neutral English commit-message conventions and align the roadmap's suggested messages.
+- Record the distinction between local checkout enforcement, semantic review, and future continuous integration; private assistant configuration remains untracked.
+
 ## Unreleased — Project licensing, 22 October 2026
 
 - Add the MIT License with copyright 2026 Azim Ben Othman.
