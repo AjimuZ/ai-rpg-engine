@@ -2,6 +2,8 @@
 
 **Status:** Proposed. **Date:** 22 October 2026.
 
+**Version update:** [ADR 0009](0009-toolchain-baseline.md) pins the exact supported toolchain versions that this record leaves to P00.
+
 **Deployment update:** [ADR 0008](0008-containerized-startup.md) supersedes the database-only Compose assumption below with a complete packaged Compose installation. The stack and modular backend decision remain in force.
 
 ## Context

@@ -35,7 +35,7 @@ The repository-license decision was resolved on 22 October 2026: project softwar
 | Decision | Working default | Resolve by | Evidence / authority |
 | --- | --- | --- | --- |
 | Publication naming checks | AI RPG Engine selected by the owner; repository slug `ai-rpg-engine` | Before public repository creation | Verify repository availability and applicable name/rights requirements |
-| Exact dependency patches | Angular 22 source baseline, Java 21, maintained compatible stack | P00 | Official compatibility and reproducible dependency matrix |
+| Exact dependency patches | Frontend resolved by [ADR 0009](adr/0009-toolchain-baseline.md): Angular 22.2.3, TypeScript 6.0.3, Node.js 24.22.1 LTS, npm 11.19.1. Backend, database, and container versions: Java 21 with a maintained compatible stack | P00.2–P00.3 for the remaining entries | Official compatibility and reproducible dependency matrix |
 | Codex release baseline | App-server with restricted packaged IPC profile; local stdio probe | P01 | Actual container/client/account contract and isolation tests |
 | Supported OS list | Windows with Linux containers/WSL2 first; other host/shell combinations unclaimed | P01, P02, and P19 | Platform-specific launcher, runtime, and persistence verification |
 | Model IDs and effort mapping | Logical catalog-resolved profiles | P08 | Available account catalog and quality/latency evaluation |

@@ -28,7 +28,7 @@ The design primarily derives from **The World I Can Develop**: Angular, Spring B
 
 | Area | Proposed baseline |
 | --- | --- |
-| Web interface | Angular 22 baseline inherited from the source project; TypeScript; standalone components; signals; SCSS |
+| Web interface | Angular 22.2 with TypeScript 6.0 on Node.js 24 LTS ([ADR 0009](docs/adr/0009-toolchain-baseline.md)); standalone components; signals; SCSS |
 | Authoritative application | Spring Boot; Java 21 LTS; Maven |
 | Persistence | PostgreSQL; Flyway migrations; relational state and JSONB extension data |
 | AI integration | Backend-managed Codex app-server integration; isolated packaged runtime with private IPC, subject to compatibility validation |
@@ -37,7 +37,7 @@ The design primarily derives from **The World I Can Develop**: Angular, Spring B
 | Retrieval | Structured and full-text retrieval first; optional semantic indexing after evidence of need |
 | Verification | JUnit, PostgreSQL integration tests, Angular/Vitest, browser acceptance tests, Codex contract fixtures |
 
-Exact supported dependency patches and the supported Codex protocol baseline must be recorded before scaffolding. The source project's package versions are evidence of its choices, not a claim about the newest supported releases.
+The frontend toolchain versions are recorded in [ADR 0009](docs/adr/0009-toolchain-baseline.md). Backend, database, and container versions and the supported Codex protocol baseline must still be recorded before scaffolding. The source project's package versions are evidence of its choices, not a claim about the newest supported releases.
 
 Campaign data is stored locally. **Codex inference requires the configured Codex service and account access.** Local hosting does not imply offline AI, unlimited usage, or local model inference. Ollama, generic provider routing, local LLMs, and direct replacement of Codex with a generic chat API are outside the initial release.
 

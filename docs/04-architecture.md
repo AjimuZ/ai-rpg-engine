@@ -31,8 +31,8 @@ The diagram describes dependencies and data exchange. It does not grant the Code
 
 | Area | Decision | Version policy |
 | --- | --- | --- |
-| Frontend | Angular, TypeScript, standalone components, signals, SCSS, zoneless style | Angular 22 is the inspected source baseline; lock a supported compatible set before scaffolding |
-| Async UI | Angular HTTP client; RxJS for streams and cancellation; signals for view state | Inherit supported Angular ecosystem versions |
+| Frontend | Angular, TypeScript, standalone components, signals, SCSS, zoneless style | Angular 22.2.3, TypeScript 6.0.3, Node.js 24.22.1 LTS, and npm 11.19.1 pinned by [ADR 0009](adr/0009-toolchain-baseline.md); committed lockfile, no `latest` resolution |
+| Async UI | Angular HTTP client; RxJS for streams and cancellation; signals for view state | RxJS 7.8.2 within Angular's supported peer range ([ADR 0009](adr/0009-toolchain-baseline.md)) |
 | Backend | Spring Boot on Java 21 LTS | Select a maintained compatible Boot release in P00 |
 | Build | Maven Wrapper | Commit wrapper and dependency lock policy in implementation |
 | Data access | Spring Data JPA for aggregate persistence; explicit queries for projections | Keep domain calculations independent of entities |

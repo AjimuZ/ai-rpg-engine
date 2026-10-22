@@ -2,6 +2,13 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Frontend toolchain baseline (P00.1), 22 October 2026
+
+- Add ADR 0009 pinning Angular 22.2.3, TypeScript 6.0.3, Node.js 24.22.1 LTS, npm 11.19.1, RxJS 7.8.2, tslib 2.8.1, and Vitest 5.0.5.
+- Record the compatibility evidence: registry engines and peer ranges, support schedules, a conflict-free lockfile resolution, and the rejection of TypeScript 7.
+- Record the workstation tool inventory; the host has Java 27, so the Java 21 baseline remains for P00.2.
+- No frontend workspace or runtime code is included.
+
 ## Unreleased — Development branch policy, 22 October 2026
 
 - Integrate verified implementation commits on the `develop` branch; `main` advances only through owner-reviewed merges and is never pushed to directly.
