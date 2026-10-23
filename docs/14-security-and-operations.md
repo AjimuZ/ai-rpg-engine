@@ -40,6 +40,8 @@ Bounded image jobs use a separately verified restricted capability, public appea
 
 Never put Codex credentials, database passwords, `.env` files, auth stores, private saves, personal notes, or raw provider traces in Git. Diagnostic exports redact keys, tokens, absolute personal paths, private content, and RPC identifiers unless an owner explicitly selects a suitably protected full diagnostic mode.
 
+The tracked root [`.env.example`](../.env.example) contains only a proposed application port and neutral database labels; no current service consumes it. Copy it to an ignored local `.env` only when future tooling documents that flow. The labels do not configure authentication. Supply passwords through private secret files and account state through the supported owner-controlled sign-in flow; never add either to a public example. Ignore rules are a staging safeguard, not a secret scanner or a substitute for reviewing the staged content.
+
 Player DTOs must omit unrevealed lore, private NPC knowledge, relationship internals, hidden encounter participants/statistics, and planner reasoning. Use separate role/audience threads so secret context cannot persist invisibly into a public narration task. Prevent media/audio choices from leaking a hidden threat before it is observed.
 
 ## 7. Data storage and retention

@@ -22,6 +22,10 @@ CLAUDE.local.md
 /logs/
 *.log
 
+# Generated developer-probe output.
+__pycache__/
+*.py[cod]
+
 # Generated frontend and backend output.
 node_modules/
 .angular/

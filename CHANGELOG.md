@@ -2,6 +2,12 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Repository policy and environment placeholders (P02.1), 23 October 2026
+
+- Add shared EditorConfig defaults for UTF-8/LF, final newlines and indentation, preserving Markdown hard breaks; retain Git text normalization and binary image handling.
+- Keep the owner-approved MIT license and contribution terms, document formatting/configuration policy, and ignore Python probe caches alongside private configuration and build output.
+- Add neutral, credential-free environment placeholders with no current consumer. Application scaffolding, packaged startup and CI enforcement remain later P02 work.
+
 ## Unreleased — Thread and turn protocol fixture (partial P01.2), 23 October 2026
 
 - Add a test-only scripted upstream on an internal Docker network, exercising seven real runtime turns, two threads and reconnect/resume without credentials. Verify explicit per-turn model/effort and full output schema at the upstream boundary, correlation, terminal outcomes and interruption of active streams.

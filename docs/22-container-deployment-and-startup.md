@@ -42,7 +42,7 @@ Stdio remains the isolated local protocol-probe option. If the packaged runtime 
 
 ## 4. Planned repository artifacts
 
-| Future artifact | Purpose |
+| Artifact | Purpose |
 | --- | --- |
 | Root `start.sh` | Stable, executable entry point for ordinary local operation |
 | Root `compose.yaml` | Named services, networks, volumes, health checks, secrets, and lifecycle settings |
@@ -51,7 +51,7 @@ Stdio remains the isolated local protocol-probe option. If the packaged runtime 
 | Root `.env.example` | Sanitized public configuration example without working credentials |
 | Version/compatibility records | Pin build/runtime images, dependency locks, runtime protocol, Compose features, and supported host environment; the pre-scaffold baseline is in [ADR 0009](adr/0009-toolchain-baseline.md) |
 
-These paths name deliverables to create during implementation, not files currently present. Keep actual `.env`, secret files, account state, and private data untracked. Build context must exclude local `.agents`, `.claude`, `.codex`, `AGENTS.md`, and `CLAUDE.md`; gameplay containers do not inherit development instructions or hooks.
+The tracked root [`.env.example`](../.env.example) contains a proposed port and neutral database labels for future local configuration; it has no current consumer and does not make this repository runnable. It contains no database password or runtime-account setting. The runtime image and compatibility records already exist for the developer probe; the engine image, root Compose profile, `.dockerignore`, and launcher remain implementation deliverables. Keep actual `.env`, secret files, account state, and private data untracked. Build context must exclude local `.agents`, `.claude`, `.codex`, `AGENTS.md`, and `CLAUDE.md`; gameplay containers do not inherit development instructions or hooks.
 
 ## 5. Launcher contract
 

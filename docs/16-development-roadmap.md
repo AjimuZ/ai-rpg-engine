@@ -121,11 +121,13 @@ Checks: a documentation review against the requirements, pack, security, and pub
 
 **Depends on:** P00; can follow P01's scope findings. **Areas:** future root configuration, `frontend/`, `backend/`, `.github/`.
 
-The root MIT license, ignore rules, text line-ending policy, and contribution documentation were delivered during repository preparation on 22 October 2026. P02.1 remains open for the neutral environment examples and review with the implemented workspace.
+The owner-approved root MIT license, ignore rules, text line-ending policy, and contribution terms were delivered during repository preparation on 22 October 2026 (licensing decision: [ADR 0010](adr/0010-name-scope-format-licensing.md#decision-licensing-plan)). P02.1 now adds shared `.editorconfig` formatting defaults, Python-cache ignores and a sanitized `.env.example` with neutral, non-secret labels and no current consumer; CONTRIBUTING documents their scope. Verified on Windows 11 on 23 October 2026: 33 real Git ignore cases; UTF-8/LF/final-newline and Git binary-attribute checks; unchanged license/notices; neutral example and tracked-content pattern review; and 275 local Markdown links/anchors across 48 documents. `git diff --check` passed. `py -B -m unittest discover -s tools/runtime_probe` ran 51 tests (46 passed, five Docker checks skipped because `RUNTIME_PROBE_DOCKER` was unset). No application build, health or database check ran.
+
+P02.1 covers repository policy only: clean-clone application build, health, database and packaged-startup checks remain gates for P02.2–P02.7 and the package exit below.
 
 P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules of [ADR 0009](adr/0009-toolchain-baseline.md). P02.3 must first move the Temurin JDK and JRE references to the first published 21.0.13 (or later 21.0.x) official image. P02.2 records the npm install-script policy and any test-library helper images.
 
-- [ ] P02.1 Add owner-approved license, ignore rules, formatting/line-ending rules, contribution policy, and neutral environment placeholders.
+- [x] P02.1 Add owner-approved license, ignore rules, formatting/line-ending rules, contribution policy, and neutral environment placeholders.
 - [ ] P02.2 Scaffold Angular and Spring Boot using pinned versions, with no adventure constants.
 - [ ] P02.3 Add pinned engine/runtime images, Compose services, durable volumes, private networks/IPC, secret handling, and the single-origin packaged interface; exclude private development data from builds.
 - [ ] P02.4 Add build/test/documentation/secret checks without Codex credentials in ordinary CI.

@@ -6,6 +6,8 @@ AI RPG Engine separates the software that runs an adventure from the files that 
 
 **Project status: design complete; compatibility verification in progress.** There is no runnable AI RPG Engine application, backend, database schema, adventure compiler, or combat implementation in this repository. Every feature below is a development target. No installation command is currently available. The developer [runtime compatibility probe](tools/runtime_probe/README.md) covers discovery (P01.1) and deterministic thread/turn lifecycle checks (partial P01.2); the owner-signed-in neutral smoke remains pending.
 
+Repository policies are in [CONTRIBUTING.md](CONTRIBUTING.md), with shared [editor defaults](.editorconfig), [Git line-ending rules](.gitattributes), and a sanitized [environment example](.env.example). The example has no runtime consumer; packaged setup and application build checks remain future P02 work.
+
 ## Why this engine exists
 
 A long RPG campaign needs more than a conversation history. Inventory must remain consistent, unfinished promises must survive a new AI session, combat must use actual abilities and resources, and the narrator must respect what each character knows. AI RPG Engine is designed to make these responsibilities explicit and testable.

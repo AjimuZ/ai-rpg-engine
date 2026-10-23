@@ -1,6 +1,6 @@
 # Contributing
 
-AI RPG Engine is currently a documentation-only project. Start with [the documentation index](docs/README.md), [requirements](docs/03-requirements-and-scope.md), and [roadmap](docs/16-development-roadmap.md). Application folders, schemas, tests, and installation commands will be added during authorized implementation.
+AI RPG Engine currently contains design documentation and a developer-only [runtime compatibility probe](tools/runtime_probe/README.md). Start with [the documentation index](docs/README.md), [requirements](docs/03-requirements-and-scope.md), and [roadmap](docs/16-development-roadmap.md). There is no runnable game application; application folders, schemas, application tests, and installation commands remain future work.
 
 ## Principles
 
@@ -21,6 +21,12 @@ Contributions to project software and documentation must be available under the 
 Describe the concrete problem, resulting behavior, affected contracts, verification, and any migration requirements. Changes to architecture, content compatibility, rules, AI authority, or security require a corresponding decision record. Distinguish a supported feature from a proposed extension.
 
 Do not add a new AI provider, executable pack scripting, distributed service, or setting-specific engine constant as incidental implementation work. Raise a scoped proposal and explain its effect on the current design.
+
+## Formatting and local configuration
+
+Use the root [`.editorconfig`](.editorconfig): UTF-8, LF line endings, a final newline, spaces, two-space indentation by default, and four spaces for Java and Python. Trim trailing whitespace except in Markdown, where intentional hard line breaks are preserved. The root [`.gitattributes`](.gitattributes) normalizes text to LF across supported hosts and treats PNG assets as binary. Avoid unrelated bulk reformatting. Language-specific formatters and CI enforcement belong to the later workspace/quality tasks; these defaults do not claim a formatter is installed.
+
+The root [`.env.example`](.env.example) contains only neutral, non-secret labels for future local tooling. No current service consumes it. Copy it to an ignored local `.env` only when the implementation documents that flow. Keep database passwords, account state, tokens, and personal paths out of examples; use private secret files and the documented owner-controlled sign-in flow. Verify new local data and build outputs against [`.gitignore`](.gitignore) before staging; an example-file exception does not authorize publishing secrets.
 
 ## Verification
 
