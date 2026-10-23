@@ -2,6 +2,7 @@
 
 This is a developer fixture, not the application or its concurrent adapter. It
 checks the pinned runtime `0.164.0`; unsupported versions fail before discovery.
+See the [supported-version matrix and retained fixtures](COMPATIBILITY.md) for P01.5 scope, replay, refresh instructions and remaining service/platform limitations.
 Run commands from the repository root. Python uses only its standard library.
 The container checks require the Docker baseline from ADR 0009 and its pinned
 Java 21 images. No dependency or image pins change in P01.2.

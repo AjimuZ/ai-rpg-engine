@@ -2,6 +2,12 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Protocol fixtures and compatibility records (P01.5), 23 October 2026
+
+- Retain projected account-free 0.164.0 request/result exchanges and terminal events with identifier aliases and neutral error text, plus a bounded-session capture command and offline contract replay.
+- Record exact executable/image/client/host scope, service maturity, unsupported architectures/platforms and upgrade checks. Keep live isolation quota, authenticated packaged restart, image capability and full application acceptance gates explicit.
+- Verify the documented capture command, all 98 runtime tests and all five packaging tests with Docker enabled and no skips, four Compose configurations, Python syntax/docstrings and local documentation links/anchors. Mark P01.5 complete; retain the remaining package and application gates.
+
 ## Unreleased — Runtime process lifecycle (P01.4), 23 October 2026
 
 - Add owned-child shutdown records and bounded escalation scoped to a unique container name; enable runtime Compose init for signal forwarding. Keep Docker control outside the backend.

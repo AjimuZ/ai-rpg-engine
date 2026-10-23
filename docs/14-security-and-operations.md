@@ -25,6 +25,8 @@ Actuator health, with no diagnostic endpoint exposure, credentials, gameplay API
 or runtime account integration. PostgreSQL configuration is external. These shell
 checks do not satisfy the complete HTTP protection or readiness design below.
 
+P01.5 retains only [projected account-free protocol evidence](../tools/runtime_probe/COMPATIBILITY.md#retained-fixtures-and-replay): aliased IDs, selected policy/status fields and independently validated neutral final text. Arbitrary account metadata, raw errors, stderr and private prompts are excluded. Capture never mounts an account volume; new fixtures require field review and isolation checks before widening supported versions or platforms.
+
 ## 4. Application HTTP boundary
 
 Bind to loopback; use one origin for release frontend/backend where practical. Validate Host, Origin, content type, body size, and local session identity on mutation endpoints. Use an unpredictable local application session/CSRF token stored with appropriate browser restrictions rather than treating a fixed custom header as authentication. Do not enable wildcard CORS.

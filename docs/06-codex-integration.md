@@ -8,6 +8,11 @@ Official documentation describes app-server as a product integration surface, wi
 
 The app-server interface has compatibility and maturity risks. The first implementation milestone must establish a supported version and safe capability profile before treating this architecture as release-ready. A protocol failure must not result in an improvised alternative AI provider.
 
+The [P01.5 compatibility matrix](../tools/runtime_probe/COMPATIBILITY.md) records
+exact supported versions, retained neutral request/result and event projections,
+service maturity, upgrade checks and unverified platforms. Support is limited to
+the measured developer profile; it is not a cross-version or release guarantee.
+
 ## 2. Alternatives
 
 | Surface | Intended AI RPG Engine use | Trade-off |
@@ -45,7 +50,7 @@ The steps below describe the local stdio probe. In the packaged profile, Compose
 11. Retire a thread on renewal or unrecoverable uncertainty; rebuild from a canonical checkpoint.
 12. On shutdown, stop admissions, request interruption, reconcile operations, close input, wait briefly, and terminate only the owned process if necessary.
 
-Protocol method candidates inherited from the demo are `initialize`, `initialized`, `account/read`, `model/list`, `thread/start`, `thread/resume`, `turn/start`, and `turn/interrupt`. Their exact fields, response shapes, events, and supported launch forms belong in a versioned adapter contract fixture. These names are not an implementation or a guarantee of perpetual compatibility.
+The pinned probe verifies `initialize`, `initialized`, `account/read`, `model/list`, `thread/start`, `thread/resume`, `thread/turns/list`, `turn/start`, and `turn/interrupt`. P01.5 retains selected request/result shapes and terminal events in the [versioned neutral fixture](../tools/runtime_probe/fixtures/0.164.0/neutral-session.json); the [compatibility matrix](../tools/runtime_probe/COMPATIBILITY.md) records launch forms, projection limits and refresh checks. This is a measured subset of 0.164.0, not the production adapter or a guarantee of perpetual compatibility.
 
 ## 5. Transport requirements
 

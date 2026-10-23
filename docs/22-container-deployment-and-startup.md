@@ -42,6 +42,11 @@ Official [app-server documentation](https://learn.chatgpt.com/docs/app-server) d
 
 Stdio remains the isolated local protocol-probe option. If the packaged runtime cannot satisfy authentication, isolation, or connection requirements, containerized delivery remains incomplete. It is not replaced with a different model provider or silently presented as a fully Dockerized host-runtime setup.
 
+P01.5's [compatibility matrix](../tools/runtime_probe/COMPATIBILITY.md) records
+this exact image/client/host scope and retained neutral fixtures. Other hosts and
+architectures, authenticated packaged restart and full startup remain unverified;
+the matrix does not complete the integration gate.
+
 ## 4. Planned repository artifacts
 
 | Artifact | Purpose |

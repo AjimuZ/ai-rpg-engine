@@ -90,8 +90,20 @@ Checks: a documentation review against the requirements, pack, security, and pub
 - [x] P01.2 Verify thread creation/resume, explicit per-turn model/effort, notification correlation, terminal status, and interruption.
 - [x] P01.3 Demonstrate restricted roots, denied canonical writes, unavailable unwanted host tools, and inherited-config isolation.
 - [x] P01.4 Demonstrate owned-process shutdown, EOF/timeout handling, stderr bounds, and early-event buffering.
-- [ ] P01.5 Save neutral protocol fixtures and a supported-version matrix; record service maturity and platform limitations.
+- [x] P01.5 Save neutral protocol fixtures and a supported-version matrix; record service maturity and platform limitations.
 - [ ] P01.6 Record supported image-generation capability or explicit unavailability, restricted invocation, output formats and account/cost boundaries; gate actual generation without blocking text-only fallback or enabling paid access implicitly.
+
+**Progress (23 October 2026):** P01.5 is complete. It retains an account-free runtime 0.164.0
+protocol projection (27 request/result exchanges and 19 selected notifications),
+a restricted capture command, and a [supported-version/platform matrix](../tools/runtime_probe/COMPATIBILITY.md).
+Identifiers and sensitive metadata are normalized or omitted. The documented capture
+command successfully refreshed the fixture; all 98 runtime tests (including eight
+offline replay/redaction checks, Java compilation/framing and real isolation/lifecycle
+checks) pass with Docker enabled and no skips (65.779 seconds). All five packaging
+checks pass with recreation enabled (13.839 seconds); four Compose configurations,
+Python syntax/docstrings and local documentation links/anchors pass. The matrix
+records developer-proof maturity, unverified architectures/hosts, the quota-blocked
+live isolation recheck and authenticated packaged restart; P01.6 remains separate.
 
 **Progress (23 October 2026):** P01.4 is complete in [`tools/runtime_probe`](../tools/runtime_probe/README.md#process-lifecycle-p014):
 
