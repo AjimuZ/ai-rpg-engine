@@ -2,6 +2,12 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Narration runtime isolation (P01.3), 23 October 2026
+
+- Bake an engine isolation profile into the 0.164.0 runtime image: a managed configuration layer, an engine model catalog, neutral instructions, requirements pinning `never`/`read-only`/no search with no extension servers, and a startup guard refusing inherited home configuration or instruction files ([ADR 0013](docs/adr/0013-narration-runtime-isolation.md)).
+- Add `test_isolation.py` with Docker fixtures. They prove an empty model tool list, six refused host tool calls with no canonical write, rejected or clamped wider thread policies, and ignored inherited configuration and launch flags. The guard refuses each inherited home file. Turns containing non-narration items now fail closed.
+- Results: all 59 probe tests pass with Docker enabled, and the packaging tests pass, including recreation. A live re-check on the rebuilt image hit the account usage limit and remains open.
+
 ## Unreleased — Device-code login prerequisite, 23 October 2026
 
 - Explain the ChatGPT security-setting/workspace permission required by the project's verified container device-code login flow in setup and integration guidance. Require actionable launcher guidance in P02.6–P02.7; keep other upstream login methods distinct and retain owner-controlled account setup.

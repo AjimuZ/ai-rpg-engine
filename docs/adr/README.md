@@ -16,5 +16,6 @@ Records 0001–0005, 0007, and 0008 are **proposed for the AI RPG Engine impleme
 | [0010](0010-name-scope-format-licensing.md) | Product name AI RPG Engine and derived identifiers, confirmed v1 boundaries, pack contract 1 file format, and licensing plan; accepted; ADR 0011 subsequently extends v1 presentation scope |
 | [0011](0011-visual-novel-and-persistent-artwork.md) | Default visual-novel play, editable quick replies, complete graphic kit, persistent character/item artwork and bounded runtime image generation; accepted design, implementation pending |
 | [0012](0012-adventure-workspace-isolation.md) | Independent adventure specifications, campaigns and media directories with explicit identity/isolation; accepted design, implementation pending |
+| [0013](0013-narration-runtime-isolation.md) | Narration runtime isolation: container boundary, managed profile, engine catalog, requirements and startup guard with no model tools; accepted, verified for runtime 0.164.0 |
 
 When a decision changes, preserve this record and create a superseding one with rationale, compatibility implications, and verification. Do not retroactively edit historical status to make a previous decision disappear.

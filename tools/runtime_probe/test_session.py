@@ -238,12 +238,36 @@ class TurnTests(unittest.TestCase):
             'invalid-turn-event': [note('turn/completed', threadId=THREAD, turnId=TURN)],
             'invalid-agent-message': [agent_message(None)],
             'invalid-turn-item': [note('item/completed', threadId=THREAD, turnId=TURN, item=[])],
+            # A host action must fail the turn as soon as it starts (ADR 0013).
+            'unexpected-turn-item': [note('item/started', threadId=THREAD, turnId=TURN,
+                                          item={'type': 'commandExecution', 'id': 'c1'})],
         }
         for code, messages in cases.items():
             rpc, _ = rpc_for(messages)
             with self.subTest(code=code), self.assertRaises(ContractError) as caught:
                 session.await_turn(rpc, THREAD, TURN, timeout=1)
             self.assertEqual(str(caught.exception), code)
+
+    def test_only_narration_item_types_are_accepted(self):
+        """Given allowed and disallowed item types, require that only text items pass.
+
+        Every non-narration type the pinned schema defines for host actions is
+        rejected on completion as well as on start, and an unknown future type
+        is rejected rather than ignored; allowed types complete normally.
+        """
+        for kind in ('commandExecution', 'fileChange', 'mcpToolCall', 'dynamicToolCall',
+                     'webSearch', 'imageView', 'collabAgentToolCall', 'futureType'):
+            for method in ('item/started', 'item/completed'):
+                rpc, _ = rpc_for([note(method, threadId=THREAD, turnId=TURN,
+                                       item={'type': kind, 'id': 'x'})])
+                with self.subTest(kind=kind, method=method),                         self.assertRaises(ContractError) as caught:
+                    session.await_turn(rpc, THREAD, TURN, timeout=1)
+                self.assertEqual(str(caught.exception), 'unexpected-turn-item')
+        allowed = [note('item/started', threadId=THREAD, turnId=TURN,
+                        item={'type': kind, 'id': kind}) for kind in session.ALLOWED_TURN_ITEMS]
+        rpc, _ = rpc_for(allowed + [agent_message('ok'),
+                                   turn_event('turn/completed', status='completed')])
+        self.assertEqual(session.await_turn(rpc, THREAD, TURN, timeout=1)['text'], 'ok')
 
     def test_event_count_per_turn_is_bounded(self):
         """Use controlled fixture inputs to check that event count per turn is bounded; return

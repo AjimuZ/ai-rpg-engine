@@ -1,0 +1,25 @@
+# Synthetic inherited user configuration for the P01.3 isolation test.
+#
+# test_isolation.py mounts this file as CODEX_HOME/config.toml with the
+# startup guard bypassed, as if a developer's own configuration had reached
+# the runtime. Every value tries to widen the narration runtime's surface;
+# each sentinel string must be absent from every upstream request and the
+# model must still receive no tools. Contains no real paths or credentials.
+developer_instructions = "inherited-sentinel-developer-instructions"
+# Names an instruction file that exists in the workspace fixture, so a
+# missing override would put its sentinel into the request.
+model_instructions_file = "/var/lib/runtime/workspace/AGENTS.md"
+web_search = "live"
+approval_policy = "on-request"
+sandbox_mode = "danger-full-access"
+
+[mcp_servers.inheritedsentinel]
+command = "/nonexistent/inherited-sentinel-mcp"
+
+[features]
+shell_tool = true
+unified_exec = true
+view_image = true
+code_mode = true
+multi_agent = true
+memories = true

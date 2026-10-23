@@ -1,4 +1,10 @@
-# This image downloads its binary in BuildKit and needs no local files.
+# The binary is downloaded in BuildKit; only the Dockerfile and the engine
+# isolation profile files it copies are sent to the builder.
 # Keep this policy independent: root .dockerignore does not cover this context.
 **
 !Dockerfile
+!managed_config.toml
+!requirements.toml
+!engine-model-catalog.json
+!engine-instructions.md
+!runtime-entrypoint.sh

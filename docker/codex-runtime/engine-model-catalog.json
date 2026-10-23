@@ -1,0 +1,444 @@
+{
+  "models": [
+    {
+      "slug": "gpt-6-astra",
+      "display_name": "GPT-6-Astra",
+      "description": "Frontier intelligence for the most demanding work.",
+      "default_reasoning_level": "low",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low",
+          "description": "Fast responses with lighter reasoning"
+        },
+        {
+          "effort": "medium",
+          "description": "Balances speed and reasoning depth for everyday tasks"
+        },
+        {
+          "effort": "high",
+          "description": "Greater reasoning depth for complex problems"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Extra high reasoning depth for complex problems"
+        },
+        {
+          "effort": "max",
+          "description": "Maximum reasoning depth for the hardest problems"
+        },
+        {
+          "effort": "ultra",
+          "description": "Maximum reasoning with automatic task delegation"
+        }
+      ],
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 2,
+      "availability_nux": null,
+      "upgrade": null,
+      "base_instructions": "You are the narration runtime of a text role-playing engine. No tools, files, commands or network resources are available to you. Answer only with the structured output the request asks for.",
+      "context_window": 272000,
+      "truncation_policy": {
+        "mode": "tokens",
+        "limit": 10000
+      },
+      "support_verbosity": true,
+      "default_verbosity": "low",
+      "minimal_client_version": "0.153.0",
+      "tool_mode": "direct",
+      "shell_type": "disabled",
+      "apply_patch_tool_type": null,
+      "experimental_supported_tools": [],
+      "input_modalities": [
+        "text"
+      ],
+      "supports_search_tool": false,
+      "include_skills_usage_instructions": false,
+      "include_plugin_usage_instructions": false,
+      "include_apps_usage_instructions": false
+    },
+    {
+      "slug": "gpt-6.1-sol",
+      "display_name": "GPT-6.1-Sol",
+      "description": "Latest workhorse model for coding and everyday work.",
+      "default_reasoning_level": "low",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low",
+          "description": "Fast responses with lighter reasoning"
+        },
+        {
+          "effort": "medium",
+          "description": "Balances speed and reasoning depth for everyday tasks"
+        },
+        {
+          "effort": "high",
+          "description": "Greater reasoning depth for complex problems"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Extra high reasoning depth for complex problems"
+        },
+        {
+          "effort": "max",
+          "description": "Maximum reasoning depth for the hardest problems"
+        },
+        {
+          "effort": "ultra",
+          "description": "Maximum reasoning with automatic task delegation"
+        }
+      ],
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 1,
+      "availability_nux": null,
+      "upgrade": null,
+      "base_instructions": "You are the narration runtime of a text role-playing engine. No tools, files, commands or network resources are available to you. Answer only with the structured output the request asks for.",
+      "context_window": 272000,
+      "truncation_policy": {
+        "mode": "tokens",
+        "limit": 10000
+      },
+      "support_verbosity": true,
+      "default_verbosity": "low",
+      "minimal_client_version": "0.153.0",
+      "tool_mode": "direct",
+      "shell_type": "disabled",
+      "apply_patch_tool_type": null,
+      "experimental_supported_tools": [],
+      "input_modalities": [
+        "text"
+      ],
+      "supports_search_tool": false,
+      "include_skills_usage_instructions": false,
+      "include_plugin_usage_instructions": false,
+      "include_apps_usage_instructions": false
+    },
+    {
+      "slug": "gpt-6-sol",
+      "display_name": "GPT-6-Sol",
+      "description": "Previous generation workhorse model.",
+      "default_reasoning_level": "medium",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low",
+          "description": "Fast responses with lighter reasoning"
+        },
+        {
+          "effort": "medium",
+          "description": "Balances speed and reasoning depth for everyday tasks"
+        },
+        {
+          "effort": "high",
+          "description": "Greater reasoning depth for complex problems"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Extra high reasoning depth for complex problems"
+        },
+        {
+          "effort": "max",
+          "description": "Maximum reasoning depth for the hardest problems"
+        },
+        {
+          "effort": "ultra",
+          "description": "Maximum reasoning with automatic task delegation"
+        }
+      ],
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 3,
+      "availability_nux": null,
+      "upgrade": null,
+      "base_instructions": "You are the narration runtime of a text role-playing engine. No tools, files, commands or network resources are available to you. Answer only with the structured output the request asks for.",
+      "context_window": 272000,
+      "truncation_policy": {
+        "mode": "tokens",
+        "limit": 10000
+      },
+      "support_verbosity": true,
+      "default_verbosity": "low",
+      "minimal_client_version": "0.155.0",
+      "tool_mode": "direct",
+      "shell_type": "disabled",
+      "apply_patch_tool_type": null,
+      "experimental_supported_tools": [],
+      "input_modalities": [
+        "text"
+      ],
+      "supports_search_tool": false,
+      "include_skills_usage_instructions": false,
+      "include_plugin_usage_instructions": false,
+      "include_apps_usage_instructions": false
+    },
+    {
+      "slug": "gpt-6-luna",
+      "display_name": "GPT-6-Luna",
+      "description": "Fast and affordable model for easier tasks.",
+      "default_reasoning_level": "medium",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low",
+          "description": "Fast responses with lighter reasoning"
+        },
+        {
+          "effort": "medium",
+          "description": "Balances speed and reasoning depth for everyday tasks"
+        },
+        {
+          "effort": "high",
+          "description": "Greater reasoning depth for complex problems"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Extra high reasoning depth for complex problems"
+        },
+        {
+          "effort": "max",
+          "description": "Maximum reasoning depth for the hardest problems"
+        }
+      ],
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 4,
+      "availability_nux": null,
+      "upgrade": null,
+      "base_instructions": "You are the narration runtime of a text role-playing engine. No tools, files, commands or network resources are available to you. Answer only with the structured output the request asks for.",
+      "context_window": 272000,
+      "truncation_policy": {
+        "mode": "tokens",
+        "limit": 10000
+      },
+      "support_verbosity": true,
+      "default_verbosity": "low",
+      "minimal_client_version": "0.155.0",
+      "tool_mode": "direct",
+      "shell_type": "disabled",
+      "apply_patch_tool_type": null,
+      "experimental_supported_tools": [],
+      "input_modalities": [
+        "text"
+      ],
+      "supports_search_tool": false,
+      "include_skills_usage_instructions": false,
+      "include_plugin_usage_instructions": false,
+      "include_apps_usage_instructions": false
+    },
+    {
+      "slug": "gpt-5.6-sol",
+      "display_name": "GPT-5.6-Sol",
+      "description": "Older generation workhorse model.",
+      "default_reasoning_level": "low",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low",
+          "description": "Fast responses with lighter reasoning"
+        },
+        {
+          "effort": "medium",
+          "description": "Balances speed and reasoning depth for everyday tasks"
+        },
+        {
+          "effort": "high",
+          "description": "Greater reasoning depth for complex problems"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Extra high reasoning depth for complex problems"
+        },
+        {
+          "effort": "max",
+          "description": "Maximum reasoning depth for the hardest problems"
+        },
+        {
+          "effort": "ultra",
+          "description": "Maximum reasoning with automatic task delegation"
+        }
+      ],
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 5,
+      "availability_nux": null,
+      "upgrade": null,
+      "base_instructions": "You are the narration runtime of a text role-playing engine. No tools, files, commands or network resources are available to you. Answer only with the structured output the request asks for.",
+      "context_window": 272000,
+      "truncation_policy": {
+        "mode": "tokens",
+        "limit": 10000
+      },
+      "support_verbosity": true,
+      "default_verbosity": "low",
+      "minimal_client_version": "0.144.0",
+      "tool_mode": "direct",
+      "shell_type": "disabled",
+      "apply_patch_tool_type": null,
+      "experimental_supported_tools": [],
+      "input_modalities": [
+        "text"
+      ],
+      "supports_search_tool": false,
+      "include_skills_usage_instructions": false,
+      "include_plugin_usage_instructions": false,
+      "include_apps_usage_instructions": false
+    },
+    {
+      "slug": "gpt-5.6-terra",
+      "display_name": "GPT-5.6-Terra",
+      "description": "Older balanced model for straightforward work.",
+      "default_reasoning_level": "medium",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low",
+          "description": "Fast responses with lighter reasoning"
+        },
+        {
+          "effort": "medium",
+          "description": "Balances speed and reasoning depth for everyday tasks"
+        },
+        {
+          "effort": "high",
+          "description": "Greater reasoning depth for complex problems"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Extra high reasoning depth for complex problems"
+        },
+        {
+          "effort": "max",
+          "description": "Maximum reasoning depth for the hardest problems"
+        },
+        {
+          "effort": "ultra",
+          "description": "Maximum reasoning with automatic task delegation"
+        }
+      ],
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 8,
+      "availability_nux": null,
+      "upgrade": null,
+      "base_instructions": "You are the narration runtime of a text role-playing engine. No tools, files, commands or network resources are available to you. Answer only with the structured output the request asks for.",
+      "context_window": 272000,
+      "truncation_policy": {
+        "mode": "tokens",
+        "limit": 10000
+      },
+      "support_verbosity": true,
+      "default_verbosity": "low",
+      "minimal_client_version": "0.144.0",
+      "tool_mode": "direct",
+      "shell_type": "disabled",
+      "apply_patch_tool_type": null,
+      "experimental_supported_tools": [],
+      "input_modalities": [
+        "text"
+      ],
+      "supports_search_tool": false,
+      "include_skills_usage_instructions": false,
+      "include_plugin_usage_instructions": false,
+      "include_apps_usage_instructions": false
+    },
+    {
+      "slug": "gpt-5.6-luna",
+      "display_name": "GPT-5.6-Luna",
+      "description": "Older fast and efficient model.",
+      "default_reasoning_level": "medium",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low",
+          "description": "Fast responses with lighter reasoning"
+        },
+        {
+          "effort": "medium",
+          "description": "Balances speed and reasoning depth for everyday tasks"
+        },
+        {
+          "effort": "high",
+          "description": "Greater reasoning depth for complex problems"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Extra high reasoning depth for complex problems"
+        },
+        {
+          "effort": "max",
+          "description": "Maximum reasoning depth for the hardest problems"
+        }
+      ],
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 9,
+      "availability_nux": null,
+      "upgrade": null,
+      "base_instructions": "You are the narration runtime of a text role-playing engine. No tools, files, commands or network resources are available to you. Answer only with the structured output the request asks for.",
+      "context_window": 272000,
+      "truncation_policy": {
+        "mode": "tokens",
+        "limit": 10000
+      },
+      "support_verbosity": true,
+      "default_verbosity": "low",
+      "minimal_client_version": "0.144.0",
+      "tool_mode": "direct",
+      "shell_type": "disabled",
+      "apply_patch_tool_type": null,
+      "experimental_supported_tools": [],
+      "input_modalities": [
+        "text"
+      ],
+      "supports_search_tool": false,
+      "include_skills_usage_instructions": false,
+      "include_plugin_usage_instructions": false,
+      "include_apps_usage_instructions": false
+    },
+    {
+      "slug": "gpt-5.5",
+      "display_name": "GPT-5.5",
+      "description": "Legacy coding model.",
+      "default_reasoning_level": "medium",
+      "supported_reasoning_levels": [
+        {
+          "effort": "low",
+          "description": "Fast responses with lighter reasoning"
+        },
+        {
+          "effort": "medium",
+          "description": "Balances speed and reasoning depth for everyday tasks"
+        },
+        {
+          "effort": "high",
+          "description": "Greater reasoning depth for complex problems"
+        },
+        {
+          "effort": "xhigh",
+          "description": "Extra high reasoning depth for complex problems"
+        }
+      ],
+      "visibility": "list",
+      "supported_in_api": true,
+      "priority": 13,
+      "availability_nux": null,
+      "upgrade": null,
+      "base_instructions": "You are the narration runtime of a text role-playing engine. No tools, files, commands or network resources are available to you. Answer only with the structured output the request asks for.",
+      "context_window": 272000,
+      "truncation_policy": {
+        "mode": "tokens",
+        "limit": 10000
+      },
+      "support_verbosity": true,
+      "default_verbosity": "low",
+      "minimal_client_version": "0.124.0",
+      "tool_mode": "direct",
+      "shell_type": "disabled",
+      "apply_patch_tool_type": null,
+      "experimental_supported_tools": [],
+      "input_modalities": [
+        "text"
+      ],
+      "supports_search_tool": false,
+      "include_skills_usage_instructions": false,
+      "include_plugin_usage_instructions": false,
+      "include_apps_usage_instructions": false
+    }
+  ]
+}

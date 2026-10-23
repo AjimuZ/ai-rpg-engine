@@ -2,8 +2,9 @@
 
 # Narration runtime image (Compose service `codex`).
 #
-# The image contains only the pinned upstream runtime release binary on a
-# digest-pinned Debian base. It contains no engine code, no database client,
+# The image contains the pinned upstream runtime release binary on a
+# digest-pinned Debian base, plus the engine isolation profile in /etc/codex
+# and a startup guard. It contains no engine code, no database client,
 # no credentials, and no development configuration. Account state lives in a
 # private volume mounted at CODEX_HOME; the control socket lives in a separate
 # IPC volume shared only with the engine.
@@ -66,6 +67,20 @@ RUN groupadd --gid 10001 runtime \
 
 COPY --from=fetch /fetch/codex /usr/local/bin/codex
 
+# Engine isolation profile (P01.3, ADR 0013). /etc/codex is where the pinned
+# runtime reads its managed configuration and requirements on Linux; files are
+# root-owned and read-only so the runtime user cannot change its own limits.
+# - managed_config.toml: empty tool surface, engine catalog and instructions;
+# - requirements.toml: no MCP servers, read-only sandbox, approval `never`;
+# - engine-model-catalog.json: pinned models with tools and agent text removed;
+# - engine-instructions.md: neutral base instructions;
+# - runtime-entrypoint.sh: refuses inherited files in the runtime home.
+# The directory is created first: `COPY --chmod` would otherwise give the new
+# directory mode 0444, and the runtime then refuses to start (verified).
+RUN install -d -o 0 -g 0 -m 0755 /etc/codex
+COPY --chown=0:0 --chmod=0444 managed_config.toml requirements.toml      engine-model-catalog.json engine-instructions.md /etc/codex/
+COPY --chown=0:0 --chmod=0555 runtime-entrypoint.sh /usr/local/bin/runtime-entrypoint
+
 # CODEX_HOME isolates account and session state from any inherited user
 # configuration. RUST_LOG keeps stderr at warnings so diagnostics stay bounded;
 # NO_COLOR removes ANSI escapes so stderr can be redacted and logged as text.
@@ -82,7 +97,9 @@ WORKDIR /var/lib/runtime/workspace
 # /run/runtime/control.sock). The stdio probe overrides the command with
 # `app-server --listen stdio://`. Features that reach remote catalogs or
 # update services at startup are disabled; analytics are off by default.
-ENTRYPOINT ["/usr/local/bin/codex"]
+# The entrypoint checks the runtime home, then execs /usr/local/bin/codex with
+# the same arguments, so command overrides keep their meaning.
+ENTRYPOINT ["/usr/local/bin/runtime-entrypoint"]
 CMD ["app-server", "--listen", "unix:///run/runtime/control.sock", \
      "--disable", "plugins", "--disable", "remote_plugin", \
      "--disable", "apps", "--disable", "in_app_updates"]

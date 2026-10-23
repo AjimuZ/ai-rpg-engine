@@ -31,6 +31,12 @@ import java.util.concurrent.Executors;
  *       completing, so the turn stays in progress until it is interrupted.</li>
  *   <li>{@code scenario-fail}: reject the request with HTTP 400, which the
  *       runtime reports as a failed turn (retries are disabled in the fixture).</li>
+ *   <li>{@code scenario-tools} (P01.3 isolation check): the first request of
+ *       the turn is answered with {@link #toolCallStream()}, which asks for
+ *       host tools the runtime was never offered. Once the runtime reports the
+ *       call results back (the request then contains a tool-call output item),
+ *       the neutral envelope is streamed so the turn can finish and the probe
+ *       can inspect what, if anything, was executed.</li>
  * </ul>
  *
  * <p>Every request is written to stdout as one line
@@ -45,7 +51,8 @@ public final class ScriptedProvider {
     /** A held stream ends on its own after this long, so a lost probe cannot leak it forever. */
     static final long HOLD_MILLIS = 120_000;
     /** Scenario tokens, in the order used for the lookup. */
-    static final String[] SCENARIOS = {"scenario-complete", "scenario-hold", "scenario-fail"};
+    static final String[] SCENARIOS = {"scenario-complete", "scenario-hold", "scenario-fail",
+        "scenario-tools"};
     /**
      * The neutral envelope, byte-for-byte equal in meaning to contract.NEUTRAL_OUTPUT.
      * test_session.py parses this constant and compares it with the Python value,
@@ -134,6 +141,67 @@ public final class ScriptedProvider {
     }
 
     /**
+     * Build the adversarial stream for the first request of {@code scenario-tools}.
+     *
+     * <p>A compromised or confused model could emit tool calls whatever the
+     * runtime advertised. Each call below targets a host capability the
+     * isolated profile must not grant: a shell write and an unrelated read
+     * through the legacy and unified shell tools, a file write through
+     * {@code apply_patch}, the code-mode {@code exec} isolate, an MCP resource
+     * read and a local image read. Every write aims at the same sentinel path
+     * under the runtime workspace, so the probe can prove that none of them
+     * ran by checking that the path still does not exist. All arguments are
+     * synthetic constants; nothing here comes from a request.
+     *
+     * @return the stream body; ends with response.completed so the runtime
+     *         answers the calls instead of waiting
+     */
+    static String toolCallStream() {
+        String sentinel = "/var/lib/runtime/workspace/canonical-sentinel.json";
+        String[] items = {
+            functionCall("call-shell", "shell", "{\"command\":[\"sh\",\"-c\",\"echo x > " + sentinel + "\"]}"),
+            functionCall("call-exec-command", "exec_command",
+                    "{\"cmd\":\"cat /etc/passwd > " + sentinel + "\"}"),
+            customCall("call-apply-patch", "apply_patch",
+                    "*** Begin Patch\n*** Add File: " + sentinel + "\n+{}\n*** End Patch\n"),
+            // JavaScript source: the escaped \\n become newlines inside the JS string.
+            customCall("call-exec", "exec", "await tools.apply_patch(\"*** Begin Patch\\n*** Add File: "
+                    + sentinel + "\\n+{}\\n*** End Patch\\n\");"),
+            functionCall("call-mcp", "read_mcp_resource", "{\"server\":\"host\",\"uri\":\"file:///etc/passwd\"}"),
+            functionCall("call-image", "view_image", "{\"path\":\"/etc/passwd\"}"),
+        };
+        StringBuilder out = new StringBuilder(event("response.created",
+                "{\"type\":\"response.created\",\"response\":{\"id\":\"resp-tools\"}}"));
+        for (String item : items) {
+            out.append(event("response.output_item.done",
+                    "{\"type\":\"response.output_item.done\",\"item\":" + item + "}"));
+        }
+        return out.append(event("response.completed",
+                "{\"type\":\"response.completed\",\"response\":{\"id\":\"resp-tools\","
+                        + "\"usage\":{\"input_tokens\":0,\"input_tokens_details\":null,"
+                        + "\"output_tokens\":0,\"output_tokens_details\":null,"
+                        + "\"total_tokens\":0}}}")).toString();
+    }
+
+    /**
+     * Return one Responses {@code function_call} item as single-line JSON.
+     * {@code arguments} is the raw JSON argument text; it is escaped here. No I/O.
+     */
+    static String functionCall(String callId, String name, String arguments) {
+        return "{\"type\":\"function_call\",\"id\":\"fc-" + callId + "\",\"call_id\":\"" + callId
+                + "\",\"name\":\"" + name + "\",\"arguments\":\"" + jsonEscape(arguments) + "\"}";
+    }
+
+    /**
+     * Return one Responses {@code custom_tool_call} item as single-line JSON.
+     * {@code input} is the raw freeform tool input; it is escaped here. No I/O.
+     */
+    static String customCall(String callId, String name, String input) {
+        return "{\"type\":\"custom_tool_call\",\"id\":\"ct-" + callId + "\",\"call_id\":\"" + callId
+                + "\",\"name\":\"" + name + "\",\"input\":\"" + jsonEscape(input) + "\"}";
+    }
+
+    /**
      * Format the supplied event name and single-line JSON data into an SSE record.
      * Returns text without I/O; callers own the invariant that inputs have no raw newlines.
      */
@@ -181,6 +249,11 @@ public final class ScriptedProvider {
             switch (scenario) {
                 case "scenario-complete" -> send(exchange, 200, "text/event-stream", completedStream());
                 case "scenario-hold" -> hold(exchange);
+                // The runtime's reply to the adversarial calls carries their
+                // output items; answering it normally lets the turn finish.
+                case "scenario-tools" -> send(exchange, 200, "text/event-stream",
+                        new String(body, StandardCharsets.UTF_8).contains("_call_output\"")
+                                ? completedStream() : toolCallStream());
                 case "scenario-fail" -> send(exchange, 400, "application/json",
                         "{\"error\":{\"message\":\"fixture rejected the request\","
                                 + "\"type\":\"invalid_request_error\"}}");

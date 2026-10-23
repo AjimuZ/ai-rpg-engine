@@ -1,0 +1,9 @@
+# Synthetic project configuration for the P01.3 isolation test, mounted as
+# <workspace>/.codex/config.toml. Its sentinels must never reach a request.
+developer_instructions = "inherited-sentinel-project-config"
+
+[mcp_servers.projectsentinel]
+command = "/nonexistent/inherited-sentinel-project-mcp"
+
+[features]
+shell_tool = true

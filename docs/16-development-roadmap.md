@@ -2,9 +2,9 @@
 
 ## 1. Status and planning rules
 
-**Current status: P00, P01.1–P01.2 and P02.1–P02.2 complete; P02.3 partial.** Angular and Spring development shells, runtime compatibility probes and partial packaging infrastructure exist; gameplay remains unimplemented. P01.2 now includes owner-authenticated neutral output and thread resume; P01.3 is the next protocol task. P02.3 can resume local image/integration work under ADR 0009's development-only Java revision below. Predecessor milestones and repository housekeeping do not complete an engine implementation work package.
+**Current status: P00, P01.1–P01.3 and P02.1–P02.2 complete; P02.3 partial.** Angular and Spring development shells, runtime compatibility probes and partial packaging infrastructure exist; gameplay remains unimplemented. P01.2 now includes owner-authenticated neutral output and thread resume; P01.3 adds the verified runtime isolation profile ([ADR 0013](adr/0013-narration-runtime-isolation.md)); P01.4 is the next protocol task. P02.3 can resume local image/integration work under ADR 0009's development-only Java revision below. Predecessor milestones and repository housekeeping do not complete an engine implementation work package.
 
-The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.3–P01.6 await their P01 predecessors. Later package work must still pass its own prerequisites and exit checks.
+The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.4–P01.6 await their P01 predecessors. Later package work must still pass its own prerequisites and exit checks.
 
 **Setup prerequisite (23 October 2026):** the owner-authenticated P01.2 check used ChatGPT device-code login. Users of this container login flow must first enable device-code login in their account's security settings, or obtain managed-workspace administrator permission. P02.6 must surface this prerequisite and the supported instructions when authorization is unavailable; it must not assume a desktop sign-in initializes the isolated runtime. P02.7 verifies the guidance/error path. See [runtime account setup](../tools/runtime_probe/README.md#owner-account-setup-for-the-live-check). This documents the required account setting for this login method, not an implemented launcher.
 
@@ -88,10 +88,33 @@ Checks: a documentation review against the requirements, pack, security, and pub
 
 - [x] P01.1 Establish pinned Codex executable/image versions, local stdio probe and packaged private IPC transport, handshake, container account readiness, paginated catalog, and output contract.
 - [x] P01.2 Verify thread creation/resume, explicit per-turn model/effort, notification correlation, terminal status, and interruption.
-- [ ] P01.3 Demonstrate restricted roots, denied canonical writes, unavailable unwanted host tools, and inherited-config isolation.
+- [x] P01.3 Demonstrate restricted roots, denied canonical writes, unavailable unwanted host tools, and inherited-config isolation.
 - [ ] P01.4 Demonstrate owned-process shutdown, EOF/timeout handling, stderr bounds, and early-event buffering.
 - [ ] P01.5 Save neutral protocol fixtures and a supported-version matrix; record service maturity and platform limitations.
 - [ ] P01.6 Record supported image-generation capability or explicit unavailability, restricted invocation, output formats and account/cost boundaries; gate actual generation without blocking text-only fallback or enabling paid access implicitly.
+
+**Progress (23 October 2026):** P01.3 is complete for the pinned 0.164.0 image ([ADR 0013](adr/0013-narration-runtime-isolation.md)):
+
+- **Profile:** [`docker/codex-runtime`](../docker/codex-runtime/Dockerfile) now installs, root-owned and read-only:
+  - a managed configuration layer that overrides user config, project config and launch flags;
+  - an engine model catalog: direct tool mode, no shell or patch tool types, text-only input;
+  - neutral engine instructions;
+  - requirements that empty the extension-server allowlist and pin approval `never`, sandbox `read-only` and search `disabled`;
+  - a `runtime-entrypoint` guard. It exits 78 if the runtime home contains `config.toml`, `AGENTS.md` or `AGENTS.override.md`; the runtime always loads the last two.
+- **Restricted roots and denied writes:** the container is the boundary: a read-only root, private tmpfs/volumes, all capabilities dropped and no tool able to reach a path.
+  - A scripted model calling shell, exec, both patch forms (writing a canonical sentinel), an extension resource and an image read received six "unsupported" answers, and the sentinel never appeared.
+  - `danger-full-access` thread starts are rejected. Workspace-write (with or without network) and `on-request`/`untrusted` requests are clamped to read-only/never.
+  - Bubblewrap is not relied on. The runtime warns that it is missing from `PATH`, and no command tool exists that would need it.
+- **Unavailable tools and inherited configuration:** every upstream request carried `tools: []`. Its only developer texts were the engine instructions and the runtime's read-only permissions statement, with no environment block.
+  - A synthetic home config, project config and project `AGENTS.md`, plus flags re-enabling shell, exec, images and live search, were all ignored with the guard bypassed.
+  - The guard refused the three inherited home files after a normal-start control.
+  - `session.await_turn` now fails a turn containing any non-narration item (`unexpected-turn-item`).
+- **Verification:** on Windows 11 / Docker Desktop / `linux/amd64`:
+  - `py -B -m unittest discover -s tools/runtime_probe` passed 59 tests (8 Docker tests skipped). With `RUNTIME_PROBE_DOCKER` set, all 59 passed, including the 7 `test_isolation.py` tests and the existing lifecycle and packaging tests through the new entrypoint.
+  - `docker compose config --quiet` passed for both probe Compose files, the isolation override and the root `compose.yaml`.
+  - `tools/container_packaging` passed 5 tests, including the opt-in Docker recreation test with the rebuilt runtime image.
+  - No volumes were deleted.
+- **Not verified:** the authorized live re-check on the rebuilt image (`gpt-6-luna` / `low`) started, and found the account present without a guard refusal. The upstream then failed the turn with `usageLimitExceeded`, and paid overage was not enabled. The real backend has therefore not yet accepted the engine instructions and catalog. Re-run `probe.py live` when quota is available, before P01 exit or gameplay integration. Only `linux/amd64` was run.
 
 **Progress (23 October 2026):** P01.2 is complete with verified implementation in [`tools/runtime_probe`](../tools/runtime_probe/README.md):
 
@@ -115,7 +138,7 @@ Checks: a documentation review against the requirements, pack, security, and pub
 - **Output contract:** `OUTPUT_SCHEMA` and the strict validator in `contract.py` are verified offline only ([contract section 16](21-ai-task-contracts-and-prompts.md#16-neutral-protocol-proof-p011)).
 - **Not verified, with owners:**
   - At the P01.1 checkpoint, sign-in, live inference and structured output awaited P01.2. The successful P01.2 live neutral/resume report above now supplies that evidence; gameplay readiness remains unverified.
-  - The runtime logs that no system `bubblewrap` is on `PATH` and falls back to its bundled copy. Whether that sandbox works with capabilities dropped belongs to P01.3.
+  - The runtime logs that no system `bubblewrap` is on `PATH` and falls back to its bundled copy. P01.3 resolved this by not relying on that sandbox: the profile offers no command tool, and the container is the boundary (ADR 0013).
   - Only `linux/amd64` was run.
   - The fixture account lives in tmpfs; persistent account volumes belong to P02.3.
 

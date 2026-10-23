@@ -1,0 +1,94 @@
+# Engine isolation profile for the narration runtime (P01.3).
+#
+# Installed read-only at /etc/codex/managed_config.toml, the path the pinned
+# runtime (0.164.0) reads on Linux as its managed configuration layer. Verified
+# behavior: this layer takes precedence over user configuration in CODEX_HOME,
+# over project configuration and over `--enable`/`-c` launch flags, so every
+# launch path of the image (stdio probe, live probe, Compose service) gets the
+# same profile and no launch argument can widen it. Two gaps remain that this
+# layer cannot close: configuration tables merge (an inherited MCP server
+# survives `mcp_servers = {}` here), and CODEX_HOME/AGENTS.md is always loaded.
+# requirements.toml and runtime-entrypoint.sh in this directory close them.
+#
+# Purpose: the model receives an empty tool list. Narration needs text in and
+# structured text out; every host capability (commands, file edits, images,
+# search, delegation, extensions) is removed here rather than refused later.
+# The tests in tools/runtime_probe/test_isolation.py fail if any tool, inherited
+# instruction or extension reaches the upstream request.
+#
+# Failure behavior: an unknown key is ignored by the runtime, which would
+# silently drop a restriction, so every key below is exercised by those tests
+# against the pinned version. Re-run them after any runtime upgrade.
+
+# Engine-owned model catalog (same models, efforts and defaults as the pinned
+# bundled catalog, verified against model/list). Each entry selects direct tool
+# mode, disables the shell tool type, removes the patch tool and experimental
+# tools, accepts text input only, and replaces upstream agent instructions with
+# neutral engine instructions. Without it, the bundled catalog forces code mode,
+# which offers command execution and patching regardless of the features below.
+model_catalog_json = "/etc/codex/engine-model-catalog.json"
+
+# Base instructions come from an engine file with the same text as the catalog
+# entries. Setting it here (rather than relying on the catalog alone) also
+# overrides any instruction file an inherited user configuration names; an
+# empty developer_instructions likewise replaces inherited developer text.
+model_instructions_file = "/etc/codex/engine-instructions.md"
+developer_instructions = ""
+
+# No search tool, no project instruction files (AGENTS.md and fallbacks), no
+# collaboration-mode prompt text, and no host environment block (working
+# directory, shell, time zone) in the prompt.
+web_search = "disabled"
+project_doc_max_bytes = 0
+include_collaboration_mode_instructions = false
+include_environment_context = false
+include_apps_instructions = false
+
+# The runtime must never ask the user anything: questions would stall a turn
+# that the engine cannot answer interactively.
+[tools.experimental_request_user_input]
+enabled = false
+
+# No skill instructions or bundled skills enter the prompt.
+[skills]
+include_instructions = false
+
+[skills.bundled]
+enabled = false
+
+# Feature switches. `false` here wins over `--enable` and user config.
+[features]
+# Remote catalogs, connectors and update checks (also disabled by the image's
+# default command; repeated here so other launch paths cannot re-enable them).
+plugins = false
+remote_plugin = false
+apps = false
+in_app_updates = false
+# Host command execution and its helpers.
+shell_tool = false
+unified_exec = false
+shell_snapshot = false
+# Code mode would offer a scripting tool with nested patching.
+code_mode = false
+code_mode_only = false
+# Host file and image access.
+view_image = false
+image_generation = false
+# Delegation, scheduling and long-running goals.
+multi_agent = false
+multi_agent_v2 = false
+sleep_tool = false
+goals = false
+# Hooks run host commands on lifecycle events.
+hooks = false
+plugin_hooks = false
+# Persistent memories and tool discovery.
+memories = false
+tool_search = false
+tool_suggest = false
+skill_search = false
+# Browser and desktop control.
+browser_use = false
+browser_use_external = false
+in_app_browser = false
+computer_use = false

@@ -45,6 +45,12 @@ MAX_TURN_EVENTS = 4096
 # The final agent message is bounded like the output contract (4 KiB) with
 # headroom, so an oversized message is rejected before validation.
 MAX_MESSAGE_TEXT = 65536
+# Item types a narration turn may contain (P01.3, ADR 0013). The isolation
+# profile offers the model no tools, so a command, file change, tool call,
+# search or any unknown item type means the profile no longer holds; the turn
+# fails closed instead of the engine trusting output produced alongside it.
+ALLOWED_TURN_ITEMS = frozenset(('userMessage', 'agentMessage', 'reasoning',
+                                'contextCompaction'))
 # The neutral task's only user text. It carries no game, account, or local
 # data, and it contains no fixture scenario token; the session fixture
 # appends one token per turn to select the scripted upstream behavior.
@@ -212,14 +218,17 @@ def await_turn(rpc, thread_id, turn_id, *, timeout, on_started=None):
     - 'model/rerouted' for this turn fails closed: the effective model would
       differ from the explicit request;
     - the agent message is taken from item/completed, never from deltas, and
-      is returned only when the terminal status is 'completed'.
+      is returned only when the terminal status is 'completed';
+    - every correlated item, on item/started and item/completed, must have a
+      type in ALLOWED_TURN_ITEMS; anything else is a host action the isolation
+      profile should have made impossible and fails the turn.
 
     ``on_started`` is called once with no arguments after the matching
     turn/started notification; the probe uses it to interrupt a held turn.
     Output: {'turnId', 'status', 'started', 'errorCode', 'willRetry', 'text',
     'ignored', 'foreign', 'events'}.
     Raises ContractError on timeout, event-limit overflow, malformed
-    correlated events, or a rerouted model.
+    correlated events, an unexpected item type, or a rerouted model.
     """
     deadline = time.monotonic() + timeout
     summary = {'turnId': turn_id, 'status': None, 'started': False, 'errorCode': None,
@@ -258,11 +267,15 @@ def await_turn(rpc, thread_id, turn_id, *, timeout, on_started=None):
         elif method == 'error':
             summary['errorCode'] = _error_code(params.get('error'))
             summary['willRetry'] = params.get('willRetry') is True
-        elif method == 'item/completed':
+        elif method in ('item/started', 'item/completed'):
             item = params.get('item')
             if not isinstance(item, dict):
                 raise ContractError('invalid-turn-item')
-            if item.get('type') == 'agentMessage':
+            # Checked on start too, so a host action is reported before the
+            # runtime finishes it rather than only after its result exists.
+            if item.get('type') not in ALLOWED_TURN_ITEMS:
+                raise ContractError('unexpected-turn-item')
+            if method == 'item/completed' and item.get('type') == 'agentMessage':
                 text = item.get('text')
                 if not isinstance(text, str) or len(text.encode('utf-8')) > MAX_MESSAGE_TEXT:
                     raise ContractError('invalid-agent-message')

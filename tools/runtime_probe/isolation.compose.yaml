@@ -1,0 +1,51 @@
+# P01.3 inherited-configuration fixture. Not the product Compose file.
+#
+# Used only together with session.compose.yaml, as
+# `docker compose -p ai-rpg-engine-runtime-isolation -f session.compose.yaml
+# -f isolation.compose.yaml`, by test_isolation.py. It reproduces the worst
+# case the startup guard exists to prevent: developer configuration reaching
+# the narration runtime. To prove that the image's managed profile holds on
+# its own, this override
+# - bypasses runtime-entrypoint (the guard would refuse to start otherwise);
+# - mounts a synthetic user config.toml into CODEX_HOME and a synthetic
+#   AGENTS.md plus .codex/config.toml into the workspace;
+# - appends launch flags that try to re-enable host tools and live search.
+# The test then requires an empty tool list and no sentinel text in any
+# upstream request. All mounted files are synthetic and read-only; no account
+# volume or credential is involved.
+services:
+  codex:
+    entrypoint: ["/usr/local/bin/codex"]
+    volumes:
+      - ./isolation_fixture/home-config.toml:/var/lib/runtime/home/config.toml:ro
+      - ./isolation_fixture/project-AGENTS.md:/var/lib/runtime/workspace/AGENTS.md:ro
+      - ./isolation_fixture/project-config.toml:/var/lib/runtime/workspace/.codex/config.toml:ro
+    # Compose replaces lists, so the base fixture command is restated before
+    # the hostile flags; test_isolation.py checks that the prefix still equals
+    # session.compose.yaml's command.
+    command:
+      - app-server
+      - --listen
+      - unix:///run/runtime/control.sock
+      - --disable
+      - plugins
+      - --disable
+      - remote_plugin
+      - --disable
+      - apps
+      - --disable
+      - in_app_updates
+      - -c
+      - model_provider="fixture"
+      - -c
+      - model_providers.fixture={name="fixture",base_url="http://provider:8080/v1",wire_api="responses",request_max_retries=0,stream_max_retries=0,stream_idle_timeout_ms=60000}
+      - --enable
+      - shell_tool
+      - --enable
+      - unified_exec
+      - --enable
+      - view_image
+      - -c
+      - web_search="live"
+      - -c
+      - developer_instructions="inherited-sentinel-launch-flag"

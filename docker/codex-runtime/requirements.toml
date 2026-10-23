@@ -1,0 +1,20 @@
+# Engine requirements for the narration runtime (P01.3).
+#
+# Installed read-only at /etc/codex/requirements.toml. Unlike the managed
+# configuration layer, which supplies values, requirements constrain what any
+# layer or request may select; a request outside them is rejected.
+#
+# Verified with the pinned runtime (0.164.0): an MCP server declared in an
+# inherited user config.toml still starts and adds resource tools when only
+# managed_config.toml sets `mcp_servers = {}`, because configuration tables
+# merge. The empty allowlist below is what removes them.
+
+# No MCP server may start, whatever any configuration layer declares.
+mcp_servers = {}
+
+# The engine always starts threads and turns read-only with approval `never`
+# (tools/runtime_probe/session.py). Anything wider is refused by the runtime
+# instead of being trusted to the caller.
+allowed_approval_policies = ["never"]
+allowed_sandbox_modes = ["read-only"]
+allowed_web_search_modes = ["disabled"]

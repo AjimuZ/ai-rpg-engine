@@ -37,7 +37,7 @@ The steps below describe the local stdio probe. In the packaged profile, Compose
 3. Launch the supported stdio form for the pinned version. The demo's historical `--stdio` flag is not assumed current.
 4. Start independent bounded stdout and stderr readers before sending requests.
 5. Perform the documented initialization handshake and discover account/model capabilities.
-6. Load only the selected runtime policy. Verify unwanted tools, inherited plugins, global MCP servers, project instructions, hooks, and development capabilities are unavailable.
+6. Load only the selected runtime policy. Verify unwanted tools, inherited plugins, global MCP servers, project instructions, hooks, and development capabilities are unavailable. For 0.164.0 this policy is baked into the runtime image ([ADR 0013](adr/0013-narration-runtime-isolation.md)); the engine still validates the effective thread policy and rejects any non-narration turn item.
 7. Create or resume a role- and audience-scoped thread bound to a logical AI session.
 8. Start a task turn with explicit effective model, effort, sandbox, and output contract.
 9. Correlate notifications to operation, process generation, thread, turn, and item.
@@ -97,6 +97,14 @@ Model service connectivity is separate from the agent's permission to browse or 
 
 If the pinned runtime cannot enforce the required restrictions, P01 fails its release gate. Use a supported restricted process environment or an explicitly isolated local runtime profile and retest. Prompt instructions are defense in depth, not the security boundary. Do not enable broad workspace writes simply to make the demo pattern work.
 
+P01.3 applied this rule to 0.164.0 ([ADR 0013](adr/0013-narration-runtime-isolation.md)):
+
+- **Boundary:** the container. Bubblewrap is absent and is not relied on.
+- **Removed capabilities:** a root-owned managed configuration layer, an engine model catalog and requirements remove every model tool (the upstream request carries `tools: []`), pin approval `never`, sandbox `read-only` and search `disabled`, and drop inherited extension servers.
+- **Startup guard:** the image refuses to start when the runtime home contains `config.toml`, `AGENTS.md` or `AGENTS.override.md`.
+- **Policy requests:** `danger-full-access` thread requests are rejected; other wider requests are clamped to read-only/never.
+- **Turn items:** the engine fails a turn containing any command, file change, tool call, search or unknown item (`unexpected-turn-item`).
+
 No gameplay action grants approval to alter the engine or developer environment. Unexpected approval or tool requests produce a controlled task error, not an approval dialog inside the fictional scene.
 
 ## 9. Model and reasoning routing
@@ -123,6 +131,6 @@ For 0.164.0, `thread/start` requests a persistent thread with `approvalPolicy: n
 
 Before the first playable release, capture: executable version; OS; launch form; protocol schema/contract digest; supported account discovery; paginated model catalog; structured result behavior; event ordering; interruption terminal states; restricted read/tool policy; inherited configuration isolation; and clean owned-process shutdown.
 
-P01.1 captured the executable version, both launch forms (stdio and the packaged socket), account discovery without sign-in, and the paginated catalog. P01.2 adds real app-server lifecycle and scripted structured-result evidence, with `inferenceVerified: false` for that fixture. Its separate owner-signed-in neutral task now validates live structured output and resume, with `inferenceVerified: true` in the retained report. Deeper isolation, process lifecycle coverage, retained compatibility fixtures and maturity/platform limits remain P01.3–P01.5 work.
+P01.1 captured the executable version, both launch forms (stdio and the packaged socket), account discovery without sign-in, and the paginated catalog. P01.2 adds real app-server lifecycle and scripted structured-result evidence, with `inferenceVerified: false` for that fixture. Its separate owner-signed-in neutral task now validates live structured output and resume, with `inferenceVerified: true` in the retained report. P01.3 verifies the restricted tool/read policy and inherited-configuration isolation with deterministic fixtures. A live re-check of that profile hit the account usage limit (`usageLimitExceeded`) and remains to be repeated. Process lifecycle coverage, retained compatibility fixtures and maturity/platform limits remain P01.4–P01.5 work.
 
 Run fixtures without live inference in normal CI. Run a minimal opt-in real Codex smoke with neutral temporary context for the supported release baseline. No private campaign, paid call, or account access is needed to verify documentation or ordinary domain tests.

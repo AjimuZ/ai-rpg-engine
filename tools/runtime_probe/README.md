@@ -34,7 +34,7 @@ This test double is confined to the fixture; it does not introduce a production
 provider abstraction. The runtime receives no account volume, credentials,
 developer home, campaign or repository mount. Runtime state is temporary. The
 relay has no network. Internal networking disables external routing; host/tool
-containment still requires P01.3.
+containment is covered by `test_isolation.py` (P01.3, below).
 
 Seven upstream requests establish these facts:
 
@@ -102,4 +102,24 @@ must resolve against the runtime catalog; defaults are resolved and then sent
 explicitly. It validates correlated completed output before resuming the thread
 in a second stdio process using that volume. Only that verified path reports
 `inferenceVerified: true`. This owner-authenticated neutral stdio path passed; packaged
-runtime/socket restart, broader platform coverage and the remaining isolation gates are pending.
+runtime/socket restart and broader platform coverage are pending. A live re-check after the
+P01.3 profile reached the account usage limit (`usageLimitExceeded`) and must be repeated.
+
+## Isolation profile (P01.3)
+
+`test_isolation.py` checks the profile baked into the runtime image
+([ADR 0013](../../docs/adr/0013-narration-runtime-isolation.md)). Its file tests always
+run. Its three Docker tests (`RUNTIME_PROBE_DOCKER`) use the synthetic, account-free
+`session` fixture under the dedicated `ai-rpg-engine-runtime-isolation` project. They
+prove the following:
+
+- the upstream request carries `tools: []` and only engine instructions;
+- six scripted host tool calls are refused, and no file is written;
+- `danger-full-access` thread starts are rejected, and other wider policies are clamped;
+- `isolation.compose.yaml` bypasses the guard to mount the synthetic files in
+  `isolation_fixture/` plus hostile launch flags, and none of them take effect;
+- the guard refuses `config.toml`, `AGENTS.md` and `AGENTS.override.md` in the
+  runtime home with exit 78.
+
+Rebuild the probe image first (`docker compose -f tools/runtime_probe/compose.yaml
+build codex`). Re-run these tests after every runtime upgrade.
