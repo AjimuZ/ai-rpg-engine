@@ -11,6 +11,9 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
+import org.springframework.core.env.MutablePropertySources;
+import org.springframework.core.env.MapPropertySource;
+import org.springframework.core.env.StandardEnvironment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -74,7 +77,27 @@ class PackagedSecretsTest {
         var application = new SpringApplication(SecretConfiguration.class);
         application.setWebApplicationType(WebApplicationType.NONE);
         application.setLogStartupInfo(false);
+        application.setEnvironment(new IsolatedEnvironment());
         return application;
+    }
+
+    /**
+     * Environment without process environment variables. Host CI and developers export
+     * SPRING_DATASOURCE_* for the database-backed tests, and those variables outrank the
+     * mounted secret file, which would make the file-contract assertions depend on the
+     * caller. Command-line arguments and system properties stay available.
+     */
+    private static final class IsolatedEnvironment extends StandardEnvironment {
+        /** Construct the environment; property sources are customized during the super call. */
+        IsolatedEnvironment() {
+        }
+
+        /** Register system properties only, deliberately skipping the process environment. */
+        @Override
+        protected void customizePropertySources(MutablePropertySources sources) {
+            sources.addLast(new MapPropertySource(
+                    SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME, getSystemProperties()));
+        }
     }
 
     /** Return isolated config arguments for a directory; a missing tree remains a fatal import. */

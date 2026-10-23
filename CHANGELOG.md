@@ -9,6 +9,9 @@ This changelog records delivered project artifacts. Future functionality belongs
   build/test against a job-local PostgreSQL, and container context/Compose checks.
 - Add stdlib-only repository checks (secret and private-path scan, Markdown links
   and fences, workflow policy, image pins) with 22 unit tests.
+- Make `PackagedSecretsTest` independent of exported `SPRING_DATASOURCE_*` variables, which
+  otherwise override the mounted secret file and failed the backend build under CI-style
+  environment settings; the job was replayed in JDK 21 and PostgreSQL 18 containers.
 - Not yet confirmed by a hosted run; the dependency license inventory moves to P19.1.
 
 ## Unreleased — Containerized application shell (P02.3), 23 October 2026

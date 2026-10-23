@@ -348,10 +348,20 @@ content/assets and full container integration remain open; P02.3 stays unchecked
   report no findings on this repository; repository_checks 22 tests, runtime_probe 116
   (18 opt-in skipped), container_packaging 5 (1 opt-in skipped) pass; `docker build --check`
   and `docker compose --env-file .env.example config --quiet` are clean; frontend typecheck,
-  test and build pass and `npm audit` reports 0 vulnerabilities. **Not verified:** the
-  workflow has never run on GitHub (it cannot be run from the development environment), and
-  `./mvnw verify` was not run on this host because its JDK 27 is rejected by the pinned
-  JDK 21 policy, so the backend job is unproven. Not delivered: the dependency license
+  test and build pass and `npm audit` reports 0 vulnerabilities.
+  **Backend job reproduced (23 October 2026, later session):** the host JDK 27 is rejected by
+  the pinned policy, so the job's steps were replayed in disposable containers on a private
+  Docker network: `eclipse-temurin:21-jdk` (plus `unzip`, which hosted Ubuntu runners
+  already include) running `./mvnw -B -ntp verify` against the digest-pinned
+  `postgres:18.6-trixie` with `SPRING_DATASOURCE_*` exported exactly as the workflow does.
+  The first replay exposed a real defect that would have failed the hosted job: the exported
+  password outranked the mounted secret file in `PackagedSecretsTest`. The test now loads
+  Boot configuration through an environment without process variables; the replay then
+  reports BUILD SUCCESS (9 tests, 3 packaged-interface tests skipped as designed). The four
+  pinned action SHAs were re-resolved from their upstream release tags and match.
+  **Not verified:** the workflow has never run on GitHub (it cannot be run from the
+  development environment); the hosted run is the remaining exit check and needs the owner
+  to publish the branch. Not delivered: the dependency license
   inventory (moved to P19.1) and automated action/image pin refresh. Left unchecked until the
   first hosted run of all four jobs succeeds.
 - [ ] P02.5 Provide health/readiness contracts and useful startup failure states.

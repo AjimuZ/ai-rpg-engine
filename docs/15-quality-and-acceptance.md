@@ -21,7 +21,9 @@ build-context/Compose suite, the frontend typecheck/test/build/audit and the
 backend `verify` against a job-local PostgreSQL. The checkers have 22 unit tests
 with negative cases; see the [repository checks](../tools/repository_checks/README.md).
 The opt-in Docker recreation and live-account checks are not run in CI, and the
-workflow has not yet executed on GitHub.
+workflow has not yet executed on GitHub. The backend job was replayed locally in JDK 21
+and PostgreSQL 18 containers; backend tests that read the secret-file contract must not
+depend on exported `SPRING_DATASOURCE_*` variables, which CI sets for the database tests.
 
 ## 2. Verification layers
 
