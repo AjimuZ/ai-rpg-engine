@@ -1,6 +1,6 @@
 # ADR 0004: Declarative, Immutable Adventure Packs
 
-**Status:** Proposed format; adventure independence is an owner requirement. **Date:** 22 October 2026.
+**Status:** Proposed format; adventure independence is an owner requirement. [ADR 0010](0010-name-scope-format-licensing.md) fixes the concrete file syntax of pack contract 1. **Date:** 22 October 2026.
 
 ## Context
 

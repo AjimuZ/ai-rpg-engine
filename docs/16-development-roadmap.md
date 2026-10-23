@@ -38,7 +38,7 @@ Critical dependency chain: compatible stack → safe Codex profile → persisten
 - [x] P00.2 Select a maintained Spring Boot version supporting Java 21, Maven Wrapper version, PostgreSQL major/image, and Flyway version.
 - [x] P00.3 Pin initial supported OS/runtime targets, Linux container images, Compose/engine versions, and shell requirements; Windows with WSL2 is first to validate.
 - [x] P00.4 Confirm AI RPG Skirmish as the implementable default and record numerical defaults as provisional.
-- [ ] P00.5 Record the selected name AI RPG Engine and confirm v1 boundaries, initial file format, and licensing plan.
+- [x] P00.5 Record the selected name AI RPG Engine and confirm v1 boundaries, initial file format, and licensing plan.
 
 **Progress (22 October 2026):** P00.1 is complete. [ADR 0009](adr/0009-toolchain-baseline.md) pins Angular 22.2.3, TypeScript 6.0.3, Node.js 24.22.1 LTS, npm 11.19.1, RxJS 7.8.2, tslib 2.8.1, and Vitest 5.0.5, and records the workstation tool inventory. Evidence: npm registry engines/peer metadata, Angular and Node.js support schedules, a conflict-free lockfile resolution of the pinned set with npm 11.19.1, and an `ERESOLVE` rejection of TypeScript 7.0.2.
 
@@ -66,6 +66,15 @@ The probe stack, image, and scratch files were removed. No volume was created. N
 - **Provisional numbers:** the tunable values, each with its defining section and calibration gate (P11, P13, P18.3). They are stored as ruleset-profile data and change only through versioned ruleset revisions.
 
 One previously implicit point is now explicit: the default profile has no maximum level, and a pack may declare one. This was a documentation review; no simulation or playtest ran, so balance remains unclaimed. P00.5 remains open, so the package exit is not yet met.
+
+**Progress (23 October 2026):** P00.5 is complete, and with it the P00 package. [ADR 0010](adr/0010-name-scope-format-licensing.md) is accepted:
+
+- **Name:** the owner-selected name AI RPG Engine is recorded with its derived identifiers. The slug, Compose project, and npm/Angular name are `ai-rpg-engine`; the Maven coordinates are `io.github.ajimuz:ai-rpg-engine-backend`; the Java base package is `io.github.ajimuz.rpgengine`; and the ruleset ID is `skirmish`. No trademark search has been done; P19.1 owns it.
+- **v1 boundaries:** the MVP, v1.0, and out-of-scope lines in the requirements are confirmed without change. Unverified hosts and prebuilt image publication are explicitly outside v1.
+- **Pack contract 1:** UTF-8 without a byte-order mark; YAML 1.2 core-schema `.yaml` files with no anchors, aliases, merge keys, tags, or duplicate keys; equivalent `.json`; CommonMark `.md` prose with no front matter or rendered HTML; JSON Schema draft 2020-12; directory or `.zip` distribution. The campaign archive format belongs to P16.
+- **Licensing plan:** MIT for the engine and the neutral sample packs, third-party packs under their own terms, a permissive allowlist for bundled dependencies (inventory gate in P02.4, review in P19.1), and locally built images that are not redistributed.
+
+Checks: a documentation review against the requirements, pack, security, and publication specifications, plus a local link and anchor check of the changed documents. No parser exists yet; P04.1, P04.4, and P04.5 verify the format with the corpus tests listed in the ADR. **P00 exit evidence:** ADR 0009 holds the version matrix, ADR 0006 and ADR 0010 settle the remaining pre-scaffold decisions, there is no "Java 17/21" ambiguity or `latest` dependency, and the only deferred items are the narration runtime image (P01.1) and the Temurin 21.0.13 image refresh (P02.3), both with owners.
 
 **Deliverables:** a concrete version matrix and updated ADR status. **Exit:** no ambiguous “Java 17/21,” implicit latest dependencies, or unowned pre-scaffold decisions. **Checks:** dependency compatibility references and a minimal tool availability inventory. **Suggested commit:** `Record supported toolchain and engine baselines`.
 

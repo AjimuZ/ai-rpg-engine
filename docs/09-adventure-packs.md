@@ -2,7 +2,7 @@
 
 ## 1. Purpose and contract status
 
-An adventure pack is a versioned set of declarative files describing playable content and supported rules configuration. It is not a script that can command the host computer. This document defines the proposed v1 authoring contract; no parser, validator, JSON Schema file, or pack compiler exists yet.
+An adventure pack is a versioned set of declarative files describing playable content and supported rules configuration. It is not a script that can command the host computer. This document defines the proposed v1 authoring contract; no parser, validator, JSON Schema file, or pack compiler exists yet. The concrete file syntax of pack contract 1 (`schemaVersion: 1`) is fixed by [ADR 0010](adr/0010-name-scope-format-licensing.md#decision-initial-pack-file-format-pack-contract-1). It covers UTF-8 encoding, YAML 1.2 core-schema `.yaml` files without anchors, aliases, tags, or duplicate keys, `.json` as an equivalent, CommonMark `.md` prose without front matter or rendered HTML, and directory or `.zip` distribution.
 
 The engine must not need a fixed plot. A minimal pack supplies world principles, a starting location/situation, character creation, a ruleset, and generation boundaries. Quests, endings, a prologue, companions, and a guide are optional.
 
@@ -90,7 +90,7 @@ Definitions reference stable IDs, never display-name matching. A label can be lo
 
 ## 5. Markdown versus structured data
 
-Markdown holds atmosphere, lore descriptions, personality notes, and author guidance. YAML or JSON holds mechanics, references, conditions, starting state, and generation policies. Front matter, if supported, follows one documented schema and cannot hide operational instructions.
+Markdown holds atmosphere, lore descriptions, personality notes, and author guidance. YAML or JSON holds mechanics, references, conditions, starting state, and generation policies. Front matter is not part of pack contract 1: a leading metadata block in a Markdown file is a blocking error, so prose cannot hide operational instructions or a second set of metadata. A later contract version may add one documented front-matter schema.
 
 Prose may say that a sword is remarkable, but a numerical bonus requires a structured effect. A lore note saying “this always succeeds” cannot override target legality, resource bounds, or engine permissions. Import diagnostics should point to this mismatch rather than relying on the model to reconcile it.
 
@@ -124,7 +124,7 @@ In combat, generated mechanics must use supported templates/effects and fit the 
 
 1. Stage the owner-selected directory/archive in a non-executable area.
 2. Reject absolute paths, `..` traversal, symlinks/reparse points escaping the root, case collisions, executable payload types, oversized or explosive archives, and remote includes.
-3. Parse with safe YAML/JSON settings; prohibit custom tags and object construction; bound aliases, nesting, and file count.
+3. Parse with safe YAML 1.2 core-schema and JSON settings. Prohibit tags and object construction, reject anchors, aliases, merge keys, and duplicate keys (contract 1 allows no aliases), and bound nesting and file count.
 4. Validate manifest and individual definition schemas, preserving filename/line/field locations.
 5. Resolve dependencies and cross-file references; detect duplicate IDs and unsupported versions.
 6. Validate rules, effect graphs, expressions, creation budgets, quest cycles, and initial invariants.

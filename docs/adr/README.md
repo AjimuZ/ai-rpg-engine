@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-Records 0001–0005, 0007, and 0008 are **proposed for the AI RPG Engine implementation baseline**. Record 0006 is accepted as the implementable default ruleset, with provisional numerical values. Record 0009 is accepted for its completed sections only. Owner-supplied constraints are identified separately from design choices. No “accepted” status implies implemented code or completed validation.
+Records 0001–0005, 0007, and 0008 are **proposed for the AI RPG Engine implementation baseline**. Record 0006 is accepted as the implementable default ruleset, with provisional numerical values. Record 0009 is accepted for its completed sections only. Record 0010 is accepted: it records the product name, v1 boundaries, initial pack file format, and licensing plan. Owner-supplied constraints are identified separately from design choices. No “accepted” status implies implemented code or completed validation.
 
 | Record | Decision |
 | --- | --- |
@@ -13,5 +13,6 @@ Records 0001–0005, 0007, and 0008 are **proposed for the AI RPG Engine impleme
 | [0007](0007-audience-isolation.md) | Knowledge filtering and role/audience thread isolation |
 | [0008](0008-containerized-startup.md) | Containerized packaged installation and root `start.sh`; supersedes the deployment assumptions in 0001 and 0002 |
 | [0009](0009-toolchain-baseline.md) | Pinned supported toolchain versions; frontend, backend, build, database, host platform, container image, Compose, and shell sections accepted; the narration runtime image belongs to P01.1 |
+| [0010](0010-name-scope-format-licensing.md) | Product name AI RPG Engine and derived identifiers, confirmed v1 boundaries, pack contract 1 file format, and licensing plan; accepted |
 
 When a decision changes, preserve this record and create a superseding one with rationale, compatibility implications, and verification. Do not retroactively edit historical status to make a previous decision disappear.

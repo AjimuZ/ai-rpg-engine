@@ -45,6 +45,8 @@ Project software and documentation use the [MIT License](../LICENSE), copyright 
 
 Authors retain their rights in their own adventure packs and content; running a pack with the engine does not impose MIT on it. Separately supplied images, audio, fonts, icons, model-related assets, and external reference material can have different licenses. Their metadata must identify origin, author, license/version, required attribution, modifications, and distribution permission. The bundled UI concept is a documentation illustration whose provenance and distribution terms are recorded [alongside the image](mockups/advanced-gameplay-ui-v1.prompt.md). The demo's missing standalone license remains a reuse question; its private content and implementation are not copied here.
 
+[ADR 0010](adr/0010-name-scope-format-licensing.md#decision-licensing-plan) holds the full licensing plan. Neutral sample packs are MIT and ship `LICENSE.md` and `CREDITS.md`. Bundled dependencies must use a permissive license from an allowlist; weak-copyleft and dual licenses need a recorded review, and strong-copyleft, source-available, and non-commercial licenses are excluded. The project builds container images locally and does not redistribute them.
+
 ## 5. Combat inspiration and rights
 
 The product should describe AI RPG Skirmish as an original configurable turn-based ruleset. Do not copy external rulebook text, distinctive settings, creature descriptions, illustrations, stat blocks, or branded presentation. Renaming a copied system is not a sufficient publication process.
