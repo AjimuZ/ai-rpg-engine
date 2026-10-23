@@ -2,6 +2,11 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Authenticated neutral lifecycle completion (P01.2), 23 October 2026
+
+- Verify one live neutral task after owner-operated device-code login in a dedicated runtime volume. Explicit `gpt-6-luna` / `low` settings produce a correlated completed envelope accepted by the independent validator; a second stdio process resumes the same completed turn and settings.
+- Retain a sanitized runtime 0.164.0 report without account identifiers, credentials or thread/turn IDs. Rerun all 51 protocol tests with Docker enabled: all pass with no skips. Complete P01.2; deeper isolation, packaged startup, gameplay behavior and QA-08/QA-28 remain open.
+
 ## Unreleased — Development packaging prerequisite revision, 23 October 2026
 
 - Permit local development image builds on the existing exact official Java 21.0.12.1 pins while the updated official images are unpublished. Retain the same distribution, base, digest checks and packaging acceptance; require the newest published Java update before release.

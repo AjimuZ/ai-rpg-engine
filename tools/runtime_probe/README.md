@@ -86,7 +86,7 @@ does not verify inference or close P01.2. Do not run live verification concurren
 with login or another process using the same account volume. The future launcher
 still needs its own tested sign-in/status integration in P02.6–P02.7.
 
-The separate `live` profile is opt-in and has **not been run for P01.2**. The
+The separate `live` profile is opt-in and **passed for P01.2 on 23 October 2026** after owner-operated sign-in. The [sanitized report](evidence/live-neutral-0.164.0.json) records explicit `gpt-6-luna` / `low`, validated completed output and resume from a second stdio process; it omits thread/turn IDs and all credentials. The
 owner must first complete supported sign-in in a dedicated runtime-home Docker
 volume accessible to UID/GID 10001; this probe never signs in or copies host
 credentials. After explicitly choosing that existing volume, run:
@@ -101,5 +101,5 @@ volume or an absent account before starting a thread. `--model` and `--effort`
 must resolve against the runtime catalog; defaults are resolved and then sent
 explicitly. It validates correlated completed output before resuming the thread
 in a second stdio process using that volume. Only that verified path reports
-`inferenceVerified: true`. Account-backed execution, persistent sign-in, packaged
-runtime restart, platform coverage and the remaining isolation gates are pending.
+`inferenceVerified: true`. This owner-authenticated neutral stdio path passed; packaged
+runtime/socket restart, broader platform coverage and the remaining isolation gates are pending.

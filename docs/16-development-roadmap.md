@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: P00, P01.1 and P02.1–P02.2 complete; P01.2 and P02.3 partial.** Angular and Spring development shells, runtime compatibility probes and partial packaging infrastructure exist; gameplay remains unimplemented. P01.2 awaits owner-authenticated neutral inference. P02.3 can resume local image/integration work under ADR 0009's development-only Java revision below. Predecessor milestones and repository housekeeping do not complete an engine implementation work package.
+**Current status: P00, P01.1–P01.2 and P02.1–P02.2 complete; P02.3 partial.** Angular and Spring development shells, runtime compatibility probes and partial packaging infrastructure exist; gameplay remains unimplemented. P01.2 now includes owner-authenticated neutral output and thread resume; P01.3 is the next protocol task. P02.3 can resume local image/integration work under ADR 0009's development-only Java revision below. Predecessor milestones and repository housekeeping do not complete an engine implementation work package.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.3–P01.6 await their P01 predecessors. Later package work must still pass its own prerequisites and exit checks.
 
@@ -85,18 +85,18 @@ Checks: a documentation review against the requirements, pack, security, and pub
 **Depends on:** P00. **Areas:** future `backend/.../codex`, isolated verification fixtures, operations docs.
 
 - [x] P01.1 Establish pinned Codex executable/image versions, local stdio probe and packaged private IPC transport, handshake, container account readiness, paginated catalog, and output contract.
-- [ ] P01.2 Verify thread creation/resume, explicit per-turn model/effort, notification correlation, terminal status, and interruption.
+- [x] P01.2 Verify thread creation/resume, explicit per-turn model/effort, notification correlation, terminal status, and interruption.
 - [ ] P01.3 Demonstrate restricted roots, denied canonical writes, unavailable unwanted host tools, and inherited-config isolation.
 - [ ] P01.4 Demonstrate owned-process shutdown, EOF/timeout handling, stderr bounds, and early-event buffering.
 - [ ] P01.5 Save neutral protocol fixtures and a supported-version matrix; record service maturity and platform limitations.
 - [ ] P01.6 Record supported image-generation capability or explicit unavailability, restricted invocation, output formats and account/cost boundaries; gate actual generation without blocking text-only fallback or enabling paid access implicitly.
 
-**Progress (23 October 2026):** P01.2 has a verified partial implementation in [`tools/runtime_probe`](../tools/runtime_probe/README.md):
+**Progress (23 October 2026):** P01.2 is complete with verified implementation in [`tools/runtime_probe`](../tools/runtime_probe/README.md):
 
 - **Lifecycle:** the pinned 0.164.0 app-server uses a scripted upstream on an internal Docker network without credentials. Seven actual turns across two threads prove creation, reconnect/resume, explicit upstream model/effort/full-schema comparisons, foreign-event filtering, completed/failed/interrupted outcomes and closure of both interrupted upstream streams. Resume checks ordered terminal histories and sticky settings; the runtime itself stays alive.
 - **Regression coverage:** effective-policy validation, unknown-error redaction, missing output, malformed lifecycle events, early notifications, privileged-request denial, queue bounds, buffered-event deadlines and refusal to treat an interrupt acknowledgment as terminal confirmation. The sequential probe discards foreign events; a production concurrent dispatcher remains future adapter work.
 - **Verification:** on Windows 11 / Docker Desktop Engine 29.9.2 / `linux/amd64`, `py -B -m unittest discover -s tools/runtime_probe` with `RUNTIME_PROBE_DOCKER` set passed all **51 tests** (including all 30 lifecycle checks). This includes the pinned JDK's warning-free compilation checks and the relay's 40 framing/handshake checks. `docker compose --file tools/runtime_probe/session.compose.yaml config --quiet` passed. Both fixture projects returned successful, empty container listings after the suite; no volumes were deleted. Every Python class/function in the changed files has a docstring. No account-backed call was made; the scripted report retains `inferenceVerified: false`.
-- **Remaining gate:** P01.2 stays unchecked because the opt-in real neutral task requires the owner's supported sign-in. The owner must initialize a dedicated runtime-home volume for UID/GID 10001, explicitly run the documented `probe.py live` command, and retain a successful correlated completed-envelope/resume report before closure. The probe never signs in or copies host credentials. P01.3–P01.5 isolation, runtime lifecycle, retained compatibility evidence and platform gates remain open; QA-08 and QA-28 are not claimed.
+- **Live completion (23 October 2026):** after owner-operated supported device-code sign-in in a dedicated UID/GID 10001 account volume, `probe.py --timeout 120 live` passed with explicit `gpt-6-luna` / `low`. The independent validator accepted the correlated completed envelope; a second stdio process resumed the thread with the same completed turn and settings. The [sanitized retained report](../tools/runtime_probe/evidence/live-neutral-0.164.0.json) records `inferenceVerified: true`, 80 events and 8 ignored events, omitting account identifiers and thread/turn IDs. The private full report is retained locally. All 51 protocol tests passed again with Docker enabled and no skips (25.392 seconds). The earlier account-free fixture remains separate evidence. P01.3–P01.5 isolation, broader runtime lifecycle, compatibility and platform gates remain open; QA-08 and QA-28 are not claimed.
 
 **Progress (23 October 2026):** P01.1 is complete for discovery without an account:
 
@@ -112,7 +112,7 @@ Checks: a documentation review against the requirements, pack, security, and pub
   - No probe container remained afterwards.
 - **Output contract:** `OUTPUT_SCHEMA` and the strict validator in `contract.py` are verified offline only ([contract section 16](21-ai-task-contracts-and-prompts.md#16-neutral-protocol-proof-p011)).
 - **Not verified, with owners:**
-  - Sign-in, a signed-in readiness state, live inference, and live structured output need the owner's account and thread/turn support. They belong to P01.2 and the P01 opt-in check.
+  - At the P01.1 checkpoint, sign-in, live inference and structured output awaited P01.2. The successful P01.2 live neutral/resume report above now supplies that evidence; gameplay readiness remains unverified.
   - The runtime logs that no system `bubblewrap` is on `PATH` and falls back to its bundled copy. Whether that sandbox works with capabilities dropped belongs to P01.3.
   - Only `linux/amd64` was run.
   - The fixture account lives in tmpfs; persistent account volumes belong to P02.3.
@@ -129,7 +129,7 @@ P02.1 covers repository policy only: clean-clone application build, health, data
 
 P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules of [ADR 0009](adr/0009-toolchain-baseline.md). Its development-only revision allows P02.3 local image builds on the verified exact official 21.0.12.1 JDK/JRE pins while updated images are unpublished. Refresh both pins when official 21.0.13 (or later 21.0.x) images appear; the newest published Java update remains a release requirement. P02.2 records the npm install-script policy and any test-library helper images.
 
-**Unblocking revision (23 October 2026):** the owner requested resuming development after external prerequisites stopped the queue. Both existing exact Java tags still resolve to the recorded index digests and the official tag API still reports zero 21.0.13 images. ADR 0009 now supersedes the first-build refresh prerequisite for local development only; earlier checkpoint descriptions of that gate below are historical. P02.3 remains unchecked until its real container integration checks pass. P01.2 independently remains unchecked until supported owner sign-in and a successful live neutral report; preparing a dedicated account volume/login does not itself verify inference. No release is authorized by this revision.
+**Unblocking revision (23 October 2026):** the owner requested resuming development after external prerequisites stopped the queue. Both existing exact Java tags still resolve to the recorded index digests and the official tag API still reports zero 21.0.13 images. ADR 0009 now supersedes the first-build refresh prerequisite for local development only; earlier checkpoint descriptions of that gate below are historical. P02.3 remains unchecked until its real container integration checks pass. P01.2 was independently closed only after owner sign-in and the successful live neutral/resume report above; preparing a volume/login alone was insufficient. No release is authorized by this revision.
 
 - [x] P02.1 Add owner-approved license, ignore rules, formatting/line-ending rules, contribution policy, and neutral environment placeholders.
 P02.2 delivered neutral standalone/zoneless Angular 22.2.3 and Spring Boot 4.1.2

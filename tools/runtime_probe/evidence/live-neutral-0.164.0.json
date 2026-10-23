@@ -1,0 +1,16 @@
+{
+  "runtimeVersion": "0.164.0",
+  "accountState": "account-present-unverified",
+  "inferenceVerified": true,
+  "model": "gpt-6-luna",
+  "effort": "low",
+  "status": "completed",
+  "events": 80,
+  "ignored": 8,
+  "resumed": true,
+  "profile": "live-container-stdio",
+  "checkedAt": "2026-10-23T14:41:05.760751+00:00",
+  "identifiersOmitted": true,
+  "environment": "Windows 11 / Docker Desktop / linux/amd64",
+  "command": "py -B tools/runtime_probe/probe.py --timeout 120 live --docker docker.exe --image rpg-engine/runtime:0.164.0 --account-volume rpg-engine-owner-runtime-account --model gpt-6-luna --effort low"
+}
