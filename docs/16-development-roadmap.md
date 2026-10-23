@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: P00 baseline decisions in progress (P00.1–P00.3 complete). No AI RPG Engine application code has been implemented.** Runtime implementation work remains pending. Predecessor milestones and repository housekeeping do not complete an engine implementation work package.
+**Current status: P00 complete; P01 in progress (P01.1 complete). No AI RPG Engine application code has been implemented.** The only code is the developer compatibility probe in `tools/runtime_probe` and the narration runtime image definition in `docker/codex-runtime`. Runtime implementation work remains pending. Predecessor milestones and repository housekeeping do not complete an engine implementation work package.
 
 Repository preparation recorded on 22 October 2026 includes the private GitHub repository, root MIT license, attribution, ignore rules, text line-ending policy, and contribution guidance. The development workflow requires immediate roadmap and affected-documentation updates after every work item, truthful completion evidence, and neutral commit messages. The owner's checkout also has verified local Git gates; lifecycle-hook activation requires review in the relevant client. These local checks are not distributed in a clone and do not replace P02.4 continuous integration.
 
@@ -49,7 +49,7 @@ Critical dependency chain: compatible stack → safe Codex profile → persisten
 - **First validation target:** Windows 11 x64 with Docker Desktop (WSL 2 backend, Linux containers), running `start.sh` from Git Bash. Bash in a WSL distribution is an unverified candidate, and Linux and macOS hosts remain unclaimed.
 - **Images, pinned by multi-platform index digest:** Dockerfile frontend 1.27.1; `node:24.22.1-trixie-slim` for the frontend build stage; Eclipse Temurin `21.0.12.1_1-jdk-resolute` and `21.0.12.1_1-jre-resolute` (Ubuntu 26.04 LTS) for the backend build and runtime stages; and the P00.2 PostgreSQL image.
 - **Launcher floors:** Docker Engine 29.0, Compose 5.0, and a Buildx plugin, verified with Docker Desktop 4.96.3, Engine 29.9.2, Compose v5.6.1, and Buildx v0.38.1. The shell floor is GNU Bash 4.4, with a fixed list of host commands and Git Bash path-conversion rules.
-- **Refresh policy:** a digest-refresh policy now covers every image. Temurin 21.0.13+9 binaries were published on 22 October 2026, but no official image existed on 23 October 2026, so P02.3 must refresh the JDK and JRE references before building the first engine image. The narration runtime image belongs to P01.1.
+- **Refresh policy:** a digest-refresh policy now covers every image. Temurin 21.0.13+9 binaries were published on 22 October 2026, but no official image existed on 23 October 2026, so P02.3 must refresh the JDK and JRE references before building the first engine image. The narration runtime image was deferred to P01.1, which has since pinned it in the same record.
 
 Evidence: registry digests resolved with `docker buildx imagetools inspect`; Adoptium, Node.js, Docker Desktop, Compose, and Dockerfile reference metadata; and a throwaway Compose probe run from Git Bash in an ignored scratch path containing a space.
 
@@ -82,12 +82,31 @@ Checks: a documentation review against the requirements, pack, security, and pub
 
 **Depends on:** P00. **Areas:** future `backend/.../codex`, isolated verification fixtures, operations docs.
 
-- [ ] P01.1 Establish pinned Codex executable/image versions, local stdio probe and packaged private IPC transport, handshake, container account readiness, paginated catalog, and output contract.
+- [x] P01.1 Establish pinned Codex executable/image versions, local stdio probe and packaged private IPC transport, handshake, container account readiness, paginated catalog, and output contract.
 - [ ] P01.2 Verify thread creation/resume, explicit per-turn model/effort, notification correlation, terminal status, and interruption.
 - [ ] P01.3 Demonstrate restricted roots, denied canonical writes, unavailable unwanted host tools, and inherited-config isolation.
 - [ ] P01.4 Demonstrate owned-process shutdown, EOF/timeout handling, stderr bounds, and early-event buffering.
 - [ ] P01.5 Save neutral protocol fixtures and a supported-version matrix; record service maturity and platform limitations.
 - [ ] P01.6 Record supported image-generation capability or explicit unavailability, restricted invocation, output formats and account/cost boundaries; gate actual generation without blocking text-only fallback or enabling paid access implicitly.
+
+**Progress (23 October 2026):** P01.1 is complete for discovery without an account:
+
+- **Pins:** runtime release `rust-v0.164.0` (`codex-cli 0.164.0`), using static musl binaries verified by `ADD --checksum`, on `debian:trixie-20261020-slim` pinned by index digest. The image is defined in [`docker/codex-runtime/Dockerfile`](../docker/codex-runtime/Dockerfile) and runs as UID/GID 10001. [ADR 0009](adr/0009-toolchain-baseline.md#container-images) mirrors every reference. `test_packaged.py` fails if the Dockerfile, the Compose fixture, the ADR, and `contract.VERSION` drift apart.
+- **Stdio probe:** `probe.py host|container` owns the child process. It sends `initialize`, then the `initialized` notification, then `account/read` with `refreshToken: false`, then `model/list` one page at a time (`limit: 2`, bounded to 32 pages, 256 models, and 1 MiB messages). Server requests are denied, stderr is counted and discarded, and the child environment is an allowlist.
+- **Packaged IPC:** `probe.py packaged` runs [`tools/runtime_probe/compose.yaml`](../tools/runtime_probe/compose.yaml). The runtime listens on `unix:///run/runtime/control.sock`. A Java 21 client, `UnixRelay.java`, stands in for the engine adapter and reaches the socket only through a tmpfs IPC volume. Neither service has a network, and both run read-only with all capabilities dropped and `no-new-privileges`.
+- **Transport findings:** the runtime speaks WebSocket (RFC 6455) text messages over the Unix socket, not newline-delimited JSON. It binds the real socket, with mode `0600`, at `/tmp/codex-daemon-<uid>/<sha256(path)>`, and leaves only a symlink at the configured path. The [deployment specification](22-container-deployment-and-startup.md#3-runtime-integration-gate) records the consequences.
+- **Results:** these ran on Windows 11 with Docker Desktop (Engine 29.9.2, Compose 5.6.1, `linux/amd64`).
+  - The container stdio profile and the packaged socket profile both returned version 0.164.0, account state `sign-in-required`, and the same eight-model catalog across several pages.
+  - Relays running as UID 10002 and as root without capabilities were refused (`socket-io`).
+  - The pinned JDK compiled the relay with `-Xlint:all -Werror`, and its 40 handshake and framing checks passed.
+  - `py -B -m unittest discover -s tools/runtime_probe` passed 21 tests. It skipped the 3 Docker tests, which run only when `RUNTIME_PROBE_DOCKER` is set. With it set, all 6 `test_packaged.py` tests passed.
+  - No probe container remained afterwards.
+- **Output contract:** `OUTPUT_SCHEMA` and the strict validator in `contract.py` are verified offline only ([contract section 16](21-ai-task-contracts-and-prompts.md#16-neutral-protocol-proof-p011)).
+- **Not verified, with owners:**
+  - Sign-in, a signed-in readiness state, live inference, and live structured output need the owner's account and thread/turn support. They belong to P01.2 and the P01 opt-in check.
+  - The runtime logs that no system `bubblewrap` is on `PATH` and falls back to its bundled copy. Whether that sandbox works with capabilities dropped belongs to P01.3.
+  - Only `linux/amd64` was run.
+  - The fixture account lives in tmpfs; persistent account volumes belong to P02.3.
 
 **Deliverables:** isolated compatibility probe and evidence, later retained as adapter tests when authorized implementation begins. **Exit:** no unreviewed broad write/tool privileges and no dependency on undocumented launch assumptions. Failure blocks real gameplay integration; it does not authorize a generic AI replacement. **Checks:** one opt-in real neutral task plus deterministic protocol fixtures. **Suggested commit:** `Verify narration runtime compatibility and isolation`.
 

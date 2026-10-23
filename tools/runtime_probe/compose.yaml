@@ -1,0 +1,77 @@
+# P01.1 packaged-transport fixture. Not the product Compose file (P02.3).
+#
+# It reproduces the packaged topology with nothing else attached: the pinned
+# narration runtime listens on its private Unix socket, and a Java 21 client
+# (UnixRelay.java, standing in for the engine adapter) reaches that socket only
+# through a shared IPC volume. Run it through `probe.py packaged`; the probe
+# owns the relay process and stops the fixture afterwards.
+#
+# Isolation in this fixture:
+# - neither service has a network, so discovery provably needs no service
+#   connectivity and cannot send inference context;
+# - the runtime gets no account volume: account state lives in memory and
+#   disappears with the container, so readiness is reported as sign-in-required;
+# - the relay mounts only the IPC volume and its own source file, never the
+#   runtime's home or a Docker socket;
+# - both root filesystems are read-only, all capabilities are dropped, and both
+#   processes run as UID/GID 10001, the only identity the 0600 socket admits.
+name: ai-rpg-engine-runtime-probe
+
+services:
+  codex:
+    build:
+      context: ../../docker/codex-runtime
+    image: ai-rpg-engine-runtime-probe/codex:0.164.0
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /var/lib/runtime/home:uid=10001,gid=10001,mode=0700
+      - /var/lib/runtime/workspace:uid=10001,gid=10001,mode=0700
+      # The runtime creates the PATH symlink here; see the image comments.
+      - /run/runtime:uid=10001,gid=10001,mode=0700
+      - /tmp:mode=1777
+    volumes:
+      # The runtime binds the real socket inside this directory.
+      - ipc:/tmp/codex-daemon-10001
+    healthcheck:
+      # The socket file name is the SHA-256 of /run/runtime/control.sock.
+      test: ["CMD", "test", "-S", "/tmp/codex-daemon-10001/bd2fc4d5dd4ec410275f7d5460680ca9c0ce1ef1b48e49b182f350ff18153681"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+      start_interval: 1s
+
+  relay:
+    # The pinned Java 21 build image from ADR 0009; the single-file source
+    # launcher compiles UnixRelay.java in memory, so no build step is needed.
+    image: eclipse-temurin:21.0.12.1_1-jdk-resolute@sha256:3b59c79a788985965c89203cca233c53893f62293108bb825264740fac926724
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    user: "10001:10001"
+    environment:
+      HOME: /tmp
+      JAVA_TOOL_OPTIONS: -XX:-UsePerfData -Xshare:off
+    tmpfs:
+      - /tmp:mode=1777
+    volumes:
+      - ipc:/ipc
+      - ./UnixRelay.java:/probe/UnixRelay.java:ro
+    entrypoint: ["java", "/probe/UnixRelay.java"]
+    command: ["/ipc/bd2fc4d5dd4ec410275f7d5460680ca9c0ce1ef1b48e49b182f350ff18153681"]
+    depends_on:
+      codex:
+        condition: service_healthy
+
+volumes:
+  # Holds only the control socket and its lock file. tmpfs-backed and owned by
+  # the runtime UID, so nothing persists at rest and other UIDs cannot enter.
+  ipc:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: uid=10001,gid=10001,mode=0700

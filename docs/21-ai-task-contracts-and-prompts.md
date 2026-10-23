@@ -128,3 +128,7 @@ Each template has a semantic contract version, content hash, role/audience polic
 Maintain neutral golden fixtures for ambiguous input, resource misuse, forbidden field patches, duplicated identities, hidden facts, invented rewards, repeated prologues, unsupported abilities, current-versus-last-known location, terminal combat outcomes, and summary contradictions. Grade structure and authority mechanically; review narrative implications with a human rubric.
 
 Measure cost in provider tasks and latency, not only response length. Avoid an additional AI classifier where a structured task type and local rules already supply routing. Do not remove required validation or memory work to make a benchmark appear faster.
+
+## 16. Neutral protocol proof (P01.1)
+
+`tools/runtime_probe/contract.py` defines a deliberately narrow compatibility envelope and `OUTPUT_SCHEMA` for the pinned runtime’s `turn/start.outputSchema`. The independent validator accepts only the exact neutral fact “The marker is blue.” with matching version, task, revision, digest, status, and body, after a confirmed completed turn. Duplicate keys, nonfinite JSON numbers, unknown fields, stale echoes, and oversized output fail closed. This is deterministic contract evidence, not a gameplay validator or a live structured-output result. Thread/turn/item correlation belongs to P01.2.

@@ -58,6 +58,13 @@ Protocol method candidates inherited from the demo are `initialize`, `initialize
 - On EOF or process exit, fail unresolved requests, reconcile each operation receipt, and discard old process-generation events.
 - Keep raw provider events outside the player-facing API.
 
+Framing verified in P01.1 for runtime 0.164.0:
+
+- **Stdio:** one JSON message per line.
+- **Packaged Unix socket:** one JSON message per WebSocket text message, after an HTTP/1.1 upgrade. The client masks its frames and reassembles fragmented messages. It rejects binary frames and applies the same size limits.
+
+The [deployment specification](22-container-deployment-and-startup.md#3-runtime-integration-gate) records the socket location and permission findings.
+
 ## 6. Task contracts
 
 | Task | Input | Allowed output | Authority |
@@ -107,5 +114,7 @@ A protocol timeout does not prove a turn did not execute. Before retrying, recon
 ## 11. Compatibility gate
 
 Before the first playable release, capture: executable version; OS; launch form; protocol schema/contract digest; supported account discovery; paginated model catalog; structured result behavior; event ordering; interruption terminal states; restricted read/tool policy; inherited configuration isolation; and clean owned-process shutdown.
+
+P01.1 used `tools/runtime_probe` to capture these items for runtime 0.164.0: the executable version, both launch forms (stdio and the packaged socket), account discovery without sign-in, and the paginated catalog. Structured results are validated offline only. The remaining items belong to P01.2–P01.5.
 
 Run fixtures without live inference in normal CI. Run a minimal opt-in real Codex smoke with neutral temporary context for the supported release baseline. No private campaign, paid call, or account access is needed to verify documentation or ordinary domain tests.

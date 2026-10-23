@@ -4,7 +4,7 @@
 
 AI RPG Engine separates the software that runs an adventure from the files that describe its world. Authors supply settings, characters, objectives, abilities, equipment, encounters, and presentation preferences. The engine supplies reliable state, deterministic rules, long-term continuity, turn-based combat, and AI orchestration through Codex.
 
-**Project status: documentation and design only.** There is no runnable AI RPG Engine application, backend, database schema, adventure compiler, or combat implementation in this repository. Every feature below is a development target. No installation command is currently available.
+**Project status: design complete; compatibility verification in progress.** There is no runnable AI RPG Engine application, backend, database schema, adventure compiler, or combat implementation in this repository. Every feature below is a development target. No installation command is currently available. The only code is a developer compatibility probe for the narration runtime in `tools/runtime_probe` (P01.1).
 
 ## Why this engine exists
 
@@ -40,7 +40,7 @@ The design primarily derives from **The World I Can Develop**: Angular, Spring B
 | Retrieval | Structured and full-text retrieval first; optional semantic indexing after evidence of need |
 | Verification | JUnit, PostgreSQL integration tests, Angular/Vitest, browser acceptance tests, Codex contract fixtures |
 
-The frontend, backend, build, and database versions, the container images, and the supported host and shell environment are recorded in [ADR 0009](docs/adr/0009-toolchain-baseline.md). The supported Codex protocol and runtime image baseline must still be recorded (P01). The source project's package versions are evidence of its choices, not a claim about the newest supported releases.
+The frontend, backend, build, and database versions, the container images, and the supported host and shell environment are recorded in [ADR 0009](docs/adr/0009-toolchain-baseline.md). The same record pins the Codex runtime image and executable at version 0.164.0 (P01.1). Thread, turn, isolation, and fixture compatibility are still being verified (P01.2–P01.5). The source project's package versions are evidence of its choices, not a claim about the newest supported releases.
 
 Campaign data is stored locally. **Codex inference requires the configured Codex service and account access.** Local hosting does not imply offline AI, unlimited usage, or local model inference. Ollama, generic provider routing, local LLMs, and direct replacement of Codex with a generic chat API are outside the initial release.
 

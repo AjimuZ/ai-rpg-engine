@@ -26,6 +26,16 @@ The packaged design targets a private Unix-domain socket shared between `engine`
 
 Official [app-server documentation](https://learn.chatgpt.com/docs/app-server) describes Unix-socket and stdio connections and identifies TCP WebSocket transport as experimental and unsupported. P01 must validate the exact pinned Linux runtime and Java client before accepting this transport. No production-support claim is inferred from the availability of a command option. A different transport requires an explicit decision update, authentication/isolation review, and new contract evidence; the launcher must not silently expose a TCP listener or mount the Docker socket into the backend to run `docker exec`.
 
+**P01.1 evidence (23 October 2026, runtime 0.164.0, `linux/amd64`):** the pinned image ([`docker/codex-runtime/Dockerfile`](../docker/codex-runtime/Dockerfile)) and a Java 21 client completed initialization, the account-state read, and catalog pagination over this socket. Neither container had a network attached ([`tools/runtime_probe/compose.yaml`](../tools/runtime_probe/compose.yaml)). These findings bind P02.3 and P08.1:
+
+- **Framing:** `--listen unix://PATH` serves WebSocket (RFC 6455) over the socket: an HTTP/1.1 upgrade, then one JSON-RPC message per text message. `java.net.http` has no Unix-socket transport, so the adapter needs its own bounded WebSocket client on `UnixDomainSocketAddress`. The probe's `UnixRelay.java` is the reference for the handshake and framing checks.
+- **Socket location:** the runtime binds the real socket, with mode `0600`, at `/tmp/codex-daemon-<uid>/<sha256(PATH)>`. That file sits in a `0700` directory next to a lock file, and `PATH` itself holds only a symlink to it.
+  - The IPC volume is therefore mounted at that daemon directory in `codex`, with `PATH`'s directory on a private tmpfs.
+  - The engine connects to the hashed file name.
+- **UID boundary:** the runtime and the engine must share one UID, 10001 in the probe. Relays running as UID 10002 and as root without capabilities were refused.
+- **Volume:** a tmpfs-backed IPC volume owned by UID 10001 keeps nothing at rest. `compose down` without `-v` leaves the named volume in place, and the launcher must not delete volumes.
+- **Not yet proven:** sign-in, readiness with a persistent account volume, and restart.
+
 Stdio remains the isolated local protocol-probe option. If the packaged runtime cannot satisfy authentication, isolation, or connection requirements, containerized delivery remains incomplete. It is not replaced with a different model provider or silently presented as a fully Dockerized host-runtime setup.
 
 ## 4. Planned repository artifacts
