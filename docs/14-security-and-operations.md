@@ -26,6 +26,8 @@ Bind to loopback; use one origin for release frontend/backend where practical. V
 
 Validate all campaign IDs and object references against the current owner. Apply the same authorization to SSE, exports, asset IDs, and diagnostics. Return inaccessible objects as safe not-found responses where appropriate. No arbitrary directory browsing, file-serving route, or remote URL proxy exists.
 
+Campaign authorization also resolves its owning adventure workspace. Specifications, narrative memory, drafts, jobs and generated-image paths cannot cross adventure/campaign scopes, even for equal entity names. Reject selected-adventure mismatches and escaped filesystem roots; follow [workspace isolation](25-adventure-workspaces.md).
+
 ## 5. Content and media security
 
 Pack imports use the containment, parser, size, alias, and archive limits in [the pack specification](09-adventure-packs.md). Reject unsupported executable types. Never render raw HTML from lore or model output without a strict sanitization policy; the default narrative format is plain text or a small safe Markdown subset.

@@ -25,6 +25,7 @@ The design primarily derives from **The World I Can Develop**: Angular, Spring B
 - Play primarily through a visual-novel screen with dominant scene art, named speakers, editable contextual quick replies and free input; keep an equivalent text-focused mode.
 - Deliver a complete graphical UI kit and persist identifying portraits/item icons, with accessible rarity and bounded runtime image generation in v1 ([presentation specification](docs/23-presentation-assets.md)).
 - Export campaigns and authoring files without exposing secrets through the player UI.
+- Keep personalized adventures in separate workspaces with their own specifications, playthroughs and generated-art folders ([workspace design](docs/25-adventure-workspaces.md)).
 
 ## Technology direction
 

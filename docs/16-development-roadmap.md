@@ -113,7 +113,7 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 
 **Depends on:** P02. **Areas:** campaign/domain/persistence, migrations.
 
-- [ ] P03.1 Implement campaign, actor, content revision, operation, event, reward source, and checkpoint foundations.
+- [ ] P03.1 Implement adventure-workspace, campaign, actor, content revision, operation, event, reward source and checkpoint foundations with explicit adventure/campaign ownership.
 - [ ] P03.2 Add campaign-scoped foreign keys and unique constraints, resource and ownership bounds, and explicit version fields.
 - [ ] P03.3 Commit state, events, receipts, and outbox messages together; no network waits in transactions.
 - [ ] P03.4 Add deterministic random-draw records and algorithm/version identity.
@@ -155,6 +155,7 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 - [ ] P06.2 Add owner-scoped campaign listing, continue, known state, inventory, quest, and ability projections.
 - [ ] P06.3 Show a pack-defined starting situation and pending decision without hardcoded prologue text.
 - [ ] P06.4 Keep exact status/inventory consultations local and separate transcript delivery from world state.
+- [ ] P06.5 Implement separate adventure specifications/media folders and library switching; prove same-name entity, draft, memory, artwork and restart/restore isolation under QA-33.
 
 **Exit:** two independent campaigns survive restart and read-only use changes no game counters. **Checks:** creation budget/loadout validation, ownership isolation, restart, and no-AI consultations. **Suggested commit:** `Add persistent campaigns and local RPG consultations`.
 
@@ -274,7 +275,7 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 - [ ] P16.1 Complete validation reports, author previews, dependency graph diagnostics, and content version inspection.
 - [ ] P16.2 Add full-owner versus player-facing exports with integrity manifests and rights metadata.
 - [ ] P16.3 Add migration/correction previews, dependency impact, backup, audit, and stale-memory invalidation.
-- [ ] P16.4 Restore into fresh storage/campaign IDs, including active combat and pending narration.
+- [ ] P16.4 Restore into explicit adventure/campaign destinations with fresh identities by default, including original artwork, active combat and pending narration; never merge by equal titles.
 - [ ] P16.5 Document manual file authoring with complete neutral examples and troubleshooting.
 
 **Exit:** an author can create and evolve content safely without a visual editor; an owner can recover data independently. **Checks:** QA-02, QA-16, QA-23, incompatible upgrade and corrupted archive tests. **Suggested commit:** `Add safe adventure and campaign administration`.
@@ -335,6 +336,7 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 | FR-029 | P00–P02, P14, P16, P19 |
 | FR-030 | P01, P04, P16–P18 |
 | FR-031 | P04, P10, P13, P17 |
+| FR-032 | P03, P05–P06, P09, P16–P17 |
 | NFR-001–012 | Cross-cutting gates in P01, P03, P07, P09, P16–P19 |
 
 ## 24. Explicitly later initiatives

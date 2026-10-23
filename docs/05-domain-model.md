@@ -49,6 +49,7 @@ One game action can emit many events but advances the game turn once. An NPC com
 | `AiSession` | Logical role, private thread reference, generation number, counters, source checkpoint hash |
 | `AssetRecord` | Category, content hash, path/object reference, rights metadata, entity links, audience |
 | `VisualIdentity` | Stable subject/definition identity, appearance/style revision, category, accepted asset reference and generation status |
+| `AdventureWorkspace` | Stable adventure ID, title/genre/locale, specifications, admitted content revisions, managed media scope and owned campaigns |
 
 Definition entities are immutable per revision. Campaign instances may extend them using validated namespaced data. New generated definitions are campaign-scoped unless explicitly exported by the owner into a pack.
 
@@ -65,6 +66,7 @@ Minimum indexes include campaign/revision, campaign/event sequence, operation id
 ### Campaign and operations
 
 - A transaction cannot mix campaign IDs or content hashes from another campaign.
+- Each campaign belongs to one adventure workspace; entity, media, memory and job ownership checks include it. Equal display names never justify cross-workspace reuse; see [workspace isolation](25-adventure-workspaces.md).
 - `expectedRevision` must equal the current revision at commit.
 - A state-changing operation has exactly one canonical receipt and at most one successful commit.
 - An idempotency key is unique within its campaign; the same key with a different normalized payload is a conflict.

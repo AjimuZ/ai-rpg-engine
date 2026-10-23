@@ -35,6 +35,8 @@ Store original accepted images under managed IDs in durable asset storage, with 
 
 ## 4. Bounded generation during play
 
+Originals and associations belong to their [adventure workspace/campaign](25-adventure-workspaces.md), with separate generated scene/portrait/item subdirectories. Equal names cannot resolve to shared private art; only public engine assets or deliberate export/import can cross scopes.
+
 Full v1 includes a bounded asynchronous generation job pipeline; static/catalog assets remain sufficient for the MVP. P01 must verify a supported image capability, its authentication/account/cost boundaries and restricted invocation. Codex text access alone is not proof of image access. Do not enable paid API credentials, another service or broader host tools implicitly. When unavailable, report the capability accurately and use a category fallback while preserving play.
 
 Pack/owner policy chooses `disabled`, `catalogOnly` or `bounded` by category. The owner enables generation explicitly and sets request/concurrency/budget limits before calls. Default to one active image job per campaign, coalesce duplicate requests and enforce a finite queue; the actual limits and provider behavior require implementation evidence. Do not generate a shop's entire unseen catalog merely because a panel opened.

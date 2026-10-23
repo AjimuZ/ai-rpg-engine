@@ -56,7 +56,7 @@ The SSE stream is at-least-once delivery, not exactly-once gameplay. Durable ope
 
 | Screen | Responsibilities |
 | --- | --- |
-| Library | Installed adventures, validation results, import, create/continue campaign |
+| Library | Independent adventure workspaces and create/continue playthroughs; reusable installed packs managed separately |
 | Character creation | Pack-defined choices, budgets, preview, validation, explicit create |
 | Narrative play | Default visual-novel scene, attributed narrator/character/player passages, editable quick replies, persistent composer and expandable chronicle |
 | Character/inventory | Authoritative stats, skills, equipment, resources, conditions, item actions |
@@ -91,6 +91,8 @@ Building the UI includes delivering its complete usable asset kit, not leaving t
 During play, supported bounded image-generation jobs can create new scene art, character portraits and identifying item icons. Save and reuse the results by stable entity/appearance identity. A named sword in a shop retains its image when inspected, purchased, equipped, saved or restored. Equivalent copies can share definition artwork; a visually distinct unique variant has its own identity. A reusable decorative portrait frame is distinct from the character portrait. Rarity uses an explicit tier name plus shape/icon/text treatment and the pack's rules, never color or artwork alone.
 
 Technical details such as model ID, reasoning level, session counters, and latency belong in settings/diagnostics. Ordinary play displays clear progress and save status. A guide panel is shown only if configured. A creative-ability panel is not labeled Rune unless the pack chooses that label.
+
+The header identifies the selected adventure/playthrough. Switching restores its drafts, reading position and art while rejecting old callbacks. The adventure-list/create/detail routes and selected-adventure campaign envelope are specified in [workspace isolation](25-adventure-workspaces.md); a world is not merely a quick-save slot.
 
 ## 7. Combat interaction
 

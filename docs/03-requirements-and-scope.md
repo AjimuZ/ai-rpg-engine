@@ -45,6 +45,7 @@
 | FR-029 | Deliver the containerized local application through a root `start.sh` launcher | Required | Prerequisite/auth diagnostics, health-based startup, no host build toolchains, persistent restart, and safe stop verified under QA-28 |
 | FR-030 | Generate and persist bounded scene, character and item artwork through a supported image capability | v1 | Stable visual identities, verified capability/cost limits, durable assets, stale-job protection and fallback under QA-31 |
 | FR-031 | Present validated, pack-defined item rarity consistently across shops, inventory and equipment | Basic tiers | Tier name plus non-color indication; artwork never assigns rarity, stats or price |
+| FR-032 | Manage parallel personalized adventure workspaces with separate specifications, campaigns and media folders | Required | QA-33 proves switching, same-name entities, memory/art isolation and scoped restore |
 
 ## 3. Nonfunctional requirements
 

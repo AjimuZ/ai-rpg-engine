@@ -23,6 +23,7 @@ Owners below are implementation responsibilities, not assigned people. The proje
 | Backups omit assets/content revisions | Incomplete recovery | Integrity manifest and fresh-storage restore rehearsal | Operations / P16, P18 |
 | Remote media disappears or tracks requests | Broken presentation/privacy | Optional origins, local fallback, rights registry, no gameplay dependency | Presentation / P17 |
 | Generated portraits/items drift, cross scopes or reveal secrets | Inconsistent identity or leaked hidden content | Stable public appearance identity, durable original assets, source/audience validation, stale-job rejection and restore checks | Presentation + QA / P17, QA-31 |
+| Parallel adventures share names or stale callbacks | Cross-world content, memory or artwork mixing | Adventure/campaign ownership, distinct managed folders, scoped drafts/threads/jobs and same-name two-genre isolation checks | Domain + QA / P03, P06, P16–P17, QA-33 |
 | Image generation is assumed available or spends without bounds | Unusable feature or unexpected account usage | Capability/account proof, explicit enablement and finite budgets, duplicate-job reconciliation and static/category fallback | Integration + Presentation / P01.6, P17.6 |
 | Public release includes private demo material | Privacy/rights exposure | Neutral samples, explicit rights inventory, no recursive source copy | Owner / P19 |
 | Stale documentation overstates implementation | Misleading public repository | One status matrix, evidence-linked milestones, docs review in CI | Maintainer / every milestone |
