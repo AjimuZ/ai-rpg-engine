@@ -12,11 +12,15 @@ from pathlib import Path
 import secrets
 import subprocess
 import unittest
+from urllib.request import ProxyHandler, build_opener
+from urllib.error import HTTPError
+from urllib.parse import urljoin, urlparse
+import re
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PROJECT = "engine-packaging-check"
-STATE = ROOT / ".local" / "packaging-check"
+PROJECT = "engine-packaged-shell-check"
+STATE = ROOT / ".local" / "packaged-shell-check"
 SOCKET = "/tmp/codex-daemon-10001/bd2fc4d5dd4ec410275f7d5460680ca9c0ce1ef1b48e49b182f350ff18153681"
 
 
@@ -33,7 +37,17 @@ class InfrastructureTest(unittest.TestCase):
             env=self.environment, capture_output=True, text=True,
             timeout=timeout, check=False,
         )
-        self.assertEqual(0, result.returncode, result.stderr[-3000:])
+        diagnostic = result.stderr[-3000:]
+        if result.returncode and arguments[0] == "up":
+            # Capture fixture-only startup diagnostics before cleanup removes
+            # failed services. No account is loaded and secrets are never logged.
+            logs = subprocess.run(
+                ["docker", "compose", "--project-name", PROJECT, "--file", str(ROOT / "compose.yaml"),
+                 "logs", "--no-color", "--tail", "45", "engine"],
+                env=self.environment, capture_output=True, text=True, timeout=30, check=False,
+            )
+            diagnostic += "\n" + logs.stdout[-6000:]
+        self.assertEqual(0, result.returncode, diagnostic)
         return result.stdout.strip()
 
     def database(self, statement: str) -> str:
@@ -57,6 +71,84 @@ class InfrastructureTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr[-1000:])
         return json.loads(result.stdout)[0]
 
+    def verify_http(self) -> None:
+        """Fetch packaged UI/health over published loopback; leaks or HTTP errors fail.
+
+        Inputs are the owned engine's dynamic host port and compiled asset URLs.
+        No proxy or owner service is contacted; only neutral response bytes remain.
+        """
+        engine = self.inspect("engine")
+        binding = engine["NetworkSettings"]["Ports"]["8080/tcp"]
+        self.assertEqual(1, len(binding))
+        self.assertEqual("127.0.0.1", binding[0]["HostIp"])
+        origin = f'http://127.0.0.1:{binding[0]["HostPort"]}/'
+        client = build_opener(ProxyHandler({}))
+        with client.open(origin, timeout=10) as response:
+            self.assertIn("text/html", response.headers["Content-Type"])
+            index = response.read().decode("utf-8")
+        self.assertIn("<title>Adventure engine</title>", index)
+        assets = re.findall(r'(?:src|href)="([^"]+\.(?:js|css))"', index)
+        self.assertGreaterEqual(len(assets), 2)
+        for asset in assets + ["3rdpartylicenses.txt", "actuator/health"]:
+            url = urljoin(origin, asset)
+            self.assertEqual(urlparse(origin).netloc, urlparse(url).netloc)
+            with client.open(url, timeout=10) as response:
+                body = response.read()
+                self.assertTrue(body)
+                if asset == "actuator/health":
+                    self.assertEqual({"status": "UP"}, json.loads(body))
+        for path in ("api/missing", ".env", "auth.json", "run/secrets/postgres_password",
+                     "actuator/env", "var/lib/engine/content/.packaging-check"):
+            with self.assertRaises(HTTPError) as error:
+                client.open(urljoin(origin, path), timeout=10)
+            try:
+                self.assertEqual(404, error.exception.code, path)
+            finally:
+                error.exception.close()
+
+    def verify_backend(self) -> None:
+        """Run all backend tests in the pinned JDK target against a separate fixture DB.
+
+        Inputs are neutral database labels and a read-only fixture secret mount;
+        no password value enters arguments/environment. Build/test failures fail
+        with bounded output. The disposable test container is always removed.
+        """
+        image = "rpg-engine/packaging-verification:0.1.0"
+        result = subprocess.run(
+            ["docker", "build", "--quiet", "--target", "verification", "--tag", image,
+             "--file", str(ROOT / "docker/engine/Dockerfile"), str(ROOT)],
+            capture_output=True, text=True, timeout=300, check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stderr[-3000:])
+        # Keep the public-schema scaffold assertion independent of the durable
+        # marker table in the infrastructure database, including on repeat runs.
+        self.database("DROP DATABASE IF EXISTS packaging_backend_checks")
+        self.database("CREATE DATABASE packaging_backend_checks")
+        try:
+            result = subprocess.run(
+                ["docker", "run", "--rm", "--network", PROJECT + "_data",
+                 "--mount", f"type=bind,source={STATE / 'postgres-password'},target=/run/secrets/postgres_password,readonly",
+                 "--env", "SPRING_PROFILES_ACTIVE=packaged",
+                 "--env", "SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/packaging_backend_checks",
+                 "--env", "SPRING_DATASOURCE_USERNAME=engine", image],
+                capture_output=True, text=True, timeout=300, check=False,
+            )
+            self.assertEqual(0, result.returncode, (result.stdout + result.stderr)[-4000:])
+            self.assertIn("Tests run: 9, Failures: 0, Errors: 0, Skipped: 0", result.stdout)
+        finally:
+            self.database("DROP DATABASE packaging_backend_checks")
+
+    def verify_missing_secret(self) -> None:
+        """Require the built jar to reject a missing config tree before healthy startup."""
+        result = subprocess.run(
+            ["docker", "compose", "--project-name", PROJECT,
+             "--env-file", str(ROOT / ".env.example"), "--file", str(ROOT / "compose.yaml"),
+             "run", "--rm", "--no-deps", "engine", "--engine.secrets-directory=/missing/"],
+            env=self.environment, capture_output=True, text=True, timeout=60, check=False,
+        )
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("does not exist", result.stdout + result.stderr)
+
     def test_recreation_preserves_private_storage(self) -> None:
         """Verify topology, UID/socket isolation and durable neutral markers on recreation."""
         STATE.mkdir(parents=True, exist_ok=True)
@@ -67,14 +159,46 @@ class InfrastructureTest(unittest.TestCase):
             with password.open("x", encoding="utf-8", newline="\n") as output:
                 output.write(secrets.token_urlsafe(32) + "\n")
             password.chmod(0o600)
-        self.environment = dict(os.environ, POSTGRES_PASSWORD_FILE=str(password))
+        self.environment = dict(os.environ, POSTGRES_PASSWORD_FILE=str(password), APP_PORT="0")
         # Never adopt or stop pre-existing containers, even with our fixture name.
         self.assertEqual("", self.compose("ps", "--all", "--quiet"),
                          "Fixture project already has containers; inspect them before rerunning")
         self.addCleanup(self.compose, "down", "--timeout", "30")
-        self.compose("up", "--detach", "--build", "--wait", "--wait-timeout", "90", timeout=300)
+        self.compose("up", "--detach", "--build", "--wait", "--wait-timeout", "90", timeout=600)
         database = self.inspect("postgres")
         runtime = self.inspect("codex")
+        engine = self.inspect("engine")
+        self.assertEqual({PROJECT + "_web", PROJECT + "_data"}, set(engine["NetworkSettings"]["Networks"]))
+        self.assertEqual("10001:10001", engine["Config"]["User"])
+        self.assertTrue(engine["HostConfig"]["ReadonlyRootfs"])
+        self.assertEqual(["ALL"], engine["HostConfig"]["CapDrop"])
+        self.assertIn("no-new-privileges:true", engine["HostConfig"]["SecurityOpt"])
+        self.assertFalse(any("PASSWORD=" in value for value in engine["Config"]["Env"]))
+        self.assertEqual(
+            {"/var/lib/engine/content", "/var/lib/engine/assets", "/tmp/codex-daemon-10001"},
+            {mount["Destination"] for mount in engine["Mounts"] if mount["Type"] == "volume"},
+        )
+        ipc = next(mount for mount in engine["Mounts"] if mount["Destination"] == "/tmp/codex-daemon-10001")
+        self.assertFalse(ipc["RW"])
+        # File secrets are the only bind; no source checkout/account/Docker socket.
+        self.assertEqual(["/run/secrets/postgres_password"],
+                         [mount["Destination"] for mount in engine["Mounts"] if mount["Type"] == "bind"])
+        self.compose("exec", "-T", "engine", "sh", "-ec",
+                     "test -r /run/secrets/postgres_password; test ! -e /var/lib/runtime/home; "
+                     "test ! -e /var/run/docker.sock; test ! -e /build; "
+                     "! command -v node; ! command -v javac; ! command -v mvn")
+        # A WebSocket upgrade proves this actual production UID can connect over
+        # the read-only IPC mount. No RPC, account read or inference is requested.
+        self.compose("exec", "-T", "engine", "sh", "-ec",
+                     'code=$(curl --silent --max-time 2 --unix-socket "$1" '
+                     '-H "Connection: Upgrade" -H "Upgrade: websocket" '
+                     '-H "Sec-WebSocket-Version: 13" '
+                     '-H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" '
+                     '-o /dev/null -w "%{http_code}" http://localhost/ || true); '
+                     'test "$code" = 101', "fixture", SOCKET)
+        self.verify_http()
+        self.verify_missing_secret()
+        self.verify_backend()
         self.assertEqual({PROJECT + "_data"}, set(database["NetworkSettings"]["Networks"]))
         self.assertEqual({PROJECT + "_inference"}, set(runtime["NetworkSettings"]["Networks"]))
         for container in (database, runtime):
@@ -109,8 +233,15 @@ class InfrastructureTest(unittest.TestCase):
         # A sentinel in each durable directory detects accidental anonymous/tmpfs
         # mounts even when Compose's rendered configuration looks correct.
         marker = secrets.token_hex(16)
-        self.database("CREATE TABLE IF NOT EXISTS packaging_check (marker text PRIMARY KEY)")
-        self.database(f"INSERT INTO packaging_check VALUES ('{marker}')")
+        self.compose("exec", "-T", "engine", "sh", "-ec",
+                     'printf "%s" "$1" > /var/lib/engine/content/.packaging-check; '
+                     'printf "%s" "$1" > /var/lib/engine/assets/.packaging-check', "fixture", marker)
+        # Keep fixture tables outside public: Flyway correctly refuses an unknown
+        # non-empty canonical schema without migration history. Do not baseline
+        # it automatically or change any previous infrastructure fixture volume.
+        self.database("CREATE SCHEMA IF NOT EXISTS packaging_fixture")
+        self.database("CREATE TABLE IF NOT EXISTS packaging_fixture.markers (marker text PRIMARY KEY)")
+        self.database(f"INSERT INTO packaging_fixture.markers VALUES ('{marker}')")
         self.compose("exec", "-T", "codex", "sh", "-ec",
                      'printf "%s" "$1" > /var/lib/runtime/home/.packaging-check; '
                      'printf "%s" "$1" > /var/lib/runtime/workspace/.packaging-check',
@@ -118,16 +249,24 @@ class InfrastructureTest(unittest.TestCase):
         self.compose("up", "--detach", "--force-recreate", "--wait", "--wait-timeout", "90")
         self.assertNotEqual(database["Id"], self.inspect("postgres")["Id"])
         self.assertNotEqual(runtime["Id"], self.inspect("codex")["Id"])
+        self.assertNotEqual(engine["Id"], self.inspect("engine")["Id"])
+        self.verify_http()
+        for directory in ("content", "assets"):
+            self.assertEqual(marker, self.compose("exec", "-T", "engine", "cat",
+                                                 f"/var/lib/engine/{directory}/.packaging-check"))
         self.assertEqual(marker, self.database(
-            f"SELECT marker FROM packaging_check WHERE marker = '{marker}'"))
+            f"SELECT marker FROM packaging_fixture.markers WHERE marker = '{marker}'"))
         for directory in ("home", "workspace"):
             self.assertEqual(marker, self.compose("exec", "-T", "codex", "cat",
                                                  f"/var/lib/runtime/{directory}/.packaging-check"))
         # Only fixture-owned neutral markers are removed; volumes remain intact.
-        self.database(f"DELETE FROM packaging_check WHERE marker = '{marker}'")
+        self.database(f"DELETE FROM packaging_fixture.markers WHERE marker = '{marker}'")
         self.compose("exec", "-T", "codex", "rm",
                      "/var/lib/runtime/home/.packaging-check",
                      "/var/lib/runtime/workspace/.packaging-check")
+        self.compose("exec", "-T", "engine", "rm",
+                     "/var/lib/engine/content/.packaging-check",
+                     "/var/lib/engine/assets/.packaging-check")
 
 
 if __name__ == "__main__":

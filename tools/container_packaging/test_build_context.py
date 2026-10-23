@@ -89,8 +89,10 @@ class BuildContextTest(unittest.TestCase):
         self.verify_context(ROOT / ".dockerignore", allowed, denied)
 
     def test_runtime_context(self) -> None:
-        """Restrict the independent runtime build context to its reviewed Dockerfile."""
-        self.verify_context(ROOT / "docker/codex-runtime/.dockerignore", {"Dockerfile"},
+        """Admit only the reviewed Dockerfile/isolation profile in the runtime context."""
+        allowed = {"Dockerfile", "managed_config.toml", "requirements.toml",
+                   "engine-model-catalog.json", "engine-instructions.md", "runtime-entrypoint.sh"}
+        self.verify_context(ROOT / "docker/codex-runtime/.dockerignore", allowed,
                             {".env", "auth.json", "private.key", "README.md",
                              ".local/account.json", ".codex/auth.json", "src/private.txt"})
 

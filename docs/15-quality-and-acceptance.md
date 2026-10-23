@@ -4,6 +4,16 @@
 
 AI RPG Engine has developer runtime compatibility tests in [`tools/runtime_probe`](../tools/runtime_probe/README.md), covering pinned discovery and deterministic thread/turn lifecycles. P01.4 adds owned-process shutdown, terminal wire failures, unresolved-request isolation, bounded/redacted stderr and ordered early events, with synthetic failure injection and the actual pinned runtime. These runtime checks do not establish gameplay/domain behavior or full QA-24 save coherence. The scripted upstream proves protocol behavior without an account and cannot establish live inference quality or account readiness. The separate owner-signed-in neutral smoke passed on 23 October 2026, validating correlated output and resume from a second stdio process; its sanitized report is retained with the probe, closing P01.2. These checks do not satisfy campaign renewal (QA-08) or packaged application startup (QA-28). P01.5 retains [neutral projections and a supported-version matrix](../tools/runtime_probe/COMPATIBILITY.md) for offline replay; replay alone cannot qualify a new runtime or platform. Predecessor test reports are references, not evidence that AI RPG Engine works. Every release claim must identify a fresh result, environment, scope, and limitation.
 
+P02.3 adds Docker Desktop Linux-container evidence for the packaged application
+shell: all five packaging checks pass, including actual HTTP delivery of the
+Angular entry point, hashed assets and notices, nine backend tests against
+PostgreSQL, missing-secret rejection, network/mount/identity isolation and
+durable markers across three-service recreation. The 116 runtime checks also
+pass without account access. This verifies packaging, not launcher, sign-in,
+campaign recovery or full QA-28 acceptance. Native Linux bind-secret ownership
+and the Java release refresh remain separate gates; see the
+[packaging checks](../tools/container_packaging/README.md).
+
 ## 2. Verification layers
 
 | Layer | Purpose | Proposed tools |

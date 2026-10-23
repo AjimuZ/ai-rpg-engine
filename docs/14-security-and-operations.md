@@ -53,19 +53,21 @@ or cost authorization; bounded policy alone cannot override this refusal.
 
 Never put Codex credentials, database passwords, `.env` files, auth stores, private saves, personal notes, or raw provider traces in Git. Diagnostic exports redact keys, tokens, absolute personal paths, private content, and RPC identifiers unless an owner explicitly selects a suitably protected full diagnostic mode.
 
-The tracked root [`.env.example`](../.env.example) contains only a proposed application port and neutral database labels; the database service now consumes its database labels. The application port is not consumed yet. The labels do not configure authentication. Supply passwords through private secret files and account state through the supported owner-controlled sign-in flow; never add either to a public example. Ignore rules are a staging safeguard, not a secret scanner or a substitute for reviewing the staged content. The root and independent runtime `.dockerignore` policies now default-deny build inputs and recursively exclude private names inside admitted source trees. Real BuildKit fixture exports verify both policies (`py -B -m unittest discover -s tools/container_packaging -v`); they do not scan arbitrary source content or establish full application containment.
+The tracked root [`.env.example`](../.env.example) contains only the consumed loopback application port and neutral database labels. The labels do not configure authentication. Supply passwords through private secret files and account state through the supported owner-controlled sign-in flow; never add either to a public example. Ignore rules are a staging safeguard, not a secret scanner or a substitute for reviewing the staged content. The root and independent runtime `.dockerignore` policies now default-deny build inputs and recursively exclude private names inside admitted source trees. Real BuildKit fixture exports verify both policies (`py -B -m unittest discover -s tools/container_packaging -v`); they do not scan arbitrary source content or establish full application containment.
 
 Player DTOs must omit unrevealed lore, private NPC knowledge, relationship internals, hidden encounter participants/statistics, and planner reasoning. Use separate role/audience threads so secret context cannot persist invisibly into a public narration task. Prevent media/audio choices from leaking a hidden threat before it is observed.
 
-The partial root Compose infrastructure gives only PostgreSQL the database file
+The root Compose shell gives only PostgreSQL and engine the database file
 secret. Runtime account/workspace volumes are separate from canonical storage;
-the runtime joins inference egress only, never the internal data network, and no
-service publishes a host port. Local Compose secrets are read-only host file
+the runtime joins inference egress only, never the internal data network. Only
+engine publishes HTTP on host loopback. Local Compose secrets are read-only host file
 mounts, not encrypted storage. The launcher still must create and restrict the
 host secret file in P02.6. PostgreSQL's official entrypoint initializes ownership
-as root and then drops privileges; the runtime uses UID/GID 10001, drops all
-capabilities and has a read-only root filesystem. The account-free infrastructure
-test verifies password-authenticated TCP and neutral persistence on recreation;
+as root and then drops privileges; engine and runtime use UID/GID 10001, drop all
+capabilities and have read-only root filesystems. Engine mounts only read-only
+socket IPC plus engine-only content/assets, never runtime account/workspace.
+The account-free integration test verifies HTTP, socket access,
+password-authenticated TCP and neutral persistence on recreation of all services;
 it never loads an account. This does not establish tool/inference containment or
 account readiness. See [deployment details](22-container-deployment-and-startup.md).
 
@@ -74,9 +76,9 @@ The backend's opt-in Spring `packaged` profile now requires a config tree at
 variable or command argument. Missing mount/password properties abort startup;
 normal explicit Spring overrides still apply. Tests use only neutral temporary
 files and cover trailing newlines and paths with spaces. This is application
-configuration, not completed Compose engine secret wiring. The future engine
-must receive only its required secret and IPC mounts, with host loopback port
-publication and verified UID readability on each supported host.
+configuration and verified Compose engine secret wiring on Windows Docker
+Desktop Linux containers. Native Linux secret-file UID readability remains a
+host qualification requirement: do not solve it by making secrets world-readable.
 
 ## 7. Data storage and retention
 

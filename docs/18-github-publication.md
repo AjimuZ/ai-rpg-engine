@@ -17,8 +17,8 @@ ai-rpg-engine/
   CONTRIBUTING.md
   SECURITY.md
   start.sh                  # future packaged local entry point
-  compose.yaml              # database/runtime infrastructure; engine pending
-  docker/                   # pinned runtime image; engine image pending
+  compose.yaml              # engine/database/runtime shell; launcher pending
+  docker/                   # pinned engine and isolated runtime images
   frontend/                 # neutral Angular development shell
   backend/                  # Spring Boot shell; runtime bridge remains future work
   adventures/               # future neutral sample packs

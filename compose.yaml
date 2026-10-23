@@ -1,10 +1,45 @@
-# Infrastructure checkpoint for P02.3, not a playable installation. The engine
-# service and its single-origin interface remain P02.3 work. ADR 0009 permits
+# Account-free application shell for P02.3, not a playable installation.
+# ADR 0009 permits
 # verified existing Java pins for local development; refresh is a release gate.
 # Never publish database/runtime ports or attach the runtime to the data network.
 name: rpg-engine
 
 services:
+  engine:
+    build:
+      context: .
+      dockerfile: docker/engine/Dockerfile
+    image: rpg-engine/engine:0.1.0
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      SPRING_PROFILES_ACTIVE: packaged
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-engine}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-engine}
+    secrets:
+      - postgres_password
+    # Only this service is reachable from the browser. Runtime inference egress
+    # remains a different network, and control traffic uses the socket only.
+    networks: [web, data]
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    volumes:
+      - content:/var/lib/engine/content
+      - assets:/var/lib/engine/assets
+      # Read-only filesystem access permits socket connections, not replacement.
+      - runtime_ipc:/tmp/codex-daemon-10001:ro
+    tmpfs:
+      - /tmp:uid=10001,gid=10001,mode=1777
+    depends_on:
+      postgres: {condition: service_healthy}
+      codex: {condition: service_healthy}
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
   postgres:
     image: postgres:18.6-trixie@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
     environment:
@@ -52,7 +87,7 @@ services:
     # Inference/sign-in egress is required; this network never reaches postgres.
     networks: [inference]
     volumes:
-      # Account state is private to this service; future engine mounts IPC only.
+      # Account state is private to this service; the engine mounts IPC only.
       - runtime_account:/var/lib/runtime/home
       - runtime_workspace:/var/lib/runtime/workspace
       # P01 proved the advertised socket is a symlink: share its real directory.
@@ -74,11 +109,14 @@ services:
       options: {max-size: 10m, max-file: "3"}
 
 networks:
+  web: {}
   data:
     internal: true
   inference: {}
 
 volumes:
+  content: {}
+  assets: {}
   database: {}
   runtime_account: {}
   runtime_workspace: {}

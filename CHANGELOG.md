@@ -2,6 +2,20 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Containerized application shell (P02.3), 23 October 2026
+
+- Build the packaged Angular interface and Spring Boot application in pinned
+  Node/JDK stages; ship only the executable jar and bundled notices in a
+  non-root JRE image.
+- Add the engine to Compose with loopback HTTP, private database/runtime
+  boundaries, read-only IPC, file-based database secrets, and durable content
+  and asset volumes. Keep private development data outside build contexts.
+- Verify the three-service shell with five packaging checks, nine backend
+  tests, frontend checks and 116 runtime checks. Recreation preserves neutral
+  storage markers; missing secrets fail startup. Full launcher/account/campaign
+  acceptance (QA-28), native Linux secret permissions and Java release refresh
+  remain separate gates.
+
 ## Unreleased — Bounded dispatch and serialized inference (P01.7), 23 October 2026
 
 - Add a bounded per-thread/turn inbox fixture using the real managed runtime

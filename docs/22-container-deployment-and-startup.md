@@ -2,7 +2,11 @@
 
 ## 1. Status and owner requirement
 
-**Design specification with partial infrastructure implementation.** The owner requires a Dockerized application launched through a root `start.sh` file. Neutral host development shells, a runtime probe and root database/runtime Compose services exist. An opt-in backend build now embeds the compiled interface and notices in one executable jar, with real HTTP verification. The packaged engine Dockerfile/service and launcher remain pending. The requirement applies to the engine and every adventure, without campaign-specific startup scripts.
+**Application shell packaging implemented; launcher/gameplay pending.** P02.3
+provides the pinned engine/runtime images and root Compose services, serving the
+neutral Angular shell and health from one loopback origin. Account-free build,
+secret, IPC and storage recreation checks pass. The owner requires a root
+`start.sh` entry point for every adventure; that launcher remains P02.6 work.
 
 The packaged local installation must run the application, database, and isolated Codex runtime through Docker Compose. Users must not need host Java, Maven, Node, or npm to build and launch that packaged profile. Codex service connectivity and supported account access are still required. Host-based development and stdio protocol probes remain optional developer workflows, not the completed packaged installation.
 
@@ -18,7 +22,7 @@ This supersedes the earlier database-only Compose plan. The decision and compati
 
 The engine remains one modular Java application. A dedicated runtime container is an isolation and packaging boundary, not a split into gameplay microservices or a generic provider service. A multi-stage engine image builds Angular and the Java application with pinned toolchains, then serves the compiled interface from the Java runtime. A separate frontend development container may be offered later for hot reload; it is not required for normal play.
 
-Only the engine's web entry point is published, bound to loopback. The proposed default is `http://127.0.0.1:8080`, configurable through a documented application-port setting. PostgreSQL and runtime-control endpoints are not published to the host. Keep the database network separate from the runtime's inference network.
+Only the engine's web entry point is published, bound to loopback. Its default is `http://127.0.0.1:8080`, configurable with `APP_PORT`. PostgreSQL and runtime-control endpoints are not published to the host. Keep the database network separate from the runtime's inference network.
 
 ## 3. Runtime integration gate
 
@@ -71,15 +75,15 @@ Production admission belongs to P08; any increase requires P08.6 evidence.
 | Root `.env.example` | Sanitized public configuration example without working credentials |
 | Version/compatibility records | Pin build/runtime images, dependency locks, runtime protocol, Compose features, and supported host environment; the pre-scaffold baseline is in [ADR 0009](adr/0009-toolchain-baseline.md) |
 
-The tracked root [`.env.example`](../.env.example) contains a proposed port and neutral database labels for future local configuration; its database labels configure the infrastructure services, but it does not make the application runnable. It contains no database password or runtime-account setting. The runtime image and compatibility records already exist for the developer probe. P02.3 adds the root [`.dockerignore`](../.dockerignore) and the independent [runtime context policy](../docker/codex-runtime/.dockerignore); the engine image/service, packaged interface, and launcher remain implementation deliverables. Keep actual `.env`, secret files, account state, and private data untracked. Build context must exclude local `.agents`, `.claude`, `.codex`, `AGENTS.md`, and `CLAUDE.md`; gameplay containers do not inherit development instructions or hooks.
+The tracked root [`.env.example`](../.env.example) contains the consumed application port and neutral database labels. It contains no database password or runtime-account setting. P02.3 supplies the engine/runtime images, root Compose and packaged interface; the launcher remains pending. Keep actual `.env`, secret files, account state, and private data untracked. The root [`.dockerignore`](../.dockerignore) and independent [runtime context policy](../docker/codex-runtime/.dockerignore) exclude local `.agents`, `.claude`, `.codex`, `AGENTS.md`, and `CLAUDE.md`; gameplay containers do not inherit development instructions or hooks.
 
-The context policies default-deny inputs: the root admits only Angular/Java build inputs and the future engine Dockerfile, while the runtime context admits only its Dockerfile. Final recursive exclusions protect private names even inside admitted source trees. New build inputs require policy and regression-test updates. The policies do not inspect arbitrary source contents for secrets. Run `py -B -m unittest discover -s tools/container_packaging -v` with the ADR 0009 Docker baseline; it exports neutral scratch-stage fixtures through real BuildKit without sending checkout contents or starting services. See the [test guide](../tools/container_packaging/README.md).
+The context policies default-deny inputs: the root admits only Angular/Java build inputs and the engine Dockerfile, while the runtime context admits its reviewed Dockerfile/profile files. Final recursive exclusions protect private names even inside admitted source trees. New build inputs require policy and regression-test updates. The policies do not inspect arbitrary source contents for secrets. Build-context tests export neutral scratch-stage fixtures through real BuildKit without sending checkout contents or starting services; the opt-in integration test builds the actual stack. See the [test guide](../tools/container_packaging/README.md).
 
 **P02.3 development image revision (23 October 2026):** the official Docker Hub tag API still returns zero tags matching `21.0.13`; the exact existing JDK/JRE tags resolve to their recorded ADR 0009 indexes. The owner-requested unblocking revision permits local development builds using those pins with every isolation and integration check retained. Refresh both official images when available; the newest published Java update remains mandatory before release. This revision itself does not build an engine image or claim packaged operation.
 
-### Single-origin application artifact (partial P02.3)
+### Single-origin application artifact (P02.3)
 
-The [backend `packaged-ui` build](../backend/README.md#single-origin-jar-assembly-partial-p023)
+The [backend `packaged-ui` build](../backend/README.md#single-origin-jar-assembly-p023)
 now copies Angular production assets and its extracted third-party notices into
 Spring's static classpath resources. Use a clean build after compiling Angular;
 missing index/notices fail before packaging. Three real HTTP integration tests
@@ -87,36 +91,42 @@ verify index/bundle/notices responses and preserve 404s for missing APIs/assets.
 No frontend server, CORS exception or catch-all route is introduced. Two ordinary
 backend tests also pass; they remain frontend-independent without this profile.
 
-This verifies jar assembly using the existing development JDK image, not the
-first engine image. ADR 0009 permits local engine Dockerfile/service work on
-the existing verified Java pins. The future multi-stage build must compile the frontend
-first, invoke this profile, and carry its artifacts and notices into the engine
-image without adding source/private files. The separate Spring runtime profile
+The [engine Dockerfile](../docker/engine/Dockerfile) builds Angular with pinned
+Node/npm and the jar with pinned Java/Maven. It runs frontend typechecks/unit
+tests and four account-free secret configuration tests during assembly. Its
+JDK `verification` target retains Maven dependencies for the complete nine-test
+suite offline on the fixture's internal database network. The final JRE stage
+copies only the jar, with no Node, JDK, Maven, source or build caches.
+The separate Spring runtime profile
 `packaged` now requires `configtree:/run/secrets/` and maps the shared
 `postgres_password` file to the datasource password. A private absolute directory
 ending in `/` can override the tree through `engine.secrets-directory` for tests.
 Missing mounts/password properties fail startup, with no fallback password;
 ordinary explicit Spring property overrides retain their normal precedence.
-The profile binds inside the container on `0.0.0.0`; the future engine service
-must publish only on host loopback. Do not use it for host development.
-Engine Compose secret mounts and durable content/asset mounts remain unfinished.
+The profile binds inside the container on `0.0.0.0`; Compose publishes only on
+host loopback. Do not use it for host development. Engine Compose secret and
+durable content/assets mounts are now verified on Docker Desktop Linux containers.
 Four neutral configuration tests pass, including unchanged host defaults. An
 absent mount fails import; an empty mount fails actual database authentication
 during startup, rather than individual-file validation by the config-tree loader.
 No full packaged readiness is claimed.
 
-All nine packaged backend tests pass against disposable PostgreSQL 18. A
-separate executable-jar smoke as UID/GID 10001 verifies secret-authenticated
-startup, minimal health, exact index/notices bytes and missing directory/file
-startup failures. It uses the existing pinned development JDK without building
-an engine image, touching account state or claiming Linux-host file permissions.
+All nine packaged backend tests pass against disposable PostgreSQL 18. The actual
+engine image/service runs as UID/GID 10001 with a read-only root, no capabilities
+and no-new-privileges. Host HTTP verifies index, JS/CSS, notices, minimal health
+and sensitive-path/API 404s before and after recreation. A WebSocket upgrade
+from engine to the private socket verifies UID/mount accessibility without RPC
+or account access. Missing secret-tree startup fails. No native Linux-host
+file permission or account readiness claim is made.
 
 ## 5. Launcher contract
 
-**Infrastructure checkpoint (P02.3):** root [`compose.yaml`](../compose.yaml)
-currently defines only `postgres` and `codex`. It publishes no ports. PostgreSQL
-joins internal `data`; the runtime joins separate `inference` for required egress.
-Named `database`, `runtime_account`, and `runtime_workspace` volumes persist;
+**Application shell (P02.3):** root [`compose.yaml`](../compose.yaml) defines
+`engine`, `postgres` and `codex`. Engine alone publishes loopback HTTP and joins
+`web` plus internal `data`; PostgreSQL joins only `data`; runtime joins only
+`inference` for required egress. The engine has no runtime-account mount, and
+the runtime has no engine/database storage, database secret or Docker socket.
+Named `database`, `content`, `assets`, `runtime_account`, and `runtime_workspace` volumes persist;
 `runtime_ipc` is tmpfs-backed, UID/GID 10001, mode 0700. The runtime has a read-only
 root filesystem, no capabilities, no account bind from the host, and no database
 secret. PostgreSQL's official entrypoint initializes volume ownership as root
@@ -128,12 +138,13 @@ The database reads `/run/secrets/postgres_password` from the private host file
 contains a path, never a password. Local Compose file secrets use read-only bind
 mounts, not encrypted storage; restrict the host file to its owner. Missing files
 must fail startup. P02.6 still owns secure initialization. `POSTGRES_DB` and
-`POSTGRES_USER` now configure the database; `APP_PORT` has no consumer yet. Never
+`POSTGRES_USER` configure both services; `APP_PORT` selects engine host HTTP. Never
 change a database password by replacing the file alone on an existing cluster:
 PostgreSQL uses it only on initial cluster creation. Preserve volumes on stop
 and recreation; never use `down -v`. See the [packaging checks](../tools/container_packaging/README.md).
 
-The following commands describe the future application interface and cannot be run successfully against this repository, which currently provides development shells, compatibility fixtures and database/runtime infrastructure:
+The following commands describe the future launcher interface and cannot yet be
+run. Manual shell build/start/stop commands are in the [packaging guide](../tools/container_packaging/README.md).
 
 ```text
 ./start.sh           Validate, build with cache, start services, and report readiness

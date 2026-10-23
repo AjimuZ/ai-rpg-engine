@@ -1,19 +1,16 @@
 # Risks and Open Decisions
 
-P02.3 infrastructure evidence (23 October 2026): root Compose separates the
-database and runtime networks/mounts and supplies the database secret only to
-PostgreSQL. Account-free neutral markers survive recreation of both containers.
-This reduces packaging uncertainty but does not close account/tool containment,
-canonical campaign recovery, launcher readiness or QA-28. ADR 0009's revised
-development policy permits the first local build on verified existing pins. Local file
-secret permissions/initialization remain P02.6 work; file mounts are not encrypted.
-The third checkpoint verifies optional single-origin jar assembly and bundled
-frontend notices independently. Container integration remains unverified and the
-Java refresh remains a release gate; jar HTTP tests do not establish full startup readiness.
-The fourth checkpoint adds mandatory packaged file-secret configuration and
-neutral missing-mount/file tests. It does not establish engine Compose wiring or
-Linux host UID readability. The container bind address requires future host
-loopback publication; ordinary Spring overrides retain their standard precedence.
+P02.3 packaging evidence (23 October 2026): pinned engine/runtime images and root
+Compose isolate networks/mounts; only engine/PostgreSQL receive the database
+file secret. Account-free HTTP, IPC, secret consumption and neutral preservation
+across recreation of all three containers pass on Windows Docker Desktop Linux
+containers. Engine-only content/assets storage is reserved, not a pack/asset
+pipeline. This does not close live account/tool containment, canonical campaign
+recovery, launcher readiness or QA-28. ADR 0009 permits the current Java pins for
+development; refreshing Java remains a release gate. Secret initialization and
+host permission hardening remain P02.6 work; file mounts are not encrypted.
+Native Linux-host UID readability remains unverified. Ordinary Spring overrides
+retain their standard precedence; configtree is not a secret manager.
 
 ## 1. Risk register
 

@@ -26,7 +26,7 @@ docker run --rm --name engine-dev-db --env POSTGRES_DB=engine --env POSTGRES_USE
 Set `SPRING_DATASOURCE_URL` to `jdbc:postgresql://127.0.0.1:5432/engine`, username
 to `engine`, and password to the same private value. This disposable database loses
 all data on stop; do not use it for persistent campaigns. Stop it with
-`docker stop engine-dev-db`. The durable packaged profile is a later task.
+`docker stop engine-dev-db`. Durable shell storage uses the root Compose profile.
 
 From `backend/`, with those variables set:
 
@@ -42,7 +42,7 @@ Use a new disposable database: the test rejects existing public gameplay tables.
 Flyway may create its history table, but there are no versioned migrations until P03.
 The executable jar is `target/engine-0.1.0.jar`; it can also run with `java -jar`.
 
-## Packaged runtime configuration (partial P02.3)
+## Packaged runtime configuration (P02.3)
 
 Activate the Spring runtime profile with `--spring.profiles.active=packaged`.
 This differs from the Maven `-Ppackaged-ui` build profile: one configures startup,
@@ -57,14 +57,15 @@ A normal trailing file newline is stripped by Spring's config-tree loader.
 Ordinary Spring property precedence still applies; this profile is not a secret
 manager and does not override explicitly supplied datasource settings.
 
-The profile binds to `0.0.0.0` **inside the container**. The future Compose engine
-service must publish only on host loopback; avoid activating this profile for
+The profile binds to `0.0.0.0` **inside the container**. The Compose engine
+service publishes only on host loopback; avoid activating this profile for
 host development. The default profile still binds to `127.0.0.1`.
 `PackagedSecretsTest` checks real configuration loading with neutral files,
 including paths with spaces, rejection of missing mounts/files under strict
 placeholder binding, and unchanged host defaults, without a
-database or account. Engine Compose secret wiring and Linux host UID readability
-remain pending; local Compose secret files are not an encrypted store.
+database or account. The engine Compose service consumes the secret as UID 10001;
+readability is verified on Windows Docker Desktop, not yet native Linux hosts.
+Local Compose secret files are not an encrypted store.
 For the actual application, an absent mount fails configuration import; an empty
 mount fails database authentication during startup. The config-tree import alone
 does not validate individual file presence before datasource initialization.
@@ -80,11 +81,12 @@ interface tests, using the same packaged runtime profile for database access.
 The development server binds to `127.0.0.1:8080`. Only `/actuator/health` is exposed,
 returning status without components/details. There are no gameplay APIs or account
 integration. Ordinary builds contain no browser assets. Full readiness/failure
-contracts are P02.5; engine image/service integration remains P02.3. No
+contracts are P02.5. Engine image/service integration is covered by the
+[packaging suite](../tools/container_packaging/README.md). No
 Testcontainers dependency or test-library helper image is used. Lint/CI is P02.4.
 
 
-## Single-origin jar assembly (partial P02.3)
+## Single-origin jar assembly (P02.3)
 
 Build the reviewed production interface in `frontend/` with `npm ci` and
 `npm run build`, then return to `backend/` and run against the disposable database:
@@ -114,8 +116,13 @@ existing pinned Java 21 development image. The ordinary build passed two tests
 with three profile tests skipped, and the missing-output guard rejected an empty
 input directory. A separate executable-jar HTTP smoke verified health and exact
 index/notices bytes; archive inspection matched all four production resources.
-This is application jar assembly,
-not a containerized installation: Compose has no engine service yet. ADR 0009
-now permits local image work on the verified existing Java pins, with the refresh
-retained as a release requirement. Do not infer
-runtime account readiness, canonical campaign recovery or QA-28 from these tests.
+These earlier results establish jar assembly. The completed P02.3 container
+check builds Angular and the jar from filtered source in pinned toolchain stages,
+then serves the shell from a JRE-only image as UID 10001. Its verification target
+runs all nine backend tests offline against a separate disposable PostgreSQL 18
+database with the packaged file secret. Production HTTP checks run on the actual
+engine service before and after recreation; a real IPC handshake checks its
+socket access as the production UID.
+See the [packaging commands and limits](../tools/container_packaging/README.md).
+ADR 0009 retains Java refresh as a release requirement. Account readiness,
+canonical campaign recovery and full QA-28 remain later gates.

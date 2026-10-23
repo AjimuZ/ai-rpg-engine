@@ -117,8 +117,11 @@ Rules for the images:
 
 - The engine image is multi-stage: Angular in the Node.js stage, the Spring Boot jar in the JDK stage, and only the jar on the JRE stage, which contains no build tools, Node.js, or package caches ([deployment specification](../22-container-deployment-and-startup.md#2-runtime-topology)).
 - Build stages may install named OS packages with `--no-install-recommends` from the base distribution's archive; today that is only `unzip` for the Maven Wrapper. Package versions are not pinned, because Ubuntu's update archive drops superseded versions. The runtime stage installs no packages unless this record is updated.
-- The runtime stage runs as a non-root user. P02.3 chooses the engine UID together with the P01 socket-permission design.
+- The runtime stage runs as a non-root user. P02.3 uses UID/GID 10001 for engine and runtime socket access; separate mounts/networks enforce the account/data boundary.
 - Use BuildKit cache mounts for the npm cache and the Maven repository, so warm builds need no downloads. Build contexts exclude secrets, private data, and local assistant files ([deployment specification](../22-container-deployment-and-startup.md#4-planned-repository-artifacts)).
+  The engine's JDK verification target retains a copy of its Maven cache so full
+  database tests can run offline on an internal fixture network. Only the jar
+  enters the final JRE image; no build cache, source or test tools enter it.
 - Generate `package-lock.json` with the pinned npm, as on the Windows workstation, and keep the Linux optional binaries in it; `npm ci` in the Linux build stage is the check. npm 11.19.1 warns that `@parcel/watcher`, `esbuild`, `lmdb`, and `msgpackr-extract` have install scripts not covered by `allowScripts`. P02.2 decides and records the install-script policy.
 - Integration tests use the pinned PostgreSQL reference. Helper images used by a test library are pinned through that library's version, and P02.2 records them.
 

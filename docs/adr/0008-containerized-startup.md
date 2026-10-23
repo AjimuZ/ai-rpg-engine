@@ -24,11 +24,13 @@ Container images, runtime credentials, durable volumes, UID/socket permissions, 
 
 P01 must prove the pinned container/runtime/client combination. P02 implements packaging and the script. QA-28 verifies the complete startup/restart workflow; P14 and P19 require a fresh-clone rehearsal. No Dockerfile, Compose file, launcher, or passing runtime result is delivered by this decision record. See [the deployment specification](../22-container-deployment-and-startup.md).
 
-Implementation evidence (P02.3, 23 October 2026): root Compose now supplies the
-pinned PostgreSQL and runtime infrastructure with private networks, file secrets,
-durable volumes and the P01 socket layout. Account-free neutral state survives
-real recreation of both containers. The engine image/service,
-launcher and complete QA-28 acceptance remain pending. A later P02.3 checkpoint
-verifies single-origin Angular assets/notices in an optional executable jar;
-this is independent application evidence, not a completed container profile. This partial checkpoint
-implements the existing direction without changing the deployment decision.
+Implementation evidence (P02.3, 23 October 2026): root Compose supplies pinned
+engine/PostgreSQL/runtime images, private networks, file secrets, durable volumes
+and the P01 socket layout. The multi-stage engine image serves compiled Angular
+assets/notices from the executable jar as UID 10001 on host loopback. The engine
+shares read-only socket IPC, never runtime account state. Account-free HTTP,
+database/secret access, IPC handshake and neutral persistence across recreation
+of all three services are verified. Content/assets directories are reserved
+engine-only storage; no pack registration or generated assets exist yet.
+This implements the existing direction without changing it. The launcher,
+account/gameplay readiness, campaign recovery and full QA-28 remain later gates.

@@ -115,16 +115,16 @@ AI conversations have isolated runtime workspaces outside the source checkout an
 
 The app binds to loopback by default. GitHub publication distributes source; it does not expose a public gameplay server. A public-hosting design needs a separate authentication, tenant isolation, credential, abuse, and deployment review.
 
-The current root Compose file is a partial infrastructure checkpoint: database
-and runtime services only, with separate data/inference networks, private named
-storage and tmpfs socket IPC. No ports are published until the engine service is
-implemented. Neutral storage survives real container recreation; the engine
-image/service and complete application startup remain pending. An opt-in Maven
-profile now embeds compiled Angular assets and notices in the executable jar;
-real HTTP tests verify single-origin serving independently of container packaging.
-A separate Spring `packaged` runtime profile requires file-secret configuration
-and binds the server inside the container; the default host profile remains
-loopback-only. Engine service/secret wiring remains unfinished P02.3 work.
+The root Compose file packages the neutral shell as `engine`, `postgres` and
+`codex`. The digest-pinned multi-stage engine build embeds Angular assets/notices
+in the jar; a JRE-only non-root service serves them on loopback. Only engine and
+postgres join internal `data`; only runtime joins `inference`; engine alone joins
+`web` for published HTTP. Engine and runtime share UID 10001 for private socket
+access, but never account/data mounts. Engine mounts socket IPC read-only and
+owns separate content/assets volumes. Its Spring `packaged` profile consumes
+the database file secret; the host profile remains loopback-only. Account-free
+HTTP, IPC, secret and neutral storage recreation checks pass. The application
+adapter, launcher, gameplay readiness and campaign recovery remain later work.
 See the [backend build instructions](../backend/README.md). ADR 0009's subsequent development-only revision permits continued local image work on the verified existing Java pins; the newest published Java update remains a release gate.
 
 ## 8. Concurrency and background work

@@ -237,7 +237,8 @@ The package exit below remains open.
 
 - [x] P02.2 Scaffold Angular and Spring Boot using pinned versions, with no adventure constants.
 
-P02.3 partial checkpoint (23 October 2026): root and independent runtime
+P02.3 first partial checkpoint (23 October 2026; historical, superseded by the
+completion below): root and independent runtime
 build contexts now default-deny unreviewed inputs, with final recursive
 exclusions for private settings, credentials, data, and build output. Two
 real BuildKit export tests pass against isolated neutral fixtures, including
@@ -251,7 +252,37 @@ zero 21.0.13 tags, and the JDK/JRE resolute aliases still resolve to the
 refresh. No engine image, root Compose, volumes, secrets, single-origin
 interface or startup/restart verification is claimed by this checkpoint.
 
-- [ ] P02.3 Add pinned engine/runtime images, Compose services, durable volumes, private networks/IPC, secret handling, and the single-origin packaged interface; exclude private development data from builds.
+- [x] P02.3 Add pinned engine/runtime images, Compose services, durable volumes, private networks/IPC, secret handling, and the single-origin packaged interface; exclude private development data from builds.
+
+P02.3 completed packaging checkpoint (23 October 2026): the digest-pinned
+multi-stage engine image and root Compose serve the neutral Angular shell,
+bundles/notices and minimal health on loopback. The engine consumes a mounted
+database secret as UID 10001, owns durable content/assets storage and shares
+read-only private socket IPC, without account/workspace mounts or inference
+network access. The runtime receives no database secret/storage/network access.
+The rendered engine assertion first failed while the service was absent.
+All five real packaging checks pass (43.343 s, no skips), including filtered
+BuildKit exports, production HTTP/404s, secret-tree failure, WebSocket upgrade
+from engine to runtime, authenticated database access, and neutral storage
+preservation across recreation of all three services. The JDK verification
+target runs all nine backend tests offline against a separate PostgreSQL 18
+fixture database. Frontend typechecks, unit test and production build run in the
+Node stage; npm audit reports zero vulnerabilities. All 116 runtime regressions
+pass with Docker enabled (78.482 s, no skips). Old infrastructure fixture volumes
+remain untouched; new markers use a separate schema in a dedicated shell fixture
+project so Flyway's unknown-schema guard is preserved. Services stop and volumes
+remain. This closes P02.3 packaging, not launcher/account readiness, application
+RPC integration, pack/asset pipelines, canonical campaign recovery or full
+QA-28 (P02.5–P02.7/P08 and later acceptance). Native Linux secret UID permissions
+and the release Java refresh remain explicit qualification gates.
+
+Final review also passes the two context tests after expanding the runtime
+allowlist fixture to all six reviewed inputs, Dockerfile build checks with no
+warnings, Compose rendering, 191 local documentation links/fences, and all 19
+Python module/class/function docstrings in the changed check modules.
+
+The partial checkpoints below are historical; their pending engine/build-gate
+statements are superseded by this checkpoint and ADR 0009's development revision.
 
 P02.3 second partial checkpoint (23 October 2026): root `compose.yaml`
 adds the pinned database/runtime infrastructure, separate data/inference networks,
