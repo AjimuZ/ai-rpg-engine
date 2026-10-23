@@ -115,6 +115,7 @@ with three profile tests skipped, and the missing-output guard rejected an empty
 input directory. A separate executable-jar HTTP smoke verified health and exact
 index/notices bytes; archive inspection matched all four production resources.
 This is application jar assembly,
-not a containerized installation: the required official Temurin refresh still
-blocks the first engine image, and Compose has no engine service. Do not infer
+not a containerized installation: Compose has no engine service yet. ADR 0009
+now permits local image work on the verified existing Java pins, with the refresh
+retained as a release requirement. Do not infer
 runtime account readiness, canonical campaign recovery or QA-28 from these tests.

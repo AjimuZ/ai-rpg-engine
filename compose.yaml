@@ -1,5 +1,6 @@
 # Infrastructure checkpoint for P02.3, not a playable installation. The engine
-# service and its single-origin interface remain gated by ADR 0009's Java refresh.
+# service and its single-origin interface remain P02.3 work. ADR 0009 permits
+# verified existing Java pins for local development; refresh is a release gate.
 # Never publish database/runtime ports or attach the runtime to the data network.
 name: rpg-engine
 

@@ -4,12 +4,12 @@ P02.3 infrastructure evidence (23 October 2026): root Compose separates the
 database and runtime networks/mounts and supplies the database secret only to
 PostgreSQL. Account-free neutral markers survive recreation of both containers.
 This reduces packaging uncertainty but does not close account/tool containment,
-canonical campaign recovery, launcher readiness or QA-28. The first engine build
-still requires the unavailable official Temurin refresh in ADR 0009. Local file
+canonical campaign recovery, launcher readiness or QA-28. ADR 0009's revised
+development policy permits the first local build on verified existing pins. Local file
 secret permissions/initialization remain P02.6 work; file mounts are not encrypted.
 The third checkpoint verifies optional single-origin jar assembly and bundled
 frontend notices independently. Container integration remains unverified and the
-image gate still applies; jar HTTP tests do not establish full startup readiness.
+Java refresh remains a release gate; jar HTTP tests do not establish full startup readiness.
 The fourth checkpoint adds mandatory packaged file-secret configuration and
 neutral missing-mount/file tests. It does not establish engine Compose wiring or
 Linux host UID readability. The container bind address requires future host
@@ -44,7 +44,7 @@ Owners below are implementation responsibilities, not assigned people. The proje
 | Stale documentation overstates implementation | Misleading public repository | One status matrix, evidence-linked milestones, docs review in CI | Maintainer / every milestone |
 | Vulnerable frontend development tooling | Development-server exposure or local command execution | P02.2 pins transitive Vite 8.3.5 through npm overrides because Angular build 22.2.3 pins 8.3.0; full audit and Windows/Linux build/test checks gate the override. Reassess/remove when Angular includes the fixes ([ADR 0009](adr/0009-toolchain-baseline.md)) | Frontend + Maintainer / P02.4, every dependency update |
 | Pinned backend line leaves open-source support or misses a dependency security fix | Unpatched framework or migration tooling | Spring Boot 4.1 open-source support ends 31 July 2027 and its patches keep Flyway 12.4; review advisories, plan the move to a supported line, and rerun PostgreSQL integration checks for any override ([ADR 0009](adr/0009-toolchain-baseline.md)) | Backend + Maintainer / every release, before July 2027 |
-| Pinned base images lag security releases or drift through untracked updates | Known vulnerabilities in shipped images or unreproducible builds | Exact tag plus index digest for every image; refresh on security releases, milestones, and release candidates with build and integration checks. The first engine image must move to the Temurin 21.0.13 image; on 23 October 2026 the official tag API still returned no 21.0.13 tags, so P02.3 remains partial. Root and independent runtime context allowlists and real BuildKit fixture exports now protect against private-path inclusion; source-content secret review remains required ([ADR 0009](adr/0009-toolchain-baseline.md)) | Operations + Maintainer / P02.3, P02.4, every release |
+| Pinned base images lag security releases or drift through untracked updates | Known vulnerabilities in shipped images or unreproducible builds | Exact tag plus index digest for every image; refresh on security releases, milestones, and release candidates with build and integration checks. On 23 October 2026 the official tag API still returned no 21.0.13 tags. Local development may use verified existing exact pins under the ADR 0009 revision; this is not security equivalence to the newer release. Refresh both images when available and require the newest published Java update before release. P02.3 integration remains open. Root and independent runtime context allowlists and real BuildKit fixture exports now protect against private-path inclusion; source-content secret review remains required ([ADR 0009](adr/0009-toolchain-baseline.md)) | Operations + Maintainer / P02.3, P02.4, every release |
 | Container runtime transport, account state, or socket permissions fail on the target host | Packaged launcher cannot provide playable readiness | Pin Linux image/client combination; verify IPC, supported sign-in, isolation, restart, and clear failure; do not substitute a host process silently. P01.1 verified the IPC and its UID boundary for 0.164.0 on Docker Desktop (`linux/amd64`) without an account; sign-in, persistent account volumes, and restart remain open ([deployment gate](22-container-deployment-and-startup.md#3-runtime-integration-gate)) | Integration + Operations / P01, P02, QA-28 |
 
 ## 2. Open decisions with safe working defaults

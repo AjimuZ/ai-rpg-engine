@@ -65,6 +65,27 @@ Only this account-free fixture logs upstream bodies to compare settings; never
 reuse that logging with private prompts or accounts. Services stop in `finally`
 without deleting named volumes. A stopped fixture is checked by the Docker test.
 
+### Owner account setup for the live check
+
+Use the supported ChatGPT device-code flow in a dedicated Docker volume; do not
+mount or copy the developer's home or credentials. After building the pinned
+image, the owner can run this interactive command from PowerShell:
+
+```powershell
+docker run --rm -it --read-only --cap-drop ALL --security-opt no-new-privileges --tmpfs /tmp:mode=1777 --volume rpg-engine-owner-runtime-account:/var/lib/runtime/home rpg-engine/runtime:0.164.0 -c cli_auth_credentials_store=file -c forced_login_method=chatgpt login --device-auth
+```
+
+The new named volume is initialized from the image's home directory owned by
+UID/GID 10001. The owner completes the displayed browser link and one-time code;
+device-code login may need enabling in the account/workspace security settings
+([official authentication guide](https://learn.chatgpt.com/docs/auth)). Keep the
+volume private and retain it after the container exits. It contains account and
+thread state; never expose its files in logs, source control or build contexts.
+Git Bash needs `MSYS_NO_PATHCONV=1` for the container paths. A successful login
+does not verify inference or close P01.2. Do not run live verification concurrently
+with login or another process using the same account volume. The future launcher
+still needs its own tested sign-in/status integration in P02.6–P02.7.
+
 The separate `live` profile is opt-in and has **not been run for P01.2**. The
 owner must first complete supported sign-in in a dedicated runtime-home Docker
 volume accessible to UID/GID 10001; this probe never signs in or copies host

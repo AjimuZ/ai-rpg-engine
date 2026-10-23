@@ -2,6 +2,12 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Development packaging prerequisite revision, 23 October 2026
+
+- Permit local development image builds on the existing exact official Java 21.0.12.1 pins while the updated official images are unpublished. Retain the same distribution, base, digest checks and packaging acceptance; require the newest published Java update before release.
+- Recheck both exact image index digests and the official tag API. This documentation revision unblocks further P02.3 work; it does not deliver an engine image, complete P02.3 or validate signed-in inference. Earlier checkpoint entries below retain their historical gate descriptions.
+- Document owner-operated device-code sign-in in a dedicated runtime volume, keeping the development account separate; login and live neutral inference remain distinct checks.
+
 ## Unreleased — Packaged file-secret configuration (partial P02.3), 23 October 2026
 
 - Add an opt-in Spring runtime profile requiring a file-secret config tree for the database password, with container HTTP binding and no fallback password; retain loopback host-development defaults.

@@ -2,7 +2,9 @@
 
 ## 1. Status and planning rules
 
-**Current status: P00 complete; P01 in progress (P01.1 complete). No AI RPG Engine application code has been implemented.** The only code is the developer compatibility probe in `tools/runtime_probe` and the narration runtime image definition in `docker/codex-runtime`. Runtime implementation work remains pending. Predecessor milestones and repository housekeeping do not complete an engine implementation work package.
+**Current status: P00, P01.1 and P02.1–P02.2 complete; P01.2 and P02.3 partial.** Angular and Spring development shells, runtime compatibility probes and partial packaging infrastructure exist; gameplay remains unimplemented. P01.2 awaits owner-authenticated neutral inference. P02.3 can resume local image/integration work under ADR 0009's development-only Java revision below. Predecessor milestones and repository housekeeping do not complete an engine implementation work package.
+
+The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.3–P01.6 await their P01 predecessors. Later package work must still pass its own prerequisites and exit checks.
 
 Repository preparation recorded on 22 October 2026 includes the private GitHub repository, root MIT license, attribution, ignore rules, text line-ending policy, and contribution guidance. The development workflow requires immediate roadmap and affected-documentation updates after every work item, truthful completion evidence, and neutral commit messages. The owner's checkout also has verified local Git gates; lifecycle-hook activation requires review in the relevant client. These local checks are not distributed in a clone and do not replace P02.4 continuous integration.
 
@@ -49,7 +51,7 @@ Critical dependency chain: compatible stack → safe Codex profile → persisten
 - **First validation target:** Windows 11 x64 with Docker Desktop (WSL 2 backend, Linux containers), running `start.sh` from Git Bash. Bash in a WSL distribution is an unverified candidate, and Linux and macOS hosts remain unclaimed.
 - **Images, pinned by multi-platform index digest:** Dockerfile frontend 1.27.1; `node:24.22.1-trixie-slim` for the frontend build stage; Eclipse Temurin `21.0.12.1_1-jdk-resolute` and `21.0.12.1_1-jre-resolute` (Ubuntu 26.04 LTS) for the backend build and runtime stages; and the P00.2 PostgreSQL image.
 - **Launcher floors:** Docker Engine 29.0, Compose 5.0, and a Buildx plugin, verified with Docker Desktop 4.96.3, Engine 29.9.2, Compose v5.6.1, and Buildx v0.38.1. The shell floor is GNU Bash 4.4, with a fixed list of host commands and Git Bash path-conversion rules.
-- **Refresh policy:** a digest-refresh policy now covers every image. Temurin 21.0.13+9 binaries were published on 22 October 2026, but no official image existed on 23 October 2026, so P02.3 must refresh the JDK and JRE references before building the first engine image. The narration runtime image was deferred to P01.1, which has since pinned it in the same record.
+- **Refresh policy:** a digest-refresh policy now covers every image. Temurin 21.0.13+9 binaries were published on 22 October 2026, but no official image existed on 23 October 2026, so the original P02.3 plan required a refresh before the first engine image; the development-only revision below supersedes that first-build prerequisite. The narration runtime image was deferred to P01.1, which has since pinned it in the same record.
 
 Evidence: registry digests resolved with `docker buildx imagetools inspect`; Adoptium, Node.js, Docker Desktop, Compose, and Dockerfile reference metadata; and a throwaway Compose probe run from Git Bash in an ignored scratch path containing a space.
 
@@ -125,7 +127,9 @@ The owner-approved root MIT license, ignore rules, text line-ending policy, and 
 
 P02.1 covers repository policy only: clean-clone application build, health, database and packaged-startup checks remain gates for P02.2–P02.7 and the package exit below.
 
-P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules of [ADR 0009](adr/0009-toolchain-baseline.md). P02.3 must first move the Temurin JDK and JRE references to the first published 21.0.13 (or later 21.0.x) official image. P02.2 records the npm install-script policy and any test-library helper images.
+P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules of [ADR 0009](adr/0009-toolchain-baseline.md). Its development-only revision allows P02.3 local image builds on the verified exact official 21.0.12.1 JDK/JRE pins while updated images are unpublished. Refresh both pins when official 21.0.13 (or later 21.0.x) images appear; the newest published Java update remains a release requirement. P02.2 records the npm install-script policy and any test-library helper images.
+
+**Unblocking revision (23 October 2026):** the owner requested resuming development after external prerequisites stopped the queue. Both existing exact Java tags still resolve to the recorded index digests and the official tag API still reports zero 21.0.13 images. ADR 0009 now supersedes the first-build refresh prerequisite for local development only; earlier checkpoint descriptions of that gate below are historical. P02.3 remains unchecked until its real container integration checks pass. P01.2 independently remains unchecked until supported owner sign-in and a successful live neutral report; preparing a dedicated account volume/login does not itself verify inference. No release is authorized by this revision.
 
 - [x] P02.1 Add owner-approved license, ignore rules, formatting/line-ending rules, contribution policy, and neutral environment placeholders.
 P02.2 delivered neutral standalone/zoneless Angular 22.2.3 and Spring Boot 4.1.2

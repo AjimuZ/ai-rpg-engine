@@ -55,7 +55,7 @@ The tracked root [`.env.example`](../.env.example) contains a proposed port and 
 
 The context policies default-deny inputs: the root admits only Angular/Java build inputs and the future engine Dockerfile, while the runtime context admits only its Dockerfile. Final recursive exclusions protect private names even inside admitted source trees. New build inputs require policy and regression-test updates. The policies do not inspect arbitrary source contents for secrets. Run `py -B -m unittest discover -s tools/container_packaging -v` with the ADR 0009 Docker baseline; it exports neutral scratch-stage fixtures through real BuildKit without sending checkout contents or starting services. See the [test guide](../tools/container_packaging/README.md).
 
-**P02.3 image gate (23 October 2026):** the official Docker Hub tag API returns zero tags matching `21.0.13`; `21-jdk-resolute` and `21-jre-resolute` still resolve to the old ADR 0009 indexes. The mandatory Java refresh therefore remains pending; this checkpoint does not build an engine image or claim packaged operation.
+**P02.3 development image revision (23 October 2026):** the official Docker Hub tag API still returns zero tags matching `21.0.13`; the exact existing JDK/JRE tags resolve to their recorded ADR 0009 indexes. The owner-requested unblocking revision permits local development builds using those pins with every isolation and integration check retained. Refresh both official images when available; the newest published Java update remains mandatory before release. This revision itself does not build an engine image or claim packaged operation.
 
 ### Single-origin application artifact (partial P02.3)
 
@@ -68,8 +68,8 @@ No frontend server, CORS exception or catch-all route is introduced. Two ordinar
 backend tests also pass; they remain frontend-independent without this profile.
 
 This verifies jar assembly using the existing development JDK image, not the
-first engine image. The required official Java image refresh still gates engine
-Dockerfile/service work. The future multi-stage build must compile the frontend
+first engine image. ADR 0009 permits local engine Dockerfile/service work on
+the existing verified Java pins. The future multi-stage build must compile the frontend
 first, invoke this profile, and carry its artifacts and notices into the engine
 image without adding source/private files. The separate Spring runtime profile
 `packaged` now requires `configtree:/run/secrets/` and maps the shared

@@ -28,7 +28,8 @@ both policy and fixtures; root policy changes do not affect independent contexts
 These tests cover path filtering, not secret detection inside otherwise admitted
 source files, nor packaged service isolation, runtime readiness or persistence.
 CI wiring belongs to P02.4. The engine image/service and packaged interface remain
-pending P02.3 work, subject to the official Java image refresh in ADR 0009.
+pending P02.3 work. ADR 0009 permits local builds on verified existing Java pins;
+refreshing to the newest published Java update remains a release requirement.
 
 ## Real infrastructure recreation
 
