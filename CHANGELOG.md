@@ -2,6 +2,11 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Neutral development shells (P02.2), 23 October 2026
+
+- Add pinned Angular and Spring Boot workspaces without adventure content, with strict frontend compilation, external PostgreSQL/Flyway configuration, and minimal status-only backend health.
+- Add default shell tests and reproducible host build commands, checksum-verified Maven Wrapper policy, Central-only resolution, and explicit npm install-script policy. Pin transitive Vite 8.3.5 to resolve development-tool advisories without changing Angular; Windows/Linux locked installs, typechecks, default tests and production builds pass, as do full npm audit and the Java 21/PostgreSQL 18 backend tests and jar build. Packaged startup and canonical migrations remain later tasks.
+
 ## Unreleased — Repository policy and environment placeholders (P02.1), 23 October 2026
 
 - Add shared EditorConfig defaults for UTF-8/LF, final newlines and indentation, preserving Markdown hard breaks; retain Git text normalization and binary image handling.

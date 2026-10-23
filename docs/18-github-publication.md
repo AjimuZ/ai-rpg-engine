@@ -2,7 +2,7 @@
 
 ## 1. Publication intent
 
-The documentation repository exists at [AjimuZ/ai-rpg-engine](https://github.com/AjimuZ/ai-rpg-engine), initially with private visibility and a `main` branch. It contains English design documentation and repository setup, not an executable engine or a runtime release. Making the repository public remains a separate owner visibility decision.
+The documentation repository exists at [AjimuZ/ai-rpg-engine](https://github.com/AjimuZ/ai-rpg-engine), initially with private visibility and a `main` branch. It contains English design documentation, repository setup, and neutral development shells, not a playable engine or a runtime release. Making the repository public remains a separate owner visibility decision.
 
 A documentation-only repository can be published honestly after the owner chooses its name, license, and public-content scope. A playable release must additionally satisfy runtime release gates. Do not describe a design repository as a working game engine.
 
@@ -19,8 +19,8 @@ ai-rpg-engine/
   start.sh                  # future packaged local entry point
   compose.yaml              # future complete containerized installation
   docker/                   # future engine/runtime image definitions
-  frontend/                 # future Angular application
-  backend/                  # future Spring Boot application and Codex bridge
+  frontend/                 # neutral Angular development shell
+  backend/                  # Spring Boot shell; runtime bridge remains future work
   adventures/               # future neutral sample packs
   prompts/                  # future versioned runtime prompt templates
   schemas/                  # future pack and output contracts
@@ -29,7 +29,7 @@ ai-rpg-engine/
   .github/                  # future issue/PR templates and CI
 ```
 
-The repository currently contains design documentation, labeled UI concepts, repository policy files, a developer-only runtime image/probe, and a sanitized [`.env.example`](../.env.example) that no service consumes. [CONTRIBUTING.md](../CONTRIBUTING.md) documents the shared editor and line-ending rules. There is no runnable game application or packaged startup launcher yet. Runtime data, private campaigns, generated personal images, local database volumes, credentials, temporary workspaces, and raw traces live outside the tracked source tree and are ignored where applicable.
+The repository currently contains design documentation, labeled UI concepts, repository policy files, a developer-only runtime image/probe, neutral [frontend](../frontend/README.md) and [backend](../backend/README.md) workspaces, and a sanitized [`.env.example`](../.env.example) that no service consumes. [CONTRIBUTING.md](../CONTRIBUTING.md) documents the shared editor and line-ending rules. There is no runnable game application or packaged startup launcher yet. Runtime data, private campaigns, generated personal images, local database volumes, credentials, temporary workspaces, and raw traces live outside the tracked source tree and are ignored where applicable.
 
 The intended local installation is the [containerized application with root `start.sh`](22-container-deployment-and-startup.md). Release setup instructions must exercise that packaged profile, including first sign-in, readiness, persistent restart, and safe stop; a host-only development setup does not complete that requirement.
 

@@ -34,9 +34,24 @@ SOFTWARE.
 
 The owner-supplied `the-world-i-can-develop-demo` informed the analysis of Codex lifecycle, memory renewal, request handling, knowledge projections, and media behavior. Its code, private campaign, images, audio catalog, runtime logs, and backup files are not bundled here. No standalone license file was observed in its root. Establish explicit rights before copying any of those materials into a future public release.
 
+## Apache Maven Wrapper
+
+`backend/mvnw` and `backend/mvnw.cmd` are the official Apache Maven Wrapper 3.3.4
+only-script distribution, produced by the Apache Maven Wrapper plugin. Preserve
+their upstream headers and the accompanying [Apache License 2.0](backend/.mvn/wrapper/LICENSE)
+and [NOTICE](backend/.mvn/wrapper/NOTICE). The scripts are build tooling, separate
+from the project's MIT-licensed application code. Source:
+[Apache Maven Wrapper 3.3.4](https://github.com/apache/maven-wrapper/tree/maven-wrapper-3.3.4).
+
+The Angular CLI 22.2.3 scaffold supplies the initial workspace configuration under
+its MIT license (Copyright Google LLC). The application template has been replaced
+with the neutral project shell. Downloaded npm/Maven dependencies retain their
+individual licenses in their distributions; the Angular production build also
+emits its third-party license inventory. No dependency binary is committed here.
+
 ## Other references
 
-Official documentation is linked for technical and rights background in [the reference register](docs/19-glossary-and-references.md). No OpenAI SDK, Codex binary, D&D/SRD rule text, external stat block, third-party image, audio file, font, or model checkpoint is distributed in this documentation-only project.
+Official documentation is linked for technical and rights background in [the reference register](docs/19-glossary-and-references.md). No OpenAI SDK, Codex binary, D&D/SRD rule text, external stat block, third-party image, audio file, font, or model checkpoint is distributed in the tracked source tree.
 
 Future dependencies and assets require their own license/provenance inventory. Mentioning a technology or an inspiration does not imply affiliation or transfer of rights.
 

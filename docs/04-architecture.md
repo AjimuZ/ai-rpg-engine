@@ -45,6 +45,12 @@ The diagram describes dependencies and data exchange. It does not grant the Code
 
 Do not select library versions merely by copying an old README or resolving “latest” during a build. Reproducible build versions and actual compatibility tests are required.
 
+P02.2 provides neutral `frontend/` and `backend/` development shells with the pinned
+toolchains and no adventure constants. The backend has JDBC/Flyway wiring and minimal
+status-only health; canonical migrations, feature modules, runtime integration,
+packaged assets, and full readiness contracts remain later tasks. See the
+[frontend](../frontend/README.md) and [backend](../backend/README.md) build/test commands.
+
 ## 3. Backend modules
 
 | Module | Responsibility | Main dependencies |

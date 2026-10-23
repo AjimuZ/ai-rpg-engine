@@ -2,7 +2,7 @@
 
 ## 1. Status and owner requirement
 
-**Design specification only.** The owner requires a Dockerized application launched through a root `start.sh` file. This document defines that delivery target; no launcher, Dockerfile, Compose configuration, image, or runnable application has been implemented yet. The requirement applies to the engine and every adventure, without campaign-specific startup scripts.
+**Design specification only.** The owner requires a Dockerized application launched through a root `start.sh` file. This document defines that delivery target; neutral host development shells and a developer-only runtime probe exist, but the packaged engine Dockerfile, Compose configuration, and launcher have not been implemented yet. The requirement applies to the engine and every adventure, without campaign-specific startup scripts.
 
 The packaged local installation must run the application, database, and isolated Codex runtime through Docker Compose. Users must not need host Java, Maven, Node, or npm to build and launch that packaged profile. Codex service connectivity and supported account access are still required. Host-based development and stdio protocol probes remain optional developer workflows, not the completed packaged installation.
 

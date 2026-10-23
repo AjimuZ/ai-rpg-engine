@@ -1,6 +1,6 @@
 # Contributing
 
-AI RPG Engine currently contains design documentation and a developer-only [runtime compatibility probe](tools/runtime_probe/README.md). Start with [the documentation index](docs/README.md), [requirements](docs/03-requirements-and-scope.md), and [roadmap](docs/16-development-roadmap.md). There is no runnable game application; application folders, schemas, application tests, and installation commands remain future work.
+AI RPG Engine currently contains design documentation, neutral [Angular](frontend/README.md) and [Spring Boot](backend/README.md) development shells, and a developer-only [runtime compatibility probe](tools/runtime_probe/README.md). Start with [the documentation index](docs/README.md), [requirements](docs/03-requirements-and-scope.md), and [roadmap](docs/16-development-roadmap.md). There is no runnable game application; canonical schemas, gameplay features, and packaged installation remain future work.
 
 ## Principles
 
@@ -30,7 +30,7 @@ The root [`.env.example`](.env.example) contains only neutral, non-secret labels
 
 ## Verification
 
-For documentation, check links, terminology, examples, formulas, status, and scope. For future code, run checks appropriate to the affected layer and report actual results. Ordinary CI must run without a live Codex account. Account-dependent smoke checks are separately opted in and use neutral temporary content.
+For documentation, check links, terminology, examples, formulas, status, and scope. For the neutral shells, follow [frontend checks](frontend/README.md) and [backend checks](backend/README.md), including a disposable PostgreSQL database for backend tests; run checks appropriate to the affected layer and report actual results. Ordinary CI must run without a live Codex account. Account-dependent smoke checks are separately opted in and use neutral temporary content.
 
 Do not report planned tests or predecessor reports as newly passed checks. Browser behavior, accessibility, provider integration, and deterministic mechanics need distinct evidence.
 

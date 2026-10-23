@@ -4,9 +4,9 @@
 
 AI RPG Engine separates the software that runs an adventure from the files that describe its world. Authors supply settings, characters, objectives, abilities, equipment, encounters, and presentation preferences. The engine supplies reliable state, deterministic rules, long-term continuity, turn-based combat, and AI orchestration through Codex.
 
-**Project status: design complete; compatibility verification in progress.** There is no runnable AI RPG Engine application, backend, database schema, adventure compiler, or combat implementation in this repository. Every feature below is a development target. No installation command is currently available. The developer [runtime compatibility probe](tools/runtime_probe/README.md) covers discovery (P01.1) and deterministic thread/turn lifecycle checks (partial P01.2); the owner-signed-in neutral smoke remains pending.
+**Project status: neutral development shells; compatibility verification in progress.** The [Angular shell](frontend/README.md) and [Spring Boot shell](backend/README.md) provide build/test entry points, with no gameplay, canonical database schema, adventure compiler, or combat implementation. Every feature below is a development target. Packaged installation is not available yet. The developer [runtime compatibility probe](tools/runtime_probe/README.md) covers discovery (P01.1) and deterministic thread/turn lifecycle checks (partial P01.2); the owner-signed-in neutral smoke remains pending.
 
-Repository policies are in [CONTRIBUTING.md](CONTRIBUTING.md), with shared [editor defaults](.editorconfig), [Git line-ending rules](.gitattributes), and a sanitized [environment example](.env.example). The example has no runtime consumer; packaged setup and application build checks remain future P02 work.
+Repository policies are in [CONTRIBUTING.md](CONTRIBUTING.md), with shared [editor defaults](.editorconfig), [Git line-ending rules](.gitattributes), and a sanitized [environment example](.env.example). The example has no runtime consumer; packaged setup remains future P02 work; host development commands are documented in each workspace.
 
 ## Why this engine exists
 

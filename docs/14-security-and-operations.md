@@ -20,6 +20,11 @@ Read-only filesystem permission controls writes; it does not by itself establish
 
 Prompt text reinforces these rules but is not sufficient enforcement. Structured outputs also need semantic checks. An authorized tool in a future version must expose a narrow capability with its own input validation, audience, quotas, and audit trail.
 
+P02.2 development scope: the backend binds to loopback and exposes only status-only
+Actuator health, with no diagnostic endpoint exposure, credentials, gameplay APIs,
+or runtime account integration. PostgreSQL configuration is external. These shell
+checks do not satisfy the complete HTTP protection or readiness design below.
+
 ## 4. Application HTTP boundary
 
 Bind to loopback; use one origin for release frontend/backend where practical. Validate Host, Origin, content type, body size, and local session identity on mutation endpoints. Use an unpredictable local application session/CSRF token stored with appropriate browser restrictions rather than treating a fixed custom header as authentication. Do not enable wildcard CORS.

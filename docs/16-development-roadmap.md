@@ -128,7 +128,28 @@ P02.1 covers repository policy only: clean-clone application build, health, data
 P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules of [ADR 0009](adr/0009-toolchain-baseline.md). P02.3 must first move the Temurin JDK and JRE references to the first published 21.0.13 (or later 21.0.x) official image. P02.2 records the npm install-script policy and any test-library helper images.
 
 - [x] P02.1 Add owner-approved license, ignore rules, formatting/line-ending rules, contribution policy, and neutral environment placeholders.
-- [ ] P02.2 Scaffold Angular and Spring Boot using pinned versions, with no adventure constants.
+P02.2 delivered neutral standalone/zoneless Angular 22.2.3 and Spring Boot 4.1.2
+shells without adventure constants, canonical migrations, gameplay APIs, runtime
+account integration, or packaged startup. ADR 0009 records a Vite 8.3.5 security
+override while retaining all framework pins. Workspace READMEs document host
+commands and the npm default install-script policy (four uncovered-script warnings;
+no broad allow grant). No test-library helper image or Testcontainers is used.
+
+Verified on 23 October 2026: Windows Node.js 24.22.1/npm 11.19.1 and a clean source
+copy in the pinned Linux Node image both pass `npm ci`, typecheck, default Vitest
+(one test), and production build. Full Windows `npm audit --audit-level=high` reports
+zero vulnerabilities after the override. The pinned Temurin JDK 21 container with
+`unzip` passes `bash ./mvnw -B -ntp verify`: two real HTTP/PostgreSQL 18 tests,
+Flyway validation, minimal health/hidden diagnostics, and executable jar packaging.
+The Windows wrapper correctly rejects host JDK 27. A temporary policy verifier
+checks exact pins and Linux/Windows lock entries, wrapper SHA-256, 339 Central-only
+artifact records, 12 real ignore paths, 290 local documentation links/fences, and a
+bounded secret/private-path scan. Initial health and audit failures were fixed and
+checks rerun; no test was removed or weakened. Lint/CI automation remains P02.4,
+full readiness/failure states P02.5, packaging/launcher/restart QA-28 P02.3/P02.6/P02.7.
+The package exit below remains open.
+
+- [x] P02.2 Scaffold Angular and Spring Boot using pinned versions, with no adventure constants.
 - [ ] P02.3 Add pinned engine/runtime images, Compose services, durable volumes, private networks/IPC, secret handling, and the single-origin packaged interface; exclude private development data from builds.
 - [ ] P02.4 Add build/test/documentation/secret checks without Codex credentials in ordinary CI.
 - [ ] P02.5 Provide health/readiness contracts and useful startup failure states.

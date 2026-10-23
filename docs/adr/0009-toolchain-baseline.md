@@ -19,6 +19,16 @@
 | Vitest | 5.0.5 | 5.x within the Angular build peer range | `@angular/build` peer: `^4.0.8 \|\| ^5.0.0`; Vitest engines include Node.js 24 |
 | zone.js | Not used | — | Zoneless change detection follows the architecture baseline; zone.js is only an optional peer |
 
+P02.2 security refinement (23 October 2026): retain Angular 22.2.3 and pin its
+transitive Vite dependency to **8.3.5** through npm `overrides`. The builder otherwise
+pins Vite 8.3.0; a full npm audit reports development-server vulnerabilities, including
+[the upstream cross-origin advisory](https://github.com/vitejs/vite/security/advisories/GHSA-9jrq-w75r-8gcw).
+The patched 8.3 line preserves Node.js 24 compatibility. This override also applies
+to Vitest's Vite resolution; review/remove it when the Angular pin incorporates the
+fix. Verify the lockfile with full npm audit plus Windows/Linux typecheck, default
+test, and production build. P02.2 verified the override with zero full-audit findings and passing Windows/Linux
+locked installs, typechecks, default tests, and production builds.
+
 Rules for applying the baseline:
 
 - Commit `package-lock.json` and install with `npm ci` in CI and container builds. Never resolve a `latest` tag or an open range during an image build.
@@ -213,7 +223,7 @@ Alternatives considered:
 - `wsl.exe -l -v` listed only `docker-desktop`, so a WSL distribution shell could not be verified.
 - The probe stack was stopped with `docker compose down`, and the probe image and scratch files were removed. No container, network, or volume remains. The pinned base images and BuildKit cache remain as local cache.
 
-These are compatibility checks, not a build of the engine; no frontend or backend workspace exists yet.
+These P00 results are compatibility checks, not builds of the engine. P02.2 subsequently adds the neutral frontend/backend workspaces; their own checks and limits are recorded in the roadmap and workspace READMEs.
 
 ## Tool availability inventory
 
