@@ -2,6 +2,8 @@
 
 This is compatibility evidence, not the gameplay adapter. Account presence and
 catalog availability never establish entitlement or successful inference.
+P01.6 records the managed profile's image unavailability without probing accounts
+or making an image request; generation admission always fails closed.
 """
 import hashlib
 import json
@@ -16,7 +18,41 @@ class ContractError(Exception):
     """A safe diagnostic code; raw runtime messages must not reach reports."""
 
 
+def image_capability():
+    """Return fresh P01.6 diagnostics for the pinned managed narration profile.
+
+    Takes no account/configuration inputs, performs no I/O and cannot fail on
+    account or quota availability. Empty formats and a null invocation mean no
+    supported generation path, rather than a claim about upstream service access.
+    """
+    return {
+        'runtimeVersion': VERSION,
+        'profile': 'managed-narration',
+        'status': 'unavailable',
+        'reason': 'managed-profile-tool-free',
+        'invocation': None,
+        'supportedOutputFormats': [],
+        'accountEntitlement': 'unverified',
+        'cost': 'unverified',
+        'generationVerified': False,
+        'paidFallbackAllowed': False,
+        'fallback': 'text-and-catalog',
+    }
+
+
+def require_image_generation(*, policy, output_format):
+    """Refuse image admission for any requested policy/format with a safe error.
+
+    Returns nothing: always raises ContractError before runtime, account, network
+    or filesystem access. Even explicit bounded policy cannot grant a capability
+    absent from this profile. Inputs deliberately cannot select a paid fallback,
+    tool, endpoint or output path, and are never echoed in diagnostics.
+    """
+    raise ContractError('image-generation-unavailable')
+
+
 def _unique_object(pairs):
+    """Return an object from JSON key/value pairs; reject duplicate keys safely."""
     result = {}
     for key, value in pairs:
         if key in result:
@@ -26,10 +62,12 @@ def _unique_object(pairs):
 
 
 def _nonfinite(_value):
+    """Reject any nonfinite JSON constant with ContractError; never return a value."""
     raise ContractError('nonfinite-json-number')
 
 
 def parse_json(data):
+    """Parse bounded JSON text/bytes; raise safe errors for malformed/ambiguous data."""
     try:
         if len(data) > MAX_MESSAGE:
             raise ContractError('message-too-large')
@@ -39,6 +77,7 @@ def parse_json(data):
 
 
 def _text(value, limit=256):
+    """Return a nonempty bounded string or raise ContractError on invalid input."""
     if not isinstance(value, str) or not value or len(value) > limit:
         raise ContractError('invalid-string')
     if any(ord(c) < 32 for c in value):
@@ -47,7 +86,12 @@ def _text(value, limit=256):
 
 
 def discover(rpc):
-    """Initialize once, inspect local account state, then drain bounded pages."""
+    """Initialize the supplied RPC, inspect account state and drain bounded pages.
+
+    Return sanitized text discovery plus the engine's managed-profile image
+    policy record; never infer image support from runtime/account fields. Raise
+    ContractError for malformed or excessive replies and propagate RPC failures.
+    """
     hello = rpc.request('initialize', {
         'clientInfo': {'name': 'engine_protocol_probe', 'title': 'Engine protocol probe', 'version': '1.0.0'},
         'capabilities': {'experimentalApi': False},
@@ -99,7 +143,8 @@ def discover(rpc):
         cursor = page.get('nextCursor')
         if cursor is None:
             return {'runtimeVersion': VERSION, 'accountState': state,
-                    'inferenceVerified': False, 'catalog': catalog}
+                    'inferenceVerified': False, 'catalog': catalog,
+                    'imageGeneration': image_capability()}
         _text(cursor, 4096)
         if cursor in cursors:
             raise ContractError('repeated-catalog-cursor')

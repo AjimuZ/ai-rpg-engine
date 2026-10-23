@@ -83,6 +83,11 @@ No intermediate output is presented as a saved scene. Publish after schema/refer
 
 Image generation is a separate bounded presentation job after entity admission, not a narrator side effect. Its request identifies the public subject/appearance/style revision, category, authorized visual brief/reference assets and generation policy/budget. Accept image bytes only through a verified supported capability and the asset-validation/registration pipeline in [presentation assets](23-presentation-assets.md). Neither the narrative contract nor image output can set rarity, stats, price or ownership. A failed or stale job leaves gameplay and the existing accepted artwork intact.
 
+The current managed profile has [no supported image invocation or generation
+output formats](../tools/runtime_probe/IMAGE_CAPABILITY.md) (P01.6). The probe
+reports unavailability independently of text discovery and rejects generation
+admission; this does not implement a production image job or asset validator.
+
 Narration and admitted content proposals preserve supplied fixed author facts, required entity IDs and public appearance constraints. Complete only allowed gaps; do not replace a required NPC, invent unsupported rules or leak a private author requirement to the player. Contradictions or missing required technical data produce diagnostics/clarification rather than silent overrides; see [the authoring contract](09-adventure-packs.md#11-author-workflow).
 
 ## 9. Guide answer

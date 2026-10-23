@@ -1,0 +1,13 @@
+{
+  "runtimeVersion": "0.164.0",
+  "profile": "managed-narration",
+  "status": "unavailable",
+  "reason": "managed-profile-tool-free",
+  "invocation": null,
+  "supportedOutputFormats": [],
+  "accountEntitlement": "unverified",
+  "cost": "unverified",
+  "generationVerified": false,
+  "paidFallbackAllowed": false,
+  "fallback": "text-and-catalog"
+}

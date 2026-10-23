@@ -45,6 +45,14 @@ Originals and associations belong to their [adventure workspace/campaign](25-adv
 
 Full v1 includes a bounded asynchronous generation job pipeline; static/catalog assets remain sufficient for the MVP. P01 must verify a supported image capability, its authentication/account/cost boundaries and restricted invocation. Codex text access alone is not proof of image access. Do not enable paid API credentials, another service or broader host tools implicitly. When unavailable, report the capability accurately and use a category fallback while preserving play.
 
+**P01.6 evidence:** the managed 0.164.0 narration profile explicitly reports
+[unavailable image generation](../tools/runtime_probe/IMAGE_CAPABILITY.md), no
+supported invocation/output formats, and unverified account entitlement/cost.
+Its developer admission gate always refuses generation while text discovery
+remains usable. This settles the P01 capability record; P17.6 must qualify a
+separate restricted invocation before enabling generation. The production
+pipeline, catalog/category UI fallback and QA-31 remain undelivered.
+
 Pack/owner policy chooses `disabled`, `catalogOnly` or `bounded` by category. The owner enables generation explicitly and sets request/concurrency/budget limits before calls. Default to one active image job per campaign, coalesce duplicate requests and enforce a finite queue; the actual limits and provider behavior require implementation evidence. Do not generate a shop's entire unseen catalog merely because a panel opened.
 
 After an entity is admitted and its appearance is public, a job may request one missing identifying image. Scene art changes only for meaningful observable visual changes or an explicit request. Its input contains only visible appearance, permitted style references and the authorized audience projection. Image output cannot create equipment, change rarity, establish stats or award objects.

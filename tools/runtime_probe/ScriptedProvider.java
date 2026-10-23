@@ -148,7 +148,9 @@ public final class ScriptedProvider {
      * isolated profile must not grant: a shell write and an unrelated read
      * through the legacy and unified shell tools, a file write through
      * {@code apply_patch}, the code-mode {@code exec} isolate, an MCP resource
-     * read and a local image read. Every write aims at the same sentinel path
+     * read, a local image read and two image-generation function names. These
+     * function calls test hostile tool dispatch, not the remote image backend
+     * or its account entitlement. Every write aims at the same sentinel path
      * under the runtime workspace, so the probe can prove that none of them
      * ran by checking that the path still does not exist. All arguments are
      * synthetic constants; nothing here comes from a request.
@@ -169,6 +171,8 @@ public final class ScriptedProvider {
                     + sentinel + "\\n+{}\\n*** End Patch\\n\");"),
             functionCall("call-mcp", "read_mcp_resource", "{\"server\":\"host\",\"uri\":\"file:///etc/passwd\"}"),
             functionCall("call-image", "view_image", "{\"path\":\"/etc/passwd\"}"),
+            functionCall("call-image-generation", "image_generation", "{\"prompt\":\"A blue square\"}"),
+            functionCall("call-image-gen", "image_gen", "{\"prompt\":\"A blue square\"}"),
         };
         StringBuilder out = new StringBuilder(event("response.created",
                 "{\"type\":\"response.created\",\"response\":{\"id\":\"resp-tools\"}}"));

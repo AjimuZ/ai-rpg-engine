@@ -47,6 +47,12 @@ this exact image/client/host scope and retained neutral fixtures. Other hosts an
 architectures, authenticated packaged restart and full startup remain unverified;
 the matrix does not complete the integration gate.
 
+P01.6 [records images as unavailable](../tools/runtime_probe/IMAGE_CAPABILITY.md)
+in the managed runtime, with no generation formats or invocation. Image account
+entitlement/cost is unverified and is not a text-readiness prerequisite. These
+checks use no account volume; no image service, API credential, wider tool profile
+or launcher sign-in is introduced. Future enablement remains separately gated.
+
 ## 4. Planned repository artifacts
 
 | Artifact | Purpose |

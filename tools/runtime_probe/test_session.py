@@ -256,7 +256,8 @@ class TurnTests(unittest.TestCase):
         is rejected rather than ignored; allowed types complete normally.
         """
         for kind in ('commandExecution', 'fileChange', 'mcpToolCall', 'dynamicToolCall',
-                     'webSearch', 'imageView', 'collabAgentToolCall', 'futureType'):
+                     'webSearch', 'imageView', 'imageGeneration', 'image_generation_call',
+                     'collabAgentToolCall', 'futureType'):
             for method in ('item/started', 'item/completed'):
                 rpc, _ = rpc_for([note(method, threadId=THREAD, turnId=TURN,
                                        item={'type': kind, 'id': 'x'})])

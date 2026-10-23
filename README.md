@@ -1,5 +1,11 @@
 # AI RPG Engine
 
+P01.6 records [image generation as unavailable in the managed narration
+profile](tools/runtime_probe/IMAGE_CAPABILITY.md), with no supported generation
+formats/invocation and unverified account/cost entitlement. The developer probe
+refuses generation without blocking text discovery; production artwork jobs
+and UI fallbacks remain P17 work.
+
 **A Codex-powered engine for persistent, customizable RPG adventures.**
 
 AI RPG Engine separates the software that runs an adventure from the files that describe its world. Authors supply settings, characters, objectives, abilities, equipment, encounters, and presentation preferences. The engine supplies reliable state, deterministic rules, long-term continuity, turn-based combat, and AI orchestration through Codex.

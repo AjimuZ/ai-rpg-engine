@@ -17,7 +17,7 @@ adds protocol and platform scope without relaxing those pins.
 | Host | Windows 11 x64, Docker Desktop 4.96.3, WSL 2 Linux containers, Engine 29.9.2, Compose 5.6.1 | Actual runtime architecture `linux/amd64`; PowerShell probe commands verified; Git Bash launcher remains P02.7 |
 | Other combinations | `aarch64` release checksum is pinned, not executed | No `linux/arm64`, native Linux/macOS/Windows runtime, WSL distribution shell or other host support claim |
 | Account-backed text | Retained [P01.2 report](evidence/live-neutral-0.164.0.json), explicit `gpt-6-luna` / `low`, neutral output and second-process stdio resume | Historical successful check predates P01.3 profile; profile recheck hit usage quota and remains required before package exit; no account volume authorized for P01.5 |
-| Images | No runtime image-generation evidence in these fixtures | P01.6 owns availability, formats, restrictions, account/cost boundaries and text fallback |
+| Images | [Explicitly unavailable in the managed profile](IMAGE_CAPABILITY.md) (P01.6); no supported generation formats/invocation | Account entitlement/cost unverified; generation refused before runtime access; text/catalog fallback retained; P17 owns future qualification |
 
 ## Retained fixtures and replay
 
@@ -78,7 +78,7 @@ The historical signed-in smoke does not prove authenticated packaged socket
 restart. Connection loss can leave a turn active; reconcile on a fresh connection
 rather than replaying a mutation. Runtime services require init for termination.
 
-P01 package exit still needs the live isolation recheck and P01.6. Packaged
+P01 package exit still needs the live isolation recheck and P01.7. Packaged
 sign-in/restart, launcher readiness, production adapter concurrency, canonical
 receipts and campaign saves remain future gates. Full QA-24 (save coherence)
 and QA-28 (fresh-clone startup/persistence) are not satisfied by these fixtures.

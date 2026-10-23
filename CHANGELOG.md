@@ -2,6 +2,16 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Explicit image capability boundaries (P01.6), 23 October 2026
+
+- Record managed-runtime image unavailability, no supported invocation/output
+  formats, unverified account entitlement/cost and text/catalog fallback scope.
+- Include separate image diagnostics in discovery and add an offline report plus
+  unconditional generation refusal before runtime/account access. No paid access,
+  live image call, account mount or production job/asset pipeline is introduced.
+- Test policy/format refusal, account-independent text discovery, CLI isolation,
+  managed profile switches and hostile image function calls in the pinned runtime.
+
 ## Unreleased — Competitive research and bilingual narrative design, 23 October 2026
 
 - Inspect five competitor repositories at recorded revisions, source/test definitions, dependencies, issue trackers and license texts. Add a traceable comparative/gap register; adopt patterns rather than copying code, media or campaign content, and distinguish observed mechanisms from unmeasured quality claims.

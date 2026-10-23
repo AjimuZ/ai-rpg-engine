@@ -128,6 +128,15 @@ P01.3 applied this rule to 0.164.0 ([ADR 0013](adr/0013-narration-runtime-isolat
 
 No gameplay action grants approval to alter the engine or developer environment. Unexpected approval or tool requests produce a controlled task error, not an approval dialog inside the fictional scene.
 
+P01.6 records [image generation as unavailable](../tools/runtime_probe/IMAGE_CAPABILITY.md)
+in this exact managed profile. Discovery includes `imageGeneration` separately
+from account state and the text catalog. No generation invocation or output
+format is supported; account entitlement and cost remain unverified. The offline
+`images --generate` probe and contract admission gate fail before runtime access,
+even for bounded opt-in. Text discovery is unaffected. Future image enablement
+requires separate restricted-profile, account/cost and format qualification in
+P17.6; it cannot widen narration tools or enable paid/API access implicitly.
+
 ## 9. Model and reasoning routing
 
 Use logical profiles: `light`, `standard`, `deliberate`, and owner-selected `fixedQuality`. Resolve them against the actual Codex catalog and compatible effort levels. Store preferred account model IDs in private application settings; do not hardcode the demo's model names as permanent product requirements.

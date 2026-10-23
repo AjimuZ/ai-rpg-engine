@@ -43,6 +43,12 @@ Serve registered assets with validated MIME type, content hash, containment chec
 
 Bounded image jobs use a separately verified restricted capability, public appearance inputs, finite budgets and managed temporary/output roots. Do not expose canonical storage, database credentials, private NPC notes or unrestricted developer tools to obtain an illustration. A generated image is untrusted media until validated and registered; it cannot change item data or choose its own serving path. Keep saved originals and subject associations in audience-aware backup/restore, as specified in [presentation assets](23-presentation-assets.md).
 
+P01.6 [records explicit image unavailability](../tools/runtime_probe/IMAGE_CAPABILITY.md)
+for the managed narration profile and refuses generation before runtime/account
+access. Empty generation formats grant no media acceptance. Text sign-in/catalog
+success and development-client image tools cannot establish runtime entitlement
+or cost authorization; bounded policy alone cannot override this refusal.
+
 ## 6. Secrets and audience separation
 
 Never put Codex credentials, database passwords, `.env` files, auth stores, private saves, personal notes, or raw provider traces in Git. Diagnostic exports redact keys, tokens, absolute personal paths, private content, and RPC identifiers unless an owner explicitly selects a suitably protected full diagnostic mode.

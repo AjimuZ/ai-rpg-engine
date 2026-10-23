@@ -1,5 +1,14 @@
 # Runtime compatibility probe
 
+## Image capability (P01.6)
+
+The managed profile records **unavailable** image generation with no supported
+output formats or invocation and unverified account/cost boundaries. Offline
+`py -B tools/runtime_probe/probe.py images` reports the same capability included
+in discovery; adding `--generate` exits 1 before any runtime/account access.
+Text discovery continues normally. See the [evidence, tests and future enablement
+gate](IMAGE_CAPABILITY.md); P17 owns the production job and asset pipeline.
+
 This is a developer fixture, not the application or its concurrent adapter. It
 checks the pinned runtime `0.164.0`; unsupported versions fail before discovery.
 See the [supported-version matrix and retained fixtures](COMPATIBILITY.md) for P01.5 scope, replay, refresh instructions and remaining service/platform limitations.
@@ -115,7 +124,8 @@ run. Its three Docker tests (`RUNTIME_PROBE_DOCKER`) use the synthetic, account-
 prove the following:
 
 - the upstream request carries `tools: []` and only engine instructions;
-- six scripted host tool calls are refused, and no file is written;
+- eight scripted host tool calls are refused, including image-generation function
+  names, and no file is written;
 - `danger-full-access` thread starts are rejected, and other wider policies are clamped;
 - `isolation.compose.yaml` bypasses the guard to mount the synthetic files in
   `isolation_fixture/` plus hostile launch flags, and none of them take effect;

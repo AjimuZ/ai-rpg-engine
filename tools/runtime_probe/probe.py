@@ -28,7 +28,8 @@ never reach it, because they can contain e-mail addresses, tokens, or local
 paths.
 
 The probe never signs in. Only the ``live`` profile contacts a real inference
-service, using the fixed neutral prompt.
+service, using the fixed neutral prompt. The ``images`` profile is an offline
+managed-policy diagnostic and refuses generation without starting a runtime.
 
 Every container protocol child gets a unique ``--name``. Its shutdown escalates with
 ``docker kill`` of exactly that name, because ending only the Docker client
@@ -47,6 +48,7 @@ import tempfile
 import time
 
 from contract import ContractError, OUTPUT_SCHEMA, VERSION, discover, validate_output
+from contract import image_capability, require_image_generation
 import session
 from transport import Rpc, Stdio
 
@@ -556,6 +558,19 @@ def probe_live(args):
     return report
 
 
+def probe_images(args):
+    """Return offline image capability evidence or refuse an explicit generation attempt.
+
+    Consumes only argparse's generate flag, returns neutral diagnostics, and raises
+    ContractError on generation. Never launches a process or inspects account state;
+    this diagnostic profile cannot take prompts, credentials or output paths.
+    """
+    if args.generate:
+        # A request flag is intent, not capability or account/cost authorization.
+        require_image_generation(policy='bounded', output_format=None)
+    return image_capability()
+
+
 def main(argv=None):
     """Parse optional CLI argv and print one evidence/error object; return zero on success or
     one on ContractError, with argparse handling invalid options.
@@ -564,6 +579,9 @@ def main(argv=None):
     parser.add_argument('--timeout', type=float, default=60.0,
                         help='per-request deadline in seconds')
     profiles = parser.add_subparsers(dest='profile', required=True)
+    images = profiles.add_parser('images', help='offline managed-profile image capability')
+    images.add_argument('--generate', action='store_true',
+                        help='exercise the unavailable generation gate; never generates')
     host = profiles.add_parser('host', help='owner-supplied executable over stdio')
     host.add_argument('--executable', required=True)
     host.add_argument('--work-dir', default='.local/runtime-probe')
@@ -586,7 +604,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     handler = {'host': probe_host, 'container': probe_container,
                'packaged': probe_packaged, 'session': probe_session,
-               'live': probe_live}[args.profile]
+               'live': probe_live, 'images': probe_images}[args.profile]
     try:
         report = handler(args)
     except ContractError as exc:

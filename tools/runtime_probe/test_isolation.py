@@ -53,11 +53,12 @@ GUARDED_HOME_FILES = ('config.toml', 'AGENTS.md', 'AGENTS.override.md')
 SENTINEL = 'inherited-sentinel'
 # The path every scripted write in ScriptedProvider's scenario-tools targets.
 CANONICAL_SENTINEL = '/var/lib/runtime/workspace/canonical-sentinel.json'
-# The runtime's own answers to the six scripted calls when no tool exists.
+# The runtime's own answers to the eight scripted calls when no tool exists.
 REFUSALS = ['unsupported call: shell', 'unsupported call: exec_command',
             'unsupported custom tool call: apply_patch',
             'unsupported custom tool call: exec',
-            'unsupported call: read_mcp_resource', 'unsupported call: view_image']
+            'unsupported call: read_mcp_resource', 'unsupported call: view_image',
+            'unsupported call: image_generation', 'unsupported call: image_gen']
 
 
 def engine_instructions():
@@ -90,7 +91,7 @@ class ProfileFileTests(unittest.TestCase):
         features = managed.pop('features')
         self.assertEqual(set(features.values()), {False})
         for name in ('shell_tool', 'unified_exec', 'code_mode', 'view_image', 'multi_agent',
-                     'hooks', 'memories', 'plugins', 'apps', 'computer_use'):
+                     'hooks', 'memories', 'plugins', 'apps', 'computer_use', 'image_generation'):
             self.assertIs(features.get(name), False, name)
         self.assertEqual(managed['model_catalog_json'], '/etc/codex/engine-model-catalog.json')
         self.assertEqual(managed['model_instructions_file'], '/etc/codex/engine-instructions.md')
@@ -246,8 +247,9 @@ class DockerIsolationTests(unittest.TestCase):
         """Prove restricted surface, denied writes and pinned policies on the packaged image.
 
         Thread 1 is the neutral control. Thread 2 makes the scripted provider
-        call six host tools (two command runners, two patch forms writing the
-        canonical sentinel, an extension read and an image read); every call
+        call eight host tools (two command runners, two patch forms writing the
+        canonical sentinel, an extension read, an image read and two image
+        generation function names); every call
         must be answered as unsupported and the sentinel must not exist.
         Finally, a thread asking for full host access must be rejected and
         threads asking for other wider policies must be clamped to

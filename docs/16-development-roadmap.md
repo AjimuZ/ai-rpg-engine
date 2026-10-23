@@ -93,8 +93,21 @@ Checks: a documentation review against the requirements, pack, security, and pub
 - [x] P01.3 Demonstrate restricted roots, denied canonical writes, unavailable unwanted host tools, and inherited-config isolation.
 - [x] P01.4 Demonstrate owned-process shutdown, EOF/timeout handling, stderr bounds, and early-event buffering.
 - [x] P01.5 Save neutral protocol fixtures and a supported-version matrix; record service maturity and platform limitations.
-- [ ] P01.6 Record supported image-generation capability or explicit unavailability, restricted invocation, output formats and account/cost boundaries; gate actual generation without blocking text-only fallback or enabling paid access implicitly.
+- [x] P01.6 Record supported image-generation capability or explicit unavailability, restricted invocation, output formats and account/cost boundaries; gate actual generation without blocking text-only fallback or enabling paid access implicitly.
 - [ ] P01.7 Qualify interleaved thread dispatch, actual provider concurrency and cancellation/priority limits under the managed profile; retain bounded evidence, or explicitly select serialized inference when simultaneity/headroom is unproved. Do not infer live throughput from scripted overlap.
+
+**Progress (23 October 2026):** P01.6 is complete with an explicit unavailable image
+capability for the managed 0.164.0 narration profile, with a
+[neutral evidence record and enablement boundaries](../tools/runtime_probe/IMAGE_CAPABILITY.md).
+No supported generation formats/invocation or verified account/cost entitlement
+are claimed. Discovery exposes the record without blocking the text catalog;
+the offline generation gate refuses even bounded opt-in before runtime access.
+The full Docker runtime regression passes (104 tests, no skips), including
+retained-evidence consistency, unexpected image-result rejection and eight
+host-tool refusals. Packaging checks pass (five tests, no skips), as do all four
+relevant Compose configurations and source/documentation audits.
+No account volume, live image call or paid fallback is used.
+P17 retains production job/asset/fallback implementation and QA-31 qualification.
 
 **Progress (23 October 2026):** P01.5 is complete. It retains an account-free runtime 0.164.0
 protocol projection (27 request/result exchanges and 19 selected notifications),
