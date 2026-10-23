@@ -69,6 +69,8 @@ Separate engine bug reports, content bugs, balance feedback, and feature request
 
 Documentation links and formatting; secret/private-path scanning; backend unit/integration checks; frontend build and relevant tests; pack-schema validation; deterministic combat regression; neutral adapter fixtures; dependency/license inventory; and selected browser paths. Add each when the corresponding code exists.
 
+A local build-context regression suite now exists at [tools/container_packaging](../tools/container_packaging/README.md): it checks actual BuildKit filtering using neutral fixtures, without reading credentials or starting application services. Wiring it into ordinary CI remains P02.4.
+
 Live Codex tests are opt-in and separated from untrusted pull requests. Never expose credentials to arbitrary contributed code or imported packs. A live account-dependent test failure should not be confused with a deterministic rules regression.
 
 ## 8. Versioning

@@ -107,6 +107,8 @@ Every reference names the exact version and OS variant plus the multi-platform i
 
 The Temurin images use Ubuntu 26.04 LTS ("resolute"): it is Temurin's default base for the 21 line, standard support runs until May 2031, and the build and runtime stages share one base. Adoptium published Temurin 21.0.13+9 binaries, the October 2026 quarterly update, on 22 October 2026, but no official `eclipse-temurin` 21.0.13 image tag existed on 23 October 2026. Before P02.3 builds the first engine image, move the JDK and JRE references to the first published 21.0.13 (or later 21.0.x) official image under the refresh rules. No release may ship on an older Java update than the newest published one.
 
+P02.3 rechecked the official Docker Hub tag API on 23 October 2026: `https://hub.docker.com/v2/repositories/library/eclipse-temurin/tags?page_size=100&name=21.0.13` returned `count: 0`; inspecting `21.0.13_9-jdk-resolute` returned `not found`. The JDK/JRE `21-*-resolute` aliases still resolve to the exact indexes above. The first engine build remains gated on publication of the refreshed official images; build-context isolation can be verified independently with scratch-stage exports.
+
 Rules for the images:
 
 - The engine image is multi-stage: Angular in the Node.js stage, the Spring Boot jar in the JDK stage, and only the jar on the JRE stage, which contains no build tools, Node.js, or package caches ([deployment specification](../22-container-deployment-and-startup.md#2-runtime-topology)).

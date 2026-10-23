@@ -1,0 +1,4 @@
+# This image downloads its binary in BuildKit and needs no local files.
+# Keep this policy independent: root .dockerignore does not cover this context.
+**
+!Dockerfile

@@ -2,6 +2,11 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Build-context isolation (partial P02.3), 23 October 2026
+
+- Add default-deny root and independent runtime Docker context policies, excluding private configuration, credentials, data, Git history and generated output, including nested private paths.
+- Add two real BuildKit export regression tests using neutral isolated fixtures. Engine image/Compose packaging remains pending because ADR 0009 requires official Temurin 21.0.13 or later images that are not yet published; no packaged runtime or persistence claim is made.
+
 ## Neutral development shells (P02.2), 23 October 2026
 
 - Add pinned Angular and Spring Boot workspaces without adventure content, with strict frontend compilation, external PostgreSQL/Flyway configuration, and minimal status-only backend health.

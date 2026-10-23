@@ -150,6 +150,21 @@ full readiness/failure states P02.5, packaging/launcher/restart QA-28 P02.3/P02.
 The package exit below remains open.
 
 - [x] P02.2 Scaffold Angular and Spring Boot using pinned versions, with no adventure constants.
+
+P02.3 partial checkpoint (23 October 2026): root and independent runtime
+build contexts now default-deny unreviewed inputs, with final recursive
+exclusions for private settings, credentials, data, and build output. Two
+real BuildKit export tests pass against isolated neutral fixtures, including
+nested private paths and local editor/account stores; an initial directory-
+admission leak was fixed. The existing runtime image still builds with its
+independent context policy. The offline runtime suite passes 46 tests, with
+five Docker checks skipped because `RUNTIME_PROBE_DOCKER` is unset.
+Packaging remains incomplete: Docker Hub's official Temurin tag API returned
+zero 21.0.13 tags, and the JDK/JRE resolute aliases still resolve to the
+21.0.12.1 indexes. ADR 0009 forbids the first engine build before the Java
+refresh. No engine image, root Compose, volumes, secrets, single-origin
+interface or startup/restart verification is claimed by this checkpoint.
+
 - [ ] P02.3 Add pinned engine/runtime images, Compose services, durable volumes, private networks/IPC, secret handling, and the single-origin packaged interface; exclude private development data from builds.
 - [ ] P02.4 Add build/test/documentation/secret checks without Codex credentials in ordinary CI.
 - [ ] P02.5 Provide health/readiness contracts and useful startup failure states.
