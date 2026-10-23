@@ -155,6 +155,8 @@ Codex authentication is completed by the owner using supported mechanisms inside
 
 The launcher does not guarantee that a desktop/editor login transfers into Linux containers. Account entitlement, service availability, rate limits, and billing remain applicable. Ordinary CI checks use fixtures and do not require account credentials.
 
+**Required for the verified ChatGPT device-code flow:** enable device-code login in the account's security settings before `--login`; for a managed workspace, an administrator must allow that login method. The owner then completes the browser link/code displayed by the runtime. P02.6 must explain this setting when device authorization is disabled or denied, linking the official instructions without changing account settings itself. P02.7 must verify that this condition produces actionable guidance rather than repeated silent retries. The [current probe setup](../tools/runtime_probe/README.md#owner-account-setup-for-the-live-check) documents the manual command used successfully in P01.2. Other upstream sign-in methods have separate requirements; this is the prerequisite for the verified device-code path.
+
 ## 7. Data, secrets, and lifecycle
 
 Use distinct persistent storage for PostgreSQL, registered content/assets, runtime account/session state, and temporary workspaces. Canonical state belongs to PostgreSQL, not the container's writable layer or the runtime transcript. Backups must include the database, pinned content revisions, and referenced registered assets; a surviving Docker volume alone is not an independent backup.

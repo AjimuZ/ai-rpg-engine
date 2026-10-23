@@ -2,6 +2,10 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Device-code login prerequisite, 23 October 2026
+
+- Explain the ChatGPT security-setting/workspace permission required by the project's verified container device-code login flow in setup and integration guidance. Require actionable launcher guidance in P02.6–P02.7; keep other upstream login methods distinct and retain owner-controlled account setup.
+
 ## Unreleased — Authenticated neutral lifecycle completion (P01.2), 23 October 2026
 
 - Verify one live neutral task after owner-operated device-code login in a dedicated runtime volume. Explicit `gpt-6-luna` / `low` settings produce a correlated completed envelope accepted by the independent validator; a second stdio process resumes the same completed turn and settings.

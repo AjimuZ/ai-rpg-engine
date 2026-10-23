@@ -22,6 +22,8 @@ The official SDK provides a server-side TypeScript library for local Codex threa
 
 Use supported Codex authentication. Do not read tokens into frontend code, copy credential files into this repository, or implement a private OAuth flow. The owner completes supported sign-in outside gameplay. The application reports account readiness and actionable authentication errors without revealing secret material.
 
+For the project's verified container device-code flow, the owner must enable device-code login in ChatGPT security settings; managed workspaces require administrator permission for that method. Complete the runtime's browser link/code in its dedicated account volume. Desktop/development-client sign-in does not initialize this isolated volume. The launcher must explain this prerequisite when device authorization is unavailable and link the [official authentication instructions](https://learn.chatgpt.com/docs/auth); account/workspace policy is never changed automatically. Other supported login methods have their own prerequisites.
+
 OpenAI documents ChatGPT subscription sign-in and API-key sign-in for local Codex use; account controls, entitlements, billing, and data handling depend on that choice. The product cannot promise that an existing desktop session always provides access, or that usage is free or unlimited. [OpenAI: authentication](https://learn.chatgpt.com/docs/auth).
 
 The local app sends selected campaign context to the configured Codex service for inference. The outbound data inventory must identify task instructions, authorized state, selected lore/events, and generated content. Full saves, unrelated files, personal profiles, other campaigns, and raw credentials are not context inputs.
