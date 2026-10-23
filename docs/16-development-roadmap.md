@@ -199,6 +199,27 @@ returns not found. Engine Dockerfile/service, secret consumption, engine-only
 content/assets storage and full container integration remain open; P02.3 and
 QA-28 are not complete. See [backend commands](../backend/README.md).
 
+P02.3 fourth partial checkpoint (23 October 2026): the Spring `packaged` runtime
+profile requires a file-secret config tree and maps `postgres_password` to the
+datasource password without an environment/argument password. Four account-free
+configuration tests pass for newline-stripped file contents, container binding,
+paths with spaces, and missing mount/file rejection. Initial tests failed before
+the profile existed. The profile is separate from the Maven `packaged-ui` build;
+default host binding remains loopback. All nine packaged backend tests pass
+against disposable PostgreSQL 18. A non-root executable jar authenticates with
+the mounted secret, serves byte-identical index/notices and minimal health, and
+rejects missing secret directories/files. Missing directories fail import;
+missing files fail datasource authentication rather than eager file validation.
+Frontend typechecks/test/build/audit pass with zero vulnerabilities; all five
+real packaging checks pass, including storage recreation. The runtime suite
+passes 46 checks with five opt-in skips. No accounts or inference are used.
+The build without `packaged-ui` passes six tests with three interface tests
+skipped, still using the packaged file-secret runtime profile for PostgreSQL.
+Text/fences and 112 local documentation links pass review.
+Docker Hub still reports zero 21.0.13 tags and both required
+JDK/JRE tags return not found. Engine image/service, secret mounts, durable
+content/assets and full container integration remain open; P02.3 stays unchecked.
+
 - [ ] P02.4 Add build/test/documentation/secret checks without Codex credentials in ordinary CI.
 - [ ] P02.5 Provide health/readiness contracts and useful startup failure states.
 - [ ] P02.6 Implement root `start.sh` with prerequisite checks, secure configuration initialization, cached builds, health-based startup, supported sign-in, status/log/stop commands, and nonzero failure results.

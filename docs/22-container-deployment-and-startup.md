@@ -71,8 +71,25 @@ This verifies jar assembly using the existing development JDK image, not the
 first engine image. The required official Java image refresh still gates engine
 Dockerfile/service work. The future multi-stage build must compile the frontend
 first, invoke this profile, and carry its artifacts and notices into the engine
-image without adding source/private files. Engine secret consumption and durable
-content/asset mounts remain unfinished. No full packaged readiness is claimed.
+image without adding source/private files. The separate Spring runtime profile
+`packaged` now requires `configtree:/run/secrets/` and maps the shared
+`postgres_password` file to the datasource password. A private absolute directory
+ending in `/` can override the tree through `engine.secrets-directory` for tests.
+Missing mounts/password properties fail startup, with no fallback password;
+ordinary explicit Spring property overrides retain their normal precedence.
+The profile binds inside the container on `0.0.0.0`; the future engine service
+must publish only on host loopback. Do not use it for host development.
+Engine Compose secret mounts and durable content/asset mounts remain unfinished.
+Four neutral configuration tests pass, including unchanged host defaults. An
+absent mount fails import; an empty mount fails actual database authentication
+during startup, rather than individual-file validation by the config-tree loader.
+No full packaged readiness is claimed.
+
+All nine packaged backend tests pass against disposable PostgreSQL 18. A
+separate executable-jar smoke as UID/GID 10001 verifies secret-authenticated
+startup, minimal health, exact index/notices bytes and missing directory/file
+startup failures. It uses the existing pinned development JDK without building
+an engine image, touching account state or claiming Linux-host file permissions.
 
 ## 5. Launcher contract
 

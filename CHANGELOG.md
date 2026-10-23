@@ -2,6 +2,11 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Packaged file-secret configuration (partial P02.3), 23 October 2026
+
+- Add an opt-in Spring runtime profile requiring a file-secret config tree for the database password, with container HTTP binding and no fallback password; retain loopback host-development defaults.
+- Verify actual configuration loading, newline handling, paths with spaces, host defaults and missing mount/file failures using neutral account-free tests. All nine packaged backend tests pass; a non-root executable jar authenticates from a mounted secret and serves exact compiled index/notices bytes. Engine image/service wiring remains gated by the official Java refresh; full packaged startup and QA-28 remain open.
+
 ## Unreleased — Single-origin jar assembly (partial P02.3), 23 October 2026
 
 - Add an opt-in Maven profile embedding compiled Angular production assets and extracted third-party notices in the executable backend jar, served at one origin without an additional server.

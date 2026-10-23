@@ -42,6 +42,41 @@ Use a new disposable database: the test rejects existing public gameplay tables.
 Flyway may create its history table, but there are no versioned migrations until P03.
 The executable jar is `target/engine-0.1.0.jar`; it can also run with `java -jar`.
 
+## Packaged runtime configuration (partial P02.3)
+
+Activate the Spring runtime profile with `--spring.profiles.active=packaged`.
+This differs from the Maven `-Ppackaged-ui` build profile: one configures startup,
+the other embeds the interface. The runtime profile requires the config tree
+`/run/secrets/` and reads `postgres_password` into `spring.datasource.password`.
+Supply the JDBC URL and role through `SPRING_DATASOURCE_URL` and
+`SPRING_DATASOURCE_USERNAME`; do not export the password or put it in arguments.
+For isolated verification, `--engine.secrets-directory=/absolute/private/path/`
+overrides the mount location; the trailing slash is required. Missing mounts or
+password properties fail startup; there is no optional import or password default.
+A normal trailing file newline is stripped by Spring's config-tree loader.
+Ordinary Spring property precedence still applies; this profile is not a secret
+manager and does not override explicitly supplied datasource settings.
+
+The profile binds to `0.0.0.0` **inside the container**. The future Compose engine
+service must publish only on host loopback; avoid activating this profile for
+host development. The default profile still binds to `127.0.0.1`.
+`PackagedSecretsTest` checks real configuration loading with neutral files,
+including paths with spaces, rejection of missing mounts/files under strict
+placeholder binding, and unchanged host defaults, without a
+database or account. Engine Compose secret wiring and Linux host UID readability
+remain pending; local Compose secret files are not an encrypted store.
+For the actual application, an absent mount fails configuration import; an empty
+mount fails database authentication during startup. The config-tree import alone
+does not validate individual file presence before datasource initialization.
+
+On 23 October 2026 all nine packaged backend tests passed against disposable
+PostgreSQL 18. A separate executable-jar smoke ran as UID/GID 10001, authenticated
+with the read-only mounted secret, checked health and exact index/notices bytes,
+and confirmed startup failure for missing directories/files. No engine image was
+built; these checks use the existing pinned Java 21 development image.
+The clean build without `-Ppackaged-ui` also passes six tests and skips its three
+interface tests, using the same packaged runtime profile for database access.
+
 The development server binds to `127.0.0.1:8080`. Only `/actuator/health` is exposed,
 returning status without components/details. There are no gameplay APIs or account
 integration. Ordinary builds contain no browser assets. Full readiness/failure

@@ -61,6 +61,15 @@ test verifies password-authenticated TCP and neutral persistence on recreation;
 it never loads an account. This does not establish tool/inference containment or
 account readiness. See [deployment details](22-container-deployment-and-startup.md).
 
+The backend's opt-in Spring `packaged` profile now requires a config tree at
+`/run/secrets/` and consumes `postgres_password` without a password environment
+variable or command argument. Missing mount/password properties abort startup;
+normal explicit Spring overrides still apply. Tests use only neutral temporary
+files and cover trailing newlines and paths with spaces. This is application
+configuration, not completed Compose engine secret wiring. The future engine
+must receive only its required secret and IPC mounts, with host loopback port
+publication and verified UID readability on each supported host.
+
 ## 7. Data storage and retention
 
 Store application data outside the source checkout. The packaged profile uses separate Docker-managed persistent volumes for PostgreSQL, registered content/assets, and private runtime state; host development may use an OS-appropriate owner data directory. Separate exports, logs, and temporary workspaces, and record their actual locations and retention during implementation. Never rely on a container's writable layer for durable campaigns. See [container deployment](22-container-deployment-and-startup.md).

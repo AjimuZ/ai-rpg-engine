@@ -10,6 +10,10 @@ secret permissions/initialization remain P02.6 work; file mounts are not encrypt
 The third checkpoint verifies optional single-origin jar assembly and bundled
 frontend notices independently. Container integration remains unverified and the
 image gate still applies; jar HTTP tests do not establish full startup readiness.
+The fourth checkpoint adds mandatory packaged file-secret configuration and
+neutral missing-mount/file tests. It does not establish engine Compose wiring or
+Linux host UID readability. The container bind address requires future host
+loopback publication; ordinary Spring overrides retain their standard precedence.
 
 ## 1. Risk register
 

@@ -122,6 +122,9 @@ implemented. Neutral storage survives real container recreation; the engine
 image/service and complete application startup remain pending. An opt-in Maven
 profile now embeds compiled Angular assets and notices in the executable jar;
 real HTTP tests verify single-origin serving independently of container packaging.
+A separate Spring `packaged` runtime profile requires file-secret configuration
+and binds the server inside the container; the default host profile remains
+loopback-only. Engine service/secret wiring is still pending the image gate.
 See the [backend build instructions](../backend/README.md).
 
 ## 8. Concurrency and background work
