@@ -57,7 +57,7 @@ The [documentation index](docs/README.md) links every specification, decision re
 
 ## A generic engine with a concrete default
 
-The core does not require a goddess, a fantasy world, Rune, Lyra, a particular protagonist, or a relationship storyline. Those belong in adventure content or optional modules. A default original ruleset, **AI RPG Skirmish**, supplies an implementable starting point for tactical combat; packs may configure its data and select supported policies. Arbitrary new mechanics still require a reviewed engine extension.
+The core does not require a goddess, a fantasy world, Rune, Lyra, a particular protagonist, or a relationship storyline. Those belong in adventure content or optional modules. A default original ruleset, **AI RPG Skirmish**, is confirmed as the implementable starting point for tactical combat ([ADR 0006](docs/adr/0006-original-combat.md)). Its numbers are provisional until simulations and playtests calibrate them; packs may configure its data and select supported policies. Arbitrary new mechanics still require a reviewed engine extension.
 
 The recommended first implementation is a local, single-owner modular application. Multiple campaigns are isolated from the beginning. Multiplayer, public hosting, a marketplace, arbitrary executable pack plugins, and a visual campaign editor are separate later initiatives.
 

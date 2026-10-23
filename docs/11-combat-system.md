@@ -2,9 +2,9 @@
 
 ## 1. Intent and boundaries
 
-Combat should preserve the recognizable experience of tabletop role-playing: ordered turns, meaningful actions, uncertain attacks, defenses, skills, equipment, abilities, conditions, and progression. **AI RPG Skirmish** is a proposed original default ruleset, not a reproduction of Dungeons & Dragons, its content, stat blocks, or rules text.
+Combat should preserve the recognizable experience of tabletop role-playing: ordered turns, meaningful actions, uncertain attacks, defenses, skills, equipment, abilities, conditions, and progression. **AI RPG Skirmish** is the confirmed original default ruleset to implement ([ADR 0006](adr/0006-original-combat.md), accepted 23 October 2026), not a reproduction of Dungeons & Dragons, its content, stat blocks, or rules text.
 
-The engine supports configurable definitions and selected policies. The initial implementation supplies one concrete scheduler and one zone model. A new tactical algorithm requires an explicit ruleset extension. Numerical values here are design defaults to implement and playtest, not claims of proven balance.
+The engine supports configurable definitions and selected policies. The initial implementation supplies one concrete scheduler and one zone model. A new tactical algorithm requires an explicit ruleset extension. Numerical values here are provisional design defaults to implement and playtest, not claims of proven balance; [section 17](#17-provisional-numerical-defaults) lists them with their calibration gates.
 
 Codex may propose encounters, portray participants, select legal enemy tactics, and narrate outcomes. The Java rules engine owns initiative, legality, dice, costs, damage, conditions, defeat, and settlement.
 
@@ -183,3 +183,34 @@ Use original terminology, formulas, writing, ability definitions, creature desig
 ## 16. Required acceptance cases
 
 Invalid targets spend nothing; legal misses spend declared costs; armor can absorb all damage; Guard/Brace stacking is bounded; reaction refresh happens once; a poisoned defeated actor cannot act; no random redraw occurs on retry; renewal preserves the exact actor/AP/effect state; escape does not imply death; a party defeat reaches the configured recovery state; settlement is idempotent; every outcome returns to a valid campaign mode.
+
+## 17. Provisional numerical defaults
+
+On 23 October 2026 (roadmap P00.4), AI RPG Skirmish was confirmed as the implementable default ruleset. A review of this document, the [gameplay modules](10-gameplay-modules.md), [encounters and progression](12-encounters-and-progression.md), and the [worked combat scenario](20-worked-scenarios.md#3-a-complete-two-round-fight) found every formula and value needed for the first implementation. The worked scenario's derived values (Health 24, Focus 10, Guard 12, threat capacity 8, level-2 maxima 26 and 11, 16 seconds of world time) match the formulas.
+
+The confirmation has two parts:
+
+- **Confirmed structure.** These are not tuning values: zone graph space, persistent initiative with stable tie-breaks, an action-point economy that expires at activation end, predeclared reactions with a maximum depth of one, 2d10 checks with margin-based strong hits, flat armor with penetration, explicit effect phases and stacking keys, backend-owned dice, multi-outcome settlement, and recoverable defeat by default. Changing one of them needs a superseding ADR, because it changes the combat scheduler or the probability model ([scope-change procedure](17-risks-and-open-decisions.md#3-scope-change-procedure)).
+- **Provisional numbers.** Every value in the table below is a starting point for implementation and tests, not a balance claim. Implement each one as ruleset-profile data in the `RulesetRevision` ([domain model](05-domain-model.md#2-core-aggregates)), not as a hard-coded constant. Tests can then pin today's values, and calibration can change them without code changes.
+
+| Area | Provisional default | Defined in | Calibration gate |
+| --- | --- | --- | --- |
+| Attributes | Force, Finesse, Insight, Resolve; supported range 0–6; creation range 0–4 with an 8-point budget | [§4](#4-default-actor-profile), [creation](10-gameplay-modules.md#4-character-creation) | P11, P13, P18.3 |
+| Skills | Ranks 0–5; creation ranks 0–2 with 6 points; rank cap `min(5, level + 1)` | [§4](#4-default-actor-profile), [advancement](12-encounters-and-progression.md#9-default-advancement-proposal) | P11, P13, P18.3 |
+| Derived pools and defenses | Health `18 + 3 × Force + 2 × (level - 1)`; Focus `6 + 2 × Resolve + (level - 1)`; Guard `10 + Finesse + equipment`; Resistance `10 + Resolve + modifier` | [§4](#4-default-actor-profile) | P11, P18.3 |
+| Defense caps | Armor 0–4; equipment Guard cap +3; situational Guard cap +4; Guard action and Brace +2 under one stacking key; partial cover +2 | [§4](#4-default-actor-profile), [§5](#5-space-zones), [§7](#7-action-economy) | P11, P18.3 |
+| Action economy | 3 AP per activation; 1 reaction per round; Move 1 per edge (difficult terrain 2); Strike 2; Guard 1; Use item 2; Ready/equip 1; Interact 1; Assess 1; Withdraw 2 | [§4](#4-default-actor-profile), [§7](#7-action-economy) | P11, P18.3 |
+| Checks | `2d10 + attribute + skill + modifier`; situational modifier clamped to -3..+3; difficulties 8/12/16/20/24; strong hit at margin 6 or more | [§8](#8-checks-and-attacks), [exploration](10-gameplay-modules.md#2-exploration-and-action-resolution) | P11, P18.3 |
+| Damage | Strong-hit bonus 1d4; neutral sample weapons `1d6 + Force` and `1d6 + Finesse` with one charge | [§9](#9-damage-and-healing) | P11, P18.3 |
+| Initiative and time | `2d10 + Finesse + Insight`, rolled once; 8 in-world seconds per round; round cap 30 | [§4](#4-default-actor-profile), [§6](#6-initiative-and-round-order), [§13](#13-terminal-conditions) | P11, P18.3 |
+| Range | Same zone, adjacent zone, or two edges away | [§5](#5-space-zones) | P13, P18.3 |
+| Threat heuristic | `baseCapacity = 8 + 2 × (level - 1)`; preparedness `0.55 + 0.30 × health + 0.15 × resource`, clamped to 0.55–1.00; bands 60–80/90–110/120–140/150–170%; costs minor 4, standard 8, elite 12, anchor 20; level scaling `ceil(baseCost × (1 + 0.20 × (level - 1)))`; at most party size + 2 hostile bodies | [encounters §4](12-encounters-and-progression.md#4-initial-threat-heuristic) | P13, P18.3 |
+| Advancement | Cumulative XP `50 × L × (L - 1)`; awards 10/20/35; one training point per level; one attribute point per even level; attribute cap 6; no default maximum level, which a pack may declare | [advancement](12-encounters-and-progression.md#9-default-advancement-proposal) | P13, P18.3 |
+| Generation and repair | One proposal repair per encounter and per tactic before the deterministic fallback | [§12](#12-legal-actions-and-ai-tactics), [encounters §3](12-encounters-and-progression.md#3-planning-pipeline) | P13 |
+
+Rules for changing these values:
+
+- P11 and P13 implement the values as listed. A defect found before release, such as an unreachable objective or an unbounded loop, is fixed in this table and in the defining section within the same change.
+- Tuning for balance belongs to P18.3. It uses the simulations and statistical checks in [quality and acceptance](15-quality-and-acceptance.md#6-statistical-combat-checks) and human playtests, and every change is published as a new versioned ruleset revision.
+- A campaign keeps the ruleset hash it was created with. Moving it to a retuned revision uses the audited migration preview of the [content upgrade flow](20-worked-scenarios.md#8-content-upgrade-during-an-active-campaign), never a silent change.
+- Until P18.3 publishes observed ranges with sample sizes, documentation and the UI must not describe these defaults as balanced.

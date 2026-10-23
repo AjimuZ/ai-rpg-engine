@@ -29,7 +29,7 @@ The snapshot has an identifier/hash. If a participating actor's mechanical state
 
 ## 4. Initial threat heuristic
 
-The first implementation needs an understandable heuristic, not a false claim of exact win probability. The following is a **proposed calibration model** to test and adjust.
+The first implementation needs an understandable heuristic, not a false claim of exact win probability. The following is a **proposed calibration model** to test and adjust; its values are listed in the [provisional numerical defaults register](11-combat-system.md#17-provisional-numerical-defaults).
 
 For each participating player/companion actor:
 

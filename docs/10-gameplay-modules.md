@@ -26,7 +26,7 @@ Weight/capacity and durability are supported configurable policies in v1, with c
 
 A creation profile specifies an attribute budget, skill choices, optional archetypes, trait exclusions, initial resources, known abilities, and starting loadout. The backend validates the total rather than trusting UI restrictions. Archetypes are data presets, not mandatory classes.
 
-The default proposal uses four attributes, Force, Finesse, Insight, and Resolve; each begins in the range 0–4 with a creation budget of eight points. Skills begin 0–2 with six total skill points across the pack's allowed skill list. These numbers belong to the default ruleset, not the engine kernel. A pack may supply a compatible profile within validated limits.
+The default proposal uses four attributes, Force, Finesse, Insight, and Resolve; each begins in the range 0–4 with a creation budget of eight points. Skills begin 0–2 with six total skill points across the pack's allowed skill list. These numbers belong to the default ruleset, not the engine kernel, and are provisional ([combat register](11-combat-system.md#17-provisional-numerical-defaults)). A pack may supply a compatible profile within validated limits.
 
 Creation previews are read-only. Campaign creation commits actor, loadout, initial world state, content hashes, initial event, and pending decision together. Reopening a campaign never recreates its starting inventory.
 

@@ -1,6 +1,6 @@
 # Worked Cross-Module Scenarios
 
-All examples are neutral design examples, not a required story or included executable pack. Their values use the proposed AI RPG Skirmish defaults. They illustrate contracts an implementation must test.
+All examples are neutral design examples, not a required story or included executable pack. Their values use the [provisional AI RPG Skirmish defaults](11-combat-system.md#17-provisional-numerical-defaults). They illustrate contracts an implementation must test.
 
 ## 1. Import an adventure without a predetermined plot
 

@@ -43,7 +43,7 @@ The repository-license decision was resolved on 22 October 2026: project softwar
 | Model IDs and effort mapping | Logical catalog-resolved profiles | P08 | Available account catalog and quality/latency evaluation |
 | Content authoring syntax | YAML for mechanics, Markdown for prose, JSON equivalent support where documented | P04 | Parser safety, diagnostics, author usability |
 | Defeat policy in neutral samples | Recoverable incapacitation; no automatic permanent death | P11 | Rules review and playtest |
-| Combat numeric tuning | AI RPG Skirmish defaults in the combat document | P13 and P18 | Simulations and human testing |
+| Combat numeric tuning | AI RPG Skirmish confirmed as the implementable default ([ADR 0006](adr/0006-original-combat.md)); its numbers are the provisional defaults listed in the [combat register](11-combat-system.md#17-provisional-numerical-defaults), stored as ruleset-profile data | P13 and P18.3 | Simulations, statistical checks, and human playtests; changes ship as versioned ruleset revisions |
 | Renewal thresholds | Ten completed tasks; context pressure thresholds | P09 | Context measurements and continuity results |
 | Asset/audio strategy | Local static assets; optional allowlisted streams | P17 | Rights, privacy, failure tests |
 | Backup retention path/settings | Owner data directory, rolling snapshots, independent daily backups | P16 | Disk usage and successful restore |

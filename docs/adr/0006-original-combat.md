@@ -1,6 +1,6 @@
 # ADR 0006: Original Deterministic Zone Combat
 
-**Status:** Proposed ruleset requiring playtest. **Date:** 22 October 2026.
+**Status:** Accepted as the implementable default ruleset on 23 October 2026 (roadmap P00.4); every numerical default is provisional until calibration (P13, P18.3). **Date:** proposed 22 October 2026.
 
 ## Context
 
@@ -18,7 +18,7 @@ Pure narrative combat cannot guarantee inspectable outcomes. Copying an external
 
 ## Consequences
 
-The default is concrete enough to build and test, but balance is provisional. Zone combat sacrifices precise grid geometry for manageable generated scenes. Interactive manual reactions are deferred; predeclared reactions keep individual actions atomic.
+The default is concrete enough to build and test, but balance is provisional. The [provisional numerical defaults register](../11-combat-system.md#17-provisional-numerical-defaults) separates the confirmed structure, whose change needs a superseding ADR, from tunable values. Those values are ruleset-profile data, and they change only through versioned ruleset revisions after simulations and playtests. Zone combat sacrifices precise grid geometry for manageable generated scenes. Interactive manual reactions are deferred; predeclared reactions keep individual actions atomic.
 
 ## Verification
 

@@ -37,7 +37,7 @@ Critical dependency chain: compatible stack → safe Codex profile → persisten
 - [x] P00.1 Select supported Angular/TypeScript/Node/npm versions using the primary project's Angular 22 baseline and actual compatibility constraints.
 - [x] P00.2 Select a maintained Spring Boot version supporting Java 21, Maven Wrapper version, PostgreSQL major/image, and Flyway version.
 - [x] P00.3 Pin initial supported OS/runtime targets, Linux container images, Compose/engine versions, and shell requirements; Windows with WSL2 is first to validate.
-- [ ] P00.4 Confirm AI RPG Skirmish as the implementable default and record numerical defaults as provisional.
+- [x] P00.4 Confirm AI RPG Skirmish as the implementable default and record numerical defaults as provisional.
 - [ ] P00.5 Record the selected name AI RPG Engine and confirm v1 boundaries, initial file format, and licensing plan.
 
 **Progress (22 October 2026):** P00.1 is complete. [ADR 0009](adr/0009-toolchain-baseline.md) pins Angular 22.2.3, TypeScript 6.0.3, Node.js 24.22.1 LTS, npm 11.19.1, RxJS 7.8.2, tslib 2.8.1, and Vitest 5.0.5, and records the workstation tool inventory. Evidence: npm registry engines/peer metadata, Angular and Node.js support schedules, a conflict-free lockfile resolution of the pinned set with npm 11.19.1, and an `ERESOLVE` rejection of TypeScript 7.0.2.
@@ -58,7 +58,14 @@ Evidence: registry digests resolved with `docker buildx imagetools inspect`; Ado
 - **Results:** host checks confirmed the served Angular index, Java 21.0.12.1, PostgreSQL 18.6 with a Flyway migration, health `UP`, an unpublished database, and no external route from the data network. Startup took 32 s to healthy on the first run and 8 s on the unchanged second run.
 - **Findings recorded as rules:** MSYS path rewriting, `docker compose port` printing `:0` with exit status 0, Docker Desktop presenting secret files as `0777`, and an npm install-script warning for P02.2.
 
-The probe stack, image, and scratch files were removed. No volume was created. No WSL user distribution is installed, so the WSL shell candidate is not verified. Launcher behavior remains P02.6–P02.7 work. P00.4–P00.5 remain open, so the package exit is not yet met.
+The probe stack, image, and scratch files were removed. No volume was created. No WSL user distribution is installed, so the WSL shell candidate is not verified. Launcher behavior remains P02.6–P02.7 work.
+
+**Progress (23 October 2026):** P00.4 is complete. [ADR 0006](adr/0006-original-combat.md) is accepted: AI RPG Skirmish is the implementable default ruleset. A review of the combat, gameplay, encounter, and worked-scenario documents found every formula and value needed for the first implementation. The worked fight's derived values match the formulas: Health 24, Focus 10, Guard 12, threat capacity 8, level-2 maxima 26 and 11, and 16 seconds of world time. The new [provisional numerical defaults register](11-combat-system.md#17-provisional-numerical-defaults) separates two things:
+
+- **Confirmed structure:** zones, persistent initiative, the AP economy, predeclared reactions, 2d10 margin checks, flat armor, and backend dice. Changing one needs a superseding ADR.
+- **Provisional numbers:** the tunable values, each with its defining section and calibration gate (P11, P13, P18.3). They are stored as ruleset-profile data and change only through versioned ruleset revisions.
+
+One previously implicit point is now explicit: the default profile has no maximum level, and a pack may declare one. This was a documentation review; no simulation or playtest ran, so balance remains unclaimed. P00.5 remains open, so the package exit is not yet met.
 
 **Deliverables:** a concrete version matrix and updated ADR status. **Exit:** no ambiguous “Java 17/21,” implicit latest dependencies, or unowned pre-scaffold decisions. **Checks:** dependency compatibility references and a minimal tool availability inventory. **Suggested commit:** `Record supported toolchain and engine baselines`.
 
