@@ -17,8 +17,8 @@ ai-rpg-engine/
   CONTRIBUTING.md
   SECURITY.md
   start.sh                  # future packaged local entry point
-  compose.yaml              # future complete containerized installation
-  docker/                   # future engine/runtime image definitions
+  compose.yaml              # database/runtime infrastructure; engine pending
+  docker/                   # pinned runtime image; engine image pending
   frontend/                 # neutral Angular development shell
   backend/                  # Spring Boot shell; runtime bridge remains future work
   adventures/               # future neutral sample packs
@@ -29,7 +29,7 @@ ai-rpg-engine/
   .github/                  # future issue/PR templates and CI
 ```
 
-The repository currently contains design documentation, labeled UI concepts, repository policy files, a developer-only runtime image/probe, neutral [frontend](../frontend/README.md) and [backend](../backend/README.md) workspaces, and a sanitized [`.env.example`](../.env.example) that no service consumes. [CONTRIBUTING.md](../CONTRIBUTING.md) documents the shared editor and line-ending rules. There is no runnable game application or packaged startup launcher yet. Runtime data, private campaigns, generated personal images, local database volumes, credentials, temporary workspaces, and raw traces live outside the tracked source tree and are ignored where applicable.
+The repository currently contains design documentation, labeled UI concepts, repository policy files, a runtime image/probe, neutral [frontend](../frontend/README.md) and [backend](../backend/README.md) workspaces, and a partial root Compose database/runtime infrastructure. Its database labels are documented in the sanitized [`.env.example`](../.env.example). [CONTRIBUTING.md](../CONTRIBUTING.md) documents the shared editor and line-ending rules. There is no runnable game application or packaged startup launcher yet. Runtime data, private campaigns, generated personal images, local database volumes, credentials, temporary workspaces, and raw traces live outside the tracked source tree and are ignored where applicable.
 
 The intended local installation is the [containerized application with root `start.sh`](22-container-deployment-and-startup.md). Release setup instructions must exercise that packaged profile, including first sign-in, readiness, persistent restart, and safe stop; a host-only development setup does not complete that requirement.
 
@@ -69,7 +69,7 @@ Separate engine bug reports, content bugs, balance feedback, and feature request
 
 Documentation links and formatting; secret/private-path scanning; backend unit/integration checks; frontend build and relevant tests; pack-schema validation; deterministic combat regression; neutral adapter fixtures; dependency/license inventory; and selected browser paths. Add each when the corresponding code exists.
 
-A local build-context regression suite now exists at [tools/container_packaging](../tools/container_packaging/README.md): it checks actual BuildKit filtering using neutral fixtures, without reading credentials or starting application services. Wiring it into ordinary CI remains P02.4.
+A local build-context regression suite now exists at [tools/container_packaging](../tools/container_packaging/README.md): it checks actual BuildKit filtering using neutral fixtures, without reading credentials or starting application services. Rendered Compose checks also verify infrastructure boundaries; full application packaging remains pending. Wiring it into ordinary CI remains P02.4.
 
 Live Codex tests are opt-in and separated from untrusted pull requests. Never expose credentials to arbitrary contributed code or imported packs. A live account-dependent test failure should not be confused with a deterministic rules regression.
 

@@ -115,6 +115,12 @@ AI conversations have isolated runtime workspaces outside the source checkout an
 
 The app binds to loopback by default. GitHub publication distributes source; it does not expose a public gameplay server. A public-hosting design needs a separate authentication, tenant isolation, credential, abuse, and deployment review.
 
+The current root Compose file is a partial infrastructure checkpoint: database
+and runtime services only, with separate data/inference networks, private named
+storage and tmpfs socket IPC. No ports are published until the engine service is
+implemented. Neutral storage survives real container recreation; the engine
+image, single-origin interface and complete application startup remain pending.
+
 ## 8. Concurrency and background work
 
 One campaign admits one state-changing operation at a time using a database-backed lease and fencing token. Queries remain available against the last committed revision. No database transaction stays open while waiting for Codex. At commit time the service verifies the state revision, lease token, current actor, and ruleset hash.

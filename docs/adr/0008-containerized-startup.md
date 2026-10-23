@@ -23,3 +23,10 @@ A database-only Compose setup is useful for development but does not fulfill the
 Container images, runtime credentials, durable volumes, UID/socket permissions, image versions, health checks, migration behavior, and shutdown/recovery become explicit deliverables. The runtime must not inherit developer settings or access canonical storage. Windows validation uses Linux containers and an appropriate shell; other host support is evidence-based.
 
 P01 must prove the pinned container/runtime/client combination. P02 implements packaging and the script. QA-28 verifies the complete startup/restart workflow; P14 and P19 require a fresh-clone rehearsal. No Dockerfile, Compose file, launcher, or passing runtime result is delivered by this decision record. See [the deployment specification](../22-container-deployment-and-startup.md).
+
+Implementation evidence (P02.3, 23 October 2026): root Compose now supplies the
+pinned PostgreSQL and runtime infrastructure with private networks, file secrets,
+durable volumes and the P01 socket layout. Account-free neutral state survives
+real recreation of both containers. The engine image/service, packaged interface,
+launcher and complete QA-28 acceptance remain pending. This partial checkpoint
+implements the existing direction without changing the deployment decision.

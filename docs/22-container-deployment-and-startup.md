@@ -2,7 +2,7 @@
 
 ## 1. Status and owner requirement
 
-**Design specification only.** The owner requires a Dockerized application launched through a root `start.sh` file. This document defines that delivery target; neutral host development shells and a developer-only runtime probe exist, but the packaged engine Dockerfile, Compose configuration, and launcher have not been implemented yet. The requirement applies to the engine and every adventure, without campaign-specific startup scripts.
+**Design specification with partial infrastructure implementation.** The owner requires a Dockerized application launched through a root `start.sh` file. Neutral host development shells, a runtime probe and root database/runtime Compose services exist. The packaged engine Dockerfile/service, single-origin interface and launcher remain pending. The requirement applies to the engine and every adventure, without campaign-specific startup scripts.
 
 The packaged local installation must run the application, database, and isolated Codex runtime through Docker Compose. Users must not need host Java, Maven, Node, or npm to build and launch that packaged profile. Codex service connectivity and supported account access are still required. Host-based development and stdio protocol probes remain optional developer workflows, not the completed packaged installation.
 
@@ -34,7 +34,7 @@ Official [app-server documentation](https://learn.chatgpt.com/docs/app-server) d
   - The engine connects to the hashed file name.
 - **UID boundary:** the runtime and the engine must share one UID, 10001 in the probe. Relays running as UID 10002 and as root without capabilities were refused.
 - **Volume:** a tmpfs-backed IPC volume owned by UID 10001 keeps nothing at rest. `compose down` without `-v` leaves the named volume in place, and the launcher must not delete volumes.
-- **Not yet proven:** sign-in, readiness with a persistent account volume, and restart.
+- **Not yet proven:** sign-in, account readiness, and authenticated runtime restart. P02.3 separately verifies account-free infrastructure recreation and neutral volume preservation below.
 
 **Partial P01.2 evidence (same pin and platform):** [`session.compose.yaml`](../tools/runtime_probe/session.compose.yaml) adds a scripted upstream solely for deterministic testing, on an internal network with no published ports; the relay still has no network and the runtime receives no account. Seven turns across two threads verify explicit upstream model/effort/schema, correlated terminal statuses and active-stream interruption. A second relay connection resumes both threads and checks their ordered histories and sticky settings while the same runtime stays alive. This proves connection resume, not runtime restart or persistent sign-in. Production remains Codex-only; the scripted upstream is never a deployment alternative. See the [probe instructions](../tools/runtime_probe/README.md) for commands and the pending owner-signed-in neutral smoke.
 
@@ -51,7 +51,7 @@ Stdio remains the isolated local protocol-probe option. If the packaged runtime 
 | Root `.env.example` | Sanitized public configuration example without working credentials |
 | Version/compatibility records | Pin build/runtime images, dependency locks, runtime protocol, Compose features, and supported host environment; the pre-scaffold baseline is in [ADR 0009](adr/0009-toolchain-baseline.md) |
 
-The tracked root [`.env.example`](../.env.example) contains a proposed port and neutral database labels for future local configuration; it has no current consumer and does not make this repository runnable. It contains no database password or runtime-account setting. The runtime image and compatibility records already exist for the developer probe. P02.3 adds the root [`.dockerignore`](../.dockerignore) and the independent [runtime context policy](../docker/codex-runtime/.dockerignore); the engine image, root Compose profile, and launcher remain implementation deliverables. Keep actual `.env`, secret files, account state, and private data untracked. Build context must exclude local `.agents`, `.claude`, `.codex`, `AGENTS.md`, and `CLAUDE.md`; gameplay containers do not inherit development instructions or hooks.
+The tracked root [`.env.example`](../.env.example) contains a proposed port and neutral database labels for future local configuration; its database labels configure the infrastructure services, but it does not make the application runnable. It contains no database password or runtime-account setting. The runtime image and compatibility records already exist for the developer probe. P02.3 adds the root [`.dockerignore`](../.dockerignore) and the independent [runtime context policy](../docker/codex-runtime/.dockerignore); the engine image/service, packaged interface, and launcher remain implementation deliverables. Keep actual `.env`, secret files, account state, and private data untracked. Build context must exclude local `.agents`, `.claude`, `.codex`, `AGENTS.md`, and `CLAUDE.md`; gameplay containers do not inherit development instructions or hooks.
 
 The context policies default-deny inputs: the root admits only Angular/Java build inputs and the future engine Dockerfile, while the runtime context admits only its Dockerfile. Final recursive exclusions protect private names even inside admitted source trees. New build inputs require policy and regression-test updates. The policies do not inspect arbitrary source contents for secrets. Run `py -B -m unittest discover -s tools/container_packaging -v` with the ADR 0009 Docker baseline; it exports neutral scratch-stage fixtures through real BuildKit without sending checkout contents or starting services. See the [test guide](../tools/container_packaging/README.md).
 
@@ -59,7 +59,27 @@ The context policies default-deny inputs: the root admits only Angular/Java buil
 
 ## 5. Launcher contract
 
-The following commands describe the future application interface and cannot be run successfully against this repository, which currently contains only developer compatibility fixtures:
+**Infrastructure checkpoint (P02.3):** root [`compose.yaml`](../compose.yaml)
+currently defines only `postgres` and `codex`. It publishes no ports. PostgreSQL
+joins internal `data`; the runtime joins separate `inference` for required egress.
+Named `database`, `runtime_account`, and `runtime_workspace` volumes persist;
+`runtime_ipc` is tmpfs-backed, UID/GID 10001, mode 0700. The runtime has a read-only
+root filesystem, no capabilities, no account bind from the host, and no database
+secret. PostgreSQL's official entrypoint initializes volume ownership as root
+before dropping to its service identity. Health checks prove process/socket
+availability only, not sign-in, schema compatibility or gameplay readiness.
+
+The database reads `/run/secrets/postgres_password` from the private host file
+`${POSTGRES_PASSWORD_FILE:-./.local/secrets/postgres-password}`. This variable
+contains a path, never a password. Local Compose file secrets use read-only bind
+mounts, not encrypted storage; restrict the host file to its owner. Missing files
+must fail startup. P02.6 still owns secure initialization. `POSTGRES_DB` and
+`POSTGRES_USER` now configure the database; `APP_PORT` has no consumer yet. Never
+change a database password by replacing the file alone on an existing cluster:
+PostgreSQL uses it only on initial cluster creation. Preserve volumes on stop
+and recreation; never use `down -v`. See the [packaging checks](../tools/container_packaging/README.md).
+
+The following commands describe the future application interface and cannot be run successfully against this repository, which currently provides development shells, compatibility fixtures and database/runtime infrastructure:
 
 ```text
 ./start.sh           Validate, build with cache, start services, and report readiness

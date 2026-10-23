@@ -166,6 +166,21 @@ refresh. No engine image, root Compose, volumes, secrets, single-origin
 interface or startup/restart verification is claimed by this checkpoint.
 
 - [ ] P02.3 Add pinned engine/runtime images, Compose services, durable volumes, private networks/IPC, secret handling, and the single-origin packaged interface; exclude private development data from builds.
+
+P02.3 second partial checkpoint (23 October 2026): root `compose.yaml`
+adds the pinned database/runtime infrastructure, separate data/inference networks,
+database-only file secret, private durable database/account/workspace volumes,
+and the proven tmpfs socket volume. Two rendered-configuration regression tests
+pass. An account-free real Docker test passes password-authenticated database
+connectivity (with passwordless TCP rejected), service network/mount/UID checks, socket mode 0600 and neutral data
+preservation across recreation of both containers. Test services stop afterwards;
+fixture volumes and their ignored password file remain. This is infrastructure
+evidence, not campaign/schema, account or full QA-28 acceptance. No engine service
+or packaged interface exists, and the mandatory Java image gate persists.
+All five packaging tests pass with `PACKAGING_DOCKER=1` (including real BuildKit
+exports); the offline runtime suite passes 46 tests and skips five opt-in Docker
+checks. Changed text/docstrings, Markdown fences and 120 local links pass review.
+
 - [ ] P02.4 Add build/test/documentation/secret checks without Codex credentials in ordinary CI.
 - [ ] P02.5 Provide health/readiness contracts and useful startup failure states.
 - [ ] P02.6 Implement root `start.sh` with prerequisite checks, secure configuration initialization, cached builds, health-based startup, supported sign-in, status/log/stop commands, and nonzero failure results.

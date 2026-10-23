@@ -2,6 +2,11 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Isolated infrastructure (partial P02.3), 23 October 2026
+
+- Add root Compose database/runtime services with separate networks, file-based database secrets, durable private storage, tmpfs control IPC, bounded logs, graceful stop and process/socket health checks.
+- Add rendered-configuration boundary tests and an opt-in account-free Docker test proving password-authenticated database connectivity, network/UID/socket checks and neutral storage preservation across container recreation. Stop test services while retaining volumes and fixture secrets. Engine packaging and the single-origin interface remain pending the official Java image refresh; full startup and account readiness are unverified.
+
 ## Unreleased — Build-context isolation (partial P02.3), 23 October 2026
 
 - Add default-deny root and independent runtime Docker context policies, excluding private configuration, credentials, data, Git history and generated output, including nested private paths.

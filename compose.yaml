@@ -1,0 +1,91 @@
+# Infrastructure checkpoint for P02.3, not a playable installation. The engine
+# service and its single-origin interface remain gated by ADR 0009's Java refresh.
+# Never publish database/runtime ports or attach the runtime to the data network.
+name: rpg-engine
+
+services:
+  postgres:
+    image: postgres:18.6-trixie@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-engine}
+      POSTGRES_USER: ${POSTGRES_USER:-engine}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    networks: [data]
+    volumes:
+      # PostgreSQL 18 stores the cluster below this major-version-aware root.
+      - database:/var/lib/postgresql
+    # The official entrypoint needs root to initialize/chown a new volume, then
+    # drops to postgres. Do not override its user or remove required capabilities.
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:mode=1777
+      - /var/run/postgresql:mode=3775
+    healthcheck:
+      # This is process availability, not application/schema readiness (P02.5).
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
+      start_interval: 1s
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
+  codex:
+    build:
+      context: ./docker/codex-runtime
+    image: rpg-engine/runtime:0.164.0
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # Inference/sign-in egress is required; this network never reaches postgres.
+    networks: [inference]
+    volumes:
+      # Account state is private to this service; future engine mounts IPC only.
+      - runtime_account:/var/lib/runtime/home
+      - runtime_workspace:/var/lib/runtime/workspace
+      # P01 proved the advertised socket is a symlink: share its real directory.
+      - runtime_ipc:/tmp/codex-daemon-10001
+    tmpfs:
+      - /run/runtime:uid=10001,gid=10001,mode=0700
+      - /tmp:mode=1777
+    healthcheck:
+      # Presence proves a listener only, never account or inference readiness.
+      test: [CMD, test, -S, /tmp/codex-daemon-10001/bd2fc4d5dd4ec410275f7d5460680ca9c0ce1ef1b48e49b182f350ff18153681]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
+      start_interval: 1s
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
+networks:
+  data:
+    internal: true
+  inference: {}
+
+volumes:
+  database: {}
+  runtime_account: {}
+  runtime_workspace: {}
+  # Only the control socket/lock live here. No account or campaign state at rest.
+  runtime_ipc:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: uid=10001,gid=10001,mode=0700
+
+secrets:
+  # Local Compose file secrets are read-only binds, not an encrypted secret store.
+  # The launcher will create/restrict this ignored file in P02.6; fail if absent.
+  postgres_password:
+    file: ${POSTGRES_PASSWORD_FILE:-./.local/secrets/postgres-password}
