@@ -30,8 +30,8 @@ One game action can emit many events but advances the game turn once. An NPC com
 | `CharacterState` | Attribute values, trained skills, XP/level or advancement track, resources, conditions |
 | `AbilityDefinition` | Costs, targeting, tags, predicates, effect graph, disclosure and generation constraints |
 | `LearnedAbility` | Actor, definition version, unlocked rank, acquisition source, configured choices |
-| `ItemDefinition` | Category, stack policy, slot tags, prices or valuation policy, effects, provenance |
-| `ItemInstance` | Owner/container, quantity, durability/charges, definition, bound/quest status |
+| `ItemDefinition` | Category, stack policy, slot tags, prices or valuation policy, validated rarity tier, effects, visual identity, provenance |
+| `ItemInstance` | Owner/container, quantity, durability/charges, definition, bound/quest status, optional admitted appearance variant |
 | `EquipmentAssignment` | Actor, slot ID, item instance; hand/slot compatibility and availability |
 | `QuestInstance` | Definition/version, discovered state, objective progress, outcome, reward settlement identity |
 | `LocationState` | Definition, spatial adjacency, discovered properties, dynamic conditions, last observed time |
@@ -43,11 +43,12 @@ One game action can emit many events but advances the game turn once. An NPC com
 | `RewardSettlement` | Unique source key, recipients, XP/items/currency, applied revision |
 | `CampaignOperation` | Idempotency key, payload hash, base revision, lease/fence, statuses, result receipt |
 | `DomainEvent` | Campaign sequence, event type/version, operation, causation, correlation, rule/source, payload |
-| `NarrativeRecord` | Public text, audience, source event range, generation profile, delivery revision |
+| `NarrativeRecord` | Ordered attributed passages, message IDs, public speaker identity, audience, source events, submitted-player linkage, delivery revision |
 | `Checkpoint` | Snapshot revision/hash, pending decision, memory references, combat state, RNG cursor |
 | `MemorySummary` | Source event interval, source revision, audience, text, covered entities, freshness status |
 | `AiSession` | Logical role, private thread reference, generation number, counters, source checkpoint hash |
 | `AssetRecord` | Category, content hash, path/object reference, rights metadata, entity links, audience |
+| `VisualIdentity` | Stable subject/definition identity, appearance/style revision, category, accepted asset reference and generation status |
 
 Definition entities are immutable per revision. Campaign instances may extend them using validated namespaced data. New generated definitions are campaign-scoped unless explicitly exported by the owner into a pack.
 
@@ -86,6 +87,7 @@ Minimum indexes include campaign/revision, campaign/event sequence, operation id
 - Hand occupancy, slots, capacity, ammunition, charges, and binding rules are checked together.
 - Consumption and effect resolution are atomic. An attack cannot consume ammunition twice on a network retry.
 - Item descriptions do not create mechanical bonuses. Bonuses require a validated effect definition.
+- Item rarity is a validated tier reference; art, color, purchase and inspection cannot change it. Shop and owned-instance views resolve the same visual identity unless an explicit visible variant is admitted.
 
 ### Knowledge and progression
 

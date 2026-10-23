@@ -52,6 +52,9 @@ Do not require live inference for ordinary CI. Test fixtures must not contain pr
 | QA-26 | Publication | Fresh clone, accurate status, rights inventory, no private data or dead local links | FR-028 |
 | QA-27 | Canon correction | Concrete preview, backup, source-linked audit, dependency revalidation, and summary invalidation; historical events preserved | FR-026 |
 | QA-28 | Containerized startup | Fresh clone starts through root `start.sh` without host build toolchains; prerequisites/auth failures are clear; repeated launch, stop, image recreation, and restore preserve campaigns and combat; secrets and runtime access remain isolated | FR-029, FR-024–025 |
+| QA-29 | Visual-novel reading and quick replies | Dominant responsive scene, explicit narrator/NPC/player labels and free input; Continue/history are read-only; selecting/editing/dismissing suggestions preserves drafts and does not submit; stale/duplicate suggestions cannot replay actions; keyboard and no-image modes remain usable | FR-005, FR-007–008, FR-027 |
+| QA-30 | Complete graphical UI kit | All required controls/bars/icons/frames and interaction/fallback states exist as separate usable assets/components, with live text/focus, accessible contrast/labels, responsive review and complete license/provenance inventory | FR-022, FR-027–028 |
+| QA-31 | Persistent generated portraits and item art | A returning character and a unique sword preserve identity across shop/purchase/equip/reload/restore; equivalent items reuse icons; rarity remains validated data; stale/duplicate jobs, limits, unavailable capability and secret sentinels cannot corrupt state or block play | FR-022–024, FR-030–031 |
 
 ## 4. Long-campaign evaluation
 
@@ -83,7 +86,7 @@ For each fault, define the expected operation state and the safe player message.
 
 ## 8. Release gates
 
-MVP requires QA-01–20, QA-23–26, and QA-28 at the supported reduced feature scope, a verified safe Codex profile, a complete simple combat flow, and a restart/renewal demonstration. v1 requires every scenario, the long-campaign evaluation, backup/restore rehearsal, actual browser/accessibility review, calibrated default rules, publication review, and all required roadmap tasks complete.
+MVP requires QA-01–20, QA-23–26, and QA-28–30 at the supported reduced feature scope, a verified safe Codex profile, the default visual-novel flow and basic graphical kit, a complete simple combat flow, and a restart/renewal demonstration. Runtime image generation under QA-31 belongs to v1, not the MVP. v1 requires every scenario, the long-campaign evaluation, backup/restore rehearsal, actual browser/accessibility review, calibrated default rules, publication review, and all required roadmap tasks complete.
 
 Failures are documented with severity and disposition. Secret leakage, canonical corruption, duplicate rewards, broken restore, or uncontrolled AI host capability block release. Cosmetic or optional-media issues can ship only with explicit scope/limitation notes and usable fallback.
 

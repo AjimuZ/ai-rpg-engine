@@ -77,7 +77,7 @@ The compiler produces a normalized internal manifest and a content digest coveri
 | Location | ID, name, public description, links, accessibility, tags, initial conditions, knowledge visibility |
 | NPC | ID, identity, role, personality constraints, goals, initial location, actor profile, private/public facts |
 | Faction | ID, public identity, goals, relationships, relevant clocks, initial knowledge |
-| Item | ID, type, stack/slot policy, validated mechanical properties, description, provenance |
+| Item | ID, type, stack/slot policy, validated rarity tier and mechanical properties, public appearance/visual identity, description, provenance |
 | Ability | ID, display text, prerequisites, action/resource costs, target policy, effect graph, tags |
 | Condition | ID, timing, duration, stacking policy, supported modifiers/effects, removal conditions |
 | Quest | ID, discoverability, objectives as predicates, transitions, outcomes, settlement policy |
@@ -117,6 +117,8 @@ Effects are declarative nodes such as damage, heal, move, apply/remove condition
 Per category, select `disabled`, `catalogOnly`, or `bounded`. A bounded policy defines eligible tags, existing templates, numerical ranges, maximum new entities per scene, allowed novelty, forbidden contradictions, knowledge scope, budget, and approval behavior.
 
 Generated additions remain proposals until validated and committed. Record generation profile, content source, base revision, references, and assigned campaign ID. The same named NPC must resolve to an existing identity when appropriate. A later scene must retrieve the admitted definition rather than generate the person again.
+
+Presentation policy separately selects `disabled`, `catalogOnly` or `bounded` scene/portrait/item art, authorized style/reference assets and generation budgets. Artwork belongs to the admitted entity/appearance identity, is durably saved and reused, and never changes mechanical definitions. Pack-defined rarity tiers carry stable IDs, localized names and accessible presentation tokens; any mechanical effect or pricing rule must be explicit supported rules data. See [presentation assets](23-presentation-assets.md).
 
 In combat, generated mechanics must use supported templates/effects and fit the frozen budget. Codex cannot invent an ability that bypasses the player's only available defense or retroactively increase a monster's HP. Secret content cannot be hinted by a public media cue.
 

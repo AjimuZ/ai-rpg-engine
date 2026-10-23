@@ -32,6 +32,8 @@ Pack imports use the containment, parser, size, alias, and archive limits in [th
 
 Serve registered assets with validated MIME type, content hash, containment checks, and `nosniff`. Disallow active SVG scripts or use a validated static subset; a file extension is insufficient. Default CSP permits only required local sources. Remote audio/image origins require an explicit configured allowlist and owner preference, with no arbitrary model-generated URL fetch.
 
+Bounded image jobs use a separately verified restricted capability, public appearance inputs, finite budgets and managed temporary/output roots. Do not expose canonical storage, database credentials, private NPC notes or unrestricted developer tools to obtain an illustration. A generated image is untrusted media until validated and registered; it cannot change item data or choose its own serving path. Keep saved originals and subject associations in audience-aware backup/restore, as specified in [presentation assets](23-presentation-assets.md).
+
 ## 6. Secrets and audience separation
 
 Never put Codex credentials, database passwords, `.env` files, auth stores, private saves, personal notes, or raw provider traces in Git. Diagnostic exports redact keys, tokens, absolute personal paths, private content, and RPC identifiers unless an owner explicitly selects a suitably protected full diagnostic mode.

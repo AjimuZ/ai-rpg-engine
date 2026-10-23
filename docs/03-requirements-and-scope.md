@@ -35,14 +35,16 @@
 | FR-019 | Advance world clocks and triggered events causally | Basic time | Bounded catch-up; no advancement from UI reads |
 | FR-020 | Support an optional guide persona without granting mechanical authority | Optional | Guide uses authorized knowledge only |
 | FR-021 | Support optional creative abilities using validated effect primitives | Deferred | Author-defined identity; no host code execution |
-| FR-022 | Associate scenes, portraits, maps, and audio cues with committed public state | Static assets | Independent categories, cue deduplication, fallback behavior |
+| FR-022 | Associate scenes, portraits, maps, identifying item icons and audio cues with committed public state | Static/catalog assets | Independent categories, stable entity artwork, cue deduplication and fallback; bounded generated artwork is a v1 extension |
 | FR-023 | Interrupt work and recover without duplicating effects | Required | Before/after commit and lost-response scenarios |
 | FR-024 | Export, back up, restore, and migrate campaigns | Basic backup | Integrity checks, separate full/player exports, compatibility gate |
 | FR-025 | Provide diagnostics for Codex account availability, model capabilities, and adapter support | Required | Useful setup failure without leaking credentials |
 | FR-026 | Preview and apply explicit canon corrections with an audit trail | Deferred | Administrative change cannot silently rewrite event history |
-| FR-027 | Offer a structured, responsive RPG interface with keyboard access | Required | Actual browser acceptance and accessibility review |
+| FR-027 | Offer a responsive visual-novel story interface with attributed dialogue, editable quick replies, free input and keyboard access | Required | Real-browser reading/choice/accessibility checks; complete graphic assets and media-free fallback |
 | FR-028 | Publish clear status, contribution, security, licensing, and release documentation | Required | Fresh-clone release rehearsal and public-content audit |
 | FR-029 | Deliver the containerized local application through a root `start.sh` launcher | Required | Prerequisite/auth diagnostics, health-based startup, no host build toolchains, persistent restart, and safe stop verified under QA-28 |
+| FR-030 | Generate and persist bounded scene, character and item artwork through a supported image capability | v1 | Stable visual identities, verified capability/cost limits, durable assets, stale-job protection and fallback under QA-31 |
+| FR-031 | Present validated, pack-defined item rarity consistently across shops, inventory and equipment | Basic tiers | Tier name plus non-color indication; artwork never assigns rarity, stats or price |
 
 ## 3. Nonfunctional requirements
 
@@ -70,6 +72,8 @@ An automated test double may replace Codex in tests. It is a verification device
 ## 5. v1 completion boundaries
 
 The full initial release supports one built-in combat scheduler, one zone-based spatial model, declarative content, bounded expressions, a small effect vocabulary, and a documented extension process. Authors can customize supported data extensively. New engine primitives, new spatial algorithms, and arbitrary code execution are not file-only customization.
+
+The default narrative UI and its graphic kit are MVP requirements. Bounded runtime scene/portrait/item image generation is a v1 requirement under [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md), with a supported capability proof and explicit generation policy/budgets. It is not a promise that every text subscription includes image generation. Static/catalog fallbacks keep play usable when generation is unavailable. Voice generation remains beyond v1 unless separately authorized.
 
 Two small neutral sample packs must demonstrate different genres, optional module selections, and vocabulary. They exist to prove reuse, not to establish a flagship canon. The original private campaign is neither a sample pack nor a public fixture.
 

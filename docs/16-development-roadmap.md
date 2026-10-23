@@ -87,6 +87,7 @@ Checks: a documentation review against the requirements, pack, security, and pub
 - [ ] P01.3 Demonstrate restricted roots, denied canonical writes, unavailable unwanted host tools, and inherited-config isolation.
 - [ ] P01.4 Demonstrate owned-process shutdown, EOF/timeout handling, stderr bounds, and early-event buffering.
 - [ ] P01.5 Save neutral protocol fixtures and a supported-version matrix; record service maturity and platform limitations.
+- [ ] P01.6 Record supported image-generation capability or explicit unavailability, restricted invocation, output formats and account/cost boundaries; gate actual generation without blocking text-only fallback or enabling paid access implicitly.
 
 **Deliverables:** isolated compatibility probe and evidence, later retained as adapter tests when authorized implementation begins. **Exit:** no unreviewed broad write/tool privileges and no dependency on undocumented launch assumptions. Failure blocks real gameplay integration; it does not authorize a generic AI replacement. **Checks:** one opt-in real neutral task plus deterministic protocol fixtures. **Suggested commit:** `Verify narration runtime compatibility and isolation`.
 
@@ -125,7 +126,7 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 **Depends on:** P03; uses P00 ruleset decisions. **Areas:** content schemas/parser/compiler, neutral content fixtures.
 
 - [ ] P04.1 Implement versioned manifest, safe YAML/JSON parsing, explicit file categories, and normalized hashes.
-- [ ] P04.2 Implement IDs, dependencies, cross-references, creation profiles, items, skills, abilities, and initial world definitions.
+- [ ] P04.2 Implement IDs, dependencies, cross-references, creation profiles, item rarity/appearance identities, skills, abilities, and initial world definitions.
 - [ ] P04.3 Implement bounded expressions/effects, graph/cycle limits, version compatibility, and actionable diagnostics.
 - [ ] P04.4 Add path/archive/type/size protections and immutable registration.
 - [ ] P04.5 Create two minimal neutral genre fixtures and prove import without source edits.
@@ -136,10 +137,13 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 
 **Depends on:** P02 and stable P04 contracts. **Areas:** frontend feature services/components, theme tokens.
 
-- [ ] P05.1 Build library, character-creation, narrative, sheet, inventory, journal, and settings shells.
+- [ ] P05.1 Build library, character-creation, default visual-novel story, sheet, inventory, journal and settings shells with dominant scene art and attributed speaker passages.
 - [ ] P05.2 Bind display names, resources, panels, and terminology to content metadata.
-- [ ] P05.3 Add text-focused and scene-focused responsive layouts with keyboard/focus support.
-- [ ] P05.4 Define revision-aware client projection state, drafts, and connection/error states.
+- [ ] P05.3 Implement the default visual-novel and alternative text-focused responsive layouts, local passage advancement, chronicle, speaker portraits and keyboard/focus support.
+- [ ] P05.4 Define revision-aware projection state, persistent free-input drafts, editable contextual quick replies and connection/error states; choosing a suggestion must not submit or advance the world.
+- [ ] P05.5 Create or license and integrate the complete UI graphic kit, including buttons, bars, icons, frames and required interaction/fallback states; register sources, notices and generated-asset provenance.
+
+**Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.
 
 **Exit:** a generic interface works with either fixture and contains no mandatory protagonist/Rune/Lyra lore. **Checks:** meaningful form/service tests and browser smoke for navigation and reading controls. **Suggested commit:** `Build the configurable RPG interface foundation`.
 
@@ -171,7 +175,7 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 **Depends on:** P01 and P07. **Areas:** Codex adapter, AI task port, versioned runtime prompts, UI status.
 
 - [ ] P08.1 Implement the supported Java transport with bounded queues, request/turn correlation, and lifecycle management.
-- [ ] P08.2 Implement typed intent and narration contracts with structural/semantic validation and one bounded repair.
+- [ ] P08.2 Implement typed intent and attributed narration/quick-reply contracts with structural/semantic validation and one bounded repair; suggestions preserve player agency and public knowledge scope.
 - [ ] P08.3 Scope threads by campaign/role/audience/policy; separate privileged planning from public narration.
 - [ ] P08.4 Resolve logical model profiles against the available catalog and set effective settings on every turn.
 - [ ] P08.5 Publish only validated final narration; add deterministic receipt fallback and narration-only retry.
@@ -194,7 +198,7 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 
 **Depends on:** P07–P09. **Areas:** characters, inventory, quests, world clock, related UI.
 
-- [ ] P10.1 Implement attributes, skills, derived stats, learned abilities, conditions, equipment and hand/slot constraints.
+- [ ] P10.1 Implement attributes, skills, derived stats, learned abilities, conditions, explicit item rarity tiers, equipment and hand/slot constraints; never derive mechanics from artwork.
 - [ ] P10.2 Implement atomic use/transfer/equip/trade commands and source-linked item creation.
 - [ ] P10.3 Implement basic objective predicates, quest transitions, and one-time reward-source accounting.
 - [ ] P10.4 Implement movement duration, rest, and a bounded world clock without time advancement on queries.
@@ -279,13 +283,14 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 
 **Depends on:** P14; uses P15–P16 metadata. **Areas:** asset registry, theme/layout, optional audio, frontend polish.
 
-- [ ] P17.1 Complete scene/map/portrait category handling, hash-based serving, stale-job protection, and visible credits.
+- [ ] P17.1 Complete scene/map/portrait/item/UI category handling, stable entity artwork, identifying shop/inventory/equipment icons, accessible rarity/frame treatment, hash-based serving, stale-job protection and visible credits.
 - [ ] P17.2 Add optional public-event audio cues, user activation, deduplication, volumes, and network-failure fallback.
-- [ ] P17.3 Finalize text-focused/scene-focused layouts, configurable tokens, and reading/history behavior.
+- [ ] P17.3 Finalize the default visual-novel and alternative text-focused layouts, graphic states, configurable tokens and attributed reading/history/quick-reply behavior.
 - [ ] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.
 - [ ] P17.5 Verify missing art/audio never blocks play and media cannot reveal secrets.
+- [ ] P17.6 Implement bounded runtime scene/portrait/item image jobs using verified capability, public appearance inputs, stable identities, durable saved assets, budget limits, deduplication and restore/stale-result checks under QA-31.
 
-**Exit:** presentation is usable without media and verified in a real browser. Live image generation and TTS are not required. **Checks:** QA-16, QA-19, QA-25, actual visual review. **Suggested commit:** `Complete accessible presentation and optional atmosphere`.
+**Exit:** the graphical visual-novel UI, persistent identifying artwork and bounded image-job pipeline are verified; unsupported generation degrades accurately without blocking play. TTS is not required. **Checks:** QA-16, QA-19, QA-25, QA-29–31, actual visual review and asset/license inventory. **Suggested commit:** `Complete accessible presentation and optional atmosphere`.
 
 ## 21. P18 — Full-engine hardening and balance
 
@@ -328,8 +333,10 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 | FR-027 | P05, P12, P17 |
 | FR-028 | P02, P14, P19 |
 | FR-029 | P00–P02, P14, P16, P19 |
+| FR-030 | P01, P04, P16–P18 |
+| FR-031 | P04, P10, P13, P17 |
 | NFR-001–012 | Cross-cutting gates in P01, P03, P07, P09, P16–P19 |
 
 ## 24. Explicitly later initiatives
 
-Semantic retrieval/pgvector after retrieval evidence; visual authoring editor after contract stabilization; live image/voice generation after provider/rights/privacy decisions; alternative combat schedulers and grid maps; public multiplayer hosting; marketplace/sharing infrastructure; generic AI providers; mobile-native or desktop packaging. Each needs its own scope, design, risks, and roadmap. None is an implicit requirement for the complete initial engine.
+Semantic retrieval/pgvector after retrieval evidence; visual authoring editor after contract stabilization; voice generation/TTS after provider/rights/privacy decisions; alternative combat schedulers and grid maps; public multiplayer hosting; marketplace/sharing infrastructure; generic AI providers; mobile-native or desktop packaging. Each needs its own scope, design, risks, and roadmap. None is an implicit requirement for the complete initial engine. Bounded runtime image generation is now in v1 under ADR 0011, subject to capability verification and playable fallback.

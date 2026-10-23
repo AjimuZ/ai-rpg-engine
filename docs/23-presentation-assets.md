@@ -1,0 +1,58 @@
+# Presentation Assets and Persistent Generated Artwork
+
+## 1. Status and intent
+
+This is an implementation specification, not delivered frontend or image-generation code. The default story screen is the visual novel described in [API and UI](13-api-and-ui.md#6-interface-direction). The owner requires a complete graphical UI kit and persistent character/item artwork, including supported generation during play. The [concept image](mockups/visual-novel-ui-v1.png) demonstrates composition only; do not slice its baked-in labels into production controls.
+
+## 2. Development-time UI asset kit
+
+P05 must inventory and deliver every asset needed by its screens. Use one coherent theme and icon system. Create missing original illustrations with the development client's supported image-generation tool, or select free assets after checking their actual license. Do not assume a free preview, search result or marketplace listing permits reuse.
+
+| Family | Required deliverable |
+| --- | --- |
+| Controls | Buttons, reply chips, tabs, fields and toggles with normal, hover, pressed, selected, focus, disabled and loading states as applicable |
+| Indicators | Health/focus/XP/progress bars with accessible labels and live numeric values; save/loading/error states |
+| Containers | Dialogue box, speaker nameplate, portrait frame, item frame, tooltip and inventory-slot treatment |
+| Icons | Consistent navigation, actions, item categories, rarity and status symbols, with text alternatives |
+| Story assets | Neutral sample scenes and portraits; independent item artwork, not a flattened interface screenshot |
+| Variants | Responsive sizes, high contrast/reduced motion behavior and fallback states |
+
+Prefer CSS/SVG for scalable control geometry, bars and focus rings. Generate or source raster assets where illustration, ornament or texture is useful; retain separate transparent cutouts when needed. Never bake translated labels, stats or interactive hit areas into an image. Keep editable originals or reproducible source/prompt records and export optimized runtime variants.
+
+[Tabler Icons](https://tabler.io/icons) is a candidate free icon set under its [MIT license](https://github.com/tabler/tabler-icons/blob/main/LICENSE), checked on 23 October 2026. It is not installed or bundled by this design change. If selected, pin the package/version and preserve its complete copyright/license notice; the free icon source and paid illustration/template bundles are different offerings. Other libraries require the same per-asset review. Use system fonts unless a separately reviewed font is bundled.
+
+## 3. Stable visual identities
+
+Keep categories separate: scene, map, character portrait, item art, UI/frame, music and effect. A scene change never overwrites a map or portrait. Introduce a proposed `VisualIdentity`/asset association keyed by campaign or admitted pack scope, entity definition revision, category, appearance revision and style profile. Associate item instances with their definition's visual identity unless an admitted visible variant needs its own artwork.
+
+- A recurring NPC reuses the same portrait across dialogue, shop, party and journal views. Preserve visible identity/style through owned or licensed reference art when a supported tool can use it.
+- A particular admitted sword has identifying artwork used in shop listing, inspect view, inventory and equipment. Buying it changes ownership, not its image. Stackable or otherwise equivalent copies can share an icon.
+- A visible customization or unique item variation can create an explicit appearance revision. Cosmetic revisions do not silently replace historical artwork or change mechanics.
+- Decorative portrait/item frames belong to the theme and are stored/reused independently from the depicted character/object. Rarity badges can select frame styling without generating the entire frame again per entity.
+- Unrevealed curses, hidden occupants, identity twists and secret rarity must not enter prompts, filenames, player-facing metadata or images.
+
+Store original accepted images under managed IDs in durable asset storage, with byte hash, MIME/dimensions, thumbnail variants and entity links in the registry. Persist the association, source/appearance revision, generation status and provenance. Include originals and metadata in backup/export/restore according to audience policy. Reloading, renewing narration, revisiting a shop or restoring a save must reuse existing accepted assets, not trigger fresh generation.
+
+## 4. Bounded generation during play
+
+Full v1 includes a bounded asynchronous generation job pipeline; static/catalog assets remain sufficient for the MVP. P01 must verify a supported image capability, its authentication/account/cost boundaries and restricted invocation. Codex text access alone is not proof of image access. Do not enable paid API credentials, another service or broader host tools implicitly. When unavailable, report the capability accurately and use a category fallback while preserving play.
+
+Pack/owner policy chooses `disabled`, `catalogOnly` or `bounded` by category. The owner enables generation explicitly and sets request/concurrency/budget limits before calls. Default to one active image job per campaign, coalesce duplicate requests and enforce a finite queue; the actual limits and provider behavior require implementation evidence. Do not generate a shop's entire unseen catalog merely because a panel opened.
+
+After an entity is admitted and its appearance is public, a job may request one missing identifying image. Scene art changes only for meaningful observable visual changes or an explicit request. Its input contains only visible appearance, permitted style references and the authorized audience projection. Image output cannot create equipment, change rarity, establish stats or award objects.
+
+Jobs carry stable request identity, category, subject identity, appearance/style revision and source campaign revision. Capture the response, validate MIME/dimensions/byte limits, save to a temporary managed location, hash it, then publish the accepted registry association atomically. A delayed scene result cannot replace the current scene; an old portrait/item result cannot overwrite a newer appearance. Repeated delivery, job retry and save renewal reuse the same accepted association. After an ambiguous provider timeout, reconcile the existing request before spending another generation request; do not claim exactly-once provider billing without supported evidence.
+
+Use a neutral category icon/portrait and visible pending/error state until art is available. Save, purchase, dialogue and combat must remain usable during failure, quota exhaustion, offline periods or policy disablement. Allow explicit retry/change-art actions with budget visibility; do not reroll art on every inspection.
+
+## 5. Rarity and item presentation
+
+Rarity is validated item data, independent from image quality or price. A pack may define supported tier IDs, localized names and presentation tokens. Proposed default labels are common, uncommon, rare, epic and legendary; they are presentation/authoring defaults, not automatic stat multipliers, price formulas or drop chances. A ruleset must explicitly define any supported mechanical consequences. Do not promise every genre uses those labels.
+
+Show the known tier as text plus an icon/frame treatment; color is supplementary. Shop, tooltip, inventory and equipment use the same admitted tier and visual identity. Unknown rarity stays unknown. A generated ornate sword is not upgraded to legendary because of its art. Rarity changes, if supported, require a validated, source-linked content or progression operation; they cannot be a media job side effect.
+
+## 6. Provenance and acceptance
+
+Each adopted asset records ID/category, creator/source, exact license and URL, required notice/attribution, modifications, verification date, and the saved artifact hash. Generated original art also records tool/version where exposed, prompt/style/reference provenance and any known restrictions. Do not invent a seed, model identifier or copyright ownership guarantee the tool does not supply. Only use reference material with appropriate rights. Imported third-party assets retain their licenses; the repository MIT license does not replace them.
+
+P05 checks the complete asset/state inventory in a real responsive UI. P17 checks a returning NPC portrait, a unique sword moving shop → inventory → equipment, equivalent-instance icon reuse, saved/reloaded/restored visual identity, stale job completion, hidden-information sentinels, unavailable image capability, duplicate requests and generation limits. No placeholder-only asset inventory or concept screenshot counts as shipped UI. See QA-29–31 in [quality and acceptance](15-quality-and-acceptance.md).

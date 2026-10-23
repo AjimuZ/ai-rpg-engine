@@ -73,11 +73,15 @@ Do not request or publish chain-of-thought. The action candidates already contai
 
 The input is a public resolved-event bundle: action cause, visible participants, known outcome, exact resource changes permitted to display, discoveries, current scene, and next decision. Include authoritative display snippets for important calculations so the narrator does not need to recompute them.
 
-The body includes bounded narrative paragraphs, optional speaker IDs already known to the player, referenced public event/fact IDs, and nonbinding action suggestions. Mechanical UI values are rendered from the receipt, not parsed back out of prose.
+The body includes ordered bounded passages with a stable message ID, kind (`narration` or `characterSpeech`), optional known public speaker ID, text and referenced public event/fact IDs. Display names/portraits resolve from the authorized projection. Player passages are derived from submitted player text/command identity, not invented by the narrator. Mechanical UI values are rendered from the receipt, not parsed back out of prose.
+
+Optional contextual suggestions contain a stable suggestion ID, kind (`reply`, `question` or `action`), concise label, editable draft text and source scene/revision/pending-decision reference. Return up to three when useful, especially after a character question, or an empty list. They contain only known information and available intentions. Selection prepares a draft; explicit submission, command validation and idempotency still apply. Do not generate an additional turn merely to fill a missing suggestion list.
 
 The narrator can vary atmosphere, metaphor, and dialogue expression. It cannot add a new attacker, invent an owned object, alter damage, declare death where the rule says defeat, assume looting, accept a surrender for the player, or advance to another choice. If the resolved bundle does not establish an action, do not imply it occurred.
 
 No intermediate output is presented as a saved scene. Publish after schema/reference/scope checks; if one narration repair fails, show the deterministic receipt and keep presentation pending. Natural-language semantic review remains an evaluation problem and must not be overstated as fully solved.
+
+Image generation is a separate bounded presentation job after entity admission, not a narrator side effect. Its request identifies the public subject/appearance/style revision, category, authorized visual brief/reference assets and generation policy/budget. Accept image bytes only through a verified supported capability and the asset-validation/registration pipeline in [presentation assets](23-presentation-assets.md). Neither the narrative contract nor image output can set rarity, stats, price or ownership. A failed or stale job leaves gameplay and the existing accepted artwork intact.
 
 ## 9. Guide answer
 

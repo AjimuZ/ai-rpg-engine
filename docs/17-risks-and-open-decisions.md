@@ -22,6 +22,8 @@ Owners below are implementation responsibilities, not assigned people. The proje
 | Event log mistaken for a fully replayable system | Unsupported recovery claims | Define tested replay scope; maintain current-state snapshots and schema versions | Backend / P03, P16 |
 | Backups omit assets/content revisions | Incomplete recovery | Integrity manifest and fresh-storage restore rehearsal | Operations / P16, P18 |
 | Remote media disappears or tracks requests | Broken presentation/privacy | Optional origins, local fallback, rights registry, no gameplay dependency | Presentation / P17 |
+| Generated portraits/items drift, cross scopes or reveal secrets | Inconsistent identity or leaked hidden content | Stable public appearance identity, durable original assets, source/audience validation, stale-job rejection and restore checks | Presentation + QA / P17, QA-31 |
+| Image generation is assumed available or spends without bounds | Unusable feature or unexpected account usage | Capability/account proof, explicit enablement and finite budgets, duplicate-job reconciliation and static/category fallback | Integration + Presentation / P01.6, P17.6 |
 | Public release includes private demo material | Privacy/rights exposure | Neutral samples, explicit rights inventory, no recursive source copy | Owner / P19 |
 | Stale documentation overstates implementation | Misleading public repository | One status matrix, evidence-linked milestones, docs review in CI | Maintainer / every milestone |
 | Pinned backend line leaves open-source support or misses a dependency security fix | Unpatched framework or migration tooling | Spring Boot 4.1 open-source support ends 31 July 2027 and its patches keep Flyway 12.4; review advisories, plan the move to a supported line, and rerun PostgreSQL integration checks for any override ([ADR 0009](adr/0009-toolchain-baseline.md)) | Backend + Maintainer / every release, before July 2027 |
@@ -45,7 +47,7 @@ The repository-license decision was resolved on 22 October 2026: project softwar
 | Defeat policy in neutral samples | Recoverable incapacitation; no automatic permanent death | P11 | Rules review and playtest |
 | Combat numeric tuning | AI RPG Skirmish confirmed as the implementable default ([ADR 0006](adr/0006-original-combat.md)); its numbers are the provisional defaults listed in the [combat register](11-combat-system.md#17-provisional-numerical-defaults), stored as ruleset-profile data | P13 and P18.3 | Simulations, statistical checks, and human playtests; changes ship as versioned ruleset revisions |
 | Renewal thresholds | Ten completed tasks; context pressure thresholds | P09 | Context measurements and continuity results |
-| Asset/audio strategy | Local static assets; optional allowlisted streams | P17 | Rights, privacy, failure tests |
+| Asset/audio strategy | Default visual novel and complete graphic kit; stable saved portrait/item identities; bounded v1 runtime images under [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md); audio remains optional | P05, P17 | Capability, rights, privacy, identity/recovery and failure tests |
 | Backup retention path/settings | Owner data directory, rolling snapshots, independent daily backups | P16 | Disk usage and successful restore |
 | Semantic retrieval | Deferred | Only after measured recall failures | Structured/full-text benchmark and new dependency decision |
 | Visual authoring editor | Deferred beyond v1 | Separate initiative | File-contract stability and author feedback |

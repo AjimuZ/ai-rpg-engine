@@ -78,7 +78,9 @@ Default behavior is reactive assistance. Advice cannot spend resources, complete
 
 Assets are registered by category: scene, map, portrait, item, UI, music, or effect. A new scene illustration does not replace the map. A portrait reference is not the current scene. Assets do not establish distances, new entities, or mechanical effects unless separately admitted as canonical data.
 
-Static local assets support the MVP. v1 includes registry, credits, safe delivery, cue deduplication, and fallback behavior. Live AI image or voice generation remains optional future scope; Codex text access does not imply an image or audio generation tool is available.
+Static/catalog assets support the MVP. Full v1 includes bounded asynchronous scene/portrait/item generation, registry, persistent visual identity, credits, safe delivery and fallback, as specified in [presentation assets](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md). Codex text access alone does not establish image capability; verify it before enabling generation. Voice generation remains future scope.
+
+Each admitted item definition or visible unique variant has an identifying icon shared across shop, inventory, inspection and equipment; equivalent copies can reuse it. A purchase or save reload does not regenerate art. Character portraits and theme frames are separate reusable assets. Rarity is validated pack/ruleset data with an explicit tier label; ornate artwork never grants rarity, bonuses, price or loot odds. Missing art has a readable category fallback while a bounded job is pending.
 
 Generate or request a new illustration only for a meaningful observable visual change or explicit owner/player request. Reuse during minor dialogue and inspections. Media jobs use source revision and scene identity so stale results cannot replace the current scene after the player moves.
 
