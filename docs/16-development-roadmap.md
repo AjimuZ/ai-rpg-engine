@@ -181,6 +181,24 @@ All five packaging tests pass with `PACKAGING_DOCKER=1` (including real BuildKit
 exports); the offline runtime suite passes 46 tests and skips five opt-in Docker
 checks. Changed text/docstrings, Markdown fences and 120 local links pass review.
 
+P02.3 third partial checkpoint (23 October 2026): the opt-in Maven
+`packaged-ui` profile embeds compiled Angular production assets and extracted
+third-party notices in the executable Spring Boot jar. All five backend tests
+pass against disposable PostgreSQL 18, including real HTTP checks for index,
+JavaScript/CSS, license notices and missing-resource/API 404 responses. The new
+index and notices assertions were first observed failing with 404. Frontend
+strict typechecks, its unit test, production build and full npm audit pass.
+The ordinary backend build passes two tests with three profile tests skipped;
+missing browser output is rejected. The executable jar serves byte-identical
+index/notices and healthy HTTP responses, with exactly the four expected static
+resources embedded. All five packaging checks pass, including Docker recreation;
+46 offline runtime checks pass with five opt-in Docker checks skipped.
+Verification uses the existing Java 21 development image, without building an
+engine image or weakening ADR 0009. The required new official JDK tag still
+returns not found. Engine Dockerfile/service, secret consumption, engine-only
+content/assets storage and full container integration remain open; P02.3 and
+QA-28 are not complete. See [backend commands](../backend/README.md).
+
 - [ ] P02.4 Add build/test/documentation/secret checks without Codex credentials in ordinary CI.
 - [ ] P02.5 Provide health/readiness contracts and useful startup failure states.
 - [ ] P02.6 Implement root `start.sh` with prerequisite checks, secure configuration initialization, cached builds, health-based startup, supported sign-in, status/log/stop commands, and nonzero failure results.

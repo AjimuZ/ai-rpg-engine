@@ -7,6 +7,9 @@ This reduces packaging uncertainty but does not close account/tool containment,
 canonical campaign recovery, launcher readiness or QA-28. The first engine build
 still requires the unavailable official Temurin refresh in ADR 0009. Local file
 secret permissions/initialization remain P02.6 work; file mounts are not encrypted.
+The third checkpoint verifies optional single-origin jar assembly and bundled
+frontend notices independently. Container integration remains unverified and the
+image gate still applies; jar HTTP tests do not establish full startup readiness.
 
 ## 1. Risk register
 

@@ -2,7 +2,7 @@
 
 ## 1. Status and owner requirement
 
-**Design specification with partial infrastructure implementation.** The owner requires a Dockerized application launched through a root `start.sh` file. Neutral host development shells, a runtime probe and root database/runtime Compose services exist. The packaged engine Dockerfile/service, single-origin interface and launcher remain pending. The requirement applies to the engine and every adventure, without campaign-specific startup scripts.
+**Design specification with partial infrastructure implementation.** The owner requires a Dockerized application launched through a root `start.sh` file. Neutral host development shells, a runtime probe and root database/runtime Compose services exist. An opt-in backend build now embeds the compiled interface and notices in one executable jar, with real HTTP verification. The packaged engine Dockerfile/service and launcher remain pending. The requirement applies to the engine and every adventure, without campaign-specific startup scripts.
 
 The packaged local installation must run the application, database, and isolated Codex runtime through Docker Compose. Users must not need host Java, Maven, Node, or npm to build and launch that packaged profile. Codex service connectivity and supported account access are still required. Host-based development and stdio protocol probes remain optional developer workflows, not the completed packaged installation.
 
@@ -56,6 +56,23 @@ The tracked root [`.env.example`](../.env.example) contains a proposed port and 
 The context policies default-deny inputs: the root admits only Angular/Java build inputs and the future engine Dockerfile, while the runtime context admits only its Dockerfile. Final recursive exclusions protect private names even inside admitted source trees. New build inputs require policy and regression-test updates. The policies do not inspect arbitrary source contents for secrets. Run `py -B -m unittest discover -s tools/container_packaging -v` with the ADR 0009 Docker baseline; it exports neutral scratch-stage fixtures through real BuildKit without sending checkout contents or starting services. See the [test guide](../tools/container_packaging/README.md).
 
 **P02.3 image gate (23 October 2026):** the official Docker Hub tag API returns zero tags matching `21.0.13`; `21-jdk-resolute` and `21-jre-resolute` still resolve to the old ADR 0009 indexes. The mandatory Java refresh therefore remains pending; this checkpoint does not build an engine image or claim packaged operation.
+
+### Single-origin application artifact (partial P02.3)
+
+The [backend `packaged-ui` build](../backend/README.md#single-origin-jar-assembly-partial-p023)
+now copies Angular production assets and its extracted third-party notices into
+Spring's static classpath resources. Use a clean build after compiling Angular;
+missing index/notices fail before packaging. Three real HTTP integration tests
+verify index/bundle/notices responses and preserve 404s for missing APIs/assets.
+No frontend server, CORS exception or catch-all route is introduced. Two ordinary
+backend tests also pass; they remain frontend-independent without this profile.
+
+This verifies jar assembly using the existing development JDK image, not the
+first engine image. The required official Java image refresh still gates engine
+Dockerfile/service work. The future multi-stage build must compile the frontend
+first, invoke this profile, and carry its artifacts and notices into the engine
+image without adding source/private files. Engine secret consumption and durable
+content/asset mounts remain unfinished. No full packaged readiness is claimed.
 
 ## 5. Launcher contract
 

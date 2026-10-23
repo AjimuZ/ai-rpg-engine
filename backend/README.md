@@ -43,7 +43,43 @@ Flyway may create its history table, but there are no versioned migrations until
 The executable jar is `target/engine-0.1.0.jar`; it can also run with `java -jar`.
 
 The development server binds to `127.0.0.1:8080`. Only `/actuator/health` is exposed,
-returning status without components/details. There are no gameplay APIs, account
-integration, or browser assets in the jar yet. Full readiness/failure contracts are
-P02.5; container networking and single-origin asset packaging are P02.3. No
+returning status without components/details. There are no gameplay APIs or account
+integration. Ordinary builds contain no browser assets. Full readiness/failure
+contracts are P02.5; engine image/service integration remains P02.3. No
 Testcontainers dependency or test-library helper image is used. Lint/CI is P02.4.
+
+
+## Single-origin jar assembly (partial P02.3)
+
+Build the reviewed production interface in `frontend/` with `npm ci` and
+`npm run build`, then return to `backend/` and run against the disposable database:
+
+```sh
+./mvnw -B -ntp clean verify -Ppackaged-ui
+java -jar target/engine-0.1.0.jar
+```
+
+The opt-in profile copies `frontend/dist/engine-ui/browser/` into the jar's
+`static/` directory and copies the adjacent `3rdpartylicenses.txt` alongside it.
+Spring serves the index, hashed JavaScript/CSS and license notices at the same
+origin as `/actuator/health`; it needs no separate frontend server or CORS
+exception. Unknown API, source/configuration and asset URLs remain 404. No broad
+SPA fallback is installed: the current shell has no client routes.
+
+Always use `clean` when changing profiles or rebuilding for distribution so old
+assets cannot survive in `target/`. A guard checks the copied index and notices
+before tests/package; missing production output fails the build with frontend
+build instructions. `ui.dist.directory` may select a different browser output
+path, with extracted notices in its parent. The HTTP tests also fail on missing
+bundles or notices. Without this profile, the three interface tests skip and the
+two ordinary backend integration tests still run.
+
+On 23 October 2026 all five profile tests passed with real PostgreSQL 18 and the
+existing pinned Java 21 development image. The ordinary build passed two tests
+with three profile tests skipped, and the missing-output guard rejected an empty
+input directory. A separate executable-jar HTTP smoke verified health and exact
+index/notices bytes; archive inspection matched all four production resources.
+This is application jar assembly,
+not a containerized installation: the required official Temurin refresh still
+blocks the first engine image, and Compose has no engine service. Do not infer
+runtime account readiness, canonical campaign recovery or QA-28 from these tests.

@@ -2,6 +2,11 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Single-origin jar assembly (partial P02.3), 23 October 2026
+
+- Add an opt-in Maven profile embedding compiled Angular production assets and extracted third-party notices in the executable backend jar, served at one origin without an additional server.
+- Verify the real HTTP index, bundles, notices and missing API/resource 404 responses against disposable PostgreSQL. Guard missing index/notices before packaging; keep ordinary backend builds independent of frontend output. Engine container packaging remains gated on the mandatory official Java image refresh; no launcher or full QA-28 acceptance is claimed.
+
 ## Unreleased — Isolated infrastructure (partial P02.3), 23 October 2026
 
 - Add root Compose database/runtime services with separate networks, file-based database secrets, durable private storage, tmpfs control IPC, bounded logs, graceful stop and process/socket health checks.

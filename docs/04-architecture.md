@@ -119,7 +119,10 @@ The current root Compose file is a partial infrastructure checkpoint: database
 and runtime services only, with separate data/inference networks, private named
 storage and tmpfs socket IPC. No ports are published until the engine service is
 implemented. Neutral storage survives real container recreation; the engine
-image, single-origin interface and complete application startup remain pending.
+image/service and complete application startup remain pending. An opt-in Maven
+profile now embeds compiled Angular assets and notices in the executable jar;
+real HTTP tests verify single-origin serving independently of container packaging.
+See the [backend build instructions](../backend/README.md).
 
 ## 8. Concurrency and background work
 

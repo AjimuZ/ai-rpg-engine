@@ -29,7 +29,9 @@ ai-rpg-engine/
   .github/                  # future issue/PR templates and CI
 ```
 
-The repository currently contains design documentation, labeled UI concepts, repository policy files, a runtime image/probe, neutral [frontend](../frontend/README.md) and [backend](../backend/README.md) workspaces, and a partial root Compose database/runtime infrastructure. Its database labels are documented in the sanitized [`.env.example`](../.env.example). [CONTRIBUTING.md](../CONTRIBUTING.md) documents the shared editor and line-ending rules. There is no runnable game application or packaged startup launcher yet. Runtime data, private campaigns, generated personal images, local database volumes, credentials, temporary workspaces, and raw traces live outside the tracked source tree and are ignored where applicable.
+The repository currently contains design documentation, labeled UI concepts, repository policy files, a runtime image/probe, neutral [frontend](../frontend/README.md) and [backend](../backend/README.md) workspaces, and a partial root Compose database/runtime infrastructure. Its database labels are documented in the sanitized [`.env.example`](../.env.example). [CONTRIBUTING.md](../CONTRIBUTING.md) documents the shared editor and line-ending rules. The backend can optionally embed compiled browser assets and notices in a
+single-origin executable jar. There is no runnable game application, engine
+container service or packaged startup launcher yet. Runtime data, private campaigns, generated personal images, local database volumes, credentials, temporary workspaces, and raw traces live outside the tracked source tree and are ignored where applicable.
 
 The intended local installation is the [containerized application with root `start.sh`](22-container-deployment-and-startup.md). Release setup instructions must exercise that packaged profile, including first sign-in, readiness, persistent restart, and safe stop; a host-only development setup does not complete that requirement.
 

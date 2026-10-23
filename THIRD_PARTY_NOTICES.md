@@ -47,7 +47,10 @@ The Angular CLI 22.2.3 scaffold supplies the initial workspace configuration und
 its MIT license (Copyright Google LLC). The application template has been replaced
 with the neutral project shell. Downloaded npm/Maven dependencies retain their
 individual licenses in their distributions; the Angular production build also
-emits its third-party license inventory. No dependency binary is committed here.
+emits its third-party license inventory. The backend `packaged-ui` profile retains
+that inventory as `/3rdpartylicenses.txt` alongside the compiled browser assets
+in the executable jar. Preserve it with distributions. No dependency binary is
+committed here.
 
 ## Other references
 

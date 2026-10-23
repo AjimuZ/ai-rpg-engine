@@ -27,6 +27,8 @@ P01 must prove the pinned container/runtime/client combination. P02 implements p
 Implementation evidence (P02.3, 23 October 2026): root Compose now supplies the
 pinned PostgreSQL and runtime infrastructure with private networks, file secrets,
 durable volumes and the P01 socket layout. Account-free neutral state survives
-real recreation of both containers. The engine image/service, packaged interface,
-launcher and complete QA-28 acceptance remain pending. This partial checkpoint
+real recreation of both containers. The engine image/service,
+launcher and complete QA-28 acceptance remain pending. A later P02.3 checkpoint
+verifies single-origin Angular assets/notices in an optional executable jar;
+this is independent application evidence, not a completed container profile. This partial checkpoint
 implements the existing direction without changing the deployment decision.

@@ -75,4 +75,70 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>packaged-ui</id>
+      <properties>
+        <!-- Consume production output only; never expose frontend source as resources. -->
+        <ui.dist.directory>${project.basedir}/../frontend/dist/engine-ui/browser</ui.dist.directory>
+      </properties>
+      <build>
+        <resources>
+          <resource>
+            <directory>src/main/resources</directory>
+            <filtering>false</filtering>
+          </resource>
+          <resource>
+            <directory>${ui.dist.directory}</directory>
+            <targetPath>static</targetPath>
+            <!-- Filtering would corrupt bundles and content-hashed filenames. -->
+            <filtering>false</filtering>
+          </resource>
+          <resource>
+            <!-- Angular emits extracted dependency licenses next to browser/. -->
+            <directory>${ui.dist.directory}/..</directory>
+            <includes><include>3rdpartylicenses.txt</include></includes>
+            <targetPath>static</targetPath>
+            <filtering>false</filtering>
+          </resource>
+        </resources>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>require-compiled-interface</id>
+                <phase>process-classes</phase>
+                <goals><goal>enforce</goal></goals>
+                <configuration>
+                  <rules>
+                    <!-- Check the copied resource before tests/package. Enforcer requires a
+                         canonical path; the sibling frontend path contains a parent segment. -->
+                    <requireFilesExist>
+                      <files>
+                        <file>${project.build.outputDirectory}/static/index.html</file>
+                        <file>${project.build.outputDirectory}/static/3rdpartylicenses.txt</file>
+                      </files>
+                      <message>Build the production interface with npm ci and npm run build in frontend/ first.</message>
+                    </requireFilesExist>
+                  </rules>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <systemPropertyVariables>
+                <!-- Ordinary backend tests remain independent of the frontend build. -->
+                <engine.packaged-ui>true</engine.packaged-ui>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

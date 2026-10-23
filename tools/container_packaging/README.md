@@ -3,7 +3,8 @@
 The root `compose.yaml` is an infrastructure checkpoint with database/runtime
 services only. `test_compose.py` renders it through real Compose and verifies
 network, mount, identity, secret and pinned-image boundaries without starting
-services. The engine service and single-origin interface are still pending.
+services. The engine service is still pending. Application-level single-origin jar
+assembly is verified separately by the [backend tests](../../backend/README.md).
 
 Run from the repository root with Python and the Linux Docker/BuildKit baseline
 in [ADR 0009](../../docs/adr/0009-toolchain-baseline.md):
