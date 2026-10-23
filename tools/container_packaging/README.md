@@ -1,7 +1,9 @@
 # Container build-context checks
 
 The root `compose.yaml` is an infrastructure checkpoint with database/runtime
-services only. `test_compose.py` renders it through real Compose and verifies
+services only. The runtime service uses `init: true` for signal forwarding and
+prompt shutdown ([P01.4 lifecycle evidence](../runtime_probe/README.md#process-lifecycle-p014)).
+`test_compose.py` renders it through real Compose and verifies
 network, mount, identity, secret and pinned-image boundaries without starting
 services. The engine service is still pending. Application-level single-origin jar
 assembly is verified separately by the [backend tests](../../backend/README.md).

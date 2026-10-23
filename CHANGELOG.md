@@ -2,6 +2,12 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Runtime process lifecycle (P01.4), 23 October 2026
+
+- Add owned-child shutdown records and bounded escalation scoped to a unique container name; enable runtime Compose init for signal forwarding. Keep Docker control outside the backend.
+- Make terminal wire failures sticky, retire unresolved RPC generations, retain ordered early notifications, and classify stderr within fixed byte/line/tail bounds with allowlisted diagnostic labels.
+- Add synthetic failure-injection and real pinned-runtime tests for process exit, ignored EOF, service stop, upstream interruption, relay-loss reconciliation and turn deadlines. Results on Windows 11 / Docker Desktop / `linux/amd64`: all 90 runtime tests and 5 packaging tests pass with Docker enabled and no skips; four Compose configurations and documentation links/anchors pass. No account-backed inference or campaign-save acceptance is claimed.
+
 ## Unreleased — Narration runtime isolation (P01.3), 23 October 2026
 
 - Bake an engine isolation profile into the 0.164.0 runtime image: a managed configuration layer, an engine model catalog, neutral instructions, requirements pinning `never`/`read-only`/no search with no extension servers, and a startup guard refusing inherited home configuration or instruction files ([ADR 0013](docs/adr/0013-narration-runtime-isolation.md)).

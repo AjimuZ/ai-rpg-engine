@@ -29,6 +29,10 @@ paths.
 
 The probe never signs in. Only the ``live`` profile contacts a real inference
 service, using the fixed neutral prompt.
+
+Every container protocol child gets a unique ``--name``. Its shutdown escalates with
+``docker kill`` of exactly that name, because ending only the Docker client
+process leaves the container running (P01.4, docs/06 section 4).
 """
 import argparse
 import base64
@@ -36,6 +40,7 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -132,17 +137,50 @@ def _container_isolation():
             '--tmpfs', '/tmp:mode=1777']
 
 
+def container_name(role):
+    """Return a fresh Docker container name for one owned child of ``role``.
+
+    The random suffix keeps parallel or repeated probes from colliding and
+    makes the name safe to pass to ``docker kill``: it can match only the
+    container this probe launched.
+    """
+    return f'rpg-probe-{role}-{secrets.token_hex(6)}'
+
+
+def open_child(command, *, env=None, cwd=None):
+    """Start ``command`` as an owned transport.Stdio child and return it.
+
+    When the command names its container (``--name``), the shutdown
+    escalation kills exactly that container through the same Docker
+    executable (command[0]); otherwise Stdio terminates the child process.
+    Launch failures propagate from Stdio.
+    """
+    terminate = None
+    if '--name' in command:
+        docker, name = command[0], command[command.index('--name') + 1]
+
+        def terminate():
+            """Kill the named container; a timeout is left to Stdio's next step."""
+            try:
+                subprocess.run([docker, 'kill', name], capture_output=True,
+                               timeout=30, shell=False)
+            except subprocess.TimeoutExpired:
+                pass
+    return Stdio(command, env=env, cwd=cwd, terminate=terminate)
+
+
 def run_discovery(command, *, env, cwd, timeout, profile):
     """Launch the supplied command/environment/cwd and return bounded discovery evidence;
     propagate transport, protocol and process failures after closing the child.
     """
-    with Stdio(command, env=env, cwd=cwd) as wire:
+    with open_child(command, env=env, cwd=cwd) as wire:
         rpc = Rpc(wire, timeout=timeout)
         report = discover(rpc)
         report['notifications'] = rpc.notifications
-    # Stderr is counted, never copied: see transport.Stdio._stderr.
+    # Stderr is counted and classified, never copied: see transport.Stdio._stderr.
     report.update(profile=profile, stderrBytes=wire.stderr_bytes,
-                  stderrTruncated=wire.stderr_truncated)
+                  stderrTruncated=wire.stderr_truncated, stderr=wire.stderr_summary(),
+                  shutdown=wire.shutdown)
     return report
 
 
@@ -171,8 +209,10 @@ def probe_container(args):
     _check_version([*run, args.image, '--version'])
     # -i keeps stdin attached; closing it is the runtime's EOF and ends the
     # container, which --rm then removes. No -t: a TTY would alter framing.
-    return run_discovery([*run, '-i', args.image, *_server_arguments()], env=None,
-                         cwd=None, timeout=args.timeout, profile='container-stdio')
+    # The name lets shutdown kill exactly this container if EOF is ignored.
+    return run_discovery([*run, '--name', container_name('stdio'), '-i', args.image,
+                          *_server_arguments()],
+                         env=None, cwd=None, timeout=args.timeout, profile='container-stdio')
 
 
 def probe_packaged(args):
@@ -185,7 +225,8 @@ def probe_packaged(args):
     try:
         # The relay is the only child this probe owns; Compose starts the
         # runtime service as its dependency, exactly like the packaged engine.
-        return run_discovery([*compose, 'run', '--rm', '-T', 'relay'], env=None, cwd=None,
+        return run_discovery([*compose, 'run', '--rm', '--name', container_name('relay'),
+                              '-T', 'relay'], env=None, cwd=None,
                              timeout=args.timeout, profile='packaged-unix-socket')
     finally:
         # Stop the fixture's runtime container. Volumes are never removed;
@@ -247,10 +288,11 @@ def _wait_for(condition, deadline, code):
         time.sleep(.2)
 
 
-def run_session_fixture(relay, *, timeout, provider_log):
+def run_session_fixture(launch, *, timeout, provider_log):
     """Drive the P01.2 lifecycle sequence over two relay connections.
 
-    Inputs: the relay command (one connection per process), the per-request
+    Inputs: a callable returning a fresh relay command (one connection per
+    process, each with its own container name), the per-request
     timeout, and a callable returning the provider's current stdout.
     Sequence on connection 1: thread T1 runs turns A (complete, settings 1)
     and B (complete, settings 2). A second thread T2 then starts turn X
@@ -326,7 +368,7 @@ def run_session_fixture(relay, *, timeout, provider_log):
         record('T1', scenario, settings, turn_id, result)
         return result
 
-    with Stdio(relay, env=None, cwd=None) as wire:
+    with open_child(launch()) as wire:
         rpc = Rpc(wire, timeout=timeout)
         found = discover(rpc)
         first, second = pick_settings(found['catalog'])
@@ -363,7 +405,7 @@ def run_session_fixture(relay, *, timeout, provider_log):
 
     # A new process is a new socket connection: resume must not depend on
     # connection-local state.
-    with Stdio(relay, env=None, cwd=None) as wire:
+    with open_child(launch()) as wire:
         rpc = Rpc(wire, timeout=timeout)
         discover(rpc)
         for label, resumed_id, settings in (('T1', thread_id, first),
@@ -416,7 +458,8 @@ def probe_session(args):
                               capture_output=True, timeout=300, shell=False)
         if done.returncode != 0:
             raise ContractError('fixture-start-failed')
-        report = run_session_fixture([*compose, 'run', '--rm', '-T', 'relay'],
+        report = run_session_fixture(lambda: [*compose, 'run', '--rm', '--name',
+                                              container_name('relay'), '-T', 'relay'],
                                      timeout=args.timeout, provider_log=provider_log)
         report['profile'] = 'packaged-session-fixture'
         return report
@@ -455,7 +498,7 @@ def run_live_task(launch, *, timeout, model=None, effort=None):
     Output: a report whose 'inferenceVerified' is true only after the output
     validator accepted a correlated completed turn and resume returned it.
     """
-    with Stdio(launch(), env=None, cwd=None) as wire:
+    with open_child(launch()) as wire:
         rpc = Rpc(wire, timeout=timeout)
         found = discover(rpc)
         if found['accountState'] != 'account-present-unverified':
@@ -469,7 +512,7 @@ def run_live_task(launch, *, timeout, model=None, effort=None):
         if result['status'] != 'completed':
             raise ContractError(f"live-turn-{result['status']}")
         validate_output(result['text'], status=result['status'])
-    with Stdio(launch(), env=None, cwd=None) as wire:
+    with open_child(launch()) as wire:
         rpc = Rpc(wire, timeout=timeout)
         discover(rpc)
         resumed = session.resume_thread(rpc, thread['threadId'])
@@ -506,7 +549,8 @@ def probe_live(args):
     isolation[index - 1:index + 1] = ['--volume', f'{args.account_volume}:/var/lib/runtime/home']
     run = [docker, 'run', '--rm', *isolation]
     _check_version([*run, args.image, '--version'])
-    report = run_live_task(lambda: [*run, '-i', args.image, *_server_arguments()],
+    report = run_live_task(lambda: [*run, '--name', container_name('live'), '-i', args.image,
+                                    *_server_arguments()],
                            timeout=args.timeout, model=args.model, effort=args.effort)
     report['profile'] = 'live-container-stdio'
     return report

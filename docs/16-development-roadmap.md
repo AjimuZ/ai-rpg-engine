@@ -89,9 +89,17 @@ Checks: a documentation review against the requirements, pack, security, and pub
 - [x] P01.1 Establish pinned Codex executable/image versions, local stdio probe and packaged private IPC transport, handshake, container account readiness, paginated catalog, and output contract.
 - [x] P01.2 Verify thread creation/resume, explicit per-turn model/effort, notification correlation, terminal status, and interruption.
 - [x] P01.3 Demonstrate restricted roots, denied canonical writes, unavailable unwanted host tools, and inherited-config isolation.
-- [ ] P01.4 Demonstrate owned-process shutdown, EOF/timeout handling, stderr bounds, and early-event buffering.
+- [x] P01.4 Demonstrate owned-process shutdown, EOF/timeout handling, stderr bounds, and early-event buffering.
 - [ ] P01.5 Save neutral protocol fixtures and a supported-version matrix; record service maturity and platform limitations.
 - [ ] P01.6 Record supported image-generation capability or explicit unavailability, restricted invocation, output formats and account/cost boundaries; gate actual generation without blocking text-only fallback or enabling paid access implicitly.
+
+**Progress (23 October 2026):** P01.4 is complete in [`tools/runtime_probe`](../tools/runtime_probe/README.md#process-lifecycle-p014):
+
+- Owned children record input-close, terminate-hook and kill escalation; unique container names restrict escalation to the launched container. Runtime Compose services use `init: true` to forward termination signals. Backend code still owns only connections/turns, never Docker access.
+- EOF/read/write/framing failures close the RPC generation and discard/count its buffered notifications. Request timeouts, malformed replies and event floods leave the request unresolved and require a new generation; a turn-wait deadline preserves the connection for explicit interruption. No failed request is replayed implicitly.
+- Stderr is drained independently, classifying at most 65,536 bytes with 512-byte line prefixes and a 16-entry tail. Only fixed levels and exact allowlisted module labels survive; log-shaped private module strings become `unclassified`.
+- Early events remain ordered until acknowledgment establishes correlation. Synthetic checks cover sticky EOF, stale-generation rejection, redaction, stderr floods, shutdown backpressure, final kill and an unrelated surviving child. All 90 runtime probe tests pass with Docker enabled and no skips (65.990 seconds), including the 13 process-lifecycle checks, real turn-deadline/reconciliation, isolation, warning-free Java compilation and relay framing checks. All 5 packaging tests pass with recreation enabled; four Compose configurations and documentation links/anchors also pass. The two leftover exploratory probe containers were stopped without deleting volumes.
+- Scope: runtime 0.164.0, Windows 11 / Docker Desktop / `linux/amd64`, account-free scripted upstream. Canonical receipts, campaign saves and full QA-24/QA-28 remain future application gates. P01.3's live quota re-check and P01.5 compatibility records remain open.
 
 **Progress (23 October 2026):** P01.3 is complete for the pinned 0.164.0 image ([ADR 0013](adr/0013-narration-runtime-isolation.md)):
 

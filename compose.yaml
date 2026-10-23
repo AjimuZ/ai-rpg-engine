@@ -41,6 +41,10 @@ services:
     build:
       context: ./docker/codex-runtime
     image: rpg-engine/runtime:0.164.0
+    # The runtime ignores SIGTERM as PID 1, so docker stop would wait the whole
+    # grace period and then SIGKILL it (P01.4). A minimal init forwards the
+    # signal and reaps children, letting the runtime exit promptly.
+    init: true
     user: "10001:10001"
     read_only: true
     cap_drop: [ALL]

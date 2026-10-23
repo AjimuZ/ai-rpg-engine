@@ -67,6 +67,16 @@ Framing verified in P01.1 for runtime 0.164.0:
 
 The [deployment specification](22-container-deployment-and-startup.md#3-runtime-integration-gate) records the socket location and permission findings.
 
+P01.4 implements these lifecycle rules in the sequential developer probe (the production concurrent adapter remains P08 work):
+
+- `Stdio` delivers queued frames before a sticky terminal EOF/read/framing error. `Rpc` closes its generation on terminal wire failure, discards/counts pending notifications, and rejects later operations without I/O. A request that ends without a correlated response is unresolved, including timeout, malformed reply and event-limit failure; reconnect and reconcile rather than replaying it. A correlated error response resolves its request and permits subsequent requests.
+- A turn-wait deadline alone leaves the connection usable for `turn/interrupt`; await the correlated terminal status. Losing a packaged relay connection leaves a running upstream turn alive. Resume through a fresh generation, inspect its history and explicitly interrupt/await when cancellation is required.
+- Close input, wait 2 seconds, invoke the owned-container hook or terminate the owned local child, wait 2 seconds, then kill/wait for the child. The Docker hook has a separate 30-second bound and targets only its unique launch name; ending the Docker CLI alone cannot establish container termination. Reader joins are bounded to 1 second each. Reports include shutdown stage, exit code and elapsed seconds; an unreaped child is reported explicitly.
+- Stderr is always drained, including after its 65,536-byte classification budget is exhausted. Keep at most a 512-byte line prefix and 16 diagnostic entries; discard messages and map unknown module names to `unclassified`. Only the fixed `codex_app_server` and `codex_core::config` module labels are retained. Counters and truncation are recorded, with no raw diagnostic content.
+- The 16-frame stdout queue and 256-notification RPC queue are bounded independently. Early notifications retain arrival order until the start acknowledgment supplies turn identity; overflow fails explicitly and deadlines also apply to buffered events.
+
+See [process lifecycle checks](../tools/runtime_probe/README.md#process-lifecycle-p014) for measured shutdown and recovery behavior. A closed process or connection alone is never evidence that a canonical operation was rolled back.
+
 ## 6. Task contracts
 
 | Task | Input | Allowed output | Authority |
@@ -131,6 +141,6 @@ For 0.164.0, `thread/start` requests a persistent thread with `approvalPolicy: n
 
 Before the first playable release, capture: executable version; OS; launch form; protocol schema/contract digest; supported account discovery; paginated model catalog; structured result behavior; event ordering; interruption terminal states; restricted read/tool policy; inherited configuration isolation; and clean owned-process shutdown.
 
-P01.1 captured the executable version, both launch forms (stdio and the packaged socket), account discovery without sign-in, and the paginated catalog. P01.2 adds real app-server lifecycle and scripted structured-result evidence, with `inferenceVerified: false` for that fixture. Its separate owner-signed-in neutral task now validates live structured output and resume, with `inferenceVerified: true` in the retained report. P01.3 verifies the restricted tool/read policy and inherited-configuration isolation with deterministic fixtures. A live re-check of that profile hit the account usage limit (`usageLimitExceeded`) and remains to be repeated. Process lifecycle coverage, retained compatibility fixtures and maturity/platform limits remain P01.4–P01.5 work.
+P01.1 captured the executable version, both launch forms (stdio and the packaged socket), account discovery without sign-in, and the paginated catalog. P01.2 adds real app-server lifecycle and scripted structured-result evidence, with `inferenceVerified: false` for that fixture. Its separate owner-signed-in neutral task now validates live structured output and resume, with `inferenceVerified: true` in the retained report. P01.3 verifies the restricted tool/read policy and inherited-configuration isolation with deterministic fixtures. A live re-check of that profile hit the account usage limit (`usageLimitExceeded`) and remains to be repeated. Process lifecycle coverage is documented above (P01.4); retained compatibility fixtures and maturity/platform limits remain P01.5 work.
 
 Run fixtures without live inference in normal CI. Run a minimal opt-in real Codex smoke with neutral temporary context for the supported release baseline. No private campaign, paid call, or account access is needed to verify documentation or ordinary domain tests.

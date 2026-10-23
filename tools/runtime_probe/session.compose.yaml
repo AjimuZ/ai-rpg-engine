@@ -48,6 +48,10 @@ services:
   codex:
     image: ai-rpg-engine-runtime-probe/codex:0.164.0
     networks: [fixture]
+    # The runtime ignores SIGTERM as PID 1, so docker stop would wait the whole
+    # grace period and then SIGKILL it (P01.4). A minimal init forwards the
+    # signal and reaps children, letting the runtime exit promptly.
+    init: true
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]

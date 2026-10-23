@@ -48,6 +48,8 @@ class ComposeTest(unittest.TestCase):
         self.assertFalse(runtime.get("secrets"))
         self.assertFalse(runtime.get("environment"))
         self.assertEqual("10001:10001", runtime["user"])
+        # Without an init, SIGTERM to the PID 1 runtime is ignored (P01.4).
+        self.assertIs(True, runtime["init"])
         self.assertTrue(runtime["read_only"])
         self.assertEqual(["ALL"], runtime["cap_drop"])
         self.assertIn("no-new-privileges:true", runtime["security_opt"])

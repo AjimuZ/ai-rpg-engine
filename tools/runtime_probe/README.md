@@ -123,3 +123,55 @@ prove the following:
 
 Rebuild the probe image first (`docker compose -f tools/runtime_probe/compose.yaml
 build codex`). Re-run these tests after every runtime upgrade.
+
+## Process lifecycle (P01.4)
+
+Run only the owned-process integration checks after building the pinned image:
+
+```powershell
+$env:RUNTIME_PROBE_DOCKER = (Get-Command docker).Source
+py -B -m unittest discover -s tools/runtime_probe -p test_lifecycle.py
+```
+
+`test_transport.py` uses controllable local children and scripted RPC messages;
+`test_lifecycle.py` repeats lifecycle scenarios against runtime 0.164.0 on the
+account-free internal fixture network. No real inference, account mount or
+credential access is needed. Tests stop their own containers and keep volumes.
+
+The checked behavior is:
+
+- Idle or mid-turn stdio input closure exits with code 0. Normal shutdown first
+  interrupts the turn and awaits `interrupted`, confirming upstream stream closure.
+- Packaged relay loss leaves the upstream turn running. A fresh connection resumes
+  the thread, inspects history, interrupts the active turn and awaits its terminal
+  notification. Closing a connection is not cancellation.
+- A turn-wait deadline leaves RPC usable for explicit interruption. A request that
+  loses its reply (timeout, malformed response or event flood) retires the generation
+  as `request-unresolved`; later calls perform no I/O. Reconcile before retrying.
+- Runtime death yields sticky EOF, clears/counts old-generation notifications and
+  rejects subsequent requests. Frames preceding EOF remain ordered on the raw wire.
+- Each protocol probe container has a random unique `--name`. Input-close escalation kills
+  exactly that container through the same Docker executable, then kills the owned
+  local client if necessary. It never enumerates or kills other runtime processes.
+- Shutdown records report stage, exit code and elapsed seconds. Defaults are 2-second
+  waits per escalation, a 30-second Docker hook limit, and 1-second reader joins.
+  Synthetic tests verify final kill, an unrelated surviving child and shutdown with
+  a full stdout queue. Compose owns the packaged runtime; the backend never calls Docker.
+- Runtime services enable `init: true`. `docker stop` then exits promptly with code 0;
+  without init, the pinned runtime as PID 1 ignores SIGTERM until Docker kills it.
+- Stderr always drains. Its summary classifies at most 65,536 bytes, keeps a maximum
+  512-byte line prefix and 16 entries, and records truncation. Only fixed log levels,
+  exact allowlisted module names (`codex_app_server`, `codex_core::config`) and
+  `unclassified`/`unstructured` survive; raw messages and unknown module text do not.
+- Early events stay in arrival order until acknowledgment supplies turn identity.
+  The raw queue holds 16 frames and RPC holds 256 notifications; overflow is explicit.
+  Buffered events cannot bypass the monotonic deadline.
+
+Verification on 23 October 2026: all 90 runtime probe tests passed with Docker
+enabled and no skips (65.990 seconds), including 23 transport tests and 13 process-
+lifecycle checks. All 5 packaging tests passed with recreation enabled. The host
+was Windows 11, Python 3.15.1, Docker Desktop Engine 29.9.2 / Compose 5.6.1 /
+`linux/amd64`. Four Compose configurations and documentation links/anchors passed.
+These checks do not implement the production concurrent adapter, canonical operation
+receipts, campaign-save coherence (QA-24), full packaged startup (QA-28), or another
+platform. The P01.3 live isolation re-check still needs account quota before P01 exit.
