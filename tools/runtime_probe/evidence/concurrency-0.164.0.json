@@ -1,0 +1,80 @@
+{
+  "evidenceVersion": 1,
+  "runtimeVersion": "0.164.0",
+  "profile": "managed-narration",
+  "source": "account-free-packaged-scripted-upstream",
+  "inferenceVerified": false,
+  "accountVolumeMounted": false,
+  "requestCount": 5,
+  "toolsEmptyEveryRequest": true,
+  "scripted": {
+    "overlappingHeldRequests": 2,
+    "targetedCancellationPreservedOtherTurn": true,
+    "interleavedDispatchVerified": true,
+    "eventsRoutedToOtherTurn": 3,
+    "terminalResults": [
+      {
+        "status": "interrupted",
+        "events": 4,
+        "started": true,
+        "ignored": 0
+      },
+      {
+        "status": "completed",
+        "events": 7,
+        "started": true,
+        "ignored": 0
+      },
+      {
+        "status": "interrupted",
+        "events": 4,
+        "started": true,
+        "ignored": 0
+      },
+      {
+        "status": "interrupted",
+        "events": 4,
+        "started": true,
+        "ignored": 0
+      },
+      {
+        "status": "completed",
+        "events": 7,
+        "started": true,
+        "ignored": 0
+      }
+    ],
+    "heldStreamsClosed": 3,
+    "cancellationElapsedMs": [
+      531,
+      529,
+      524
+    ],
+    "serializedPriorityHandoffVerified": true,
+    "priorityMechanism": "client-interrupt-reconcile-then-dispatch"
+  },
+  "bounds": {
+    "requestTimeoutSeconds": 60,
+    "turnTimeoutSeconds": 60,
+    "upstreamWaitSeconds": 60,
+    "cancellationBudgetSeconds": 180,
+    "registeredTurns": 3,
+    "bufferedEvents": 1024,
+    "liveRequests": 0
+  },
+  "decision": {
+    "mode": "serialized",
+    "installationActiveTurnLimit": 1,
+    "liveSimultaneityVerified": false,
+    "liveHeadroomVerified": false,
+    "liveCancellationLatencyVerified": false,
+    "liveQuotaBehaviorVerified": false,
+    "providerPriorityVerified": false,
+    "throughputMeasured": false,
+    "reason": "live-simultaneity-and-headroom-unproved",
+    "priorityOwner": "backend",
+    "releasePermit": "terminal-confirmed-or-reconciled",
+    "unknownOutcome": "stop-admissions-and-reconcile",
+    "increaseGate": "P08.6"
+  }
+}

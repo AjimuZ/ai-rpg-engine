@@ -49,6 +49,12 @@ Owners below are implementation responsibilities, not assigned people. The proje
 
 ## 2. Open decisions with safe working defaults
 
+P01.7 explicitly selects [serialized inference](../tools/runtime_probe/CONCURRENCY.md),
+one active turn installation-wide. Its bounded scripted routing/cancellation
+evidence does not establish live simultaneity, headroom, service priority or
+quota behavior. P08.6 retains the increase gate and QA-37 owns production
+priority/fairness/recovery; the P01 live isolation recheck is still open.
+
 Research-revision risks and defaults are tracked in the focused contracts:
 
 | Risk | Safe initial decision | Gate / evidence |

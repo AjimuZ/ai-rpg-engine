@@ -116,6 +116,15 @@ P01.4 extends diagnostics with a bounded stderr summary: bytes classified (at mo
 
 ## 11. Performance budgets
 
+P01.7's [bounded qualification](../tools/runtime_probe/CONCURRENCY.md) explicitly
+selects one active inference turn installation-wide. Scripted overlap measures
+no live throughput, account headroom or service priority. Do not release a
+permit on interrupt acknowledgment or connection loss; await terminal
+confirmation/reconcile uncertain work. Production priority, finite queues,
+fairness and quota/backpressure/restart checks remain P08/QA-37 work. Optional
+jobs stay disabled or in explicit idle maintenance windows when safe preemption
+is unproved; higher concurrency requires P08.6's authorized live evidence.
+
 Initial targets on documented reference hardware with a warmed local database: public status/inventory query p95 under 200 ms; deterministic combat calculation excluding persistence p95 under 50 ms; normal canonical commit p95 under 250 ms; operation acceptance under 300 ms. These are measurable targets, not achieved benchmarks.
 
 Do not give an end-to-end AI latency guarantee before measurement. Record provider latency separately from application overhead and include account/profile, context size, and test sample size in reports. A faster response with broken continuity is not an optimization.

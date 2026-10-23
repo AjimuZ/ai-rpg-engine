@@ -2,6 +2,18 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Bounded dispatch and serialized inference (P01.7), 23 October 2026
+
+- Add a bounded per-thread/turn inbox fixture using the real managed runtime
+  and internal scripted upstream; preserve interleaved events and verify
+  targeted interruption, unaffected active work and terminal/stream closure.
+- Retain five neutral scripted turns and local cancellation observations;
+  exercise interrupt/reconcile/dispatch priority with one active turn.
+- Explicitly select one active inference turn installation-wide: live
+  simultaneity, headroom, quota behavior and service priority remain unverified.
+  Scripted overlap provides no live throughput claim; P08 owns production
+  admission/recovery, and P08.6 gates any increase. No account is accessed.
+
 ## Unreleased — Explicit image capability boundaries (P01.6), 23 October 2026
 
 - Record managed-runtime image unavailability, no supported invocation/output

@@ -12,6 +12,15 @@ gate](IMAGE_CAPABILITY.md); P17 owns the production job and asset pipeline.
 This is a developer fixture, not the application or its concurrent adapter. It
 checks the pinned runtime `0.164.0`; unsupported versions fail before discovery.
 See the [supported-version matrix and retained fixtures](COMPATIBILITY.md) for P01.5 scope, replay, refresh instructions and remaining service/platform limitations.
+
+P01.7 selects **one active inference turn installation-wide** because live
+simultaneity/headroom is unproved. Its [bounded qualification](CONCURRENCY.md)
+retains five scripted turns with per-turn inbox routing, isolated cancellation
+and a client-controlled serialized priority handoff. Scripted overlap and local
+timings establish no live throughput or service priority. Refresh only the fixed
+account-free evidence with `py -B tools/runtime_probe/concurrency.py`; replay its
+offline checks with `py -B -m unittest discover -s tools/runtime_probe -p test_concurrency.py`.
+The Docker-enabled full suite repeats the experiment without rewriting evidence.
 Run commands from the repository root. Python uses only its standard library.
 The container checks require the Docker baseline from ADR 0009 and its pinned
 Java 21 images. No dependency or image pins change in P01.2.

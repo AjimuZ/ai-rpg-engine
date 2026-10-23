@@ -153,6 +153,19 @@ A protocol timeout does not prove a turn did not execute. Before retrying, recon
 
 ## 11. Compatibility gate
 
+P01.7 [selects serialized inference](../tools/runtime_probe/CONCURRENCY.md): one
+active turn installation-wide across campaigns/roles. A separate account-free
+managed-profile experiment routes interleaved events into bounded exact
+thread/turn inboxes, confirms targeted cancellation without stopping another
+turn, and tests a client-controlled interrupt/reconcile/dispatch handoff.
+Its five scripted turns qualify protocol dispatch only. Live simultaneity,
+headroom, effective maximum capacity, quota behavior, cancellation latency and
+service priority are unverified. No live account is authorized for that check.
+The production adapter/priority queue remains P08 work; P08.6 must qualify any
+increase above one. Lost confirmation retains the permit and requires terminal
+reconciliation; unsafe preemption disables optional work or confines it to an
+explicit idle maintenance window. P01's live isolation recheck remains open.
+
 The P01.2 developer fixture runs the pinned app-server against a deterministic upstream on an internal Docker network, with no account ([commands and scope](../tools/runtime_probe/README.md)). Its lifecycle client validates effective read-only/approval settings and correlates notifications by both thread and turn; it retains early notifications within a bounded queue. The 30 lifecycle checks pass, including exact upstream model/effort/schema comparisons across seven turns and reconnect/resume of two threads. This is protocol evidence, not live inference or a production concurrent dispatcher. The owner subsequently completed supported sign-in and the separate live neutral output/resume probe passed; see the retained report in the probe instructions. This does not verify gameplay narration quality.
 
 For 0.164.0, `thread/start` requests a persistent thread with `approvalPolicy: never` and `sandbox: read-only`, then checks the effective response. Every `turn/start` sends explicit model, effort, `sandboxPolicy` and output schema; upstream evidence confirms all seven requests, and resume confirms that model/effort become sticky thread settings. Structured output remains a per-turn field. `thread/resume` uses `excludeTurns: true`; ordered history comes from `thread/turns/list` with `sortDirection: asc`. The bounded probe rejects another history page rather than claiming a complete history.

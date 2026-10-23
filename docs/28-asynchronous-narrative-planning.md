@@ -230,6 +230,14 @@ On application restart, stop admissions until job leases, runtime permits, opera
 
 ### Operating profiles
 
+P01.7's [retained qualification](../tools/runtime_probe/CONCURRENCY.md) now
+explicitly selects that one-turn installation-wide baseline. The managed
+runtime passes bounded interleaved dispatch and targeted cancellation against
+an internal scripted upstream, including interrupt/reconcile/dispatch priority.
+Live simultaneity/headroom, service priority, quota behavior and cancellation
+latency remain unverified; production queue/fairness/recovery and the higher-limit
+gate above remain undelivered. Scripted overlap gives no live throughput result.
+
 Assess these first as internal policy presets behind one optional planning setting, not three mandatory player-facing screens:
 
 | Candidate profile | Preparation policy | Added cost and trade-off |

@@ -1,5 +1,10 @@
 # AI RPG Engine
 
+P01.7 selects [serialized inference](tools/runtime_probe/CONCURRENCY.md): one
+active turn installation-wide. Bounded scripted dispatch/cancellation evidence
+does not prove live simultaneity, headroom or throughput; production scheduling
+and any limit increase remain P08 work. The P01 live isolation recheck is open.
+
 P01.6 records [image generation as unavailable in the managed narration
 profile](tools/runtime_probe/IMAGE_CAPABILITY.md), with no supported generation
 formats/invocation and unverified account/cost entitlement. The developer probe

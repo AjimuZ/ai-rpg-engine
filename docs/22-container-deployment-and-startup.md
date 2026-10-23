@@ -53,6 +53,13 @@ entitlement/cost is unverified and is not a text-readiness prerequisite. These
 checks use no account volume; no image service, API credential, wider tool profile
 or launcher sign-in is introduced. Future enablement remains separately gated.
 
+P01.7 [qualifies managed-profile scripted dispatch/cancellation](../tools/runtime_probe/CONCURRENCY.md)
+on the existing private IPC fixture, without account mounts or topology changes.
+It explicitly selects one active inference turn per installation; additional
+threads/campaigns/containers do not imply more qualified live capacity.
+Live simultaneity/headroom and authenticated packaged restart remain unverified.
+Production admission belongs to P08; any increase requires P08.6 evidence.
+
 ## 4. Planned repository artifacts
 
 | Artifact | Purpose |

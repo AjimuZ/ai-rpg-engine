@@ -21,6 +21,15 @@ adds protocol and platform scope without relaxing those pins.
 
 ## Retained fixtures and replay
 
+P01.7's [managed-profile concurrency qualification](CONCURRENCY.md) selects
+serialized inference with one active turn installation-wide. Its separate
+[evidence record](evidence/concurrency-0.164.0.json) retains bounded real-runtime
+dispatch/cancellation observations against the internal scripted upstream.
+Two overlapping held requests prove protocol handling only; actual inference
+simultaneity, maximum capacity, headroom, quota behavior, cancellation latency
+and service priority remain unverified. The new inbox router is a developer
+fixture, not the production adapter. Any increase remains gated by P08.6.
+
 [`fixtures/0.164.0/neutral-session.json`](fixtures/0.164.0/neutral-session.json)
 contains selected request/result payloads and consumed notifications from the
 real packaged runtime against the internal scripted upstream. It covers the
@@ -78,7 +87,8 @@ The historical signed-in smoke does not prove authenticated packaged socket
 restart. Connection loss can leave a turn active; reconcile on a fresh connection
 rather than replaying a mutation. Runtime services require init for termination.
 
-P01 package exit still needs the live isolation recheck and P01.7. Packaged
+P01 package exit still needs the live isolation recheck. P01.7's safe serialized
+selection does not waive that requirement. Packaged
 sign-in/restart, launcher readiness, production adapter concurrency, canonical
 receipts and campaign saves remain future gates. Full QA-24 (save coherence)
 and QA-28 (fresh-clone startup/persistence) are not satisfied by these fixtures.

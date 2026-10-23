@@ -42,4 +42,13 @@ Full-owner restore preserves relevant artifacts and pending events, remaps ident
 
 ## Verification
 
+P01.7 now explicitly selects the serialized baseline: one active inference turn
+installation-wide. Its [bounded evidence](../../tools/runtime_probe/CONCURRENCY.md)
+qualifies real managed-runtime interleaved dispatch, targeted interruption and
+client-controlled serialized priority against an internal scripted upstream.
+Live simultaneity/headroom, quota behavior, cancellation latency and service
+priority remain unverified. No production scheduler or throughput result is
+claimed. P08.6 still gates every increase, and the P01 live isolation recheck
+remains required. This confirms the existing decision without changing topology.
+
 Planned AP-01–AP-12 cover selective staleness, query phantoms, admission races, duplicate workers, fencing, cancellation/EOF/restart, play-before-plan fallback, world-time separation, secret sinks, cross-adventure fairness/restore, author constraints and bilingual A/B/C evaluation. Compare single narration, narration plus planning, and optional review with measured quality, p50/p95 latency, usage and waste. No superiority or completed implementation is claimed. Evidence, proposed objectives, ownership and source links are in the [planning specification](../28-asynchronous-narrative-planning.md).

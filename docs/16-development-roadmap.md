@@ -94,7 +94,28 @@ Checks: a documentation review against the requirements, pack, security, and pub
 - [x] P01.4 Demonstrate owned-process shutdown, EOF/timeout handling, stderr bounds, and early-event buffering.
 - [x] P01.5 Save neutral protocol fixtures and a supported-version matrix; record service maturity and platform limitations.
 - [x] P01.6 Record supported image-generation capability or explicit unavailability, restricted invocation, output formats and account/cost boundaries; gate actual generation without blocking text-only fallback or enabling paid access implicitly.
-- [ ] P01.7 Qualify interleaved thread dispatch, actual provider concurrency and cancellation/priority limits under the managed profile; retain bounded evidence, or explicitly select serialized inference when simultaneity/headroom is unproved. Do not infer live throughput from scripted overlap.
+- [x] P01.7 Qualify interleaved thread dispatch, actual provider concurrency and cancellation/priority limits under the managed profile; retain bounded evidence, or explicitly select serialized inference when simultaneity/headroom is unproved. Do not infer live throughput from scripted overlap.
+
+**Progress (23 October 2026):** P01.7 is complete through the explicit serialized
+option: **one active inference turn installation-wide**. Its
+[bounded qualification and retained evidence](../tools/runtime_probe/CONCURRENCY.md)
+use the real managed 0.164.0 runtime on the internal scripted upstream: five
+neutral turns, two overlapping held requests, three targeted interrupted
+terminals/closed streams, two completed outputs and per-turn inbox routing with
+no discarded correlated events. The separate one-active-turn sequence verifies
+client-controlled interrupt/reconcile/dispatch priority. Local cancellation
+timings include polling overhead; they prove no live cancellation guarantee.
+Live simultaneity, headroom, quota behavior and service priority are unverified,
+and no account volume/live request is authorized or used. Scripted overlap gives
+no live throughput result. Production admission/queue/fairness/recovery remains
+P08/QA-37 work; P08.6 gates every increase. All 116 runtime tests pass with Docker
+and no skips (76.574s), including the 12 new qualification checks. The capture
+refuses existing fixture containers before start/cleanup. All five
+packaging checks pass with recreation enabled (13.265s). Four Compose configs,
+two Python syntax/docstring audits, 205 local links/anchors and whitespace checks
+pass. Owned containers are stopped, with no volumes deleted. P01 package exit
+still needs the quota-blocked live isolation recheck; full QA-24/QA-28 remain
+application gates. This task's serialized selection does not waive them.
 
 **Progress (23 October 2026):** P01.6 is complete with an explicit unavailable image
 capability for the managed 0.164.0 narration profile, with a

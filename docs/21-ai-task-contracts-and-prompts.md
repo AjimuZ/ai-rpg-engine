@@ -154,6 +154,15 @@ Measure cost in provider tasks and latency, not only response length. Avoid an a
 
 ## 16. Neutral protocol proof (P01.1)
 
+P01.7's [managed dispatch qualification](../tools/runtime_probe/CONCURRENCY.md)
+uses the same neutral envelope for five scripted turns, with exact thread/turn
+inboxes, terminal-only output acceptance and cancellation isolation. It selects
+one active inference turn installation-wide; neither scripted overlap nor
+historical single-task live output proves live simultaneous inference/headroom.
+Task-role priority is backend policy, not an instruction/prompt or a verified
+upstream priority guarantee. Production scheduling and any higher limit remain
+gated by P08/P08.6.
+
 `tools/runtime_probe/contract.py` defines a deliberately narrow compatibility envelope and `OUTPUT_SCHEMA` for the pinned runtime’s `turn/start.outputSchema`. The independent validator accepts only the exact neutral fact “The marker is blue.” with matching version, task, revision, digest, status, and body, after a confirmed completed turn. Duplicate keys, nonfinite JSON numbers, unknown fields, stale echoes, and oversized output fail closed. This is deterministic contract evidence, not a gameplay validator or a live structured-output result.
 
 P01.2 supplies this schema on every scripted turn, compares the full schema at the upstream boundary, and validates each completed envelope only after thread/turn/item correlation and terminal confirmation. Failed/interrupted turns never expose partial output. The separate opt-in live profile uses the same neutral prompt, schema and independent validator, then checks resume from a second process. After supported owner sign-in, this neutral live output/resume check passed on 23 October 2026 with explicit `gpt-6-luna` / `low`; the sanitized report retains `inferenceVerified: true` ([probe instructions](../tools/runtime_probe/README.md)).
