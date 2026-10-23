@@ -96,6 +96,8 @@ The header identifies the selected adventure/playthrough. Switching restores its
 
 ## 7. Combat interaction
 
+Combat is a dedicated tactical mode that returns to visual-novel play after settlement, preserving actors, inventory and canonical state. Use the default ruleset unless the adventure pins another supported configuration. The later editor exposes the bounded customization in [combat](11-combat-system.md) and [its editor plan](26-adventure-editor-roadmap.md#4-combat-as-a-customizable-mode).
+
 Show active actor, initiative order, remaining action points, available reaction policy, visible positions, known conditions, and objective. Actions expose known costs and legal targets before submission. Highlight reachability and cover with text/icon equivalents. A target card shows only revealed enemy statistics; the engine may know exact hidden values without returning them.
 
 Free text can express intent, but ambiguous targets or resource spending produce a clarification. Selecting a suggestion only prepares input unless the control is explicitly a named action button with a clear cost and submit behavior. No auto-attack, automatic protagonist dialogue, or automatic build choice occurs merely because Codex proposes it.

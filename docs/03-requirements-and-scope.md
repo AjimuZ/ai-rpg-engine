@@ -14,7 +14,7 @@
 
 | ID | Requirement | MVP | v1 verification |
 | --- | --- | --- | --- |
-| FR-001 | Import a versioned adventure pack and report file/field diagnostics | Required | Invalid references, unsupported modules, and malicious paths rejected |
+| FR-001 | Import a versioned adventure pack with fixed author requirements and bounded generation gaps | Required | Preserve required entities/facts; reject contradictions, invalid references, unsupported mechanics and malicious paths |
 | FR-002 | Create a campaign pinned to pack and ruleset revisions | Required | Two campaigns do not share mutable state |
 | FR-003 | Configure a protagonist using pack-defined options and validated bounds | Required | Names, attributes, starting abilities and equipment persist |
 | FR-004 | Submit structured or free-text player actions through one command pipeline | Required | Ambiguity requests do not consume a turn |
@@ -67,6 +67,8 @@
 ## 4. MVP exclusions
 
 The MVP does not include multiplayer, public hosting, arbitrary executable plugins, a visual editor, semantic embeddings, voice acting, live image generation, advanced political simulation, or compatibility with an external tabletop ruleset. It does include the data boundaries necessary for later optional modules.
+
+The integrated editor is scheduled after core v1 in [its separate roadmap](26-adventure-editor-roadmap.md). Manual files already preserve authored facts/mandatory entities and permit completion of allowed gaps across genres. Default combat data is customizable within supported primitives/policies; a new scheduler or arbitrary code is not file/editor-only customization.
 
 An automated test double may replace Codex in tests. It is a verification device, not a user-selectable production AI provider. When Codex is unavailable, the product may serve deterministic consultations and rules explanations; it must not pretend to generate a new AI scene.
 

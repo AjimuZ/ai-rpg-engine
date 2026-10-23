@@ -158,6 +158,8 @@ Write a minimal manifest and world overview. Define character creation and start
 
 A future editor must write this same contract. Its visual form cannot become a second incompatible authoring model.
 
+Author-specified facts, required entities and supported constraints are fixed inputs, not suggestions the narrator can replace. Use stable IDs and supported requirement predicates; generate only permitted missing details within policy/budgets. Missing required technical fields and contradictory constraints are diagnostics, not permission to invent rules. The integrated text/graphical editor, genre examples and fixed/open workflow are in [the later editor roadmap](26-adventure-editor-roadmap.md).
+
 ## 12. Engine-generic acceptance
 
 One neutral fantasy exploration pack and one science-fiction salvage pack must differ in vocabulary, world structure, skills, resources, assets, and optional guide/creative-ability settings. Both must run with the same built engine. Neither needs a full authored plot. Shared mechanics can remain AI RPG Skirmish while their presentation and supported numerical configuration differ.

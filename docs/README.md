@@ -43,6 +43,7 @@ Requirements stated by the project owner are binding for this design. Technical 
 | [23 — Presentation assets](23-presentation-assets.md) | Complete UI graphics, persistent character/item artwork, bounded runtime generation, rarity and provenance |
 | [24 — Dynamic music and credits](24-dynamic-music-and-credits.md) | Planned public-state soundtrack, optional online playback, licensed candidates, credits and failure checks |
 | [25 — Adventure workspaces](25-adventure-workspaces.md) | Distinct personalized worlds, campaigns, folders, memory/media scope, switching and restore |
+| [26 — Later adventure editor](26-adventure-editor-roadmap.md) | Post-core text/graphical authoring, fixed requirements, bounded gap completion, genres and combat customization |
 | [Visual-novel story UI concept](mockups/visual-novel-ui-v1.png) | Primary narrative-screen direction; [prompt and provenance](mockups/visual-novel-ui-v1.prompt.md) |
 | [Advanced gameplay UI concept](mockups/advanced-gameplay-ui-v1.png) | Illustrative interface image; [prompt and provenance](mockups/advanced-gameplay-ui-v1.prompt.md) |
 | [Architecture decision records](adr/README.md) | Rationale and consequences of major proposed decisions |

@@ -83,6 +83,8 @@ No intermediate output is presented as a saved scene. Publish after schema/refer
 
 Image generation is a separate bounded presentation job after entity admission, not a narrator side effect. Its request identifies the public subject/appearance/style revision, category, authorized visual brief/reference assets and generation policy/budget. Accept image bytes only through a verified supported capability and the asset-validation/registration pipeline in [presentation assets](23-presentation-assets.md). Neither the narrative contract nor image output can set rarity, stats, price or ownership. A failed or stale job leaves gameplay and the existing accepted artwork intact.
 
+Narration and admitted content proposals preserve supplied fixed author facts, required entity IDs and public appearance constraints. Complete only allowed gaps; do not replace a required NPC, invent unsupported rules or leak a private author requirement to the player. Contradictions or missing required technical data produce diagnostics/clarification rather than silent overrides; see [the authoring contract](09-adventure-packs.md#11-author-workflow).
+
 ## 9. Guide answer
 
 The body answers the question using only the guide's allowed facts, supported rule explanations, and known uncertainty. Advice can include references to legal actions and an explanation of missing prerequisites. It cannot execute a recipe, unlock an ability, spend resources, or claim remote senses absent from its authored profile.

@@ -127,7 +127,7 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 
 - [ ] P04.1 Implement versioned manifest, safe YAML/JSON parsing, explicit file categories, and normalized hashes.
 - [ ] P04.2 Implement IDs, dependencies, cross-references, creation profiles, item rarity/appearance identities, skills, abilities, and initial world definitions.
-- [ ] P04.3 Implement bounded expressions/effects, graph/cycle limits, version compatibility, and actionable diagnostics.
+- [ ] P04.3 Implement bounded expressions/effects, graph/cycle limits, fixed author/required-entity constraints, version compatibility and conflict diagnostics; generated gap filling cannot override them.
 - [ ] P04.4 Add path/archive/type/size protections and immutable registration.
 - [ ] P04.5 Create two minimal neutral genre fixtures and prove import without source edits.
 
@@ -211,7 +211,7 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 
 **Depends on:** P10. **Areas:** combat domain, rules, persistence, fixtures.
 
-- [ ] P11.1 Implement encounter lifecycle, frozen profiles, zone graph, objectives, and opening-action policy.
+- [ ] P11.1 Implement encounter lifecycle, frozen per-adventure profiles around the default ruleset, zone graph, objectives and opening-action policy; validate supported customization without changing the scheduler kernel.
 - [ ] P11.2 Implement initiative, rounds, activations, AP, movement, legal targeting, and explicit end activation.
 - [ ] P11.3 Implement attack/defense/strong-hit/armor/healing calculations with recorded draws.
 - [ ] P11.4 Implement predeclared reactions, stacking caps, effect phases, durations, cooldowns, and no-chain limits.
@@ -322,7 +322,7 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 
 | Requirements | Owning packages |
 | --- | --- |
-| FR-001–003 | P03–P06, P16 |
+| FR-001–003 | P03–P06, P08, P16 |
 | FR-004–007 | P07–P08, P12 |
 | FR-008–010 | P06, P10 |
 | FR-011–013 | P03, P09, P18 |
@@ -342,3 +342,5 @@ P02 applies the image, Compose, launcher-floor, shell, and digest-refresh rules 
 ## 24. Explicitly later initiatives
 
 Semantic retrieval/pgvector after retrieval evidence; visual authoring editor after contract stabilization; voice generation/TTS after provider/rights/privacy decisions; alternative combat schedulers and grid maps; public multiplayer hosting; marketplace/sharing infrastructure; generic AI providers; mobile-native or desktop packaging. Each needs its own scope, design, risks, and roadmap. None is an implicit requirement for the complete initial engine. Bounded runtime image generation is now in v1 under ADR 0011, subject to capability verification and playable fallback.
+
+The owner explicitly requests the integrated text/graphical adventure editor **after core v1**. Its ordered [E01–E06 roadmap](26-adventure-editor-roadmap.md) covers world/history/requirements, mandatory characters, author-fixed versus generatable gaps, fantasy/cyberpunk content, supported combat-profile controls and validate/publish/migrate previews. It is deliberately outside P00–P19 and does not delay the initial engine release. Fixed author constraints and bounded combat customization remain file-contract requirements now; the future editor writes that same contract. QA-34 validates those semantics independently of an editor UI.

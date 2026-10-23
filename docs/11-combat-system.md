@@ -6,6 +6,8 @@ Combat should preserve the recognizable experience of tabletop role-playing: ord
 
 The engine supports configurable definitions and selected policies. The initial implementation supplies one concrete scheduler and one zone model. A new tactical algorithm requires an explicit ruleset extension. Numerical values here are provisional design defaults to implement and playtest, not claims of proven balance; [section 17](#17-provisional-numerical-defaults) lists them with their calibration gates.
 
+The owner confirms this is the **default**, not a prohibition on supported per-adventure customization. Combat uses a dedicated tactical mode over the same campaign state, then returns to visual-novel play. Authors can vary admitted stat/formula data, equipment, costs, abilities, effects, reaction/stacking policies, zones, templates and objectives within supported primitives/bounds. New schedulers, real-time/grid algorithms and arbitrary code remain extensions. Publish new immutable revisions and preserve frozen active encounters. The later [editor plan](26-adventure-editor-roadmap.md#4-combat-as-a-customizable-mode) exposes supported controls without inventing rules.
+
 Codex may propose encounters, portray participants, select legal enemy tactics, and narrate outcomes. The Java rules engine owns initiative, legality, dice, costs, damage, conditions, defeat, and settlement.
 
 ## 2. Combat state machine

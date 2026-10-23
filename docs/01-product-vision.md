@@ -19,6 +19,7 @@ The intended outcome is a coherent, persistent RPG experience with inspectable m
 - Account for inventory, attributes, statistics, abilities, skills, progression, and long campaigns.
 - Make dynamic visual-novel play the default: dominant scene art, attributed dialogue/narration, editable quick replies and free player input.
 - Deliver the complete UI graphics kit and support bounded, saved scene/portrait/item generation during play, with stable identities and accessible rarity presentation; see [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md).
+- After the core engine, provide an integrated text/graphical adventure editor that preserves author requirements and fills only permitted gaps; support cyberpunk/other genres and bounded combat customization around the default ([later roadmap](26-adventure-editor-roadmap.md)).
 
 ## 3. Design assumptions
 

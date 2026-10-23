@@ -64,6 +64,8 @@ The core does not require a goddess, a fantasy world, Rune, Lyra, a particular p
 
 The recommended first implementation is a local, single-owner modular application. Multiple campaigns are isolated from the beginning. Multiplayer, public hosting, a marketplace, arbitrary executable pack plugins, and a visual campaign editor are separate later initiatives.
 
+The requested [integrated adventure editor](docs/26-adventure-editor-roadmap.md) follows core v1: text and graphical controls define world history, mandatory characters and other fixed requirements; only permitted gaps can be completed automatically. Fantasy/cyberpunk worlds use the same engine. The accepted combat ruleset is the default, with supported data/policy customization; new tactical algorithms still require an engine extension.
+
 ## Development and publication
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [the publication guide](docs/18-github-publication.md). Project software and documentation are licensed under the [MIT License](LICENSE), copyright 2026 Azim Ben Othman. MIT permits use, modification, redistribution, and commercial use while requiring preservation of its copyright and permission notices. Source heritage and the upstream notice are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Third-party adventures and assets retain their own terms; using the engine does not relicense user-created content. The licensing plan for sample packs, dependencies, and container images is in [ADR 0010](docs/adr/0010-name-scope-format-licensing.md#decision-licensing-plan).
