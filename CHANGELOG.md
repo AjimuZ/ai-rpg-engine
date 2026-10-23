@@ -2,6 +2,15 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Ordinary credential-free CI (P02.4), 23 October 2026
+
+- Add a GitHub Actions workflow with read-only permissions, no secrets, SHA-pinned
+  actions and four jobs: repository checks, frontend build/test/audit, backend
+  build/test against a job-local PostgreSQL, and container context/Compose checks.
+- Add stdlib-only repository checks (secret and private-path scan, Markdown links
+  and fences, workflow policy, image pins) with 22 unit tests.
+- Not yet confirmed by a hosted run; the dependency license inventory moves to P19.1.
+
 ## Unreleased — Containerized application shell (P02.3), 23 October 2026
 
 - Build the packaged Angular interface and Spring Boot application in pinned

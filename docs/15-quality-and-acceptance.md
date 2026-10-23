@@ -14,6 +14,15 @@ campaign recovery or full QA-28 acceptance. Native Linux bind-secret ownership
 and the Java release refresh remain separate gates; see the
 [packaging checks](../tools/container_packaging/README.md).
 
+P02.4 adds ordinary CI without runtime credentials (`.github/workflows/ci.yml`):
+repository checks (secret/private-path scan, Markdown links and fences, workflow
+policy, image pins), the account-free runtime probe suite, the packaging
+build-context/Compose suite, the frontend typecheck/test/build/audit and the
+backend `verify` against a job-local PostgreSQL. The checkers have 22 unit tests
+with negative cases; see the [repository checks](../tools/repository_checks/README.md).
+The opt-in Docker recreation and live-account checks are not run in CI, and the
+workflow has not yet executed on GitHub.
+
 ## 2. Verification layers
 
 | Layer | Purpose | Proposed tools |

@@ -17,10 +17,10 @@ npm start
 The development server binds to `127.0.0.1:4200`. The default test command runs once
 using Angular's Vitest builder and jsdom; it needs no browser or account.
 The production output is `dist/engine-ui/browser/`. The backend's opt-in
-[`packaged-ui` profile](../backend/README.md#single-origin-jar-assembly-partial-p023)
+[`packaged-ui` profile](../backend/README.md#single-origin-jar-assembly-p023)
 embeds this output and the adjacent extracted license notices in one executable
 jar; engine container integration remains P02.3.
-No lint target exists yet; P02.4 owns lint/CI policy.
+No lint target exists; CI runs `npm ci`, `typecheck`, `test`, `build` and `npm audit` ([workflow](../.github/workflows/ci.yml)).
 
 Vite is overridden to 8.3.5 to fix the development-server advisories in Angular
 build's 8.3.0 dependency while preserving Angular 22.2.3; see ADR 0009.

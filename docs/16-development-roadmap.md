@@ -78,7 +78,7 @@ One previously implicit point is now explicit: the default profile has no maximu
 - **Name:** the owner-selected name AI RPG Engine is recorded with its derived identifiers. The slug, Compose project, and npm/Angular name are `ai-rpg-engine`; the Maven coordinates are `io.github.ajimuz:ai-rpg-engine-backend`; the Java base package is `io.github.ajimuz.rpgengine`; and the ruleset ID is `skirmish`. No trademark search has been done; P19.1 owns it.
 - **v1 boundaries:** the MVP, v1.0, and out-of-scope lines in the requirements are confirmed without change. Unverified hosts and prebuilt image publication are explicitly outside v1.
 - **Pack contract 1:** UTF-8 without a byte-order mark; YAML 1.2 core-schema `.yaml` files with no anchors, aliases, merge keys, tags, or duplicate keys; equivalent `.json`; CommonMark `.md` prose with no front matter or rendered HTML; JSON Schema draft 2020-12; directory or `.zip` distribution. The campaign archive format belongs to P16.
-- **Licensing plan:** MIT for the engine and the neutral sample packs, third-party packs under their own terms, a permissive allowlist for bundled dependencies (inventory gate in P02.4, review in P19.1), and locally built images that are not redistributed.
+- **Licensing plan:** MIT for the engine and the neutral sample packs, third-party packs under their own terms, a permissive allowlist for bundled dependencies (inventory gate and review in P19.1; P02.4 delivered the credential-free CI checks without a license inventory), and locally built images that are not redistributed.
 
 Checks: a documentation review against the requirements, pack, security, and publication specifications, plus a local link and anchor check of the changed documents. No parser exists yet; P04.1, P04.4, and P04.5 verify the format with the corpus tests listed in the ADR. **P00 exit evidence:** ADR 0009 holds the version matrix, ADR 0006 and ADR 0010 settle the remaining pre-scaffold decisions, there is no "Java 17/21" ambiguity or `latest` dependency, and the only deferred items are the narration runtime image (P01.1) and the Temurin 21.0.13 image refresh (P02.3), both with owners.
 
@@ -231,8 +231,7 @@ The Windows wrapper correctly rejects host JDK 27. A temporary policy verifier
 checks exact pins and Linux/Windows lock entries, wrapper SHA-256, 339 Central-only
 artifact records, 12 real ignore paths, 290 local documentation links/fences, and a
 bounded secret/private-path scan. Initial health and audit failures were fixed and
-checks rerun; no test was removed or weakened. Lint/CI automation remains P02.4,
-full readiness/failure states P02.5, packaging/launcher/restart QA-28 P02.3/P02.6/P02.7.
+checks rerun; no test was removed or weakened. Credential-free CI was added later in P02.4; full readiness/failure states P02.5, packaging/launcher/restart QA-28 P02.3/P02.6/P02.7.
 The package exit below remains open.
 
 - [x] P02.2 Scaffold Angular and Spring Boot using pinned versions, with no adventure constants.
@@ -338,6 +337,23 @@ JDK/JRE tags return not found. Engine image/service, secret mounts, durable
 content/assets and full container integration remain open; P02.3 stays unchecked.
 
 - [ ] P02.4 Add build/test/documentation/secret checks without Codex credentials in ordinary CI.
+  **Partial (23 October 2026):** `.github/workflows/ci.yml` defines four jobs with read-only
+  contents permission, no secrets, no write-token triggers, SHA-pinned actions and a
+  job-local PostgreSQL 18 whose password is generated and masked inside the job:
+  repository checks, frontend `npm ci`/typecheck/test/build/audit, backend `mvnw verify`
+  and container build-context/Compose checks. The stdlib-only
+  [repository checks](../tools/repository_checks/README.md) (secret and private-path scan
+  with `.gitignore` coverage, Markdown link/anchor/fence check, workflow policy, image pin
+  check) have 22 unit tests including negative cases. Verified locally: all four checks
+  report no findings on this repository; repository_checks 22 tests, runtime_probe 116
+  (18 opt-in skipped), container_packaging 5 (1 opt-in skipped) pass; `docker build --check`
+  and `docker compose --env-file .env.example config --quiet` are clean; frontend typecheck,
+  test and build pass and `npm audit` reports 0 vulnerabilities. **Not verified:** the
+  workflow has never run on GitHub (it cannot be run from the development environment), and
+  `./mvnw verify` was not run on this host because its JDK 27 is rejected by the pinned
+  JDK 21 policy, so the backend job is unproven. Not delivered: the dependency license
+  inventory (moved to P19.1) and automated action/image pin refresh. Left unchecked until the
+  first hosted run of all four jobs succeeds.
 - [ ] P02.5 Provide health/readiness contracts and useful startup failure states.
 - [ ] P02.6 Implement root `start.sh` with prerequisite checks, secure configuration initialization, cached builds, health-based startup, supported sign-in, status/log/stop commands, and nonzero failure results.
 - [ ] P02.7 Verify idempotent launch, supported Windows shell behavior, interruption, graceful stop, and campaign preservation across restart/image recreation; record QA-28 evidence.

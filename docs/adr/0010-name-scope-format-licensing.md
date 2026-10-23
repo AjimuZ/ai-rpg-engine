@@ -70,4 +70,4 @@ The campaign export and backup archive format is a different contract and belong
 
 - **P04.1 and P04.4:** parser corpus tests for BOMs, aliases, merge keys, tags, duplicate keys, YAML 1.1 scalars, front matter, unrecognized extensions, two manifests in one pack, and ZIP limits.
 - **P04.5:** two packs, one using YAML and one including JSON files, import without source edits.
-- **P02.4 and P19.1:** the dependency license inventory passes the allowlist, and every bundled asset has a provenance record.
+- **P19.1** (moved from P02.4, which delivered credential-free CI without an inventory): the dependency license inventory passes the allowlist, and every bundled asset has a provenance record.

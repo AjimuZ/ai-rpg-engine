@@ -83,7 +83,7 @@ returning status without components/details. There are no gameplay APIs or accou
 integration. Ordinary builds contain no browser assets. Full readiness/failure
 contracts are P02.5. Engine image/service integration is covered by the
 [packaging suite](../tools/container_packaging/README.md). No
-Testcontainers dependency or test-library helper image is used. Lint/CI is P02.4.
+Testcontainers dependency or test-library helper image is used. The CI job runs `./mvnw -B -ntp verify` against a job-local disposable PostgreSQL 18 ([workflow](../.github/workflows/ci.yml)); a style linter is not configured.
 
 
 ## Single-origin jar assembly (P02.3)

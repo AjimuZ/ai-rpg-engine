@@ -30,7 +30,7 @@ The root [`.env.example`](.env.example) contains only neutral, non-secret labels
 
 ## Verification
 
-For documentation, check links, terminology, examples, formulas, status, and scope. For the neutral shells, follow [frontend checks](frontend/README.md) and [backend checks](backend/README.md), including a disposable PostgreSQL database for backend tests; run checks appropriate to the affected layer and report actual results. Ordinary CI must run without a live Codex account. Account-dependent smoke checks are separately opted in and use neutral temporary content.
+Run `py -B tools/repository_checks/checks.py all` before a push; see [repository checks](tools/repository_checks/README.md). For documentation, check links, terminology, examples, formulas, status, and scope. For the neutral shells, follow [frontend checks](frontend/README.md) and [backend checks](backend/README.md), including a disposable PostgreSQL database for backend tests; run checks appropriate to the affected layer and report actual results. Ordinary CI must run without a live Codex account. Account-dependent smoke checks are separately opted in and use neutral temporary content.
 
 Do not report planned tests or predecessor reports as newly passed checks. Browser behavior, accessibility, provider integration, and deterministic mechanics need distinct evidence.
 

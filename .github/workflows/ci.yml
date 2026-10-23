@@ -1,0 +1,152 @@
+# Ordinary continuous integration: build, test, documentation and secret checks.
+#
+# Design rules (enforced by tools/repository_checks/checks.py and its tests):
+#   * No repository, organization or environment secrets are referenced anywhere.
+#     Narration-runtime accounts, sign-in state and live inference are never
+#     available to this workflow; every test uses neutral fixtures or a
+#     throw-away database whose password is generated inside the job.
+#   * The GITHUB_TOKEN is limited to read-only repository contents.
+#   * Only the `push` and `pull_request` triggers are used; `pull_request_target`
+#     and `workflow_run` would run contributed code with write tokens.
+#   * Every third-party action is pinned to a full commit SHA, with the release in
+#     a trailing comment. Refresh pins deliberately (see docs/18-github-publication.md).
+#   * Toolchain versions mirror docs/adr/0009-toolchain-baseline.md.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Read-only token for every job; jobs must not widen this.
+permissions:
+  contents: read
+
+# A newer run for the same ref supersedes an older one; saves runner time only.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository:
+    name: Repository hygiene, documentation and workflow policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15.1"
+      # Unit tests of the checkers, then the checkers themselves on the checkout.
+      - name: Test the repository checks
+        run: python -B -m unittest discover -s tools/repository_checks -v
+      - name: Scan for secrets and private paths
+        run: python -B tools/repository_checks/checks.py secrets
+      - name: Check Markdown links, anchors and fences
+        run: python -B tools/repository_checks/checks.py docs
+      - name: Check the workflow policy
+        run: python -B tools/repository_checks/checks.py workflows
+      - name: Check container image pins
+        run: python -B tools/repository_checks/checks.py images
+      # Neutral runtime-adapter fixtures: opt-in Docker and account checks stay skipped.
+      - name: Run account-free runtime probe tests
+        run: python -B -m unittest discover -s tools/runtime_probe
+
+  frontend:
+    name: Angular typecheck, test and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.22.1"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # The lockfile is the build contract (ADR 0009); `npm ci` never resolves ranges.
+      - name: Install locked dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Unit tests
+        working-directory: frontend
+        run: npm test
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+      # Reads the public advisory database only; sends the dependency list, no credentials.
+      - name: Audit dependencies
+        working-directory: frontend
+        run: npm audit
+
+  backend:
+    name: Spring Boot build and tests against disposable PostgreSQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      # The database lives only for this job. Its password is generated here, masked
+      # in logs and passed through the job environment; it is not a repository secret
+      # and protects nothing beyond a container that disappears with the runner.
+      - name: Start disposable PostgreSQL 18
+        run: |
+          password="$(openssl rand -hex 24)"
+          echo "::add-mask::${password}"
+          {
+            echo "SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/engine"
+            echo "SPRING_DATASOURCE_USERNAME=engine"
+            echo "SPRING_DATASOURCE_PASSWORD=${password}"
+          } >> "$GITHUB_ENV"
+          docker run --detach --name engine-ci-db \
+            --env POSTGRES_DB=engine --env POSTGRES_USER=engine --env POSTGRES_PASSWORD="${password}" \
+            --publish 127.0.0.1:5432:5432 --tmpfs /var/lib/postgresql \
+            postgres:18.6-trixie@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
+          for _ in $(seq 1 60); do
+            docker exec engine-ci-db pg_isready --username engine --dbname engine && exit 0
+            sleep 2
+          done
+          docker logs engine-ci-db | tail -n 40
+          exit 1
+      # Includes the enforcer rules for JDK 21, Maven 3.10.x and release-only versions.
+      - name: Build and test
+        working-directory: backend
+        run: ./mvnw -B -ntp verify
+      - name: Stop disposable PostgreSQL
+        if: always()
+        run: docker rm --force engine-ci-db
+
+  containers:
+    name: Container build contexts and Compose boundaries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.15.1"
+      # Exports real BuildKit contexts and renders Compose; starts no service. The
+      # opt-in PACKAGING_DOCKER service-recreation check stays out of ordinary CI
+      # until native Linux secret-mount ownership is qualified (docs/16 P02.3).
+      - name: Check build contexts and Compose boundaries
+        run: python -B -m unittest discover -s tools/container_packaging -v
+      - name: Lint the engine Dockerfile
+        run: docker build --check -f docker/engine/Dockerfile .
+      - name: Render Compose with the sanitized example environment
+        run: docker compose --env-file .env.example config --quiet

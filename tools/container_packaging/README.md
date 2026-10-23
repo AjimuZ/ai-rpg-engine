@@ -21,7 +21,7 @@ reviewed managed-profile files. Both exclude nested private paths. New inputs
 must update the relevant policy and fixtures. These checks do not inspect account
 files or detect secrets embedded in otherwise admitted source files.
 `test_compose.py` checks rendered service boundaries without starting services.
-Missing Docker/BuildKit and build failures fail these checks; CI belongs to P02.4.
+Missing Docker/BuildKit and build failures fail these checks; Ordinary CI runs this default suite ([workflow](../../.github/workflows/ci.yml), P02.4); the opt-in `PACKAGING_DOCKER=1` recreation check stays out of CI until native Linux secret-mount ownership is qualified.
 
 ## Real packaged-shell recreation
 

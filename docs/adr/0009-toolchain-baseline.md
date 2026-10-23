@@ -154,7 +154,7 @@ The launcher (P02.6) uses the current Docker context and never switches it. It f
 This policy applies to every image: the Dockerfile frontend, build and runtime stages, Compose services, and test images.
 
 - Reference images as `<name>:<exact version and OS variant>@sha256:<multi-platform index digest>`. Floating tags such as `latest`, `1`, `21-jdk`, `24`, or `18`, tag-only references, and platform-manifest digests are not allowed. When both are present, Docker resolves by digest; the tag documents the intended version.
-- Keep each reference in one place in the build files and mirror it in this record; change both in the same commit. P02.4 adds a check that every external-image `FROM`, every `# syntax=` line, and every Compose `image:` line carries an exact tag and an index digest. A `FROM` that names an earlier build stage is exempt, and so is the `image:` name given to a locally built image.
+- Keep each reference in one place in the build files and mirror it in this record; change both in the same commit. P02.4 delivered that check (`tools/repository_checks/checks.py images`, run in ordinary CI): every external-image `FROM`, every `# syntax=` line, and every Compose `image:` line carries an exact tag and an index digest. A `FROM` that names an earlier build stage is exempt, and so is the `image:` name given to a locally built image.
 - Refresh a digest when:
   - the pinned line, or its base OS, publishes a security release or advisory. Examples: Temurin quarterly updates (January, April, July, October), Node.js security releases, PostgreSQL quarterly minor releases (February, May, August, November), and Dockerfile frontend releases.
   - a milestone demonstration or a release candidate is prepared.
@@ -165,7 +165,7 @@ This policy applies to every image: the Dockerfile frontend, build and runtime s
   3. Rebuild the engine image, and run the frontend build, the backend tests against PostgreSQL, and the launcher checks that exist at that time.
   4. Record the evidence.
 - A different line (Java 25, Node.js 26, PostgreSQL 19, or another OS base) requires an update to this record and a compatibility review. A PostgreSQL major version also requires the backup-and-migrate procedure.
-- Update automation, if P02.4 adds it, may propose digest changes, but it must not merge them without these checks.
+- P02.4 added no update automation. Any later automation may propose digest changes, but it must not merge them without these checks.
 
 ### Resource expectations (provisional)
 
@@ -248,7 +248,7 @@ Owner workstation, Windows 11, 22 October 2026, with the container and shell ent
 | Docker Engine / Compose / Buildx | 29.9.2 (API 1.56) / v5.6.1 / v0.38.1; containerd 2.4.2, runc 1.5.2 | Verified versions above the launcher floors |
 | WSL | 3.0.3.0, kernel 6.18.54.1; distributions: `docker-desktop` only | No user distribution, so the WSL shell candidate is unverified |
 | Git / Git Bash | Git 2.56.0.windows.2; GNU Bash 5.3.15, MSYS runtime 3.6.10 | Repository workflow; first launcher shell |
-| Python | 3.15.1 | Local repository checks only; not an engine dependency |
+| Python | 3.15.1 | Repository checks and packaging/runtime-probe tests, locally and in ordinary CI (`actions/setup-python`); not an engine dependency |
 
 Host versions describe one development machine. The packaged profile must not depend on them.
 
