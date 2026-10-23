@@ -123,6 +123,24 @@ This template operates within actual higher-priority platform instructions and e
 
 ## 13. Versioning and evaluations
 
+New envelope extensions are `adventureId`, `campaignGeneration`, job/attempt and
+snapshot/dependency bindings where applicable, plus `outputLocale`,
+`localeRevision` and glossary revision for public language output. Schemas remain
+allowlisted/versioned and bounded. Task kinds `quest-plan`, `quest-plan-refine`,
+`world-development-proposal` and optional `plan-review` follow the canonical
+[planning contract](28-asynchronous-narrative-planning.md); they produce artifacts,
+not commands to execute, guaranteed future events or saved world facts. A review
+result contains bounded issue/source references, never chain-of-thought, and
+does not replace deterministic admission. Use ordinary tool-free turns, not the
+runtime's code-review or delegated-agent features.
+
+Generate public narration/quick replies directly in the selected EN/IT language
+under [localization](29-localization.md). A locale mismatch can trigger the
+existing single narration repair, not a new world action or unlimited translation
+chain. Typed presentation cues reference only admitted public actor/asset/line
+IDs and are validated before frontend dispatch. Speech receives the final
+accepted line and its language, not hidden planner text or interim tokens.
+
 Each template has a semantic contract version, content hash, role/audience policy, evaluated model/profile set, known failure cases, and changelog. A prompt change that affects admitted operation shape requires a contract update. Existing operations keep the version used when planned; a running task does not hot-reload instructions.
 
 Maintain neutral golden fixtures for ambiguous input, resource misuse, forbidden field patches, duplicated identities, hidden facts, invented rewards, repeated prologues, unsupported abilities, current-versus-last-known location, terminal combat outcomes, and summary contradictions. Grade structure and authority mechanically; review narrative implications with a human rubric.

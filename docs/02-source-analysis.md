@@ -86,7 +86,7 @@ The demo does not provide a general token-budget estimator or prove a ten-respon
 | Retain Markdown/YAML/JSON for authoring and export | Accessible, versionable files without making AI their authoritative editor |
 | Retain session renewal, local reads, request identity, selective media | Demonstrated practical improvements |
 | Design full combat and progression contracts | Neither predecessor supplies a reusable complete implementation |
-| Defer separate AI microservice, vectors, image generation, voice, visual editor | Keep the first complete engine feasible |
+| Defer generic AI microservice, vectors and visual editor; bound later presentation extensions | Keep the first playable engine feasible. ADR 0011 subsequently admits bounded image jobs for v1; ADR 0016 qualifies optional local speech without making it a release prerequisite |
 
 ## 8. Reuse and licensing boundary
 

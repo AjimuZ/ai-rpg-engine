@@ -50,6 +50,11 @@ One game action can emit many events but advances the game turn once. An NPC com
 | `AssetRecord` | Category, content hash, path/object reference, rights metadata, entity links, audience |
 | `VisualIdentity` | Stable subject/definition identity, appearance/style revision, category, accepted asset reference and generation status |
 | `AdventureWorkspace` | Stable adventure ID, title/genre/locale, specifications, admitted content revisions, managed media scope and owned campaigns |
+| `AiJob` | Adventure/campaign/role/audience, source snapshot, dedup key, priority/budget reservation, attempt/deadline, lease/fence, terminal result and admission reference |
+| `PlanningSnapshot` | Immutable selected facts, read/negative/query dependencies, author constraints and content/rules/policy hashes; not a full database copy |
+| `QuestPlanArtifact` | Immutable versioned candidate/validated plan, branch predicates, dependencies, provenance and disposition; not a quest state transition |
+| `PlanDependency` | Typed entity/field/source/query-epoch observation and expected version, visibility and branch relevance |
+| `VoiceIdentity` | Scoped actor/narrator identity, approved voice recipe/model/reference rights and revision; no gameplay authority |
 
 Definition entities are immutable per revision. Campaign instances may extend them using validated namespaced data. New generated definitions are campaign-scoped unless explicitly exported by the owner into a pack.
 
@@ -126,3 +131,26 @@ A complete checkpoint references exact pack/ruleset/prompt-policy versions, curr
 Content upgrades require a dry-run migration, backup, compatibility checks, reference mapping, and owner confirmation of concrete changes. Running campaigns do not silently follow edited pack files. New content versions apply to newly created campaigns unless a migration is performed.
 
 Administrative corrections have a reason, before/after values, dependencies affected, actor identity, and a new revision. If a correction invalidates a summary or active encounter, mark it stale and revalidate. Rewinding a campaign is a restore or branch operation, never deletion of audit history presented as if it never occurred.
+
+## 9. Derived planning and presentation records
+
+Plan artifacts and job status belong to durable `ai_*`/presentation records,
+separate from canonical world state. Background completion can update their
+administrative revision and emit a safe status outbox record without incrementing
+`stateRevision`, `gameTurn`, time or RNG. Admission is not activation; any new
+actionable entity/fact or pending world event is created only by its validated
+ordinary canonical operation. Track branch dependency versions and predicate
+query epochs to catch inserts/removals and negative-read phantoms, not just
+existing-row updates. Enforce ownership in every unique/FK relationship.
+
+Owner `uiLocale`, campaign `narrativeLocale`/`localeRevision`, immutable
+`NarrativeRecord.passageLocale`, glossary revision and media configuration
+generation are presentation data. They cannot change mechanical definitions or
+overwrite old text. Cache keys and background consumers bind these generations
+as well as adventure/campaign/audience. See [planning](28-asynchronous-narrative-planning.md),
+[localization](29-localization.md) and [speech](30-local-speech-synthesis.md).
+
+Exports preserve admitted plan/voice provenance according to audience and rights;
+restore invalidates active job leases, process/thread IDs and delivery cursors,
+remaps ownership and revalidates derived artifacts against the restored snapshot.
+Do not import another person's live queue, tokens or account-bound state.

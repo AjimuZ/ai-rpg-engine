@@ -2,6 +2,12 @@
 
 ## 1. Integration decision
 
+The research extension retains this Codex-only runtime and verified ADR 0013
+isolation. [Asynchronous planning](28-asynchronous-narrative-planning.md) uses
+logical role/audience threads and a backend durable queue, not model subagents
+with tools or a replacement production provider. The external development
+orchestrator's Claude/Codex switching is unrelated to this gameplay contract.
+
 AI RPG Engine uses **Codex app-server** as its initial AI runtime interface. The Java backend manages task-oriented RPC connections. The packaged Docker profile targets an isolated runtime service and a private Unix socket; local protocol probes retain an owned stdio process. The browser communicates only with AI RPG Engine. No desktop UI automation, scraping, generic chat wrapper, Ollama endpoint, or generic provider abstraction is part of this design. [ADR 0008](adr/0008-containerized-startup.md) supersedes the earlier mandatory host-child-process deployment assumption.
 
 Official documentation describes app-server as a product integration surface, with a JSON-RPC-style protocol, threads, turns, streamed items, and an initialization handshake. It documents stdio transport, per-turn configuration and structured output, including restricted read-access policies. These capabilities support the proposed adapter; actual version and platform support must be tested. [OpenAI: Codex app-server](https://learn.chatgpt.com/docs/app-server).

@@ -169,3 +169,58 @@ One neutral fantasy exploration pack and one science-fiction salvage pack must d
 Export an admitted campaign-generated NPC or ability only through a review that removes private runtime identifiers, selects rights/provenance, resolves dependencies, and creates stable content IDs. Do not copy the live save into an adventure pack and call it reusable content.
 
 Pack migration is explicit, previewed, backed up, and reference-mapped. Removing an ability used by an active encounter blocks migration until a supported resolution is selected. The engine must never hot-reload changed combat formulas into a fight already in progress.
+
+## 14. Portable stories and person-to-person sharing
+
+An adventure bundle is the reusable story/world definition, distributed as the
+existing contract-1 directory or `.zip`: manifest, explicit lore/entity/rule
+files, authored anchors/generation boundaries, locale overlays/glossary, and
+licensed presentation assets. An editor export uses this same contract; manual
+authors can exchange it before the later editor exists. A finished plot is
+optional and an exported story can remain authored, emergent or hybrid.
+
+Export a new immutable pack revision with stable pack/content IDs, exact
+supported schemas/engine/ruleset ranges, dependency versions/hashes, file/asset
+hash manifest, provenance and per-component license/credit records. Bundle
+permitted local dependencies explicitly or list required separately installable
+revisions; no silent remote include or account-bound runtime dependency.
+Nonredistributable assets are omitted with a diagnostic and usable fallback;
+never claim that free playback or local generation automatically grants sharing
+rights. Optional model weights/reference voice recordings are not part of an
+ordinary story bundle.
+
+Default export includes authored public and clearly marked GM/secret content
+needed to run the story, not private campaign transcripts, player choices,
+generated private memories/plans, job leases, provider IDs, credentials, machine
+paths or active saves. Warn authors that a complete editable adventure can
+contain plot secrets; a player-facing journal export is a separate audience.
+Promoting a campaign-generated character/artifact into reusable authored content
+requires an explicit reviewed content-export operation, rights and dependency
+checks; do not export the whole playthrough implicitly.
+
+Recipients preview origin, title, version, supported locales, dependencies,
+rights, required modules and warnings before explicit import. Apply the existing
+hostile-archive/parser limits regardless of trusted sender. An existing ID/version
+with different hashes is a conflict; never overwrite silently. Duplicate imports
+are idempotent, and a deliberate fork receives explicit new identity/provenance.
+Install content immutably, then create a new local adventure/campaign with local
+IDs. No recipient account, active world or save is replaced by import.
+
+P16.2/P16.5 verify export followed by import on a separate clean installation,
+both locales/genres, missing dependencies/assets, incompatible revisions,
+malicious files and unchanged sender/recipient saves. The later editor E05/E06
+adds graphical preview and round-trip tests over exactly this interchange format.
+
+## 15. Localized content and narrative plans
+
+The optional `localizations` map and text-only overlays are specified in
+[localization](29-localization.md). Stable IDs and mechanical values remain
+language-independent; the compiler reports coverage, glossary and source-text
+fallbacks and includes overlays in revision hashes. Both neutral fixtures ship
+reviewed EN/IT text; untranslated external content is labeled explicitly.
+
+Authors may define flexible quest premises, allowed planning categories, protected
+facts/required entities, forbidden developments and supported conditional beats.
+The [plan contract](28-asynchronous-narrative-planning.md) references compiled IDs
+and predicates, not arbitrary executable scripts. Generated plans cannot override
+author-fixed inputs, invent guaranteed future events or authorize player choices.

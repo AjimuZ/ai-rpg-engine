@@ -56,6 +56,16 @@ Checked during documentation preparation on **22 October 2026**. URLs can redire
 
 ## 4. Source versus proposal
 
+The 23 October research revision adds the revision-pinned
+[competitive/source and gap matrix](27-competitive-analysis-and-gaps.md), primary
+planning references in [asynchronous narrative planning](28-asynchronous-narrative-planning.md),
+official Angular/CLDR references in [localization](29-localization.md) and separate
+code/weight/voice rights in [local speech](30-local-speech-synthesis.md).
+`Plan artifact` means noncanonical preparation; `plan admission` validates its
+eligibility; `activation` remains a canonical command. `Locale revision` is
+presentation state, not world advancement. A `portable story bundle` contains
+reusable authored content, not the sender's private playthrough or account.
+
 Observed source facts include package metadata, existing Python behavior, documented memory procedures, and predecessor test definitions. AI RPG Engine is the name selected by the owner. Proposed technical decisions include the Java Codex adapter, operation protocol, adventure schema, zone combat, 2d10 formulas, threat heuristic, advancement tables, and roadmap sequencing.
 
 Numerical gameplay defaults require simulation/playtesting. Performance figures are acceptance targets. Security isolation and Codex compatibility require implementation evidence. No runnable product, account capability, successful runtime test, legal clearance, or public publication is implied by writing this documentation.

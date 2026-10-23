@@ -20,12 +20,15 @@ The intended outcome is a coherent, persistent RPG experience with inspectable m
 - Make dynamic visual-novel play the default: dominant scene art, attributed dialogue/narration, editable quick replies and free player input.
 - Deliver the complete UI graphics kit and support bounded, saved scene/portrait/item generation during play, with stable identities and accessible rarity presentation; see [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md).
 - After the core engine, provide an integrated text/graphical adventure editor that preserves author requirements and fills only permitted gaps; support cyberpunk/other genres and bounded combat customization around the default ([later roadmap](26-adventure-editor-roadmap.md)).
+- Support English-default and first-class Italian from the initial playable release, with reviewed UI and directly generated selected-language narration ([localization](29-localization.md)).
+- Prepare important quest situations asynchronously through bounded, validated plans without prescribing player choices; retain the responsive no-plan baseline and authoritative world simulation ([planning](28-asynchronous-narrative-planning.md)).
+- Qualify optional local EN/IT voices and shareable story bundles; keep rights, privacy, quotas and graceful text-only play explicit.
 
 ## 3. Design assumptions
 
 The first supported installation has one human owner and one active player per campaign. It runs on the owner's computer and uses that person's configured Codex access. Many campaigns may exist, but a campaign processes one state-changing operation at a time. The initial supported operating system is Windows, reflecting the available demo; Linux and macOS require explicit support checks before release claims.
 
-Authors initially work with files and import diagnostics. A visual editor is useful later but must not be necessary to author or play a complete adventure. The engine UI starts in English; story and pack text may use another declared locale.
+Authors initially work with files and import diagnostics. A visual editor is useful later but must not be necessary to author or play a complete adventure. The UI defaults to English and fully supports Italian from MVP; story source language, selected narration and historical passage language are distinct as defined in ADR 0015. Reusable story bundles can be exchanged between owners under their content/asset licenses; private campaign histories and credentials are excluded.
 
 These assumptions are reversible through versioned decisions. They are not requests for multiplayer, public hosting, third-party service integrations, or an online content marketplace.
 

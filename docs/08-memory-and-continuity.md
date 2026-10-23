@@ -4,6 +4,11 @@
 
 The campaign database is the source of truth. An AI thread is disposable working context. A public transcript is a record of player-visible communication. A summary is a lossy, derived retrieval aid. None can silently replace the others.
 
+Versioned narrative plans are another derived layer: hypotheses and future
+opportunities with explicit source/dependency references, never past events or
+truth merely because the planner wrote them. The [planning specification](28-asynchronous-narrative-planning.md)
+extends this memory contract without replacing canonical retrieval.
+
 The primary project supplies the layered-memory design. The demo adds operational discipline: stable identifiers, explicit source precedence, read-before-resume, checkpoint verification, short continuity summaries, renewable threads, immutable history, and no “saved” claim without a successful write.
 
 ## 2. Authority and conflict resolution
@@ -108,6 +113,12 @@ On startup, reconcile unfinished operations and leases. Load the last committed 
 If content or ruleset dependencies are missing, pause mutation and offer restore/import diagnostics. Do not substitute another pack. If the checkpoint hash is invalid, recover from canonical state or a verified backup; never fabricate a clean state.
 
 ## 11. Long-session quality measures
+
+Extend the existing measures with plan-specific dependency recall, stale branch
+rejection, remembered motives/relationship causes and direct EN/IT continuity.
+The [evaluation protocol](31-research-validation-and-evaluations.md) separates
+100/500-turn fault/replay checks from budgeted live narrative/human evaluation.
+No additional vector store is admitted by this design update.
 
 Track unresolved-promise retention, entity consistency, incorrect known-location claims, quest repetition, secret leakage, stale summaries, context size, renewal frequency, and response latency. A 500-turn seeded scenario with frequent context renewal is a required v1 evaluation. Its success criteria are specified in [quality and acceptance](15-quality-and-acceptance.md).
 

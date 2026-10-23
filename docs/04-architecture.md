@@ -124,8 +124,8 @@ profile now embeds compiled Angular assets and notices in the executable jar;
 real HTTP tests verify single-origin serving independently of container packaging.
 A separate Spring `packaged` runtime profile requires file-secret configuration
 and binds the server inside the container; the default host profile remains
-loopback-only. Engine service/secret wiring is still pending the image gate.
-See the [backend build instructions](../backend/README.md).
+loopback-only. Engine service/secret wiring remains unfinished P02.3 work.
+See the [backend build instructions](../backend/README.md). ADR 0009's subsequent development-only revision permits continued local image work on the verified existing Java pins; the newest published Java update remains a release gate.
 
 ## 8. Concurrency and background work
 
@@ -136,3 +136,34 @@ Summary generation and media work occur after canonical commit. The outbox retri
 ## 9. Architectural evolution
 
 Add full-text retrieval before semantic indexing. Add an authoring editor after the pack format stabilizes. Add a separate AI service only when profiling or required libraries make it necessary. Add alternate rules schedulers through explicit versioned extensions. A future generic provider is a separate product decision, not hidden v1 scope.
+
+## 10. Research revision: planning, language and optional media
+
+Retain the Angular/Spring/Java/PostgreSQL modular monolith. Extend existing
+background work with one PostgreSQL durable priority queue and distinct logical
+intent/narration, quest-planning and occasional world-direction tasks. Begin with
+one active inference turn; qualified concurrency is an opt-in capability, not a
+claim that threads create independent provider capacity. The [planning contract](28-asynchronous-narrative-planning.md)
+owns snapshots, dependency-sensitive admission, lifecycle, fairness and budgets;
+ADR 0014 preserves ADR 0013's verified tool-free runtime isolation. No broker,
+autonomous-agent framework, runtime pool or vector database is required.
+
+Interactive work has reserved admission and bounded waiting. No transaction or
+campaign mutation lease is held while a deep background plan runs. Planning
+artifacts are durable noncanonical preparation; completion never advances the
+world clock, awards a reward or forces the next player action. Typed command
+services revalidate dependencies and activation. Hidden planner context never
+enters a public narrator thread, media cue or loading diagnostic.
+
+The [bilingual contract](29-localization.md) adds locale variants/preferences and
+direct selected-language narrative output without replacing canonical IDs.
+An optional [local speech worker](30-local-speech-synthesis.md) is a justified
+media process for Python/ONNX libraries, not a second game backend or text-AI
+provider. It receives only validated public lines and admitted voice references,
+has no database/account mount, and shares bounded media/GPU admission with image
+jobs. SSE delivers metadata/asset IDs; complete audio segments use authorized
+asset serving, not raw model tokens or executable frontend directives.
+
+Verified status remains the existing shell/probe/partial packaging evidence.
+These architectural additions are design only; their EN/IT, concurrency, narrative
+quality and GPU checks are scheduled separately and have not run.

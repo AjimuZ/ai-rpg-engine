@@ -116,6 +116,27 @@ Do not give an end-to-end AI latency guarantee before measurement. Record provid
 
 ## 12. Upgrades and incident recovery
 
+Research extensions keep background planning and local media within the same
+trust model. [Plan admission](28-asynchronous-narrative-planning.md) checks complete
+engine-recorded dependencies, query epochs, ownership and fences twice; neither
+a reviewer approval nor a model echo authenticates an output. Privileged plans,
+budgets, job names and errors are never public narrative/media input. Reserve
+interactive capacity, cap retries/speculation and preserve usage accounting
+through restart/renewal; multiple runtime processes do not multiply entitlement.
+
+The optional [speech worker](30-local-speech-synthesis.md) has no canonical-store,
+runtime-account, host-home or Docker socket mount. Admit fixed public model
+revisions and rights before an explicit installation, validate audio bounds and
+reference types, keep consented private voice references out of ordinary story
+exports, and reject arbitrary URLs, serialized code and model-supplied SSML.
+GPU admission/OOM/worker loss falls back to text and must not restart a game
+action. Locale changes and translated errors cannot bypass audience filtering.
+
+Story bundles are untrusted imports regardless of sender; preview rights,
+compatibility and IDs, enforce existing archive limits and create fresh local
+identities. Do not transfer account credentials or private playthrough history
+with a reusable authored adventure. See [portable stories](09-adventure-packs.md#14-portable-stories-and-person-to-person-sharing).
+
 Maintain supported engine, pack schema, ruleset, database, and Codex adapter compatibility tables. Back up before an upgrade that changes persistent formats. Unsupported inputs produce a controlled migration-required state. Do not silently downgrade content or rules.
 
 For a suspected incorrect action, preserve the operation receipt, source event references, and last good backup. Disable further mutation if invariants are violated. Use an explicit correction or restore after diagnosis. Do not edit event history to conceal the fault.

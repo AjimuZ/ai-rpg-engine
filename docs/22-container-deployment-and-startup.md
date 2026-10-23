@@ -149,6 +149,16 @@ No startup, restart, log, or stop action may reset campaigns, regenerate existin
 
 ## 6. Host and authentication prerequisites
 
+The research revision adds an optional local speech worker under [ADR 0016](adr/0016-optional-local-speech.md).
+It is off by default and is not part of mandatory text-only startup readiness.
+Admit explicit model/voice revisions, rights, download sizes and hashes before
+an owner installs the optional media profile. A missing GPU/worker/model must
+produce usable text, not a failed game startup or silent cloud/API substitute.
+The intended RTX 4070 12 GB / 32 GB Windows/WSL2 profile is an evaluation target,
+not measured support. Its private service network and least-privilege mounts
+exclude PostgreSQL, runtime accounts and the Docker socket. Keep the accepted
+core packaged topology; do not add an agent framework or runtime pool for speech.
+
 The host needs:
 
 - Docker Engine 29.0 or later running Linux containers, the Docker Compose plugin 5.0 or later, and the Buildx plugin;

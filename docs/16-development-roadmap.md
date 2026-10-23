@@ -16,6 +16,8 @@ The owner also requires a fully containerized packaged installation and a root `
 
 This is an ordered development roadmap, not a claim of committed delivery dates. The work spans architecture, authoring, AI integration, rules, UI, and operations. Estimate each micro-phase after its prerequisites are verified. A credible calendar requires team availability and results from the Codex compatibility and combat prototypes.
 
+**Research/design revision (23 October 2026):** the owner requests [source-backed competitive analysis](27-competitive-analysis-and-gaps.md), first-release [English/Italian support](29-localization.md), safe [asynchronous narrative planning](28-asynchronous-narrative-planning.md), [optional local speech](30-local-speech-synthesis.md) and portable stories. ADR 0014–0016 record the decisions; [prospective evaluations](31-research-validation-and-evaluations.md) and the [Italian report](32-research-executive-summary-it.md) explain gates and priorities. Eleven new unchecked tasks bring the queue from 106 to 117, preserving all twelve verified completion boxes and the later E01–E06 editor. This is documentation-only work: no new application features, model installation or benchmarks are delivered. Optional deep planning/review and speech must not delay text-only MVP play; their unavailable/disabled qualification outcomes need recorded evidence and tested fallbacks, not a claim that the disabled feature was implemented. No optional capability may bypass its safety/rights/quality gates merely to close a task.
+
 Each work package must be split into small reviewable changes with one main objective. For each change record intended behavior, affected modules/files, required checks, documentation update, completion evidence, and a suggested English commit message. Source paths below describe **future** work; they are not folders scaffolded by this documentation phase.
 
 Do not commit, push, create a remote repository, or publish a release merely because a roadmap task mentions it. Those actions follow the owner's development/publication instructions when execution begins. As of 22 October 2026 the owner authorizes commits and pushes of verified implementation work to `main`, the project's single branch; releases and publication remain owner decisions. Each implementation commit names its roadmap item in a final `Roadmap: <item>` body line so progress can be traced to Git history ([contribution workflow](../CONTRIBUTING.md#git-workflow)).
@@ -92,6 +94,7 @@ Checks: a documentation review against the requirements, pack, security, and pub
 - [x] P01.4 Demonstrate owned-process shutdown, EOF/timeout handling, stderr bounds, and early-event buffering.
 - [x] P01.5 Save neutral protocol fixtures and a supported-version matrix; record service maturity and platform limitations.
 - [ ] P01.6 Record supported image-generation capability or explicit unavailability, restricted invocation, output formats and account/cost boundaries; gate actual generation without blocking text-only fallback or enabling paid access implicitly.
+- [ ] P01.7 Qualify interleaved thread dispatch, actual provider concurrency and cancellation/priority limits under the managed profile; retain bounded evidence, or explicitly select serialized inference when simultaneity/headroom is unproved. Do not infer live throughput from scripted overlap.
 
 **Progress (23 October 2026):** P01.5 is complete. It retains an account-free runtime 0.164.0
 protocol projection (27 request/result exchanges and 19 selected notifications),
@@ -280,11 +283,12 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 
 **Depends on:** P02. **Areas:** campaign/domain/persistence, migrations.
 
-- [ ] P03.1 Implement adventure-workspace, campaign, actor, content revision, operation, event, reward source and checkpoint foundations with explicit adventure/campaign ownership.
+- [ ] P03.1 Implement adventure-workspace, campaign, actor, content revision, operation, event, reward source and checkpoint foundations with explicit adventure/campaign ownership; keep UI/narrative locale preferences and presentation generations distinct from canonical counters.
 - [ ] P03.2 Add campaign-scoped foreign keys and unique constraints, resource and ownership bounds, and explicit version fields.
 - [ ] P03.3 Commit state, events, receipts, and outbox messages together; no network waits in transactions.
 - [ ] P03.4 Add deterministic random-draw records and algorithm/version identity.
 - [ ] P03.5 Implement startup journal reconciliation, lease/fencing foundations, and baseline backup/restore.
+- [ ] P03.6 Add durable AI jobs, immutable planning snapshots, versioned plan/dependency records, query epochs and recovery generations; persist locale preferences separately from world revisions and test atomic outbox/admission foundations.
 
 **Exit:** persisted state survives restart and concurrent duplicate attempts cannot double-commit. **Checks:** real PostgreSQL transaction rollback, duplicate keys, cross-campaign references, stale revision, draw reuse, and recovery. **Suggested commit:** `Add canonical campaign persistence and event receipts`.
 
@@ -297,6 +301,7 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 - [ ] P04.3 Implement bounded expressions/effects, graph/cycle limits, fixed author/required-entity constraints, version compatibility and conflict diagnostics; generated gap filling cannot override them.
 - [ ] P04.4 Add path/archive/type/size protections and immutable registration.
 - [ ] P04.5 Create two minimal neutral genre fixtures and prove import without source edits.
+- [ ] P04.6 Validate optional ID-based English/Italian text overlays, glossary/quote policies, locale coverage and source-language fallback; localized fields cannot alter mechanics or visibility, and both neutral genre fixtures include reviewed EN/IT resources.
 
 **Exit:** valid packs compile; invalid/malicious packs fail with file/field context. No arbitrary executable pack plugins. **Checks:** schema/reference/limit/path corpus, hash conflicts, dependency resolution, two-pack integration. **Suggested commit:** `Add validated versioned adventure packs`.
 
@@ -309,6 +314,8 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 - [ ] P05.3 Implement the default visual-novel and alternative text-focused responsive layouts, local passage advancement, chronicle, speaker portraits and keyboard/focus support.
 - [ ] P05.4 Define revision-aware projection state, persistent free-input drafts, editable contextual quick replies and connection/error states; choosing a suggestion must not submit or advance the world.
 - [ ] P05.5 Create or license and integrate the complete UI graphic kit, including buttons, bars, icons, frames and required interaction/fallback states; register sources, notices and generated-asset provenance.
+- [ ] P05.6 Deliver reviewed English-default/Italian UI variants, localized receipts/errors/accessibility, persisted language selection and draft/cursor-safe reload; extend single-origin packaging/resource checks under QA-35.
+- [ ] P05.7 Define and render bounded typed public presentation events for scene, pose/expression and optional line audio hooks; reject executable/raw-URL directives, deduplicate delivery and preserve text-only/keyboard/reduced-motion behavior under QA-40.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.
 
@@ -335,6 +342,7 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 - [ ] P07.3 Add resource, ownership, prerequisite, knowledge, and causal validation.
 - [ ] P07.4 Implement local action calculations, durable draws, events, receipts, and pending decisions.
 - [ ] P07.5 Add resumable public stream, cancellation race handling, and post-commit presentation jobs.
+- [ ] P07.6 Implement atomic plan admission with dependency/query-epoch rechecks, scope/content/author validation, fencing and idempotency; artifacts never directly change world facts/time/rewards, and activation uses ordinary commands under QA-36.
 
 **Exit:** untrusted proposals cannot mutate state directly; retries and crashes have deterministic outcomes. This gate precedes real AI-driven mutations. **Checks:** QA-03–07, QA-17–20, transaction fault injection. **Suggested commit:** `Enforce transactional command validation and idempotency`.
 
@@ -343,10 +351,12 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 **Depends on:** P01 and P07. **Areas:** Codex adapter, AI task port, versioned runtime prompts, UI status.
 
 - [ ] P08.1 Implement the supported Java transport with bounded queues, request/turn correlation, and lifecycle management.
-- [ ] P08.2 Implement typed intent and attributed narration/quick-reply contracts with structural/semantic validation and one bounded repair; suggestions preserve player agency and public knowledge scope.
+- [ ] P08.2 Implement typed intent and attributed narration/quick-reply contracts with structural/semantic validation and one bounded repair; generate directly in selected English/Italian, preserve glossary/locale generations, player agency and public knowledge scope.
 - [ ] P08.3 Scope threads by campaign/role/audience/policy; separate privileged planning from public narration.
 - [ ] P08.4 Resolve logical model profiles against the available catalog and set effective settings on every turn.
 - [ ] P08.5 Publish only validated final narration; add deterministic receipt fallback and narration-only retry.
+- [ ] P08.6 Implement one durable fair priority queue with isolated logical role/audience threads, interactive reservations, bounded quota/backoff/cancel/restart handling and conservative single-active-turn default; higher concurrency requires P01.7 evidence and QA-37.
+- [ ] P08.7 Add the versioned bounded quest-plan contract and selective dependency validation/replanning with a playable no-plan baseline; prove contract/admission/fallback with deterministic fixtures. A live investigation comparison may be deferred/unavailable without blocking MVP; no forced player choice or waiting for a whole arc.
 
 **Exit:** an action runs through Codex interpretation when needed, deterministic resolution, save, and grounded narration without raw tool logs. **Checks:** protocol fixtures, invalid output corpus, no-secret projection tests, opt-in neutral real smoke. **Suggested commit:** `Integrate validated narrative orchestration`.
 
@@ -355,7 +365,7 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 **Depends on:** P08. **Areas:** knowledge, memory, retrieval, AI sessions, resume UI.
 
 - [ ] P09.1 Implement typed facts, beliefs, provenance, scopes, current/last-known location, and unresolved commitments.
-- [ ] P09.2 Build stamped context envelopes, mandatory/optional budgets, ID/full-text retrieval, and overflow behavior.
+- [ ] P09.2 Build stamped context envelopes, mandatory/optional budgets, ID/full-text retrieval and overflow behavior; distinguish private planning assumptions from admitted facts and public narration, with language/glossary binding.
 - [ ] P09.3 Implement checkpoints, source-linked summaries, freshness/invalidation, and bounded background jobs.
 - [ ] P09.4 Implement count/context/error-triggered renewal and manual idle renewal, preserving transcript and campaign.
 - [ ] P09.5 Reconcile restart, committed narration pending, missing dependencies, and stale summaries.
@@ -415,10 +425,10 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 
 **Depends on:** P00–P13. **Areas:** cross-module tests, sample packs, installation docs.
 
-- [ ] P14.1 Complete one end-to-end neutral adventure slice per genre fixture, including combat and return to exploration.
+- [ ] P14.1 Complete one end-to-end neutral adventure slice per genre fixture in English and Italian, including combat, localized terminology and return to exploration.
 - [ ] P14.2 Verify reboot, AI renewal, interrupted generation, lost response, backup restore, and no duplicate effects.
 - [ ] P14.3 Run the required reduced-scope MVP QA matrix and record fresh evidence.
-- [ ] P14.4 Measure baseline latency/context use and list unresolved defects honestly.
+- [ ] P14.4 Measure baseline latency/context use and list unresolved defects honestly; demonstrate one optional bilingual baseline/planner investigation comparison when available, or record deferred/unavailable planning with the playable fallback. Advanced planning cannot block MVP.
 - [ ] P14.5 Write reproducible setup and an accurate MVP capability table.
 
 **Exit:** a fresh installation can play, fight, save, resume, and change adventure files without editing engine source. Critical integrity/security failures block the milestone. **Suggested commit:** `Validate the first playable engine milestone`.
@@ -432,6 +442,7 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 - [ ] P15.3 Add guide personas with separate knowledge/session scope and no mutation authority.
 - [ ] P15.4 Add creative ability drafting, validation preview, explicit execution, learned recipes, and bounded high-power profiles.
 - [ ] P15.5 Prove disabled modules disappear cleanly and enabled modules remain adventure-independent.
+- [ ] P15.6 Qualify optional adaptive quest/world-direction tasks using event-triggered significant actors, causal relationship histories and deterministic off-screen catch-up; enable only after agency/coherence/cost comparison, otherwise document disabled/deferred capability with verified baseline fallback.
 
 **Exit:** all supported gameplay modules have typed data, rules, projections, and meaningful integration coverage. **Checks:** QA-21–22 and full requirement-specific scenarios. **Suggested commit:** `Complete reusable world companion and optional ability modules`.
 
@@ -440,7 +451,7 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 **Depends on:** P14; integrates P15 definitions. **Areas:** content migration, export/restore, corrections, diagnostic tools.
 
 - [ ] P16.1 Complete validation reports, author previews, dependency graph diagnostics, and content version inspection.
-- [ ] P16.2 Add full-owner versus player-facing exports with integrity manifests and rights metadata.
+- [ ] P16.2 Add full-owner versus player-facing campaign exports and reusable adventure-bundle import/export for sharing between people, with integrity/dependency/locale/rights manifests; prove clean-recipient round trips and no private save/account leakage under QA-41.
 - [ ] P16.3 Add migration/correction previews, dependency impact, backup, audit, and stale-memory invalidation.
 - [ ] P16.4 Restore into explicit adventure/campaign destinations with fresh identities by default, including original artwork, active combat and pending narration; never merge by equal titles.
 - [ ] P16.5 Document manual file authoring with complete neutral examples and troubleshooting.
@@ -457,6 +468,7 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 - [ ] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.
 - [ ] P17.5 Verify missing art/audio never blocks play and media cannot reveal secrets.
 - [ ] P17.6 Implement bounded runtime scene/portrait/item image jobs using verified capability, public appearance inputs, stable identities, durable saved assets, budget limits, deduplication and restore/stale-result checks under QA-31.
+- [ ] P17.7 Qualify optional local EN/IT speech with admitted model/voice licenses, stable voice identities, accepted-line audio caching and shared GPU limits under QA-38; ship disabled with tested text-only fallback if hardware/rights/quality gates fail. No TTS prerequisite for core v1.
 
 **Exit:** the graphical visual-novel UI, persistent identifying artwork and bounded image-job pipeline are verified; unsupported generation degrades accurately without blocking play. Optional dynamic music follows [its specification](24-dynamic-music-and-credits.md); no player or audio integration is delivered by adding that document. TTS is not required. **Checks:** QA-16, QA-19, QA-25, QA-29–32, actual visual review and asset/license inventory. **Suggested commit:** `Complete accessible presentation and optional atmosphere`.
 
@@ -469,6 +481,7 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 - [ ] P18.3 Calibrate AI RPG Skirmish with simulations and human playtests; update threat/rules defaults with versioned changes.
 - [ ] P18.4 Profile queries, outbox, memory retrieval, context budgets, AI calls, and latency; optimize measured bottlenecks.
 - [ ] P18.5 Rehearse backup recovery, supported migrations, degraded provider mode, and owned-process shutdown.
+- [ ] P18.6 Record paired baseline/planner/reviewer comparisons in English and Italian at 100/500 turns, including agency, secrets, wasted work, latency/quota and recovery; publish unrun/unavailable narrative cells honestly under QA-39; benchmark optional speech/GPU under QA-38 only when enabling it.
 
 **Exit:** all v1 hard gates pass, balance limitations are published, and no integrity/security-critical defect remains open. **Suggested commit:** `Harden the complete engine for long campaigns`.
 
@@ -504,10 +517,15 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 | FR-030 | P01, P04, P16–P18 |
 | FR-031 | P04, P10, P13, P17 |
 | FR-032 | P03, P05–P06, P09, P16–P17 |
-| NFR-001–012 | Cross-cutting gates in P01, P03, P07, P09, P16–P19 |
+| FR-033 | P03–P05, P08–P09, P14, P17–P18; QA-35, QA-39 |
+| FR-034 | P01.7, P03.6, P07.6, P08.6–P08.7, P09, P15.6, P16, P18.6; QA-36–37, QA-39 |
+| FR-035 | P05.7, P08.2, P17; QA-40 |
+| FR-036 | Optional P17.7, conditional P18.6; QA-38 |
+| FR-037 | P04, P16.2, P16.5 and later E05–E06; QA-41 |
+| NFR-001–015 | Cross-cutting gates in P01, P03, P07–P09, P16–P19 |
 
 ## 24. Explicitly later initiatives
 
-Semantic retrieval/pgvector after retrieval evidence; visual authoring editor after contract stabilization; voice generation/TTS after provider/rights/privacy decisions; alternative combat schedulers and grid maps; public multiplayer hosting; marketplace/sharing infrastructure; generic AI providers; mobile-native or desktop packaging. Each needs its own scope, design, risks, and roadmap. None is an implicit requirement for the complete initial engine. Bounded runtime image generation is now in v1 under ADR 0011, subject to capability verification and playable fallback.
+Semantic retrieval/pgvector after retrieval evidence; visual authoring editor after core v1; advanced voice design/fine-tuning or true streaming after separate rights/quality/runtime proofs; alternative combat schedulers and grid maps; public multiplayer hosting; online marketplace/hosted sharing infrastructure; generic AI providers; mobile-native or desktop packaging. Each needs its own scope, design, risks, and roadmap. None is an implicit requirement for the complete initial engine. Bounded runtime image generation is in v1 under ADR 0011; local EN/IT speech is independently optional under ADR 0016. Portable story-file exchange is a v1 P16 requirement and does not require a hosted marketplace.
 
 The owner explicitly requests the integrated text/graphical adventure editor **after core v1**. Its ordered [E01–E06 roadmap](26-adventure-editor-roadmap.md) covers world/history/requirements, mandatory characters, author-fixed versus generatable gaps, fantasy/cyberpunk content, supported combat-profile controls and validate/publish/migrate previews. It is deliberately outside P00–P19 and does not delay the initial engine release. Fixed author constraints and bounded combat customization remain file-contract requirements now; the future editor writes that same contract. QA-34 validates those semantics independently of an editor UI.

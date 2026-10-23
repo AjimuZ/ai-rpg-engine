@@ -1,6 +1,6 @@
 # Documentation Index
 
-Baseline date: **22 October 2026**. Language: English. Status: proposed design, awaiting implementation and product review.
+Baseline date: **22 October 2026**, research revision **23 October 2026**. Technical language: English; the owner-facing report 32 is Italian. Status: planned gameplay contracts with separately recorded verified scaffold/runtime-probe work; design acceptance is not feature completion.
 
 Requirements stated by the project owner are binding for this design. Technical defaults and numerical rules are proposals, explicitly identified where relevant. An unchecked roadmap task is incomplete; any verified partial implementation and remaining gates are recorded beside it. Observations about predecessor projects do not count as AI RPG Engine features.
 
@@ -44,6 +44,12 @@ Requirements stated by the project owner are binding for this design. Technical 
 | [24 — Dynamic music and credits](24-dynamic-music-and-credits.md) | Planned public-state soundtrack, optional online playback, licensed candidates, credits and failure checks |
 | [25 — Adventure workspaces](25-adventure-workspaces.md) | Distinct personalized worlds, campaigns, folders, memory/media scope, switching and restore |
 | [26 — Later adventure editor](26-adventure-editor-roadmap.md) | Post-core text/graphical authoring, fixed requirements, bounded gap completion, genres and combat customization |
+| [27 — Competitive analysis and gaps](27-competitive-analysis-and-gaps.md) | Revision-pinned source evidence for five projects, feature/gap matrix, priorities, rights and design recommendations |
+| [28 — Asynchronous narrative planning](28-asynchronous-narrative-planning.md) | Durable priority jobs, scoped roles, versioned quest plans, selective staleness, admission, quotas and recovery |
+| [29 — English and Italian localization](29-localization.md) | First-release language contract, Angular variants, preference/reload, content overlays, direct generation and tests |
+| [30 — Optional local speech](30-local-speech-synthesis.md) | Verified candidate/license comparison, persistent voices, audio cache/playback, GPU admission and conditional selection |
+| [31 — Research evaluation protocol](31-research-validation-and-evaluations.md) | Planned paired narrative studies, bilingual quality, 100/500-turn safety/continuity and speech/GPU measurements |
+| [32 — Italian technical summary](32-research-executive-summary-it.md) | Owner-facing findings, decisions, priorities, sharing, remaining risks and actual documentation scope |
 | [Visual-novel story UI concept](mockups/visual-novel-ui-v1.png) | Primary narrative-screen direction; [prompt and provenance](mockups/visual-novel-ui-v1.prompt.md) |
 | [Advanced gameplay UI concept](mockups/advanced-gameplay-ui-v1.png) | Illustrative interface image; [prompt and provenance](mockups/advanced-gameplay-ui-v1.prompt.md) |
 | [Architecture decision records](adr/README.md) | Rationale and consequences of major proposed decisions |

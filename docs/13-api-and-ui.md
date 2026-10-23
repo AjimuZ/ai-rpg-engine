@@ -136,7 +136,7 @@ Use revision-aware feature services and presentational components. Avoid a singl
 
 ## 11. Illustrative advanced-gameplay concept
 
-The primary narrative-screen concept is below. It illustrates the owner's visual-novel direction, including speaker separation, quick-suggestion chips and free input. Italian labels illustrate localization; the initial interface-language assumption remains English with localizable strings. This is a design image, not an implemented UI or a runtime asset kit. [Prompt and provenance](mockups/visual-novel-ui-v1.prompt.md).
+The primary narrative-screen concept is below. It illustrates the owner's visual-novel direction, including speaker separation, quick-suggestion chips and free input. Italian labels are consistent with the subsequent first-class EN/IT requirement; English remains the default. This is a design image, not an implemented UI or a runtime asset kit. [Prompt and provenance](mockups/visual-novel-ui-v1.prompt.md).
 
 ![Visual-novel concept with a large harbor scene, named character portrait, narrator/player exchanges, dialogue, suggestions and free input](mockups/visual-novel-ui-v1.png)
 
@@ -145,3 +145,39 @@ The earlier image below remains a secondary **combat-screen** concept; it does n
 ![Concept of the advanced AI RPG Engine combat interface with character sheet, party, equipment, scene, tactical zones, target details, and action controls](mockups/advanced-gameplay-ui-v1.png)
 
 This generated design concept illustrates an evolved campaign during a turn-based encounter. It is not implemented software. The example adventure, names, portraits, inventory, and numerical values are illustrative and do not change the generic engine or mechanical rules. Character and item images here are baked into one concept image; this does not implement dynamic asset generation. [Final prompt and provenance](mockups/advanced-gameplay-ui-v1.prompt.md).
+
+## 12. Bilingual presentation-event contract
+
+Language settings follow [localization](29-localization.md): English default,
+Italian fully supported, persisted UI/campaign narrative preferences and a safe
+variant reload preserving draft, operation ID, cursor and reading position.
+Localized API errors use stable codes/parameters. Source-language content
+fallbacks are visible. A language change cannot submit a draft or advance time.
+
+Proposed `PresentationEvent` fields: stable delivery ID, adventure/campaign and
+audience scope, narrative/message/line ID, source scene/revision, locale and
+presentation generations, allowlisted kind, and bounded typed payload. Initial
+kinds are `scene.show`, `character.show`, `character.expression`, `ambient.set`
+and `speech.ready`. Actor/pose/asset references must exist in the authorized
+public projection. Expression/position uses admitted enums, normalized bounded
+slots and registered appearance variants, never arbitrary CSS/JavaScript, URLs,
+HTML, SSML, shell commands or instructions to fetch local files.
+
+The backend derives/validates cues from admitted public facts and accepted
+narration; a narrator suggestion is not a trusted frontend command. Events
+cannot introduce a hidden actor, threat, costume/item change or new canonical
+location. Missing assets retain the prior compatible frame or a labeled public
+fallback. Reconnect deduplicates delivery; switching scenes/adventures/languages
+invalidates stale callbacks. Reading/skipping a line never changes world state.
+Keep multi-character composition readable on narrow screens and expose live
+speaker labels, reduced-motion transitions and keyboard focus.
+
+Speech is explicitly enabled, plays only validated accepted lines and follows
+their language/voice identity. Text is available first; skip/cancel/history replay
+are local presentation actions. No automatic old audio replay on reconnect;
+history playback is deliberate. Separate voice/music/effect controls, captions,
+volume/mute and optional speech progress remain accessible. Optional planning
+status is generic and public-safe; do not reveal a quest secret through queue
+labels or imply a future branch is guaranteed. Core play does not wait for
+advanced planning, illustrations or speech. See QA-35, QA-38, QA-40 and the
+[speech contract](30-local-speech-synthesis.md).

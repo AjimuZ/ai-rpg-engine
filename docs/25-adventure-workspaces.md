@@ -1,5 +1,14 @@
 # Independent Adventure Workspaces
 
+Story exchange uses the [portable adventure bundle](09-adventure-packs.md#14-portable-stories-and-person-to-person-sharing)
+contract: export reusable authored content and permitted assets, then preview
+and import on another person's installation to create fresh local adventure and
+campaign identities. Default bundles exclude private playthrough data, live jobs,
+provider threads and credentials. The [later editor](26-adventure-editor-roadmap.md)
+uses the same format; sharing does not merge worlds by title or transfer account
+access. Voice, locale and planning artifacts retain the same scoped identity
+rules as images and memory.
+
 ## 1. Meaning and status
 
 The owner requires personalized adventures in parallel, each with its own specifications, content and media folders. An **adventure workspace** is not a quick-save slot. It owns an authored world/configuration and can contain multiple **campaigns** (playthroughs); each campaign can have checkpoints/backups. A reusable imported **pack** is a versioned content source, not the active adventure or a saved campaign. This is a proposed contract, not delivered storage/UI code.

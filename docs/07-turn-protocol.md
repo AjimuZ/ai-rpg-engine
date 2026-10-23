@@ -112,3 +112,27 @@ Protocol reconnect may retry safe discovery/read requests. Proposal repair is li
 An action resolves only the player's declared intent and unavoidable consequences. Suggested actions fill the composer or open a confirmation preview; they never submit themselves. A narrative answer must stop where another meaningful choice is needed.
 
 Generated details that change future possibilities must be registered through the content/fact proposal path before their narration is published as canon. A final narrator can choose atmosphere and wording but cannot introduce a usable potion, secret passage, binding promise, new attacker, or extra player action after commit. If such a proposal is desirable, it belongs in a subsequent planned operation.
+
+## 11. Background preparation and presentation
+
+Quest acceptance commits its known terms and current pending decision through
+this pipeline; it does not wait for a deep quest outline. A background job may
+prepare compatible future possibilities from that snapshot. Until admission,
+immediate narration uses only known/committed facts and the playable baseline,
+never promises that an undiscovered clue or particular ending exists.
+
+On completion, validate the versioned plan's scope, author constraints and
+declared/read/query dependencies, then repeat the affected checks transactionally
+with fencing and idempotency. Unrelated world revisions alone need not discard
+independent content. New deaths, discoveries, removals or query phantoms do
+invalidate affected assumptions. Reject or selectively replan with bounded
+retries; never resurrect a required NPC or reopen a completed quest merely to
+preserve a plan. The canonical [plan admission contract](28-asynchronous-narrative-planning.md)
+defines the state machine and dependency rules.
+
+Only ordinary validated commands activate facts, consequences or scheduled
+events, with the existing receipts and source settlement keys. Accepting a
+noncanonical artifact, changing locale, reading a passage or playing audio has
+no world effect. Typed public presentation events are derived after accepted
+narration; replay/cancel/skip cannot resubmit a game command. Locale mismatch or
+optional media failure preserves the original canonical receipt.

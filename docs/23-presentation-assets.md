@@ -1,5 +1,11 @@
 # Presentation Assets and Persistent Generated Artwork
 
+Research extension: [competitive source comparisons](27-competitive-analysis-and-gaps.md),
+[typed presentation events](13-api-and-ui.md#12-bilingual-presentation-event-contract)
+and [optional local speech](30-local-speech-synthesis.md) refine this pipeline.
+These are planned contracts, not installed generators, downloaded models or
+measured appearance/voice consistency.
+
 ## 1. Status and intent
 
 This is an implementation specification, not delivered frontend or image-generation code. The default story screen is the visual novel described in [API and UI](13-api-and-ui.md#6-interface-direction). The owner requires a complete graphical UI kit and persistent character/item artwork, including supported generation during play. The [concept image](mockups/visual-novel-ui-v1.png) demonstrates composition only; do not slice its baked-in labels into production controls.
@@ -54,6 +60,30 @@ Rarity is validated item data, independent from image quality or price. A pack m
 Show the known tier as text plus an icon/frame treatment; color is supplementary. Shop, tooltip, inventory and equipment use the same admitted tier and visual identity. Unknown rarity stays unknown. A generated ornate sword is not upgraded to legendary because of its art. Rarity changes, if supported, require a validated, source-linked content or progression operation; they cannot be a media job side effect.
 
 ## 6. Provenance and acceptance
+
+The [competitive source review](27-competitive-analysis-and-gaps.md) motivates
+reusing admitted layered body/face/clothing/expression assets for deterministic
+variation, where available, without importing competitor code or artwork.
+Repeated prompts or seeds alone are not a guarantee of identity across model
+versions. Keep approved original portraits/reference sheets, appearance/style
+versions and reference-asset rights; pass those references only to a capability
+that supports them. Clothing/equipment variants must refer to observable admitted
+changes. Validate association and review visual consistency before replacing an
+accepted face/item image; retain the prior compatible asset on uncertainty.
+
+Treat reference-conditioned generation, deterministic layered compositing and
+fully new generation as distinct techniques with different verification. A
+model/version change invalidates unsupported assumptions, not the saved original
+asset. Caches bind subject/appearance/style/model/reference digests and audience,
+not a character display name. Restored copies keep original bytes and remapped
+metadata; they do not regenerate a similar-looking approximation.
+
+Image and optional speech jobs use the shared media-resource admission policy
+in [local speech](30-local-speech-synthesis.md). Local generation cannot reserve
+GPU memory indefinitely, starve currently read dialogue or start while another
+heavy model exceeds the admitted memory envelope. Cloud image generation still
+needs its own supported capability and account budget. No GPU worker receives
+gameplay credentials, hidden planner notes or authority to change canon.
 
 Each adopted asset records ID/category, creator/source, exact license and URL, required notice/attribution, modifications, verification date, and the saved artifact hash. Generated original art also records tool/version where exposed, prompt/style/reference provenance and any known restrictions. Do not invent a seed, model identifier or copyright ownership guarantee the tool does not supply. Only use reference material with appropriate rights. Imported third-party assets retain their licenses; the repository MIT license does not replace them.
 

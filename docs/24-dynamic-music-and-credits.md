@@ -4,6 +4,13 @@
 
 This chapter specifies future P17.2 work. No music player, streaming integration, downloaded tracks or active soundtrack is delivered by this documentation change. Music is optional and must never block narration, combat, saves or the text-focused interface.
 
+Optional spoken dialogue is a distinct [local speech capability](30-local-speech-synthesis.md),
+not a new music-source license. The mixer keeps separate voice/music/effect
+controls, with optional music ducking during deliberate dialogue playback and
+no autoplay on reconnect. Speech follows each accepted EN/IT passage; music cues
+remain derived only from observable public state. Reference voices, model weights
+and generated recordings each require their own rights/provenance inventory.
+
 The owner wants a soundtrack that follows the situation and can play from a free online library without a required manual download. Support a curated allowlisted streaming catalog and optional locally installed tracks. Browser streaming still transfers/buffers audio; it does not mean offline playback. Do not require background music files in an adventure export unless the owner has chosen a permitted local copy.
 
 ## 2. Event-driven soundtrack

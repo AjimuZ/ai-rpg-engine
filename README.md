@@ -17,6 +17,17 @@ The design primarily derives from **The World I Can Develop**: Angular, Spring B
 
 ## Planned capabilities
 
+The [research and gap review](docs/27-competitive-analysis-and-gaps.md) informs
+the following targets without claiming implemented gameplay or benchmark
+superiority. English is the default and Italian is required from the first
+playable release. Important quests may receive [bounded background preparation](docs/28-asynchronous-narrative-planning.md)
+through safe durable jobs; ordinary narration and the no-plan baseline remain
+playable. [Local EN/IT speech](docs/30-local-speech-synthesis.md) is optional and
+requires model/voice rights, quality and hardware checks. Reusable story bundles
+can be imported/exported between people under the [pack contract](docs/09-adventure-packs.md#14-portable-stories-and-person-to-person-sharing);
+the integrated graphical editor remains a later initiative. No new feature,
+model installation or performance result is delivered by this documentation update.
+
 - Load versioned adventure packs without changing engine source code.
 - Run authored, emergent, or hybrid adventures without requiring a fixed plot.
 - Generate narration, dialogue, encounter proposals, and tactical choices through Codex.

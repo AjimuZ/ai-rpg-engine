@@ -78,7 +78,7 @@ Default behavior is reactive assistance. Advice cannot spend resources, complete
 
 Assets are registered by category: scene, map, portrait, item, UI, music, or effect. A new scene illustration does not replace the map. A portrait reference is not the current scene. Assets do not establish distances, new entities, or mechanical effects unless separately admitted as canonical data.
 
-Static/catalog assets support the MVP. Full v1 includes bounded asynchronous scene/portrait/item generation, registry, persistent visual identity, credits, safe delivery and fallback, as specified in [presentation assets](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md). Codex text access alone does not establish image capability; verify it before enabling generation. Voice generation remains future scope.
+Static/catalog assets support the MVP. Full v1 includes bounded asynchronous scene/portrait/item generation, registry, persistent visual identity, credits, safe delivery and fallback, as specified in [presentation assets](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md). Codex text access alone does not establish image capability; verify it before enabling generation. Local English/Italian voice generation is an optional v1 capability under [its separate contract](30-local-speech-synthesis.md), with text-only fallback and rights/hardware/quality gates.
 
 Each admitted item definition or visible unique variant has an identifying icon shared across shop, inventory, inspection and equipment; equivalent copies can reuse it. A purchase or save reload does not regenerate art. Character portraits and theme frames are separate reusable assets. Rarity is validated pack/ruleset data with an explicit tier label; ornate artwork never grants rarity, bonuses, price or loot odds. Missing art has a readable category fallback while a bounded job is pending.
 
@@ -87,3 +87,29 @@ Generate or request a new illustration only for a meaningful observable visual c
 Optional dynamic music follows public scene/combat state using reviewed licensed catalog entries, stable loops, bounded crossfades and explicit user activation. Remote playback must not require a manual download, but must respect hosting, privacy and license conditions and degrade to silence. The policy and researched reference-only credit records are in [dynamic music and credits](24-dynamic-music-and-credits.md); no audio integration is implemented here.
 
 Audio follows observable committed state, starts after a user gesture, uses separate volume preferences, and tolerates missing sources. Effects are keyed to a committed event and play at most once per client delivery cursor. Loading a campaign does not replay old combat hits. Remote streams are opt-in with documented availability and privacy implications; no remote catalog from the private demo is copied by default.
+
+## 12. Living-world and narrative preparation refinements
+
+Model NPC intentions as persistent goals with priorities, prerequisites, known
+resources, remembered causes and commitments. Relationships include directed
+beliefs, rivalries/alliances, expressed boundaries and source-linked milestones;
+trust/affection numbers alone cannot create consent, romance or an obligation.
+Lies record the claimed fact and audience separately from canonical truth.
+Witnesses and causal message routes bound off-screen knowledge propagation.
+
+Use three relevance levels: deterministic/lazy schedule and clock updates for
+ordinary actors, bounded event-driven goal selection for relevant off-screen
+actors, and occasional deeper planning for significant unresolved situations.
+No continuous per-NPC model loop and no real-time wall-clock world advancement.
+Time jumps retain due-event order and catch-up limits. Preparatory world/director
+output is not a simulation event; mechanics change only through validated
+world-time operations.
+
+Quest plans supply flexible motives, clues and optional approaches, including
+failure/abandonment; they never prescribe the player's solution. A lightweight
+direction policy tracks repetition, unresolved tension and foreshadowing sources
+and occasionally requests a scoped planning task. It cannot secretly buff an
+enemy, force a fight or erase an advantage for pacing. See [planning](28-asynchronous-narrative-planning.md)
+and [paired evaluations](31-research-validation-and-evaluations.md) before
+enabling more costly adaptive behavior. Direct narration and system terminology
+follow the selected [English/Italian contract](29-localization.md).

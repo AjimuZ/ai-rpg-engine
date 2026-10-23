@@ -2,6 +2,16 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Competitive research and bilingual narrative design, 23 October 2026
+
+- Inspect five competitor repositories at recorded revisions, source/test definitions, dependencies, issue trackers and license texts. Add a traceable comparative/gap register; adopt patterns rather than copying code, media or campaign content, and distinguish observed mechanisms from unmeasured quality claims.
+- Specify a durable shared-runtime priority queue, private versioned quest-plan artifacts, complete read/query dependencies, transactional admission, cancellation/recovery, fair budgets and a playable no-plan baseline. Preserve backend authority, tool-free runtime isolation and Codex-only gameplay; higher inference concurrency and narrative review remain evidence-gated.
+- Require English-default and first-class Italian from the first playable release. Define localized Angular variants, safe preference reload, text-only pack overlays, direct selected-language generation, stable terminology and immutable historical language.
+- Research local speech code/weights/voice rights and languages; conditionally select Qwen3-TTS 0.6B Base with a Kokoro CPU/ONNX fallback, pending exact distributable rights, EN/IT quality and target-hardware tests. Define persistent voice identities, validated-line playback, cache/restore and bounded GPU admission; no speech model is installed or benchmarked.
+- Add explicit person-to-person story-bundle import/export with compatibility, locale, dependency, hash and credit manifests; retain private-playthrough/account boundaries and the separate later editor E01–E06.
+- Add ADR 0014–0016, FR-033–037, NFR-013–015, QA-35–41, an unexecuted evaluation protocol and an Italian executive report. Integrate eleven unchecked implementation/qualification tasks into P00–P19, preserving all twelve verified completion boxes. Advanced planning/review and speech do not become hidden MVP blockers.
+- This change delivers research and documentation only. Validation checks sources/references, links/anchors, traceability, task dependencies/status and the documentation-only diff; it establishes no new gameplay, concurrency, speech or narrative-quality result.
+
 ## Unreleased — Protocol fixtures and compatibility records (P01.5), 23 October 2026
 
 - Retain projected account-free 0.164.0 request/result exchanges and terminal events with identifier aliases and neutral error text, plus a bounded-session capture command and offline contract replay.

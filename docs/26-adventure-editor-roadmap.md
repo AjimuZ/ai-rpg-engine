@@ -38,7 +38,25 @@ Publish a new immutable content/rules revision. Existing campaigns keep their pi
 - [ ] E02 Add entity/appearance inspectors, fixed/open fields, mandatory-character predicates and conflict diagnostics.
 - [ ] E03 Add bounded gap-completion drafts, provenance and review/adoption without overwriting authored facts.
 - [ ] E04 Add supported combat controls, default comparison and deterministic preview; reject unsupported algorithms/code.
-- [ ] E05 Add validate/publish/version/migration previews, isolated workspace persistence and portable export.
-- [ ] E06 Verify fantasy/cyberpunk authoring, required NPC/locked-field preservation, image identity, player/GM separation, frozen combat, round-trip file compatibility and keyboard use.
+- [ ] E05 Add validate/publish/version/migration previews, isolated workspace persistence and import/export of portable story bundles for sharing between people, using the existing pack contract with dependencies, locales, hashes, licensed assets and credits.
+- [ ] E06 Verify fantasy/cyberpunk authoring, required NPC/locked-field preservation, image identity, player/GM separation, frozen combat, keyboard use and export/import on another owner's clean installation without account/save leakage or silent ID/version overwrite.
 
 Activate this as a separate implementation project after the core is complete. It must write the same manifests/schemas as manual files, not a second incompatible format.
+
+## 6. Sharing stories between people
+
+The owner explicitly requires shareable stories. Export the reusable world,
+characters, supported rules, authored constraints, EN/IT text and redistributable
+resources as a versioned directory/ZIP under the [adventure bundle contract](09-adventure-packs.md#14-portable-stories-and-person-to-person-sharing).
+Another owner can preview and import that bundle and create their own isolated
+adventure/playthrough. The editor does not need an online marketplace, hosting
+account or direct file-transfer service; users can exchange the resulting file.
+
+Show compatibility, missing dependencies, locale coverage, permissions/credits
+and omitted assets before export/import. Preserve original author provenance;
+forks receive a deliberate new content identity. Default exports exclude private
+playthrough history, credentials, live jobs and account/model state. Full editable
+story bundles may contain GM plot secrets and are labeled accordingly. Existing
+recipient adventures and saves are never overwritten implicitly. Graphical
+editing remains post-core; manual pack exchange and P16 author exports establish
+portability earlier without pulling the editor into the MVP.

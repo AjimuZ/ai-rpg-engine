@@ -49,6 +49,22 @@ Owners below are implementation responsibilities, not assigned people. The proje
 
 ## 2. Open decisions with safe working defaults
 
+Research-revision risks and defaults are tracked in the focused contracts:
+
+| Risk | Safe initial decision | Gate / evidence |
+| --- | --- | --- |
+| Planning from stale or incomplete dependencies | Engine-recorded read/query sets, branch invalidation and a second fenced transactional check; baseline when precision fails | P03.6/P07.6, QA-36 |
+| Background work increases latency or consumes shared quota | One durable queue, default active1, interactive reservation, bounded cancellation/reconciliation and persisted usage; no pool/provider fallback | P01.7/P08.6, QA-37 |
+| Extra roles improve appearance of sophistication without quality gain | Planner/reviewer/director optional enablement; paired bilingual baseline comparison and actual waste/usage metrics | P14/P18.6, QA-39 |
+| Italian merely translates labels while prose/voices regress | First-class EN/IT resources, direct generation, glossary/quote policies and competent human review | P04.6/P05.6, QA-35/39 |
+| Voice weights/recordings have separate restrictions or consent gaps | Conditional Qwen/Kokoro selection only after exact distributable/voice inventory; XTTS-v2 excluded from default commercial-compatible path | P17.7/P19.1, QA-38 |
+| RTX4070 OOM or local image/TTS contention | Hardware is unmeasured; bounded single-heavy-job admission, unload/CPU/text fallback and no mandatory speech startup | P17.7/P18.6 |
+| Shared story bundles leak private data or overwrite a recipient world | Export reusable authored content/rights only; preview, hostile-archive checks and fresh local identities | P16.2, QA-41, later E05–E06 |
+
+The [competitive matrix](27-competitive-analysis-and-gaps.md) distinguishes
+observed source, claims and design inferences. No upstream license or model
+support statement substitutes for reviewing exact assets/dependencies at release.
+
 These are bounded decision records, not missing core specifications. Development can use the documented defaults after the applicable milestone review.
 
 The repository-license decision was resolved on 22 October 2026: project software and documentation use the [MIT License](../LICENSE), with the upstream notice retained in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md). Separate adventure-pack and asset rights still require their own provenance records.
