@@ -74,6 +74,8 @@ Measure local read latency, rule execution time, database commit time, AI queue/
 
 Avoid logging complete prompts or private dialogue by default. Structured error codes should diagnose unsupported runtime, account unavailable, context overflow, invalid proposal, illegal action, stale state, lost lease, interrupted before commit, and committed narration pending.
 
+The P01.2 probe retains only recognized runtime error variants; unknown strings or object keys become `unclassified`, since even an unknown error key can contain private data. Its final report omits raw errors, stderr and upstream bodies. Only the account-free scripted fixture logs upstream request bodies (neutral text plus runtime instructions) for settings/schema comparison, and its containers are removed afterwards. This fixture logging must not be enabled for live tasks. The opt-in live profile requires an explicitly named existing account volume and never copies host credentials or creates a missing volume. Internal fixture networking does not establish host/tool containment; P01.3 remains open.
+
 ## 11. Performance budgets
 
 Initial targets on documented reference hardware with a warmed local database: public status/inventory query p95 under 200 ms; deterministic combat calculation excluding persistence p95 under 50 ms; normal canonical commit p95 under 250 ms; operation acceptance under 300 ms. These are measurable targets, not achieved benchmarks.

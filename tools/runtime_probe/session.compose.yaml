@@ -1,0 +1,124 @@
+# P01.2 session fixture. Not the product Compose file (P02.3).
+#
+# It extends the P01.1 packaged topology (compose.yaml) with a scripted model
+# provider so that thread and turn lifecycles can be proven without an
+# account: the pinned narration runtime is configured with a custom provider
+# whose base URL is ScriptedProvider.java on an internal network. The runtime
+# performs every app-server step itself (thread state, per-turn settings,
+# notifications, terminal status, interruption); only the upstream stream is
+# scripted. Run it through `probe.py session`; the probe owns the relay
+# processes and stops the fixture afterwards.
+#
+# Isolation in this fixture:
+# - `fixture` is an internal network, with external routing disabled and
+#   no published ports; the relay has no network at all. Host access/tool
+#   containment is a separate P01.3 gate, not established by this setting;
+# - the runtime gets no account volume and no credentials; the custom
+#   provider needs none, so no account data can reach the fixture;
+# - root filesystems are read-only, all capabilities are dropped, and every
+#   process runs as UID/GID 10001.
+name: ai-rpg-engine-runtime-session
+
+services:
+  provider:
+    # The pinned Java 21 build image from ADR 0009, as for the relay.
+    image: eclipse-temurin:21.0.12.1_1-jdk-resolute@sha256:3b59c79a788985965c89203cca233c53893f62293108bb825264740fac926724
+    networks: [fixture]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    user: "10001:10001"
+    environment:
+      HOME: /tmp
+      JAVA_TOOL_OPTIONS: -XX:-UsePerfData -Xshare:off
+    tmpfs:
+      - /tmp:mode=1777
+    volumes:
+      - ./ScriptedProvider.java:/probe/ScriptedProvider.java:ro
+    entrypoint: ["java", "/probe/ScriptedProvider.java"]
+    command: ["8080", "/tmp/ready"]
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+      start_interval: 1s
+
+  codex:
+    image: ai-rpg-engine-runtime-probe/codex:0.164.0
+    networks: [fixture]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /var/lib/runtime/home:uid=10001,gid=10001,mode=0700
+      - /var/lib/runtime/workspace:uid=10001,gid=10001,mode=0700
+      - /run/runtime:uid=10001,gid=10001,mode=0700
+      - /tmp:mode=1777
+    volumes:
+      - ipc:/tmp/codex-daemon-10001
+    # The image's default command plus the scripted provider. Retries are off
+    # so a rejected request becomes a failed turn at once instead of after
+    # backoff; the idle timeout bounds a held stream if the probe disappears.
+    command:
+      - app-server
+      - --listen
+      - unix:///run/runtime/control.sock
+      - --disable
+      - plugins
+      - --disable
+      - remote_plugin
+      - --disable
+      - apps
+      - --disable
+      - in_app_updates
+      - -c
+      - model_provider="fixture"
+      - -c
+      - model_providers.fixture={name="fixture",base_url="http://provider:8080/v1",wire_api="responses",request_max_retries=0,stream_max_retries=0,stream_idle_timeout_ms=60000}
+    healthcheck:
+      # Same socket name as compose.yaml: SHA-256 of /run/runtime/control.sock.
+      test: ["CMD", "test", "-S", "/tmp/codex-daemon-10001/bd2fc4d5dd4ec410275f7d5460680ca9c0ce1ef1b48e49b182f350ff18153681"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+      start_interval: 1s
+    depends_on:
+      provider:
+        condition: service_healthy
+
+  relay:
+    image: eclipse-temurin:21.0.12.1_1-jdk-resolute@sha256:3b59c79a788985965c89203cca233c53893f62293108bb825264740fac926724
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    user: "10001:10001"
+    environment:
+      HOME: /tmp
+      JAVA_TOOL_OPTIONS: -XX:-UsePerfData -Xshare:off
+    tmpfs:
+      - /tmp:mode=1777
+    volumes:
+      - ipc:/ipc
+      - ./UnixRelay.java:/probe/UnixRelay.java:ro
+    entrypoint: ["java", "/probe/UnixRelay.java"]
+    command: ["/ipc/bd2fc4d5dd4ec410275f7d5460680ca9c0ce1ef1b48e49b182f350ff18153681"]
+    depends_on:
+      codex:
+        condition: service_healthy
+
+networks:
+  # Disable external routing; this fixture publishes no service ports.
+  fixture:
+    internal: true
+
+volumes:
+  # Holds only the control socket and its lock file; see compose.yaml.
+  ipc:
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: uid=10001,gid=10001,mode=0700

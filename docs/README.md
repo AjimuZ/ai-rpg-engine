@@ -2,7 +2,7 @@
 
 Baseline date: **22 October 2026**. Language: English. Status: proposed design, awaiting implementation and product review.
 
-Requirements stated by the project owner are binding for this design. Technical defaults and numerical rules are proposals, explicitly identified where relevant. An unchecked roadmap task means no AI RPG Engine implementation has been delivered. Observations about predecessor projects do not count as AI RPG Engine features.
+Requirements stated by the project owner are binding for this design. Technical defaults and numerical rules are proposals, explicitly identified where relevant. An unchecked roadmap task is incomplete; any verified partial implementation and remaining gates are recorded beside it. Observations about predecessor projects do not count as AI RPG Engine features.
 
 ## Product and research
 

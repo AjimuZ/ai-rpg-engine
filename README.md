@@ -4,7 +4,7 @@
 
 AI RPG Engine separates the software that runs an adventure from the files that describe its world. Authors supply settings, characters, objectives, abilities, equipment, encounters, and presentation preferences. The engine supplies reliable state, deterministic rules, long-term continuity, turn-based combat, and AI orchestration through Codex.
 
-**Project status: design complete; compatibility verification in progress.** There is no runnable AI RPG Engine application, backend, database schema, adventure compiler, or combat implementation in this repository. Every feature below is a development target. No installation command is currently available. The only code is a developer compatibility probe for the narration runtime in `tools/runtime_probe` (P01.1).
+**Project status: design complete; compatibility verification in progress.** There is no runnable AI RPG Engine application, backend, database schema, adventure compiler, or combat implementation in this repository. Every feature below is a development target. No installation command is currently available. The developer [runtime compatibility probe](tools/runtime_probe/README.md) covers discovery (P01.1) and deterministic thread/turn lifecycle checks (partial P01.2); the owner-signed-in neutral smoke remains pending.
 
 ## Why this engine exists
 

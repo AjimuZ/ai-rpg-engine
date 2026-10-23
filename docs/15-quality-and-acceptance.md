@@ -2,7 +2,7 @@
 
 ## 1. Evidence policy
 
-AI RPG Engine has no runtime tests yet because this phase contains documentation only. This chapter defines future verification. Predecessor test reports are references, not evidence that AI RPG Engine works. Every release claim must identify a fresh result, environment, scope, and limitation.
+AI RPG Engine has developer runtime compatibility tests in [`tools/runtime_probe`](../tools/runtime_probe/README.md), covering pinned discovery and deterministic thread/turn lifecycles. Application/domain tests remain future work. The scripted upstream proves protocol behavior without an account and cannot establish live inference quality or account readiness. The signed-in neutral smoke is pending, so P01.2 remains open. These checks do not satisfy campaign renewal (QA-08) or packaged application startup (QA-28). Predecessor test reports are references, not evidence that AI RPG Engine works. Every release claim must identify a fresh result, environment, scope, and limitation.
 
 ## 2. Verification layers
 

@@ -36,6 +36,8 @@ Official [app-server documentation](https://learn.chatgpt.com/docs/app-server) d
 - **Volume:** a tmpfs-backed IPC volume owned by UID 10001 keeps nothing at rest. `compose down` without `-v` leaves the named volume in place, and the launcher must not delete volumes.
 - **Not yet proven:** sign-in, readiness with a persistent account volume, and restart.
 
+**Partial P01.2 evidence (same pin and platform):** [`session.compose.yaml`](../tools/runtime_probe/session.compose.yaml) adds a scripted upstream solely for deterministic testing, on an internal network with no published ports; the relay still has no network and the runtime receives no account. Seven turns across two threads verify explicit upstream model/effort/schema, correlated terminal statuses and active-stream interruption. A second relay connection resumes both threads and checks their ordered histories and sticky settings while the same runtime stays alive. This proves connection resume, not runtime restart or persistent sign-in. Production remains Codex-only; the scripted upstream is never a deployment alternative. See the [probe instructions](../tools/runtime_probe/README.md) for commands and the pending owner-signed-in neutral smoke.
+
 Stdio remains the isolated local protocol-probe option. If the packaged runtime cannot satisfy authentication, isolation, or connection requirements, containerized delivery remains incomplete. It is not replaced with a different model provider or silently presented as a fully Dockerized host-runtime setup.
 
 ## 4. Planned repository artifacts
@@ -53,7 +55,7 @@ These paths name deliverables to create during implementation, not files current
 
 ## 5. Launcher contract
 
-The following commands describe the future interface and cannot be run successfully against this documentation-only repository:
+The following commands describe the future application interface and cannot be run successfully against this repository, which currently contains only developer compatibility fixtures:
 
 ```text
 ./start.sh           Validate, build with cache, start services, and report readiness
