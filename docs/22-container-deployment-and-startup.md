@@ -37,7 +37,7 @@ Stdio remains the isolated local protocol-probe option. If the packaged runtime 
 | `docker/` | Reviewed engine/runtime image definitions and build support |
 | Root `.dockerignore` | Exclude credentials, local assistant settings, private data, Git history, and irrelevant build context |
 | Root `.env.example` | Sanitized public configuration example without working credentials |
-| Version/compatibility records | Pin build/runtime images, dependency locks, runtime protocol, Compose features, and supported host environment |
+| Version/compatibility records | Pin build/runtime images, dependency locks, runtime protocol, Compose features, and supported host environment; the pre-scaffold baseline is in [ADR 0009](adr/0009-toolchain-baseline.md) |
 
 These paths name deliverables to create during implementation, not files currently present. Keep actual `.env`, secret files, account state, and private data untracked. Build context must exclude local `.agents`, `.claude`, `.codex`, `AGENTS.md`, and `CLAUDE.md`; gameplay containers do not inherit development instructions or hooks.
 
@@ -58,7 +58,7 @@ The following commands describe the future interface and cannot be run successfu
 Normal startup must:
 
 1. Resolve paths relative to the script itself, including when invoked from another directory or a path containing spaces. Use LF line endings and preserve the Git executable bit.
-2. Check the container CLI, reachable daemon, compatible Compose version, selected Docker context, required configuration, and application-port availability. Report an actionable failure; do not install software, change Docker contexts, or request elevated privileges automatically.
+2. Check the container CLI, a reachable daemon running Linux containers, the Docker Engine, Compose, and Buildx floors, the selected Docker context, required configuration, and application-port availability. Report an actionable failure; do not install software, change Docker contexts, or request elevated privileges automatically.
 3. Establish a stable installation/project identity. Repeated launches must reuse the same services and volumes; separate installations must not accidentally share them.
 4. Initialize missing private configuration safely, without overwriting owner values or generating known/shared passwords. Create secrets from an operating-system cryptographic random source, or require explicit owner provisioning when secure generation is unavailable.
 5. Build or reuse pinned images with dependency/build caches, then start only this Compose project's services. First-run downloads and builds may take time and require network access; subsequent starts should reuse unchanged layers and images.
@@ -72,7 +72,14 @@ No startup, restart, log, or stop action may reset campaigns, regenerate existin
 
 ## 6. Host and authentication prerequisites
 
-The host needs a supported container engine, Compose v2 with the selected health-wait features, a POSIX-compatible shell environment, enough disk/memory, and network access for first builds and inference. Windows is the first validation target, using Docker Desktop's Linux containers with WSL2; Git Bash is an additional candidate to verify. Native PowerShell does not execute a shell script directly. Linux and macOS support must be claimed only after their launcher and runtime checks pass.
+The host needs:
+
+- Docker Engine 29.0 or later running Linux containers, the Docker Compose plugin 5.0 or later, and the Buildx plugin;
+- GNU Bash 4.4 or later, with the limited host-command set in [ADR 0009](adr/0009-toolchain-baseline.md#shell-requirements);
+- enough disk and memory (provisionally at least 10 GB of free Docker disk space);
+- network access for first builds and inference.
+
+The first validation target is Windows 11 x64 with Docker Desktop's WSL 2 backend and Linux containers, running `start.sh` from Git Bash. That combination was verified with Docker Desktop 4.96.3, Engine 29.9.2, Compose v5.6.1, and Bash 5.3 for the pinned images and Compose features; the launcher itself is verified in P02.7. Bash inside a WSL distribution is an unverified candidate. Native PowerShell and `cmd.exe` do not run the shell script. Linux and macOS support must be claimed only after their launcher and runtime checks pass; macOS's default Bash 3.2 is below the floor.
 
 Codex authentication is completed by the owner using supported mechanisms inside the dedicated runtime environment. Persist its state in a private runtime-only volume; never bake credentials into an image or mount the owner's entire home/development configuration. The planned `--login` command must document the supported interactive or device flow for the pinned version and handle refresh/expiry. See [official authentication guidance](https://learn.chatgpt.com/docs/auth) and [the integration specification](06-codex-integration.md).
 
@@ -84,13 +91,13 @@ Use distinct persistent storage for PostgreSQL, registered content/assets, runti
 
 The pinned PostgreSQL 18 image keeps its cluster in `/var/lib/postgresql/18/docker`. Mount the database volume at `/var/lib/postgresql`; the `/var/lib/postgresql/data` path used by PostgreSQL 17 and earlier images would not persist data across container re-creation. Moving to a new PostgreSQL major version is an explicit backup-and-migrate operation, never an image tag update ([ADR 0009](adr/0009-toolchain-baseline.md)).
 
-Provide database credentials only to `postgres` and the canonical backend through reviewed secret-file handling. Runtime authentication is available only to `codex`. Local Compose secret files are not a promise of encrypted host storage. Run services without privileged mode, without a Docker-daemon socket mount, and with minimum writable paths and capabilities. Test effective filesystem/network/tool restrictions; containerization alone does not prove them.
+Provide database credentials only to `postgres` and the canonical backend through reviewed secret-file handling. Runtime authentication is available only to `codex`. Local Compose secret files are not a promise of encrypted host storage. Docker Desktop presents secret files from the Windows drive as mode `0777`, owned by root, inside containers, so confidentiality rests on host file permissions and per-service secret mounts. Linux hosts keep host ownership, so each secret must be readable by its consuming service's UID. Run services without privileged mode, without a Docker-daemon socket mount, and with minimum writable paths and capabilities. Test effective filesystem/network/tool restrictions; containerization alone does not prove them.
 
 On normal shutdown, stop admitting commands, reconcile or cancel in-flight work, flush receipts/outbox state, and close connections before service termination. Compose stop grace periods must permit that sequence. Restart and image recreation must recover active combat, pending operations, and campaign identity from canonical state. Pack/ruleset and database migrations remain explicit compatibility operations, not side effects of every launch.
 
 ## 8. Delivery and verification
 
-P00 pins the container/toolchain baseline. P01 proves isolated runtime transport and account readiness. P02 delivers images, Compose, configuration, and the launcher. P14 proves the packaged playable loop. P16 and P19 validate recovery and fresh-clone release behavior.
+P00.3 pinned the container, host, and shell baseline ([ADR 0009](adr/0009-toolchain-baseline.md)), verified with a throwaway Compose probe rather than the launcher. P01 proves isolated runtime transport and account readiness. P02 delivers images, Compose, configuration, and the launcher. P14 proves the packaged playable loop. P16 and P19 validate recovery and fresh-clone release behavior.
 
 The implementation must verify clean first start without host build toolchains; a second idempotent launch; invocation from another directory and paths with spaces; daemon unavailable; missing/incompatible Compose; busy port; first-build failure; missing/expired account access; runtime unavailable with saved-data inspection; interrupted startup; graceful stop; restart and image recreation with unchanged campaign/party/inventory/combat; migration failure without reset; independent restore; and absence of secrets, private saves, or development instructions in images and ordinary logs.
 

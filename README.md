@@ -37,11 +37,11 @@ The design primarily derives from **The World I Can Develop**: Angular, Spring B
 | Retrieval | Structured and full-text retrieval first; optional semantic indexing after evidence of need |
 | Verification | JUnit, PostgreSQL integration tests, Angular/Vitest, browser acceptance tests, Codex contract fixtures |
 
-The frontend, backend, build, and database versions are recorded in [ADR 0009](docs/adr/0009-toolchain-baseline.md). Container images, supported host environments, and the supported Codex protocol baseline must still be recorded before scaffolding. The source project's package versions are evidence of its choices, not a claim about the newest supported releases.
+The frontend, backend, build, and database versions, the container images, and the supported host and shell environment are recorded in [ADR 0009](docs/adr/0009-toolchain-baseline.md). The supported Codex protocol and runtime image baseline must still be recorded (P01). The source project's package versions are evidence of its choices, not a claim about the newest supported releases.
 
 Campaign data is stored locally. **Codex inference requires the configured Codex service and account access.** Local hosting does not imply offline AI, unlimited usage, or local model inference. Ollama, generic provider routing, local LLMs, and direct replacement of Codex with a generic chat API are outside the initial release.
 
-**Planned startup:** run `./start.sh` to validate configuration, build/reuse images, start the containerized application and PostgreSQL, and print the local browser URL. The packaged profile will not require host Java, Maven, Node, or npm. Windows requires a compatible shell and Linux-container environment. Initial Codex sign-in remains owner-controlled. See [container deployment and startup](docs/22-container-deployment-and-startup.md). The launcher and container files do not exist yet; this is a documented implementation requirement.
+**Planned startup:** run `./start.sh` to validate configuration, build/reuse images, start the containerized application and PostgreSQL, and print the local browser URL. The packaged profile will not require host Java, Maven, Node, or npm. The first supported host is Windows 11 with Docker Desktop (WSL 2 backend, Linux containers), running the launcher from Git Bash; it needs Docker Engine 29.0+, Compose 5.0+, and GNU Bash 4.4+. Initial Codex sign-in remains owner-controlled. See [container deployment and startup](docs/22-container-deployment-and-startup.md). The launcher and container files do not exist yet; this is a documented implementation requirement.
 
 ## Start reading
 

@@ -1,6 +1,6 @@
 # ADR 0009: Supported Toolchain Baseline
 
-**Status:** Accepted for the frontend toolchain (P00.1) and the backend, build, and database baseline (P00.2). The OS, engine/runtime container image, Compose, and shell sections are pending P00.3. **Date:** 22 October 2026; P00.2 section 23 October 2026.
+**Status:** Accepted for the frontend toolchain (P00.1), the backend, build, and database baseline (P00.2), and the host platform, container image, Compose, and shell baseline (P00.3). The narration runtime image belongs to P01.1. **Date:** 22 October 2026; P00.2 and P00.3 sections 23 October 2026.
 
 ## Context
 
@@ -23,7 +23,7 @@ Rules for applying the baseline:
 
 - Commit `package-lock.json` and install with `npm ci` in CI and container builds. Never resolve a `latest` tag or an open range during an image build.
 - Record the toolchain in `package.json` (`engines` and `packageManager`) when the workspace is scaffolded in P02.2.
-- Packaged builds use an official Node.js 24.22.1 image pinned by digest (P00.3), so hosts need no Node.js installation.
+- Packaged builds use the official Node.js 24.22.1 image pinned by digest ([P00.3 section](#decision-host-platforms-container-images-compose-and-shell-p003)), so hosts need no Node.js installation.
 - Select the browser acceptance runner (Playwright or equivalent) when browser tests are introduced in P05, under the same pinning rules.
 
 Node.js 26 becomes LTS on 28 October 2026, with end of life on 30 April 2029. It is not selected today because it is not yet LTS and has not been verified with this workspace. Reconsider it before the v1 release candidate (P19) or as Node.js 24 approaches end of life.
@@ -32,7 +32,7 @@ Node.js 26 becomes LTS on 28 October 2026, with end of life on 30 April 2029. It
 
 | Component | Pinned version | Allowed updates | Evidence on 22–23 October 2026 |
 | --- | --- | --- | --- |
-| Java | Java 21 LTS: compile with `release 21`; build and run on a JDK 21 | 21.0.x updates; moving to Java 25 LTS needs a matrix update with build and test evidence | Spring Boot 4.1.2 requires Java 17 or later and is compatible up to Java 27. Eclipse Temurin 21 is supported until at least December 2029. The JDK distribution and image digest are pinned with the other container images in P00.3 |
+| Java | Java 21 LTS: compile with `release 21`; build and run on a JDK 21 | 21.0.x updates; moving to Java 25 LTS needs a matrix update with build and test evidence | Spring Boot 4.1.2 requires Java 17 or later and is compatible up to Java 27. Eclipse Temurin 21 is supported until at least December 2029. The JDK distribution is Eclipse Temurin; its build and runtime images are pinned in the P00.3 section |
 | Spring Boot | 4.1.2 (`spring-boot-starter-parent`) | 4.1.x patches; Spring Boot 4.2 after its GA release and a compatibility review, before 4.1 open-source support ends | Published on Maven Central on 22 October 2026. Spring support data: 4.1.x open-source support until 31 July 2027 (commercial until 31 July 2028); 4.0.x open-source support ends 31 December 2026; 3.5.x open-source support ended 30 June 2026. 4.2.0-RC1 is a pre-release, with 4.2 GA planned for November 2026 |
 | Libraries managed by Spring Boot | Versions from the Spring Boot 4.1.2 dependency BOM, including Spring Framework 7.0.10, Hibernate ORM 7.4.13.Final, Jackson 3.1.7, HikariCP 7.0.2, and JUnit Jupiter 6.0.3 | Only by changing the Spring Boot version | Values read from `spring-boot-dependencies-4.1.2.pom`. Overriding a managed version requires an ADR update and compatibility evidence |
 | Flyway | 12.4.0, open-source edition: `org.flywaydb:flyway-core` plus `org.flywaydb:flyway-database-postgresql` | Follows the Spring Boot BOM; no independent override | Managed by Spring Boot 4.1.2. The newest Flyway release is 13.11.1, but Spring Boot 4.1's Flyway auto-configuration targets the managed 12.x line. The Redgate editions (`com.redgate.flyway`) are not used |
@@ -52,7 +52,7 @@ Rules for applying the baseline:
 - Database migrations use Flyway's versioned forward migrations with the open-source PostgreSQL module. Pack and database migrations remain explicit operations ([deployment specification](../22-container-deployment-and-startup.md)).
 - PostgreSQL 18 images declare `VOLUME /var/lib/postgresql` and keep the cluster in `PGDATA=/var/lib/postgresql/18/docker`. Mount the durable database volume at `/var/lib/postgresql`, not at `/var/lib/postgresql/data` as for PostgreSQL 17 and earlier images. The major-version subdirectory keeps a later major upgrade explicit.
 - Use the Debian (`trixie`) image variant for glibc-based locale behavior. Alpine images use musl libc, and the official image documentation limits their locale support to ICU locales.
-- Official image tags are rebuilt as their base images change. Reference the image by digest, and refresh the digest deliberately with the PostgreSQL integration checks. P00.3 extends this policy to all images.
+- Official image tags are rebuilt as their base images change. Reference the image by digest, and refresh the digest deliberately with the PostgreSQL integration checks. The P00.3 section extends this policy to all images.
 - Host-based backend development needs a JDK 21. The owner workstation's Oracle JDK 27.0.1 is compatible with Spring Boot 4.1.2 but is not the Java 21 target, so the enforcer rule will reject it. The packaged profile needs no host JDK or Maven.
 
 Alternatives considered:
@@ -66,6 +66,101 @@ Alternatives considered:
 - **Maven Wrapper `bin` or `source` types:** add a JAR or compiled sources to the repository without a benefit for this project.
 
 Known limitation: Spring Boot patch releases keep the managed Flyway 12.4 line, so a fix published only in a later Flyway release does not reach this baseline automatically. If an advisory affects Flyway 12.4.0 and no Spring Boot 4.1 patch resolves it, evaluate a Flyway override or a Spring Boot upgrade, and rerun the PostgreSQL integration checks. Spring Boot 4.1 open-source support ends on 31 July 2027; plan the move to a supported line before that date.
+
+## Decision: host platforms, container images, Compose, and shell (P00.3)
+
+### Host platform targets
+
+| Target | Status on 23 October 2026 | Conditions |
+| --- | --- | --- |
+| Windows 11 x64 with Docker Desktop (WSL 2 backend, Linux containers); `start.sh` run from Git Bash (Git for Windows) | **First validation target.** The pinned images and the Compose features below were verified here (see Verification). Launcher behavior is verified in P02.7 | Docker Desktop's own requirements apply: Windows 11 23H2 (build 22631) or later within Microsoft's servicing timeline, WSL 2.1.5 or later, 8 GB system RAM, and hardware virtualization |
+| Windows 11 x64 with Bash inside a WSL 2 distribution, using Docker Desktop's WSL integration | Candidate, not verified | The owner workstation has no user WSL distribution, only Docker Desktop's internal `docker-desktop` distribution. P02.7 verifies it once a distribution is installed, and records whether a checkout on the Windows drive (`/mnt/c`) is acceptable |
+| Linux with Docker Engine; macOS with Docker Desktop; Windows with Docker Desktop's Hyper-V backend | Unclaimed | Claim only after the launcher, runtime, and persistence checks pass on that host (P19). macOS ships Bash 3.2, below the shell floor |
+| Windows on Arm, Windows 10, Windows Server, Docker Desktop's Windows-containers mode, WSL 1, PowerShell or `cmd.exe` as the launcher shell | Not supported | Docker Desktop on Windows Arm is early access, and Docker Desktop does not support server editions. The engine images are Linux images, and `start.sh` cannot run natively in PowerShell or `cmd.exe` |
+
+All images are Linux images. The verified platform is `linux/amd64`. The pinned multi-platform indexes also contain `linux/arm64`, which remains unverified.
+
+### Container images
+
+Every reference names the exact version and OS variant plus the multi-platform index digest.
+
+| Role | Pinned reference | Base OS | Allowed updates | Evidence on 23 October 2026 |
+| --- | --- | --- | --- | --- |
+| Dockerfile frontend (`# syntax=` line) | `docker/dockerfile:1.27.1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e` | — | Reviewed 1.x releases | The stable `docker/dockerfile:1` channel resolves to this digest. Version 1.28.0 (7 October 2026) is published but has not been promoted to `1` |
+| Frontend build stage | `node:24.22.1-trixie-slim@sha256:43b9ba1142b8dcf33fa8f922ca1be85714adc444e0586c7cf7726daaeabc1bea` | Debian 13 (glibc 2.41) | Node.js 24.x patches, as in the P00.1 section | Node.js 24.22.1 is the newest 24.x release (security release, 20 October 2026). The image reports Node.js v24.22.1 and npm 11.19.1 |
+| Backend build stage | `eclipse-temurin:21.0.12.1_1-jdk-resolute@sha256:3b59c79a788985965c89203cca233c53893f62293108bb825264740fac926724` plus the Ubuntu `unzip` package | Ubuntu 26.04.1 LTS | Java 21.0.x updates; JDK and JRE move together | Newest published official Temurin 21 image: `21.0.12.1+1`. Its `linux/amd64` image is identical to that of the unsuffixed `21.0.12.1_1-jdk` tag used by the P00.2 probe |
+| Engine runtime stage | `eclipse-temurin:21.0.12.1_1-jre-resolute@sha256:e7b42d0fad9b3dd6d61d6816ce3984df079a5da7d8e9af81c464243d15c04e3e` | Ubuntu 26.04.1 LTS | Same as the JDK | The JRE (49 modules, including `java.sql` and `jdk.httpserver`) ran the Spring Boot 4.1.2 probe as a non-root user. The image includes `bash`, `curl`, and `wget`, and has the `ubuntu` account (UID 1000) |
+| Database | `postgres:18.6-trixie@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6` | Debian 13 | As in the P00.2 section | The registry still serves the same index digest |
+| Narration runtime (`codex` service) | Not pinned here | — | — | P01.1 pins the runtime executable and image. That image follows the reference and refresh rules below |
+
+The Temurin images use Ubuntu 26.04 LTS ("resolute"): it is Temurin's default base for the 21 line, standard support runs until May 2031, and the build and runtime stages share one base. Adoptium published Temurin 21.0.13+9 binaries, the October 2026 quarterly update, on 22 October 2026, but no official `eclipse-temurin` 21.0.13 image tag existed on 23 October 2026. Before P02.3 builds the first engine image, move the JDK and JRE references to the first published 21.0.13 (or later 21.0.x) official image under the refresh rules. No release may ship on an older Java update than the newest published one.
+
+Rules for the images:
+
+- The engine image is multi-stage: Angular in the Node.js stage, the Spring Boot jar in the JDK stage, and only the jar on the JRE stage, which contains no build tools, Node.js, or package caches ([deployment specification](../22-container-deployment-and-startup.md#2-runtime-topology)).
+- Build stages may install named OS packages with `--no-install-recommends` from the base distribution's archive; today that is only `unzip` for the Maven Wrapper. Package versions are not pinned, because Ubuntu's update archive drops superseded versions. The runtime stage installs no packages unless this record is updated.
+- The runtime stage runs as a non-root user. P02.3 chooses the engine UID together with the P01 socket-permission design.
+- Use BuildKit cache mounts for the npm cache and the Maven repository, so warm builds need no downloads. Build contexts exclude secrets, private data, and local assistant files ([deployment specification](../22-container-deployment-and-startup.md#4-planned-repository-artifacts)).
+- Generate `package-lock.json` with the pinned npm, as on the Windows workstation, and keep the Linux optional binaries in it; `npm ci` in the Linux build stage is the check. npm 11.19.1 warns that `@parcel/watcher`, `esbuild`, `lmdb`, and `msgpackr-extract` have install scripts not covered by `allowScripts`. P02.2 decides and records the install-script policy.
+- Integration tests use the pinned PostgreSQL reference. Helper images used by a test library are pinned through that library's version, and P02.2 records them.
+
+### Docker Engine, Compose, and Buildx
+
+| Component | Required floor, checked by the launcher | Verified version |
+| --- | --- | --- |
+| Docker Desktop for Windows | A release that bundles the floors below, using the WSL 2 backend and Linux containers | 4.96.3 (244472), released 22 October 2026 |
+| Docker Engine (daemon) | 29.0 or later, with daemon `OSType` `linux` | 29.9.2 (API 1.56), containerd 2.4.2, runc 1.5.2, cgroup v2 |
+| Docker Compose plugin (`docker compose`) | 5.0 or later. The legacy standalone `docker-compose` command is not supported | v5.6.1, released 21 October 2026 |
+| Docker Buildx plugin | Present; Compose 5 delegates builds to Bake | v0.38.1 |
+| WSL | 2.1.5 or later (Docker Desktop requirement) | 3.0.3.0, kernel 6.18.54.1 |
+
+Compose 5.0 (2 December 2025) removed the internal builder, so every build goes through Buildx and Bake. A 5.x floor therefore gives one build path. Engine 29.0 is the oldest release of the verified major line. Both floors are above every feature the packaged profile uses: `depends_on` with `condition: service_healthy` and `required` (Compose 2.20.0), `healthcheck.start_interval` (Compose 2.20.2 and Docker Engine 25.0), `up --wait`, file secrets with a custom `target`, internal networks, and loopback-only port publishing. Versions between a floor and the verified version are accepted but unverified, and `start.sh --check` reports the verified matrix. Raising a floor requires a reason and a verification record.
+
+The launcher (P02.6) uses the current Docker context and never switches it. It fails with an actionable message when the CLI is missing, the daemon is unreachable, the daemon runs Windows containers, or the Engine, Compose, or Buildx floor is not met. Compose 5.6.1 prints `:0` and exits with status 0 for a port that is not published, so checks must compare command output rather than rely on exit status.
+
+### Shell requirements
+
+- `start.sh` is a Bash script: `#!/usr/bin/env bash`, GNU Bash 4.4 or later. It checks `BASH_VERSINFO` before using any other Bash feature. Bash 4.4 is the first release that accepts an empty array expansion under `set -u`. The script has LF line endings (`.gitattributes` applies `eol=lf` to all text files) and Git file mode `100755`.
+- The script resolves its own directory (`cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P`), changes into it, and passes Compose files by relative path. That works from any working directory and for paths containing spaces. The Windows `docker.exe` cannot read MSYS paths such as `/c/Users/...`; when an absolute host path must reach Docker, convert it with `cygpath -w` where `cygpath` exists.
+- Under Git Bash, export `MSYS_NO_PATHCONV=1` and `MSYS2_ARG_CONV_EXCL='*'` before calling Docker. Otherwise MSYS rewrites container paths: `-w /tmp` became `C:/Users/.../Temp`, and Docker rejected it.
+- Host commands are limited to Bash builtins (including `/dev/tcp`), `docker` with its Compose and Buildx plugins, and these utilities, which are present in Git for Windows and common Linux distributions: `awk`, `cat`, `chmod`, `date`, `dirname`, `grep`, `head`, `mkdir`, `mktemp`, `od`, `rm` (only for the launcher's own temporary files), `sed`, `tr`, `uname`, plus `cygpath` when present. Do not require `curl`, `wget`, `openssl`, `jq`, `python`, `ss`, `lsof`, or `netstat` on the host; Git Bash lacks `ss`, `lsof`, and `netstat`. Adding a command requires updating this list and the P02.7 evidence.
+- Generate secrets from `/dev/urandom`, for example with `od -An -N32 -tx1 /dev/urandom`, under `umask 077`. In Git Bash the MSYS runtime provides the device from the Windows system random generator.
+- Docker Desktop shows Compose file secrets from the Windows drive as mode `0777`, owned by root, inside containers, whatever the host permissions. Secret confidentiality therefore rests on the host file's location and permissions and on mounting each secret only into the service that needs it. On Linux hosts, bind-mounted secrets keep host ownership and mode, so P02.3 must make each secret readable by its consuming service's UID there.
+- TTY allocation and signal delivery to the native Windows `docker.exe` differ from Linux. P02.6 and P02.7 must verify the interactive `--login` flow and Ctrl+C interruption in Git Bash before claiming them.
+
+### Image reference and digest refresh policy
+
+This policy applies to every image: the Dockerfile frontend, build and runtime stages, Compose services, and test images.
+
+- Reference images as `<name>:<exact version and OS variant>@sha256:<multi-platform index digest>`. Floating tags such as `latest`, `1`, `21-jdk`, `24`, or `18`, tag-only references, and platform-manifest digests are not allowed. When both are present, Docker resolves by digest; the tag documents the intended version.
+- Keep each reference in one place in the build files and mirror it in this record; change both in the same commit. P02.4 adds a check that every external-image `FROM`, every `# syntax=` line, and every Compose `image:` line carries an exact tag and an index digest. A `FROM` that names an earlier build stage is exempt, and so is the `image:` name given to a locally built image.
+- Refresh a digest when:
+  - the pinned line, or its base OS, publishes a security release or advisory. Examples: Temurin quarterly updates (January, April, July, October), Node.js security releases, PostgreSQL quarterly minor releases (February, May, August, November), and Dockerfile frontend releases.
+  - a milestone demonstration or a release candidate is prepared.
+  - a base OS approaches the end of its standard support.
+- Refresh procedure:
+  1. Resolve the digest with `docker buildx imagetools inspect <name>:<tag>`.
+  2. Update the build file and this record.
+  3. Rebuild the engine image, and run the frontend build, the backend tests against PostgreSQL, and the launcher checks that exist at that time.
+  4. Record the evidence.
+- A different line (Java 25, Node.js 26, PostgreSQL 19, or another OS base) requires an update to this record and a compatibility review. A PostgreSQL major version also requires the backup-and-migrate procedure.
+- Update automation, if P02.4 adds it, may propose digest changes, but it must not merge them without these checks.
+
+### Resource expectations (provisional)
+
+After the P00.3 probe, the pinned images used 337 MB (Node.js), 728 MB (JDK), 461 MB (JRE), and 650 MB (PostgreSQL). The probe engine image used 505 MB, and the BuildKit cache 2.2 GB, including the P00.2 probe's Maven cache. Plan for at least 10 GB of free Docker disk space. Docker Desktop's VM had 7.6 GiB of memory and 20 CPUs, and the probe ran without memory pressure. P02.7 replaces these figures with measurements of the real engine, including cold and warm start times.
+
+Alternatives considered:
+
+- **Alpine-based Node.js, JDK, or JRE images:** musl libc changes the native packages of the Angular toolchain and locale behavior, and image size is not a constraint here.
+- **Distroless or minimal JRE runtime images:** they have no shell or `curl` for health checks and diagnosis. Reconsider them during hardening (P18) together with a Java-based health probe.
+- **Temurin on Ubuntu 24.04 (`noble`) or UBI:** supported, but `noble`'s standard support ends in 2029, two years earlier, and neither is Temurin's default base for the 21 line.
+- **Waiting for Temurin 21.0.13 images:** they were not published on 23 October 2026. The 21.0.12.1 pin plus the mandatory refresh before P02.3 keeps the baseline unambiguous.
+- **`docker/dockerfile:1.28.0`, or no `# syntax=` line:** 1.28.0 is not yet in the stable `1` channel. Without a `# syntax=` line, the Dockerfile frontend would vary with each host's BuildKit version.
+- **A Compose 2.x floor:** it covers the required features, but builds through the removed internal builder and is unverified.
+- **POSIX `sh` or Bash 3.2 compatibility:** they would allow dash or macOS's default Bash, but lose arrays, `BASH_SOURCE`, and safe `set -u` with arrays. Reconsider when macOS support is evaluated.
+- **A PowerShell launcher:** a second implementation to maintain and verify, while the owner requires `start.sh`.
+- **A WSL distribution as the first shell:** none is installed on the owner workstation, and installing one is a system change. Git Bash ships with Git for Windows, which development already requires.
 
 ## Verification
 
@@ -90,26 +185,55 @@ Known limitation: Spring Boot patch releases keep the managed Flyway 12.4 line, 
 - `pg_dump -Fc` and `pg_restore` 18.6 restored the migrated database into a new database, preserving the Flyway history row and the JSONB row.
 - The probe containers and network were removed. No Docker volume was created.
 
+### Host, container images, Compose, and shell (P00.3)
+
+- Resolved every pinned reference with `docker buildx imagetools inspect` against Docker Hub. All are OCI image indexes that include `linux/amd64` and `linux/arm64`. Also checked:
+  - Docker Hub tag metadata: no `eclipse-temurin` 21.0.13 tag existed.
+  - The Adoptium API: `jdk-21.0.13+9`, published 22 October 2026.
+  - The Node.js release index, the Docker Desktop release notes and Windows requirements, the Compose releases and service reference, the Dockerfile `HEALTHCHECK` reference, and the Dockerfile frontend release `dockerfile/1.28.0`.
+- Pulled the JDK, JRE, and Node.js images by digest and inspected them:
+  - JDK and JRE: Ubuntu 26.04.1 LTS, Temurin `21.0.12.1+1`. The JDK lacks `unzip`; both images include `bash`, `curl`, and `wget`.
+  - Node.js: Debian 13, Node.js v24.22.1, npm 11.19.1, glibc 2.41. The image has no `curl`, `wget`, `git`, or `python3`.
+- Generated a minimal Angular 22.2.3 application with TypeScript 6.0.3, a Spring Boot 4.1.2 application, and a Compose file in an ignored scratch directory whose path contains a space. The Angular lockfile was generated with npm 11.19.1 on the Windows host and contains both the `linux-x64` and `win32-x64` optional binaries. Ran the probe from Git Bash 5.3.15, invoking it directly from the repository root and through `bash` from `/tmp`. The probe:
+  - checked the CLI, the daemon `OSType`, the Engine, Compose, and Buildx floors, and Bash 4.4;
+  - generated the database password from `/dev/urandom`;
+  - ran `docker compose up --build --wait`, with the pinned Dockerfile frontend, BuildKit cache mounts, a health-gated `depends_on`, `start_interval` health checks, file secrets (one mapped to a Spring Boot `configtree` property), an internal data network, and a read-only engine with all capabilities dropped and `no-new-privileges`.
+- Results:
+  - `npm ci` installed 224 packages in 5 s and `ng build` produced the bundle in the Node.js stage.
+  - The Maven Wrapper build succeeded in the JDK stage with `unzip` installed, Maven Central-only settings, and `-C`.
+  - The JRE stage served the compiled Angular index and reported Java `21.0.12.1` (Temurin), running as `uid=1000(ubuntu)`.
+  - PostgreSQL `18.6`, Flyway version 1, and a JSONB row were readable through the secret-provided password, and readiness health was `UP`.
+  - The engine was published only on `127.0.0.1:18080`, and PostgreSQL was not published. The data network had no external route.
+  - Bash `/dev/tcp` reached the published port.
+  - First run to healthy: 32 s, with the base images already pulled and a Maven cache left by P00.2. Unchanged second run: 8 s to healthy, about 14 s including stop, with every build step cached.
+- Rebuilding only the frontend stage without its cache took 8.4 s.
+- Findings now recorded as rules above: the MSYS path rewriting, the `:0` output from `docker compose port`, the `0777` root-owned secret files on Docker Desktop, and the npm install-script warning.
+- `wsl.exe -l -v` listed only `docker-desktop`, so a WSL distribution shell could not be verified.
+- The probe stack was stopped with `docker compose down`, and the probe image and scratch files were removed. No container, network, or volume remains. The pinned base images and BuildKit cache remain as local cache.
+
 These are compatibility checks, not a build of the engine; no frontend or backend workspace exists yet.
 
 ## Tool availability inventory
 
-Owner workstation, Windows 11, 22 October 2026:
+Owner workstation, Windows 11, 22 October 2026, with the container and shell entries rechecked on 23 October 2026:
 
 | Tool | Version | Relevance |
 | --- | --- | --- |
+| Windows | Windows 11 Pro x64, OS build 10.0.26300.9711, 20 logical CPUs | First validation host |
 | Node.js / npm | 24.22.1 / 11.19.1 | Matches the pinned frontend toolchain for host development |
-| Java (Oracle JDK) | 27.0.1 | Not the Java 21 target; host backend development needs a JDK 21. Containerized builds use a JDK 21 image |
+| Java (Oracle JDK) | 27.0.1 | Not the Java 21 target; host backend development needs a JDK 21. Containerized builds use the pinned Temurin 21 image |
 | Maven | 3.10.0 | Matches the Maven baseline; project builds use the Maven Wrapper |
-| Docker Engine / Compose | 29.9.2 / v5.6.1 (Docker Desktop with WSL2) | Used for the P00.2 probe; container baseline in P00.3 |
-| Git | 2.56.0 | Repository workflow |
+| Docker Desktop | 4.96.3 (244472), WSL 2 backend, `desktop-linux` context, Linux containers, 7.6 GiB VM memory | Verified container host (P00.3) |
+| Docker Engine / Compose / Buildx | 29.9.2 (API 1.56) / v5.6.1 / v0.38.1; containerd 2.4.2, runc 1.5.2 | Verified versions above the launcher floors |
+| WSL | 3.0.3.0, kernel 6.18.54.1; distributions: `docker-desktop` only | No user distribution, so the WSL shell candidate is unverified |
+| Git / Git Bash | Git 2.56.0.windows.2; GNU Bash 5.3.15, MSYS runtime 3.6.10 | Repository workflow; first launcher shell |
 | Python | 3.15.1 | Local repository checks only; not an engine dependency |
 
 Host versions describe one development machine. The packaged profile must not depend on them.
 
 ## Consequences
 
-Frontend and backend scaffolding in P02.2 has an unambiguous, reproducible baseline. TypeScript upgrades follow Angular's supported range rather than the npm `latest` tag. Java, Spring Boot, Flyway, and the JDBC driver move together through the Spring Boot BOM. PostgreSQL major upgrades are deliberate migrations with backups. The Spring Boot 4.1 support window makes a reviewed framework upgrade a planned task before July 2027. Remaining version ambiguity is limited to the OS targets, engine/runtime images, Compose, and shell requirements, which P00.3 adds to this record.
+Frontend and backend scaffolding in P02.2 has an unambiguous, reproducible baseline. TypeScript upgrades follow Angular's supported range rather than the npm `latest` tag. Java, Spring Boot, Flyway, and the JDBC driver move together through the Spring Boot BOM. PostgreSQL major upgrades are deliberate migrations with backups. The Spring Boot 4.1 support window makes a reviewed framework upgrade a planned task before July 2027. Packaging in P02.3 and the launcher in P02.6 start from digest-pinned Linux images, explicit Engine, Compose, and Buildx floors, and a single supported shell profile. The first image work is the mandatory refresh to the Temurin 21.0.13 images. Image updates become deliberate, evidence-backed commits instead of side effects of a rebuild. Host support beyond Windows 11 with Docker Desktop on WSL 2 and Git Bash stays unclaimed until verified. The narration runtime image is the remaining container decision, owned by P01.1.
 
 ## References
 
@@ -124,3 +248,13 @@ Frontend and backend scaffolding in P02.2 has an unambiguous, reproducible basel
 - [Flyway PostgreSQL support](https://documentation.red-gate.com/fd/postgresql-database-277579325.html)
 - [Maven release history](https://maven.apache.org/docs/history.html)
 - [Maven Wrapper plugin `wrapper` goal](https://maven.apache.org/tools/wrapper/maven-wrapper-plugin/wrapper-mojo.html)
+- [Docker Desktop for Windows requirements](https://docs.docker.com/desktop/setup/install/windows-install/)
+- [Docker Desktop release notes](https://docs.docker.com/desktop/release-notes/)
+- [Docker Compose releases](https://github.com/docker/compose/releases)
+- [Compose services reference](https://docs.docker.com/reference/compose-file/services/)
+- [Dockerfile reference (`HEALTHCHECK`, `# syntax=`)](https://docs.docker.com/reference/dockerfile/)
+- [Dockerfile frontend releases](https://github.com/moby/buildkit/releases)
+- [Eclipse Temurin official image](https://hub.docker.com/_/eclipse-temurin)
+- [Adoptium release API](https://api.adoptium.net/q/swagger-ui/)
+- [Node.js official image](https://hub.docker.com/_/node)
+- [Ubuntu release cycle](https://ubuntu.com/about/release-cycle)
