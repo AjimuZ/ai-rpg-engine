@@ -41,6 +41,7 @@ Requirements stated by the project owner are binding for this design. Technical 
 | [21 — AI task contracts and prompts](21-ai-task-contracts-and-prompts.md) | Structured task envelopes, authority limits, and generic English prompt drafts |
 | [22 — Container deployment and startup](22-container-deployment-and-startup.md) | Dockerized application, root launcher, authentication, persistent data, and startup/recovery gates |
 | [23 — Presentation assets](23-presentation-assets.md) | Complete UI graphics, persistent character/item artwork, bounded runtime generation, rarity and provenance |
+| [24 — Dynamic music and credits](24-dynamic-music-and-credits.md) | Planned public-state soundtrack, optional online playback, licensed candidates, credits and failure checks |
 | [Visual-novel story UI concept](mockups/visual-novel-ui-v1.png) | Primary narrative-screen direction; [prompt and provenance](mockups/visual-novel-ui-v1.prompt.md) |
 | [Advanced gameplay UI concept](mockups/advanced-gameplay-ui-v1.png) | Illustrative interface image; [prompt and provenance](mockups/advanced-gameplay-ui-v1.prompt.md) |
 | [Architecture decision records](adr/README.md) | Rationale and consequences of major proposed decisions |

@@ -84,4 +84,6 @@ Each admitted item definition or visible unique variant has an identifying icon 
 
 Generate or request a new illustration only for a meaningful observable visual change or explicit owner/player request. Reuse during minor dialogue and inspections. Media jobs use source revision and scene identity so stale results cannot replace the current scene after the player moves.
 
+Optional dynamic music follows public scene/combat state using reviewed licensed catalog entries, stable loops, bounded crossfades and explicit user activation. Remote playback must not require a manual download, but must respect hosting, privacy and license conditions and degrade to silence. The policy and researched reference-only credit records are in [dynamic music and credits](24-dynamic-music-and-credits.md); no audio integration is implemented here.
+
 Audio follows observable committed state, starts after a user gesture, uses separate volume preferences, and tolerates missing sources. Effects are keyed to a committed event and play at most once per client delivery cursor. Loading a campaign does not replay old combat hits. Remote streams are opt-in with documented availability and privacy implications; no remote catalog from the private demo is copied by default.

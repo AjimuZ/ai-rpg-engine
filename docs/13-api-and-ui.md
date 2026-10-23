@@ -120,6 +120,7 @@ After reconnect, fetch operation status before enabling a retry. Reusing the ori
 - Preserve reading position unless the player is following the newest output.
 - Announce concise operation status, not every streamed token, to assistive technology.
 - Audio is optional, user-activated, independently adjustable, and never required for clues.
+- Dynamic music uses the reviewed catalog and complete current-track/Music Credits treatment in [music and credits](24-dynamic-music-and-credits.md); ordinary play cannot trigger unapproved remote requests.
 
 These are targets requiring actual browser and assistive-technology review. A stylesheet or DOM unit test does not certify accessibility.
 

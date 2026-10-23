@@ -39,3 +39,7 @@ The owner-supplied `the-world-i-can-develop-demo` informed the analysis of Codex
 Official documentation is linked for technical and rights background in [the reference register](docs/19-glossary-and-references.md). No OpenAI SDK, Codex binary, D&D/SRD rule text, external stat block, third-party image, audio file, font, or model checkpoint is distributed in this documentation-only project.
 
 Future dependencies and assets require their own license/provenance inventory. Mentioning a technology or an inspiration does not imply affiliation or transfer of rights.
+
+## Music research references — no bundled recordings
+
+The [dynamic music specification](docs/24-dynamic-music-and-credits.md) records two candidate works by Kevin MacLeod (incompetech.com): [Wholesome](https://commons.wikimedia.org/wiki/File:Wholesome_by_Kevin_MacLeod.ogg), declared [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), and [Darkest Child, ISRC USUAN1100783](https://commons.wikimedia.org/wiki/File:Darkest_Child_%28ISRC_USUAN1100783%29.mp3), declared [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). Source/file-page declarations were checked on 23 October 2026. These are reference-only credits: no recording is copied, modified, installed or played by this change. Before runtime admission, retain the selected recording's complete rights evidence, exact license version, source and any processing notice. The project's MIT license does not relicense that music.

@@ -35,7 +35,7 @@
 | FR-019 | Advance world clocks and triggered events causally | Basic time | Bounded catch-up; no advancement from UI reads |
 | FR-020 | Support an optional guide persona without granting mechanical authority | Optional | Guide uses authorized knowledge only |
 | FR-021 | Support optional creative abilities using validated effect primitives | Deferred | Author-defined identity; no host code execution |
-| FR-022 | Associate scenes, portraits, maps, identifying item icons and audio cues with committed public state | Static/catalog assets | Independent categories, stable entity artwork, cue deduplication and fallback; bounded generated artwork is a v1 extension |
+| FR-022 | Associate scenes, portraits, maps, identifying item icons and dynamic music/audio cues with committed public state | Static/catalog assets | Stable entity art; optional reviewed online/local soundtrack with public cues, versioned credits, deduplication and fallback; bounded generated artwork is a v1 extension |
 | FR-023 | Interrupt work and recover without duplicating effects | Required | Before/after commit and lost-response scenarios |
 | FR-024 | Export, back up, restore, and migrate campaigns | Basic backup | Integrity checks, separate full/player exports, compatibility gate |
 | FR-025 | Provide diagnostics for Codex account availability, model capabilities, and adapter support | Required | Useful setup failure without leaking credentials |
