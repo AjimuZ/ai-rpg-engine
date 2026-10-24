@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: P00, P01.1–P01.7, P02.1–P02.7 and P03.1–P03.4 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; P03.1–P03.4 add the canonical schema, bounded resources, ownership constraints, storage versions, internal atomic commit boundary and versioned deterministic draw reservations, and gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. The root launcher and its Windows lifecycle checks (P02.7) are verified for Docker Desktop with Git Bash only; Linux/macOS, interactive Ctrl+C, owner sign-in, campaign persistence beyond these foundations (P03.5–P03.6) and full QA-28 remain pending. P03.5 is the next task. Design specifications and predecessor milestones do not establish completed gameplay.
+**Current status: P00, P01.1–P01.7, P02.1–P02.7 and P03.1–P03.5 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; P03.1–P03.5 add the canonical schema, bounded resources, ownership constraints, storage versions, internal atomic commit boundary, versioned deterministic draw reservations, fenced mutation leases, startup journal reconciliation and a baseline database backup tool, and gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. The root launcher and its Windows lifecycle checks (P02.7) are verified for Docker Desktop with Git Bash only; Linux/macOS, interactive Ctrl+C, owner sign-in, campaign persistence beyond these foundations (P03.6) and full QA-28 remain pending. P03.6 is the next task. Design specifications and predecessor milestones do not establish completed gameplay.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -517,7 +517,24 @@ content/assets and full container integration remain open; P02.3 stays unchecked
   policy checks report no findings. Dependency pins are unchanged. Equivalent-new-
   attempt policy, gameplay authorization, leases/recovery and full package acceptance
   remain later work; no hosted-CI or backup/restore result is claimed.
-- [ ] P03.5 Implement startup journal reconciliation, lease/fencing foundations, and baseline backup/restore.
+- [x] P03.5 Implement startup journal reconciliation, lease/fencing foundations, and baseline backup/restore.
+  Completed 24 October 2026. V5 adds per-campaign mutation leases that use PostgreSQL
+  time, and a persistent fence that grows on every grant, release and expiry
+  retirement. Draws and commits require the current token after immutable replay, and
+  a commit releases the lease atomically. Startup reconciliation runs before the web
+  server starts, in pages of 100 with one transaction per operation. It fails orphaned
+  precommit work, marks interrupted narration pending and aborts startup on error.
+  `tools/database_backup` writes a pg_dump archive and manifest, restores only into a
+  new database and retires saved leases. Full backend `verify` (Windows 11, Docker
+  Desktop, pinned JDK 21, PostgreSQL 18.6) passes 95 tests with three packaged-profile
+  skips and builds the jar. The backup tool passes 9 offline tests (one symlink skip).
+  A manual rehearsal passed: backup, directory reuse refused, tamper rejected,
+  restore, data equality, lease retirement (fence 1→2), and both interrupted
+  operations moved to `FAILED_BEFORE_COMMIT` by the jar's startup. Repository-checker
+  tests pass 22/22, packaging checks pass 20 with two opt-in skips, and policy checks
+  report no findings. Limits: database-only backup, single-installation recovery
+  assumption, no worker renewal/cancellation or job accounting (P03.6/P07), and no
+  hosted-CI or full QA-17/QA-23 claim.
 - [ ] P03.6 Add durable AI jobs, immutable planning snapshots, versioned plan/dependency records, query epochs and recovery generations; persist locale preferences separately from world revisions and test atomic outbox/admission foundations.
 
 **Exit:** persisted state survives restart and concurrent duplicate attempts cannot double-commit. **Checks:** real PostgreSQL transaction rollback, duplicate keys, cross-campaign references, stale revision, draw reuse, and recovery. **Suggested commit:** `Add canonical campaign persistence and event receipts`.

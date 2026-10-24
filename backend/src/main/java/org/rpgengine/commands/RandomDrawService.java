@@ -87,6 +87,7 @@ public class RandomDrawService {
                 || !campaign.getContentRevisionId().equals(c.contentRevisionId())) {
             throw new IllegalStateException("stale or ineligible draw operation");
         }
+        MutationLeaseService.requireHeld(jdbc, c);
         // The campaign lock serializes lazy seed creation as well as all draw inserts.
         var seeds = jdbc.query("select seed from campaign_random_seed where campaign_id = ?",
                 (row, index) -> row.getBytes(1), c.campaignId());

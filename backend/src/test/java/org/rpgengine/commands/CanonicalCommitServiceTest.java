@@ -1,6 +1,9 @@
 package org.rpgengine.commands;
 
 import java.time.Instant;
+import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -48,6 +51,11 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest
 class CanonicalCommitServiceTest {
+    @Autowired
+    private MutationLeaseService leases;
+    @Autowired
+    private JournalRecoveryService recovery;
+    private final Map<UUID, MutationLeaseService.Token> tokens = new ConcurrentHashMap<>();
     private static final Instant NOW = Instant.parse("2026-10-24T12:00:00Z");
     private static final String HASH = "c".repeat(64);
     private static final List<String> TABLES = List.of("campaign", "actor_resource", "operation_journal",
@@ -78,7 +86,7 @@ class CanonicalCommitServiceTest {
             jdbc.execute("drop trigger if exists p033_fault on " + table);
         }
         jdbc.execute("drop function if exists p033_fail()");
-        jdbc.execute("truncate operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
+        jdbc.execute("truncate campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
                 + "operation_journal, actor_resource, actor, presentation_campaign_settings, campaign, "
                 + "content_revision, adventure_workspace, identity_owner_profile");
     }
@@ -107,6 +115,7 @@ class CanonicalCommitServiceTest {
                 jdbc.queryForMap("select * from canonical_outbox limit 1").keySet());
 
         var next = operation(fixture.campaign(), 1);
+        leaseOperation(fixture.campaign(), next);
         var later = plan(fixture, next);
         later = new ResolvedCommit(later.context(), new ResolvedCommit.WorldChange(false, 0,
                 CampaignMode.EXPLORATION, null), List.of(), later.events(), List.of(), "{}", false);
@@ -123,7 +132,7 @@ class CanonicalCommitServiceTest {
         var c = plan.context();
         var changedPayload = new ResolvedCommit(new ResolvedCommit.Context(c.adventureId(), c.campaignId(),
                 c.operationId(), c.contentRevisionId(), "d".repeat(64), c.expectedRevision(),
-                c.expectedOperationVersion()), plan.world(), plan.resources(), plan.events(), plan.rewards(), "{}", true);
+                c.expectedOperationVersion(), c.lease()), plan.world(), plan.resources(), plan.events(), plan.rewards(), "{}", true);
         assertThrows(IllegalStateException.class, () -> commits.commit(changedPayload));
         assertEquals(before, snapshot());
     }
@@ -175,13 +184,13 @@ class CanonicalCommitServiceTest {
     void rejectsInvalidDrawContextAndAmbientTransactions() {
         var c = plan(fixture, fixture.operation()).context();
         assertThrows(RuntimeException.class, () -> draws.reserve(new ResolvedCommit.Context(UUID.randomUUID(),
-                c.campaignId(), c.operationId(), c.contentRevisionId(), HASH, 0, 2), 0, 10));
+                c.campaignId(), c.operationId(), c.contentRevisionId(), HASH, 0, 2, c.lease()), 0, 10));
         assertThrows(RuntimeException.class, () -> draws.reserve(new ResolvedCommit.Context(c.adventureId(),
-                c.campaignId(), UUID.randomUUID(), c.contentRevisionId(), HASH, 0, 2), 0, 10));
+                c.campaignId(), UUID.randomUUID(), c.contentRevisionId(), HASH, 0, 2, c.lease()), 0, 10));
         assertThrows(IllegalStateException.class, () -> draws.reserve(new ResolvedCommit.Context(c.adventureId(),
-                c.campaignId(), c.operationId(), c.contentRevisionId(), "d".repeat(64), 0, 2), 0, 10));
+                c.campaignId(), c.operationId(), c.contentRevisionId(), "d".repeat(64), 0, 2, c.lease()), 0, 10));
         assertThrows(IllegalStateException.class, () -> draws.reserve(new ResolvedCommit.Context(c.adventureId(),
-                c.campaignId(), c.operationId(), c.contentRevisionId(), HASH, 0, 99), 0, 10));
+                c.campaignId(), c.operationId(), c.contentRevisionId(), HASH, 0, 99, c.lease()), 0, 10));
         assertThrows(IllegalStateException.class, () -> new TransactionTemplate(manager)
                 .execute(status -> draws.reserve(c, 0, 10)));
         assertEquals(0, count("operation_random_draw"));
@@ -241,7 +250,7 @@ class CanonicalCommitServiceTest {
         var otherContext = plan(other, other.operation()).context();
         draws.reserve(otherContext, 0, 10);
         assertThrows(RuntimeException.class, () -> draws.reserve(new ResolvedCommit.Context(c.adventureId(),
-                c.campaignId(), otherContext.operationId(), c.contentRevisionId(), HASH, 0, 2), 0, 10));
+                c.campaignId(), otherContext.operationId(), c.contentRevisionId(), HASH, 0, 2, c.lease()), 0, 10));
         String insert = "insert into operation_random_draw values (?, ?, ?, ?, ?, ?, ?, ?, now())";
         assertThrows(RuntimeException.class, () -> jdbc.update(insert, UUID.randomUUID(), c.campaignId(),
                 otherContext.operationId(), 1, 10, 1, "HMAC-SHA-256", 1));
@@ -310,7 +319,7 @@ class CanonicalCommitServiceTest {
                     fault.equals("content") ? other.campaign().getContentRevisionId() : c.contentRevisionId(),
                     fault.equals("payload") ? "d".repeat(64) : c.payloadHash(),
                     fault.equals("revision") ? 1 : c.expectedRevision(),
-                    fault.equals("operationVersion") ? 1 : c.expectedOperationVersion());
+                    fault.equals("operationVersion") ? 1 : c.expectedOperationVersion(), c.lease());
         }
         var changes = plan.resources();
         var events = plan.events();
@@ -346,6 +355,7 @@ class CanonicalCommitServiceTest {
     void duplicateRewardRollsBackLaterState() {
         commits.commit(plan(fixture, fixture.operation()));
         var next = operation(fixture.campaign(), 1);
+        leaseOperation(fixture.campaign(), next);
         var original = plan(fixture, next);
         long version = number("actor_resource", "row_version");
         var duplicate = new ResolvedCommit(original.context(), original.world(),
@@ -442,9 +452,162 @@ class CanonicalCommitServiceTest {
                 UUID.randomUUID(), campaign, operation, revision, kind));
     }
 
+    /** Live duplicate acquisition is stable; release/reacquisition retires every previous callback capability. */
+    @Test
+    void leasesAreExclusiveScopedAndMonotonic() {
+        var c = plan(fixture, fixture.operation()).context();
+        var first = leases.acquire(c.adventureId(), c.campaignId(), c.operationId(), c.lease().holderId(), Duration.ofSeconds(20));
+        assertEquals(c.lease(), first.token());
+        assertEquals(first, leases.acquire(c.adventureId(), c.campaignId(), c.operationId(), c.lease().holderId(), Duration.ofSeconds(300)));
+        assertThrows(IllegalStateException.class, () -> leases.acquire(c.adventureId(), c.campaignId(),
+                c.operationId(), UUID.randomUUID(), Duration.ofSeconds(20)));
+        assertThrows(RuntimeException.class, () -> leases.acquire(UUID.randomUUID(), c.campaignId(),
+                c.operationId(), UUID.randomUUID(), Duration.ofSeconds(20)));
+        assertTrue(leases.renew(c.adventureId(), c.campaignId(), c.operationId(), c.lease(),
+                Duration.ofSeconds(300)).expiresAt().compareTo(first.expiresAt()) >= 0);
+        assertTrue(leases.release(c.adventureId(), c.campaignId(), c.operationId(), c.lease()));
+        var next = leases.acquire(c.adventureId(), c.campaignId(), c.operationId(), UUID.randomUUID(), Duration.ofSeconds(20));
+        assertTrue(next.token().fence() > first.token().fence());
+        assertFalse(leases.release(c.adventureId(), c.campaignId(), c.operationId(), c.lease()));
+        assertThrows(IllegalStateException.class, () -> commits.commit(plan(fixture, fixture.operation())));
+        assertThrows(IllegalStateException.class, () -> leases.renew(c.adventureId(), c.campaignId(),
+                c.operationId(), c.lease(), Duration.ofSeconds(20)));
+    }
+
+    /** Concurrent contenders get one durable grant; no losing worker can renew/release the winner. */
+    @Test
+    void concurrentLeaseContendersHaveOneWinner() throws Exception {
+        var c = plan(fixture, fixture.operation()).context();
+        leases.release(c.adventureId(), c.campaignId(), c.operationId(), c.lease());
+        var results = race(
+                () -> leases.acquire(c.adventureId(), c.campaignId(), c.operationId(), UUID.randomUUID(), Duration.ofSeconds(30)),
+                () -> leases.acquire(c.adventureId(), c.campaignId(), c.operationId(), UUID.randomUUID(), Duration.ofSeconds(30)));
+        assertEquals(1, results.stream().filter(MutationLeaseService.Grant.class::isInstance).count());
+        assertEquals(1, results.stream().filter(RuntimeException.class::isInstance).count());
+        assertEquals(0L, number("campaign", "state_revision"));
+    }
+
+    /** Expired permits reject both writes and renewal; a new fenced worker reuses the old durable draw. */
+    @Test
+    void expiryFencesLateCommitAndNewDrawButPreservesReplay() {
+        var old = plan(fixture, fixture.operation());
+        var c = old.context();
+        var draw = draws.reserve(c, 0, 10);
+        expireLease(c.campaignId());
+        assertThrows(IllegalStateException.class, () -> leases.renew(c.adventureId(), c.campaignId(),
+                c.operationId(), c.lease(), Duration.ofSeconds(30)));
+        assertThrows(IllegalStateException.class, () -> commits.commit(old));
+        assertThrows(IllegalStateException.class, () -> draws.reserve(c, 1, 10));
+        assertEquals(draw, draws.reserve(c, 0, 10));
+        leaseOperation(fixture.campaign(), fixture.operation());
+        var fresh = plan(fixture, fixture.operation());
+        assertTrue(fresh.context().lease().fence() > c.lease().fence());
+        assertThrows(IllegalStateException.class, () -> commits.commit(old));
+        var receipt = commits.commit(fresh);
+        assertEquals(receipt, commits.commit(old));
+        assertNull(jdbc.queryForObject("select holder_id from campaign_mutation_lease", UUID.class));
+    }
+
+    /** Database constraints retain fence history and reject malformed scope independent of Java callers. */
+    @Test
+    void leaseDatabaseConstraintsAndInputBoundsFailClosed() {
+        var c = plan(fixture, fixture.operation()).context();
+        assertThrows(RuntimeException.class, () -> jdbc.update("delete from campaign_mutation_lease"));
+        assertThrows(RuntimeException.class, () -> jdbc.update("update campaign_mutation_lease set fence = 0"));
+        assertThrows(RuntimeException.class, () -> jdbc.update("update campaign_mutation_lease set holder_id = ?", UUID.randomUUID()));
+        assertThrows(RuntimeException.class, () -> jdbc.update("update campaign_mutation_lease set expires_at = null"));
+        var other = createFixture();
+        assertThrows(RuntimeException.class, () -> jdbc.update("update campaign_mutation_lease set fence = fence + 1, "
+                + "operation_id = ? where campaign_id = ?", other.operation().getId(), c.campaignId()));
+        for (Duration duration : List.of(Duration.ZERO, Duration.ofMillis(1500), Duration.ofSeconds(301))) {
+            assertThrows(IllegalArgumentException.class, () -> leases.acquire(c.adventureId(), c.campaignId(),
+                    c.operationId(), UUID.randomUUID(), duration));
+        }
+        assertThrows(IllegalStateException.class, () -> new TransactionTemplate(manager).execute(status ->
+                leases.acquire(c.adventureId(), c.campaignId(), c.operationId(), UUID.randomUUID(), Duration.ofSeconds(20))));
+        assertThrows(IllegalStateException.class, () -> new TransactionTemplate(manager).execute(status -> recovery.reconcile()));
+    }
+
+    /** Recovery handles every precommit interruption, including anomalous persisted COMMITTING, exactly once. */
+    @ParameterizedTest
+    @ValueSource(strings = {"ACCEPTED", "PLANNING", "VALIDATING", "COMMITTING"})
+    void recoversUncommittedJournalsWithoutRepeatingEffects(String interrupted) {
+        var c = plan(fixture, fixture.operation()).context();
+        var draw = draws.reserve(c, 0, 10);
+        // Inject crash evidence directly; normal service code never persists COMMITTING alone.
+        jdbc.update("update operation_journal set status = ?, row_version = row_version + 1 where id = ?",
+                interrupted, c.operationId());
+        expireLease(c.campaignId());
+        assertEquals(1, recovery.reconcile());
+        assertEquals("FAILED_BEFORE_COMMIT", jdbc.queryForObject("select status from operation_journal", String.class));
+        assertEquals(draw, draws.reserve(c, 0, 10));
+        assertEquals(0L, number("campaign", "state_revision"));
+        assertEquals(0, count("campaign_event"));
+        assertEquals(0, count("canonical_outbox"));
+        assertEquals(10L, number("actor_resource", "current_value"));
+        var recovered = snapshot();
+        assertEquals(0, recovery.reconcile());
+        assertEquals(recovered, snapshot());
+        assertThrows(IllegalStateException.class, () -> commits.commit(plan(fixture, fixture.operation())));
+    }
+
+    /** Startup recovery leaves another live worker intact and continues over multiple bounded pages of orphans. */
+    @Test
+    void recoveryPreservesLiveLeasesAndProcessesAllPages() {
+        var before = snapshot();
+        assertEquals(0, recovery.reconcile());
+        assertEquals(before, snapshot());
+        for (int index = 0; index < 105; index++) {
+            operation(fixture.campaign(), 0);
+        }
+        assertEquals(105, recovery.reconcile());
+        assertEquals(1, jdbc.queryForObject("select count(*) from operation_journal where status = 'VALIDATING'", Integer.class));
+        assertEquals(0, recovery.reconcile());
+        assertEquals(1L, commits.commit(plan(fixture, fixture.operation())).stateRevision());
+    }
+
+    /** A fresh complete application context runs reconciliation before becoming ready and preserves commit evidence. */
+    @Test
+    void applicationRestartPreservesCommittedReceiptAndPendingNarration() {
+        var plan = plan(fixture, fixture.operation());
+        var draw = draws.reserve(plan.context(), 0, 10);
+        var receipt = commits.commit(plan);
+        var world = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
+        // WebApplicationType.NONE avoids a second server; this is the real persistence
+        // and singleton startup path, with the same disposable database and no account.
+        try (var restarted = new org.springframework.boot.builder.SpringApplicationBuilder(org.rpgengine.EngineApplication.class)
+                .web(org.springframework.boot.WebApplicationType.NONE).run()) {
+            assertEquals("COMMITTED_NARRATION_PENDING", jdbc.queryForObject("select status from operation_journal", String.class));
+            assertEquals(receipt, restarted.getBean(CanonicalCommitService.class).commit(plan));
+            assertEquals(draw, restarted.getBean(RandomDrawService.class).reserve(plan.context(), 0, 10));
+            assertEquals(world, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
+            assertEquals(2, count("canonical_outbox"));
+            assertEquals(1, count("reward_settlement"));
+            assertEquals(0, restarted.getBean(JournalRecoveryService.class).reconcile());
+        }
+    }
+
+    /** A recovery write failure rolls back its fence retirement and journal update; the next run safely retries. */
+    @Test
+    void recoveryFailureRollsBackAndPreventsStartupCompletion() {
+        expireLease(fixture.campaign().getId());
+        var before = snapshot();
+        installFailure("operation_journal");
+        assertThrows(RuntimeException.class, () -> new JournalStartupReconciliation(recovery).afterSingletonsInstantiated());
+        assertEquals(before, snapshot());
+        jdbc.execute("drop trigger p033_fault on operation_journal");
+        jdbc.execute("drop function p033_fail()");
+        assertEquals(1, recovery.reconcile());
+    }
+
+    /** Set a fixture permit's deadline in the past without sleeping or using the host clock. */
+    private void expireLease(UUID campaign) {
+        jdbc.update("update campaign_mutation_lease set expires_at = clock_timestamp() - interval '1 second' where campaign_id = ?", campaign);
+    }
+
     /** Construct a fresh independent owner/adventure/content/campaign/actor/resource and validating operation. */
     private Fixture createFixture() {
-        return new TransactionTemplate(manager).execute(status -> {
+        Fixture created = new TransactionTemplate(manager).execute(status -> {
             var owner = OwnerProfile.create("Owner", NOW);
             entities.persist(owner);
             var adventure = AdventureWorkspace.create(owner.getId(), "Neutral", "neutral", SupportedLocale.EN, NOW);
@@ -461,6 +624,15 @@ class CanonicalCommitServiceTest {
             entities.persist(resource);
             return new Fixture(campaign, resource, operation(campaign, 0));
         });
+        leaseOperation(created.campaign(), created.operation());
+        return created;
+    }
+
+    /** Admit the fixture worker outside its creation transaction; persist the real returned fence for plans. */
+    private void leaseOperation(Campaign campaign, CampaignOperation operation) {
+        var grant = leases.acquire(campaign.getAdventureId(), campaign.getId(), operation.getId(),
+                operation.getId(), Duration.ofSeconds(300));
+        tokens.put(operation.getId(), grant.token());
     }
 
     /** Persist a new command at base revision, already resolved through VALIDATING; return its detached identity. */
@@ -475,10 +647,11 @@ class CanonicalCommitServiceTest {
     }
 
     /** Return a bounded resolved action with a cost, public/private events, reward, decision and narration intent. */
-    private static ResolvedCommit plan(Fixture fixture, CampaignOperation operation) {
+    private ResolvedCommit plan(Fixture fixture, CampaignOperation operation) {
         return new ResolvedCommit(new ResolvedCommit.Context(fixture.campaign().getAdventureId(),
                 fixture.campaign().getId(), operation.getId(), fixture.campaign().getContentRevisionId(), HASH,
-                operation.getBaseRevision(), operation.getOperationVersion()),
+                operation.getBaseRevision(), operation.getOperationVersion(),
+                tokens.getOrDefault(operation.getId(), new MutationLeaseService.Token(operation.getId(), 1))),
                 new ResolvedCommit.WorldChange(true, 60, CampaignMode.EXPLORATION, "{\"kind\":\"choose\"}"),
                 List.of(new ResolvedCommit.ResourceChange(fixture.resource().getId(), 0, -3)),
                 List.of(new ResolvedCommit.Event(fixture.resource().getActorId(), null, EventVisibility.PUBLIC,
@@ -491,8 +664,10 @@ class CanonicalCommitServiceTest {
 
     /** Capture every affected row, including storage versions, for exact rollback comparisons. */
     private List<List<String>> snapshot() {
-        return TABLES.stream().map(table -> jdbc.queryForList("select to_jsonb(t)::text from "
-                + table + " t order by id", String.class)).toList();
+        var rows = new ArrayList<>(TABLES.stream().map(table -> jdbc.queryForList("select to_jsonb(t)::text from "
+                + table + " t order by id", String.class)).toList());
+        rows.add(jdbc.queryForList("select to_jsonb(l)::text from campaign_mutation_lease l order by campaign_id", String.class));
+        return rows;
     }
 
     /** Read one numeric fixture column; callers use constant table/column names and one-row fixtures. */

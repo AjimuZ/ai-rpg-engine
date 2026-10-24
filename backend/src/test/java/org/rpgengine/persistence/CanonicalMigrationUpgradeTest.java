@@ -90,7 +90,7 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(0, v3.migrate().migrationsExecuted);
                     // V4 must retain existing outcomes and counters, never invent old randomness.
                     Flyway v4 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
-                            .locations("classpath:db/migration").load();
+                            .locations("classpath:db/migration").target("4").load();
                     assertEquals(1, v4.migrate().migrationsExecuted);
                     assertTrue(v4.validateWithResult().validationSuccessful);
                     assertEquals(journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
@@ -99,6 +99,16 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(0, jdbc.queryForObject("select count(*) from campaign_random_seed", Integer.class));
                     assertEquals(7L, jdbc.queryForObject("select state_revision from campaign", Long.class));
                     assertEquals(0, v4.migrate().migrationsExecuted);
+                    // V5 keeps historic outcomes intact and creates no fictitious lease owner.
+                    Flyway v5 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").load();
+                    assertEquals(1, v5.migrate().migrationsExecuted);
+                    assertTrue(v5.validateWithResult().validationSuccessful);
+                    assertEquals(journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
+                            String.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from campaign_mutation_lease", Integer.class));
+                    assertEquals(7L, jdbc.queryForObject("select state_revision from campaign", Long.class));
+                    assertEquals(0, v5.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

@@ -149,6 +149,25 @@ Combat player and NPC operations update initiative and encounter state according
 
 ## 8. Interrupt and recovery matrix
 
+P03.5 foundations (verified 24 October 2026): `MutationLeaseService` grants an
+internal worker one campaign mutation lease for 1..300 whole seconds measured with
+PostgreSQL time. V5 keeps a persistent fence high-water mark per campaign; every
+grant, release and expiry retirement increments it, so a late holder can never
+match again. `ResolvedCommit.Context` carries the holder/fence token. New draws and
+canonical commits check it under the campaign → journal → lease locks, while
+immutable draw/receipt replay still comes first. A commit releases the lease in the
+same transaction. Before the web server starts, `JournalRecoveryService` scans keyset
+pages of 100, one transaction per operation. It preserves live leases, retires
+expired ones and moves orphaned `ACCEPTED`/`PLANNING`/`VALIDATING`/`COMMITTING` work
+to `FAILED_BEFORE_COMMIT`. It moves `NARRATING`, and `COMMITTED` with a narration
+outbox intent, to `COMMITTED_NARRATION_PENDING`. Receipts, draws and world state are
+unchanged; any recovery error aborts startup. Limits: recovery assumes one local
+installation, with no other admitter between acceptance and lease grant.
+`COMMITTED` without a narration intent stays `COMMITTED`. Runtime cancellation,
+durable job accounting and worker lease renewal are later work (P03.6, P07). The
+[database backup tool](../tools/database_backup/README.md) retires all saved leases
+on restore.
+
 | Interruption point | Required behavior |
 | --- | --- |
 | Before planning completes | Cancel generation, release lease, no canonical changes |

@@ -22,7 +22,7 @@ class ResolvedCommitTest {
     @Test
     void boundsAndFreezesResolvedEffects() {
         var context = new ResolvedCommit.Context(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                UUID.randomUUID(), "a".repeat(64), 0, 2);
+                UUID.randomUUID(), "a".repeat(64), 0, 2, new MutationLeaseService.Token(UUID.randomUUID(), 1));
         var world = new ResolvedCommit.WorldChange(true, 1, CampaignMode.EXPLORATION, null);
         var event = new ResolvedCommit.Event(null, null, EventVisibility.PUBLIC,
                 new CampaignEvent.Body("changed", 1, 1, "{}"));

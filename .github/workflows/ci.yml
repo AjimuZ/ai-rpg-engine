@@ -51,6 +51,9 @@ jobs:
         run: python -B tools/repository_checks/checks.py workflows
       - name: Check container image pins
         run: python -B tools/repository_checks/checks.py images
+      # Offline backup-tool logic; the real PostgreSQL rehearsal stays a manual release check.
+      - name: Test the database backup tool
+        run: python -B -m unittest discover -s tools/database_backup -v
       # Neutral runtime-adapter fixtures: opt-in Docker and account checks stay skipped.
       - name: Run account-free runtime probe tests
         run: python -B -m unittest discover -s tools/runtime_probe

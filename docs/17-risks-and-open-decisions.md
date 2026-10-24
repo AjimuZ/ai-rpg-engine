@@ -18,7 +18,8 @@ P03.4 adds durable same-operation random reuse and pinned HMAC-SHA-256 v1 identi
 Private campaign seeds are trusted database/backup material, never runtime context.
 Reservation survives failed/cancelled canonical work, but future command policy must
 still prevent equivalent unresolved actions from using fresh operation IDs to fish
-for rerolls. Backup/restore and lease/fencing checks remain P03.5; seed/draw ledgers
+for rerolls. P03.5 adds a database-only backup and leases/fences; startup recovery assumes one
+local installation. Seed/draw ledgers
 must be preserved together and protocol changes must retain old replay support.
 
 Owners below are implementation responsibilities, not assigned people. The project owner can combine roles in a solo project.
@@ -32,14 +33,14 @@ Owners below are implementation responsibilities, not assigned people. The proje
 | AI text contradicts committed outcome | False player understanding | Narrate resolved bundles; structured claims; one repair; mechanical receipt fallback; human evaluations | AI + QA / P08, P18 |
 | Secret leakage through prior thread context | Spoilers or private information exposed | Role/audience thread isolation and input filtering; sentinel tests across API/media/diagnostics | Knowledge + QA / P09, P18 |
 | Long-session summary loses a promise or identity | Narrative discontinuity | Preserve structured obligations/provenance; fresh checkpoints; delayed recall tests | Memory / P09, P18 |
-| Concurrent workers or retries duplicate actions | Corrupt resources/rewards | P03.2 adds row versions, frozen scope, resource bounds, unique committed revisions and write-once outcomes; real PostgreSQL races verify one duplicate winner and stale-writer rollback. P03.3 adds atomic state/event/receipt/outbox commits, exact revision checks and rollback/duplicate race evidence; leases/fences, dispatch and recovery remain later tasks; SQL writers must compare expected row versions, and application boundaries still need authorization | Backend / P03, P07 |
+| Concurrent workers or retries duplicate actions | Corrupt resources/rewards | P03.2 adds row versions, frozen scope, resource bounds, unique committed revisions and write-once outcomes; real PostgreSQL races verify one duplicate winner and stale-writer rollback. P03.3 adds atomic state/event/receipt/outbox commits, exact revision checks and rollback/duplicate race evidence. P03.5 adds fenced mutation leases and startup journal reconciliation; dispatch and worker cancellation remain later tasks; SQL writers must compare expected row versions, and application boundaries still need authorization | Backend / P03, P07 |
 | Genericity becomes arbitrary execution | Unsafe/unmaintainable packs | Bounded data/expressions; supported primitives; explicit extension contract | Content + Security / P04 |
 | Encounter budget misses powerful combinations | Unfair or trivial fights | Combination caps, feasibility checks, simulations, human calibration, published limitations | Rules + QA / P13, P18 |
 | Adaptive generation undermines player progress | Loss of trust | Freeze mechanics at entry; prebudget reinforcements; no secret counter-scaling | Rules / P13 |
 | Too many modules delay a playable core | Endless design/development | Milestone gates, no optional vector/editor/media blockers, small complete combat slice | Product / every package |
 | Pack upgrade invalidates an active campaign | Broken saves/abilities | Immutable snapshots, explicit migration preview, backups, dependency validation | Content + Operations / P16 |
 | Event log mistaken for a fully replayable system | Unsupported recovery claims | Define tested replay scope; maintain current-state snapshots and schema versions | Backend / P03, P16 |
-| Backups omit assets/content revisions | Incomplete recovery | Integrity manifest and fresh-storage restore rehearsal | Operations / P16, P18 |
+| Backups omit assets/content revisions | Incomplete recovery | Integrity manifest and fresh-storage restore rehearsal; the P03.5 tool covers the database only and refuses unknown tables or migrations | Operations / P16, P18 |
 | Remote media disappears or tracks requests | Broken presentation/privacy | Optional origins, local fallback, rights registry, no gameplay dependency | Presentation / P17 |
 | Generated portraits/items drift, cross scopes or reveal secrets | Inconsistent identity or leaked hidden content | Stable public appearance identity, durable original assets, source/audience validation, stale-job rejection and restore checks | Presentation + QA / P17, QA-31 |
 | Parallel adventures share names or stale callbacks | Cross-world content, memory or artwork mixing | Adventure/campaign ownership, distinct managed folders, scoped drafts/threads/jobs and same-name two-genre isolation checks | Domain + QA / P03, P06, P16–P17, QA-33 |

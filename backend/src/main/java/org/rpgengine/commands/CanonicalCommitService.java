@@ -94,6 +94,7 @@ public class CanonicalCommitService {
                 || !campaign.getContentRevisionId().equals(context.contentRevisionId())) {
             throw new IllegalStateException("stale or ineligible resolved operation");
         }
+        MutationLeaseService.requireHeld(jdbc, context);
         ContentRevision content = entities.find(ContentRevision.class, campaign.getContentRevisionId());
         Instant now = Instant.now();
         long firstSequence = Math.addExact(campaign.getCounters().eventSequence(), 1);
@@ -157,6 +158,9 @@ public class CanonicalCommitService {
             entities.persist(new OutboxMessage(operation, OutboxMessage.Kind.NARRATION_REQUIRED, now));
         }
         entities.flush();
+        // Release with the outcome, never before it: rollback retains the permit and
+        // a committed duplicate can replay even though its old permit is now retired.
+        MutationLeaseService.releaseHeld(jdbc, context.campaignId(), context.operationId(), context.lease());
         // Read the stored JSONB rendering so the first response and a later replay are
         // identical, even though PostgreSQL normalizes whitespace and object key order.
         entities.refresh(operation);

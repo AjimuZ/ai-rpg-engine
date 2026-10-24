@@ -25,7 +25,8 @@ import org.rpgengine.persistence.VersionedEntity;
  * token: that is the inherited row version, which every update advances (V2). The
  * database additionally keeps terminal statuses final and the commit outcome
  * write-once. {@link CanonicalCommitService} sets the outcome with state, events,
- * settlements and outbox in one transaction. Leases and fencing arrive with P03.5.
+ * settlements and outbox in one transaction. P03.5 checks a separate campaign lease
+ * and preserves its fencing high-water mark through release and recovery.
  */
 @Entity
 @Table(name = "operation_journal")
@@ -162,6 +163,32 @@ public class CampaignOperation extends VersionedEntity {
      */
     public boolean matchesPayload(String candidateHash) {
         return payloadHash.equals(candidateHash);
+    }
+
+    /**
+     * Recover an interrupted journal under the campaign/journal locks, after checking
+     * that no live lease owns it. Return whether a transition occurred. Uncommitted
+     * work fails closed, including an anomalously persisted COMMITTING row; committed
+     * receipts never change. Only durable narration intent or an interrupted narrator
+     * requires pending presentation. Terminal rows and legacy commits without an
+     * outbox remain unchanged; malformed time/counter overflow aborts recovery.
+     */
+    boolean recoverAfterInterruption(boolean narrationRequired, Instant now) {
+        OperationStatus recovered = switch (status) {
+            case ACCEPTED, PLANNING, VALIDATING, COMMITTING -> OperationStatus.FAILED_BEFORE_COMMIT;
+            case COMMITTED -> narrationRequired ? OperationStatus.COMMITTED_NARRATION_PENDING : status;
+            case NARRATING -> OperationStatus.COMMITTED_NARRATION_PENDING;
+            default -> status;
+        };
+        if (recovered == status) {
+            return false;
+        }
+        // Recovery is an evidence-based exception to the normal worker lifecycle:
+        // there is no speculative replay of COMMITTING or fictitious narration step.
+        updatedAt = CanonicalValues.timestamp(now, "now");
+        operationVersion = Math.addExact(operationVersion, 1);
+        status = recovered;
+        return true;
     }
 
     /** @return owning campaign ID */

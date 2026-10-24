@@ -67,8 +67,8 @@ hidden world data; this is not encryption at rest. Never log/export seed bytes t
 runtime contexts or owner-facing diagnostics. Uncommitted draw values are internal
 preparation data; only a committed receipt exposes its operation's values/references.
 Seeds and immutable draw reservations must be retained together in backups; preserve
-the pinned algorithm/version when restoring. No backup/restore workflow is delivered
-by P03.4. Application authorization and equivalent-new-attempt policy remain future
+the pinned algorithm/version when restoring. The P03.5 database backup captures both
+in one `pg_dump` snapshot. Application authorization and equivalent-new-attempt policy remain future
 gates; durable same-operation reuse alone does not prevent new-operation reroll fishing.
 
 Never put Codex credentials, database passwords, `.env` files, auth stores, private saves, personal notes, or raw provider traces in Git. Diagnostic exports redact keys, tokens, absolute personal paths, private content, and RPC identifiers unless an owner explicitly selects a suitably protected full diagnostic mode.
@@ -112,8 +112,9 @@ inference and delivery must run outside. Campaign/journal locks, exact revision 
 resource version checks protect atomic state/events/settlements/receipt/outbox writes.
 Immutable outbox envelopes contain scoped references only; future workers must build
 authorized projections and deduplicate delivery by message identity. No worker,
-acknowledgment, pruning policy, owner authorization endpoint or lease/fence is delivered
-here. See [commit limits and timeout contract](07-turn-protocol.md#5-canonical-commit).
+acknowledgment, pruning policy or owner authorization endpoint is delivered here.
+P03.5 adds a database-clock campaign mutation lease with a monotonic fence; commits
+and new draws require the current token, and a commit releases it atomically. See [commit limits and timeout contract](07-turn-protocol.md#5-canonical-commit).
 
 ## 8. Backups and restore
 
@@ -123,11 +124,22 @@ Create backups before migration, restore replacement, and significant canon corr
 
 Test restoration into a fresh database and asset directory. Verify sample encounters, quests, operations, and pending decisions. A backup job is not considered successful merely because an archive file exists.
 
+P03.5 delivers a baseline [database backup tool](../tools/database_backup/README.md) for a
+trusted owner with writers stopped. It produces a `pg_dump` custom archive and a
+manifest written last, holding the version, catalog, size and SHA-256. Restore
+validates the archive before any write and goes only into a newly created database,
+in one transaction. It compares the migration catalog and retires every saved
+mutation lease; engine startup reconciliation then runs before HTTP. A manual
+PostgreSQL 18.6 rehearsal checked backup, refusal to reuse a directory, tamper
+rejection, restore, data equality, lease retirement and reconciliation on startup.
+Assets, content packs, campaign-identity restore, replacement preview and the full
+QA-23 rehearsal remain later work (P16, P18).
+
 ## 9. Startup and shutdown
 
 The packaged entry point is the future root `start.sh`. It orchestrates the Compose stack, validates prerequisites and account readiness, and preserves existing configuration and volumes on repeated start or stop. The backend sequence below runs inside that deployment. Database health and backend readiness must be checked explicitly. Runtime account availability is a separate gameplay-readiness state, not a reason to erase data or a live-inference health probe.
 
-Startup order: load configuration → verify filesystem permissions → connect database → validate/apply supported migrations after required backup policy → reconcile unfinished operations and leases → check content dependencies → start HTTP → lazily connect Codex when requested or when an opted-in readiness check runs.
+Startup order: load configuration → verify filesystem permissions → connect database → validate/apply supported migrations after required backup policy → reconcile unfinished operations and leases (P03.5; a failure aborts startup) → check content dependencies → start HTTP → lazily connect Codex when requested or when an opted-in readiness check runs.
 
 An unavailable Codex process does not prevent local inspection of a valid saved campaign. A missing database or incompatible schema blocks mutation. Startup never silently resets a campaign.
 

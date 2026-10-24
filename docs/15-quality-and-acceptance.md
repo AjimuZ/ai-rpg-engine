@@ -69,6 +69,19 @@ part of QA-17; startup reconciliation, backup/restore, lease/fencing, equivalent
 attempt reroll policy and full QA-17/QA-20/QA-33 remain later gates. No live runtime,
 gameplay or hosted-CI claim is made.
 
+P03.5 (24 October 2026): the full backend verify passes 95 tests, with three
+packaged-interface profile skips, on PostgreSQL 18.6. The checks cover exclusive,
+monotonic and concurrent lease grants; expiry fencing of late commits and new draws
+while replay is kept; database lease guards and bounds; recovery of each precommit
+status with no repeated effects; preservation of live leases; pagination past one
+page; a restart that keeps a committed receipt with narration pending; recovery
+failure that aborts startup; and a populated V4-to-V5 upgrade. The backup tool
+passes 9 offline unit tests (one symlink case is skipped on hosts without the
+privilege), and a manual backup/restore rehearsal is recorded in
+[security §8](14-security-and-operations.md#8-backups-and-restore). This is the
+crash-before-commit foundation of QA-17 and a database-only precursor of QA-23, not
+their full acceptance.
+
 ## 2. Verification layers
 
 | Layer | Purpose | Proposed tools |

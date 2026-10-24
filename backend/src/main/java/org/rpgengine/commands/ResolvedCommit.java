@@ -53,13 +53,14 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
 
     /** Scope, pinned content and expected domain versions from the backend's planning snapshot. */
     public record Context(UUID adventureId, UUID campaignId, UUID operationId, UUID contentRevisionId,
-            String payloadHash, long expectedRevision, long expectedOperationVersion) {
+            String payloadHash, long expectedRevision, long expectedOperationVersion, MutationLeaseService.Token lease) {
         /** Reject missing identities, malformed hash or negative counters. */
         public Context {
             Objects.requireNonNull(adventureId, "adventureId");
             Objects.requireNonNull(campaignId, "campaignId");
             Objects.requireNonNull(operationId, "operationId");
             Objects.requireNonNull(contentRevisionId, "contentRevisionId");
+            Objects.requireNonNull(lease, "lease");
             CanonicalValues.requireSha256Hex(payloadHash, "payloadHash");
             CanonicalValues.requireNonNegative(expectedRevision, "expectedRevision");
             CanonicalValues.requireNonNegative(expectedOperationVersion, "expectedOperationVersion");

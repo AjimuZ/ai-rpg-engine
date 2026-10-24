@@ -2,6 +2,15 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Leases, startup recovery and database backups (P03.5), 24 October 2026
+
+- Add forward-only V5 campaign mutation leases with a persistent fence that only grows, database guards against rewinds or unfenced owner changes, and a recovery index. `MutationLeaseService` grants, renews and releases leases using PostgreSQL time.
+- Require the current lease token for new draws and canonical commits, after immutable replay. Release the lease in the commit transaction, so a late or expired holder cannot commit.
+- Reconcile the journal at startup, before the web server starts, in bounded pages: retire expired leases, keep live ones, fail orphaned precommit work and mark interrupted narration pending without repeating effects. A recovery error aborts startup.
+- Add `tools/database_backup`, a trusted-owner `pg_dump`/`pg_restore` tool with a version, catalog and checksum manifest. It restores only into a new database and retires saved leases; its offline tests run in CI.
+- Pass the full offline backend verify on pinned JDK 21/PostgreSQL 18.6 (95 tests pass, three packaged-interface profile skips, jar built) and 9 backup-tool tests (one symlink skip). A manual backup/tamper/restore/startup rehearsal also passed. Repository-checker tests pass 22/22, default packaging checks pass 20/22 with two opt-in skips, and policy checks report no findings.
+- Assets and content in backups, worker cancellation, durable jobs and full QA-17/QA-23 remain later work; hosted CI for this change is unconfirmed.
+
 ## Unreleased — Deterministic draw reservations (P03.4), 24 October 2026
 
 - Add private lazy campaign seeds and immutable operation/ordinal draw records in forward-only V4, with scoped foreign keys, uniqueness and bounds. Preserve historical outcomes without backfilling randomness.
