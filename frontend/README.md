@@ -17,6 +17,15 @@ registered pack/campaign projections remain P06. Current resource values are nev
 invented from definitions.
 
 Open `/library`, `/settings`, or `/adventures/mosslight/story` (also `relay`).
+P05.5 adds `/interface-kit`, linked from Settings, for the shared original MIT
+SVG/CSS theme: control states, 20 icons, bounded numeric meters, progress,
+dialogue/portrait/item frames, empty slots and independent sample item artwork.
+Navigation/story controls, sheet placeholders and inventory use these primitives.
+The [public source inventory](public/ui/README.md) and full MIT notice ship with
+the build; no external asset/font dependencies or raster generation are used.
+Review-page values/art are explicitly examples, never campaign data. Persistent
+help disclosure provides keyboard/touch access without hover-only tooltips.
+
 Each adventure has `create`, `story`, `sheet`, `inventory` and `journal` routes;
 `guide` and `creative` render only when their public configuration is present.
 Unknown adventure IDs show an unavailable screen. Creation validates a 1–60

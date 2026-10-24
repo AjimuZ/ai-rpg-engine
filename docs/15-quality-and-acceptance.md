@@ -282,6 +282,23 @@ draft/projection portion of QA-29; actual campaign operation reconciliation,
 reconnect deduplication, assistive-technology review and full QA-29/30/33/35 remain
 later gates. Send remains disabled until P06/P07 provide campaign operations.
 
+P05.5 establishes QA-30 for the local graphic kit: all 30 frontend tests, strict
+typecheck, production build (345.91 kB), zero-vulnerability audit and 22 repository
+tests pass. Original SVG/CSS geometry covers controls, 20 icons, finite/clamped
+numeric resource bars, progress, dialogue/nameplate/portrait/item frames, empty
+slots, independent sample item art, status symbols and persistent help disclosure.
+Settings ships credits plus source/provenance inventory and complete MIT notice.
+Chrome 155 verifies real keyboard and pointer states, disabled/busy/invalid
+semantics, live meter labels, measured text/placeholder contrast >=4.5:1 and field boundary/
+focus contrast >=3:1, notice delivery and forced-colour/increased-contrast/reduced-
+motion rendering. Desktop/mobile full-page screenshots were visually reviewed;
+320px/landscape checks have no horizontal overflow. Unknown/inherited icon keys,
+literal labels, invalid numeric input and review-state isolation have regression
+coverage. An existing browser timing race now waits for the zoneless draft guard
+render before checking its unchanged disabled assertion. These checks do not
+establish runtime campaign artwork persistence, Italian review, assistive-
+technology acceptance or the remaining QA-29/31/33/35 gates.
+
 Combat-chat acceptance for P11/P12 also includes a real-browser English/Italian
 path with visible speaker/recipient, editable suggestions and explicit Send;
 desktop/mobile keyboard access to both chat and tactics; draft preservation while

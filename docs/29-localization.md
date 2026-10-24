@@ -77,6 +77,11 @@ Reading preferences/positions remain tab-lifetime; no operation is created or
 persisted by the preview composer. Language resources, locale-generation guards,
 operation identity and full language-switch restoration remain P05.6/P06/P07.
 
+P05.5 adds the English-only graphic-kit review and credits/source inventory.
+Its control, meter, rarity and fallback labels remain live text beside decorative
+SVG geometry; no translated text is embedded in artwork. Localizing those labels,
+review examples and accessible names is part of P05.6, with the existing screens.
+
 Before reload, persist the adventure/campaign-scoped input draft, operation ID,
 last stream cursor and reading position. Wait for or reconcile an outstanding
 operation, restore by IDs and deduplicate messages. Do not submit the draft.

@@ -1,10 +1,11 @@
 /** Local reading settings shell; runtime, audio and localization remain explicitly unavailable. */
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { PreviewState } from './preview-state';
+import { RouterLink } from '@angular/router';
 
 /** Apply bounded in-memory reading preferences; accepts native select values and ignores invalid numbers. */
 @Component({
-  selector: 'app-settings', changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-settings', imports: [RouterLink], changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<section class="panel narrow"><h1>Settings</h1><h2>Reading</h2>
     <label for="text-size">Story text size</label>
     <select id="text-size" [value]="state.textSize()" (change)="changeSize($event)">
@@ -17,7 +18,8 @@ import { PreviewState } from './preview-state';
     <h2>Language</h2><p>English preview. Italian interface resources and persisted language selection are planned.</p>
     <h2>Sound and appearance</h2><p>No audio is loaded. Motion is disabled in this preview.</p>
     <h2>Runtime</h2><p>No campaign or narration service is connected.</p>
-    <h2>Credits</h2><p>Original scene and speaker vector illustrations, distributed under the project MIT license. System fonts; no external media requests.</p>
+    <h2>Credits</h2><p>Original scene, speaker and item vector illustrations, icons, frames and control geometry. Copyright 2026 Azim Ben Othman; distributed under the project MIT license. System fonts; no external media requests.</p>
+    <p><a routerLink="/interface-kit">Review interface graphic kit</a> · <a href="/ui/README.md">Asset sources and provenance</a> · <a href="/ui/LICENSE.txt">MIT license</a></p>
     </section>`,
 })
 export class Settings {

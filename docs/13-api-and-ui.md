@@ -120,6 +120,15 @@ Selecting a chip **fills an editable draft**; only the separate, explicit Send a
 
 ### 6.3 Graphics, persistent portraits and item identity
 
+P05.5 implements the local [graphic-kit inventory](../frontend/public/ui/README.md):
+original scalable controls, resource/progress bars, 20 allowlisted line icons,
+dialogue/portrait/item frames, a separate sample item illustration and persistent
+help disclosure. Settings links the review surface and bundled MIT/source notices.
+Unavailable campaign resources/items retain explicit text fallbacks; review-page
+numbers/artwork are examples only. Native focus/selected/disabled/busy/invalid and
+pointer states, contrast and narrow/forced-colour/reduced-motion variants pass
+browser checks. Campaign media delivery/persistence and runtime images remain P17.
+
 Building the UI includes delivering its complete usable asset kit, not leaving the illustrative mockup as a substitute. Produce original graphics through supported image-generation tools when suitable, or obtain them from verified free libraries with preserved notices. Use accessible CSS/SVG for scalable bars and controls; decorative frames, textures, portraits and distinct item artwork can be separate image assets. Text, focus indicators and numerical values remain live UI elements. The inventory, required interaction states, source records and acceptance checks are specified in [presentation assets](23-presentation-assets.md).
 
 During play, supported bounded image-generation jobs can create new scene art, character portraits and identifying item icons. Save and reuse the results by stable entity/appearance identity. A named sword in a shop retains its image when inspected, purchased, equipped, saved or restored. Equivalent copies can share definition artwork; a visually distinct unique variant has its own identity. A reusable decorative portrait frame is distinct from the character portrait. Rarity uses an explicit tier name plus shape/icon/text treatment and the pack's rules, never color or artwork alone.

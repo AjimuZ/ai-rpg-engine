@@ -14,6 +14,13 @@ retain their standard precedence; configtree is not a secret manager.
 
 ## 1. Risk register
 
+P05.5 reduces local UI asset/rights risk with original editable MIT SVG/CSS,
+a complete public source inventory and shipped notice, without external art/font
+dependencies. Browser-reviewed control/meter/frame fallbacks preserve text,
+numeric labels, keyboard access and forced-colour/reduced-motion use. This covers
+the local graphic kit only; it does not settle runtime generation capability,
+campaign identity/rights, bilingual review or release accessibility gates.
+
 P04.1–P04.4 now separate parsing, semantic compilation, protected staging and
 transactional admission. `ParsedPack`/`CompiledPack` alone are not admitted
 revisions. ZIP bytes never extract to disk; database seals prevent ordinary

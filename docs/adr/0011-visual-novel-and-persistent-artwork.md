@@ -1,6 +1,6 @@
 # ADR 0011 — Visual-novel presentation and persistent artwork
 
-- Status: Accepted design requirement; P05.1–P05.4 local reading/drafts implemented, full presentation and persistent artwork pending
+- Status: Accepted design requirement; P05.1–P05.5 local reading/drafts/graphic kit implemented, full presentation and persistent artwork pending
 - Date: 23 October 2026
 - Owner direction: immersive visual-novel play, editable quick replies, a complete graphic asset kit, and persistent generated character/item images
 
@@ -18,4 +18,4 @@ Known item rarity is explicit validated data with accessible labels and shared p
 
 ## Consequences and verification
 
-Update P01 capability proof, P04 item data, P05 UI/graphics, P08 narration contracts, P10/P13 rarity semantics, P16 asset recovery and P17 generation. P05.1–P05.3 supply local visual-novel/text-focused reading, attributed passages/chronicle, original vector environments/portraits and browser-verified keyboard focus. P05.4 adds scoped persistent unsent drafts, editable typed suggestions and revision/connection guards; choosing/dismissing never submits or advances state. Real campaign submission/reconnect reconciliation, the graphic kit and runtime image code remain pending. Verify QA-29–31 and the linked [interface](../13-api-and-ui.md) and [asset specification](../23-presentation-assets.md). No third-party runtime art is bundled by this decision.
+Update P01 capability proof, P04 item data, P05 UI/graphics, P08 narration contracts, P10/P13 rarity semantics, P16 asset recovery and P17 generation. P05.1–P05.3 supply local visual-novel/text-focused reading, attributed passages/chronicle, original vector environments/portraits and browser-verified keyboard focus. P05.4 adds scoped persistent unsent drafts, editable typed suggestions and revision/connection guards; choosing/dismissing never submits or advances state. P05.5 integrates the original MIT SVG/CSS graphic kit and its source/notice inventory with browser-reviewed interaction/fallback states. Real campaign submission/reconnect reconciliation and runtime image code remain pending. Verify QA-29–31 and the linked [interface](../13-api-and-ui.md) and [asset specification](../23-presentation-assets.md). No third-party runtime art is bundled by this decision.

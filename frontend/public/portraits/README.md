@@ -9,5 +9,5 @@ Each portrait resolves from a stable public speaker ID inside its local preview.
 Live names and role labels remain readable if artwork is absent or fails. Images
 are decorative alongside that attribution; text-focused mode loads no artwork.
 These illustrative identities are not imported or persisted campaign entities.
-The complete graphic kit remains P05.5; runtime artwork and identity persistence
-remain P17.
+The complete local graphic kit and distributed notice are indexed in
+[UI sources](../ui/README.md); runtime artwork and identity persistence remain P17.

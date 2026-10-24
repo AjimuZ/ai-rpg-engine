@@ -4,10 +4,11 @@ import { ActivatedRoute } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { displayLabel } from './content-metadata';
 import { WorkspaceContext } from './workspace';
+import { UiItem, UiMeter } from './ui-kit';
 
 /** Render scoped attribute/resource names with unavailable values; no saved state is accepted. */
 @Component({
-  selector: 'app-sheet', changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-sheet', imports: [UiMeter], changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<section class="panel"><h1>{{ context.term('sheet') }}</h1><p>No character is connected to this preview.</p>
     <h2>{{ context.term('attributes') }}</h2>
     @if (context.adventure()?.content?.attributes?.length) {
@@ -18,7 +19,7 @@ import { WorkspaceContext } from './workspace';
     <h2>{{ context.term('resources') }}</h2>
     @if (context.adventure()?.content?.resources?.length) {
       <dl>@for (resource of context.adventure()?.content?.resources; track resource.id) {
-        <div [attr.data-resource]="resource.id"><dt>{{ label(resource.name, resource.id) }}</dt><dd>Not connected</dd></div>
+        <div [attr.data-resource]="resource.id"><dt>{{ label(resource.name, resource.id) }}</dt><dd><app-ui-meter [label]="label(resource.name, resource.id)" /></dd></div>
       }</dl>
     } @else { <p>No resource definitions to display.</p> }
     <h2>{{ context.term('skills') }}</h2><p>Accepted character values will appear here.</p>
@@ -32,9 +33,9 @@ export class Sheet {
 
 /** Render inventory/equipment placeholders; unavailable actions never imply ownership changes. */
 @Component({
-  selector: 'app-inventory', changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-inventory', imports: [UiItem], changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<section class="panel"><h1>{{ context.term('inventory') }}</h1><p>No campaign inventory is connected.</p>
-    <h2>Carried items</h2><p>Known owned items will appear here with quantities and explicit rarity labels.</p>
+    <h2>Carried items</h2><p>Known owned items will appear here with quantities and explicit rarity labels.</p><app-ui-item />
     <h2>{{ context.term('equipment') }}</h2><p>No equipment to inspect.</p><button disabled>Equip item</button></section>`,
 })
 export class Inventory {

@@ -11,8 +11,10 @@ measured appearance/voice consistency.
 This specification is partially implemented: P05.1 delivers preview shells and two
 original vector environments with live passage text and a missing-image fallback.
 The [asset inventory](../frontend/public/scenes/README.md) records editable sources
-and MIT licensing; no external art or service is used. Full UI kit and runtime
-image-generation code remain pending. The default story screen is the visual novel
+and MIT licensing; no external art or service is used. P05.5 adds the original
+[UI kit inventory](../frontend/public/ui/README.md), reusable SVG/CSS graphics and
+an isolated browser-reviewed route under QA-30. Runtime image-generation
+code remains pending. The default story screen is the visual novel
 described in [API and UI](13-api-and-ui.md#6-interface-direction). The owner requires
 a complete graphical UI kit and persistent character/item artwork, including
 supported generation during play. The [concept image](mockups/visual-novel-ui-v1.png)
@@ -24,13 +26,41 @@ P05.3 adds two original static [vector portraits](../frontend/public/portraits/R
 under MIT with editable sources and no third-party inputs. Scoped public IDs bind
 them to live character labels; absent/failed images retain a neutral initial and
 text attribution. Text-focused mode omits scene and portrait images entirely.
-These sample assets do not establish the complete P05.5 kit or P17 persistence.
+P05.5 completes the local UI kit described below; P17 persistence remains pending.
+
+P05.5 integrates original MIT geometry from `frontend/src/app/preview/ui-kit.ts`
+and `frontend/src/_ui-kit.scss` with the existing theme: 20 allowlisted line icons,
+finite/clamped resource meters, an independent crystal illustration, item/empty
+slot frames, control states and help surfaces. Workspace navigation and story
+actions use decorative icons beside live labels; sheets render unavailable bars
+until real values exist, and inventories retain explicit empty slots. The review
+route `/interface-kit`, linked from Settings, demonstrates health/focus/XP and
+progress values, selected/disabled/busy/invalid states, frames and all icons using
+clearly labeled examples. It neither creates items nor changes a campaign.
+
+Native persistent disclosure is used for tooltip/help content so keyboard and
+touch users retain the same explanation without hover timing. CSS/SVG remains
+editable runtime geometry; no raster generation, third-party library or external
+reference is needed. The public inventory records these decisions and all source
+families, including existing scenes/portraits. Settings credits and the bundled
+`/ui/LICENSE.txt` preserve the complete project MIT notice. No mockup is sliced
+or shipped as production controls. English labels remain P05.6 localization work.
+
+QA-30 local-kit verification passes 30 frontend tests, strict typecheck/build and
+Chrome 155 desktop/mobile review, plus 320px/landscape overflow checks, keyboard
+and pointer states, rendered contrast measurements, forced colours, increased
+contrast, reduced motion and same-origin notice delivery. Resource values reject
+missing/nonfinite/invalid bounds instead of inventing zero; unknown icon names
+cannot inject markup or URLs. Text-only story reading still omits story artwork.
+Runtime generation, entity artwork persistence and assistive-technology review
+remain their separate acceptance gates.
 
 P04.5 includes original MIT-licensed 48×32 woodland/station PNG schematics in the
 [neutral import fixtures](../backend/src/test/resources/packs/README.md), with
 per-pack license and credit inventories. Integration checks preserve their exact
 bytes and verify admitted image metadata. These are import corpus assets;
-production scene art, catalogs, delivery routes and UI kit acceptance remain open.
+production campaign scene art, catalogs and delivery routes remain open. Local
+preview UI-kit acceptance is recorded above.
 
 P04.4 delivers authored-pack media admission only: PNG/JPEG/WebP image and
 Ogg/MP3/WAV audio signatures, byte/dimension ceilings, original immutable bytes

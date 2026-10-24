@@ -1,9 +1,10 @@
+@use 'ui-kit';
 /* Preview theme: quiet navigation leaves the scene and spoken passage dominant. */
 :root {
   color-scheme: dark;
   --surface: #141522;
   --raised: #202032;
-  --line: #514c68;
+  --line: #817a96;
   --text: #f0edf5;
   --muted: #c0bbd0;
   --accent: #e6c783;
@@ -44,7 +45,7 @@ input, textarea, select {
 }
 textarea { resize: vertical; }
 textarea:disabled { opacity: 1; color: var(--muted); }
-textarea::placeholder { color: var(--muted); }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 label { display: block; margin: .75rem 0 .4rem; font-weight: 600; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
 h1, h2, p { overflow-wrap: anywhere; }
@@ -121,3 +122,6 @@ summary { cursor: pointer; color: var(--focus); padding: .4rem 0; }
 .quick-replies li { display: flex; flex-wrap: wrap; gap: .3rem; max-width: 100%; }
 .quick-replies button { white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .composer-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+
+/* Apply kit state overrides after baseline element styles so media and invalid states win. */
+@include ui-kit.theme;

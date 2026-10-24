@@ -738,7 +738,19 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     with no exceptions or nonlocal/action requests; mobile composer visually reviewed.
     Send and retry await P06/P07 campaign/operation transport; full accessibility
     and bilingual acceptance remain later gates.
-- [ ] P05.5 Create or license and integrate the complete UI graphic kit, including buttons, bars, icons, frames and required interaction/fallback states; register sources, notices and generated-asset provenance.
+- [x] P05.5 Create or license and integrate the complete UI graphic kit, including buttons, bars, icons, frames and required interaction/fallback states; register sources, notices and generated-asset provenance.
+  - Original MIT SVG/CSS kit supplies 20 icons, bounded resource bars, separate item
+    artwork, inventory/portrait/dialogue frames, native control states and persistent
+    help disclosure. Navigation, reading actions, sheet and inventory use the kit;
+    Settings links its review route, editable-source inventory and shipped notice.
+    No third-party artwork or raster generation is used. All 30 frontend tests,
+    strict typecheck/build (345.91 kB), zero-vulnerability audit and 22 repository
+    tests pass. Chrome 155 verifies keyboard/pointer states, live numeric labels,
+    measured text/placeholder/control contrast, forced colours, increased contrast, reduced
+    motion and notice delivery. Desktop/mobile screenshots were visually reviewed;
+    320px/landscape layouts do not overflow. QA-30 covers this local kit; campaign
+    asset delivery/ownership, Italian resources and runtime artwork remain later
+    tasks. No sample value or item implies canonical state.
 - [ ] P05.6 Deliver reviewed English-default/Italian UI variants, localized receipts/errors/accessibility, persisted language selection and draft/cursor-safe reload; extend single-origin packaging/resource checks under QA-35.
 - [ ] P05.7 Define and render bounded typed public presentation events for scene, pose/expression and optional line audio hooks; reject executable/raw-URL directives, deduplicate delivery and preserve text-only/keyboard/reduced-motion behavior under QA-40.
 

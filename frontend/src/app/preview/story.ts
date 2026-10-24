@@ -4,10 +4,12 @@ import { QuickReply, StoryInputState, StoryStatus } from './story-input-state';
 import { Passage } from './preview-state';
 import { PreviewState } from './preview-state';
 import { WorkspaceContext } from './workspace';
+import { UiIcon } from './ui-kit';
 
 /** Accept scoped preview content and reading preferences, rendering live attribution; missing content/media stays readable without throwing. */
 @Component({
   selector: 'app-story',
+  imports: [UiIcon],
   host: { '(window:offline)': 'connectionChanged(false)', '(window:online)': 'connectionChanged(true)' },
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -35,7 +37,7 @@ import { WorkspaceContext } from './workspace';
             </p>
             <p class="passage">{{ current.text }}</p></div>
           </section>
-          <div class="reading-controls"><button (click)="advance(dialogue)" [disabled]="atEnd()" aria-describedby="reading-progress">Continue</button>
+          <div class="reading-controls"><button (click)="advance(dialogue)" [disabled]="atEnd()" aria-describedby="reading-progress"><app-ui-icon name="continue" />Continue</button>
             <span id="reading-progress">Passage {{ state.position(adventure.id) + 1 }} of {{ adventure.passages.length }} · {{ atEnd() ? 'End of available passages' : 'reading only' }}</span>
           </div>
         } @else {
@@ -64,7 +66,7 @@ import { WorkspaceContext } from './workspace';
             placeholder="Write a draft…" rows="3" aria-describedby="draft-status composer-help"
             (input)="saveDraft(playerInput)" (select)="saveDraft(playerInput)" (keyup)="saveDraft(playerInput)"
             (click)="saveDraft(playerInput)" (focus)="restoreSelection(playerInput)"></textarea>
-          <div class="composer-actions"><button type="button" data-send disabled>Send</button>
+          <div class="composer-actions"><button type="button" data-send disabled><app-ui-icon name="send" />Send</button>
             <button type="button" (click)="clearDraft(playerInput)" [disabled]="input.draft().text === ''">Clear draft</button></div>
           <p id="draft-status" class="muted">{{ input.persistence() === 'saved' ? 'Draft saved on this device.' : input.persistence() === 'invalid' ? 'Saved draft could not be restored. New edits will replace it.' : 'Draft kept in this tab only. Device storage is unavailable.' }}</p>
           <p id="composer-help" class="muted">Reading and suggestions never submit an action. No campaign is connected; Send is unavailable.</p>

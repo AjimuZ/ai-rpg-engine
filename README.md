@@ -1,5 +1,10 @@
 # AI RPG Engine
 
+P05.5 delivers the original MIT [UI graphic kit](frontend/public/ui/README.md):
+scalable controls, bars, icons, frames, independent sample item art and fallback
+states. Settings links the browser-reviewed kit, editable-source inventory and
+distributed notices. Campaign artwork persistence and runtime generation remain P17.
+
 P02.4 ordinary CI is verified by [hosted run 40028086153](https://github.com/AjimuZ/ai-rpg-engine/actions/runs/40028086153), with all four jobs passing on the recorded source revision. This validates the current repository/shell checks, not gameplay or full packaged readiness.
 
 P01.7 selects [serialized inference](tools/runtime_probe/CONCURRENCY.md): one

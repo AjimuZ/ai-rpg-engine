@@ -234,6 +234,8 @@ try {
     await command('Input.insertText', { text: 'Still drafting.' });
     const draft = 'My edited response\nStill drafting.';
     await waitFor(`document.querySelector('#player-input').value === ${JSON.stringify(draft)}`);
+    // Native input updates before zoneless rendering; await the guard's DOM update before asserting it.
+    await waitFor(`document.querySelector('[data-suggestion]').disabled`);
     assert.equal(await evaluate(`document.querySelector('[data-suggestion]').disabled`), true);
     await evaluate(`document.querySelector('[data-dismiss]').focus(); document.querySelector('[data-dismiss]').click()`);
     await waitFor(`document.querySelectorAll('[data-dismiss]').length === 1`);
@@ -265,11 +267,72 @@ try {
     await command('Page.reload');
     await waitFor(`document.querySelector('#player-input')?.value === ''`);
   }
+  // Review shared primitives independently of campaign content; samples cannot create world actions.
+  await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
+  await command('Page.navigate', { url: origin + '/settings' });
+  await waitFor(`!!document.querySelector('a[href="/interface-kit"]')`);
+  await clickLink('Review interface graphic kit', '/interface-kit');
+  await waitFor(`!!document.querySelector('button[aria-pressed]')`);
+  assert.equal(await evaluate(`document.querySelectorAll('[role=meter]').length`), 3);
+  assert.equal(await evaluate(`document.querySelectorAll('.icon-inventory li').length`), 20);
+  assert.equal(await evaluate(`document.querySelector('button[aria-busy]').disabled`), true);
+  assert.equal(await evaluate(`document.querySelector('input[aria-invalid]').getAttribute('aria-describedby')`), 'kit-error-help');
+  await evaluate(`document.querySelector('button[aria-pressed]').focus()`);
+  await pressKey('Enter', 'Enter', 13, '\r');
+  await waitFor(`document.querySelector('button[aria-pressed]').getAttribute('aria-pressed') === 'true'`);
+  assert.equal(await evaluate(`document.querySelector('button[aria-pressed]').getAttribute('aria-pressed')`), 'true');
+  assert.equal(await evaluate(`getComputedStyle(document.activeElement).outlineStyle`), 'solid');
+  await evaluate(`document.querySelector('.toggle input').focus()`);
+  await pressKey(' ', 'Space', 32, ' ');
+  assert.equal(await evaluate(`document.querySelector('.toggle input').checked`), true);
+  await evaluate(`document.querySelector('.kit-help summary').focus()`);
+  await pressKey('Enter', 'Enter', 13, '\r');
+  assert.equal(await evaluate(`document.querySelector('.kit-help').open`), true);
+  // Measure contrast from rendered opaque colours instead of duplicating palette estimates.
+  assert.equal(await evaluate(`(() => {
+    /** Convert computed RGB to relative luminance; all sampled theme colours are opaque. */
+    const luminance = colour => colour.match(/[\\d.]+/g).slice(0, 3).map(Number).map(/** Linearize one sRGB byte for the WCAG luminance formula. */ v => { const c = v / 255; return c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4; }).reduce(/** Weight linear channels into relative luminance. */ (sum, c, i) => sum + c * [.2126, .7152, .0722][i], 0);
+    /** Return the WCAG contrast ratio for two opaque computed colours. */
+    const ratio = (a, b) => { const x = luminance(a), y = luminance(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+    const panel = getComputedStyle(document.querySelector('.graphic-kit')).backgroundColor;
+    const field = getComputedStyle(document.querySelector('#kit-field'));
+    const placeholder = getComputedStyle(document.querySelector('#kit-field'), '::placeholder');
+    const button = getComputedStyle(document.querySelector('button[aria-pressed]'));
+    const text = [...document.querySelectorAll('.graphic-kit p, .graphic-kit label, .speaker')].every(/** Check each visible label against its shared opaque panel surface. */ el => ratio(getComputedStyle(el).color, panel) >= 4.5);
+    return text && ratio(placeholder.color, field.backgroundColor) >= 4.5 && ratio(field.color, field.backgroundColor) >= 4.5 && ratio(field.borderTopColor, field.backgroundColor) >= 3 && ratio(button.color, button.backgroundColor) >= 4.5 && ratio(button.outlineColor, panel) >= 3;
+  })()`), true);
+  // Pointer states must remain distinguishable without an animated transition.
+  await evaluate(`document.querySelector('.quick-replies button').scrollIntoView({block: 'center'})`);
+  const point = await evaluate(`(() => { const r = document.querySelector('.quick-replies button').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+  const normal = await evaluate(`getComputedStyle(document.querySelector('.quick-replies button')).backgroundColor`);
+  await command('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+  const hover = await evaluate(`getComputedStyle(document.querySelector('.quick-replies button')).backgroundColor`);
+  assert.notEqual(hover, normal);
+  await command('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point });
+  assert.notEqual(await evaluate(`getComputedStyle(document.querySelector('.quick-replies button')).backgroundColor`), hover);
+  await command('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point });
+  for (const [width, height] of [[1440, 1100], [390, 844], [320, 740], [740, 320]]) {
+    await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
+    assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+    if (width === 1440 || width === 390) {
+      const { cssContentSize } = await command('Page.getLayoutMetrics');
+      await writeFile(resolve(artifacts, `p055-kit-${width}.png`), Buffer.from((await command('Page.captureScreenshot', { captureBeyondViewport: true, clip: { x: 0, y: 0, width, height: cssContentSize.height, scale: 1 } })).data, 'base64'));
+    }
+  }
+  await command('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }, { name: 'prefers-reduced-motion', value: 'reduce' }] });
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.meter-fill')).forcedColorAdjust`), 'none');
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('progress:indeterminate')).appearance`), 'none');
+  assert.equal(await evaluate(`document.querySelector('[role=meter]').getAttribute('aria-valuenow')`), '18');
+  await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-contrast', value: 'more' }] });
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('#kit-field')).borderTopWidth`), '2px');
+  await command('Emulation.setEmulatedMedia', { features: [] });
+  assert.equal(await evaluate(`fetch('/ui/LICENSE.txt').then(r => r.text()).then(text => text.includes('MIT License') && text.includes('Copyright (c) 2026 Azim Ben Othman'))`), true);
+  assert.equal(await evaluate(`fetch('/ui/README.md').then(r => r.text()).then(text => text.includes('src/app/preview/ui-kit.ts') && text.includes('No third-party artwork'))`), true);
   await command('Page.navigate', { url: origin + '/adventures/missing/story' });
   await waitFor(`document.querySelector('h1')?.textContent === 'Adventure unavailable'`);
   assert.deepEqual(exceptions, []);
   assert.equal(requests.some(/** Reject world/API writes or remote media requests during preview journeys. */ (request) => request.method !== 'GET' || !request.url.startsWith(origin + '/')), false);
-  console.log(`Browser smoke passed: ${version.product}; desktop/mobile and narrow/landscape text layouts, portraits/failures, Enter/Space reading and chronicle, final focus/Tab, reduced motion, metadata/panels, form/settings, draft editing/reload/selection/isolation, offline/online recovery; no page exceptions or nonlocal/action requests.`);
+  console.log(`Browser smoke passed: ${version.product}; responsive reading/drafts/recovery and graphic kit, keyboard/pointer states, contrast, forced colours/reduced motion, notices; no page exceptions or nonlocal/action requests.`);
 } finally {
   browser.kill();
   await new Promise(/** Release the loopback listener before completing; no background server survives. */ (accept) => server.close(accept));

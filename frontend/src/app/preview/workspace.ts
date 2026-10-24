@@ -4,6 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { PreviewState } from './preview-state';
 import { contentTerm, ContentTerm, displayLabel } from './content-metadata';
+import { UiIcon } from './ui-kit';
 
 /** Resolve parent route parameters reactively for child screens; unknown IDs produce undefined. */
 @Injectable()
@@ -22,7 +23,7 @@ export class WorkspaceContext {
 /** Render compact navigation around one known preview; invalid IDs show an actionable fallback. */
 @Component({
   selector: 'app-workspace',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, UiIcon],
   providers: [WorkspaceContext],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -30,7 +31,7 @@ export class WorkspaceContext {
       <header class="workspace-heading"><p>{{ adventure.title }} <span class="badge">Preview</span></p>
         <nav aria-label="Adventure">
           @for (page of pages(); track page.path) {
-            <a [routerLink]="page.path" routerLinkActive="selected" ariaCurrentWhenActive="page">{{ page.label }}</a>
+            <a [routerLink]="page.path" routerLinkActive="selected" ariaCurrentWhenActive="page"><app-ui-icon [name]="page.path" />{{ page.label }}</a>
           }
         </nav>
       </header>

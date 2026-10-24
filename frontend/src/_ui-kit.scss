@@ -1,0 +1,50 @@
+/* Original plum/gold control geometry; live text, native semantics and system fonts are invariant. */
+@mixin theme {
+app-ui-icon { display: inline-flex; width: 1.25em; height: 1.25em; vertical-align: middle; flex: 0 0 auto; }
+app-ui-icon svg { width: 100%; height: 100%; }
+button app-ui-icon, a app-ui-icon { margin-inline-end: .45rem; }
+/* Selected toggles use both a stronger boundary and pressed semantics, never colour alone. */
+button[aria-pressed='true'] { border-width: 3px; padding: calc(.65rem - 2px) calc(1rem - 2px); background: #49415e; }
+button[aria-busy='true'] { border-style: dashed; }
+input:hover:enabled, textarea:hover:enabled, select:hover:enabled { border-color: var(--muted); }
+input:active:enabled, textarea:active:enabled, select:active:enabled { border-color: var(--accent); }
+input:disabled, select:disabled { color: var(--muted); background: var(--raised); cursor: not-allowed; }
+[aria-invalid='true'] { border: 2px solid #ffc2c2; }
+.error-text { color: #ffc2c2; }
+.toggle { display: flex; gap: .75rem; align-items: center; min-height: 2.75rem; }
+.toggle input { display: inline-block; width: 1.25rem; min-height: 1.25rem; height: 1.25rem; accent-color: var(--accent); }
+.resource-meter { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .35rem 1rem; margin-block: .8rem; max-width: 32rem; }
+.meter-track { grid-column: 1 / -1; height: .8rem; border: 1px solid var(--muted); border-radius: .2rem; overflow: hidden; background: var(--surface); }
+.meter-fill { display: block; height: 100%; background: var(--focus); }
+.meter-track.unavailable { border-style: dashed; }
+progress { display: block; width: min(100%, 32rem); height: 1rem; accent-color: var(--focus); }
+/* Item frames remain independent of illustrations and retain explicit empty/rarity text. */
+.item-frame { display: grid; justify-items: center; width: 12rem; max-width: 100%; min-height: 11rem; margin: 0; padding: 1rem; border: 2px solid var(--accent); border-radius: .4rem; background: var(--surface); }
+.item-frame figcaption { text-align: center; overflow-wrap: anywhere; }
+.item-empty { border-style: dashed; color: var(--muted); }
+.rarity-label { display: flex; justify-content: center; align-items: center; gap: .4rem; font-size: .875rem; margin-top: .4rem; }
+.kit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-block: 1rem; }
+.kit-status { display: flex; align-items: center; gap: .5rem; }
+.icon-inventory { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: .75rem; padding: 0; list-style: none; }
+.icon-inventory li { display: flex; gap: .6rem; align-items: center; }
+/* Persistent disclosure replaces hover-only tooltips so keyboard/touch users read the same help. */
+.kit-help { margin-block: 1rem; padding: .75rem; border: 1px solid var(--line); border-radius: .3rem; }
+.kit-help[open] { border-color: var(--focus); }
+/* Loading has explicit text and requires no decorative animation in reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  progress:indeterminate { appearance: none; background: var(--raised); border: 1px dashed var(--muted); }
+  progress:indeterminate::-webkit-progress-bar { background: var(--raised); }
+  progress:indeterminate::-webkit-progress-value { animation: none; }
+  progress:indeterminate::-moz-progress-bar { animation: none; }
+}
+@media (prefers-contrast: more) {
+  :root { --line: #c0bbd0; }
+  button, .button, input, select, textarea { border-width: 2px; }
+}
+@media (forced-colors: active) {
+  .meter-fill { background: Highlight; forced-color-adjust: none; }
+  .meter-track, .item-frame, .kit-help, button[aria-pressed='true'] { border-color: CanvasText; }
+  [aria-invalid='true'] { border-color: CanvasText; border-style: double; }
+  .error-text { color: CanvasText; }
+}
+}

@@ -2,6 +2,18 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Complete local interface graphic kit (P05.5), 24 October 2026
+
+- Integrate original MIT SVG/CSS controls, 20 allowlisted icons, bounded numeric
+  resource/progress bars, dialogue/portrait/item frames and independent sample item
+  art, with explicit empty/unavailable/invalid/selected/disabled/busy states.
+- Add a Settings-linked review surface, editable-source/provenance inventory and
+  complete distributed MIT notice; no third-party art or raster generation is used.
+- Verify 30 frontend tests, strict typecheck/build, zero-vulnerability audit,
+  22 repository tests and Chrome desktop/mobile keyboard/pointer/contrast checks,
+  including narrow layouts, forced colours, increased contrast and reduced motion.
+  Runtime campaign artwork and Italian resources remain later milestones.
+
 ## Unreleased — Revision-aware drafts and quick replies (P05.4), 24 October 2026
 
 - Separate scoped public projection state from unsent drafts, with canonical and
