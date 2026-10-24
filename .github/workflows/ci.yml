@@ -84,6 +84,11 @@ jobs:
       - name: Production build
         working-directory: frontend
         run: npm run build
+      # Compile-time locale work is reviewed separately until all screens and
+      # safe language reload are ready for the packaged application entry point.
+      - name: Localization checker tests and review variants
+        working-directory: frontend
+        run: npm run test:i18n && npm run build:locales
       # Reads the public advisory database only; sends the dependency list, no credentials.
       - name: Audit dependencies
         working-directory: frontend

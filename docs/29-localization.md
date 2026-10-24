@@ -51,10 +51,20 @@ language-scoped thread/context generation handles future output.
 
 Choose Angular's built-in extraction and compile-time localized variants with
 stable semantic message IDs. Keep source English and reviewed Italian XLIFF
-resources, ICU plurals/selects and placeholder types. Pin `@angular/localize` to
-the existing Angular baseline when P05 implements it; this document installs
-nothing. Mark missing required translations as build failures. Avoid string
+resources, ICU plurals/selects and placeholder types. P05.6 pins `@angular/localize`
+to the existing Angular 22.2.3 baseline. Translation coverage and localized
+packaging remain in progress. Mark missing required translations as build failures. Avoid string
 concatenation, inline hardcoded error prose and HTML returned by a model.
+
+The first P05.6 checkpoint marks/reviews 26 shell messages (navigation, Settings,
+its accessible navigation name, reading-size placeholder, credits and two browser
+titles). `npm run build:locales` checks fresh extracted IDs, exact source freshness,
+nonempty Italian targets and placeholder occurrence parity before compiling review
+variants into `dist/engine-ui-localized/browser/{en,it}/`. Missing/duplicate
+translations are build errors. [Resource instructions](../frontend/src/locale/README.md)
+describe the review scope and tests. English outside this marked shell remains
+untranslated. These separate review builds do not replace the default production
+build or establish localized jar delivery, safe language switching or full QA-35.
 
 Build `/en/` and `/it/` static variants into the same Spring application artifact.
 `/api/v1` and authorized asset routes remain unlocalized. Root entry chooses the

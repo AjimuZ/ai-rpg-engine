@@ -5,6 +5,10 @@
     "ng": "ng",
     "start": "ng serve --host 127.0.0.1",
     "build": "ng build",
+    "extract:i18n": "ng extract-i18n --output-path .angular/i18n --out-file messages.en.xlf",
+    "check:i18n": "npm run extract:i18n && node tools/check-localization.mjs .angular/i18n/messages.en.xlf src/locale/messages.it.xlf",
+    "build:locales": "npm run check:i18n && ng build --configuration production,localized",
+    "test:i18n": "node --test tools/check-localization.test.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json"
@@ -16,6 +20,7 @@
     "@angular/compiler": "22.2.3",
     "@angular/core": "22.2.3",
     "@angular/forms": "22.2.3",
+    "@angular/localize": "22.2.3",
     "@angular/platform-browser": "22.2.3",
     "@angular/router": "22.2.3",
     "rxjs": "7.8.2",

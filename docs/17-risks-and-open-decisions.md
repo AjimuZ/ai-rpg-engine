@@ -14,6 +14,14 @@ retain their standard precedence; configtree is not a secret manager.
 
 ## 1. Risk register
 
+Partial P05.6 reduces translation drift for the 26 marked navigation/Settings
+messages through source freshness, exact ID and placeholder checks and separate
+browser-reviewed EN/IT builds. Unmarked screens remain English. The review builds
+must not replace the packaged preview until all resources, localized failures,
+persisted locale and safe reload are implemented and real Spring/jar/container
+checks pass. Resource review does not establish independent bilingual playtest
+acceptance or complete QA-35.
+
 P05.5 reduces local UI asset/rights risk with original editable MIT SVG/CSS,
 a complete public source inventory and shipped notice, without external art/font
 dependencies. Browser-reviewed control/meter/frame fallbacks preserve text,

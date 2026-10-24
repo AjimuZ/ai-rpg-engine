@@ -16,11 +16,20 @@
       "root": "",
       "sourceRoot": "src",
       "prefix": "app",
+      "i18n": {
+        "sourceLocale": { "code": "en", "subPath": "en" },
+        "locales": {
+          "it": { "translation": "src/locale/messages.it.xlf", "subPath": "it" }
+        }
+      },
       "architect": {
         "build": {
           "builder": "@angular/build:application",
           "options": {
             "browser": "src/main.ts",
+            "polyfills": ["@angular/localize/init"],
+            "i18nMissingTranslation": "error",
+            "i18nDuplicateTranslation": "error",
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
             "assets": [
@@ -34,6 +43,10 @@
             ]
           },
           "configurations": {
+            "localized": {
+              "localize": ["en", "it"],
+              "outputPath": "dist/engine-ui-localized"
+            },
             "production": {
               "budgets": [
                 {
@@ -68,6 +81,10 @@
             }
           },
           "defaultConfiguration": "development"
+        },
+        "extract-i18n": {
+          "builder": "@angular/build:extract-i18n",
+          "options": { "format": "xlf2" }
         },
         "test": {
           "builder": "@angular/build:unit-test"

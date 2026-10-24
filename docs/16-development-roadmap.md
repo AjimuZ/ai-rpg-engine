@@ -752,6 +752,20 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     asset delivery/ownership, Italian resources and runtime artwork remain later
     tasks. No sample value or item implies canonical state.
 - [ ] P05.6 Deliver reviewed English-default/Italian UI variants, localized receipts/errors/accessibility, persisted language selection and draft/cursor-safe reload; extend single-origin packaging/resource checks under QA-35.
+  - Partial checkpoint: pin `@angular/localize` to Angular 22.2.3 and extract/review
+    26 navigation/Settings messages, including accessible navigation, titles,
+    reading-size placeholders and credits. Exact ID/source/placeholder parity
+    rejects missing, blank, stale (including whitespace), extra and duplicate translations. Separate
+    EN/IT review builds compile; the existing packaged English build stays in use.
+    Remaining: all other UI/content/error/receipt/kit resources, ICU/formatting,
+    persisted locale and draft/reading/operation/cursor-safe reload with focus and
+    stale-language guards, plus real Spring/jar/container localized packaging.
+    Four checker tests, 30 frontend tests, strict typecheck, both build commands,
+    zero-vulnerability audit and Chrome 155 review smoke pass. Browser checks
+    cover localized labels/titles/focus, four viewport sizes, locale bases and
+    same-origin script/style/notice hashes and missing-resource 404s using a
+    loopback review harness. All 22 repository tests and docs/secrets/workflows/images
+    scans pass. Full QA-35 and bilingual release acceptance remain open.
 - [ ] P05.7 Define and render bounded typed public presentation events for scene, pose/expression and optional line audio hooks; reject executable/raw-URL directives, deduplicate delivery and preserve text-only/keyboard/reduced-motion behavior under QA-40.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.

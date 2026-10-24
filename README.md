@@ -1,5 +1,10 @@
 # AI RPG Engine
 
+P05.6 is in progress: [localization review builds](frontend/src/locale/README.md)
+provide English/Italian navigation and Settings with strict resource parity checks.
+Other screens, persisted language reload and localized single-origin packaging
+remain pending; the packaged interface still uses the English preview.
+
 P05.5 delivers the original MIT [UI graphic kit](frontend/public/ui/README.md):
 scalable controls, bars, icons, frames, independent sample item art and fallback
 states. Settings links the browser-reviewed kit, editable-source inventory and

@@ -2,6 +2,17 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Localization review foundation (partial P05.6), 24 October 2026
+
+- Pin Angular localize 22.2.3 and add separate English/Italian review builds with
+  26 reviewed navigation/Settings messages, accessible labels and page titles.
+- Reject missing, blank, stale, extra or duplicate translations and mismatched
+  placeholders before compilation; run checker tests and review builds in CI.
+- Verify both Settings variants in Chrome, including narrow layouts, keyboard
+  focus, locale bases, same-origin resource hashes, notices and missing-file 404s.
+- Keep the packaged English preview while remaining screens, localized errors,
+  safe persisted language reload and real localized packaging are implemented.
+
 ## Unreleased — Complete local interface graphic kit (P05.5), 24 October 2026
 
 - Integrate original MIT SVG/CSS controls, 20 allowlisted icons, bounded numeric

@@ -5,8 +5,11 @@ import { createServer } from 'node:http';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const root = fileURLToPath(new URL('../dist/engine-ui/browser/', import.meta.url));
+const localizedRoot = fileURLToPath(new URL('../dist/engine-ui-localized/browser/', import.meta.url));
+const reviewLocales = process.argv.includes('--locales');
 const artifacts = fileURLToPath(new URL('../../.local/scratch/', import.meta.url));
 await mkdir(artifacts, { recursive: true });
 const profile = await mkdtemp(resolve(artifacts, 'ui-smoke-'));
@@ -16,12 +19,20 @@ const browserPath = process.env['BROWSER_PATH'] ?? 'C:/Program Files/Google/Chro
 const server = createServer(async (request, response) => {
   try {
     const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
-    const requested = resolve(root, '.' + pathname);
-    if (!requested.startsWith(root.endsWith(sep) ? root : root + sep) && requested !== resolve(root)) {
+    const locale = reviewLocales ? /^\/(en|it)(?:\/|$)/.exec(pathname)?.[1] : undefined;
+    const directory = locale ? localizedRoot : root;
+    const requested = resolve(directory, '.' + pathname);
+    if (!requested.startsWith(directory.endsWith(sep) ? directory : directory + sep) && requested !== resolve(directory)) {
       response.writeHead(403).end();
       return;
     }
-    const file = extname(requested) ? requested : resolve(root, 'index.html');
+    // Review variants expose only their actual shell routes. Never disguise an
+    // absent localized asset or API resource as a successful settings document.
+    if (locale && !extname(requested) && !new RegExp(`^/${locale}/(?:settings|library)?$`).test(pathname)) {
+      response.writeHead(404).end();
+      return;
+    }
+    const file = extname(requested) ? requested : resolve(directory, ...(locale ? [locale] : []), 'index.html');
     const data = await readFile(file);
     const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
     response.writeHead(200, { 'Content-Type': types[extname(file)] ?? 'application/octet-stream' }).end(data);
@@ -330,9 +341,50 @@ try {
   assert.equal(await evaluate(`fetch('/ui/README.md').then(r => r.text()).then(text => text.includes('src/app/preview/ui-kit.ts') && text.includes('No third-party artwork'))`), true);
   await command('Page.navigate', { url: origin + '/adventures/missing/story' });
   await waitFor(`document.querySelector('h1')?.textContent === 'Adventure unavailable'`);
+  if (reviewLocales) {
+    for (const [locale, heading, navigation, title] of [
+      ['en', 'Settings', 'Application', 'Settings | Adventure engine'],
+      ['it', 'Impostazioni', 'Applicazione', 'Impostazioni | Motore di avventure'],
+    ]) {
+      await command('Page.navigate', { url: `${origin}/${locale}/settings` });
+      await waitFor(`document.querySelector('h1')?.textContent === ${JSON.stringify(heading)}`);
+      assert.equal(await evaluate('document.documentElement.lang'), locale);
+      assert.equal(await evaluate('document.baseURI'), `${origin}/${locale}/`);
+      assert.equal(await evaluate('document.title'), title);
+      assert.equal(await evaluate(`document.querySelector('nav').getAttribute('aria-label')`), navigation);
+      assert.equal(await evaluate(`document.querySelector('#text-size').labels[0].textContent`), locale === 'it' ? 'Dimensione del testo della storia' : 'Story text size');
+      assert.equal(await evaluate(`document.querySelector('#text-size').options.length`), 10);
+      assert.equal(await evaluate(`document.querySelector('a.brand').getAttribute('href')`), `/${locale}/library`);
+      await evaluate(`document.querySelector('#text-size').focus()`);
+      assert.equal(await evaluate(`getComputedStyle(document.activeElement).outlineStyle`), 'solid');
+      for (const [width, height] of [[1440, 1100], [390, 844], [320, 740], [740, 320]]) {
+        await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
+        assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+        if (width === 1440 || width === 390) {
+          await writeFile(resolve(artifacts, `p056-settings-${locale}-${width}.png`), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
+        }
+      }
+      // Compare actual HTTP bytes with the production files, including notices;
+      // a misleading HTML fallback cannot pass a hash comparison.
+      const html = await readFile(resolve(localizedRoot, locale, 'index.html'), 'utf8');
+      const assets = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)].map(
+        /** Retain compiler-selected filenames rather than assuming a stable chunk name. */ (match) => match[1]);
+      assert.ok(assets.length > 0);
+      for (const asset of [...assets, 'ui/README.md', 'ui/LICENSE.txt']) {
+        const response = await fetch(`${origin}/${locale}/${asset}`);
+        assert.equal(response.status, 200);
+        const served = Buffer.from(await response.arrayBuffer());
+        const expected = await readFile(resolve(localizedRoot, locale, asset));
+        assert.equal(createHash('sha256').update(served).digest('hex'), createHash('sha256').update(expected).digest('hex'));
+      }
+      for (const absent of ['missing.js', 'ui/missing.svg', 'api/v1/missing', 'unknown-screen']) {
+        assert.equal((await fetch(`${origin}/${locale}/${absent}`)).status, 404);
+      }
+    }
+  }
   assert.deepEqual(exceptions, []);
   assert.equal(requests.some(/** Reject world/API writes or remote media requests during preview journeys. */ (request) => request.method !== 'GET' || !request.url.startsWith(origin + '/')), false);
-  console.log(`Browser smoke passed: ${version.product}; responsive reading/drafts/recovery and graphic kit, keyboard/pointer states, contrast, forced colours/reduced motion, notices; no page exceptions or nonlocal/action requests.`);
+  console.log(`Browser smoke passed: ${version.product}; responsive reading/drafts/recovery and graphic kit${reviewLocales ? ', EN/IT review shells and resource hashes/404s' : ''}; no page exceptions or nonlocal/action requests.`);
 } finally {
   browser.kill();
   await new Promise(/** Release the loopback listener before completing; no background server survives. */ (accept) => server.close(accept));

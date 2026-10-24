@@ -1,0 +1,214 @@
+<?xml version='1.0' encoding='utf-8'?>
+<xliff xmlns="urn:oasis:names:tc:xliff:document:2.0" version="2.0" srcLang="en" trgLang="it">
+  <file id="ngi18n" original="ng.template">
+    <unit id="shell.skip">
+      <notes>
+        <note category="location">src/app/app.html:1,2</note>
+      </notes>
+      <segment>
+        <source>Skip to content</source>
+      <target>Vai al contenuto</target></segment>
+    </unit>
+    <unit id="shell.brand">
+      <notes>
+        <note category="location">src/app/app.html:3,4</note>
+      </notes>
+      <segment>
+        <source>Adventure engine</source>
+      <target>Motore di avventure</target></segment>
+    </unit>
+    <unit id="shell.navigation">
+      <notes>
+        <note category="location">src/app/app.html:4</note>
+      </notes>
+      <segment>
+        <source>Application</source>
+      <target>Applicazione</target></segment>
+    </unit>
+    <unit id="shell.library">
+      <notes>
+        <note category="location">src/app/app.html:5,6</note>
+      </notes>
+      <segment>
+        <source>Library</source>
+      <target>Biblioteca</target></segment>
+    </unit>
+    <unit id="shell.settings">
+      <notes>
+        <note category="location">src/app/app.html:6,9</note>
+      </notes>
+      <segment>
+        <source>Settings</source>
+      <target>Impostazioni</target></segment>
+    </unit>
+    <unit id="shell.libraryTitle">
+      <notes>
+        <note category="location">src/app/app.routes.ts:14</note>
+      </notes>
+      <segment>
+        <source>Library | Adventure engine</source>
+      <target>Biblioteca | Motore di avventure</target></segment>
+    </unit>
+    <unit id="shell.settingsTitle">
+      <notes>
+        <note category="location">src/app/app.routes.ts:15</note>
+      </notes>
+      <segment>
+        <source>Settings | Adventure engine</source>
+      <target>Impostazioni | Motore di avventure</target></segment>
+    </unit>
+    <unit id="settings.title">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:9</note>
+      </notes>
+      <segment>
+        <source>Settings</source>
+      <target>Impostazioni</target></segment>
+    </unit>
+    <unit id="settings.reading">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:9,10</note>
+      </notes>
+      <segment>
+        <source>Reading</source>
+      <target>Lettura</target></segment>
+    </unit>
+    <unit id="settings.textSize">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:10,11</note>
+      </notes>
+      <segment>
+        <source>Story text size</source>
+      <target>Dimensione del testo della storia</target></segment>
+    </unit>
+    <unit id="settings.pixels">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:12,13</note>
+      </notes>
+      <segment>
+        <source><ph id="0" equiv="INTERPOLATION" disp="{{ size }}" /> px</source>
+      <target><ph id="0" equiv="INTERPOLATION" disp="{{ size }}" /> px</target>
+      </segment>
+    </unit>
+    <unit id="settings.layout">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:14,15</note>
+      </notes>
+      <segment>
+        <source>Story layout</source>
+      <target>Visualizzazione della storia</target></segment>
+    </unit>
+    <unit id="settings.visualNovel">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:16</note>
+      </notes>
+      <segment>
+        <source>Visual novel</source>
+      <target>Visual novel</target></segment>
+    </unit>
+    <unit id="settings.textFocused">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:16,17</note>
+      </notes>
+      <segment>
+        <source>Text focused (no artwork)</source>
+      <target>Solo testo (senza illustrazioni)</target></segment>
+    </unit>
+    <unit id="settings.tabPreferences">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:17,18</note>
+      </notes>
+      <segment>
+        <source>Reading preferences last for this tab session. Reload restores defaults.</source>
+      <target>Le preferenze di lettura durano per questa sessione della scheda. Ricaricando la pagina si ripristinano i valori predefiniti.</target></segment>
+    </unit>
+    <unit id="settings.language">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:18</note>
+      </notes>
+      <segment>
+        <source>Language</source>
+      <target>Lingua</target></segment>
+    </unit>
+    <unit id="settings.languagePending">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:18,19</note>
+      </notes>
+      <segment>
+        <source>Language selection will be available when all interface screens support English and Italian.</source>
+      <target>La selezione della lingua sarà disponibile quando tutte le schermate supporteranno inglese e italiano.</target></segment>
+    </unit>
+    <unit id="settings.sound">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:19</note>
+      </notes>
+      <segment>
+        <source>Sound and appearance</source>
+      <target>Suono e aspetto</target></segment>
+    </unit>
+    <unit id="settings.noAudio">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:19,20</note>
+      </notes>
+      <segment>
+        <source>No audio is loaded. Motion is disabled in this preview.</source>
+      <target>Non viene caricato alcun audio. Il movimento è disattivato in questa anteprima.</target></segment>
+    </unit>
+    <unit id="settings.runtime">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:20</note>
+      </notes>
+      <segment>
+        <source>Runtime</source>
+      <target>Ambiente di esecuzione</target></segment>
+    </unit>
+    <unit id="settings.noRuntime">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:20,21</note>
+      </notes>
+      <segment>
+        <source>No campaign or narration service is connected.</source>
+      <target>Non è collegato alcun servizio di campagna o narrazione.</target></segment>
+    </unit>
+    <unit id="settings.credits">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:21</note>
+      </notes>
+      <segment>
+        <source>Credits</source>
+      <target>Crediti</target></segment>
+    </unit>
+    <unit id="settings.rights">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:21,22</note>
+      </notes>
+      <segment>
+        <source>Original scene, speaker and item vector illustrations, icons, frames and control geometry. Copyright 2026 Azim Ben Othman; distributed under the project MIT license. System fonts; no external media requests.</source>
+      <target>Illustrazioni vettoriali originali di scene, personaggi e oggetti, icone, cornici e geometrie dei controlli. Copyright 2026 Azim Ben Othman; distribuiti con la licenza MIT del progetto. Caratteri di sistema; nessuna richiesta di contenuti multimediali esterni.</target></segment>
+    </unit>
+    <unit id="settings.kit">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:22</note>
+      </notes>
+      <segment>
+        <source>Review interface graphic kit</source>
+      <target>Esamina il kit grafico dell’interfaccia</target></segment>
+    </unit>
+    <unit id="settings.sources">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:22</note>
+      </notes>
+      <segment>
+        <source>Asset sources and provenance</source>
+      <target>Sorgenti e provenienza delle risorse</target></segment>
+    </unit>
+    <unit id="settings.license">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:22,25</note>
+      </notes>
+      <segment>
+        <source>MIT license</source>
+      <target>Licenza MIT</target></segment>
+    </unit>
+  </file>
+</xliff>

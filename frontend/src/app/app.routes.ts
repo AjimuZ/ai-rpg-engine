@@ -11,8 +11,8 @@ import { GraphicKit } from './preview/ui-kit';
 /** Route screens and browser titles; unmatched paths return to the local library. */
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'library' },
-  { path: 'library', component: Library, title: 'Library | Adventure engine' },
-  { path: 'settings', component: Settings, title: 'Settings | Adventure engine' },
+  { path: 'library', component: Library, title: $localize`:@@shell.libraryTitle:Library | Adventure engine` },
+  { path: 'settings', component: Settings, title: $localize`:@@shell.settingsTitle:Settings | Adventure engine` },
   { path: 'interface-kit', component: GraphicKit, title: 'Interface kit | Adventure engine' },
   { path: 'adventures/:adventureId', component: Workspace, children: [
     { path: '', pathMatch: 'full', redirectTo: 'story' },

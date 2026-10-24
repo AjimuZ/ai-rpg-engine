@@ -1,5 +1,12 @@
 # Browser interface previews
 
+P05.6 currently provides separate [English/Italian review builds](src/locale/README.md)
+for navigation and Settings (26 messages). Run `npm run test:i18n` and
+`npm run build:locales`, then `node tools/browser-smoke.mjs --locales` after
+`npm run build`. These builds do not replace the packaged English preview.
+Other screens, errors/receipts, persisted language selection, safe reload and
+localized Spring/jar/container serving remain open.
+
 This is a standalone Angular interface with SCSS, strict TypeScript/templates,
 zoneless change detection, and no runtime calls or credentials. P05.1 provides
 library, character-creation, story, sheet, inventory, journal and settings shells.
