@@ -38,11 +38,17 @@ From `backend/`, with those variables set:
 `verify` starts an ephemeral HTTP server and checks minimal health, hidden diagnostic
 endpoints, PostgreSQL major version, Flyway validation, and the canonical schema.
 A missing database fails tests; nothing silently skips or uses H2. Use a new
-disposable database: the test requires exactly the ten tables created by
-`src/main/resources/db/migration/V1__canonical_foundations.sql` (P03.1), with no
+disposable database: the test requires exactly the eleven tables created by
+`src/main/resources/db/migration/V1__canonical_foundations.sql` (P03.1) and
+`V2__campaign_bounds_and_versions.sql` (P03.2, adding `actor_resource`), with no
 rows, and Hibernate validates the entities against them (`ddl-auto=validate`).
 The persistence tests truncate these tables before and after each test, so never
 point `verify` at a database whose data you want to keep.
+P03.2 adds storage row versions separate from canonical counters, frozen ownership,
+bounded actor resources and complete write-once journal outcomes. Integration tests
+include cross-campaign rejection, scoped reads, concurrent duplicate inserts and
+stale-writer rollback, plus populated V1-to-V2 upgrade in a disposable schema.
+See [database invariants and payload limits](../docs/05-domain-model.md#3-database-organization).
 The executable jar is `target/engine-0.1.0.jar`; it can also run with `java -jar`.
 
 ## Packaged runtime configuration (P02.3)

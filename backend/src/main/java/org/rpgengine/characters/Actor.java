@@ -10,17 +10,19 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 
-import org.rpgengine.persistence.AssignedIdEntity;
 import org.rpgengine.persistence.CanonicalValues;
+import org.rpgengine.persistence.VersionedEntity;
 
 /**
- * Actor instance owned by exactly one campaign (docs/05 section 2). Attributes,
- * resources, conditions and inventory attach in later phases (P06/P07); this
- * foundation fixes identity, ownership and the revision that created the actor.
+ * Actor instance owned by exactly one campaign (docs/05 section 2). Bounded numeric
+ * values attach as {@link ActorResource} rows; attributes, conditions and inventory
+ * attach in later phases (P06/P07). Identity, owning campaign, kind, definition and
+ * creation revision are fixed after insert, and the database rejects any attempt to
+ * move the actor to another campaign (V2).
  */
 @Entity
 @Table(name = "actor")
-public class Actor extends AssignedIdEntity {
+public class Actor extends VersionedEntity {
     @Column(name = "campaign_id", nullable = false, updatable = false)
     private UUID campaignId;
 

@@ -9,8 +9,8 @@ import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
-import org.rpgengine.persistence.AssignedIdEntity;
 import org.rpgengine.persistence.CanonicalValues;
+import org.rpgengine.persistence.VersionedEntity;
 import org.rpgengine.presentation.SupportedLocale;
 import org.rpgengine.presentation.SupportedLocaleConverter;
 
@@ -21,7 +21,7 @@ import org.rpgengine.presentation.SupportedLocaleConverter;
  */
 @Entity
 @Table(name = "adventure_workspace")
-public class AdventureWorkspace extends AssignedIdEntity {
+public class AdventureWorkspace extends VersionedEntity {
     @Column(name = "owner_id", nullable = false, updatable = false)
     private UUID ownerId;
 

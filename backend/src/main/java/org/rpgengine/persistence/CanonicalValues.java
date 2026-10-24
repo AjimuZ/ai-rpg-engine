@@ -1,5 +1,6 @@
 package org.rpgengine.persistence;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
@@ -7,7 +8,7 @@ import java.util.regex.Pattern;
 
 /**
  * Argument checks shared by canonical entities, mirroring the database CHECK
- * constraints of the V1 migration so invalid values fail early with a clear message.
+ * constraints of the V1 and V2 migrations so invalid values fail early with a clear message.
  * The database remains the final authority; these checks only shorten the feedback loop.
  * Every method throws {@link IllegalArgumentException} (or {@link NullPointerException}
  * for a missing value) and never repairs input silently.
@@ -99,18 +100,26 @@ public final class CanonicalValues {
     }
 
     /**
-     * Light shape check for JSON object payloads; the database verifies they parse
-     * as objects and later packages validate their typed schema.
+     * Light shape and size check for JSON object payloads; the database verifies they
+     * parse as objects, enforces the same byte bound on the stored rendering (V2) and
+     * later packages validate their typed schema.
      *
      * @param value serialized JSON
      * @param name field name used in the error message
+     * @param maxBytes inclusive maximum size of the UTF-8 encoding in bytes
      * @return the unchanged value
-     * @throws IllegalArgumentException unless the text starts with an object brace
+     * @throws IllegalArgumentException unless the text starts with an object brace and
+     *         fits in {@code maxBytes}
      */
-    public static String requireJsonObject(String value, String name) {
+    public static String requireJsonObject(String value, String name, int maxBytes) {
         Objects.requireNonNull(value, name);
         if (!value.strip().startsWith("{")) {
             throw new IllegalArgumentException(name + " must be a JSON object");
+        }
+        // Count encoded bytes, not characters: the database bound is octet_length, and
+        // non-ASCII narrative text takes up to four bytes per code point.
+        if (value.getBytes(StandardCharsets.UTF_8).length > maxBytes) {
+            throw new IllegalArgumentException(name + " must not exceed " + maxBytes + " bytes");
         }
         return value;
     }

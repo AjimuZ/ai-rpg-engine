@@ -9,8 +9,8 @@ import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
-import org.rpgengine.persistence.AssignedIdEntity;
 import org.rpgengine.persistence.CanonicalValues;
+import org.rpgengine.persistence.VersionedEntity;
 import org.rpgengine.presentation.SupportedLocale;
 import org.rpgengine.presentation.SupportedLocaleConverter;
 
@@ -21,7 +21,7 @@ import org.rpgengine.presentation.SupportedLocaleConverter;
  */
 @Entity
 @Table(name = "identity_owner_profile")
-public class OwnerProfile extends AssignedIdEntity {
+public class OwnerProfile extends VersionedEntity {
     @Column(name = "display_name", nullable = false)
     private String displayName;
 

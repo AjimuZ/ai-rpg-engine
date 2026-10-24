@@ -93,7 +93,12 @@ class CampaignFoundationsTest {
         assertThrows(IllegalArgumentException.class, () -> CanonicalValues.requireSha256Hex("a".repeat(63), "h"));
         assertThrows(IllegalArgumentException.class, () -> CanonicalValues.requirePositive(0, "n"));
         assertEquals(0, CanonicalValues.requireNonNegative(0, "n"));
-        assertThrows(IllegalArgumentException.class, () -> CanonicalValues.requireJsonObject("\"text\"", "j"));
+        assertThrows(IllegalArgumentException.class, () -> CanonicalValues.requireJsonObject("\"text\"", "j", 64));
+        // Count UTF-8 bytes: the two accented letters make this object ten bytes long.
+        assertEquals("{\"a\":1}", CanonicalValues.requireJsonObject("{\"a\":1}", "j", 7));
+        assertThrows(IllegalArgumentException.class, () -> CanonicalValues.requireJsonObject("{\"a\":1} ", "j", 7));
+        assertThrows(IllegalArgumentException.class,
+                () -> CanonicalValues.requireJsonObject("{\"éé\":0}", "j", 9));
     }
 
     /** @return an unsaved admitted revision owned by the given adventure */

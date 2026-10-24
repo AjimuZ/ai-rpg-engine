@@ -2,6 +2,14 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Campaign constraints and storage versions (P03.2), 24 October 2026
+
+- Add forward-only V2 with bounded actor resources, campaign/actor foreign keys and unique resource keys; freeze ownership and provenance after insert.
+- Add independent optimistic row versions to seven mutable tables, prevent counter rewinds, require complete write-once journal outcomes and one committed operation per campaign revision, and bound stored JSONB payload bytes.
+- Verify repository scope, raw SQL constraints, inclusive resource/payload limits, stale/concurrent writer rollback, simultaneous duplicate keys/reward sources and populated V1-to-V2 upgrade preserving canonical counters.
+- Pass full backend compilation, tests and jar build against PostgreSQL 18.6: 43 tests pass and three packaged-interface tests skip outside their profile. Repository-checker tests pass 22/22, default packaging checks pass 20/20 with two opt-in checks skipped, and repository policy checks report no findings. Dependency pins are unchanged.
+- Application authorization, atomic command/outbox commits, deterministic draws, leases and recovery remain later tasks; this establishes persistence foundations only.
+
 ## Unreleased — Canonical foundations (P03.1), 24 October 2026
 
 - Add Spring Data JPA and the first Flyway migration with ten tables for owner profile, adventure workspaces, content revisions, campaigns, presentation settings, actors, the operation journal, campaign events, reward settlements and checkpoints; Hibernate validates the mapping at startup.

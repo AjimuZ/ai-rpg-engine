@@ -28,6 +28,9 @@ import org.rpgengine.persistence.CanonicalValues;
 @Immutable
 @Table(name = "campaign_event")
 public class CampaignEvent extends AssignedIdEntity {
+    /** Inclusive payload bound in UTF-8 bytes; matches campaign_event_payload_size_ck (V2). */
+    public static final int MAX_PAYLOAD_BYTES = 65_536;
+
     @Column(name = "campaign_id", nullable = false, updatable = false)
     private UUID campaignId;
 
@@ -179,7 +182,7 @@ public class CampaignEvent extends AssignedIdEntity {
             CanonicalValues.requireText(eventType, "eventType", 128);
             CanonicalValues.requirePositive(eventVersion, "eventVersion");
             CanonicalValues.requirePositive(payloadSchemaVersion, "payloadSchemaVersion");
-            CanonicalValues.requireJsonObject(payload, "payload");
+            CanonicalValues.requireJsonObject(payload, "payload", MAX_PAYLOAD_BYTES);
         }
     }
 }

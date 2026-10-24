@@ -25,6 +25,19 @@ workflow has not yet executed on GitHub. The backend job was replayed locally in
 and PostgreSQL 18 containers; backend tests that read the secret-file contract must not
 depend on exported `SPRING_DATASOURCE_*` variables, which CI sets for the database tests.
 
+P03.2 adds persistence evidence on 24 October 2026 (Windows 11, Docker Desktop,
+pinned JDK 21 and PostgreSQL 18.6). Backend `verify` passes 43 tests; three
+packaged-interface tests skip outside their separate profile. Coverage includes
+campaign/adventure foreign keys, positive and negative scoped repository reads,
+frozen ownership/provenance, explicit optimistic versions, concurrent stale-writer
+rollback, simultaneous duplicate operation/reward insertion, resource and JSONB
+byte boundaries, and a populated V1-to-V2 migration with unchanged domain counters.
+The repository checker passes 22 unit tests and all policy checks; the default
+packaging suite passes 20 checks with two opt-in lifecycle/recreation checks skipped.
+This is storage-level evidence toward QA-03/QA-04, QA-10 and QA-20; no command API,
+inventory gameplay, owner authorization, full QA-20/QA-33 acceptance, atomic outbox,
+draw reuse or recovery is claimed. Those remain later tasks in P03 and beyond.
+
 ## 2. Verification layers
 
 | Layer | Purpose | Proposed tools |

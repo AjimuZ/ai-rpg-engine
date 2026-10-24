@@ -26,6 +26,9 @@ import org.rpgengine.persistence.CanonicalValues;
 @Immutable
 @Table(name = "reward_settlement")
 public class RewardSettlement extends AssignedIdEntity {
+    /** Inclusive rewards bound in UTF-8 bytes; matches reward_settlement_rewards_size_ck (V2). */
+    public static final int MAX_REWARDS_BYTES = 16_384;
+
     @Column(name = "campaign_id", nullable = false, updatable = false)
     private UUID campaignId;
 
@@ -78,7 +81,7 @@ public class RewardSettlement extends AssignedIdEntity {
         settlement.recipientKey = CanonicalValues.requireText(recipientKey, "recipientKey", 256);
         settlement.operationId = Objects.requireNonNull(operationId, "operationId");
         settlement.appliedRevision = CanonicalValues.requirePositive(appliedRevision, "appliedRevision");
-        settlement.rewards = CanonicalValues.requireJsonObject(rewardsJson, "rewards");
+        settlement.rewards = CanonicalValues.requireJsonObject(rewardsJson, "rewards", MAX_REWARDS_BYTES);
         settlement.settledAt = CanonicalValues.timestamp(now, "now");
         return settlement;
     }

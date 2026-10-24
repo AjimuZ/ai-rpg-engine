@@ -5,6 +5,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +26,8 @@ import org.rpgengine.campaign.EventVisibility;
 import org.rpgengine.characters.Actor;
 import org.rpgengine.characters.ActorKind;
 import org.rpgengine.characters.ActorRepository;
+import org.rpgengine.characters.ActorResource;
+import org.rpgengine.characters.ActorResourceRepository;
 import org.rpgengine.commands.CampaignOperation;
 import org.rpgengine.commands.CampaignOperationRepository;
 import org.rpgengine.commands.OperationStatus;
@@ -40,7 +46,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,7 +58,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Exercise the P03.1 canonical foundations against the real Flyway schema on
+ * Exercise the P03.1/P03.2 canonical foundations against the real Flyway schema on
  * PostgreSQL 18: round trips through JPA, relational ownership enforced by composite
  * foreign keys, uniqueness of idempotency keys, event sequences, reward settlements and
  * checkpoints, append-only triggers, and the separation of presentation generations
@@ -89,6 +98,10 @@ class CanonicalFoundationsPersistenceTest {
     private RewardSettlementRepository rewards;
     @Autowired
     private CampaignCheckpointRepository checkpoints;
+    @Autowired
+    private ActorResourceRepository resources;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private OwnerProfile owner;
 
@@ -291,25 +304,313 @@ class CanonicalFoundationsPersistenceTest {
         assertEquals(CampaignCounters.initial(), campaigns.findById(f.campaign.getId()).orElseThrow().getCounters());
     }
 
-    /** Canonical counters and stored vocabularies are constrained in the database too. */
+    /**
+     * Canonical counters and stored vocabularies are constrained in the database too.
+     * Each update advances row_version correctly, so the rejection comes from the value
+     * rules (negative counters now meet the V2 monotonic guard first) and not from the
+     * row-version step.
+     */
     @Test
     void rejectsInvalidCanonicalValuesInTheDatabase() {
         Fixture f = newCampaign("Checks");
         for (String column : List.of("state_revision", "game_turn", "world_time_seconds", "event_sequence")) {
-            assertThrows(DataIntegrityViolationException.class,
-                    () -> jdbc.update("update campaign set " + column + " = -1 where id = ?", f.campaign.getId()),
-                    column);
+            assertThrows(DataIntegrityViolationException.class, () -> jdbc.update("update campaign set " + column
+                    + " = -1, row_version = row_version + 1 where id = ?", f.campaign.getId()), column);
         }
-        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
-                "update presentation_campaign_settings set narrative_locale = 'fr' where campaign_id = ?",
-                f.campaign.getId()));
-        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
-                "update identity_owner_profile set ui_locale = 'de' where id = ?", owner.getId()));
+        assertRejected("presentation_campaign_settings_narrative_locale_check", () -> jdbc.update(
+                "update presentation_campaign_settings set narrative_locale = 'fr', row_version = row_version + 1 "
+                        + "where campaign_id = ?", f.campaign.getId()));
+        assertRejected("identity_owner_profile_ui_locale_check", () -> jdbc.update(
+                "update identity_owner_profile set ui_locale = 'de', row_version = row_version + 1 where id = ?",
+                owner.getId()));
         assertEquals(CampaignCounters.initial(), campaigns.findById(f.campaign.getId()).orElseThrow().getCounters());
     }
 
     /** Workspace, admitted revision, campaign and presentation settings created together. */
     private record Fixture(AdventureWorkspace adventure, ContentRevision revision, Campaign campaign) {
+    }
+
+    /** Bounded resources round-trip through JPA; lookup and uniqueness include campaign and actor. */
+    @Test
+    void persistsResourcesAndRejectsCrossCampaignOwnership() {
+        Fixture a = newCampaign("ResourcesA");
+        Fixture b = newCampaign("ResourcesB");
+        Actor actor = actors.saveAndFlush(Actor.create(a.campaign.getId(), ActorKind.CHARACTER,
+                null, "Hero", null, 0, NOW));
+        Actor otherActor = actors.saveAndFlush(Actor.create(b.campaign.getId(), ActorKind.CHARACTER,
+                null, "Hero", null, 0, NOW));
+        ActorResource health = resources.saveAndFlush(ActorResource.create(actor, "health", 0, 10, 10, 0, NOW));
+        resources.saveAndFlush(ActorResource.create(otherActor, "health", 0, 10, 10, 0, NOW));
+        assertEquals(List.of(health), resources.findByCampaignIdAndActorIdOrderByResourceKeyAsc(
+                a.campaign.getId(), actor.getId()));
+        assertTrue(resources.findByCampaignIdAndActorIdOrderByResourceKeyAsc(
+                b.campaign.getId(), actor.getId()).isEmpty());
+        assertRejected("actor_resource_key_uk", () -> resources.saveAndFlush(
+                ActorResource.create(actor, "health", 0, 10, 10, 0, NOW)));
+        assertRejected("actor_resource_actor_fk", () -> jdbc.update(
+                "insert into actor_resource (id, campaign_id, actor_id, resource_key, minimum_value, "
+                        + "current_value, maximum_value, updated_revision, created_at, updated_at) "
+                        + "values (?, ?, ?, 'stamina', 0, 5, 10, 0, now(), now())",
+                UUID.randomUUID(), a.campaign.getId(), otherActor.getId()));
+        for (String assignment : List.of("current_value = -1", "current_value = 11", "minimum_value = 11",
+                "maximum_value = 9")) {
+            assertRejected("actor_resource_bounds_ck", () -> jdbc.update("update actor_resource set "
+                    + assignment + ", row_version = row_version + 1 where id = ?", health.getId()));
+        }
+        health.adjust(-10, 1, NOW.plusSeconds(1));
+        resources.saveAndFlush(health);
+        ActorResource reloaded = resources.findById(health.getId()).orElseThrow();
+        assertEquals(0, reloaded.getCurrentValue());
+        assertEquals(1, reloaded.getUpdatedRevision());
+        assertEquals(1, reloaded.getRowVersion());
+        assertEquals(10, reloaded.getMaximumValue());
+    }
+
+    /** Every mutable table rejects ownership/provenance rewrites and missing or skipped versions. */
+    @Test
+    void freezesOwnershipAndRequiresVersionSteps() {
+        Fixture a = newCampaign("FrozenA");
+        Fixture b = newCampaign("FrozenB");
+        Actor actor = actors.saveAndFlush(Actor.create(a.campaign.getId(), ActorKind.NPC,
+                "npc.guard", "Guard", null, 0, NOW));
+        ActorResource resource = resources.saveAndFlush(ActorResource.create(actor, "health", 0, 5, 10, 0, NOW));
+        CampaignOperation operation = operations.saveAndFlush(CampaignOperation.accept(a.campaign.getId(),
+                "frozen", PAYLOAD_HASH, "move", 0, NOW));
+        // Table/column names are fixed test constants. Values remain bound parameters.
+        Map<String, UUID> rows = Map.of("identity_owner_profile", owner.getId(), "adventure_workspace",
+                a.adventure.getId(), "campaign", a.campaign.getId(), "actor", actor.getId(),
+                "actor_resource", resource.getId(), "operation_journal", operation.getId(),
+                "presentation_campaign_settings", a.campaign.getId());
+        for (var row : rows.entrySet()) {
+            String key = row.getKey().equals("presentation_campaign_settings") ? "campaign_id" : "id";
+            for (String version : List.of("row_version", "row_version + 2", "-1")) {
+                assertRejected(row.getKey() + "_row_version_step", () -> jdbc.update("update " + row.getKey()
+                        + " set row_version = " + version + " where " + key + " = ?", row.getValue()));
+            }
+            assertRejected(row.getKey() + "_frozen", () -> jdbc.update("update " + row.getKey()
+                    + " set " + key + " = ?, row_version = row_version + 1 where " + key + " = ?",
+                    UUID.randomUUID(), row.getValue()));
+        }
+        Map<String, String> ownership = Map.of("adventure_workspace", "owner_id", "campaign", "adventure_id",
+                "actor", "campaign_id", "actor_resource", "actor_id", "operation_journal", "campaign_id");
+        for (var row : ownership.entrySet()) {
+            assertRejected(row.getKey() + "_frozen", () -> jdbc.update("update " + row.getKey() + " set "
+                    + row.getValue() + " = ?, row_version = row_version + 1 where id = ?",
+                    b.campaign.getId(), rows.get(row.getKey())));
+        }
+        assertRejected("campaign_frozen", () -> jdbc.update("update campaign set content_revision_id = ?, "
+                + "row_version = row_version + 1 where id = ?", b.revision.getId(), a.campaign.getId()));
+        assertRejected("operation_journal_frozen", () -> jdbc.update("update operation_journal set "
+                + "payload_hash = ?, row_version = row_version + 1 where id = ?", RULESET_HASH, operation.getId()));
+        // The version guard does not replace CAS: a stale WHERE matches no row and changes nothing.
+        assertEquals(1, jdbc.update("update campaign set title = 'Renamed', row_version = row_version + 1 "
+                + "where id = ? and row_version = 0", a.campaign.getId()));
+        assertEquals(0, jdbc.update("update campaign set title = 'Stale', row_version = row_version + 1 "
+                + "where id = ? and row_version = 0", a.campaign.getId()));
+        assertEquals("Renamed", campaigns.findById(a.campaign.getId()).orElseThrow().getTitle());
+    }
+
+    /** Canonical revisions step once; domain and presentation counters cannot rewind. */
+    @Test
+    void rejectsRevisionJumpsAndCounterRewinds() {
+        Fixture f = newCampaign("Monotonic");
+        jdbc.update("update campaign set state_revision = 1, game_turn = 2, world_time_seconds = 60, "
+                + "event_sequence = 3, row_version = row_version + 1 where id = ?", f.campaign.getId());
+        assertRejected("campaign_state_revision_step", () -> jdbc.update("update campaign set state_revision = 3, "
+                + "row_version = row_version + 1 where id = ?", f.campaign.getId()));
+        for (String column : List.of("state_revision", "game_turn", "world_time_seconds", "event_sequence")) {
+            assertRejected("campaign_counters_monotonic", () -> jdbc.update("update campaign set " + column
+                    + " = 0, row_version = row_version + 1 where id = ?", f.campaign.getId()));
+        }
+        jdbc.update("update presentation_campaign_settings set locale_revision = 1, glossary_revision = 1, "
+                + "media_configuration_generation = 1, row_version = row_version + 1 where campaign_id = ?",
+                f.campaign.getId());
+        for (String column : List.of("locale_revision", "glossary_revision", "media_configuration_generation")) {
+            assertRejected("presentation_campaign_settings_monotonic", () -> jdbc.update(
+                    "update presentation_campaign_settings set " + column + " = 0, row_version = row_version + 1 "
+                            + "where campaign_id = ?", f.campaign.getId()));
+        }
+    }
+
+    /** Journal outcomes are complete and write-once; per-campaign revisions cannot be paid twice. */
+    @Test
+    void enforcesCompleteWriteOnceCommitOutcomes() {
+        Fixture a = newCampaign("CommitA");
+        Fixture b = newCampaign("CommitB");
+        CampaignOperation pending = operations.saveAndFlush(CampaignOperation.accept(a.campaign.getId(),
+                "pending", PAYLOAD_HASH, "move", 0, NOW));
+        for (String assignment : List.of("receipt = '{}'", "committed_revision = 1", "status = 'COMMITTED'")) {
+            assertRejected("operation_journal_commit_consistency_ck", () -> jdbc.update("update operation_journal set "
+                    + assignment + ", row_version = row_version + 1 where id = ?", pending.getId()));
+        }
+        CampaignOperation committed = committedOperation(a.campaign.getId(), "done");
+        committedOperation(b.campaign.getId(), "done");
+        assertRejected("operation_journal_committed_revision_uk", () -> committedOperation(a.campaign.getId(), "twice"));
+        for (String assignment : List.of("receipt = '{\"changed\":true}'", "committed_revision = 2")) {
+            assertRejected("operation_journal_write_once", () -> jdbc.update("update operation_journal set "
+                    + assignment + ", row_version = row_version + 1 where id = ?", committed.getId()));
+        }
+        committed.transitionTo(OperationStatus.NARRATING, NOW);
+        committed.transitionTo(OperationStatus.DELIVERED, NOW);
+        operations.saveAndFlush(committed);
+        assertRejected("operation_journal_terminal_status", () -> jdbc.update("update operation_journal set "
+                + "status = 'NARRATING', row_version = row_version + 1 where id = ?", committed.getId()));
+        assertRejected("operation_journal_monotonic", () -> jdbc.update("update operation_journal set "
+                + "operation_version = 0, row_version = row_version + 1 where id = ?", committed.getId()));
+    }
+
+    /** Detached stale copies fail and a lost concurrent resource race rolls back the whole transaction. */
+    @Test
+    void rejectsStaleAndConcurrentWriters() throws Exception {
+        Fixture f = newCampaign("Concurrent");
+        Actor actor = actors.saveAndFlush(Actor.create(f.campaign.getId(), ActorKind.CHARACTER,
+                null, "Hero", null, 0, NOW));
+        ActorResource resource = resources.saveAndFlush(ActorResource.create(actor, "health", 0, 10, 10, 0, NOW));
+        ActorResource stale = resources.findById(resource.getId()).orElseThrow();
+        resource.adjust(-1, 1, NOW);
+        resources.saveAndFlush(resource);
+        stale.adjust(-2, 1, NOW);
+        assertThrows(OptimisticLockingFailureException.class, () -> resources.saveAndFlush(stale));
+        CountDownLatch loaded = new CountDownLatch(2);
+        CountDownLatch release = new CountDownLatch(1);
+        Callable<Boolean> spend = () -> {
+            try {
+                new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                    ActorResource copy = resources.findById(resource.getId()).orElseThrow();
+                    loaded.countDown();
+                    await(release);
+                    // This row is inserted before the contested flush; a losing writer must roll it back.
+                    operations.saveAndFlush(CampaignOperation.accept(f.campaign.getId(), UUID.randomUUID().toString(),
+                            PAYLOAD_HASH, "spend", 1, NOW));
+                    copy.adjust(-1, 2, NOW);
+                    resources.saveAndFlush(copy);
+                });
+                return true;
+            } catch (OptimisticLockingFailureException conflict) {
+                return false;
+            }
+        };
+        assertEquals(1, race(spend, loaded, release));
+        assertEquals(8, resources.findById(resource.getId()).orElseThrow().getCurrentValue());
+        assertEquals(1, operations.count());
+        assertEquals(0, campaigns.findById(f.campaign.getId()).orElseThrow().getCounters().stateRevision());
+        assertRejected("actor_resource_monotonic", () -> jdbc.update("update actor_resource set updated_revision = 0, "
+                + "row_version = row_version + 1 where id = ?", resource.getId()));
+    }
+
+    /** Concurrent duplicate inserts succeed once for both idempotency keys and reward sources. */
+    @Test
+    void serializesConcurrentDuplicateKeysAndRewards() throws Exception {
+        Fixture f = newCampaign("Duplicates");
+        CampaignOperation operation = committedOperation(f.campaign.getId(), "source");
+        for (boolean reward : List.of(false, true)) {
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch release = new CountDownLatch(1);
+            Callable<Boolean> insert = () -> {
+                ready.countDown();
+                await(release);
+                try {
+                    if (reward) {
+                        rewards.saveAndFlush(RewardSettlement.settle(f.campaign.getId(), "quest", "party",
+                                operation.getId(), 1, "{}", NOW));
+                    } else {
+                        operations.saveAndFlush(CampaignOperation.accept(f.campaign.getId(), "duplicate",
+                                PAYLOAD_HASH, "move", 0, NOW));
+                    }
+                    return true;
+                } catch (DataIntegrityViolationException conflict) {
+                    assertTrue(conflict.getMessage().contains(reward ? "reward_settlement_source_uk"
+                            : "operation_journal_idempotency_uk"), conflict.getMessage());
+                    return false;
+                }
+            };
+            assertEquals(1, race(insert, ready, release));
+        }
+        assertEquals(1, rewards.count());
+        assertEquals(2, operations.count());
+    }
+
+    /** Run two independent writers after both reach their barrier; timeouts fail instead of hanging CI. */
+    private static int race(Callable<Boolean> action, CountDownLatch ready, CountDownLatch release) throws Exception {
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(action);
+            var second = executor.submit(action);
+            try {
+                assertTrue(ready.await(15, TimeUnit.SECONDS), "writers must reach the same starting point");
+            } finally {
+                release.countDown();
+            }
+            return (first.get(20, TimeUnit.SECONDS) ? 1 : 0) + (second.get(20, TimeUnit.SECONDS) ? 1 : 0);
+        }
+    }
+
+    /** Await a test barrier for at most 15 seconds; interruption preserves the flag and fails the test. */
+    private static void await(CountDownLatch latch) {
+        try {
+            assertTrue(latch.await(15, TimeUnit.SECONDS), "test barrier timed out");
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("test interrupted", interrupted);
+        }
+    }
+
+    /** Every existing scoped repository query excludes entities persisted solely in another campaign. */
+    @Test
+    void excludesOtherCampaignsFromScopedReads() {
+        Fixture a = newCampaign("ReadsA");
+        Fixture b = newCampaign("ReadsB");
+        actors.saveAndFlush(Actor.create(a.campaign.getId(), ActorKind.NPC, null, "Same name", null, 0, NOW));
+        CampaignOperation operation = committedOperation(a.campaign.getId(), "source");
+        events.saveAndFlush(event(a.campaign.getId(), 1, operation.getId(), null, null));
+        rewards.saveAndFlush(RewardSettlement.settle(a.campaign.getId(), "quest", "party", operation.getId(), 1, "{}", NOW));
+        checkpoints.saveAndFlush(CampaignCheckpoint.capture(a.campaign.getId(), CampaignCounters.of(1, 1, 0, 1),
+                new CampaignCheckpoint.Hashes(CONTENT_HASH, RULESET_HASH, "d".repeat(64)), 1, "{}", NOW));
+        assertEquals(List.of(b.campaign), campaigns.findByAdventureIdOrderByCreatedAtAsc(b.adventure.getId()));
+        assertTrue(actors.findByCampaignIdOrderByCreatedAtAsc(b.campaign.getId()).isEmpty());
+        assertTrue(operations.findByCampaignIdAndIdempotencyKey(b.campaign.getId(), "source").isEmpty());
+        assertTrue(events.findByCampaignIdOrderBySequenceAsc(b.campaign.getId()).isEmpty());
+        assertTrue(rewards.findByCampaignIdAndSourceKeyAndRecipientKey(b.campaign.getId(), "quest", "party").isEmpty());
+        assertTrue(checkpoints.findTopByCampaignIdOrderByStateRevisionDesc(b.campaign.getId()).isEmpty());
+    }
+
+    /** PostgreSQL bounds the normalized UTF-8 payload, including JSONB's rendering overhead. */
+    @Test
+    void enforcesStoredPayloadByteBounds() {
+        Fixture f = newCampaign("Payloads");
+        CampaignOperation operation = committedOperation(f.campaign.getId(), "source");
+        CampaignEvent event = events.saveAndFlush(event(f.campaign.getId(), 1, operation.getId(), null, null));
+        RewardSettlement reward = rewards.saveAndFlush(RewardSettlement.settle(f.campaign.getId(), "quest",
+                "party", operation.getId(), 1, "{}", NOW));
+        CampaignCheckpoint checkpoint = checkpoints.saveAndFlush(CampaignCheckpoint.capture(f.campaign.getId(),
+                CampaignCounters.of(1, 1, 0, 1), new CampaignCheckpoint.Hashes(CONTENT_HASH, RULESET_HASH,
+                        "d".repeat(64)), 1, "{}", NOW));
+        int overhead = jdbc.queryForObject("select octet_length(jsonb_build_object('text', '')::text)", Integer.class);
+        // The copied row remains valid in every other respect, so the byte check is the rejection reason.
+        assertPayloadBoundary("campaign_event", "payload", event.getId(), CampaignEvent.MAX_PAYLOAD_BYTES,
+                overhead, "{\"sequence\":2}", "{\"sequence\":3}");
+        assertPayloadBoundary("reward_settlement", "rewards", reward.getId(), RewardSettlement.MAX_REWARDS_BYTES,
+                overhead, "{\"source_key\":\"boundary\"}", "{\"source_key\":\"oversized\"}");
+        assertPayloadBoundary("campaign_checkpoint", "snapshot", checkpoint.getId(), CampaignCheckpoint.MAX_SNAPSHOT_BYTES,
+                overhead, "{\"state_revision\":2}", "{\"state_revision\":3}");
+        assertPayloadBoundary("operation_journal", "receipt", operation.getId(), CampaignOperation.MAX_RECEIPT_BYTES,
+                overhead, "{\"idempotency_key\":\"boundary\",\"committed_revision\":2}",
+                "{\"idempotency_key\":\"oversized\",\"committed_revision\":3}");
+        jdbc.update("update campaign set pending_decision = jsonb_build_object('text', repeat('x', ?)), "
+                + "row_version = row_version + 1 where id = ?", 16_384 - overhead, f.campaign.getId());
+        assertRejected("campaign_pending_decision_size_ck", () -> jdbc.update("update campaign set "
+                + "pending_decision = jsonb_build_object('text', repeat('x', ?)), row_version = row_version + 1 "
+                + "where id = ?", 16_385 - overhead, f.campaign.getId()));
+    }
+
+    /** Insert copies at the exact byte limit and one byte above it; only fixed test identifiers enter SQL. */
+    private void assertPayloadBoundary(String table, String column, UUID source, int limit, int overhead,
+            String validOverrides, String invalidOverrides) {
+        String sql = "insert into " + table + " select (jsonb_populate_record(null::" + table
+                + ", to_jsonb(s) || cast(? as jsonb) || jsonb_build_object('id', cast(? as uuid), '" + column
+                + "', jsonb_build_object('text', repeat('x', ?))))).* from " + table + " s where id = ?";
+        assertEquals(1, jdbc.update(sql, validOverrides, UUID.randomUUID(), limit - overhead, source));
+        assertRejected(table + "_" + column + "_size_ck", () -> jdbc.update(sql, invalidOverrides,
+                UUID.randomUUID(), limit - overhead + 1, source));
     }
 
     /**
@@ -379,7 +680,7 @@ class CanonicalFoundationsPersistenceTest {
     /** Remove all rows; TRUNCATE bypasses the row-level immutability triggers by design. */
     private void truncateAll() {
         jdbc.execute("truncate table campaign_checkpoint, reward_settlement, campaign_event, operation_journal, "
-                + "actor, presentation_campaign_settings, campaign, content_revision, adventure_workspace, "
-                + "identity_owner_profile");
+                + "actor_resource, actor, presentation_campaign_settings, campaign, content_revision, "
+                + "adventure_workspace, identity_owner_profile");
     }
 }

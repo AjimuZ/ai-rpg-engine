@@ -29,6 +29,9 @@ import org.rpgengine.persistence.CanonicalValues;
 @Immutable
 @Table(name = "campaign_checkpoint")
 public class CampaignCheckpoint extends AssignedIdEntity {
+    /** Inclusive snapshot bound in UTF-8 bytes; matches campaign_checkpoint_snapshot_size_ck (V2). */
+    public static final int MAX_SNAPSHOT_BYTES = 8_388_608;
+
     @Column(name = "campaign_id", nullable = false, updatable = false)
     private UUID campaignId;
 
@@ -99,7 +102,7 @@ public class CampaignCheckpoint extends AssignedIdEntity {
         checkpoint.snapshotHash = hashes.snapshotHash();
         checkpoint.snapshotSchemaVersion =
                 (int) CanonicalValues.requirePositive(snapshotSchemaVersion, "snapshotSchemaVersion");
-        checkpoint.snapshot = CanonicalValues.requireJsonObject(snapshotJson, "snapshot");
+        checkpoint.snapshot = CanonicalValues.requireJsonObject(snapshotJson, "snapshot", MAX_SNAPSHOT_BYTES);
         checkpoint.createdAt = CanonicalValues.timestamp(now, "now");
         return checkpoint;
     }

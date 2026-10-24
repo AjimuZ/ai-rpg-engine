@@ -43,6 +43,14 @@ PostgreSQL remains authoritative for state, events, ownership and saved asset as
 
 `AdventureWorkspace` owns ID, title/genre/locale, authored specifications, admitted content revisions and presentation/generation policy. Each campaign belongs to exactly one adventure. Every mutable query, job, thread, summary, image association and export verifies adventure/campaign ownership. Existing campaign routes can derive the adventure server-side but reject mismatched selected-adventure context.
 
+The P03.2 database foundations freeze the workspace owner, campaign adventure and
+content revision, and actor/resource/operation campaign associations after insert.
+Resources additionally reference an actor in the same campaign. A reassignment
+cannot silently move existing state between adventures, even under a direct SQL
+UPDATE. Scoped repository queries have negative isolation tests; application
+authorization, routes, media and job isolation remain later work. These storage
+checks alone do not complete QA-33.
+
 Proposed additions are `GET /api/v1/adventures`, `POST /api/v1/adventures` and `GET /api/v1/adventures/{adventureId}`. The existing campaign-creation envelope requires `adventureId` and an admitted pack revision belonging to it. Continue/list operations expose only its campaigns. These are design contracts, not running endpoints.
 
 Scope client projections, drafts, quick replies, reading cursor and media to adventure/campaign. Switching detaches old subscriptions and rejects stale callbacks in the new view, without submitting an old draft. The header identifies the selected adventure/playthrough. Memory and narrative threads never cross adventures because character names match. Generated images stay in their originating folders; no global search-by-name cache is allowed. Public engine UI assets may be shared read-only; reuse of authored/private material requires explicit rights-aware export/import and identity remapping.

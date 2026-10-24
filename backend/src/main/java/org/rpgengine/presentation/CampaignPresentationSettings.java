@@ -10,8 +10,8 @@ import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
-import org.rpgengine.persistence.AssignedIdEntity;
 import org.rpgengine.persistence.CanonicalValues;
+import org.rpgengine.persistence.VersionedEntity;
 
 /**
  * Presentation preferences of one campaign (docs/29): the narrative locale and the
@@ -26,7 +26,7 @@ import org.rpgengine.persistence.CanonicalValues;
 @Entity
 @Table(name = "presentation_campaign_settings")
 @AttributeOverride(name = "id", column = @Column(name = "campaign_id", updatable = false))
-public class CampaignPresentationSettings extends AssignedIdEntity {
+public class CampaignPresentationSettings extends VersionedEntity {
     @Convert(converter = SupportedLocaleConverter.class)
     @Column(name = "narrative_locale", nullable = false)
     private SupportedLocale narrativeLocale;

@@ -12,6 +12,15 @@ Treat player text, imported packs, Markdown lore, AI output, remote media, and r
 
 The canonical writer is the backend application service using constrained database credentials. The Codex process receives no database credentials, canonical filesystem write roots, developer repository, or general administrative API. The frontend receives authorized projections, not raw saves.
 
+P03.2 hardens the database boundary with immutable owner/adventure/campaign
+associations, campaign-scoped foreign keys and resource keys, explicit optimistic
+row versions, bounded resource balances and bounded JSONB objects. Database
+constraints protect storage integrity; they do not authorize reads. Future
+application boundaries must verify owner and selected adventure/campaign and use
+scoped repository queries, keeping inherited administrative methods private.
+No domain service/API or database row-level security policy is implemented yet;
+QA-20 evidence at this stage covers constraints and scoped persistence queries.
+
 ## 3. Codex capability controls
 
 Use a separately scoped runtime directory and an explicit supported restricted capability profile. Verify inherited global/project instructions, plugins, MCP servers, shell tools, filesystem roots, network tools, hooks, and agent delegation rather than assuming they are absent. Record effective policy in diagnostics without secrets.

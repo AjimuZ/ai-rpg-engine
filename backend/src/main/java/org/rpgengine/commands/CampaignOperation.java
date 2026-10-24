@@ -12,8 +12,8 @@ import jakarta.persistence.Table;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-import org.rpgengine.persistence.AssignedIdEntity;
 import org.rpgengine.persistence.CanonicalValues;
+import org.rpgengine.persistence.VersionedEntity;
 
 /**
  * Operation journal entry (docs/07 section 2). The idempotency key is unique per
@@ -21,13 +21,19 @@ import org.rpgengine.persistence.CanonicalValues;
  * same key with another hash is a conflict ({@link #matchesPayload}).
  *
  * <p>{@code operationVersion} counts this row's own lifecycle transitions. It is not a
- * world counter and never feeds {@code stateRevision}. Leases and fencing tokens
- * arrive with P03.5; the atomic commit that sets {@code committedRevision} with state
+ * world counter and never feeds {@code stateRevision}. It is also not the optimistic-lock
+ * token: that is the inherited row version, which every update advances (V2). The
+ * database additionally keeps terminal statuses final and the commit outcome
+ * write-once. Leases and fencing tokens arrive with P03.5; the atomic commit that
+ * sets {@code committedRevision} with state
  * and events in one transaction arrives with P03.3.
  */
 @Entity
 @Table(name = "operation_journal")
-public class CampaignOperation extends AssignedIdEntity {
+public class CampaignOperation extends VersionedEntity {
+    /** Inclusive receipt bound in UTF-8 bytes; matches operation_journal_receipt_size_ck (V2). */
+    public static final int MAX_RECEIPT_BYTES = 65_536;
+
     @Column(name = "campaign_id", nullable = false, updatable = false)
     private UUID campaignId;
 
@@ -131,7 +137,7 @@ public class CampaignOperation extends AssignedIdEntity {
         if (newRevision <= baseRevision) {
             throw new IllegalArgumentException("committedRevision must exceed baseRevision");
         }
-        CanonicalValues.requireJsonObject(receiptJson, "receipt");
+        CanonicalValues.requireJsonObject(receiptJson, "receipt", MAX_RECEIPT_BYTES);
         advance(OperationStatus.COMMITTED, now);
         committedRevision = newRevision;
         receipt = receiptJson;

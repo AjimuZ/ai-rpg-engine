@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: P00, P01.1–P01.7, P02.1–P02.7 and P03.1 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; P03.1 adds the canonical schema and domain foundations only, and gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. The root launcher and its Windows lifecycle checks (P02.7) are verified for Docker Desktop with Git Bash only; Linux/macOS, interactive Ctrl+C, owner sign-in, campaign persistence beyond the P03.1 foundations (P03.2–P03.6) and full QA-28 remain pending. P03.2 is the next task. Design specifications and predecessor milestones do not establish completed gameplay.
+**Current status: P00, P01.1–P01.7, P02.1–P02.7 and P03.1–P03.2 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; P03.1–P03.2 add the canonical schema, bounded resources, ownership constraints and storage versions, and gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. The root launcher and its Windows lifecycle checks (P02.7) are verified for Docker Desktop with Git Bash only; Linux/macOS, interactive Ctrl+C, owner sign-in, campaign persistence beyond these foundations (P03.3–P03.6) and full QA-28 remain pending. P03.3 is the next task. Design specifications and predecessor milestones do not establish completed gameplay.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -472,7 +472,21 @@ content/assets and full container integration remain open; P02.3 stays unchecked
   `@Version` fields, resource/ownership bounds and systematic cross-campaign tests remain P03.2,
   atomic commit and outbox P03.3, random draws P03.4, leases/restore/journal reconciliation P03.5,
   and narration jobs/planning snapshots P03.6. Hosted CI for this commit is unconfirmed.
-- [ ] P03.2 Add campaign-scoped foreign keys and unique constraints, resource and ownership bounds, and explicit version fields.
+- [x] P03.2 Add campaign-scoped foreign keys and unique constraints, resource and ownership bounds, and explicit version fields.
+  Completed 24 October 2026: V2 adds bounded actor resources with a composite actor/campaign
+  foreign key and unique resource key; seven mutable tables use independent JPA row
+  versions. PostgreSQL freezes scope/provenance, prevents counter rewinds, bounds JSONB
+  bytes and requires unique, complete write-once commit outcomes. Tests exercise raw SQL
+  and repository isolation, stale and concurrent writers with losing-transaction rollback,
+  concurrent idempotency/reward duplicates, inclusive resource/payload boundaries and a
+  populated V1-to-V2 upgrade preserving domain counters. Full backend `verify` on pinned
+  JDK 21/PostgreSQL 18.6 passes 43 tests (three packaged-interface tests require the
+  separate UI profile and are skipped). Repository-checker tests pass 22/22; default
+  packaging checks pass 20/20 with two opt-in lifecycle/recreation checks skipped;
+  `tools/repository_checks/checks.py all` reports no findings. No dependency versions
+  change. Atomic state/event/receipt/outbox commit, expected canonical revision, random
+  draws, leases and recovery remain P03.3–P03.6; future API authorization and full
+  QA-20/QA-33 acceptance remain unverified. Hosted CI for this commit is unconfirmed.
 - [ ] P03.3 Commit state, events, receipts, and outbox messages together; no network waits in transactions.
 - [ ] P03.4 Add deterministic random-draw records and algorithm/version identity.
 - [ ] P03.5 Implement startup journal reconciliation, lease/fencing foundations, and baseline backup/restore.

@@ -46,6 +46,16 @@ stateDiagram-v2
 
 The acceptance response identifies the durable operation. A dropped HTTP response does not mean the action failed.
 
+P03.2 persistence guards now give each mutable journal row a storage `row_version`
+separate from `operationVersion` and the canonical revision. JPA rejects a stale
+copy; raw SQL must compare the expected row version and check the affected-row
+count. PostgreSQL permits multiple uncommitted NULL revisions, but only one
+operation per `(campaign_id, committed_revision)`. Committed statuses carry both
+receipt and revision; other statuses carry neither. Once recorded, neither commit
+field can change, and terminal statuses cannot reopen. These are database bounds;
+the atomic acceptance/commit service, revision checks, leases and outbox are still
+pending P03.3/P03.5. See [domain constraints](05-domain-model.md#3-database-organization).
+
 ## 4. Planning and validation
 
 Capture a consistent state revision and assemble authorized context. Known structured actions bypass AI interpretation. Free text may need a Codex intent proposal. An ambiguous action that could spend a rare item, make a binding commitment, or affect several targets requires clarification before spending anything.

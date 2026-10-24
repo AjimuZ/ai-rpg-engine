@@ -14,8 +14,8 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.rpgengine.content.ContentRevision;
-import org.rpgengine.persistence.AssignedIdEntity;
 import org.rpgengine.persistence.CanonicalValues;
+import org.rpgengine.persistence.VersionedEntity;
 
 /**
  * Campaign aggregate root (docs/05 section 2): one playthrough of exactly one adventure,
@@ -24,11 +24,13 @@ import org.rpgengine.persistence.CanonicalValues;
  *
  * <p>The canonical counters are embedded here; presentation preferences are not, so a
  * locale change can never rewrite this row. Counter advancement belongs to the atomic
- * commit path (P03.3) and is intentionally not exposed yet.
+ * commit path (P03.3) and is intentionally not exposed yet. The database already
+ * guards it (V2): counters never decrease, {@code stateRevision} advances by at most
+ * one per update, and the adventure, content revision and seed identity are fixed.
  */
 @Entity
 @Table(name = "campaign")
-public class Campaign extends AssignedIdEntity {
+public class Campaign extends VersionedEntity {
     @Column(name = "adventure_id", nullable = false, updatable = false)
     private UUID adventureId;
 

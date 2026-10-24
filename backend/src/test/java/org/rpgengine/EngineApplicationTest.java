@@ -32,9 +32,9 @@ class EngineApplicationTest {
     @Autowired
     private Flyway flyway;
 
-    /** Tables created by V1, sorted by name; identifiers are constants, never user input. */
+    /** Tables created by V1/V2, sorted by name; identifiers are constants, never user input. */
     private static final List<String> CANONICAL_TABLES = List.of(
-            "actor", "adventure_workspace", "campaign", "campaign_checkpoint", "campaign_event",
+            "actor", "actor_resource", "adventure_workspace", "campaign", "campaign_checkpoint", "campaign_event",
             "content_revision", "identity_owner_profile", "operation_journal",
             "presentation_campaign_settings", "reward_settlement");
 
@@ -67,7 +67,7 @@ class EngineApplicationTest {
         assertEquals(18, version / 10000);
         assertTrue(flyway.validateWithResult().validationSuccessful);
         assertEquals(0, flyway.info().pending().length);
-        // Exactly the P03.1 canonical foundation tables exist; nothing else sneaks in.
+        // Exactly the P03.1/P03.2 canonical foundation tables exist; nothing else sneaks in.
         List<String> tables = jdbc.queryForList(
                 "select table_name from information_schema.tables where table_schema = 'public' "
                         + "and table_name <> 'flyway_schema_history' order by table_name", String.class);
