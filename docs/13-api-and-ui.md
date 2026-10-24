@@ -1,5 +1,11 @@
 # Application API and Player Interface
 
+
+Partial P06.1 implements an internal owner-scoped creation service and durable
+request results, but `POST /api/v1/campaigns` remains proposed. The trusted owner
+argument must come from future session admission, never a client owner field.
+No HTTP creation route is exposed before Host/Origin/session/CSRF protections.
+
 ## 1. Contract status
 
 The following endpoints and DTO fields are proposed v1 contracts. They are not running services or generated OpenAPI definitions. API and content versions are separate. Use an `/api/v1` namespace and explicit schema versions for persisted/imported data.

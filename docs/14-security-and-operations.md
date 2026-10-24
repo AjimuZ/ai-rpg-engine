@@ -1,5 +1,13 @@
 # Security, Privacy, and Operations
 
+
+Partial P06.1 exposes creation only as an internal service with trusted owner
+context. It rejects inaccessible adventure/revision scopes before returning stored
+identities and accepts no player-supplied item or ability grants. HTTP creation
+remains unavailable pending local session, Host/Origin and CSRF admission. V9
+backup scope now includes character state, item instances, learned abilities and
+immutable creation requests; older schema archives remain explicitly rejected.
+
 ## 1. Deployment threat model
 
 The initial supported product is a local application for one owner. Relevant threats still include malicious adventure files, prompt injection, generated operations outside rules, secret leakage, unsafe asset paths, cross-origin requests to localhost, corrupted saves, duplicate actions, inherited Codex tooling, and mistaken shutdown of unrelated processes.

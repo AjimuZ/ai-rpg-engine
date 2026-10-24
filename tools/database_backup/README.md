@@ -1,4 +1,4 @@
-# Database backup and restore (V8 scope)
+# Database backup and restore (V9 scope)
 
 A trusted-owner disaster-recovery tool for the canonical PostgreSQL database. It
 uses only the Python standard library and the `pg_dump`/`pg_restore` clients inside
@@ -19,7 +19,7 @@ py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
 ## What it does
 
 - **Backup** checks the exact server and client version, the exact table set and
-  successful migrations V1–V8, including immutable pack bytes and sealed reports. It then creates the target directory, which must
+  successful migrations V1–V9, including immutable pack bytes and sealed reports. It then creates the target directory, which must
   not already exist, and writes `database.dump` (custom format, no owners or
   privileges). It re-reads the catalog and writes `manifest.json` last. The manifest
   holds the format, schema and PostgreSQL versions, the scope, the byte count, the
@@ -75,3 +75,8 @@ py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
   and Italian preferences. Immutable rows matched; recovery generation advanced 0→1,
   mutation fence 4→5, a usable plan gained an invalidation, and jar startup superseded
   the old running job. Canonical revision/turn/time/event counters stayed 7/3/60/12.
+
+V9 scope includes `character_state`, `item_instance`, `learned_ability` and
+`campaign_creation`, so initial allocations, grants and idempotent request results
+are retained with campaign pins. The schema/table allowlist tests cover this scope;
+the earlier V8 live dump/restore rehearsal is not V9 rehearsal evidence.

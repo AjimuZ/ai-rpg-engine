@@ -203,6 +203,37 @@ public class PackRegistry {
         });
     }
 
+    /**
+     * Reload and recompile one sealed adventure-owned revision inside a caller's transaction.
+     * The caller must authorize the owner first. Returns privileged immutable definitions;
+     * never expose them as a public projection. Missing/unsealed revisions, changed hashes
+     * or an unavailable pinned ruleset fail before campaign writes. No filesystem is read.
+     */
+    public CompiledPack loadForCampaign(UUID adventureId, UUID revisionId) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("campaign content loading requires a transaction");
+        }
+        var hashes = jdbc.query("select c.content_hash, c.ruleset_hash from content_revision c "
+                + "join content_revision_report r on r.content_revision_id = c.id "
+                + "where c.adventure_id = ? and c.id = ?",
+                (row, index) -> Map.entry(row.getString(1), row.getString(2)), adventureId, revisionId);
+        if (hashes.isEmpty()) {
+            throw new IllegalArgumentException("sealed content revision is unavailable in this adventure");
+        }
+        if (!contract.rulesetHash().equals(hashes.getFirst().getValue())) {
+            throw new IllegalArgumentException("pinned ruleset is unavailable in this engine build");
+        }
+        Map<String, byte[]> files = new TreeMap<>();
+        jdbc.query("select path, content from content_revision_file where content_revision_id = ? order by path",
+                (org.springframework.jdbc.core.RowCallbackHandler) row ->
+                        files.put(row.getString(1), row.getBytes(2)), revisionId);
+        ParsedPack parsed = new PackParser().parse(files);
+        if (!parsed.contentHash().equals(hashes.getFirst().getKey())) {
+            throw new IllegalStateException("stored pack files do not match the pinned content hash");
+        }
+        return new PackCompiler(new Catalog(adventureId), contract).compile(parsed);
+    }
+
     /** Parse the staged bytes and check every asset; no database access, so no lock is held meanwhile. */
     private static Prepared prepare(PackStaging.StagedPack staged) {
         Objects.requireNonNull(staged, "staged");

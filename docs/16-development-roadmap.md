@@ -817,6 +817,16 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 
 - [ ] P06.1 Create campaigns atomically from immutable pack snapshots and validated character choices.
   **Requires tasks:** P05.5.
+  - Verified internal creation-core checkpoint (24 October 2026): owner/adventure
+    authorization, sealed-byte/ruleset reload, bounded preset/custom budgets and atomic
+    character/resources/loadout/locale state with immutable durable request retries.
+    V9 preserves populated legacy state without fabricated backfill; recovery scope
+    includes all four new tables. Full pinned Java/Maven packaged verification passes
+    275 tests on PostgreSQL 18.6; 22 repository policy tests and 8 backup tests pass
+    (one Windows symlink case skips); repository scans have zero findings.
+    Public creation transport/session/CSRF admission and pinned external mechanical
+    dependency loading remain unimplemented; keep P06.1 open. No starting narration,
+    public projection or full restart/consultation acceptance is claimed.
   - Scheduling correction (24 October 2026): the completed P05.1–P05.5
     foundation permits P06/P07 API development; P05.6 waits explicitly for P06.2
     and P07.5, then becomes eligible again in roadmap order. All 117 task IDs

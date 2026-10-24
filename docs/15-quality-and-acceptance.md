@@ -1,5 +1,12 @@
 # Quality Strategy and Acceptance Criteria
 
+
+Partial P06.1 adds a creation acceptance corpus: pure allocation/minimum/budget/
+loadout checks, real PostgreSQL atomic creation, ownership, same-ID genre isolation,
+durable and concurrent retries, deferred COMMIT rollback, and populated V8-to-V9
+upgrade without backfill. This is internal-service evidence, not full P06 public
+campaign reload/consultation or browser acceptance.
+
 ## 1. Evidence policy
 
 Partial P05.6 evidence (24 October 2026, Windows 11, Chrome 155): four resource

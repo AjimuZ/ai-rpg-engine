@@ -114,6 +114,27 @@ Core state is relational. Immutable compiled content and event payloads may use 
 
 Minimum indexes include campaign/revision, campaign/event sequence, operation idempotency key, current actor and encounter, knowledge audience/entity, quest source settlement, source-summary event range, and owned item/container. Full-text indexes support lore and event retrieval. Indexes must be justified by measured query plans later.
 
+### Campaign creation checkpoint (partial P06.1)
+
+V9 introduces `character_state`, `item_instance`, `learned_ability` and immutable
+`campaign_creation`. The internal creation service authorizes owner/adventure,
+loads sealed original bytes, checks the pinned ruleset and validates the manifest's
+profile before inserting the campaign, player actor, allocations, full resources,
+starting stacks/abilities and presentation locale in one transaction. Request IDs
+are scoped to the adventure; exact retries return stored identities and changed
+payloads fail. Creation starts at revision/turn/time/event zero and makes no draw,
+job or narration call. Legacy campaigns receive no invented character rows.
+
+The full backend packaged verification passes 275 tests on PostgreSQL 18.6,
+including creation/rollback/retry and populated upgrade coverage. Mutable inventory/progression commands,
+equipment, starting presentation and the protected HTTP boundary remain later work.
+Dependency-provided mechanical definitions fail closed at creation until their
+pinned definition closure is supported; local mechanics can use registered pack
+metadata dependencies. Initial grants are explicit authored grants, not ability
+use. Attribute cost is above declared minima, skill cost is total ranks; omitted
+values use minima/zero and unspent points are allowed. Repeated starting item
+grants aggregate into one bounded stack, so duplication cannot bypass `maxStack`.
+
 ## 4. Mandatory invariants
 
 ### Campaign and operations

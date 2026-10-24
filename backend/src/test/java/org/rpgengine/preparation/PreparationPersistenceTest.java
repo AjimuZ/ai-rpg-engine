@@ -63,7 +63,7 @@ class PreparationPersistenceTest {
         jdbc.execute("drop trigger if exists p036_fault on plan_admission");
         jdbc.execute("drop trigger if exists p036_fault on ai_job");
         jdbc.execute("drop function if exists p036_fail()");
-        jdbc.execute("truncate plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, "
+        jdbc.execute("truncate campaign_creation, character_state, item_instance, learned_ability, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, "
                 + "ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, "
                 + "operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, "
                 + "reward_settlement, campaign_event, operation_journal, actor_resource, actor, "

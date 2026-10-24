@@ -1,5 +1,12 @@
 # Adventure Pack Specification
 
+
+Partial P06.1 adds an internal snapshot consumer for creation: it loads only a
+sealed revision in the selected adventure, verifies the byte inventory hash and
+current ruleset contract, and recompiles it inside the creation transaction.
+Player allocations cannot supply grants. Referenced external mechanical definitions
+fail closed in this checkpoint; loading their pinned closure remains unfinished.
+
 ## 1. Purpose and contract status
 
 An adventure pack is a versioned set of declarative files describing playable content and supported rules configuration. It is not a script that can command the host computer. P04.1–P04.4 implement parsing, semantic compilation, protected directory/ZIP staging and immutable registration through internal Java APIs. Only `PackRegistry` admits staged bytes as a sealed `ContentRevision`; `ParsedPack` and `CompiledPack` alone do not establish admission. P04.5 adds two standalone neutral genre fixtures and import checks; P04.6 adds optional validated EN/IT text catalogs, policies and source-fallback reports. Import UI/endpoints and playable campaigns remain later work. The concrete file syntax of pack contract 1 (`schemaVersion: 1`) is fixed by [ADR 0010](adr/0010-name-scope-format-licensing.md#decision-initial-pack-file-format-pack-contract-1). It covers UTF-8 encoding, YAML 1.2 core-schema `.yaml` files without anchors, aliases, tags, or duplicate keys, `.json` as an equivalent, CommonMark `.md` prose without front matter or rendered HTML, and directory or `.zip` distribution.

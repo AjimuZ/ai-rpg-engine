@@ -38,20 +38,21 @@ From `backend/`, with those variables set:
 `verify` starts an ephemeral HTTP server and checks minimal health, hidden diagnostic
 endpoints, PostgreSQL major version, Flyway validation, and the canonical schema.
 A missing database fails tests; nothing silently skips or uses H2. Use a new
-disposable database: the test requires exactly the twenty-five domain tables created by
+disposable database: the test requires exactly the twenty-nine domain tables created by
 `src/main/resources/db/migration/V1__canonical_foundations.sql` (P03.1),
 `V2__campaign_bounds_and_versions.sql` (P03.2, adding `actor_resource`) and
 `V3__canonical_outbox.sql` (P03.3), `V4__deterministic_random_draws.sql` (P03.4) and
 `V5__campaign_mutation_leases.sql` (P03.5) and
 `V6__durable_jobs_and_planning.sql` (P03.6), `V7__pack_registration.sql` (P04.4) and
-`V8__localized_pack_reports.sql` (P04.6, report-version constraint only), with no
+`V8__localized_pack_reports.sql` (P04.6, report-version constraint only) and
+`V9__campaign_creation.sql` (partial P06.1, character state, grants and request identities), with no
 rows, and Hibernate validates the entities against them (`ddl-auto=validate`).
 The persistence tests truncate these tables before and after each test, so never
 point `verify` at a database whose data you want to keep.
 P03.2 adds storage row versions separate from canonical counters, frozen ownership,
 bounded actor resources and complete write-once journal outcomes. Integration tests
 include cross-campaign rejection, scoped reads, concurrent duplicate inserts and
-stale-writer rollback, plus populated V1-to-V8 upgrade in a disposable schema.
+stale-writer rollback, plus populated V1-to-V9 upgrade in a disposable schema.
 P03.3 adds an internal `CanonicalCommitService` consuming immutable `ResolvedCommit`
 values from trusted backend resolution. It atomically saves world/resource changes,
 events, settlements, a backend receipt and reference-only outbox intents, and returns
@@ -287,3 +288,23 @@ socket access as the production UID.
 See the [packaging commands and limits](../tools/container_packaging/README.md).
 ADR 0009 retains Java refresh as a release requirement. Account readiness,
 canonical campaign recovery and full QA-28 remain later gates.
+
+
+## Internal campaign creation checkpoint (partial P06.1)
+
+`CampaignCreationService.create(ownerId, adventureId, request)` accepts trusted owner
+context, a sealed content revision, a request UUID, title, narrative locale and
+bounded character choices. It authorizes the adventure before returning any retry,
+recompiles exact stored bytes and validates preset/custom allocations and authored
+grants before writing. One transaction saves the campaign, actor, character state,
+resources, item stacks, learned abilities, locale and immutable request result.
+Identical retries survive service reconstruction; changed payloads conflict.
+Creation leaves canonical counters at zero and creates no event, draw or job.
+
+`CharacterCreationTest` and `CampaignCreationPersistenceTest` cover authored minima,
+budgets, caps, loadouts, two same-ID genre snapshots, independent campaigns,
+owner rejection, concurrent retries and rollback of deferred COMMIT failures.
+The populated upgrade test preserves V8 rows and creates no fictional backfill.
+There is no creation HTTP endpoint yet: session/CSRF admission and mechanical
+resolution of pinned external dependencies remain P06.1 work. Listing, public
+projections, starting narration and pending decisions remain later P06 tasks.

@@ -15,7 +15,7 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V8 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V9 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -159,6 +159,19 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(v6Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
                     assertEquals(journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o", String.class));
                     assertEquals(0, v8.migrate().migrationsExecuted);
+                    // V9 adds empty creation storage without inventing character choices or changing old state.
+                    Flyway v9 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("9").load();
+                    assertEquals(1, v9.migrate().migrationsExecuted);
+                    assertTrue(v9.validateWithResult().validationSuccessful);
+                    assertEquals(v6Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
+                    assertEquals(journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o", String.class));
+                    assertEquals(oldFile, jdbc.queryForObject("select to_jsonb(f)::text from content_revision_file f", String.class));
+                    assertEquals(oldReport, jdbc.queryForObject("select to_jsonb(r)::text from content_revision_report r", String.class));
+                    for (String table : new String[] {"character_state", "item_instance", "learned_ability", "campaign_creation"}) {
+                        assertEquals(0, jdbc.queryForObject("select count(*) from " + table, Integer.class));
+                    }
+                    assertEquals(0, v9.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

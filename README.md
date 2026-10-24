@@ -60,6 +60,13 @@ mechanics or visibility. Both fixtures include bilingual catalog resources; impo
 screens, transport-localized UI, runtime narration and playable campaigns remain pending.
 See the [pack contract](docs/09-adventure-packs.md).
 
+
+The partial P06.1 checkpoint adds internal atomic campaign creation from sealed
+pack bytes, validated character budgets and authored grants, with durable retries
+and V9 storage. Public creation transport/session protection and external
+mechanical dependency resolution remain unfinished; no playable creation route
+is exposed. See [backend scope](backend/README.md#internal-campaign-creation-checkpoint-partial-p061).
+
 ## Why this engine exists
 
 A long RPG campaign needs more than a conversation history. Inventory must remain consistent, unfinished promises must survive a new AI session, combat must use actual abilities and resources, and the narrator must respect what each character knows. AI RPG Engine is designed to make these responsibilities explicit and testable.

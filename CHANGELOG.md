@@ -2,6 +2,16 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Internal campaign creation (partial P06.1), 24 October 2026
+
+- Add an owner-scoped transactional creation service from sealed pack snapshots,
+  validated preset/custom budgets, resource maxima and authored item/ability grants.
+  Persist immutable scoped request identities for durable, concurrent safe retries.
+- Add V9 character/loadout storage and recovery allowlist coverage; preserve
+  populated older schemas without inventing character choices or advancing counters.
+- Keep public creation transport and external dependency mechanics unfinished;
+  no creation endpoint or starting narration is exposed by this checkpoint.
+
 ## Unreleased — Staged interface integration dependencies, 24 October 2026
 
 - Correct the roadmap dependency cycle between localized interface integration

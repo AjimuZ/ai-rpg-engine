@@ -9,6 +9,13 @@ uses the same format; sharing does not merge worlds by title or transfer account
 access. Voice, locale and planning artifacts retain the same scoped identity
 rules as images and memory.
 
+
+Partial P06.1 creation authorizes the owner/adventure before looking up a durable
+retry and requires the sealed revision to belong to that adventure. The adventure
+row lock serializes registration and creation; same request UUIDs are scoped by
+adventure. Separate campaign and actor identities isolate same-ID genre definitions
+and initial grants. Public workspace admission/switching remains unfinished.
+
 ## 1. Meaning and status
 
 The owner requires personalized adventures in parallel, each with its own specifications, content and media folders. An **adventure workspace** is not a quick-save slot. It owns an authored world/configuration and can contain multiple **campaigns** (playthroughs); each campaign can have checkpoints/backups. A reusable imported **pack** is a versioned content source, not the active adventure or a saved campaign. P03.1 delivers the storage foundation only: `adventure_workspace`, adventure-owned `content_revision`, `campaign` rows pinned to a revision of the same adventure, and `campaign_checkpoint` rows. Managed folders, the library UI, backups and workspace commands are not delivered.

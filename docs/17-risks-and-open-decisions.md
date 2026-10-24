@@ -12,6 +12,13 @@ host permission hardening remain P02.6 work; file mounts are not encrypted.
 Native Linux-host UID readability remains unverified. Ordinary Spring overrides
 retain their standard precedence; configtree is not a secret manager.
 
+
+Partial P06.1 has verified internal creation foundations but no public creation
+admission. Session/CSRF protection and mechanical dependency-closure loading must
+be completed before its roadmap box closes; dependency mechanics currently fail
+closed. Service reconstruction tests durable retries, not full application/browser
+restart acceptance. Existing campaigns receive no invented character-state backfill.
+
 ## 1. Risk register
 
 Partial P05.6 reduces translation drift for the 218 marked local-preview

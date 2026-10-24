@@ -32,10 +32,10 @@ class EngineApplicationTest {
     @Autowired
     private Flyway flyway;
 
-    /** Tables created by V1–V7, sorted by name; identifiers are constants, never user input. */
+    /** Tables created by V1–V9, sorted by name; identifiers are constants, never user input. */
     private static final List<String> CANONICAL_TABLES = List.of(
-            "actor", "actor_resource", "adventure_workspace", "ai_job", "ai_job_attempt", "campaign", "campaign_checkpoint", "campaign_event",
-            "campaign_mutation_lease", "campaign_random_seed", "canonical_outbox", "content_revision", "content_revision_file", "content_revision_report", "identity_owner_profile", "operation_journal",
+            "actor", "actor_resource", "adventure_workspace", "ai_job", "ai_job_attempt", "campaign", "campaign_checkpoint", "campaign_creation", "campaign_event",
+            "campaign_mutation_lease", "campaign_random_seed", "canonical_outbox", "character_state", "content_revision", "content_revision_file", "content_revision_report", "identity_owner_profile", "item_instance", "learned_ability", "operation_journal",
             "operation_random_draw",
             "plan_admission", "plan_dependency", "plan_disposition", "planning_snapshot",
             "presentation_campaign_settings", "query_epoch", "quest_plan_artifact", "reward_settlement");
@@ -69,7 +69,7 @@ class EngineApplicationTest {
         assertEquals(18, version / 10000);
         assertTrue(flyway.validateWithResult().validationSuccessful);
         assertEquals(0, flyway.info().pending().length);
-        // Exactly the P03.1–P03.6 foundation tables exist; nothing else sneaks in.
+        // Exactly the admitted canonical tables exist; nothing else sneaks in.
         List<String> tables = jdbc.queryForList(
                 "select table_name from information_schema.tables where table_schema = 'public' "
                         + "and table_name <> 'flyway_schema_history' order by table_name", String.class);
