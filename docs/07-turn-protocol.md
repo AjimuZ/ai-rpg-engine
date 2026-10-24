@@ -163,10 +163,19 @@ to `FAILED_BEFORE_COMMIT`. It moves `NARRATING`, and `COMMITTED` with a narratio
 outbox intent, to `COMMITTED_NARRATION_PENDING`. Receipts, draws and world state are
 unchanged; any recovery error aborts startup. Limits: recovery assumes one local
 installation, with no other admitter between acceptance and lease grant.
-`COMMITTED` without a narration intent stays `COMMITTED`. Runtime cancellation,
-durable job accounting and worker lease renewal are later work (P03.6, P07). The
+`COMMITTED` without a narration intent stays `COMMITTED`. P03.6 persists preparation
+attempt accounting and lease renewal; runtime cancellation transport remains P07/P08. The
 [database backup tool](../tools/database_backup/README.md) retires all saved leases
-on restore.
+on restore and advances the campaign recovery generation.
+
+P03.6 job recovery scans unfinished rows in keyset pages of 100, with campaign →
+job lock order and one short transaction per job. A live current-generation lease
+survives service restart. An expired lease closes the attempt as interrupted,
+increments its fence and enters `RECONCILIATION_REQUIRED`; it never silently requeues
+potentially running external work. Only explicit `confirmStopped` allows a bounded
+retry, cancellation or expiry. Retired-generation work becomes `SUPERSEDED`.
+Recovery failure aborts startup and keeps claims/admissions gated. Completed audit
+rows remain immutable; duplicate admission also checks the current generation.
 
 | Interruption point | Required behavior |
 | --- | --- |
@@ -192,6 +201,25 @@ An action resolves only the player's declared intent and unavoidable consequence
 Generated details that change future possibilities must be registered through the content/fact proposal path before their narration is published as canon. A final narrator can choose atmosphere and wording but cannot introduce a usable potion, secret passage, binding promise, new attacker, or extra player action after commit. If such a proposal is desirable, it belongs in a subsequent planned operation.
 
 ## 11. Background preparation and presentation
+
+P03.6 implements the persistence/admission foundation below as internal services,
+without a dispatcher or gameplay endpoint. `ResolvedCommit.Preparation` carries up
+to 64 affected query scopes and 16 job intents. Epoch bumps, critical enqueue and
+query-based plan invalidation share the world/event/receipt/outbox transaction; a
+deferred database check requires a critical job's originating operation to have a
+committed outcome. Duplicate intent must also match payload/schema and origin.
+
+Snapshot capture checks assembler revision, recovery and presentation tokens under
+locks, then stores the exact selected state and typed dependency manifest. Admission
+requires that complete manifest, the recorded result digest, current job fence,
+generation and query epochs. Public snapshot locale/glossary tokens must still
+match; language-neutral private structure can survive a locale change. A public
+snapshot requires an initialized presentation row so capture/admission can lock it.
+Unrelated revision changes do not alone invalidate an artifact. Non-query semantic
+dependencies currently reject with `UNSUPPORTED_DEPENDENCY`; author/rules/quest
+semantic validation remains P08.7. Rejection permits at most one regeneration within
+the durable attempt/deadline budget. Concurrent duplicate delivery stores one
+immutable version/admission receipt; later versions append and supersede prior ones.
 
 Quest acceptance commits its known terms and current pending decision through
 this pipeline; it does not wait for a deep quest outline. A background job may

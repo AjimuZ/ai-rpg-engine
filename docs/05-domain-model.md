@@ -87,7 +87,26 @@ V2 freezes row identities, owner/adventure/campaign associations and creation pr
 
 Canonical counters and presentation generations cannot decrease, and a campaign state revision advances by at most one per row update. Committed journal statuses require both revision and receipt; other statuses require neither. Commit outcomes are write-once, terminal statuses cannot reopen, and `(campaign_id, committed_revision)` is unique while uncommitted NULL revisions remain distinct. Checkpoints and settlements also expose composite campaign/identity unique keys for later relationships. P03.3 adds the internal atomic commit/revision/outbox boundary described below; P03.4 adds draw records above. P03.5 adds the V5 campaign mutation lease/fence and startup journal recovery ([turn protocol §8](07-turn-protocol.md#8-interrupt-and-recovery-matrix)). Acceptance APIs remain later tasks. Java owns the full lifecycle transition table. Scoped repository methods are persistence primitives; future application boundaries must authorize owner/adventure/campaign before calling them, and must not expose inherited unscoped repository methods.
 
-JSONB object bounds use UTF-8 bytes of PostgreSQL's normalized text rendering: pending decision and reward payload 16,384 bytes, receipt and event payload 65,536 bytes, checkpoint snapshot 8,388,608 bytes. Java rejects oversized input early; JSONB whitespace/escape normalization can change the byte count, so the database remains authoritative. Larger exports/media belong outside these payloads. The constraints, boundary values, races and populated-upgrade checks pass in the full backend verification on PostgreSQL 18.6 (24 October 2026); see the [evidence scope](15-quality-and-acceptance.md#1-evidence-policy). The other table families above remain later work.
+JSONB object bounds use UTF-8 bytes of PostgreSQL's normalized text rendering: pending decision and reward payload 16,384 bytes, receipt and event payload 65,536 bytes, checkpoint snapshot 8,388,608 bytes. Java rejects oversized input early; JSONB whitespace/escape normalization can change the byte count, so the database remains authoritative. Larger exports/media belong outside these payloads. The constraints, boundary values, races and populated-upgrade checks pass in the full backend verification on PostgreSQL 18.6 (24 October 2026); see the [evidence scope](15-quality-and-acceptance.md#1-evidence-policy). The other table families above remain later work, except the P03.6 preparation
+foundation verified on 24 October 2026. Its V6 rows store immutable snapshots,
+plan versions/dependencies/admission receipts, fenced jobs/attempts and query epochs.
+Snapshot inputs carry assembler revision, recovery and presentation tokens; admission
+must retain their complete manifest. Non-query semantic dependencies fail closed
+until typed evaluators exist. These internal services expose no gameplay endpoint.
+
+V6 adds `ai_job`, `ai_job_attempt`, `planning_snapshot`, `query_epoch`,
+`quest_plan_artifact`, `plan_dependency`, `plan_admission` and `plan_disposition`.
+Composite keys bind jobs to their adventure/campaign, snapshots to the campaign's
+pinned content, and plans/dependencies/receipts to scoped attempts. Snapshot digest
+inputs include the full selected state, source references, typed dependency manifest,
+audience, source counters and policy/content hashes. Selected state and plan bodies
+are bounded to 65,536 normalized JSONB bytes; manifests allow at most 512 typed
+dependencies and 65,536 bytes. Artifact versions, snapshots, dependencies and
+admissions cannot be rewritten; dispositions append a new sequence. Job attempts
+retain write-once runtime/result/outcome history, a finite retry budget and a fence
+that increases on claim/release. `campaign.recovery_generation` is independent of
+canonical revision and advances on database restore. Usage counters are durable
+accounting primitives; global budget admission remains P08.6.
 
 P03.3 adds `V3__canonical_outbox.sql` and the internal `CanonicalCommitService`. A bounded immutable resolved plan commits world counters/mode/decision, typed resource adjustments, ordered events, settlements, a backend-built receipt and outbox intents together. The service serializes by campaign, rechecks snapshot tokens, rejects ambient transactions and returns only after COMMIT. Outbox kinds are `PUBLIC_STATE` and optional `NARRATION_REQUIRED`; envelopes contain only identity, campaign, operation, committed revision, kind and creation time. `(campaign_id, operation_id, kind)` is unique; a deferred composite foreign key requires the referenced journal outcome to be committed at the same revision. Rows cannot be updated/deleted. Historic operations receive no fabricated outbox records on upgrade. Delivery state/retention and workers are later work. See [commit contract and bounds](07-turn-protocol.md#5-canonical-commit).
 

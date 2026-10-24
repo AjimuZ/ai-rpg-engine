@@ -2,6 +2,15 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Durable preparation and fenced admission (P03.6), 24 October 2026
+
+- Add V6 scoped jobs/attempts, immutable snapshots, versioned artifacts/dependencies, admission receipts, append-only dispositions, query epochs and campaign recovery generations.
+- Persist finite attempt budgets, usage observations, cancellation and lease fences. Gate claims/admissions on startup reconciliation; require confirmed external stop before retrying expired work. Restore retires generations, leases and usable plans while preserving canonical counters and audit bytes.
+- Check snapshot assembler freshness and the complete engine manifest; reject query phantoms, stale public locale/glossary tokens and unsupported semantic dependencies. Serialize admission and canonical invalidation by campaign; cancellation races under the job lock. Keep public locale preferences separate from canonical state.
+- Commit critical jobs, query-epoch bumps and invalidation with the canonical state/event/receipt/outbox bundle; reject conflicting duplicate intent and roll back injected failures. Admission creates no canonical event, draw, reward or time advance.
+- Pass full backend `verify` on pinned JDK 21/PostgreSQL 18.6: 113 tests pass, three packaged-interface profile skips, jar built; includes 17 preparation tests and populated V1→V6 upgrade. A V6 backup/restore and jar-startup rehearsal passes. Repository tests pass 22; backup tests pass 8 with one Windows symlink skip; default packaging tests pass 20 with two opt-in skips.
+- Keep dispatch, fairness/global quota enforcement, runtime cancellation transport, full semantic dependency validation, gameplay consumption and full QA-36/37 for later packages. No hosted-CI or narrative-quality result is claimed.
+
 ## Unreleased — Leases, startup recovery and database backups (P03.5), 24 October 2026
 
 - Add forward-only V5 campaign mutation leases with a persistent fence that only grows, database guards against rewinds or unfenced owner changes, and a recovery index. `MutationLeaseService` grants, renews and releases leases using PostgreSQL time.

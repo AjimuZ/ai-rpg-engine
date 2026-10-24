@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 POSTGRES_VERSION = "18.6"
-SCHEMA_VERSION = "5"
+SCHEMA_VERSION = "6"
 # Flyway versions this tool understands; test_backup.py fails when a new backend
 # migration or table appears, so the archive scope can never silently drift.
 MIGRATIONS = [str(version) for version in range(1, int(SCHEMA_VERSION) + 1)]
@@ -26,6 +26,8 @@ TABLES = sorted([
     "campaign_event", "campaign_mutation_lease", "campaign_random_seed", "canonical_outbox",
     "content_revision", "flyway_schema_history", "identity_owner_profile", "operation_journal",
     "operation_random_draw", "presentation_campaign_settings", "reward_settlement",
+    "ai_job", "ai_job_attempt", "planning_snapshot", "query_epoch", "quest_plan_artifact",
+    "plan_dependency", "plan_admission", "plan_disposition",
 ])
 
 
@@ -86,7 +88,7 @@ class Database:
         schemas = self.sql("select nspname from pg_namespace where nspname <> 'public' "
                            "and nspname <> 'information_schema' and nspname not like 'pg_%'")
         if tables != TABLES or schemas:
-            raise ValueError("unsupported database scope; expected only the P03.5 schema")
+            raise ValueError("unsupported database scope; expected only the P03.6 schema")
         migrations = json.loads(self.sql(
             "select coalesce(json_agg(json_build_object('version', version, 'checksum', checksum, "
             "'success', success) order by installed_rank), '[]') from flyway_schema_history where type = 'SQL'"))
@@ -154,7 +156,8 @@ def restore(database: Database, directory: Path, new_name: str) -> None:
     """Restore trusted bytes into a new isolated database; never overwrite or drop an existing target.
 
     The source database argument is used only for version checks and CREATE DATABASE.
-    Restore runs atomically, verifies schema history, then retires all saved leases.
+    Restore runs atomically, verifies schema history, then retires generations, usable
+    plans and saved leases in one transaction without changing canonical counters.
     Failures retain the new database offline for diagnosis, never report it ready,
     and never change the source. Run the engine's startup reconciliation before use.
     """
@@ -172,7 +175,16 @@ def restore(database: Database, directory: Path, new_name: str) -> None:
         raise ValueError("restored migration history differs; keep the new database offline")
     # An installation recovery preserves campaign identities, but a saved worker
     # capability must never become live again even when its deadline is in the future.
+    # Preparation bytes remain immutable audit evidence; append invalidation for every
+    # formerly usable plan before startup can accept a restored callback or new work.
     target.sql("begin; set local lock_timeout = '2s'; set local statement_timeout = '5s'; "
+               "update campaign set recovery_generation = recovery_generation + 1, row_version = row_version + 1; "
+               "insert into plan_disposition (artifact_id, sequence, campaign_id, status, reason_code, "
+               "checked_revision, created_at) select a.id, d.sequence + 1, a.campaign_id, 'INVALIDATED', "
+               "'GENERATION_RETIRED', c.state_revision, clock_timestamp() from quest_plan_artifact a "
+               "join campaign c on c.id = a.campaign_id cross join lateral "
+               "(select sequence, status from plan_disposition where artifact_id = a.id "
+               "order by sequence desc limit 1) d where d.status in ('VALIDATED', 'PARTIALLY_INVALIDATED'); "
                "update campaign_mutation_lease set fence = fence + 1, operation_id = null, "
                "holder_id = null, expires_at = null; commit;")
 

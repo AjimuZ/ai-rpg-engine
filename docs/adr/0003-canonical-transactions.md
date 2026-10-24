@@ -32,6 +32,16 @@ and do not replace, the short atomic transaction and lease/fencing checks of P03
 
 ## Verification
 
+P03.6 implementation decision (24 October 2026): the same short canonical transaction
+also bumps explicitly affected query epochs, appends invalidation of dependent plans
+and enqueues bounded critical preparation intents. A deferred database trigger requires
+each critical job to reference a committed origin, so enqueue failure rolls back the
+entire world/event/receipt/outbox bundle. Duplicate logical jobs must match origin and
+payload/schema identity; a prior proactive job cannot silently replace a critical
+outbox obligation. Preparation admission uses its own campaign-serialized transaction
+and immutable receipt, with no canonical counters, draws or events. PostgreSQL fault
+injection, duplicate replay and admission/epoch races verify both boundaries.
+
 P03.4 decision (24 October 2026): reserve immutable operation/ordinal draws in their
 own bounded transaction before canonical commit. Use lazy private 256-bit campaign
 seed material and explicitly framed HMAC-SHA-256 v1 with rejection sampling, rather

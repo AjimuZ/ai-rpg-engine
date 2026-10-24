@@ -38,23 +38,24 @@ From `backend/`, with those variables set:
 `verify` starts an ephemeral HTTP server and checks minimal health, hidden diagnostic
 endpoints, PostgreSQL major version, Flyway validation, and the canonical schema.
 A missing database fails tests; nothing silently skips or uses H2. Use a new
-disposable database: the test requires exactly the fifteen tables created by
+disposable database: the test requires exactly the twenty-three domain tables created by
 `src/main/resources/db/migration/V1__canonical_foundations.sql` (P03.1),
 `V2__campaign_bounds_and_versions.sql` (P03.2, adding `actor_resource`) and
 `V3__canonical_outbox.sql` (P03.3), `V4__deterministic_random_draws.sql` (P03.4) and
-`V5__campaign_mutation_leases.sql` (P03.5), with no
+`V5__campaign_mutation_leases.sql` (P03.5) and
+`V6__durable_jobs_and_planning.sql` (P03.6), with no
 rows, and Hibernate validates the entities against them (`ddl-auto=validate`).
 The persistence tests truncate these tables before and after each test, so never
 point `verify` at a database whose data you want to keep.
 P03.2 adds storage row versions separate from canonical counters, frozen ownership,
 bounded actor resources and complete write-once journal outcomes. Integration tests
 include cross-campaign rejection, scoped reads, concurrent duplicate inserts and
-stale-writer rollback, plus populated V1-to-V5 upgrade in a disposable schema.
+stale-writer rollback, plus populated V1-to-V6 upgrade in a disposable schema.
 P03.3 adds an internal `CanonicalCommitService` consuming immutable `ResolvedCommit`
 values from trusted backend resolution. It atomically saves world/resource changes,
 events, settlements, a backend receipt and reference-only outbox intents, and returns
 only after commit succeeds. It rejects ambient transactions and has no network ports
-or executable callbacks. Operation acceptance, gameplay authorization/rules, leases,
+or executable callbacks. Operation acceptance, gameplay authorization/rules,
 outbox delivery and narration remain later tasks; no command endpoint is exposed.
 `CanonicalCommitServiceTest` uses real PostgreSQL failure triggers (including deferred
 commit failures), duplicate/stale races and scoped references; no runtime account is needed.
@@ -72,6 +73,19 @@ the current token in `ResolvedCommit.Context`. `JournalStartupReconciliation` ru
 `JournalRecoveryService` before the web server starts, and any failure aborts
 startup. See the [recovery matrix](../docs/07-turn-protocol.md#8-interrupt-and-recovery-matrix)
 and the [database backup tool](../tools/database_backup/README.md).
+P03.6 adds the internal `preparation` package: deduplicated jobs and fenced attempts,
+immutable snapshots with assembler freshness tokens, versioned plan/dependency and
+admission records, query epochs, cancellation/recovery state and durable usage counts.
+Critical jobs, epoch bumps and plan invalidation commit with the canonical outbox.
+Admission preserves the complete snapshot manifest and checks query epochs, generation,
+lease and public locale/glossary tokens under database locks. Unsupported non-query
+semantic dependencies fail closed until P08.7. `JobStartupReconciliation` gates claims
+and admissions until recovery completes; expired attempts require confirmed external
+stop before requeue. Restore advances generations and invalidates usable artifacts.
+No dispatcher, runtime cancellation transport, global quota enforcement, plan-consumption
+API or gameplay validation is exposed. The full V6 verify passes 113 tests with three
+packaged-interface skips; a populated backup/restore and packaged startup rehearsal
+also passes (24 October 2026).
 The executable jar is `target/engine-0.1.0.jar`; it can also run with `java -jar`.
 
 ## Packaged runtime configuration (P02.3)

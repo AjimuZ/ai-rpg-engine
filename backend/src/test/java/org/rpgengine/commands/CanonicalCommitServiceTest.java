@@ -32,6 +32,8 @@ import org.rpgengine.characters.ActorResource;
 import org.rpgengine.content.ContentRevision;
 import org.rpgengine.identity.OwnerProfile;
 import org.rpgengine.presentation.SupportedLocale;
+import org.rpgengine.preparation.JobRequest;
+import org.rpgengine.preparation.PreparationJobService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -82,13 +84,81 @@ class CanonicalCommitServiceTest {
     /** Remove only test-owned fault triggers/functions and rows, including after an assertion fails. */
     @AfterEach
     void clear() {
+        jdbc.execute("drop trigger if exists p033_fault on ai_job");
         for (String table : TABLES) {
             jdbc.execute("drop trigger if exists p033_fault on " + table);
         }
         jdbc.execute("drop function if exists p033_fail()");
-        jdbc.execute("truncate campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
+        jdbc.execute("truncate plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
                 + "operation_journal, actor_resource, actor, presentation_campaign_settings, campaign, "
                 + "content_revision, adventure_workspace, identity_owner_profile");
+    }
+
+    /** Critical jobs and negative-query epochs are outbox effects of the same canonical commit. */
+    @Test
+    void preparationIntentsCommitOnceWithCanonicalReceipt() {
+        var resolved = preparationPlan();
+        var receipt = commits.commit(resolved);
+        assertEquals(receipt.json(), commits.commit(resolved).json());
+        assertEquals(1, count("ai_job"));
+        assertEquals(1, count("query_epoch"));
+        assertEquals(1L, number("query_epoch", "epoch"));
+        assertEquals(2, count("canonical_outbox"));
+        assertEquals(fixture.operation().getId(), jdbc.queryForObject(
+                "select origin_operation_id from ai_job", UUID.class));
+        assertEquals(1L, number("campaign", "state_revision"));
+        assertEquals(0, count("ai_job_attempt"));
+    }
+
+    /** A job insertion failure rolls back world effects, receipt, outbox, epoch and lease release together. */
+    @Test
+    void preparationFailureRollsBackEntireCanonicalBundle() {
+        var before = snapshot();
+        installFailure("ai_job");
+        assertThrows(RuntimeException.class, () -> commits.commit(preparationPlan()));
+        assertEquals(before, snapshot());
+        assertEquals(0, count("query_epoch"));
+        assertEquals(0, count("ai_job"));
+        jdbc.execute("drop trigger p033_fault on ai_job");
+        commits.commit(preparationPlan());
+        assertEquals(1, count("ai_job"));
+    }
+
+    /** A critical outbox intent cannot commit while its origin is only VALIDATING. */
+    @Test
+    void criticalJobRequiresCommittedOriginAtTransactionEnd() {
+        var job = preparationPlan().preparation().jobs().getFirst();
+        assertThrows(RuntimeException.class, () -> new TransactionTemplate(manager).executeWithoutResult(status ->
+                PreparationJobService.enqueueWithin(jdbc, fixture.campaign().getAdventureId(), fixture.campaign().getId(),
+                        fixture.operation().getId(), job)));
+        assertEquals(0, count("ai_job"));
+        assertEquals(0L, number("campaign", "state_revision"));
+    }
+
+    /** A proactive row with the same logical identity cannot silently replace a critical command intent. */
+    @Test
+    void criticalJobConflictingWithProactiveOriginRollsBack() {
+        var job = preparationPlan().preparation().jobs().getFirst();
+        var proactive = new JobRequest(job.kind(), job.target(), job.purpose(), job.contractVersion(),
+                job.dependencyFingerprint(), job.payloadHash(), job.schemaHash(), job.policyHash(), job.priority(),
+                false, job.delay(), job.timeToLive(), job.maxAttempts(), job.estimatedUsage(), job.reservedUsage());
+        new TransactionTemplate(manager).executeWithoutResult(status -> PreparationJobService.enqueueWithin(jdbc,
+                fixture.campaign().getAdventureId(), fixture.campaign().getId(), null, proactive));
+        var before = snapshot();
+        assertThrows(IllegalStateException.class, () -> commits.commit(preparationPlan()));
+        assertEquals(before, snapshot());
+        assertEquals(1, count("ai_job"));
+        assertEquals(0, count("query_epoch"));
+    }
+
+    /** Extend the ordinary resolved fixture with a critical job and the precise scope its change dirties. */
+    private ResolvedCommit preparationPlan() {
+        var base = plan(fixture, fixture.operation());
+        var job = new JobRequest("QUEST_PLAN", "quest:gate", "initial", "v1", HASH, HASH, HASH, HASH,
+                10, true, Duration.ZERO, Duration.ofHours(1), 3, 10, 10);
+        return new ResolvedCommit(base.context(), base.world(), base.resources(), base.events(), base.rewards(),
+                base.receiptDetails(), base.narrationRequired(),
+                new ResolvedCommit.Preparation(List.of("quest:gate"), List.of(job)));
     }
 
     /** All effects persist together; lost acknowledgments and later narration never spend again. */

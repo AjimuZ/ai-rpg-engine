@@ -535,7 +535,27 @@ content/assets and full container integration remain open; P02.3 stays unchecked
   report no findings. Limits: database-only backup, single-installation recovery
   assumption, no worker renewal/cancellation or job accounting (P03.6/P07), and no
   hosted-CI or full QA-17/QA-23 claim.
-- [ ] P03.6 Add durable AI jobs, immutable planning snapshots, versioned plan/dependency records, query epochs and recovery generations; persist locale preferences separately from world revisions and test atomic outbox/admission foundations.
+- [x] P03.6 Add durable AI jobs, immutable planning snapshots, versioned plan/dependency records, query epochs and recovery generations; persist locale preferences separately from world revisions and test atomic outbox/admission foundations.
+  Completed 24 October 2026: V6 adds eight scoped preparation tables and campaign
+  recovery generations. Internal services persist deduplicated jobs, bounded attempts,
+  immutable snapshot inputs, versioned artifacts, full dependency manifests and
+  append-only admission/disposition records. Critical enqueue, query-epoch bumps and
+  plan invalidation share the canonical commit/outbox transaction. Snapshot capture
+  checks assembler revision/generation/presentation tokens; admission rechecks query
+  epochs and fences under campaign locks, without changing world counters or draws.
+  Public locale staleness is rejected; locale preferences remain separately persisted.
+  Expired workers require explicit stop confirmation before retry; startup gates new
+  work, and restore advances generations, fences leases and invalidates usable plans.
+  Full backend `verify` on pinned JDK 21/PostgreSQL 18.6 passes 113 tests with three
+  packaged-interface profile skips (116 total), including 17 preparation tests and
+  populated V1→V6 upgrade, and builds the jar. A populated V6 backup/restore plus jar
+  startup rehearsal preserves immutable bytes and world counters while retiring old
+  jobs. Backup tests pass 8 with one Windows symlink skip; repository tests pass 22;
+  default packaging tests pass 20 with two opt-in skips. Repository secret, document,
+  workflow and image policy checks report no findings. Full semantic dependency
+  validation fails closed until P08.7; scheduling, fairness/quota enforcement, runtime
+  cancellation, gameplay consumption and full QA-36/37 remain later work. No hosted
+  CI or narrative-quality result is claimed.
 
 **Exit:** persisted state survives restart and concurrent duplicate attempts cannot double-commit. **Checks:** real PostgreSQL transaction rollback, duplicate keys, cross-campaign references, stale revision, draw reuse, and recovery. **Suggested commit:** `Add canonical campaign persistence and event receipts`.
 

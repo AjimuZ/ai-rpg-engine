@@ -9,6 +9,7 @@ import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.campaign.CampaignMode;
 import org.rpgengine.campaign.EventVisibility;
 import org.rpgengine.persistence.CanonicalValues;
+import org.rpgengine.preparation.JobRequest;
 import org.rpgengine.progression.RewardSettlement;
 
 /**
@@ -20,14 +21,18 @@ import org.rpgengine.progression.RewardSettlement;
  *
  * <p>No executable work can be supplied: inference and other network preparation must
  * finish before this value enters the commit service. Later rule modules extend the
- * explicit effect types instead of adding generic entity writes.
+ * explicit effect types instead of adding generic entity writes. Preparation intents
+ * (query-scope epoch bumps and critical preparation jobs) are data too; they commit or
+ * roll back with the world change that caused them.
  */
 public record ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources,
-        List<Event> events, List<Reward> rewards, String receiptDetails, boolean narrationRequired) {
+        List<Event> events, List<Reward> rewards, String receiptDetails, boolean narrationRequired,
+        Preparation preparation) {
     /** Copy bounded lists to freeze the plan; reject duplicate resource effects and missing events. */
     public ResolvedCommit {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(world, "world");
+        Objects.requireNonNull(preparation, "preparation");
         resources = bounded(resources, 128, "resources");
         events = bounded(events, 128, "events");
         rewards = bounded(rewards, 128, "rewards");
@@ -41,6 +46,12 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
             }
         }
         CanonicalValues.requireJsonObject(receiptDetails, "receiptDetails", 32_768);
+    }
+
+    /** Build a commit without preparation intents (no epoch bumps, no critical jobs). */
+    public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
+            List<Reward> rewards, String receiptDetails, boolean narrationRequired) {
+        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, Preparation.NONE);
     }
 
     /** Return a defensive copy of at most limit non-null entries; fail before taking any locks. */
@@ -104,6 +115,29 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
             CanonicalValues.requireText(sourceKey, "sourceKey", 256);
             CanonicalValues.requireText(recipientKey, "recipientKey", 256);
             CanonicalValues.requireJsonObject(rewardsJson, "rewards", RewardSettlement.MAX_REWARDS_BYTES);
+        }
+    }
+
+    /**
+     * Preparation intents written atomically with the canonical effects (docs/28
+     * section 7). Each scope's query epoch is bumped once, current plans that read a
+     * bumped scope are invalidated, and each job is enqueued deduplicated with this
+     * operation as its origin; replaying an identical intent finds the same job.
+     *
+     * @param queryScopes at most 64 distinct query scopes the effects can change
+     * @param jobs at most 16 critical or ordinary preparation jobs to create
+     */
+    public record Preparation(List<String> queryScopes, List<JobRequest> jobs) {
+        /** No scopes and no jobs. */
+        public static final Preparation NONE = new Preparation(List.of(), List.of());
+
+        /** Copy and bound both lists; reject duplicate scopes so each bump is meaningful. */
+        public Preparation {
+            queryScopes = bounded(queryScopes, 64, "queryScopes");
+            jobs = bounded(jobs, 16, "jobs");
+            if (new HashSet<>(queryScopes).size() != queryScopes.size()) {
+                throw new IllegalArgumentException("duplicate query scope");
+            }
         }
     }
 }

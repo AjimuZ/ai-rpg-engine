@@ -1,6 +1,6 @@
 # ADR 0014 — Bounded asynchronous narrative planning
 
-- Status: Accepted design direction for the documentation baseline; implementation and benefit verification pending
+- Status: Accepted; P03.6 persistence/admission foundations verified, full runtime integration and benefit verification pending
 - Date: 23 October 2026
 
 ## Context
@@ -42,6 +42,22 @@ Full-owner restore preserves relevant artifacts and pending events, remaps ident
 
 ## Verification
 
+P03.6 implementation decision (24 October 2026): capture immutable selected inputs
+with explicit assembler freshness tokens and a full typed engine manifest; reject
+an admission that omits or changes that manifest. Under a campaign lock, recheck
+query epochs, job fence/deadline, recovery generation and public locale/glossary
+tokens. Unsupported non-query semantics fail closed rather than being treated as
+validated. Every future gameplay writer must bump all affected query scopes in its
+canonical transaction; no automatic predicate evaluator is implied by this storage
+foundation. Critical job enqueue and invalidation share that transaction's outbox
+boundary. Append immutable versions and admission/disposition history without world
+changes. Recovery never requeues a possibly live expired attempt until explicit
+stop confirmation, and installation restore advances generations and invalidates
+usable plans before job startup reconciliation. Real PostgreSQL races, rollback,
+restart and V6 restore checks pass; scheduling and semantic validation remain
+P07/P08. The [evidence policy](../15-quality-and-acceptance.md#1-evidence-policy)
+records counts and limits.
+
 P01.7 now explicitly selects the serialized baseline: one active inference turn
 installation-wide. Its [bounded evidence](../../tools/runtime_probe/CONCURRENCY.md)
 qualifies real managed-runtime interleaved dispatch, targeted interruption and
@@ -51,4 +67,4 @@ priority remain unverified. No production scheduler or throughput result is
 claimed. P08.6 still gates every increase, and the P01 live isolation recheck
 remains required. This confirms the existing decision without changing topology.
 
-Planned AP-01–AP-12 cover selective staleness, query phantoms, admission races, duplicate workers, fencing, cancellation/EOF/restart, play-before-plan fallback, world-time separation, secret sinks, cross-adventure fairness/restore, author constraints and bilingual A/B/C evaluation. Compare single narration, narration plus planning, and optional review with measured quality, p50/p95 latency, usage and waste. No superiority or completed implementation is claimed. Evidence, proposed objectives, ownership and source links are in the [planning specification](../28-asynchronous-narrative-planning.md).
+Planned AP-01–AP-12 cover selective staleness, query phantoms, admission races, duplicate workers, fencing, cancellation/EOF/restart, play-before-plan fallback, world-time separation, secret sinks, cross-adventure fairness/restore, author constraints and bilingual A/B/C evaluation. Compare single narration, narration plus planning, and optional review with measured quality, p50/p95 latency, usage and waste. P03.6 covers only the storage/admission subset above; no full AP acceptance or superiority is claimed. Evidence, proposed objectives, ownership and source links are in the [planning specification](../28-asynchronous-narrative-planning.md).

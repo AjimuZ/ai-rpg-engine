@@ -135,11 +135,22 @@ rejection, restore, data equality, lease retirement and reconciliation on startu
 Assets, content packs, campaign-identity restore, replacement preview and the full
 QA-23 rehearsal remain later work (P16, P18).
 
+P03.6 extends that tool to V6 and all preparation tables. After verified restore,
+one transaction increments recovery generations/storage versions, appends an
+invalidation to usable plans and retires mutation leases. All old writers/runtime
+workers must be stopped: this is single-installation recovery, not concurrent
+campaign cloning. Job startup reconciliation supersedes unfinished old-generation
+work and preserves attempt history before claims/admissions are allowed. A populated
+V6 rehearsal on 24 October 2026 preserved snapshots, plan/admission bytes, delivered
+critical-job origins and Italian preferences; generation 0→1 and fence 4→5 retired
+saved capabilities, the plan became invalidated, and jar startup superseded a saved
+running job. World revision/turn/time/event counters remained 7/3/60/12.
+
 ## 9. Startup and shutdown
 
 The packaged entry point is the future root `start.sh`. It orchestrates the Compose stack, validates prerequisites and account readiness, and preserves existing configuration and volumes on repeated start or stop. The backend sequence below runs inside that deployment. Database health and backend readiness must be checked explicitly. Runtime account availability is a separate gameplay-readiness state, not a reason to erase data or a live-inference health probe.
 
-Startup order: load configuration → verify filesystem permissions → connect database → validate/apply supported migrations after required backup policy → reconcile unfinished operations and leases (P03.5; a failure aborts startup) → check content dependencies → start HTTP → lazily connect Codex when requested or when an opted-in readiness check runs.
+Startup order: load configuration → verify filesystem permissions → connect database → validate/apply supported migrations after required backup policy → reconcile unfinished operations, leases and preparation jobs (P03.5–P03.6; a failure aborts startup) → check content dependencies → start HTTP → lazily connect Codex when requested or when an opted-in readiness check runs.
 
 An unavailable Codex process does not prevent local inspection of a valid saved campaign. A missing database or incompatible schema blocks mutation. Startup never silently resets a campaign.
 

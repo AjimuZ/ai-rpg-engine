@@ -22,6 +22,15 @@ AI RPG Engine separates the software that runs an adventure from the files that 
 Repository policies are in [CONTRIBUTING.md](CONTRIBUTING.md), with shared [editor defaults](.editorconfig), [Git line-ending rules](.gitattributes), and a sanitized [environment example](.env.example). The example's database labels now configure the infrastructure Compose services; full packaged setup remains future P02 work; host development commands are documented in each workspace. P02.3 delivers application-shell infrastructure, an opt-in
 [single-origin jar build](backend/README.md#single-origin-jar-assembly-p023), [packaged file-secret configuration](backend/README.md#packaged-runtime-configuration-p023), and [packaging boundary checks](tools/container_packaging/README.md). The pinned multi-stage engine image and root Compose now serve the neutral shell on loopback, with isolated runtime IPC, file secrets and durable database/content/assets/runtime storage. Account-free build, HTTP, IPC and recreation checks pass; no account or gameplay readiness is implied. The development-only revision in [ADR 0009](docs/adr/0009-toolchain-baseline.md) permits these exact Java pins; refreshing Java before release remains mandatory. Ordinary credential-free [CI](.github/workflows/ci.yml) and [repository checks](tools/repository_checks/README.md) are defined (P02.4) but not yet confirmed by a hosted run. The root `./start.sh` launcher is implemented (P02.6) and was verified on Windows 11 with Docker Desktop from Git Bash; its idempotent launch, graceful stop, interruption exit status and restart/image-recreation preservation of neutral markers were checked there (P02.7, [evidence](tools/container_packaging/evidence/launcher-lifecycle-windows.json)). Owner sign-in, interactive Ctrl+C, Linux/macOS hosts, real campaign data and full QA-28 remain pending.
 
+P03.5–P03.6 add internal mutation leases, startup recovery, database backup/restore,
+durable preparation jobs and attempts, immutable planning snapshots, versioned plan
+and dependency records, query epochs and recovery generations. Critical preparation
+commits atomically with the canonical outbox; fenced admission changes no world
+counters. Locale preferences remain separate from world revisions. PostgreSQL tests
+and a populated V6 restore/startup rehearsal pass; scheduling, global budgets,
+complete semantic plan validation and gameplay consumption remain future work.
+See the [backend scope](backend/README.md) and [P03 evidence](docs/15-quality-and-acceptance.md#1-evidence-policy).
+
 ## Why this engine exists
 
 A long RPG campaign needs more than a conversation history. Inventory must remain consistent, unfinished promises must survive a new AI session, combat must use actual abilities and resources, and the narrator must respect what each character knows. AI RPG Engine is designed to make these responsibilities explicit and testable.

@@ -154,6 +154,13 @@ per-task language/routing; P09 preserves multilingual provenance. P14 runs both
 genres in both languages. P17 speech is optional. The editor remains later
 E01–E06 and writes the same localization contract.
 
+P03.6 verifies that changing EN→IT preferences leaves revision, turn, time and
+event counters unchanged. Jobs retain locale/glossary/media configuration tokens;
+immutable snapshots bind the assembler's locale/glossary revisions. Public snapshot
+capture/admission locks an existing settings row and rejects stale presentation
+tokens. Private language-neutral planning can survive that change. These are
+persistence/admission checks, not translated UI resources or narrative quality.
+
 QA-35 covers complete message/placeholder parity, missing-key failure, format
 round-trips, same numeric mechanics in EN/IT, protected names, source-pack
 fallback, drafts/cursor/operation preservation on switch, wrong-locale stale

@@ -53,8 +53,14 @@ content revision, and actor/resource/operation campaign associations after inser
 Resources additionally reference an actor in the same campaign. A reassignment
 cannot silently move existing state between adventures, even under a direct SQL
 UPDATE. Scoped repository queries have negative isolation tests; application
-authorization, routes, media and job isolation remain later work. These storage
+authorization, routes and media isolation remain later work. These storage
 checks alone do not complete QA-33.
+
+P03.6 adds scoped preparation jobs and snapshots: composite keys prevent a job from
+binding another campaign's snapshot/attempt/artifact, and snapshot content must
+match its campaign's pinned revision. Enqueue/capture check adventure ownership;
+worker mutations require the scoped lease and recovery generation. Internal tests
+cover wrong scopes and restored stale callbacks, without claiming UI/media isolation.
 
 P03.3's internal commit service additionally locks the campaign in the requested
 adventure and reads the operation/resources in that campaign. Event actor/causation
@@ -70,6 +76,11 @@ Scope client projections, drafts, quick replies, reading cursor and media to adv
 Each campaign retains one state-changing operation at a time. Global owner/provider budgets also bound concurrent narrative/image work across adventures. Reloading or switching neither regenerates accepted art nor resets generation limits. Late results can be stored only in their valid originating scope and must not update the newly selected world's view.
 
 ## 4. Restore and verification
+
+The P03.6 database-only recovery tool preserves identities in a new database with
+all writers stopped, increments campaign recovery generations and invalidates usable
+plans before startup retires old jobs. This is an installation-recovery foundation;
+the full workspace restore/remapping contract below remains P16.
 
 Full-owner backups preserve adventure configuration, admitted revisions, campaign data and artwork. Player-facing exports omit private specifications/notes. Restore previews show destination adventure/campaign identities and asset remapping; default to new identities instead of overwriting or merging by equal titles. Deliberate recovery validates existing associations/hashes. Deleting an adventure is a separate explicit owner action, never startup/retry behavior. Stopping one campaign must not kill another's unrelated work.
 

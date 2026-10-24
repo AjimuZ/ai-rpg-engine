@@ -2,7 +2,21 @@
 
 ## 1. Status and purpose
 
-This is a proposed application contract and research synthesis dated **23 October 2026**. No production job dispatcher, quest-plan schema, plan admission service, concurrency benchmark or narrative-quality result is delivered by this document. The checked P01.1–P01.5 runtime work remains limited to the evidence below. [ADR 0014](adr/0014-bounded-asynchronous-planning.md) records the design decision.
+This application contract and research synthesis was recorded on **23 October 2026**. P03.6 subsequently implements the database and internal admission foundations described below (24 October 2026). No production dispatcher, complete semantic planner, concurrency benchmark or narrative-quality result is delivered. The checked P01 runtime work remains limited to its recorded evidence. [ADR 0014](adr/0014-bounded-asynchronous-planning.md) records the design decision.
+
+The V6 foundation persists jobs/attempts, immutable input snapshots, versioned plans,
+typed dependencies, admission receipts, append-only dispositions, query epochs and
+campaign recovery generations. Critical enqueue/epoch invalidation shares the
+canonical transaction. Capture rejects stale assembler tokens; admission keeps the
+entire engine-recorded manifest and rechecks query epochs, generation, lease and
+public presentation tokens under locks. Non-query semantic dependencies fail closed
+until P08.7 supplies typed evaluators. Unrelated world revisions alone do not reject
+a plan. Claims/admissions wait for startup reconciliation; expired leases require
+explicit external-stop confirmation before retry. Restore retires old generations
+and usable plans. Seventeen real PostgreSQL preparation tests plus canonical tests
+and a populated restore/startup rehearsal establish this limited scope. Full epoch
+tagging by gameplay writers, scheduler fairness/budgets, runtime cancellation,
+author/quest semantics and plan consumption remain P07.6/P08.6–P08.7.
 
 Keep the playable loop small: validated intent when needed, deterministic resolution, canonical save, then public narration. Prepare selected expensive narrative situations separately, so accepting a mystery does not require generating its whole future before acknowledging the action. A prepared situation supplies motives, causal dependencies, clues and alternatives; it never prescribes the protagonist's choices or makes an anticipated outcome inevitable.
 
@@ -301,4 +315,4 @@ P14 should record one optional A/B demonstration in both languages when the plan
 
 ### Research checkpoint
 
-Completed for this design: inspected relevant existing architecture/turn/memory/author/workspace contracts, runtime probe source and retained evidence; fetched current official app-server documentation and four primary planning papers; compared topology alternatives and recorded explicit proposal/verification boundaries. No inference, implementation or benchmark was executed. Remaining investigations belong to P08/P18: exact supported-account concurrency/priority/cancellation measurements, durable dependency-query implementation, bilingual A/B/C study and policy tuning. Next executable work remains the first eligible item in the existing P00–P19 queue; this document neither checks it off nor changes P01's remaining live isolation/image gates.
+Completed for the 23 October design checkpoint: inspected relevant existing architecture/turn/memory/author/workspace contracts, runtime probe source and retained evidence; fetched current official app-server documentation and four primary planning papers; compared topology alternatives and recorded explicit proposal/verification boundaries. That checkpoint ran no inference, implementation or benchmark. P03.6 implementation evidence is recorded in section 1. Remaining investigations belong to P07/P08/P18: complete gameplay query-epoch tagging and semantic dependencies, exact supported-account concurrency/priority/cancellation measurements, bilingual A/B/C study and policy tuning. The design does not change P01's remaining live isolation/image gates.

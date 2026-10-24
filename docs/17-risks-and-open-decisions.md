@@ -14,6 +14,18 @@ retain their standard precedence; configtree is not a secret manager.
 
 ## 1. Risk register
 
+P03.6 verifies scoped durable jobs, complete snapshot manifests, fenced admission,
+query-epoch races, cancellation/restart metadata and generation retirement on restore.
+These remain internal foundations: every future gameplay writer must identify all
+affected query scopes, or phantom protection is incomplete. Non-query semantic
+dependencies fail closed until P08.7. Attempt/usage persistence does not enforce
+installation-wide quotas or fairness, and persisted cancellation is not proof that
+the runtime stopped; explicit stop confirmation is required before retry. P07/P08
+must establish those boundaries before enabling scheduling or plan consumption.
+The V6 backup remains database-only, with all old writers/workers stopped during
+single-installation recovery; full content/assets and identity-remapping restore
+remain P16. No completed QA-36/37 or narrative benefit is implied.
+
 P03.4 adds durable same-operation random reuse and pinned HMAC-SHA-256 v1 identity.
 Private campaign seeds are trusted database/backup material, never runtime context.
 Reservation survives failed/cancelled canonical work, but future command policy must
@@ -40,7 +52,7 @@ Owners below are implementation responsibilities, not assigned people. The proje
 | Too many modules delay a playable core | Endless design/development | Milestone gates, no optional vector/editor/media blockers, small complete combat slice | Product / every package |
 | Pack upgrade invalidates an active campaign | Broken saves/abilities | Immutable snapshots, explicit migration preview, backups, dependency validation | Content + Operations / P16 |
 | Event log mistaken for a fully replayable system | Unsupported recovery claims | Define tested replay scope; maintain current-state snapshots and schema versions | Backend / P03, P16 |
-| Backups omit assets/content revisions | Incomplete recovery | Integrity manifest and fresh-storage restore rehearsal; the P03.5 tool covers the database only and refuses unknown tables or migrations | Operations / P16, P18 |
+| Backups omit assets/content revisions | Incomplete recovery | Integrity manifest and fresh-storage restore rehearsal; the P03.5–P03.6 tool covers the database only, retires saved generations/leases/plans and refuses unknown tables or migrations | Operations / P16, P18 |
 | Remote media disappears or tracks requests | Broken presentation/privacy | Optional origins, local fallback, rights registry, no gameplay dependency | Presentation / P17 |
 | Generated portraits/items drift, cross scopes or reveal secrets | Inconsistent identity or leaked hidden content | Stable public appearance identity, durable original assets, source/audience validation, stale-job rejection and restore checks | Presentation + QA / P17, QA-31 |
 | Parallel adventures share names or stale callbacks | Cross-world content, memory or artwork mixing | Adventure/campaign ownership, distinct managed folders, scoped drafts/threads/jobs and same-name two-genre isolation checks | Domain + QA / P03, P06, P16–P17, QA-33 |

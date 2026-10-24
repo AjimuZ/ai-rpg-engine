@@ -204,6 +204,10 @@ class BackupToolTest(unittest.TestCase):
         self.assertLess(create, restore)
         self.assertLess(restore, retire)
         self.assertIn("fence = fence + 1", calls[retire][2][-1])
+        self.assertIn("recovery_generation = recovery_generation + 1", calls[retire][2][-1])
+        self.assertIn("row_version = row_version + 1", calls[retire][2][-1])
+        self.assertIn("insert into plan_disposition", calls[retire][2][-1])
+        self.assertIn("'GENERATION_RETIRED'", calls[retire][2][-1])
 
     def test_restore_mismatch_keeps_leases_untouched_and_reports_failure(self):
         """A restored catalog that differs stops before lease retirement and success output."""

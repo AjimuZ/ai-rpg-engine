@@ -15,7 +15,7 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V2/V3 on real PostgreSQL without touching the shared public schema. */
+/** Upgrade populated V1 through V6 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -101,7 +101,7 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(0, v4.migrate().migrationsExecuted);
                     // V5 keeps historic outcomes intact and creates no fictitious lease owner.
                     Flyway v5 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
-                            .locations("classpath:db/migration").load();
+                            .locations("classpath:db/migration").target("5").load();
                     assertEquals(1, v5.migrate().migrationsExecuted);
                     assertTrue(v5.validateWithResult().validationSuccessful);
                     assertEquals(journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
@@ -109,6 +109,21 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(0, jdbc.queryForObject("select count(*) from campaign_mutation_lease", Integer.class));
                     assertEquals(7L, jdbc.queryForObject("select state_revision from campaign", Long.class));
                     assertEquals(0, v5.migrate().migrationsExecuted);
+                    // V6 preserves populated canonical state and initializes only the recovery token.
+                    String v5Campaign = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
+                    Flyway v6 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").load();
+                    assertEquals(1, v6.migrate().migrationsExecuted);
+                    assertTrue(v6.validateWithResult().validationSuccessful);
+                    assertEquals(v5Campaign, jdbc.queryForObject("select (to_jsonb(c) - 'recovery_generation')::text "
+                            + "from campaign c", String.class));
+                    assertEquals(journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o", String.class));
+                    assertEquals(0L, jdbc.queryForObject("select recovery_generation from campaign", Long.class));
+                    for (String table : new String[] {"ai_job", "ai_job_attempt", "planning_snapshot", "query_epoch",
+                            "quest_plan_artifact", "plan_dependency", "plan_admission", "plan_disposition"}) {
+                        assertEquals(0, jdbc.queryForObject("select count(*) from " + table, Integer.class));
+                    }
+                    assertEquals(0, v6.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

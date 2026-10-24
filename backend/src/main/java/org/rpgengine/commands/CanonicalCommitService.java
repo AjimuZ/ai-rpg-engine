@@ -10,6 +10,10 @@ import org.rpgengine.campaign.Campaign;
 import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.characters.ActorResource;
 import org.rpgengine.content.ContentRevision;
+import org.rpgengine.preparation.JobRequest;
+import org.rpgengine.preparation.PlanAdmissionService;
+import org.rpgengine.preparation.PreparationJobService;
+import org.rpgengine.preparation.QueryEpochs;
 import org.rpgengine.progression.RewardSettlement;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -158,6 +162,20 @@ public class CanonicalCommitService {
             entities.persist(new OutboxMessage(operation, OutboxMessage.Kind.NARRATION_REQUIRED, now));
         }
         entities.flush();
+        // Preparation intents share this transaction and the campaign lock already held
+        // (lock order campaign, then job): epochs move with the write that changed the
+        // scopes, critical jobs exist exactly when the world change does, and plans that
+        // read a changed scope are invalidated before any later admission can see them.
+        var preparation = plan.preparation();
+        for (String scope : preparation.queryScopes()) {
+            QueryEpochs.bump(jdbc, campaign.getId(), scope);
+        }
+        for (JobRequest job : preparation.jobs()) {
+            PreparationJobService.enqueueWithin(jdbc, context.adventureId(), campaign.getId(), operation.getId(), job);
+        }
+        if (!preparation.queryScopes().isEmpty()) {
+            PlanAdmissionService.invalidateWithin(jdbc, campaign.getId(), counters.stateRevision());
+        }
         // Release with the outcome, never before it: rollback retains the permit and
         // a committed duplicate can replay even though its old permit is now retired.
         MutationLeaseService.releaseHeld(jdbc, context.campaignId(), context.operationId(), context.lease());

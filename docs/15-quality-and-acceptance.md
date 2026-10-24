@@ -82,6 +82,21 @@ privilege), and a manual backup/restore rehearsal is recorded in
 crash-before-commit foundation of QA-17 and a database-only precursor of QA-23, not
 their full acceptance.
 
+P03.6 evidence (24 October 2026): pinned JDK 21/PostgreSQL 18.6 full backend
+`verify` passes 113 tests with three packaged-interface skips (116 total), including
+17 preparation tests and the populated V1→V6 upgrade. Real transactions cover
+concurrent enqueue/claim/admission, version conflicts, deferred admission rollback,
+critical enqueue/outbox rollback and replay, scoped snapshot constraints, immutable
+inputs, omitted-manifest rejection, query phantoms, unrelated revisions, concurrent
+epoch invalidation, cancellation, finite retries/expiry, restart gating, generation
+retirement and locale separation. Non-query semantics fail closed. A populated V6
+backup/restore and jar-startup rehearsal preserves immutable bytes and canonical
+counters while retiring old jobs/plans. Repository tests pass 22, backup tests pass
+8 with one Windows symlink skip, packaging tests pass 20 with two opt-in skips.
+These establish the enabled storage/outbox/admission portions of QA-36/37; they do
+not complete semantic plan validation, fair scheduling, runtime cancellation,
+player-facing fallback, author/secret checks or narrative-quality evaluation.
+
 ## 2. Verification layers
 
 | Layer | Purpose | Proposed tools |
