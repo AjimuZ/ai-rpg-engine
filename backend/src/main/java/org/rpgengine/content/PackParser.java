@@ -3,7 +3,6 @@ package org.rpgengine.content;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -79,33 +78,31 @@ public final class PackParser {
         return new ParsedPack(manifest, documents, prose, hashes.contentHash(), hashes.fileHashes());
     }
 
-    /** Copy a bounded logical inventory before parsing; reject noncanonical paths and case collisions without filesystem access. */
+    /** Copy a bounded logical inventory before parsing; reject noncanonical paths and case or prefix collisions without filesystem access. */
     private static Map<String, byte[]> snapshot(Map<String, byte[]> input) {
         if (input == null || input.isEmpty() || input.size() > 2000) {
             throw error("LIMIT", "adventure.yaml", "Inventory requires 1..2000 files");
         }
         long total = 0;
-        Set<String> folded = new HashSet<>();
         for (var entry : input.entrySet()) {
             requirePath(entry.getKey(), new SourceLocation("adventure.yaml", 1, 1, ""));
-            if (!folded.add(entry.getKey().toLowerCase(Locale.ROOT))) {
-                throw error("PATH", entry.getKey(), "Case-colliding paths are forbidden");
-            }
             if (entry.getValue() == null || (total += entry.getValue().length) > MAX_TOTAL_BYTES) {
                 throw error("LIMIT", entry.getKey(), "Inventory exceeds 250 MiB or contains absent bytes");
             }
+        }
+        // Case-folded duplicates and file/directory prefix clashes cannot coexist on every host.
+        String collision = PackPaths.collision(new TreeMap<>(input).keySet(), List.of());
+        if (collision != null) {
+            throw error("PATH", collision, "Case-colliding or file/directory-colliding paths are forbidden");
         }
         Map<String, byte[]> snapshot = new TreeMap<>();
         input.forEach((path, bytes) -> snapshot.put(path, bytes.clone()));
         return snapshot;
     }
 
-    /** Require canonical portable relative names; actual containment, file types and ZIP validation belong to P04.4. */
+    /** Require canonical portable relative names; host containment, links and ZIP handling belong to PackStaging. */
     private static void requirePath(String path, SourceLocation location) {
-        if (path == null || path.length() > 240 || !path.matches("[A-Za-z0-9_][A-Za-z0-9_./-]*")
-                || java.util.Arrays.stream(path.split("/", -1)).anyMatch(part -> part.isEmpty() || part.equals(".") || part.equals(".."))) {
-            throw new PackException("PATH", location, "Expected a canonical portable relative path");
-        }
+        PackPaths.require(path, location);
     }
 
     /** Check that one manifest policy/theme path resolves to its explicit category; no external includes are followed. */

@@ -58,10 +58,16 @@ migration and the canonical foundation entities in the `identity`, `adventure`,
 
 P04.1 adds a data-only manifest/parsing/hash stage in `content`, using fixed
 classpath schemas and no I/O ports. Its immutable `ParsedPack` is distinct from
-an admitted `ContentRevision`; semantic compilation and protected staging/registry
-operations remain P04.3–P04.4. P04.2 adds the pure `PackCompiler` semantic stage
+an admitted `ContentRevision`. P04.2–P04.3 add the pure `PackCompiler` semantic stage
 (IDs, dependencies through a local catalog, cross-references, creation, items,
 skills, abilities and world definitions) producing a `CompiledPack`. See the [pack contract](09-adventure-packs.md).
+
+P04.4 adds a bounded `PackStaging` filesystem/ZIP boundary and `PackRegistry`, a
+transactional JDBC service. Only staged inventories can enter registration; pure
+parser/compiler results alone cannot bypass staging and media checks. V7 stores
+original pack bytes and a sealed import report with the adventure-owned revision.
+Dependencies resolve only within that adventure. No controller, activation or
+media-serving route is exposed. See [ADR 0018](adr/0018-protected-pack-registration.md).
 
 | Module | Responsibility | Main dependencies |
 | --- | --- | --- |

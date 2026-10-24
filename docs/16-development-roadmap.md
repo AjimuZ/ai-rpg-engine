@@ -615,7 +615,27 @@ content/assets and full container integration remain open; P02.3 stays unchecked
     ruleset 1.0.0 is a provisional contract until P07; the gate is not yet called by any
     runtime path (P10/P12 must use it); reachability ignores locks and move effects.
     Archive/path protections and registration are P04.4.
-- [ ] P04.4 Add path/archive/type/size protections and immutable registration.
+- [x] P04.4 Add path/archive/type/size protections and immutable registration.
+  - Complete protected in-memory directory/ZIP staging, portable path/device/case
+    guards, actual byte/inflation budgets, consistent local/central ZIP records and
+    descriptors, CRC verification and media signature/dimension checks. Inventories
+    are privately constructed and defensively copied. Registry preview is read-only;
+    registration stores original files and reports atomically, resolves only sealed
+    adventure-local dependencies and enforces idempotency/version conflicts.
+    V7 seals immutable file sets under serialized READ COMMITTED writes, recomputes
+    stored sizes/hashes and rejects late insertion; reload verifies the pack digest.
+    All 23 focused tests pass, including concurrent retries, direct insertion versus
+    sealing, legacy-unsealed rejection, tamper detection and failed-seal rollback.
+    Pinned JDK 21/PostgreSQL 18.6 full `verify` passes 218 tests with three separate
+    packaging-profile skips (221 total), including populated V1→V7 preservation,
+    and builds the jar. Repository tests pass 22; docs/secrets/workflows/images have
+    zero findings. ADR 0018 records PostgreSQL byte storage and provisional ruleset
+    descriptor hashing. Directory sources must be owner-controlled/quiescent;
+    full media decoding/rights verification and request-level concurrency limits
+    remain gates for future serving/import APIs. P04.5/P04.6 and overall playable
+    genre/localization acceptance remain open.
+    Final review adds direct payload-CRC, trailing-deflate and unsigned-descriptor
+    cases to the staging corpus; their focused rerun passes all 12 tests.
 - [ ] P04.5 Create two minimal neutral genre fixtures and prove import without source edits.
 - [ ] P04.6 Validate optional ID-based English/Italian text overlays, glossary/quote policies, locale coverage and source-language fallback; localized fields cannot alter mechanics or visibility, and both neutral genre fixtures include reviewed EN/IT resources.
 

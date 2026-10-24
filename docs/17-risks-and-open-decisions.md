@@ -14,17 +14,21 @@ retain their standard precedence; configtree is not a secret manager.
 
 ## 1. Risk register
 
-P04.1 adds an in-memory parsing boundary only. Its schemas and raw hashes cannot
-establish safe filesystem/archive extraction, allowed media, licensing, correct
-mechanics or playable references. `ParsedPack` must never be registered as an
-admitted revision without the remaining P04.4 gate; P04.2–P04.3 `CompiledPack` output is still not an admitted revision. The P04.3 ruleset contract 1.0.0 is provisional until P07, reachability is a heuristic warning, and no runtime caller enforces the generation gate before P10/P12. The preliminary
-definition schema deliberately leaves `data` semantics to those gates. Fixed
-parser budgets bound text work; archive expansion/media budgets and import
-isolation still require the protected staging layer. The 63-case parser/schema/hash
-corpus passes, including strict final-terminator boundaries and an independent digest
-vector. Full backend verification passes 176 tests with three packaging-profile skips;
-repository tests pass 22 and policy checks report zero findings. No archive/import
-or semantic admission security claim follows from these parser-stage results.
+P04.1–P04.4 now separate parsing, semantic compilation, protected staging and
+transactional admission. `ParsedPack`/`CompiledPack` alone are not admitted
+revisions. ZIP bytes never extract to disk; database seals prevent ordinary
+mutation and late insertion, including concurrent writers. Directory imports
+require owner-controlled, quiescent source trees: intermediate-directory races
+against another local process are not excluded by portable path APIs. Media
+signature/dimension checks do not prove codec validity, decoded memory bounds or
+rights. No serving/import endpoint exists; decoder/frame/duration limits and
+request concurrency budgets must precede those APIs. Original bytes live in
+PostgreSQL, increasing database/backup size; moving them to managed folders later
+requires a coherent migration. See [ADR 0018](adr/0018-protected-pack-registration.md).
+Ruleset 1.0.0 and its descriptor digest remain provisional until P07. Reachability
+is a heuristic, and no runtime caller enforces the generation gate before P10/P12.
+Genre fixtures, bilingual overlays and playable acceptance remain P04.5/P04.6
+and later milestones; the focused 23 admission tests do not establish those exits.
 
 P03.6 verifies scoped durable jobs, complete snapshot manifests, fenced admission,
 query-epoch races, cancellation/restart metadata and generation retirement on restore.

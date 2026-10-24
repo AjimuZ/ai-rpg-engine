@@ -67,7 +67,7 @@ class PreparationPersistenceTest {
                 + "ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, "
                 + "operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, "
                 + "reward_settlement, campaign_event, operation_journal, actor_resource, actor, "
-                + "presentation_campaign_settings, campaign, content_revision, adventure_workspace, identity_owner_profile");
+                + "presentation_campaign_settings, campaign, content_revision_report, content_revision_file, content_revision, adventure_workspace, identity_owner_profile");
     }
 
     /** Same logical requests race to one durable row and workers cannot share an attempt. */

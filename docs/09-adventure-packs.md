@@ -2,7 +2,7 @@
 
 ## 1. Purpose and contract status
 
-An adventure pack is a versioned set of declarative files describing playable content and supported rules configuration. It is not a script that can command the host computer. P04.1 implements the in-memory manifest/parsing/hash stage and publishes structural JSON Schemas; semantic compilation, protected directory/archive import and immutable registration remain P04.2–P04.4. A `ParsedPack` is not a valid playable pack or an admitted `ContentRevision`. The concrete file syntax of pack contract 1 (`schemaVersion: 1`) is fixed by [ADR 0010](adr/0010-name-scope-format-licensing.md#decision-initial-pack-file-format-pack-contract-1). It covers UTF-8 encoding, YAML 1.2 core-schema `.yaml` files without anchors, aliases, tags, or duplicate keys, `.json` as an equivalent, CommonMark `.md` prose without front matter or rendered HTML, and directory or `.zip` distribution.
+An adventure pack is a versioned set of declarative files describing playable content and supported rules configuration. It is not a script that can command the host computer. P04.1–P04.4 implement parsing, semantic compilation, protected directory/ZIP staging and immutable registration through internal Java APIs. Only `PackRegistry` admits staged bytes as a sealed `ContentRevision`; `ParsedPack` and `CompiledPack` alone do not establish admission. Import UI/endpoints, playable genre fixtures and locale overlays remain later work. The concrete file syntax of pack contract 1 (`schemaVersion: 1`) is fixed by [ADR 0010](adr/0010-name-scope-format-licensing.md#decision-initial-pack-file-format-pack-contract-1). It covers UTF-8 encoding, YAML 1.2 core-schema `.yaml` files without anchors, aliases, tags, or duplicate keys, `.json` as an equivalent, CommonMark `.md` prose without front matter or rendered HTML, and directory or `.zip` distribution.
 
 The engine must not need a fixed plot. A minimal pack supplies world principles, a starting location/situation, character creation, a ruleset, and generation boundaries. Quests, endings, a prologue, companions, and a guide are optional.
 
@@ -68,18 +68,22 @@ Only `adventure.yaml` and the files it requires are mandatory. Files can be spli
 | `dependencies` | No | Locally installed, explicitly versioned content packages |
 | `provenance` | No | Source/authoring information and inherited material |
 
-The parser produces a deeply immutable JSON-shaped manifest and a content digest covering the root manifest and every explicitly listed file, including asset bytes, in sorted relative-path order. Import timestamps and installation paths are metadata outside that digest. A changed byte in the distributed pack produces a different digest even if the author forgot to bump its version; future registration must report that conflict. YAML/JSON equivalence means the same schema and values, not the same raw-byte digest.
+The parser produces a deeply immutable JSON-shaped manifest and a content digest covering the root manifest and every explicitly listed file, including asset bytes, in sorted relative-path order. Import timestamps and installation paths are metadata outside that digest. A changed byte in the distributed pack produces a different digest even if the author forgot to bump its version; registration reports `HASH_CONFLICT` with both hashes. YAML/JSON equivalence means the same schema and values, not the same raw-byte digest.
 
 ### 3.1 Concrete manifest shape
 
 The bundled [manifest schema](../backend/src/main/resources/pack-contract/1/manifest.schema.json)
 is JSON Schema draft 2020-12. Unknown fields are errors, including inside nested
 manifest records. This stage requires a nonempty license declaration for every
-pack; checking SPDX/file rights is part of later registration. Version is a
+pack; P04.4 preserves that declaration but does not verify SPDX identifiers,
+license-file contents or redistribution rights. Per-asset provenance and export
+rights review remain part of the later asset/editor/export workflows. Version is a
 SemVer release label. Engine/ruleset range strings and policy/module IDs are
-structurally required; support and compatibility are checked in P04.2–P04.3.
+structurally required; support and compatibility are checked by the compiler.
 `contentLocale` retains its authored language tag; this stage checks its lexical
 shape without mapping it to a player language or claiming locale coverage.
+Registration currently accepts source locales supported by the engine (`en`, `it`);
+text overlays and coverage validation remain P04.6.
 
 ```yaml
 schemaVersion: 1
@@ -108,7 +112,8 @@ must be listed; hidden/unreferenced extra bytes are rejected. Logical paths use
 portable ASCII names, `/`, at most 240 characters, and no empty, `.` or `..`
 segments. Absolute paths, backslashes and case collisions fail. Filesystem
 containment, reparse points, Windows reserved names, ZIP handling and media
-type/size checks still require P04.4; this API receives bytes and opens no paths.
+type/size checks run in P04.4 staging/registration; this parser API receives bytes
+and opens no paths.
 
 Categories `lore`, `narrativeStyle`, `license`, `credits` require `.md`;
 `asset` holds opaque binary bytes. Structured `.yaml`/`.json` categories are
@@ -218,18 +223,79 @@ In combat, generated mechanics must use supported templates/effects and fit the 
 
 ## 9. Import and compilation pipeline
 
+P04.4 implements `PackStaging.directory(Path)` and `archive(InputStream)` followed
+by `PackRegistry.preview(adventureId, staged)` or `register(adventureId, staged)`.
+Staging buffers bytes in memory without extraction or execution; its inventory
+has a private constructor and defensive byte-array copies. Preview compiles and
+returns a deterministic report without writes. No import endpoint or UI is exposed.
+
 1. Stage the owner-selected directory/archive in a non-executable area.
-2. Reject absolute paths, `..` traversal, symlinks/reparse points escaping the root, case collisions, executable payload types, oversized or explosive archives, and remote includes.
+2. Reject absolute paths, `..` traversal, symlinks/reparse points, case collisions, executable payload types, oversized or explosive archives, and remote includes.
 3. Parse with safe YAML 1.2 core-schema and JSON settings. Prohibit tags and object construction, reject anchors, aliases, merge keys, and duplicate keys (contract 1 allows no aliases), and bound nesting and file count.
 4. Validate manifest and individual definition schemas, preserving filename/line/field locations.
 5. Resolve dependencies and cross-file references; detect duplicate IDs and unsupported versions.
 6. Validate rules, effect graphs, expressions, creation budgets, quest cycles, and initial invariants.
-7. Validate asset paths/types/hashes and required rights metadata.
+7. Validate asset paths/types/hashes and the required nonempty license/authorship declarations; these declarations do not prove rights.
 8. Detect direct mechanical contradictions and issue warnings for unverifiable narrative ambiguity.
 9. Produce a normalized immutable pack revision and an import report.
 10. Register only if no blocking errors remain. Preview is read-only; activation requires the owner's import action.
 
-Initial archive limits: 100 MB compressed, 250 MB expanded, 2,000 files, 1 MB per structured text file, and 50:1 maximum expansion ratio. These are configurable product limits to validate against actual sample packs; images can use a separate per-file asset limit. Allowlisted media types and decompression budgets are mandatory.
+Default staging limits are 100 MiB compressed, 250 MiB expanded, 2,000 files,
+4,000 total file/directory entries, 32 MiB per file, and 50:1 expanded bytes to
+whole archive bytes. Text categories have a further 1 MiB parser limit, including
+Markdown. `PackStaging.Limits` can tighten budgets for callers/tests; parser and
+media ceilings still apply. Actual reads/inflation enforce budgets independently
+of declared lengths. Concurrent imports need a future request-level memory budget;
+the per-pack limits are not a bound on process-wide memory.
+
+Portable logical names are ASCII, at most 240 characters and 16 path components.
+Each component starts with an ASCII letter, digit or underscore and otherwise
+contains only letters, digits, underscores, dots and hyphens; trailing dots and
+Windows device names (including stems before extensions) are forbidden. Paths
+cannot be absolute, contain backslashes/drive prefixes, dot traversal or empty
+components. File and directory-prefix spellings must agree under case folding;
+files cannot shadow directory names. Diagnostics contain bounded logical names,
+never host source paths. Directory staging rejects links/junctions/special files
+and opens files without following final links. The owner-selected source tree
+must remain under owner control and quiescent: portable JDK path traversal does
+not prevent another local process replacing an intermediate directory during
+the walk. Use the in-memory ZIP boundary for untrusted distributed content.
+
+ZIP accepts only stored/deflate, single-disk, nonencrypted, non-ZIP64 entries with
+portable ASCII names. Central and local names, methods, flags, CRCs, sizes and
+streaming descriptors must agree. Local records must be contiguous with no
+overlap, prefix or hidden entries; every deflate stream must finish and consume
+all compressed bytes. Links, special files, directory payloads, unknown flags,
+truncation and CRC mismatches fail closed. A single top folder containing the
+manifest is stripped only when every entry belongs to it; its name and ZIP
+metadata do not enter the content hash. Extra fields never override entry names
+or trigger filesystem writes. [ADR 0018](adr/0018-protected-pack-registration.md)
+records the accepted subset and storage decision.
+
+Assets allow PNG, JPEG, WebP, Ogg, MP3 and WAV with matching extension and magic
+bytes; SVG, HTML, scripts, fonts and nested archives are refused. Images must
+declare sides of 1..8,192 and at most 32 Mi pixels. Inspection is bounded header
+validation, not full codec validation or a decompressed-memory guarantee. Future
+decoding/serving must impose allocation, frame/duration and audience restrictions,
+validated MIME and `nosniff`; there is no media-serving API yet.
+
+Registration locks the owning adventure, compiles against only its already sealed
+local dependencies, and stores original bytes, file hashes, revision coordinates,
+exports and an import report in one PostgreSQL transaction. Same ID/version/hash
+returns the existing revision; different bytes require a new version. Legacy
+metadata without a sealed inventory cannot satisfy a retry (`UNSEALED_REVISION`).
+V7 file/report triggers reject updates/deletes and serialize file insertion and
+sealing on the revision row under READ COMMITTED; other write isolation levels
+are rejected. A seal checks count/total size, each file's digest/size is recomputed
+by the database, and late insertion is forbidden. Failed sealing rolls back the
+entire registration. `PackRegistry.files` verifies the full content hash on reload.
+
+Report version 1 records pack/ruleset coordinates, source locale, file hashes,
+sizes/categories/media types/dimensions, definition counts and compiler warnings.
+It excludes host paths, timestamps and archive metadata; PostgreSQL JSONB may
+reorder object keys without changing its meaning. The provisional ruleset hash
+frames the ruleset ID/version and sorted policy profiles with SHA-256; it is a
+contract descriptor until P07 pins executable mechanics, not a kernel code hash.
 
 The P04.1 in-memory boundary enforces at most 2,000 files/250 MiB total,
 1 MiB per text file (including Markdown), depth 32, 20,000 nodes including mapping

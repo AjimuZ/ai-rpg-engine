@@ -2,6 +2,25 @@
 
 ## 1. Evidence policy
 
+P04.4 evidence (24 October 2026, Windows 11/Docker Desktop, pinned JDK 21 and
+PostgreSQL 18.6): all 23 focused staging/registration tests pass. Cases cover
+paths/devices/case aliases, links and special entries, conflicting archive views,
+descriptors/CRC/truncation/amplification, media types/dimensions, immutable copies,
+preview/idempotency/conflicts, adventure-scoped dependencies, reload tampering,
+database sealing, concurrent retries/direct insertion and transactional rollback.
+Full backend `verify` passes 218 tests with three separate packaged-interface
+profile skips (221 total), builds the jar, and verifies populated V1→V7 preservation.
+Repository checker tests pass 22; docs/secrets/workflows/images report zero findings.
+The first full run exposed a V6-latest assumption in the upgrade fixture; it was
+extended to V7 and both the focused upgrade test and full suite then passed.
+This supplies the hostile-import/immutable-registration portion of QA-02, not
+playable two-genre or bilingual acceptance. Directory tests ran in Linux containers;
+native Windows junction races, full media decoding, rights review and future
+import/serving UI remain outside these results. See [ADR 0018](adr/0018-protected-pack-registration.md).
+Final staged review adds payload-CRC, trailing-deflate and unsigned-descriptor
+regressions that reach stream validation independently of header mismatches;
+the focused staging rerun passes all 12 tests.
+
 AI RPG Engine has developer runtime compatibility tests in [`tools/runtime_probe`](../tools/runtime_probe/README.md), covering pinned discovery and deterministic thread/turn lifecycles. P01.4 adds owned-process shutdown, terminal wire failures, unresolved-request isolation, bounded/redacted stderr and ordered early events, with synthetic failure injection and the actual pinned runtime. These runtime checks do not establish gameplay/domain behavior or full QA-24 save coherence. The scripted upstream proves protocol behavior without an account and cannot establish live inference quality or account readiness. The separate owner-signed-in neutral smoke passed on 23 October 2026, validating correlated output and resume from a second stdio process; its sanitized report is retained with the probe, closing P01.2. These checks do not satisfy campaign renewal (QA-08) or packaged application startup (QA-28). P01.5 retains [neutral projections and a supported-version matrix](../tools/runtime_probe/COMPATIBILITY.md) for offline replay; replay alone cannot qualify a new runtime or platform. Predecessor test reports are references, not evidence that AI RPG Engine works. Every release claim must identify a fresh result, environment, scope, and limitation.
 
 P02.3 adds Docker Desktop Linux-container evidence for the packaged application

@@ -91,7 +91,7 @@ class CanonicalCommitServiceTest {
         jdbc.execute("drop function if exists p033_fail()");
         jdbc.execute("truncate plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
                 + "operation_journal, actor_resource, actor, presentation_campaign_settings, campaign, "
-                + "content_revision, adventure_workspace, identity_owner_profile");
+                + "content_revision_report, content_revision_file, content_revision, adventure_workspace, identity_owner_profile");
     }
 
     /** Critical jobs and negative-query epochs are outbox effects of the same canonical commit. */

@@ -12,6 +12,13 @@ This is an implementation specification, not delivered frontend or image-generat
 
 ## 2. Development-time UI asset kit
 
+P04.4 delivers authored-pack media admission only: PNG/JPEG/WebP image and
+Ogg/MP3/WAV audio signatures, byte/dimension ceilings, original immutable bytes
+and hashes in PostgreSQL, and an import report. It does not decode or serve media,
+generate artwork, prove provenance/rights or validate codec frame/duration budgets.
+Those remain gates for the playback/generation/export implementations below;
+see [pack admission](09-adventure-packs.md#9-import-and-compilation-pipeline).
+
 P05 must inventory and deliver every asset needed by its screens. Use one coherent theme and icon system. Create missing original illustrations with the development client's supported image-generation tool, or select free assets after checking their actual license. Do not assume a free preview, search result or marketplace listing permits reuse.
 
 | Family | Required deliverable |

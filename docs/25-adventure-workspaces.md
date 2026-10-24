@@ -17,6 +17,14 @@ The library's primary cards represent adventures. “New adventure” creates a 
 
 ## 2. Separate managed folders
 
+P04.4 stores imported original files and sealed reports in PostgreSQL alongside
+their adventure-owned revision. Dependencies cannot resolve through another
+adventure. Re-import is idempotent for identical bytes and never replaces an
+existing release; campaigns retain their pinned revision. This bounded initial
+store is the authority included in database backups. The folder layout below
+remains planned; future managed-file storage must migrate bytes explicitly and
+preserve hashes/ownership, rather than introduce a second editable authority.
+
 Proposed layout under the owner's managed data root, outside the source checkout/container writable layer:
 
 ```text

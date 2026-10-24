@@ -17,7 +17,7 @@ class PackCompilerTest {
     }
 
     /** Files of the valid reference pack, as JSON text so single facts can be replaced by string edits. */
-    private static Map<String, String> sources() {
+    static Map<String, String> sources() {
         Map<String, String> files = new LinkedHashMap<>();
         files.put("adventure.json", """
                 {"schemaVersion":1,"id":"example:harbor","version":"1.0.0","title":"Harbor","summary":"A quiet harbor.",
@@ -63,7 +63,7 @@ class PackCompilerTest {
     }
 
     /** Wrap comma-separated definitions in the contract-1 envelope. */
-    private static String envelope(String definitions) {
+    static String envelope(String definitions) {
         return "{\"schemaVersion\":1,\"definitions\":[" + definitions + "]}";
     }
 

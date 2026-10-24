@@ -38,19 +38,19 @@ From `backend/`, with those variables set:
 `verify` starts an ephemeral HTTP server and checks minimal health, hidden diagnostic
 endpoints, PostgreSQL major version, Flyway validation, and the canonical schema.
 A missing database fails tests; nothing silently skips or uses H2. Use a new
-disposable database: the test requires exactly the twenty-three domain tables created by
+disposable database: the test requires exactly the twenty-five domain tables created by
 `src/main/resources/db/migration/V1__canonical_foundations.sql` (P03.1),
 `V2__campaign_bounds_and_versions.sql` (P03.2, adding `actor_resource`) and
 `V3__canonical_outbox.sql` (P03.3), `V4__deterministic_random_draws.sql` (P03.4) and
 `V5__campaign_mutation_leases.sql` (P03.5) and
-`V6__durable_jobs_and_planning.sql` (P03.6), with no
+`V6__durable_jobs_and_planning.sql` (P03.6) and `V7__pack_registration.sql` (P04.4), with no
 rows, and Hibernate validates the entities against them (`ddl-auto=validate`).
 The persistence tests truncate these tables before and after each test, so never
 point `verify` at a database whose data you want to keep.
 P03.2 adds storage row versions separate from canonical counters, frozen ownership,
 bounded actor resources and complete write-once journal outcomes. Integration tests
 include cross-campaign rejection, scoped reads, concurrent duplicate inserts and
-stale-writer rollback, plus populated V1-to-V6 upgrade in a disposable schema.
+stale-writer rollback, plus populated V1-to-V7 upgrade in a disposable schema.
 P03.3 adds an internal `CanonicalCommitService` consuming immutable `ResolvedCommit`
 values from trusted backend resolution. It atomically saves world/resource changes,
 events, settlements, a backend receipt and reference-only outbox intents, and returns
@@ -95,8 +95,8 @@ Boot-managed SnakeYAML dependency is used only for parser events; custom core
 scalar resolution bypasses YAML 1.1 typing and all object constructors. Bundled
 draft-2020-12 schemas describe the manifest and preliminary definition envelope.
 The focused corpus runs with `./mvnw -B -ntp -Dtest=PackParsingTest test` without
-PostgreSQL. `ParsedPack` establishes parsing only: semantic definitions, protected
-filesystem/ZIP import, asset rights/type checks and registration are unavailable.
+PostgreSQL. `ParsedPack` establishes parsing only; callers must use staging and
+registration below for admission, and later export workflows must verify rights.
 The 63 parser cases and full JDK 21/PostgreSQL 18.6 backend `verify` pass: 176
 tests pass, three packaged-interface profile tests skip, and the built jar contains
 both contract schemas (24 October 2026).
@@ -106,10 +106,35 @@ P04.2–P04.3 add `content.PackCompiler`, which turns a `ParsedPack` into a `Com
 The compiler checks typed references, bounded expressions/effects, quests, dependency
 cycles, engine/ruleset/module compatibility and hash conflicts. It also compiles a
 `GenerationPolicy`, and `content.GenerationGate` checks generated proposals against it.
-`CompiledPack` output is not yet a registered revision (P04.4). The compiler suite runs
+`CompiledPack` output alone is not a registered revision. The compiler suite runs
 with `./mvnw -B -ntp -Dtest=PackCompilerTest test` without PostgreSQL: 19 tests pass.
 The full backend `verify` passes 198 tests with three profile skips (24 October 2026).
 See [ADR 0017](../docs/adr/0017-bounded-pack-semantics.md).
+
+P04.4 adds `PackStaging.directory(Path)` / `archive(InputStream)` and the injected
+`PackRegistry.preview(adventureId, staged)` / `register(adventureId, staged)`.
+Only protected staged inventories can enter registration. Preview is read-only;
+registration compiles, checks media headers and stores the exact files plus a
+sealed report in one transaction. Dependencies are adventure-local. Identical
+imports return the existing revision; differing bytes at the same ID/version
+fail. `report(revisionId)` reads the report and `files(revisionId)` checks the
+stored inventory against its normalized hash. No controller or media route exists.
+
+Defaults: 100 MiB ZIP, 250 MiB expanded, 2,000 files, 50:1 expansion, 32 MiB per
+file (text further limited to 1 MiB); image headers declare at most 8,192 per side
+and 32 Mi pixels. Directory sources must be owner-controlled and quiescent;
+archive bytes never extract to disk. Media admission does not fully decode files
+or verify redistribution rights. The provisional ruleset descriptor hash is not
+a gameplay-kernel hash. [ADR 0018](../docs/adr/0018-protected-pack-registration.md)
+records storage, sealing, restrictions and deferred decoder/concurrency gates.
+Focused checks use `./mvnw -B -ntp -Dtest=PackStagingTest,PackRegistryPersistenceTest test`
+against a disposable PostgreSQL database (23 tests pass). The populated migration
+test also verifies V7 leaves legacy metadata and campaign pins intact without
+fabricating stored bytes or admission reports.
+Full pinned JDK 21/PostgreSQL 18.6 `verify` passes 218 tests, skips the three
+separate packaged-interface profile tests (221 total), and builds the jar
+(24 October 2026). The initial full run exposed a V6-latest fixture assumption;
+the V1→V7 extension and subsequent full rerun both pass.
 
 ## Packaged runtime configuration (P02.3)
 

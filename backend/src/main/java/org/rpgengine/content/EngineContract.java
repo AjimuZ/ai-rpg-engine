@@ -1,7 +1,12 @@
 package org.rpgengine.content;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * What the running engine offers to packs: its own version, the one ruleset it implements, the
@@ -28,6 +33,44 @@ public record EngineContract(String engineVersion, String rulesetId, String rule
         Versions.version(rulesetVersion);
         policyProfiles = Set.copyOf(policyProfiles);
         modules = Set.copyOf(modules);
+    }
+
+    /**
+     * Provisional ruleset hash recorded on every admitted ContentRevision.
+     *
+     * <p>Until the deterministic rules kernel publishes a hash of its executable rules (P07), this is
+     * the SHA-256 of a canonical descriptor: a domain label, the ruleset ID and version, the sorted
+     * policy profiles and the pack contract revision, each length-prefixed so no two descriptors share
+     * an encoding. It changes whenever any of those inputs change, which is enough to pin a revision
+     * to the ruleset contract it was validated against; it does not yet fingerprint rule behavior.
+     *
+     * @return lowercase hexadecimal SHA-256
+     */
+    public String rulesetHash() {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            StringBuilder descriptor = new StringBuilder();
+            for (String part : descriptorParts()) {
+                descriptor.append(part.length()).append(':').append(part).append(';');
+            }
+            return HexFormat.of().formatHex(digest.digest(descriptor.toString().getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            // Every Java platform is required to provide SHA-256.
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
+    }
+
+    /** Ordered descriptor fields; profiles are sorted so set iteration order cannot change the hash. */
+    private java.util.List<String> descriptorParts() {
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        parts.add("rpgengine.ruleset.descriptor.v1");
+        parts.add(rulesetId);
+        parts.add(rulesetVersion);
+        // The profile count keeps the variable-length list unambiguous.
+        parts.add("profiles=" + policyProfiles.size());
+        parts.addAll(new TreeSet<>(policyProfiles));
+        parts.add("contract=" + PACK_CONTRACT);
+        return parts;
     }
 
     /**

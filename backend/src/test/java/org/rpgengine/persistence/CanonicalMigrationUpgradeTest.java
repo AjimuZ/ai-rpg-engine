@@ -15,7 +15,7 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V6 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V7 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -112,7 +112,7 @@ class CanonicalMigrationUpgradeTest {
                     // V6 preserves populated canonical state and initializes only the recovery token.
                     String v5Campaign = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
                     Flyway v6 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
-                            .locations("classpath:db/migration").load();
+                            .locations("classpath:db/migration").target("6").load();
                     assertEquals(1, v6.migrate().migrationsExecuted);
                     assertTrue(v6.validateWithResult().validationSuccessful);
                     assertEquals(v5Campaign, jdbc.queryForObject("select (to_jsonb(c) - 'recovery_generation')::text "
@@ -124,6 +124,22 @@ class CanonicalMigrationUpgradeTest {
                         assertEquals(0, jdbc.queryForObject("select count(*) from " + table, Integer.class));
                     }
                     assertEquals(0, v6.migrate().migrationsExecuted);
+                    // V7 preserves metadata-only revisions and pinned campaigns; it must not invent
+                    // file bytes or a report that would falsely claim a legacy pack passed admission.
+                    String legacyRevision = jdbc.queryForObject("select to_jsonb(c)::text from content_revision c",
+                            String.class);
+                    String v6Campaign = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
+                    Flyway v7 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("7").load();
+                    assertEquals(1, v7.migrate().migrationsExecuted);
+                    assertTrue(v7.validateWithResult().validationSuccessful);
+                    assertEquals(legacyRevision, jdbc.queryForObject("select to_jsonb(c)::text from content_revision c",
+                            String.class));
+                    assertEquals(v6Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
+                    assertEquals(journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o", String.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from content_revision_file", Integer.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from content_revision_report", Integer.class));
+                    assertEquals(0, v7.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

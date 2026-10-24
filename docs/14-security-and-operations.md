@@ -48,6 +48,22 @@ Campaign authorization also resolves its owning adventure workspace. Specificati
 
 Pack imports use the containment, parser, size, alias, and archive limits in [the pack specification](09-adventure-packs.md). Reject unsupported executable types. Never render raw HTML from lore or model output without a strict sanitization policy; the default narrative format is plain text or a small safe Markdown subset.
 
+P04.4 stages ZIP bytes entirely in memory, checks both ZIP views and bounded
+inflation, and admits only allowlisted media signatures and declared image sizes.
+Directory sources must be owner-controlled and quiescent: static links/reparse
+points are rejected, but portable path-based traversal does not exclude a local
+process swapping intermediate directories during import. Use ZIP for hostile
+distribution. Media headers are not full decoder validation; no serving endpoint
+exists. Limit decoder allocation/frames/duration before introducing playback.
+Per-pack memory caps also need request concurrency limits before an import API.
+
+Registered bytes and reports are immutable database rows. V7 serializes sealing
+and file insertion under READ COMMITTED, checks stored sizes/hashes and rejects
+later files or mutations. Failed registration rolls back all bytes. These guards
+protect ordinary application writes, not a database administrator disabling
+triggers or truncating tables. License declarations are preserved, not evidence
+of redistribution rights; export still requires provenance/rights review.
+
 Serve registered assets with validated MIME type, content hash, containment checks, and `nosniff`. Disallow active SVG scripts or use a validated static subset; a file extension is insufficient. Default CSP permits only required local sources. Remote audio/image origins require an explicit configured allowlist and owner preference, with no arbitrary model-generated URL fetch.
 
 Bounded image jobs use a separately verified restricted capability, public appearance inputs, finite budgets and managed temporary/output roots. Do not expose canonical storage, database credentials, private NPC notes or unrestricted developer tools to obtain an illustration. A generated image is untrusted media until validated and registered; it cannot change item data or choose its own serving path. Keep saved originals and subject associations in audience-aware backup/restore, as specified in [presentation assets](23-presentation-assets.md).

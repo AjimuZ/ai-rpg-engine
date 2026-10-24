@@ -2,6 +2,14 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Protected pack registration (P04.4), 24 October 2026
+
+- Add bounded directory/ZIP staging with portable path/device/case guards, link/special-file rejection, consistent archive headers/descriptors, CRC verification and actual inflation limits; retain immutable staged byte copies without disk extraction.
+- Validate allowlisted media signatures and image header dimensions. Store original pack bytes, hashes, exports and deterministic reports atomically in adventure-owned revisions. Serialize idempotent imports and sealing; reject conflicts, legacy-unsealed retries, mutations and late file insertion, and verify hashes on reload.
+- Add V7 tables/triggers and populated V1→V7 preservation checks. Record the bounded ZIP subset, PostgreSQL storage and provisional ruleset descriptor hash in ADR 0018.
+- Verification: 23 focused admission tests; full pinned JDK 21/PostgreSQL 18.6 `verify` passes 218 tests with three packaging-profile skips (221 total) and builds the jar; 22 repository tests pass and all four policy checks have zero findings.
+- Directory sources require owner control and a quiescent tree. Header checks do not fully decode media or prove rights. Import UI/endpoints, serving/decoder budgets, genre fixtures and locale overlays remain future work.
+
 ## Unreleased — Bounded pack semantics and generation gate (P04.3), 24 October 2026
 
 - Add a statically analyzed, data-only expression language with depth/node/dice/overflow/division limits; typed effects with bounded conditional nesting and inherited timing; condition stacking, duration, modifiers and ticks; and quest definitions with world-scope predicates and outcomes.

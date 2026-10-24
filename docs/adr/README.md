@@ -21,5 +21,6 @@ Records 0001–0005, 0007, and 0008 are **proposed for the AI RPG Engine impleme
 | [0015](0015-bilingual-first-release.md) | English-default and first-class Italian from MVP, small locale model, compiled UI variants and direct selected-language narration; supersedes English-only assumption |
 | [0016](0016-optional-local-speech.md) | Optional local bilingual speech, conditionally selected primary/fallback, rights/voice/GPU/cache boundaries; no model installed or performance verified |
 | [0017](0017-bounded-pack-semantics.md) | Static bounded expressions/effects, dependency cycles, SemVer compatibility, hash conflicts and a deterministic generation gate for fixed author constraints; implemented in P04.3, runtime callers pending |
+| [0018](0018-protected-pack-registration.md) | Bounded directory/ZIP staging, media headers, transactional original-byte storage and serialized immutable sealing; implemented in P04.4, import UI and decoding pending |
 
 When a decision changes, preserve this record and create a superseding one with rationale, compatibility implications, and verification. Do not retroactively edit historical status to make a previous decision disappear.
