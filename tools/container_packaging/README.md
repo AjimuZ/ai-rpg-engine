@@ -3,7 +3,7 @@
 The root `compose.yaml` builds the packaged engine, PostgreSQL and the isolated
 runtime. The engine serves the Angular shell, hashed assets, notices and health
 at one loopback origin (default `http://127.0.0.1:8080`; `APP_PORT` overrides the
-port). Gameplay and launcher workflows remain pending. The runtime uses
+port). Gameplay workflows remain pending; the root `start.sh` launcher (P02.6) wraps this stack. The runtime uses
 `init: true` for signal forwarding and prompt shutdown.
 
 Run from the repository root with Python and the Linux Docker/BuildKit baseline
@@ -21,6 +21,7 @@ reviewed managed-profile files. Both exclude nested private paths. New inputs
 must update the relevant policy and fixtures. These checks do not inspect account
 files or detect secrets embedded in otherwise admitted source files.
 `test_compose.py` checks rendered service boundaries without starting services.
+`test_launcher.py` checks the root `start.sh` contract (static rules, redaction, refusal paths and, when a Docker daemon is reachable, the read-only `--check` command) without starting or stopping services.
 Missing Docker/BuildKit and build failures fail these checks; Ordinary CI runs this default suite ([workflow](../../.github/workflows/ci.yml), P02.4); the opt-in `PACKAGING_DOCKER=1` recreation check stays out of CI until native Linux secret-mount ownership is qualified.
 
 ## Real packaged-shell recreation
@@ -51,7 +52,7 @@ networks and markers, never Docker volumes. No account or game data is used.
 The check retains its named volumes and the paired generated password file
 `.local/packaged-shell-check/postgres-password`. This ignored fixture secret is
 never printed or passed as a command-line value. On Windows it inherits the
-private checkout directory's ACL; launcher permission hardening belongs to P02.6.
+private checkout directory's ACL. The launcher's own secret (`.local/secrets/postgres-password`) is created by `start.sh`; NTFS ignores its chmod modes.
 Native Linux bind-secret ownership still needs verification. Do not reuse these
 fixtures for application data. Without the opt-in environment flag only this
 integration check skips. The completed Windows Docker Desktop run passed all
@@ -73,6 +74,8 @@ docker compose --env-file .env.example down --timeout 30
 Open the loopback URL manually after health checks pass. A missing secret fails
 startup. Database labels/passwords initialize a new cluster only; changing the
 file does not rotate an existing cluster's password. Preserve volumes; never add
-`-v` to the stop command. The future `start.sh` owns ordinary setup. ADR 0009
+`-v` to the stop command. `start.sh` owns ordinary setup (see the
+[launcher contract](../../docs/22-container-deployment-and-startup.md#5-launcher-contract) and
+`test_launcher.py`, which needs no Docker for its static and function checks). ADR 0009
 permits local builds on the verified existing Java pins; refreshing to the newest
 published Java update remains a release requirement.

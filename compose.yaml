@@ -129,6 +129,6 @@ volumes:
 
 secrets:
   # Local Compose file secrets are read-only binds, not an encrypted secret store.
-  # The launcher will create/restrict this ignored file in P02.6; fail if absent.
+  # start.sh creates this ignored file once (random, never overwritten); fail if absent.
   postgres_password:
     file: ${POSTGRES_PASSWORD_FILE:-./.local/secrets/postgres-password}

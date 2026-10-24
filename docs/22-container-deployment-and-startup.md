@@ -2,11 +2,12 @@
 
 ## 1. Status and owner requirement
 
-**Application shell packaging implemented; launcher/gameplay pending.** P02.3
+**Application shell packaging and root launcher implemented; gameplay pending.** P02.3
 provides the pinned engine/runtime images and root Compose services, serving the
 neutral Angular shell and health from one loopback origin. Account-free build,
-secret, IPC and storage recreation checks pass. The owner requires a root
-`start.sh` entry point for every adventure; that launcher remains P02.6 work.
+secret, IPC and storage recreation checks pass. P02.6 adds the root `start.sh`
+entry point (see the launcher contract in section 5). Its cross-shell, interruption
+and restart-preservation verification remains P02.7, and gameplay readiness remains P14.
 
 The packaged local installation must run the application, database, and isolated Codex runtime through Docker Compose. Users must not need host Java, Maven, Node, or npm to build and launch that packaged profile. Codex service connectivity and supported account access are still required. Host-based development and stdio protocol probes remain optional developer workflows, not the completed packaged installation.
 
@@ -75,7 +76,7 @@ Production admission belongs to P08; any increase requires P08.6 evidence.
 | Root `.env.example` | Sanitized public configuration example without working credentials |
 | Version/compatibility records | Pin build/runtime images, dependency locks, runtime protocol, Compose features, and supported host environment; the pre-scaffold baseline is in [ADR 0009](adr/0009-toolchain-baseline.md) |
 
-The tracked root [`.env.example`](../.env.example) contains the consumed application port and neutral database labels. It contains no database password or runtime-account setting. P02.3 supplies the engine/runtime images, root Compose and packaged interface; the launcher remains pending. Keep actual `.env`, secret files, account state, and private data untracked. The root [`.dockerignore`](../.dockerignore) and independent [runtime context policy](../docker/codex-runtime/.dockerignore) exclude local `.agents`, `.claude`, `.codex`, `AGENTS.md`, and `CLAUDE.md`; gameplay containers do not inherit development instructions or hooks.
+The tracked root [`.env.example`](../.env.example) contains the consumed application port and neutral database labels. It contains no database password or runtime-account setting. P02.3 supplies the engine/runtime images, root Compose and packaged interface; P02.6 adds the launcher, which creates the ignored `.env` from this example on first start and the private database-password file. Keep actual `.env`, secret files, account state, and private data untracked. The root [`.dockerignore`](../.dockerignore) and independent [runtime context policy](../docker/codex-runtime/.dockerignore) exclude local `.agents`, `.claude`, `.codex`, `AGENTS.md`, and `CLAUDE.md`; gameplay containers do not inherit development instructions or hooks.
 
 The context policies default-deny inputs: the root admits only Angular/Java build inputs and the engine Dockerfile, while the runtime context admits its reviewed Dockerfile/profile files. Final recursive exclusions protect private names even inside admitted source trees. New build inputs require policy and regression-test updates. The policies do not inspect arbitrary source contents for secrets. Build-context tests export neutral scratch-stage fixtures through real BuildKit without sending checkout contents or starting services; the opt-in integration test builds the actual stack. See the [test guide](../tools/container_packaging/README.md).
 
@@ -137,14 +138,15 @@ The database reads `/run/secrets/postgres_password` from the private host file
 `${POSTGRES_PASSWORD_FILE:-./.local/secrets/postgres-password}`. This variable
 contains a path, never a password. Local Compose file secrets use read-only bind
 mounts, not encrypted storage; restrict the host file to its owner. Missing files
-must fail startup. P02.6 still owns secure initialization. `POSTGRES_DB` and
+must fail startup. The launcher creates the file on first start (see the launcher
+behavior below). `POSTGRES_DB` and
 `POSTGRES_USER` configure both services; `APP_PORT` selects engine host HTTP. Never
 change a database password by replacing the file alone on an existing cluster:
 PostgreSQL uses it only on initial cluster creation. Preserve volumes on stop
 and recreation; never use `down -v`. See the [packaging checks](../tools/container_packaging/README.md).
 
-The following commands describe the future launcher interface and cannot yet be
-run. Manual shell build/start/stop commands are in the [packaging guide](../tools/container_packaging/README.md).
+The launcher (P02.6) provides the commands below. Manual shell build/start/stop
+commands remain in the [packaging guide](../tools/container_packaging/README.md).
 
 ```text
 ./start.sh           Validate, build with cache, start services, and report readiness
@@ -166,6 +168,17 @@ Normal startup must:
 6. Wait for database health, complete supported migration and operation-reconciliation steps, then verify the web/API and runtime connection. Container creation order alone is not readiness.
 7. Distinguish API/storage readiness from gameplay readiness. Check runtime account/capability availability without generating a scene or consuming a gameplay turn. Never perform a live inference merely as an automatic health check.
 8. Print the local browser URL, effective status, and supported stop/log commands. Report failure with a nonzero exit code and bounded, redacted diagnostics. Never print secrets or raw account files.
+
+**Launcher behavior (P02.6, `start.sh`):**
+
+- **Exit codes:** 0 success, 1 failure, 2 usage error, and 3 only from `--status` when storage is ready but gameplay is not. `--check` changes nothing and exits 1 on any failed prerequisite.
+- **Identity:** the first run writes a random 12-hex installation id to the ignored `.local/installation-id` and exports `COMPOSE_PROJECT_NAME=rpg-engine-<id>`. Later runs reuse it, so services and volumes are stable; a malformed id file is refused, never regenerated.
+- **Configuration:** `.env` is copied from `.env.example` when absent and then parsed as `KEY=value` lines, never sourced, so its content cannot run code. Exported variables take precedence. An invalid `APP_PORT` or a busy port (the launcher's own running engine excepted) fails with the variable name and the way to change it.
+- **Database password:** 64 hex characters from `/dev/urandom` written without a newline to `.local/secrets/postgres-password` (or `POSTGRES_PASSWORD_FILE`), created exclusively with umask 077. An existing non-empty file is never touched. An empty file, or a missing file while this installation's database volume exists, is refused with instructions, because a new password would not match the existing cluster. The value is never printed.
+- **Start:** `docker compose build` reuses the layer cache; `up --detach --no-build --wait` follows, then the launcher polls `/actuator/health/readiness` by executing `curl` inside the engine container (the host needs no HTTP client). On failure it prints bounded, redacted service status and recent log lines and exits 1. It then reports `gameplay` readiness separately and prints the loopback URL and the status, log, stop and sign-in commands.
+- **Sign-in:** `--login` stops the runtime service, runs `codex login --device-auth` in a one-off container created from the runtime service definition without its dependencies (so no database or engine is started; file credential store, ChatGPT method), then verifies the state and restores the runtime if it was running. Interruption removes the one-off container and restores the runtime. `--status` classifies sign-in from `codex login status` output only; credential files are never read, printed or copied. The launcher enables no paid overage or API-key fallback and does not change account settings. Device-code prerequisites are in section 6.
+- **Logs and stop:** `--logs [SERVICE] [--no-follow]` prints the last 200 lines through a redactor (Bearer tokens, `key=value` credentials, signed tokens, `sk-` keys and the exact password value) and then follows. `--stop` runs `compose down --timeout 35` without `-v`, so every volume is kept.
+- **Limits:** NTFS ignores the `chmod` modes on the password file, and native Linux ownership is not verified. Compose file secrets are bind mounts, not encrypted storage. The password file is a host-user-readable secret, not a vault.
 
 **Health contract (P02.5):** status-only Actuator groups, each HTTP 200 when `UP` and 503 otherwise:
 `liveness` (process only, never touches the database), `readiness` (storage readiness: `readinessState`,
@@ -204,13 +217,13 @@ The host needs:
 - enough disk and memory (provisionally at least 10 GB of free Docker disk space);
 - network access for first builds and inference.
 
-The first validation target is Windows 11 x64 with Docker Desktop's WSL 2 backend and Linux containers, running `start.sh` from Git Bash. That combination was verified with Docker Desktop 4.96.3, Engine 29.9.2, Compose v5.6.1, and Bash 5.3 for the pinned images and Compose features; the launcher itself is verified in P02.7. Bash inside a WSL distribution is an unverified candidate. Native PowerShell and `cmd.exe` do not run the shell script. Linux and macOS support must be claimed only after their launcher and runtime checks pass; macOS's default Bash 3.2 is below the floor.
+The first validation target is Windows 11 x64 with Docker Desktop's WSL 2 backend and Linux containers, running `start.sh` from Git Bash. That combination was verified with Docker Desktop 4.96.3, Engine 29.9.2, Compose v5.6.1, and Bash 5.3 for the pinned images and Compose features; the P02.6 launcher was exercised on that same combination, and P02.7 completes the idempotence, interruption and restart verification. Bash inside a WSL distribution is an unverified candidate. Native PowerShell and `cmd.exe` do not run the shell script. Linux and macOS support must be claimed only after their launcher and runtime checks pass; macOS's default Bash 3.2 is below the floor.
 
-Codex authentication is completed by the owner using supported mechanisms inside the dedicated runtime environment. Persist its state in a private runtime-only volume; never bake credentials into an image or mount the owner's entire home/development configuration. The planned `--login` command must document the supported interactive or device flow for the pinned version and handle refresh/expiry. See [official authentication guidance](https://learn.chatgpt.com/docs/auth) and [the integration specification](06-codex-integration.md).
+Codex authentication is completed by the owner using supported mechanisms inside the dedicated runtime environment. Persist its state in a private runtime-only volume; never bake credentials into an image or mount the owner's entire home/development configuration. The `--login` command runs the device-code flow for the pinned version in a one-off runtime container; it never reads or prints the stored credentials. Refresh and expiry handling beyond reporting the signed-in or signed-out state remains later work. See [official authentication guidance](https://learn.chatgpt.com/docs/auth) and [the integration specification](06-codex-integration.md).
 
 The launcher does not guarantee that a desktop/editor login transfers into Linux containers. Account entitlement, service availability, rate limits, and billing remain applicable. Ordinary CI checks use fixtures and do not require account credentials.
 
-**Required for the verified ChatGPT device-code flow:** enable device-code login in the account's security settings before `--login`; for a managed workspace, an administrator must allow that login method. The owner then completes the browser link/code displayed by the runtime. P02.6 must explain this setting when device authorization is disabled or denied, linking the official instructions without changing account settings itself. P02.7 must verify that this condition produces actionable guidance rather than repeated silent retries. The [current probe setup](../tools/runtime_probe/README.md#owner-account-setup-for-the-live-check) documents the manual command used successfully in P01.2. Other upstream sign-in methods have separate requirements; this is the prerequisite for the verified device-code path.
+**Required for the verified ChatGPT device-code flow:** enable device-code login in the account's security settings before `--login`; for a managed workspace, an administrator must allow that login method. The owner then completes the browser link/code displayed by the runtime. `./start.sh --login` and its help text explain this setting and link the official instructions without changing account settings. P02.7 must verify that this condition produces actionable guidance rather than repeated silent retries. The [current probe setup](../tools/runtime_probe/README.md#owner-account-setup-for-the-live-check) documents the manual command used successfully in P01.2. Other upstream sign-in methods have separate requirements; this is the prerequisite for the verified device-code path.
 
 ## 7. Data, secrets, and lifecycle
 
@@ -232,7 +245,9 @@ P00.3 pinned the container, host, and shell baseline ([ADR 0009](adr/0009-toolch
 
 The implementation must verify clean first start without host build toolchains; a second idempotent launch; invocation from another directory and paths with spaces; daemon unavailable; missing/incompatible Compose; busy port; first-build failure; missing/expired account access; runtime unavailable with saved-data inspection; interrupted startup; graceful stop; restart and image recreation with unchanged campaign/party/inventory/combat; migration failure without reset; independent restore; and absence of secrets, private saves, or development instructions in images and ordinary logs.
 
-Record the supported host/shell/engine/runtime matrix and measured cold/warm startup behavior. Do not claim container, shell, authentication, or recovery checks passed before an executable implementation exists. See FR-029, QA-28, and the linked roadmap tasks.
+Record the supported host/shell/engine/runtime matrix and measured cold/warm startup behavior. Do not claim container, shell, authentication, or recovery checks passed before an executable implementation exists.
+
+**P02.6 evidence (24 October 2026):** on Windows 11 with Docker Desktop 4.96.3 (Engine 29.9.2, Compose v5.6.1) and Git Bash 5.3.15, the launcher was run against real Docker for first start, repeated start, status, bounded logs, stop with volumes kept, restart reusing the database and password, busy port, invalid port, unreachable daemon, a missing secret with an existing database volume, and `--login` up to the displayed device-code prompt. Sixteen launcher unit tests (`tools/container_packaging/test_launcher.py`) cover file format, the tracked executable bit, forbidden host tools, volume safety, `.env` parsing, redaction, identity and secret handling, and a read-only `--check` from a path with spaces. Not verified: Linux or macOS hosts, a completed owner sign-in (human-only), gameplay readiness (503 until P14), Ctrl+C on an interactive Git Bash terminal, graceful-stop timing, image-recreation campaign preservation and a measured cold build (P02.7). See FR-029, QA-28, and the linked roadmap tasks.
 
 ## 9. Implementation references
 

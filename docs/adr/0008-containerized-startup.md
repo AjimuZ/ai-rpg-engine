@@ -32,5 +32,4 @@ shares read-only socket IPC, never runtime account state. Account-free HTTP,
 database/secret access, IPC handshake and neutral persistence across recreation
 of all three services are verified. Content/assets directories are reserved
 engine-only storage; no pack registration or generated assets exist yet.
-This implements the existing direction without changing it. The launcher,
-account/gameplay readiness, campaign recovery and full QA-28 remain later gates.
+This implements the existing direction without changing it. The root `start.sh` launcher (P02.6) adds prerequisite checks, one-time secret and `.env` creation, cached builds, health-based startup, owner-run sign-in, status/log/stop commands and nonzero failure results; restart, interrupt and recovery evidence is P02.7. Account/gameplay readiness, campaign recovery and full QA-28 remain later gates.

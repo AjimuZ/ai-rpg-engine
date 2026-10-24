@@ -6,7 +6,7 @@
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
-**Setup prerequisite (23 October 2026):** the owner-authenticated P01.2 check used ChatGPT device-code login. Users of this container login flow must first enable device-code login in their account's security settings, or obtain managed-workspace administrator permission. P02.6 must surface this prerequisite and the supported instructions when authorization is unavailable; it must not assume a desktop sign-in initializes the isolated runtime. P02.7 verifies the guidance/error path. See [runtime account setup](../tools/runtime_probe/README.md#owner-account-setup-for-the-live-check). This documents the required account setting for this login method, not an implemented launcher.
+**Setup prerequisite (23 October 2026):** the owner-authenticated P01.2 check used ChatGPT device-code login. Users of this container login flow must first enable device-code login in their account's security settings, or obtain managed-workspace administrator permission. P02.6 must surface this prerequisite and the supported instructions when authorization is unavailable; it must not assume a desktop sign-in initializes the isolated runtime. P02.7 verifies the guidance/error path. See [runtime account setup](../tools/runtime_probe/README.md#owner-account-setup-for-the-live-check). This documents the required account setting for this login method; the P02.6 launcher surfaces it in `--login` and `--help` without changing account settings.
 
 Repository preparation recorded on 22 October 2026 includes the private GitHub repository, root MIT license, attribution, ignore rules, text line-ending policy, and contribution guidance. The development workflow requires immediate roadmap and affected-documentation updates after every work item, truthful completion evidence, and neutral commit messages. The owner's checkout also has verified local Git gates; lifecycle-hook activation requires review in the relevant client. These local checks are not distributed in a clone and do not replace P02.4 continuous integration.
 
@@ -64,7 +64,7 @@ Evidence: registry digests resolved with `docker buildx imagetools inspect`; Ado
 - **Results:** host checks confirmed the served Angular index, Java 21.0.12.1, PostgreSQL 18.6 with a Flyway migration, health `UP`, an unpublished database, and no external route from the data network. Startup took 32 s to healthy on the first run and 8 s on the unchanged second run.
 - **Findings recorded as rules:** MSYS path rewriting, `docker compose port` printing `:0` with exit status 0, Docker Desktop presenting secret files as `0777`, and an npm install-script warning for P02.2.
 
-The probe stack, image, and scratch files were removed. No volume was created. No WSL user distribution is installed, so the WSL shell candidate is not verified. Launcher behavior remains P02.6–P02.7 work.
+The probe stack, image, and scratch files were removed. No volume was created. No WSL user distribution is installed, so the WSL shell candidate is not verified. Launcher behavior was added in P02.6 and is verified further in P02.7.
 
 **Progress (23 October 2026):** P00.4 is complete. [ADR 0006](adr/0006-original-combat.md) is accepted: AI RPG Skirmish is the implementable default ruleset. A review of the combat, gameplay, encounter, and worked-scenario documents found every formula and value needed for the first implementation. The worked fight's derived values match the formulas: Health 24, Focus 10, Guard 12, threat capacity 8, level-2 maxima 26 and 11, and 16 seconds of world time. The new [provisional numerical defaults register](11-combat-system.md#17-provisional-numerical-defaults) separates two things:
 
@@ -378,7 +378,28 @@ content/assets and full container integration remain open; P02.3 stays unchecked
   packaged-UI tests skipped by design); live unreachable-database startup prints the description.
   Not run: the Docker packaging suite after relaxing its exact-body health assertion (syntax-checked
   only), a live wrong-password run, and hosted CI for this commit. Gameplay readiness itself stays P01/P14.
-- [ ] P02.6 Implement root `start.sh` with prerequisite checks, secure configuration initialization, cached builds, health-based startup, supported sign-in, status/log/stop commands, and nonzero failure results.
+- [x] P02.6 Implement root `start.sh` with prerequisite checks, secure configuration initialization, cached builds, health-based startup, supported sign-in, status/log/stop commands, and nonzero failure results.
+  Added the executable root `start.sh` (Bash 4.4 guard, mode 100755, LF): `./start.sh`, `--check`
+  (read-only), `--login`, `--status`, `--logs`, `--stop`, `--help`; exit 0 ok, 1 failure, 2 usage, 3 only
+  from `--status` (storage ready, gameplay not). Prerequisites cover host utilities, Docker CLI,
+  daemon, Linux containers, Engine/Compose/Buildx floors, application-port availability and a
+  stable `rpg-engine-<12 hex>` installation identity. A 64-hex database password is created once
+  from `/dev/urandom` (never regenerated, never printed; refused when the file is empty or when
+  the file is missing while the installation's database volume exists). Start builds with the layer
+  cache, then `up --wait` and polls `readiness` through `docker compose exec` (no host curl);
+  gameplay `UNKNOWN`/503 is reported honestly until P14. Logs are redacted; `--stop` uses
+  `down` without volume removal.
+  Verified on Windows 11, Docker Desktop 4.96.3 (Engine 29.9.2, Compose v5.6.1), Git Bash 5.3.15
+  with real Docker: first start, repeat start, status, logs, stop with volumes kept, restart reusing
+  the database and password, busy port, invalid port, unreachable daemon, missing secret with an
+  existing volume, and `--login` reaching the device-code prompt (interrupt restores the runtime
+  and removes the one-off container). `python -B -m unittest discover -s tools/container_packaging`
+  passes (21 tests, 1 skipped by design: the opt-in `PACKAGING_DOCKER=1` recreation check) and
+  `python -B tools/repository_checks/checks.py all` reports 0 findings.
+  Not verified: Linux and macOS hosts; native Linux secret-file ownership/permissions (NTFS ignores
+  the chmod modes); a completed owner sign-in (human-only, never automated); gameplay readiness
+  (P14); Ctrl+C on a real Git Bash terminal, graceful-stop timing and image-recreation campaign
+  preservation (P02.7); fresh-image build duration; hosted CI for this commit.
 - [ ] P02.7 Verify idempotent launch, supported Windows shell behavior, interruption, graceful stop, and campaign preservation across restart/image recreation; record QA-28 evidence.
 
 **Exit:** clean clone builds and runs shells/database with documented commands; no private data tracked. **Checks:** frontend build/default test, backend health test, database connectivity, docs links, ignore/secret checks. **Suggested commit:** `Establish the Angular and Spring Boot workspace`.

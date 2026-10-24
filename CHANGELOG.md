@@ -2,6 +2,13 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Root launcher (P02.6), 24 October 2026
+
+- Add the root `start.sh` (Bash 4.4+, mode 100755): prerequisite checks against the documented Docker floors, one-time `.env` and random database-secret creation, cached builds, health-based startup, and `--check`, `--status`, `--logs`, `--stop` and `--login` commands with nonzero exit codes on failure.
+- Never regenerate or print the database secret, refuse to start when it is missing while the installation's database volume exists, redact credential-like values from logs, and stop without removing volumes.
+- `--login` only runs the supported device-code flow in an isolated one-off container for the owner; it never reads credential files or enables paid fallback. Gameplay readiness stays unclaimed.
+- Add 16 launcher tests. Manual Docker Desktop checks covered first start, repeat start, restart with data kept, busy port and unreachable daemon; Linux/macOS hosts, completed sign-in, interrupt timing and hosted CI for this commit are not verified.
+
 ## Unreleased — Hosted CI verification (P02.4), 24 October 2026
 
 - Confirm [hosted run 40028086153](https://github.com/AjimuZ/ai-rpg-engine/actions/runs/40028086153) on commit `09a6311d9557be01f2fee9abeb119206f0b02e34`: all four repository, frontend, backend and container jobs completed successfully. Record its exact source revision and completion time, complete P02.4 and remove the stale manual-confirmation blocker.
