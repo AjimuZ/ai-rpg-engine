@@ -2,6 +2,13 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Canonical foundations (P03.1), 24 October 2026
+
+- Add Spring Data JPA and the first Flyway migration with ten tables for owner profile, adventure workspaces, content revisions, campaigns, presentation settings, actors, the operation journal, campaign events, reward settlements and checkpoints; Hibernate validates the mapping at startup.
+- Enforce explicit ownership in PostgreSQL: campaigns pin a content revision of their own adventure, campaign-owned rows use composite campaign foreign keys, idempotency keys and reward sources are unique per campaign, and events, revisions, checkpoints and settlements are immutable.
+- Keep canonical counters on the campaign row and narrative locale, glossary and media generations in a separate presentation table; implement the docs/07 operation lifecycle and the en/it locale allowlist.
+- Add 21 backend tests against real PostgreSQL 18.6 and in memory. No service, API or UI uses the tables yet; version fields, bounds, atomic commit, random draws, leases and recovery remain P03.2–P03.6.
+
 ## Unreleased — Launcher lifecycle verification (P02.7), 24 October 2026
 
 - Add the opt-in `test_lifecycle.py` and a sanitized Windows report. On Windows 11 with Docker Desktop and Git Bash it verified repeated launch (containers and password unchanged), a 3.5 s graceful stop (exit codes 0, 0 and 143 for the engine), restart and image-recreation preservation of neutral database and content markers, and exit 130 after interrupts during build and startup.

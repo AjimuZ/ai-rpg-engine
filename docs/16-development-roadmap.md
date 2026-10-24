@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: P00, P01.1–P01.7 and P02.1–P02.7 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. The root launcher and its Windows lifecycle checks (P02.7) are verified for Docker Desktop with Git Bash only; Linux/macOS, interactive Ctrl+C, owner sign-in, campaign data (P03) and full QA-28 remain pending. P03.1 is the next task. Design specifications and predecessor milestones do not establish completed gameplay.
+**Current status: P00, P01.1–P01.7, P02.1–P02.7 and P03.1 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; P03.1 adds the canonical schema and domain foundations only, and gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. The root launcher and its Windows lifecycle checks (P02.7) are verified for Docker Desktop with Git Bash only; Linux/macOS, interactive Ctrl+C, owner sign-in, campaign persistence beyond the P03.1 foundations (P03.2–P03.6) and full QA-28 remain pending. P03.2 is the next task. Design specifications and predecessor milestones do not establish completed gameplay.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -438,7 +438,40 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 
 **Depends on:** P02. **Areas:** campaign/domain/persistence, migrations.
 
-- [ ] P03.1 Implement adventure-workspace, campaign, actor, content revision, operation, event, reward source and checkpoint foundations with explicit adventure/campaign ownership; keep UI/narrative locale preferences and presentation generations distinct from canonical counters.
+- [x] P03.1 Implement adventure-workspace, campaign, actor, content revision, operation, event, reward source and checkpoint foundations with explicit adventure/campaign ownership; keep UI/narrative locale preferences and presentation generations distinct from canonical counters.
+  Added Spring Data JPA and the Flyway migration
+  `backend/src/main/resources/db/migration/V1__canonical_foundations.sql` (Hibernate validates it
+  with `ddl-auto=validate`; `open-in-view=false`). It creates ten tables: `identity_owner_profile`
+  (UI locale), `adventure_workspace`, `content_revision`, `campaign`,
+  `presentation_campaign_settings`, `actor`, `operation_journal`, `campaign_event`,
+  `reward_settlement` and `campaign_checkpoint`. Domain classes live in the `adventure`,
+  `campaign`, `characters`, `commands`, `content`, `identity`, `memory`, `persistence`,
+  `presentation` and `progression` packages. Decisions:
+  - Ownership is explicit: a content revision belongs to one adventure, a campaign pins a revision
+    of its own adventure through the composite key `(adventure_id, content_revision_id)`, and
+    actors, operations, events, reward settlements and checkpoints carry `campaign_id` with
+    composite `(campaign_id, id)` foreign keys, so PostgreSQL rejects cross-adventure and
+    cross-campaign references. All foreign keys are `ON DELETE RESTRICT`.
+  - The canonical counters (state revision, game turn, world time, event sequence) live only on
+    the campaign row. Narrative locale, locale revision, glossary revision and media configuration
+    generation live in `presentation_campaign_settings`; the UI locale lives on the owner profile.
+    `SupportedLocale` holds the en/it allowlist with a visible English fallback.
+  - The operation journal implements the docs/07 lifecycle table; `COMMITTED` is reachable only
+    through `recordCommit`, and the operation version is the row's own counter. Idempotency keys
+    are unique per campaign; reward settlements are unique per `(campaign, source, recipient)`.
+  - A `reject_mutation()` trigger makes events, content revisions, checkpoints and reward
+    settlements immutable; events also cannot be deleted.
+  Verification (24 October 2026): `./mvnw -B -ntp verify` ran in the Java 21 build image against a
+  disposable tmpfs `postgres:18.6` container: BUILD SUCCESS, 34 tests, 0 failures, 3 skipped (the
+  pre-existing opt-in packaged-interface tests). The 21 new tests cover the persisted graph round
+  trip, cross-adventure and cross-campaign foreign keys, idempotency scoping, per-campaign
+  uniqueness, immutability triggers, database checks, unchanged campaign rows after presentation
+  changes, the lifecycle table, locale negotiation and value validation. `tools/repository_checks`
+  (22 tests) and `tools/container_packaging` (22 tests, 2 skipped by design) pass; repository
+  checks report 0 findings. Limits: no service, API or UI uses these tables yet; optimistic
+  `@Version` fields, resource/ownership bounds and systematic cross-campaign tests remain P03.2,
+  atomic commit and outbox P03.3, random draws P03.4, leases/restore/journal reconciliation P03.5,
+  and narration jobs/planning snapshots P03.6. Hosted CI for this commit is unconfirmed.
 - [ ] P03.2 Add campaign-scoped foreign keys and unique constraints, resource and ownership bounds, and explicit version fields.
 - [ ] P03.3 Commit state, events, receipts, and outbox messages together; no network waits in transactions.
 - [ ] P03.4 Add deterministic random-draw records and algorithm/version identity.

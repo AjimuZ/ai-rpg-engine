@@ -36,10 +36,13 @@ From `backend/`, with those variables set:
 ```
 
 `verify` starts an ephemeral HTTP server and checks minimal health, hidden diagnostic
-endpoints, PostgreSQL major version, Flyway validation, and absence of gameplay
-schema/data. A missing database fails tests; nothing silently skips or uses H2.
-Use a new disposable database: the test rejects existing public gameplay tables.
-Flyway may create its history table, but there are no versioned migrations until P03.
+endpoints, PostgreSQL major version, Flyway validation, and the canonical schema.
+A missing database fails tests; nothing silently skips or uses H2. Use a new
+disposable database: the test requires exactly the ten tables created by
+`src/main/resources/db/migration/V1__canonical_foundations.sql` (P03.1), with no
+rows, and Hibernate validates the entities against them (`ddl-auto=validate`).
+The persistence tests truncate these tables before and after each test, so never
+point `verify` at a database whose data you want to keep.
 The executable jar is `target/engine-0.1.0.jar`; it can also run with `java -jar`.
 
 ## Packaged runtime configuration (P02.3)

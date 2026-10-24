@@ -11,7 +11,7 @@ rules as images and memory.
 
 ## 1. Meaning and status
 
-The owner requires personalized adventures in parallel, each with its own specifications, content and media folders. An **adventure workspace** is not a quick-save slot. It owns an authored world/configuration and can contain multiple **campaigns** (playthroughs); each campaign can have checkpoints/backups. A reusable imported **pack** is a versioned content source, not the active adventure or a saved campaign. This is a proposed contract, not delivered storage/UI code.
+The owner requires personalized adventures in parallel, each with its own specifications, content and media folders. An **adventure workspace** is not a quick-save slot. It owns an authored world/configuration and can contain multiple **campaigns** (playthroughs); each campaign can have checkpoints/backups. A reusable imported **pack** is a versioned content source, not the active adventure or a saved campaign. P03.1 delivers the storage foundation only: `adventure_workspace`, adventure-owned `content_revision`, `campaign` rows pinned to a revision of the same adventure, and `campaign_checkpoint` rows. Managed folders, the library UI, backups and workspace commands are not delivered.
 
 The library's primary cards represent adventures. “New adventure” creates a workspace; “New playthrough” creates a campaign inside it; “Continue” resumes its selected campaign. Installed reusable packs are managed separately. Switching adventures never clones, resets or merges state.
 

@@ -2,7 +2,9 @@
 
 ## 1. Status and supported release
 
-Accepted design requirement, not implemented translation resources. English is
+Accepted design requirement, not implemented translation resources. P03.1 stores
+the owner's UI locale, each campaign's narrative locale and the locale, glossary
+and media generations outside the canonical counters. English is
 the default; English and Italian are both required for the first playable MVP
 and v1. UI, errors, help, combat, inventory, quests, narration and accessibility
 must work in both. No additional languages are required now. This supersedes the
@@ -145,7 +147,8 @@ falls back to Italian subtitles/text, never an English voice reading Italian.
 
 ## 6. Acceptance and ownership
 
-P03 persists preferences and generations; P04.6 validates overlays; P05.6 owns
+P03.1 persists preferences and generations (`identity_owner_profile.ui_locale`,
+`presentation_campaign_settings`); P04.6 validates overlays; P05.6 owns
 UI resources, locale serving/reload and bilingual forms; P08.2/P08.4 enforce
 per-task language/routing; P09 preserves multilingual provenance. P14 runs both
 genres in both languages. P17 speech is optional. The editor remains later

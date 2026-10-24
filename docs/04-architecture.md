@@ -47,8 +47,11 @@ Do not select library versions merely by copying an old README or resolving “l
 
 P02.2 provides neutral `frontend/` and `backend/` development shells with the pinned
 toolchains and no adventure constants. The backend has JDBC/Flyway wiring and minimal
-status-only health; canonical migrations, feature modules, runtime integration,
-packaged assets, and full readiness contracts remain later tasks. See the
+status-only health; runtime integration, packaged assets and full readiness
+contracts were later P02 tasks. P03.1 adds Spring Data JPA, the first Flyway
+migration and the canonical foundation entities in the `identity`, `adventure`,
+`content`, `campaign`, `commands`, `characters`, `progression`, `memory`,
+`presentation` and `persistence` packages; no application services use them yet. See the
 [frontend](../frontend/README.md) and [backend](../backend/README.md) build/test commands.
 
 ## 3. Backend modules
@@ -56,6 +59,7 @@ packaged assets, and full readiness contracts remain later tasks. See the
 | Module | Responsibility | Main dependencies |
 | --- | --- | --- |
 | `identity` | Local owner identity and administrative privileges | Configuration and storage |
+| `adventure` | Adventure workspaces that own content revisions and campaigns ([docs/25](25-adventure-workspaces.md)) | Identity, persistence |
 | `content` | Parse, validate, compile, register, and version packs | Rules catalog, asset registry |
 | `campaign` | Campaign creation, activation, state revision, lifecycle | Content, persistence |
 | `commands` | Command taxonomy, idempotency, leases, operation state machine | Campaign, rules, orchestration |
@@ -73,6 +77,7 @@ packaged assets, and full readiness contracts remain later tasks. See the
 | `codex` | Runtime transport/lifecycle, protocol framing, events, cancellation | Private IPC or local process API according to deployment profile; no domain repositories |
 | `presentation` | Narrative records, scene references, safe media cues | Committed events and projections |
 | `operations` | Backups, imports/exports, diagnostics, recovery | All modules through administrative services |
+| `persistence` | Shared entity base, engine-assigned identifiers and canonical value checks | JPA only; no domain rules |
 
 These are logical packages initially, not separate Maven artifacts or services. Split further only when actual complexity warrants it.
 

@@ -60,7 +60,9 @@ Definition entities are immutable per revision. Campaign instances may extend th
 
 ## 3. Database organization
 
-Proposed table families: `content_*`, `campaign_*`, `actor_*`, `inventory_*`, `quest_*`, `world_*`, `knowledge_*`, `combat_*`, `memory_*`, `ai_*`, `operation_*`, and `presentation_*`. Use explicit foreign keys and campaign-scoped unique constraints. No table names or SQL migrations are implemented in this phase.
+Proposed table families: `content_*`, `campaign_*`, `actor_*`, `inventory_*`, `quest_*`, `world_*`, `knowledge_*`, `combat_*`, `memory_*`, `ai_*`, `operation_*`, and `presentation_*`. Use explicit foreign keys and campaign-scoped unique constraints.
+
+P03.1 implements the first migration, `V1__canonical_foundations.sql`, with ten foundation tables: `identity_owner_profile`, `adventure_workspace`, `content_revision`, `campaign`, `presentation_campaign_settings`, `actor`, `operation_journal`, `campaign_event`, `reward_settlement` and `campaign_checkpoint`. Campaign-owned rows reference their campaign through composite `(campaign_id, id)` foreign keys, and a campaign pins a content revision of its own adventure, so cross-campaign and cross-adventure references fail in PostgreSQL. The canonical counters of section 1 live only on the campaign row; locale and presentation generations live in `presentation_campaign_settings`. Events, content revisions, checkpoints and reward settlements are immutable rows. The other table families above, version fields, resource bounds and the atomic commit/outbox path remain P03.2–P03.6 and later work.
 
 Core state is relational. Immutable compiled content and event payloads may use JSONB with an explicit schema version. Store large media on disk under managed identifiers, keeping metadata and hashes in PostgreSQL. Do not store arbitrary user-supplied paths as trusted URLs.
 
