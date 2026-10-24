@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 224">
+  <!-- Original public preview portrait: static vector shapes, no scripts or external resources. -->
+  <rect width="192" height="224" fill="#263e3e"/>
+  <path d="M13 224v-33q7-48 83-48t83 48v33" fill="#647c64"/>
+  <path d="M76 135h40v36l-20 17-20-17" fill="#bc8767"/>
+  <path d="M45 94q-4-65 51-65t51 65l-8 44H53" fill="#373334"/>
+  <ellipse cx="96" cy="101" rx="40" ry="53" fill="#d5a17c"/>
+  <path d="M52 87q0-65 45-56 47 0 47 57-37-12-58-37-6 25-34 36" fill="#45403b"/>
+  <path d="M69 99h12m30 0h12" stroke="#373334" stroke-width="5" stroke-linecap="round"/>
+  <path d="M84 130q12 8 24 0" fill="none" stroke="#754c43" stroke-width="3"/>
+  <path d="M76 165l20 23-22 21-21-49m63 5-20 23 22 21 21-49" fill="#3f5954"/>
+</svg>

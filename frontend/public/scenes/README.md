@@ -9,5 +9,6 @@ They contain no baked labels, scripts or external references.
 These are local illustrative environments for the Mosslight Trail and Silent
 Relay shells, not imported pack media or authoritative location maps. Accessible
 descriptions remain live in the story component. The complete control/icon/frame,
-portrait and item graphic kit and its QA-30 review remain P05.5; this inventory
+and item graphic kit and its QA-30 review remain P05.5; separate sample
+[portraits](../portraits/README.md) arrive in P05.3. This inventory
 does not claim that work is complete.

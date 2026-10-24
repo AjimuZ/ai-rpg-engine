@@ -20,6 +20,12 @@ demonstrates composition only; do not slice its baked-in labels into production 
 
 ## 2. Development-time UI asset kit
 
+P05.3 adds two original static [vector portraits](../frontend/public/portraits/README.md)
+under MIT with editable sources and no third-party inputs. Scoped public IDs bind
+them to live character labels; absent/failed images retain a neutral initial and
+text attribution. Text-focused mode omits scene and portrait images entirely.
+These sample assets do not establish the complete P05.5 kit or P17 persistence.
+
 P04.5 includes original MIT-licensed 48×32 woodland/station PNG schematics in the
 [neutral import fixtures](../backend/src/test/resources/packs/README.md), with
 per-pack license and credit inventories. Integration checks preserve their exact

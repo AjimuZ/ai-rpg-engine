@@ -2,6 +2,20 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Responsive reading layouts (P05.3), 24 October 2026
+
+- Add a tab-lifetime text-focused reading preference alongside the default visual
+  novel; omit artwork in text mode while retaining public scene descriptions.
+- Resolve original vector portraits from scoped public speaker identities with
+  live labels and missing-image fallbacks; record editable sources and MIT terms.
+- Attribute revealed chronicle entries and keep keyboard focus in the dialogue
+  when Continue reaches the end of supplied text. Reading remains local-only.
+- Pass strict typecheck, 18 frontend tests, production build, zero-vulnerability
+  audit, 22 repository tests and Chrome desktop/mobile keyboard/focus smoke,
+  including 320px/landscape no-artwork reading at 24px and reduced motion.
+  Visually review three screenshots. Persistent drafts, playable input,
+  localization, the complete graphic kit and assistive-technology review remain.
+
 ## Unreleased — Content-bound interface metadata (P05.2), 24 October 2026
 
 - Bind navigation, headings, character-name terminology and attribute/resource

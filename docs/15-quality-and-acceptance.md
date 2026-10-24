@@ -257,6 +257,17 @@ were visually reviewed. All 22 repository tests and docs/secrets/workflows/image
 scans pass. This verifies a typed local public projection contract, not registered
 pack/campaign APIs, authored-pack module execution or full QA-29/30/33/35.
 
+P05.3 passes 18 frontend tests, strict typecheck/build, zero-vulnerability audit
+and 22 repository tests. Chrome 155 exercises Enter and Space on Continue and
+Chronicle, visible focus and Tab after the final advancement, public portrait
+identity/failure, scene failure, and navigation-preserved reading/layout choices.
+Default desktop/mobile and text-mobile screenshots were visually reviewed.
+No-artwork text mode passes 320px and landscape layouts at 24px with reduced
+motion; no scene/portrait requests are initiated by that story view. No page
+exceptions, nonlocal requests or action requests occur. This covers the local
+reading portion of QA-29; playable drafts/suggestions, reconnect deduplication,
+assistive-technology review and full QA-29/30/33/35 remain later gates.
+
 Combat-chat acceptance for P11/P12 also includes a real-browser English/Italian
 path with visible speaker/recipient, editable suggestions and explicit Send;
 desktop/mobile keyboard access to both chat and tactics; draft preservation while

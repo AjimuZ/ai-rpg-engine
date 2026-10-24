@@ -13,6 +13,77 @@ async function open(url: string) {
 }
 
 describe('Preview screens', /** Register user-facing route checks; assertions fail normally. */ () => {
+  it('switches layouts without losing reading position and omits all artwork in text mode', /** Preference changes affect rendering only and reject unsupported selections. */ async () => {
+    const harness = await open('/adventures/mosslight/story');
+    let root = harness.routeNativeElement!;
+    expect(root.querySelector('.story.text-focused')).toBeNull();
+    root.querySelector<HTMLButtonElement>('.reading-controls button')!.click();
+    await harness.fixture.whenStable();
+    expect(root.querySelector('.portrait')).toBeTruthy();
+    await harness.navigateByUrl('/settings');
+    const select = harness.routeNativeElement!.querySelector<HTMLSelectElement>('#reading-layout')!;
+    select.value = 'text-focused';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await harness.fixture.whenStable();
+    TestBed.inject(PreviewState).setReadingLayout('unsupported');
+    await harness.navigateByUrl('/adventures/mosslight/story');
+    root = harness.routeNativeElement!;
+    expect(root.querySelector('.story.text-focused')).toBeTruthy();
+    expect(root.querySelector('img')).toBeNull();
+    expect(root.querySelector('.scene-description')?.textContent).toContain('winding trail');
+    expect(root.querySelector('.speaker')?.textContent).toContain('Trail keeper');
+    expect(root.querySelectorAll('.chronicle li')).toHaveLength(2);
+    TestBed.inject(PreviewState).setReadingLayout('visual-novel');
+    await harness.fixture.whenStable();
+    expect(root.querySelector('.portrait')).toBeTruthy();
+  });
+
+  it('keeps attribution after portrait failure and replaces scoped identities', /** Missing media cannot hide text or leak another adventure's speaker. */ async () => {
+    const harness = await open('/adventures/mosslight/story');
+    const root = harness.routeNativeElement!;
+    root.querySelector<HTMLButtonElement>('.reading-controls button')!.click();
+    await harness.fixture.whenStable();
+    expect(root.querySelector('.portrait')?.getAttribute('src')).toBe('/portraits/keeper.svg');
+    root.querySelector('.portrait')!.dispatchEvent(new Event('error'));
+    await harness.fixture.whenStable();
+    expect(root.querySelector('.portrait-fallback')).toBeTruthy();
+    expect(root.querySelector('.speaker')?.textContent).toContain('Trail keeper');
+    await harness.navigateByUrl('/adventures/relay/story');
+    expect(root.querySelector('.portrait')).toBeNull();
+    root.querySelector<HTMLButtonElement>('.reading-controls button')!.click();
+    await harness.fixture.whenStable();
+    expect(root.querySelector('.portrait')?.getAttribute('src')).toBe('/portraits/attendant.svg');
+    expect(root.querySelector('.speaker')?.textContent).not.toContain('Trail keeper');
+  });
+
+  it('handles absent portraits, unknown labels and empty supplied passages', /** Public labels are literal and no fallback invents player words or negative positions. */ async () => {
+    const harness = await open('/library');
+    const state = TestBed.inject(PreviewState);
+    const original = state.find('mosslight')!;
+    const find = vi.spyOn(state, 'find').mockReturnValue({ ...original, speakers: {}, passages: [
+      { speaker: 'character', speakerId: 'unknown', name: ' ', text: '<b>Public words</b>' },
+      { speaker: 'player', name: 'Ignored label', text: 'Explicit submitted words.' },
+    ] });
+    await harness.navigateByUrl('/adventures/mosslight/story');
+    const root = harness.routeNativeElement!;
+    expect(root.querySelector('.speaker')?.textContent).toContain('Unknown character');
+    expect(root.querySelector('.portrait-fallback')).toBeTruthy();
+    expect(root.querySelector('.passage b')).toBeNull();
+    expect(root.querySelector('.chronicle')?.textContent).not.toContain('Explicit submitted words.');
+    root.querySelector<HTMLButtonElement>('.reading-controls button')!.click();
+    await harness.fixture.whenStable();
+    expect(root.querySelector('.speaker')?.textContent).toContain('You');
+    expect(root.querySelector('.speaker')?.textContent).toContain('Player');
+    expect(root.querySelector('.portrait-frame')).toBeNull();
+    find.mockReturnValue({ ...original, passages: [] });
+    await harness.navigateByUrl('/library');
+    await harness.navigateByUrl('/adventures/relay/story');
+    state.advance('relay');
+    expect(state.position('relay')).toBe(0);
+    expect(harness.routeNativeElement!.textContent).toContain('No passages are available.');
+    expect(harness.routeNativeElement!.querySelector('.reading-controls')).toBeNull();
+  });
+
   it('keeps content with no optional modules or definitions usable', /** Empty public metadata must not invent resource meters or optional panels. */ async () => {
     const harness = await open('/library');
     const state = TestBed.inject(PreviewState);

@@ -7,6 +7,13 @@ export interface Passage {
   readonly speaker: 'narrator' | 'character' | 'player';
   readonly name: string;
   readonly text: string;
+  readonly speakerId?: string;
+}
+
+/** Public portrait identity within one preview; absent artwork leaves attribution usable. */
+export interface PublicSpeaker {
+  readonly name: string;
+  readonly portrait?: string;
 }
 
 /** Small fixture preview contract; IDs are local examples, never registered workspace IDs. */
@@ -18,6 +25,7 @@ export interface AdventurePreview {
   readonly sceneAlt: string;
   readonly location: string;
   readonly passages: readonly Passage[];
+  readonly speakers: Readonly<Record<string, PublicSpeaker>>;
   readonly content: ContentMetadata;
 }
 
@@ -28,8 +36,9 @@ const previews: readonly AdventurePreview[] = [
     scene: '/scenes/woodland.svg', sceneAlt: 'A winding trail crosses a quiet grove beneath layered green canopies.',
     location: 'Trailhead', passages: [
       { speaker: 'narrator', name: 'Narrator', text: 'The trail opens into a quiet grove. Pale light settles on the path ahead.' },
-      { speaker: 'character', name: 'Trail keeper', text: 'The path continues through the trees. What would you like to know?' },
+      { speaker: 'character', speakerId: 'keeper', name: 'Trail keeper', text: 'The path continues through the trees. What would you like to know?' },
     ],
+    speakers: { keeper: { name: 'Trail keeper', portrait: '/portraits/keeper.svg' } },
     content: {
       attributes: [{ id: 'awareness', name: 'Awareness' }],
       resources: [{ id: 'vigor', name: 'Vigor' }],
@@ -42,8 +51,9 @@ const previews: readonly AdventurePreview[] = [
     scene: '/scenes/station.svg', sceneAlt: 'A blue-lit station corridor leads from the docking ring toward a silent relay.',
     location: 'Dock', passages: [
       { speaker: 'narrator', name: 'Narrator', text: 'Beyond the docking ring, a line of blue lamps marks the station corridor.' },
-      { speaker: 'character', name: 'Dock attendant', text: 'The relay is quiet. Where would you like to begin your survey?' },
+      { speaker: 'character', speakerId: 'attendant', name: 'Dock attendant', text: 'The relay is quiet. Where would you like to begin your survey?' },
     ],
+    speakers: { attendant: { name: 'Dock attendant', portrait: '/portraits/attendant.svg' } },
     content: {
       terms: { sheet: 'Crew profile', inventory: 'Cargo', journal: 'Mission log', characterName: 'Specialist name',
         abilities: 'Techniques', equipment: 'Installed equipment', quests: 'Known assignments' },
@@ -61,6 +71,13 @@ export class PreviewState {
   private readonly positions = signal<Readonly<Record<string, number>>>({});
   private readonly size = signal(18);
   readonly textSize = this.size.asReadonly();
+  private readonly layout = signal<'visual-novel' | 'text-focused'>('visual-novel');
+  readonly readingLayout = this.layout.asReadonly();
+
+  /** Accept a supported layout string; unknown values leave the tab preference unchanged. */
+  setReadingLayout(value: string): void {
+    if (value === 'visual-novel' || value === 'text-focused') this.layout.set(value);
+  }
 
   /** Resolve a local preview ID, returning undefined for unknown identities. */
   find(id: string): AdventurePreview | undefined {
@@ -75,7 +92,7 @@ export class PreviewState {
   /** Reveal one already supplied passage; unknown IDs and the last passage are no-ops. */
   advance(id: string): void {
     const adventure = this.find(id);
-    if (!adventure) return;
+    if (!adventure || adventure.passages.length === 0) return;
     const next = Math.min(this.position(id) + 1, adventure.passages.length - 1);
     this.positions.update(/** Preserve every other preview's independent position. */ (current) => ({ ...current, [id]: next }));
   }

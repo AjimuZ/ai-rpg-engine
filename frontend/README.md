@@ -32,8 +32,23 @@ and attributed public sample passages. Continue reveals only supplied text;
 Chronicle shows already revealed passages. Reading positions remain independent
 per sample while the tab is open. Settings adjusts story text from 15–24 px;
 reload resets all preferences/positions. English-only resources, full localization,
-text-focused layout, portraits, persistent drafts, revision-aware input and the
-complete graphic kit remain P05.3–P05.7. No submitted player dialogue is fabricated.
+persistent drafts, revision-aware input and the complete graphic kit remain
+P05.4–P05.7. No submitted player dialogue is fabricated.
+
+P05.3 adds a Settings layout choice: default scene-led visual novel or a narrow
+text-focused column with a live scene description and no artwork requests.
+Original [speaker portraits](public/portraits/README.md) resolve by scoped public
+identity and retain live names/roles on failure. Chronicle lists revealed text
+with attribution; text-size preferences apply to both current text and history.
+Native keyboard controls keep visible focus, transferring it to the dialogue
+when the last available passage disables Continue. No global shortcuts or motion
+are used. Acceptance passes all 18 frontend tests, typecheck, production build
+(325.63 kB), and audit (zero vulnerabilities). Chrome 155 checks Enter/Space,
+final-passage focus/Tab, portrait/scene failures, text mode without artwork loads,
+24px text at 320px and landscape sizes, and reduced-motion operation. Desktop,
+mobile and text-mobile screenshots were visually reviewed. All 22 repository
+tests pass. This is local reading acceptance; full QA-29 input/reconnect behavior
+and an assistive-technology audit remain pending.
 Use Node.js 24.22.1 and npm 11.19.1 from [ADR 0009](../docs/adr/0009-toolchain-baseline.md).
 
 From `frontend/`:

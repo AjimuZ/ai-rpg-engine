@@ -78,7 +78,19 @@ main { max-width: 78rem; margin: auto; padding: 1.25rem; }
 .scene img { display: block; width: 100%; height: clamp(18rem, 53vh, 42rem); object-fit: cover; }
 .scene figcaption { position: absolute; bottom: .65rem; right: .75rem; background: #141522ec; color: var(--muted); padding: .2rem .6rem; font-size: .8rem; }
 .scene-fallback { min-height: 18rem; padding: 2rem; }
-.dialogue { padding: 1rem clamp(1rem, 3vw, 2rem); background: var(--raised); border: 1px solid var(--line); border-top: 2px solid var(--accent); }
+.dialogue { display: flex; align-items: flex-start; gap: 1rem; padding: 1rem clamp(1rem, 3vw, 2rem); background: var(--raised); border: 1px solid var(--line); border-top: 2px solid var(--accent); }
+.dialogue-text { min-width: 0; flex: 1; }
+/* Portrait geometry stays separate from live attribution; a failed image keeps the same footprint. */
+.portrait-frame { flex: 0 0 auto; width: clamp(3rem, 9vw, 6rem); aspect-ratio: 6 / 7; border: 1px solid var(--accent); border-radius: .3rem; overflow: hidden; }
+.portrait { display: block; width: 100%; height: 100%; object-fit: cover; }
+.portrait-fallback { display: grid; place-items: center; height: 100%; font-size: 2rem; color: var(--muted); }
+/* Text mode removes artwork from the DOM and keeps a single, comfortably sized reading column. */
+.text-focused { max-width: 48rem; margin-inline: auto; }
+.scene-description { color: var(--muted); }
+.text-focused .dialogue { border-radius: .4rem; }
+.chronicle ol { padding-left: 1.75rem; }
+.chronicle li { padding-left: .25rem; }
+.chronicle p { font-family: Georgia, serif; font-size: var(--reading-size, 18px); line-height: 1.65; }
 .speaker { color: var(--accent); font-weight: 650; margin: 0; }
 .speaker span { margin-left: .75rem; font-size: .85rem; font-weight: 400; }
 .passage { font-family: Georgia, serif; font-size: var(--reading-size, 18px); line-height: 1.65; margin: .5rem 0; min-height: 3.3em; }

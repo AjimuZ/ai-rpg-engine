@@ -9,11 +9,15 @@ import { PreviewState } from './preview-state';
     <label for="text-size">Story text size</label>
     <select id="text-size" [value]="state.textSize()" (change)="changeSize($event)">
       @for (size of sizes; track size) { <option [value]="size">{{ size }} px</option> }
+    </select>
+    <label for="reading-layout">Story layout</label>
+    <select id="reading-layout" [value]="state.readingLayout()" (change)="changeLayout($event)">
+      <option value="visual-novel">Visual novel</option><option value="text-focused">Text focused (no artwork)</option>
     </select><p>Reading preferences last for this tab session. Reload restores defaults.</p>
     <h2>Language</h2><p>English preview. Italian interface resources and persisted language selection are planned.</p>
     <h2>Sound and appearance</h2><p>No audio is loaded. Motion is disabled in this preview.</p>
     <h2>Runtime</h2><p>No campaign or narration service is connected.</p>
-    <h2>Credits</h2><p>Original woodland and station vector illustrations, distributed under the project MIT license. System fonts; no external media requests.</p>
+    <h2>Credits</h2><p>Original scene and speaker vector illustrations, distributed under the project MIT license. System fonts; no external media requests.</p>
     </section>`,
 })
 export class Settings {
@@ -23,5 +27,10 @@ export class Settings {
   /** Read a native select event; absent targets or invalid values leave settings unchanged. */
   changeSize(event: Event): void {
     if (event.target instanceof HTMLSelectElement) this.state.setTextSize(Number(event.target.value));
+  }
+
+  /** Apply a native layout selection; missing targets and unsupported values leave preferences unchanged. */
+  changeLayout(event: Event): void {
+    if (event.target instanceof HTMLSelectElement) this.state.setReadingLayout(event.target.value);
   }
 }

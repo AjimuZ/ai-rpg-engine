@@ -713,7 +713,19 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     requests; three screenshots were visually reviewed. Empty metadata and literal
     markup have regression coverage. Registered pack/campaign APIs remain P06;
     these definitions never imply current balances or enable pack module execution.
-- [ ] P05.3 Implement the default visual-novel and alternative text-focused responsive layouts, local passage advancement, chronicle, speaker portraits and keyboard/focus support.
+- [x] P05.3 Implement the default visual-novel and alternative text-focused responsive layouts, local passage advancement, chronicle, speaker portraits and keyboard/focus support.
+  - Settings selects scene-led or no-artwork reading without changing local passage
+    positions; scoped public speaker IDs resolve original MIT vector portraits.
+    Missing portraits/scenes retain public text, and the attributed ordered chronicle
+    contains only revealed passages. Native Enter/Space controls, visible focus and
+    final-passage focus transfer pass Chrome 155 browser checks on both previews.
+    Desktop/mobile screenshots were visually reviewed; text mode also passes 320px
+    and landscape layouts at 24px with reduced motion and no story artwork requests.
+    Strict typecheck, all 18 frontend tests, production build, zero-vulnerability
+    audit and all 22 repository tests pass; docs/secrets/workflows/images scans
+    report zero findings. Full QA-29 input/reconnect behavior,
+    bilingual resources, the complete graphic kit and assistive-technology review
+    remain outside this local reading increment; no campaign actions are enabled.
 - [ ] P05.4 Define revision-aware projection state, persistent free-input drafts, editable contextual quick replies and connection/error states; choosing a suggestion must not submit or advance the world.
 - [ ] P05.5 Create or license and integrate the complete UI graphic kit, including buttons, bars, icons, frames and required interaction/fallback states; register sources, notices and generated-asset provenance.
 - [ ] P05.6 Deliver reviewed English-default/Italian UI variants, localized receipts/errors/accessibility, persisted language selection and draft/cursor-safe reload; extend single-origin packaging/resource checks under QA-35.

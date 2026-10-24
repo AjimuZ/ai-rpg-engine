@@ -99,6 +99,12 @@ async function clickLink(text, path) {
   await waitFor(`location.pathname === ${JSON.stringify(path)}`);
 }
 
+/** Dispatch native key events to the focused element; protocol errors reject the journey. */
+async function pressKey(key, code, virtualKey, text) {
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: virtualKey, ...(text ? { text } : {}) });
+  await command('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: virtualKey });
+}
+
 // Spawn failures should reject pending commands immediately instead of leaving a hanging harness.
 browser.on('error', /** Propagate executable/startup errors to every pending command. */ (error) => {
   for (const waiter of pending.values()) { clearTimeout(waiter.timer); waiter.reject(error); }
@@ -129,9 +135,18 @@ try {
   await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
   await waitFor(`document.querySelector('.speaker').textContent.includes('Trail keeper')`);
   assert.equal(await evaluate(`document.querySelector('.reading-controls button').disabled`), true);
-  await evaluate(`document.querySelector('summary').click()`);
+  assert.equal(await evaluate(`document.activeElement === document.querySelector('.dialogue')`), true);
+  await waitFor(`document.querySelector('.portrait')?.naturalWidth > 0`);
+  // Tab must skip the now-disabled Continue and reach the next reading control.
+  await pressKey('Tab', 'Tab', 9);
+  assert.equal(await evaluate(`document.activeElement === document.querySelector('summary')`), true);
+  assert.equal(await evaluate(`getComputedStyle(document.activeElement).outlineStyle !== 'none'`), true);
+  await pressKey(' ', 'Space', 32, ' ');
   assert.equal(await evaluate(`document.querySelector('details').open`), true);
-  await writeFile(resolve(artifacts, 'p052-desktop.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
+  await pressKey('Enter', 'Enter', 13, '\r');
+  assert.equal(await evaluate(`document.querySelector('details').open`), false);
+  await pressKey('Enter', 'Enter', 13, '\r');
+  await writeFile(resolve(artifacts, 'p053-desktop.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
   for (const [label, path] of [['Character', 'sheet'], ['Inventory', 'inventory'], ['Journal', 'journal'], ['New playthrough', 'create']]) {
     await clickLink(label, `/adventures/mosslight/${path}`);
     await waitFor(`!!document.querySelector('h1')`);
@@ -163,15 +178,49 @@ try {
   await waitFor(`document.querySelector('.scene img')?.naturalWidth > 0`);
   await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
-  await writeFile(resolve(artifacts, 'p052-mobile.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
+  await evaluate(`document.querySelector('.reading-controls button').focus()`);
+  await pressKey(' ', 'Space', 32, ' ');
+  await waitFor(`document.querySelector('.speaker').textContent.includes('Dock attendant')`);
+  await waitFor(`document.querySelector('.portrait')?.naturalWidth > 0`);
+  assert.equal(await evaluate(`document.activeElement === document.querySelector('.dialogue')`), true);
+  await writeFile(resolve(artifacts, 'p053-mobile.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
+  // A blocked media load preserves labels, passage and reading controls.
+  await evaluate(`document.querySelector('.portrait').dispatchEvent(new Event('error')); document.querySelector('.scene img').dispatchEvent(new Event('error'))`);
+  await waitFor(`!!document.querySelector('.portrait-fallback') && !!document.querySelector('.scene-fallback')`);
+  assert.equal(await evaluate(`document.querySelector('.speaker').textContent.includes('Dock attendant')`), true);
+  await clickLink('Settings', '/settings');
+  await evaluate(`(() => { const select = document.querySelector('#reading-layout'); select.value = 'text-focused'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
+  // The earlier full-page direct-route check intentionally reset tab-lifetime preferences.
+  await evaluate(`(() => { const select = document.querySelector('#text-size'); select.value = '24'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
+  await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+  await clickLink('Library', '/library');
+  await waitFor(`document.querySelector('h1')?.textContent === 'Your adventures'`);
+  const textRequestsStart = requests.length;
+  await evaluate(`document.querySelector('a[href="/adventures/relay/story"]').click()`);
+  await waitFor(`!!document.querySelector('.story.text-focused')`);
+  assert.equal(await evaluate(`document.querySelectorAll('.story img').length`), 0);
+  assert.equal(await evaluate(`document.querySelector('.speaker').textContent.includes('Dock attendant')`), true);
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.passage')).fontSize`), '24px');
+  assert.equal(await evaluate(`document.querySelector('.scene-description').textContent.includes('station corridor')`), true);
+  // Exercise the no-artwork reading column at a narrow 320px width and landscape.
+  for (const [width, height] of [[320, 740], [844, 390]]) {
+    await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+    assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+  }
+  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await evaluate(`document.querySelector('summary').focus()`);
+  await pressKey('Enter', 'Enter', 13, '\r');
+  await waitFor(`document.querySelector('details').open`);
+  assert.equal(await evaluate(`document.querySelectorAll('.chronicle li').length`), 2);
+  assert.equal(requests.slice(textRequestsStart).some(/** Text layout must not initiate scene or portrait loads. */ (request) => /\/(scenes|portraits)\/.*\.svg/.test(request.url)), false);
+  await writeFile(resolve(artifacts, 'p053-text-mobile.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
   await clickLink('Crew profile', '/adventures/relay/sheet');
   assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
-  await writeFile(resolve(artifacts, 'p052-metadata-mobile.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
   await command('Page.navigate', { url: origin + '/adventures/missing/story' });
   await waitFor(`document.querySelector('h1')?.textContent === 'Adventure unavailable'`);
   assert.deepEqual(exceptions, []);
   assert.equal(requests.some(/** Reject world/API writes or remote media requests during preview journeys. */ (request) => request.method !== 'GET' || !request.url.startsWith(origin + '/')), false);
-  console.log(`Browser smoke passed: ${version.product}; desktop/mobile navigation, metadata/resources, optional/disabled panels, reading, form, settings, unknown identity; no page exceptions or nonlocal/action requests.`);
+  console.log(`Browser smoke passed: ${version.product}; desktop/mobile and narrow/landscape text layouts, portraits/failures, Enter/Space reading and chronicle, final focus/Tab, reduced motion, metadata/panels, form/settings; no page exceptions or nonlocal/action requests.`);
 } finally {
   browser.kill();
   await new Promise(/** Release the loopback listener before completing; no background server survives. */ (accept) => server.close(accept));

@@ -17,6 +17,11 @@ The library's primary cards represent adventures. “New adventure” creates a 
 
 ## 2. Separate managed folders
 
+P05.3 scopes public portrait lookup to each local preview's speaker registry.
+Reading/layout changes do not merge positions; switching scenes replaces speaker
+artwork and clears asset-failure state. These tab-lifetime checks do not prove
+persisted workspace isolation or runtime media ownership.
+
 P05.1 adds a library shell with two local genre preview cards and a separate
 installed-packs section. Scoped URLs reject unknown preview identities; reading
 positions are independent in memory. These samples are not persisted workspaces

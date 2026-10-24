@@ -59,7 +59,9 @@ Continue reads supplied text only. These shells have no connected campaigns or
 world-action API. P05.2 binds terminology, attribute/resource names and optional
 guide/creative panels to typed local public metadata, with neutral fallbacks and
 scope-aware route checks. Registered pack/campaign binding remains P06; input,
-localization and graphics remain later P05 work.
+localization and the full graphic kit remain later P05 work. P05.3 adds default
+visual-novel and no-artwork text layouts, scoped speaker portraits, attributed
+chronicle and keyboard focus handling for the end of available passages.
 
 ## Planned capabilities
 

@@ -91,6 +91,17 @@ remains P06, catalog locale resolution and bilingual UI remain P05.6.
 
 ## 6. Interface direction
 
+P05.3 adds a Settings reading-layout choice: default visual novel or text focused,
+with no scene/portrait elements in text mode and a live scene description instead.
+The tab preference and reading positions survive local navigation, not reload.
+Portraits resolve from stable public speaker IDs scoped to each preview; failed
+or absent artwork keeps live speaker attribution and a neutral initial fallback.
+The ordered chronicle contains only revealed passages and explicit speaker roles.
+Native Continue and Chronicle controls support Enter/Space and visible focus;
+on the final advancement, focus moves to the dialogue before Continue disables.
+There are no global reading shortcuts to intercept input. No animation or audio
+is used. Persistent projections/drafts and real player submissions remain later work.
+
 Retain the first project's structured RPG panels and readable dark-theme option. Its obsidian, violet, gold, and cyan palette can become the default theme. It is not mandatory for all packs; support neutral and high-contrast profiles. Content terminology and visible panels derive from enabled modules.
 
 The **default play experience is a dynamic visual novel**: one dominant scene image, a readable dialogue area, and the player's persistent composer. On desktop the scene should occupy approximately the upper 60–70% of the story workspace when space permits; text size and actual content take precedence over a fixed ratio. Character portraits may overlay the scene without replacing it. Character sheet, inventory, map and journal open through compact navigation or dismissible panels, rather than permanently surrounding the story with dense columns. Combat can expose its dedicated tactical controls when needed. A text-focused alternative remains complete without artwork and is available as a reading/accessibility preference.
