@@ -201,7 +201,7 @@ try {
   assert.equal(await evaluate(`document.querySelector('.speaker').textContent.includes('Dock attendant')`), true);
   await clickLink('Settings', '/settings');
   await evaluate(`(() => { const select = document.querySelector('#reading-layout'); select.value = 'text-focused'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
-  // The earlier full-page direct-route check intentionally reset tab-lifetime preferences.
+  // Reading preferences survive full-page direct routes; reselecting an existing size is idempotent.
   await evaluate(`(() => { const select = document.querySelector('#text-size'); select.value = '24'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
   await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   await clickLink('Library', '/library');
@@ -230,6 +230,8 @@ try {
   // Hard reload verifies device persistence independently of the root service's in-memory cache.
   for (const mobile of [false, true]) {
     await command('Emulation.setDeviceMetricsOverride', { width: mobile ? 390 : 1440, height: mobile ? 844 : 1100, deviceScaleFactor: 1, mobile });
+    // Each independent draft journey begins at the first supplied passage, rather than relying on reload to reset reading.
+    await evaluate(`sessionStorage.removeItem('engine.preview-reading.v1')`);
     await command('Page.navigate', { url: origin + '/adventures/mosslight/story' });
     await waitFor(`!!document.querySelector('#player-input')`);
     await evaluate(`document.querySelector('.composer-actions button:last-child').click()`);
@@ -346,6 +348,7 @@ try {
       ['en', 'Settings', 'Application', 'Settings | Adventure engine'],
       ['it', 'Impostazioni', 'Applicazione', 'Impostazioni | Motore di avventure'],
     ]) {
+      await evaluate(`sessionStorage.clear(); localStorage.clear()`);
       await command('Page.navigate', { url: `${origin}/${locale}/settings` });
       await waitFor(`document.querySelector('h1')?.textContent === ${JSON.stringify(heading)}`);
       assert.equal(await evaluate('document.documentElement.lang'), locale);
@@ -453,10 +456,75 @@ try {
         assert.equal((await fetch(`${origin}/${locale}/${absent}`)).status, 404);
       }
     }
+    // Real full-document EN→IT→EN switches share origin storage but create fresh
+    // compiled projections. Authored text and numeric positions must stay literal.
+    await evaluate(`sessionStorage.clear(); localStorage.clear()`);
+    await command('Page.navigate', { url: `${origin}/en/adventures/relay/story` });
+    await waitFor(`document.querySelector('#player-input') !== null`);
+    await evaluate(`(/** Save an independent scope's draft; missing controls fail the journey. */ () => {
+      const field = document.querySelector('#player-input'); field.value = 'Relay draft';
+      field.setSelectionRange(1, 4); field.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`);
+    await command('Page.navigate', { url: `${origin}/en/adventures/mosslight/story` });
+    await waitFor(`document.querySelector('#player-input') !== null`);
+    await evaluate(`(/** Preserve literal text and nonterminal selection through both compiled variants. */ () => {
+      const field = document.querySelector('#player-input'); field.value = 'My <b>parole</b> 🌱';
+      field.setSelectionRange(3, 9); field.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector('.reading-controls button').click();
+    })()`);
+    await waitFor(`document.querySelector('.reading-controls button').disabled`);
+    await clickLink('Settings', '/en/settings');
+    await evaluate(`(/** Persist bounded reading preferences before changing the compiled UI language. */ () => {
+      for (const [id, value] of [['text-size', '23'], ['reading-layout', 'text-focused']]) {
+        const field = document.getElementById(id); field.value = value; field.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    })()`);
+    for (const [locale, next, label] of [['en', 'it', 'Impostazioni'], ['it', 'en', 'Settings']]) {
+      await evaluate(`document.querySelector('#ui-language').focus()`);
+      // Native select keyboard activation exercises the actual change event and full-page navigation.
+      await pressKey(next === 'it' ? 'ArrowDown' : 'ArrowUp', next === 'it' ? 'ArrowDown' : 'ArrowUp', next === 'it' ? 40 : 38);
+      await pressKey('Enter', 'Enter', 13, '\r');
+      await waitFor(`location.pathname === '/${next}/settings' && document.documentElement.lang === '${next}' && document.activeElement.id === 'ui-language'`);
+      assert.equal(await evaluate(`localStorage.getItem('engine.ui-locale.v1')`), next);
+      assert.equal(await evaluate(`document.querySelector('#ui-language').value`), next);
+      assert.equal(await evaluate(`document.querySelector('#text-size').value`), '23');
+      assert.equal(await evaluate(`document.querySelector('#reading-layout').value`), 'text-focused');
+      assert.equal(await evaluate(`getComputedStyle(document.activeElement).outlineStyle`), 'solid');
+      await evaluate(`document.querySelector('a.brand').click()`);
+      await waitFor(`location.pathname === '/${next}/library'`);
+      await evaluate(`document.querySelector('a[href="/${next}/adventures/mosslight/story"]').click()`);
+      await waitFor(`document.querySelector('#player-input')?.value === 'My <b>parole</b> 🌱'`);
+      assert.equal(await evaluate(`document.querySelector('.story.text-focused') !== null`), true);
+      assert.equal(await evaluate(`document.querySelector('.reading-controls button').disabled`), true);
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('.passage')).fontSize`), '23px');
+      await evaluate(`document.querySelector('#player-input').focus()`);
+      assert.deepEqual(await evaluate(`(/** Read exact UTF-16 draft offsets after language reload. */ () => {
+        const field = document.querySelector('#player-input'); return [field.selectionStart, field.selectionEnd];
+      })()`), [3, 9]);
+      assert.equal(await evaluate(`document.querySelector('[data-send]').disabled`), true);
+      await clickLink(label, `/${next}/settings`);
+    }
+    await command('Page.navigate', { url: `${origin}/en/adventures/relay/story` });
+    await waitFor(`document.querySelector('#player-input')?.value === 'Relay draft'`);
+    assert.equal(await evaluate(`document.querySelector('.reading-controls button').disabled`), false);
+    await clickLink('Settings', '/en/settings');
+    await evaluate(`localStorage.setItem('engine.ui-locale.v1', 'fr-FR')`);
+    await command('Page.reload');
+    await waitFor(`document.querySelector('#language-status')?.textContent.includes('Saved language is unsupported')`);
+    assert.equal(await evaluate(`document.querySelector('#ui-language').value`), 'en');
+    await evaluate(`(/** Simulate a denied storage policy without touching existing persisted drafts. */ () => {
+      window.restoreStorageWrite = Storage.prototype.setItem;
+      Storage.prototype.setItem = /** Reject every write like a denied browser storage policy; existing values remain intact. */ function () { throw new Error('Storage denied'); };
+      const field = document.querySelector('#ui-language'); field.value = 'it'; field.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await waitFor(`document.querySelector('#language-status')?.textContent.includes('Language could not be saved or reloaded')`);
+    assert.equal(await evaluate('location.pathname'), '/en/settings');
+    assert.equal(await evaluate(`document.querySelector('#ui-language').value`), 'en');
+    await evaluate(`Storage.prototype.setItem = window.restoreStorageWrite; delete window.restoreStorageWrite`);
   }
   assert.deepEqual(exceptions, []);
   assert.equal(requests.some(/** Reject world/API writes or remote media requests during preview journeys. */ (request) => request.method !== 'GET' || !request.url.startsWith(origin + '/')), false);
-  console.log(`Browser smoke passed: ${version.product}; responsive reading/drafts/recovery and graphic kit${reviewLocales ? ', EN/IT story/plurals/forms/receipts/fallbacks and resource hashes/404s' : ''}; no page exceptions or nonlocal/action requests.`);
+  console.log(`Browser smoke passed: ${version.product}; responsive reading/drafts/recovery and graphic kit${reviewLocales ? ', EN/IT story/plurals/forms/receipts/fallbacks, safe language reload/focus/storage and resource hashes/404s' : ''}; no page exceptions or nonlocal/action requests.`);
 } finally {
   browser.kill();
   await new Promise(/** Release the loopback listener before completing; no background server survives. */ (accept) => server.close(accept));

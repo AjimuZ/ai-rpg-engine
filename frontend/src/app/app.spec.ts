@@ -2,7 +2,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { routes } from './app.routes';
 import { PreviewState } from './preview/preview-state';
 
@@ -13,6 +13,7 @@ async function open(url: string) {
 }
 
 describe('Preview screens', /** Register user-facing route checks; assertions fail normally. */ () => {
+  beforeEach(/** Each journey starts with independent device/tab preferences. */ () => { localStorage.clear(); sessionStorage.clear(); });
   it('switches layouts without losing reading position and omits all artwork in text mode', /** Preference changes affect rendering only and reject unsupported selections. */ async () => {
     const harness = await open('/adventures/mosslight/story');
     let root = harness.routeNativeElement!;
@@ -20,7 +21,9 @@ describe('Preview screens', /** Register user-facing route checks; assertions fa
     root.querySelector<HTMLButtonElement>('.reading-controls button')!.click();
     await harness.fixture.whenStable();
     expect(root.querySelector('.portrait')).toBeTruthy();
+    TestBed.inject(PreviewState).setTextSize(23);
     await harness.navigateByUrl('/settings');
+    expect(harness.routeNativeElement!.querySelector<HTMLSelectElement>('#text-size')!.value).toBe('23');
     const select = harness.routeNativeElement!.querySelector<HTMLSelectElement>('#reading-layout')!;
     select.value = 'text-focused';
     select.dispatchEvent(new Event('change', { bubbles: true }));

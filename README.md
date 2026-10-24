@@ -1,10 +1,12 @@
 # AI RPG Engine
 
 P05.6 is in progress: [localization review builds](frontend/src/locale/README.md)
-provide 212 English/Italian messages across all local screens, sample passages,
+provide 218 English/Italian messages across all local screens, sample passages,
 validation, preview receipts, recovery and accessibility, with strict resource parity.
-Persisted language reload and localized single-origin packaging
-remain pending; the packaged interface still uses the English preview.
+The compiled review variants support persisted language selection and safe preview
+reload, retaining scoped drafts/selections and tab reading preferences/positions.
+Real operation/cursor reconciliation and localized single-origin packaging remain
+pending; the packaged interface still uses the English preview.
 
 P05.5 delivers the original MIT [UI graphic kit](frontend/public/ui/README.md):
 scalable controls, bars, icons, frames, independent sample item art and fallback

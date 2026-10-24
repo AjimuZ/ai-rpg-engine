@@ -119,8 +119,8 @@
         <note category="location">src/app/preview/settings.ts:17,18</note>
       </notes>
       <segment>
-        <source>Reading preferences last for this tab session. Reload restores defaults.</source>
-      <target>Le preferenze di lettura durano per questa sessione della scheda. Ricaricando la pagina si ripristinano i valori predefiniti.</target></segment>
+        <source>Reading preferences and passage positions survive reload in this tab.</source>
+      <target>Le preferenze di lettura e le posizioni dei brani restano disponibili dopo il ricaricamento in questa scheda.</target></segment>
     </unit>
     <unit id="settings.language">
       <notes>
@@ -135,8 +135,8 @@
         <note category="location">src/app/preview/settings.ts:18,19</note>
       </notes>
       <segment>
-        <source>Language selection will be available when all interface screens support English and Italian.</source>
-      <target>La selezione della lingua sarà disponibile quando tutte le schermate supporteranno inglese e italiano.</target></segment>
+        <source>Language selection is available in the English and Italian review variants. Packaged language delivery is still pending.</source>
+      <target>La selezione della lingua è disponibile nelle versioni di revisione inglese e italiana. La distribuzione delle lingue nel pacchetto è ancora da completare.</target></segment>
     </unit>
     <unit id="settings.sound">
       <notes>
@@ -1890,5 +1890,35 @@
       <target>{VAR_PLURAL, plural, =0 {Nessun brano} =1 {Un brano} other {<ph id="0" equiv="INTERPOLATION" /> brani}}</target>
       </segment>
     </unit>
-    </file>
+      <unit id="settings.readingStorage">
+      <segment>
+        <source>Reading preferences could not be restored or saved. Language reload requires available tab storage.</source>
+      <target>Non è stato possibile ripristinare o salvare le preferenze di lettura. Per ricaricare la lingua è necessario consentire l’archiviazione della scheda.</target></segment>
+    </unit>
+    <unit id="settings.interfaceLanguage">
+      <segment>
+        <source>Interface language</source>
+      <target>Lingua dell’interfaccia</target></segment>
+    </unit>
+    <unit id="settings.languageHelp">
+      <segment>
+        <source>Changing language saves your preference on this device and reloads the interface. Preview drafts, selections and reading positions are kept. No action is sent.</source>
+      <target>Cambiare lingua salva la preferenza su questo dispositivo e ricarica l’interfaccia. Le bozze dell’anteprima, le selezioni e le posizioni di lettura vengono conservate. Nessuna azione viene inviata.</target></segment>
+    </unit>
+    <unit id="settings.unsupportedLanguage">
+      <segment>
+        <source>Saved language is unsupported. English is the default; choose English or Italian.</source>
+      <target>La lingua salvata non è supportata. L’inglese è la lingua predefinita; scegli inglese o italiano.</target></segment>
+    </unit>
+    <unit id="settings.languageStorage">
+      <segment>
+        <source>Language could not be saved or reloaded. Keep this tab open to preserve your work and allow device and tab storage before trying again.</source>
+      <target>Non è stato possibile salvare o ricaricare la lingua. Tieni aperta questa scheda per conservare il lavoro e consenti l’archiviazione del dispositivo e della scheda prima di riprovare.</target></segment>
+    </unit>
+    <unit id="settings.languageUnsafe">
+      <segment>
+        <source>Language reload is paused because drafts are not safely saved or recovery is unresolved. Keep this tab open and resolve recovery before trying again.</source>
+      <target>Il ricaricamento della lingua è sospeso perché le bozze non sono salvate in sicurezza o il ripristino è ancora in sospeso. Tieni aperta questa scheda e completa il ripristino prima di riprovare.</target></segment>
+    </unit>
+  </file>
 </xliff>

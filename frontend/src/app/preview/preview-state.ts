@@ -1,6 +1,6 @@
 /** Local, public sample content and reading preferences; never an authoritative game projection. */
-import { Injectable, signal } from '@angular/core';
-import { QuickReply } from './story-input-state';
+import { Inject, Injectable, InjectionToken, signal } from '@angular/core';
+import { DraftStorage, QuickReply } from './story-input-state';
 import { ContentMetadata } from './content-metadata';
 
 /** A display-only passage; player text must come from an explicit player submission. */
@@ -71,7 +71,14 @@ const previews: readonly AdventurePreview[] = [
   },
 ];
 
-/** Own tab-lifetime preview state; accepts local IDs and rejects invalid values without throwing. */
+/** Obtain tab-scoped storage; denied browser access falls back to memory. */
+export const PREVIEW_READING_STORAGE = new InjectionToken<DraftStorage | null>('Preview reading storage', {
+  providedIn: 'root', factory: /** Contain browser storage policy errors at the boundary. */ () => {
+    try { return globalThis.sessionStorage ?? null; } catch { return null; }
+  },
+});
+
+/** Own validated tab-scoped reading state; invalid persisted values use defaults without throwing. */
 @Injectable({ providedIn: 'root' })
 export class PreviewState {
   readonly adventures = previews;
@@ -80,10 +87,48 @@ export class PreviewState {
   readonly textSize = this.size.asReadonly();
   private readonly layout = signal<'visual-novel' | 'text-focused'>('visual-novel');
   readonly readingLayout = this.layout.asReadonly();
+  private readonly saved = signal<'saved' | 'unavailable' | 'invalid'>('saved');
+  readonly persistence = this.saved.asReadonly();
+
+  /** Restore versioned local reading preferences and known passage IDs; unavailable storage keeps defaults. */
+  constructor(@Inject(PREVIEW_READING_STORAGE) private readonly storage: DraftStorage | null = null) {
+    let raw: string | null;
+    try {
+      if (!storage) throw new Error('Storage unavailable');
+      raw = storage.getItem('engine.preview-reading.v1');
+    } catch { this.saved.set('unavailable'); return; }
+    if (raw === null) return;
+    try {
+      if (raw.length > 2000) { this.saved.set('invalid'); return; }
+      const value = JSON.parse(raw);
+      if (!value || value.version !== 1 || !Number.isInteger(value.size) || value.size < 15 || value.size > 24 ||
+        !['visual-novel', 'text-focused'].includes(value.layout) || !value.positions ||
+        typeof value.positions !== 'object' || Array.isArray(value.positions) ||
+        Object.entries(value.positions).some(/** Unknown IDs or out-of-bounds positions cannot select arbitrary content. */ ([id, position]) => {
+          const adventure = this.find(id);
+          return !adventure || typeof position !== 'number' || !Number.isSafeInteger(position) || position < 0 || position >= adventure.passages.length;
+        })) { this.saved.set('invalid'); return; }
+      this.size.set(value.size);
+      this.layout.set(value.layout);
+      this.positions.set(value.positions);
+    } catch { this.saved.set('invalid'); }
+  }
+
+  /** Persist the complete bounded reading snapshot; return false rather than reload away unsaved state. */
+  prepareReload(): boolean {
+    try {
+      if (!this.storage) throw new Error('Storage unavailable');
+      const snapshot = JSON.stringify({ version: 1, size: this.size(), layout: this.layout(), positions: this.positions() });
+      this.storage.setItem('engine.preview-reading.v1', snapshot);
+      if (this.storage.getItem('engine.preview-reading.v1') !== snapshot) throw new Error('Storage verification failed');
+      this.saved.set('saved');
+      return true;
+    } catch { this.saved.set('unavailable'); return false; }
+  }
 
   /** Accept a supported layout string; unknown values leave the tab preference unchanged. */
   setReadingLayout(value: string): void {
-    if (value === 'visual-novel' || value === 'text-focused') this.layout.set(value);
+    if (value === 'visual-novel' || value === 'text-focused') { this.layout.set(value); this.prepareReload(); }
   }
 
   /** Resolve a local preview ID, returning undefined for unknown identities. */
@@ -102,6 +147,7 @@ export class PreviewState {
     if (!adventure || adventure.passages.length === 0) return;
     const next = Math.min(this.position(id) + 1, adventure.passages.length - 1);
     this.positions.update(/** Preserve every other preview's independent position. */ (current) => ({ ...current, [id]: next }));
+    this.prepareReload();
   }
 
   /** Validate a bounded name and return a local summary; never create or save a campaign. */
@@ -113,6 +159,6 @@ export class PreviewState {
 
   /** Set a finite integral reading size from 15–24 px; ignore unsupported values. */
   setTextSize(value: number): void {
-    if (Number.isInteger(value) && value >= 15 && value <= 24) this.size.set(value);
+    if (Number.isInteger(value) && value >= 15 && value <= 24) { this.size.set(value); this.prepareReload(); }
   }
 }

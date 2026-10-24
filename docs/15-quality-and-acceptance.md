@@ -3,8 +3,8 @@
 ## 1. Evidence policy
 
 Partial P05.6 evidence (24 October 2026, Windows 11, Chrome 155): four resource
-checker tests and 33 frontend tests pass, with strict typecheck, production and
-separate EN/IT review builds and a zero-vulnerability dependency audit. All 212
+checker tests and 42 frontend tests pass, with strict typecheck, production and
+separate EN/IT review builds and a zero-vulnerability dependency audit. All 218
 unique messages across the local preview have reviewed Italian targets and exact
 source/ID/placeholder parity. Browser checks cover localized titles, navigation
 and form labels, keyboard focus, four viewport sizes, locale bases, same-origin
@@ -13,8 +13,15 @@ also cover one/many passage plurals, recovery guidance, media fallback, native
 validation and escaped unsaved receipts while preserving literal input/selection.
 Unit tests cover all preview recovery states and locale-formatted meter text with
 invariant numeric ARIA values. The loopback test server is a review harness, not
-Spring packaging evidence. Persisted locale and draft/operation/cursor-safe reload,
-real API errors/receipts and pack-source fallback integration remain unimplemented;
+Spring packaging evidence. Native EN→IT→EN keyboard journeys now verify persisted
+language, two scoped literal drafts/selections, reading layout/size/position and
+equivalent-control focus, plus unsupported saved locale and storage-denial notices.
+Nine unit tests cover reload/storage boundaries, corrupt snapshots, recovery across
+detachment, conflicting draft writes and old callback/reply invalidation. A browser
+failure exposed restored text-size options selecting the first value; option-level
+selection and a routed regression assertion correct that behavior. Real localized
+packaging, operation/cursor reconciliation, API errors/receipts and pack-source
+fallback integration remain unimplemented;
 QA-35 and independent bilingual playtests stay open.
 All 22 repository-checker tests pass; docs/secrets/workflows/images scans have
 zero findings. Desktop English and mobile Italian Settings screenshots, plus

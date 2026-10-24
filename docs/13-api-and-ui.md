@@ -184,7 +184,9 @@ state is persisted by this service. Corrupt/incompatible data produces a visible
 fallback; denied/quota storage keeps the new draft in memory with an explicit
 warning. Device storage is local convenience, not a campaign backup or cross-tab
 merge protocol (the latest device write wins). Shared-device users can explicitly
-clear each draft. P05.6 retains full language-switch/cursor-safe reload acceptance.
+clear each draft. P05.6 review variants preserve these drafts/selections on explicit
+language reload and refuse unsaved/conflicting storage. Full operation/cursor-safe
+reload acceptance remains dependent on campaign transport.
 
 Suggestions are at most three unique typed speech/question/action plain-text replies (240 code units each),
 supplied by revealed public fixture context. Choosing requires an empty composer
@@ -208,7 +210,14 @@ native form validation/unsaved receipts. Every local preview screen and neutral
 term has reviewed resources. Chronicle counts use ICU plural branches; meter
 text uses the compiled locale while numeric ARIA values remain unchanged. These
 are local presentation messages, not implemented backend error-code or operation
-receipt contracts. Persisted language and safe reload remain pending.
+receipt contracts. Compiled review Settings now persists English/Italian device
+language, verifies draft bytes across scopes and reloads with validated tab reading
+preferences/positions and equivalent-control focus. Unknown saved preferences
+fall back visibly to English; storage failure and unresolved recovery block
+reload even after leaving the story. Old projection callbacks and reply references
+are invalidated. Real campaign contexts remain blocked until operation/cursor
+reconciliation exists. The unlocalized packaged build does not offer switching;
+localized Spring routing and resource checks remain P05.6.
 
 ## 9. Accessibility and responsive behavior
 

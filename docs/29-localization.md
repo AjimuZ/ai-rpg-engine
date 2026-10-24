@@ -3,8 +3,9 @@
 ## 1. Status and supported release
 
 P04.6 implements pack text catalogs and EN/IT fixture resources; P05.6 provides
-separate EN/IT review variants for all local preview screens. Persisted language,
-safe reload, packaged localized delivery and narration remain later work. P03.1 stores
+separate EN/IT review variants for all local preview screens, with persisted device
+language and verified safe local-preview reload. Packaged localized
+delivery, operation/cursor reconciliation and narration remain later work. P03.1 stores
 the owner's UI locale, each campaign's narrative locale and the locale, glossary
 and media generations outside the canonical counters. English is
 the default; English and Italian are both required for the first playable MVP
@@ -16,8 +17,8 @@ English-only initial UI assumption in the earlier vision, under [ADR 0015](adr/0
 
 P05.2's typed local presentation metadata supplies scoped names/terminology and
 neutral fallbacks. P05.6 localizes the local preview metadata and neutral terms
-through compiled catalogs. Pack catalog bindings remain P06; language selection
-and persistence remain pending in P05.6.
+through compiled catalogs. Compiled review variants expose an English/Italian
+selector with origin-local device persistence; pack catalog bindings remain P06.
 Stable definition IDs remain separate from their displayed names.
 
 | Value | Scope and purpose | Change behavior |
@@ -54,8 +55,8 @@ language-scoped thread/context generation handles future output.
 Choose Angular's built-in extraction and compile-time localized variants with
 stable semantic message IDs. Keep source English and reviewed Italian XLIFF
 resources, ICU plurals/selects and placeholder types. P05.6 pins `@angular/localize`
-to the existing Angular 22.2.3 baseline. Localized packaging and language-switch
-restoration remain in progress. Mark missing required translations as build failures. Avoid string
+to the existing Angular 22.2.3 baseline. Localized packaging remains in progress;
+local preview language-switch restoration is browser-verified. Mark missing required translations as build failures. Avoid string
 concatenation, inline hardcoded error prose and HTML returned by a model.
 
 The second P05.6 checkpoint reviews 212 unique messages covering every local
@@ -70,7 +71,7 @@ variants into `dist/engine-ui-localized/browser/{en,it}/`. Missing/duplicate
 translations are build errors. [Resource instructions](../frontend/src/locale/README.md)
 describe the review scope and tests. Real backend error/receipt and source-pack
 fallback bindings await campaign transport. These separate review builds do not replace the default production
-build or establish localized jar delivery, safe language switching or full QA-35.
+build or establish localized jar delivery or full QA-35.
 
 Build `/en/` and `/it/` static variants into the same Spring application artifact.
 `/api/v1` and authorized asset routes remain unlocalized. Root entry chooses the
@@ -89,9 +90,29 @@ unless a measured requirement makes this approach inadequate.
 
 P05.4 supplies the local foundation: versioned adventure/campaign
 scoped draft text and selection persistence across reload, without submission.
-Reading preferences/positions remain tab-lifetime; no operation is created or
-persisted by the preview composer. P05.6 review resources cover both languages; locale-generation guards,
-operation identity and full language-switch restoration remain P05.6/P06/P07.
+Reading preferences/positions now persist in validated, versioned tab storage.
+Only known preview IDs, bounded passage indexes, supported layouts and integral
+15–24 px sizes restore. Corrupt snapshots leave defaults and a visible notice;
+storage failure keeps the current in-memory view and blocks language reload.
+No operation is created or persisted by the preview composer.
+
+The compiled review variants offer an explicit Settings reload that verifies
+all edited scopes' exact draft bytes (including selection), persists reading
+state and a one-use equivalent-control focus marker, then saves `engine.ui-locale.v1`
+on the device. Unsupported stored tags produce a visible English-default notice;
+supported region tags normalize to `en`/`it`. Persisted data never supplies a URL.
+The trusted same-origin `/en/` or `/it/` prefix changes while route/query/hash stay
+intact. Direct locale links remain explicit; root preference routing awaits packaging.
+Old callbacks and suggestion objects are invalidated before navigation; drafts
+are never translated or submitted. Reload refuses unsaved/conflicting drafts,
+unresolved recovery even after detachment, and every real campaign context until
+durable operation/cursor reconciliation is implemented in P06/P07. The unlocalized
+default build explains that switching requires the compiled review variants.
+Nine reload/storage tests and native Chrome EN→IT→EN journeys verify these local
+guarantees, including unsupported saved values, storage denial, two scoped drafts,
+selection, restored native text-size selection, layout, reading position and focus.
+The catalog now contains 218 reviewed messages (224 extracted occurrences).
+These checks do not establish full operation/stream-cursor preservation.
 
 P05.5 adds the graphic-kit review and credits/source inventory.
 Its control, meter, rarity and fallback labels remain live text beside decorative

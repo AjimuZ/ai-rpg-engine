@@ -4,6 +4,13 @@ This changelog records delivered project artifacts. Future functionality belongs
 
 ## Unreleased — Localization review foundation (partial P05.6), 24 October 2026
 
+- Add persisted English/Italian selection to compiled review Settings, safe reload
+  with scoped literal drafts/selections, validated tab reading preferences/positions
+  and equivalent-control keyboard focus; invalidate old callbacks and reply objects.
+- Block language reload for unsaved/conflicting drafts, unresolved recovery across
+  route changes, denied storage and real campaign contexts awaiting reconciliation.
+  Review 218 unique messages including storage/fallback guidance; verify real
+  EN→IT→EN keyboard reloads, scope isolation and persisted native size selection.
 - Extend to 212 unique reviewed messages across every local preview screen,
   public sample passages/metadata, forms, preview receipts, recovery, kit and
   accessibility. Preserve IDs, proper adventure titles and literal player drafts.
@@ -16,7 +23,7 @@ This changelog records delivered project artifacts. Future functionality belongs
 - Verify both Settings variants in Chrome, including narrow layouts, keyboard
   focus, locale bases, same-origin resource hashes, notices and missing-file 404s.
 - Keep the packaged English preview while real transport errors/receipts,
-  safe persisted language reload and real localized packaging are implemented.
+  operation/cursor reconciliation and localized packaging are implemented.
 
 ## Unreleased — Complete local interface graphic kit (P05.5), 24 October 2026
 

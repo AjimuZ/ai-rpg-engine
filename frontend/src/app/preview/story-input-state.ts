@@ -40,6 +40,7 @@ export class StoryInputState {
   private epoch = 0;
   private readonly memory = new Map<string, { draft: InputDraft; persistence: 'saved' | 'unavailable' | 'invalid' }>();
   private readonly snapshots = new Map<string, StoryProjection>();
+  private readonly unresolved = new Set<string>();
   private readonly currentProjection = signal<StoryProjection | null>(null);
   readonly projection = this.currentProjection.asReadonly();
   private readonly currentDraft = signal<InputDraft>(emptyDraft);
@@ -55,10 +56,34 @@ export class StoryInputState {
   /** Receive an injectable storage port; null keeps edits in memory and reports persistence unavailable. */
   constructor(@Inject(STORY_DRAFT_STORAGE) private readonly storage: DraftStorage | null) {}
 
+  /** Verify every edited preview draft before reload; unresolved operations or storage loss block navigation. */
+  prepareReload(): boolean {
+    if (this.unresolved.size > 0 || !['loading', 'preview', 'ready', 'disconnected', 'error', 'stale-revision'].includes(this.status()) ||
+      (this.scope && this.scope.campaignId !== 'local-preview')) return false;
+    try {
+      // Re-read exact bytes: a later quota/policy failure or another tab's edit must not silently lose this tab's draft.
+      for (const [key, value] of this.memory) {
+        if (value.persistence !== 'saved' || !this.storage ||
+          this.storage.getItem(key) !== JSON.stringify({ version: 1, ...value.draft })) return false;
+      }
+      return true;
+    } catch { return false; }
+  }
+
+  /** Invalidate old-language callbacks and reply references after persistence succeeds; never submit or mutate a draft. */
+  invalidateForReload(): void {
+    this.epoch++;
+    this.currentProjection.set(null);
+    this.currentStatus.set('loading');
+    this.snapshots.clear();
+  }
+
   /** Activate stable IDs and return a callback epoch; leaving/re-entering a scope invalidates old asynchronous callbacks. */
   activate(scope: StoryScope): number {
     if (this.scope?.adventureId === scope.adventureId && this.scope.campaignId === scope.campaignId) return this.epoch;
     this.scope = { ...scope };
+    // Real campaign identity requires future durable operation/cursor reconciliation, even after route detachment.
+    if (scope.campaignId !== 'local-preview') this.unresolved.add(this.key());
     this.epoch++;
     const cachedProjection = this.snapshots.get(this.key());
     // Fresh reply references prevent detached UI closures from selecting a previously displayed chip.
@@ -70,6 +95,10 @@ export class StoryInputState {
     const cached = this.memory.get(this.key());
     this.currentDraft.set(cached?.draft ?? this.restore());
     if (cached) this.saved.set(cached.persistence);
+    // A restored nonempty draft also belongs to this tab: later conflicting writes must block its language reload.
+    if (!cached && this.persistence() === 'saved' && this.draft().text !== '') {
+      this.memory.set(this.key(), { draft: this.draft(), persistence: 'saved' });
+    }
     return this.epoch;
   }
 
@@ -134,7 +163,13 @@ export class StoryInputState {
 
   /** Apply a scoped connection/operation presentation status; obsolete callbacks cannot affect the current screen. */
   setStatus(status: StoryStatus, epoch: number): void {
-    if (this.scope && epoch === this.epoch) this.currentStatus.set(status);
+    if (this.scope && epoch === this.epoch) {
+      this.currentStatus.set(status);
+      // Keep recovery obligations across Settings navigation; detachment must not turn a pending operation into idle.
+      if (this.scope.campaignId !== 'local-preview' || !['loading', 'preview', 'ready', 'disconnected', 'error', 'stale-revision'].includes(status)) {
+        this.unresolved.add(this.key());
+      } else this.unresolved.delete(this.key());
+    }
   }
 
   /** Build an unambiguous versioned origin-local key; punctuation in IDs cannot merge campaigns. */

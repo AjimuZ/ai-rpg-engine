@@ -1,6 +1,6 @@
 # Compile-time localization resources
 
-P05.6 now reviews 212 unique semantic messages across all local preview screens,
+P05.6 now reviews 218 unique semantic messages across all local preview screens,
 public sample metadata/passages/suggestions, neutral terminology, validation,
 unsaved preview receipts, recovery states, graphic kit and accessibility text.
 Chronicle ICU plurals cover zero/one/many; numeric meters format using the compiled
@@ -35,9 +35,22 @@ it requires both builds. The test server exposes known preview routes only,
 compares actual HTTP resource hashes and checks missing-resource 404s. It does
 not establish Spring routing or jar/container localization.
 
-Remaining P05.6 work: integrate real API errors/receipts and explicit source-pack
-fallback when campaign transport is available; persist locale and safe reload with draft/selection, reading
-position, operation/cursor reconciliation, focus and stale-language guards; and
-integrate both variants and notices into real single-origin packaging checks.
-Language selection remains unavailable until those requirements pass. The review
-variants cover the local preview but are not packaged release variants.
+Review Settings offers English/Italian language selection. The preference is saved
+as `engine.ui-locale.v1` on the device; draft bytes/selection remain under their
+existing stable scope keys. `engine.preview-reading.v1` in tab storage restores
+validated preferences and known passage positions. A one-use tab focus marker
+returns keyboard focus to the equivalent language selector. Literal drafts are
+never translated/submitted. All edited or restored nonempty drafts are checked
+for storage loss/conflicting writes; unresolved recovery survives detachment and
+blocks reload. Previous projection callbacks and reply references are invalidated
+before navigation. Denied storage and unsupported saved locale values have
+reviewed notices. The unlocalized default build explains this review-only scope.
+
+Browser checks perform native keyboard EN→IT→EN reloads with two independent
+draft scopes, selection, reading layout/size/positions, focus, unsupported locale
+and storage denial. Unit tests additionally reject corrupt snapshots, pending
+recovery, real campaign contexts, conflicting writes and obsolete callbacks.
+Root preference routing, real API errors/receipts, explicit source-pack fallback,
+operation/stream-cursor reconciliation and localized Spring/jar/container checks
+remain open. These samples create no operation/cursor; they do not establish
+full QA-35 or independent human bilingual/screen-reader acceptance.

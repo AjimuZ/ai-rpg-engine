@@ -8,7 +8,7 @@ import { STORY_DRAFT_STORAGE, StoryInputState, StoryStatus } from './preview/sto
 import { PreviewState } from './preview/preview-state';
 
 describe('Story composer', /** Register player-agency regressions through real routed components. */ () => {
-  beforeEach(/** Isolate durable browser drafts across tests. */ () => localStorage.clear());
+  beforeEach(/** Isolate durable drafts and tab-scoped reading positions across tests. */ () => { localStorage.clear(); sessionStorage.clear(); });
   it('renders every recovery status while preserving literal text and selection', /** Every protocol status uses reviewed local prose; none can submit or reinterpret a draft. */ async () => {
     TestBed.configureTestingModule({ providers: [provideRouter(routes)] });
     const harness = await RouterTestingHarness.create('/adventures/mosslight/story');

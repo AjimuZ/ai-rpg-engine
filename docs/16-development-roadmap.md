@@ -764,9 +764,20 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     ICU plurals and locale-formatted meter text compile in both variants; numeric
     ARIA/protocol values remain invariant. All recovery-state and locale-format
     tests pass, alongside bilingual story/receipt/validation browser journeys.
-    Remaining: persisted locale and draft/reading/operation/cursor-safe reload with focus and
-    stale-language guards, plus real Spring/jar/container localized packaging.
-    Four checker tests, 33 frontend tests, strict typecheck, both build commands,
+    Third checkpoint adds allowlisted persisted language selection in
+    the compiled review variants, validated tab-scoped reading preferences/positions,
+    draft-storage verification and safe reload with equivalent Settings focus and
+    old callback/reply invalidation. Nine reload/storage tests and native
+    EN→IT→EN browser journeys pass, including two independent draft scopes,
+    reading size/layout/position, focus, unsupported locale and storage denial.
+    Restore the native text-size option after loop-created options exist.
+    Reload refuses
+    unresolved recovery, real campaign contexts and unsaved/conflicting drafts,
+    including after route detachment. No operation/cursor transport is invented.
+    Remaining: actual operation/cursor reconciliation and real Spring/jar/container
+    localized packaging; the default unlocalized build does not offer switching.
+    Four checker tests, 42 frontend tests, strict typecheck, both build commands
+    (218 reviewed messages),
     zero-vulnerability audit and Chrome 155 review smoke pass. Browser checks
     cover localized labels/titles/focus, literal drafts and selection, one/many
     passage plurals, recovery/media fallbacks, four viewport sizes, locale bases and

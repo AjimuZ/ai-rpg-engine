@@ -14,13 +14,16 @@ retain their standard precedence; configtree is not a secret manager.
 
 ## 1. Risk register
 
-Partial P05.6 reduces translation drift for the 212 marked local-preview
+Partial P05.6 reduces translation drift for the 218 marked local-preview
 messages through source freshness, exact ID and placeholder checks and separate
 browser-reviewed EN/IT builds. Local recovery guidance, validation, unsaved receipts
 and accessible names are reviewed; real transport errors and receipts remain open.
-The review builds must not replace the packaged preview until persisted locale,
-safe reload and real API localization are implemented and real Spring/jar/container
-checks pass. Resource review does not establish independent bilingual playtest
+Review variants now persist device language and validate reading/draft state before
+reload, restoring equivalent-control focus and invalidating old callbacks/replies.
+Unsaved/conflicting drafts, unresolved recovery and real campaign contexts block
+reload. They do not establish durable operation/cursor reconciliation. The review
+builds must not replace the packaged preview until real Spring/jar/container
+checks pass. Real API localization remains a transport gate. Resource review does not establish independent bilingual playtest
 acceptance or complete QA-35.
 
 P05.5 reduces local UI asset/rights risk with original editable MIT SVG/CSS,
