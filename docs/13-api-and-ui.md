@@ -1,18 +1,57 @@
 # Application API and Player Interface
 
 
-Partial P06.1 implements an internal owner-scoped creation service and durable
-request results, but `POST /api/v1/campaigns` remains proposed. The trusted owner
-argument must come from future session admission, never a client owner field.
-No HTTP creation route is exposed before Host/Origin/session/CSRF protections.
-Internal creation accepts external profiles and grants through a verified pinned
+P06.1 implements an owner-scoped creation service, durable request results and
+`POST /api/v1/campaigns` behind local Host/Origin/session/CSRF admission.
+The trusted owner comes from server configuration, never a client owner field.
+Creation accepts external profiles and grants through a verified pinned
 dependency closure. Custom skill keys use root-local IDs or `pack#definition`
 for dependency skills, including skills local to an external creation profile;
-bare equal IDs from other packs are rejected. This does not expose a public DTO.
+bare equal IDs from other packs are rejected.
+
+`GET /api/v1/session` bootstraps the local session described in
+[HTTP security](14-security-and-operations.md#4-application-http-boundary).
+Creation requires `Origin`, the session cookie, `X-CSRF-Token` and UTF-8
+`application/json`. The body is at most 16 KiB (including chunked bodies):
+
+```json
+{
+  "requestId": "a4ef32ab-d8d5-4f21-a769-245262e23f8d",
+  "adventureId": "b4ef32ab-d8d5-4f21-a769-245262e23f8d",
+  "contentRevisionId": "c4ef32ab-d8d5-4f21-a769-245262e23f8d",
+  "title": "First expedition",
+  "narrativeLocale": "en",
+  "choices": {
+    "name": "Traveler",
+    "archetypeId": "surveyor",
+    "attributes": {},
+    "skills": {}
+  }
+}
+```
+
+Identities are canonical lowercase UUIDs. `choices.background` and `choices.role`
+are optional bounded strings; `archetypeId` may be missing/null for custom
+allocations. Both allocation maps are required, with exact integer values.
+Unknown fields (including owner, resource/item/ability overrides), duplicate keys,
+bad UTF-8, trailing documents and type coercions are rejected. IDs and budgets
+must resolve in the selected sealed snapshot. The example uses fixture-specific
+choices; applications obtain creation metadata from later projection work.
+Successful creation and identical retries return HTTP 201 with exactly
+`campaignId`, `actorId`, `contentRevisionId`. No narration or game counter advances.
+Changed-payload retries return 409; inaccessible adventure/revision returns 404;
+malformed JSON/shape returns 400; illegal choices return 422; oversized bodies
+return 413; non-JSON/encoded bodies return 415; admission fails with 403,
+capacity with 429 and unavailable configuration/storage/content with 503.
+Failures return only a stable `code`; raw pack, SQL and exception messages are
+excluded. Retry uncertain responses with the original request and payload.
 
 ## 1. Contract status
 
-The following endpoints and DTO fields are proposed v1 contracts. They are not running services or generated OpenAPI definitions. API and content versions are separate. Use an `/api/v1` namespace and explicit schema versions for persisted/imported data.
+Except for the session/creation endpoints above, the following endpoints and DTO
+fields are proposed v1 contracts. There are no generated OpenAPI definitions.
+API and content versions are separate. Use an `/api/v1` namespace and explicit
+schema versions for persisted/imported data.
 
 ## 2. Proposed endpoint families
 

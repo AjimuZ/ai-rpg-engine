@@ -13,12 +13,14 @@ Native Linux-host UID readability remains unverified. Ordinary Spring overrides
 retain their standard precedence; configtree is not a secret manager.
 
 
-Partial P06.1 has verified internal creation foundations but no public creation
-admission. Session/CSRF protection and actual restart acceptance must be completed
-before its roadmap box closes. Dependency mechanics now reload a bounded sealed
+P06.1 has verified atomic creation and an opt-in local HTTP
+adapter with configured owner/origin and bounded session/CSRF admission. All 290
+packaged backend tests pass on PostgreSQL 18.6. Separate-JVM restart
+acceptance now preserves both genre campaigns and rejects old browser sessions.
+Dependency mechanics reload a bounded sealed
 closure; conflicting versions of one pack ID are rejected rather than aliased.
-Service reconstruction tests durable retries, not full application/browser
-restart acceptance. Existing campaigns receive no invented character-state backfill.
+Browser reload/projection acceptance remains later P06/P05 integration work.
+Existing campaigns receive no invented character-state backfill.
 
 ## 1. Risk register
 

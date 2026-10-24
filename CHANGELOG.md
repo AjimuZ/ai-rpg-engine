@@ -2,7 +2,7 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
-## Unreleased — Internal campaign creation (partial P06.1), 24 October 2026
+## Unreleased — Atomic campaign creation (P06.1), 24 October 2026
 
 - Add an owner-scoped transactional creation service from sealed pack snapshots,
   validated preset/custom budgets, resource maxima and authored item/ability grants.
@@ -12,8 +12,14 @@ This changelog records delivered project artifacts. Future functionality belongs
 - Load bounded transitive sealed dependency snapshots, resolve external creation
   profiles and mechanics in their declaring namespace, and enforce actual pinned caps.
   Reject ambiguous dependency versions and keep existing root-local identities stable.
-- Keep public creation transport unfinished;
-  no creation endpoint or starting narration is exposed by this checkpoint.
+- Add opt-in local session bootstrap and protected synchronous campaign creation,
+  with exact Host/Origin, server-configured ownership, bounded ephemeral sessions,
+  independent CSRF proofs, concurrency admission and strict 16 KiB UTF-8 JSON.
+  Return only committed identities and stable sanitized errors. Starting narration
+  and creation UI integration remain later tasks.
+- Verify two genre campaigns and immutable retry results across separate application
+  JVM restarts, with old browser sessions rejected and initial counters/grants intact.
+  All 290 packaged backend tests and 22 repository policy tests pass; scans are clean.
 
 ## Unreleased — Staged interface integration dependencies, 24 October 2026
 

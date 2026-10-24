@@ -1,7 +1,7 @@
 # Adventure Pack Specification
 
 
-Partial P06.1 adds an internal snapshot consumer for creation: it loads only a
+P06.1 adds an atomic snapshot consumer for creation: it loads only a
 sealed revision in the selected adventure, verifies the byte inventory hash and
 current ruleset contract, and recompiles it inside the creation transaction.
 Player allocations cannot supply grants. Creation reloads the transitive dependency

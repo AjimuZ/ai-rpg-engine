@@ -10,11 +10,13 @@ access. Voice, locale and planning artifacts retain the same scoped identity
 rules as images and memory.
 
 
-Partial P06.1 creation authorizes the owner/adventure before looking up a durable
+P06.1 creation authorizes the owner/adventure before looking up a durable
 retry and requires the sealed revision to belong to that adventure. The adventure
 row lock serializes registration and creation; same request UUIDs are scoped by
 adventure. Separate campaign and actor identities isolate same-ID genre definitions
-and initial grants. Public workspace admission/switching remains unfinished.
+and initial grants. Protected HTTP creation derives the owner from local server
+configuration and verifies the selected adventure before any retry lookup.
+Public workspace administration/switching remains unfinished.
 
 ## 1. Meaning and status
 

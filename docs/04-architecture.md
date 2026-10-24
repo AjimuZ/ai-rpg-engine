@@ -56,6 +56,13 @@ migration and the canonical foundation entities in the `identity`, `adventure`,
 
 ## 3. Backend modules
 
+P06.1 exposes atomic campaign creation through an opt-in local HTTP adapter.
+`identity.LocalHttpAdmission` supplies server-configured owner context;
+`campaign.CampaignCreationController` strictly decodes bounded JSON and delegates
+to the transactional service. Durable creation receipts survive process restart,
+while ephemeral browser sessions do not. See [ADR 0019](adr/0019-local-campaign-admission.md)
+for the local trust boundary and explicit future-route admission requirement.
+
 P04.1 adds a data-only manifest/parsing/hash stage in `content`, using fixed
 classpath schemas and no I/O ports. Its immutable `ParsedPack` is distinct from
 an admitted `ContentRevision`. P04.2–P04.3 add the pure `PackCompiler` semantic stage

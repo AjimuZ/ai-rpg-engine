@@ -114,7 +114,7 @@ Core state is relational. Immutable compiled content and event payloads may use 
 
 Minimum indexes include campaign/revision, campaign/event sequence, operation idempotency key, current actor and encounter, knowledge audience/entity, quest source settlement, source-summary event range, and owned item/container. Full-text indexes support lore and event retrieval. Indexes must be justified by measured query plans later.
 
-### Campaign creation checkpoint (partial P06.1)
+### Campaign creation (P06.1)
 
 V9 introduces `character_state`, `item_instance`, `learned_ability` and immutable
 `campaign_creation`. The internal creation service authorizes owner/adventure,
@@ -125,9 +125,11 @@ are scoped to the adventure; exact retries return stored identities and changed
 payloads fail. Creation starts at revision/turn/time/event zero and makes no draw,
 job or narration call. Legacy campaigns receive no invented character rows.
 
-The full backend packaged verification passes 281 tests on PostgreSQL 18.6,
-including creation/rollback/retry and populated upgrade coverage. Mutable inventory/progression commands,
-equipment, starting presentation and the protected HTTP boundary remain later work.
+The full backend packaged verification passes 290 tests on PostgreSQL 18.6,
+including creation/rollback/retry, populated upgrade, protected HTTP and separate-JVM
+restart coverage. HTTP ownership is server-configured, never selected by a client;
+see [local admission](14-security-and-operations.md#4-application-http-boundary).
+Mutable inventory/progression commands, equipment and starting presentation remain later work.
 Creation verifies the complete pinned sealed dependency closure before writing;
 external profiles, skills, locations and grants resolve in their declaring pack.
 Dependency IDs persist as `pack#definition`; root IDs retain their local form.

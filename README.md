@@ -61,11 +61,14 @@ screens, transport-localized UI, runtime narration and playable campaigns remain
 See the [pack contract](docs/09-adventure-packs.md).
 
 
-The partial P06.1 checkpoint adds internal atomic campaign creation from sealed
+P06.1 delivers atomic campaign creation from sealed
 pack bytes, validated character budgets and authored grants, with durable retries
 and V9 storage. Pinned external mechanics now load from a bounded sealed dependency
-closure. Public creation transport/session protection remains unfinished; no playable creation route
-is exposed. See [backend scope](backend/README.md#internal-campaign-creation-checkpoint-partial-p061).
+closure. An opt-in local creation API now requires a server-configured owner and
+exact origin, bounded sessions and CSRF proof. All 290 packaged backend tests pass,
+including two-genre campaign preservation across application process restart.
+UI integration and starting narration remain later tasks.
+See [backend scope](backend/README.md#atomic-campaign-creation-p061).
 
 ## Why this engine exists
 

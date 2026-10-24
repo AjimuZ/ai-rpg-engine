@@ -70,19 +70,25 @@ public class CampaignCreationService {
         var scope = jdbc.query("select id from adventure_workspace where id = ? and owner_id = ? for update",
                 (row, index) -> row.getObject(1, UUID.class), adventureId, ownerId);
         if (scope.isEmpty()) {
-            throw new IllegalArgumentException("adventure is unavailable");
+            throw new CampaignCreationFailure(CampaignCreationFailure.Kind.SCOPE_UNAVAILABLE);
         }
         var previous = jdbc.query("select r.payload_hash, r.campaign_id, r.actor_id, c.content_revision_id "
                 + "from campaign_creation r join campaign c on c.id = r.campaign_id "
                 + "where r.adventure_id = ? and r.request_id = ?", (row, index) -> {
                     if (!hash.equals(row.getString(1))) {
-                        throw new IllegalArgumentException("creation request identity has a different payload");
+                        throw new CampaignCreationFailure(CampaignCreationFailure.Kind.REQUEST_CONFLICT);
                     }
                     return new CreatedCampaign(row.getObject(2, UUID.class), row.getObject(3, UUID.class),
                             row.getObject(4, UUID.class));
                 }, adventureId, request.requestId());
         if (!previous.isEmpty()) {
             return previous.getFirst();
+        }
+        // Resolve identity scope before mechanics. Missing and foreign revisions share one safe
+        // transport category; neither can leak its existence outside the selected adventure.
+        if (jdbc.queryForObject("select count(*) from content_revision where id = ? and adventure_id = ?",
+                Integer.class, request.contentRevisionId(), adventureId) != 1) {
+            throw new CampaignCreationFailure(CampaignCreationFailure.Kind.SCOPE_UNAVAILABLE);
         }
         var pack = packs.loadForCampaign(adventureId, request.contentRevisionId());
         var initial = CharacterCreation.resolve(pack, request.choices());

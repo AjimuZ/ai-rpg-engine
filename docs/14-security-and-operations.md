@@ -1,10 +1,11 @@
 # Security, Privacy, and Operations
 
 
-Partial P06.1 exposes creation only as an internal service with trusted owner
+P06.1 exposes creation through a protected local adapter with trusted owner
 context. It rejects inaccessible adventure/revision scopes before returning stored
 identities and accepts no player-supplied item or ability grants. HTTP creation
-remains unavailable pending local session, Host/Origin and CSRF admission. V9
+requires an exact configured loopback Host/Origin and server-side owner,
+with bounded ephemeral sessions and independent CSRF proofs. V9
 backup scope now includes character state, item instances, learned abilities and
 immutable creation requests; older schema archives remain explicitly rejected.
 
@@ -26,8 +27,9 @@ row versions, bounded resource balances and bounded JSONB objects. Database
 constraints protect storage integrity; they do not authorize reads. Future
 application boundaries must verify owner and selected adventure/campaign and use
 scoped repository queries, keeping inherited administrative methods private.
-No domain service/API or database row-level security policy is implemented yet;
-QA-20 evidence at this stage covers constraints and scoped persistence queries.
+P06.1 adds an owner-scoped creation service/API with explicit adventure/revision
+authorization. Database row-level security remains unimplemented; QA-20 evidence
+covers constraints, scoped persistence queries and creation admission, not future APIs.
 
 ## 3. Codex capability controls
 
@@ -45,6 +47,22 @@ checks do not satisfy the complete HTTP protection or readiness design below.
 P01.5 retains only [projected account-free protocol evidence](../tools/runtime_probe/COMPATIBILITY.md#retained-fixtures-and-replay): aliased IDs, selected policy/status fields and independently validated neutral final text. Arbitrary account metadata, raw errors, stderr and private prompts are excluded. Capture never mounts an account volume; new fixtures require field review and isolation checks before widening supported versions or platforms.
 
 ## 4. Application HTTP boundary
+
+`engine.http.owner-id` selects a pre-existing local owner server-side; absent
+configuration disables session/creation routes with 503. Unknown API paths still
+return 404; future API controllers must join this admission boundary explicitly.
+`engine.http.origin` defaults to
+`http://127.0.0.1:8080` and accepts only an exact HTTP loopback origin with explicit
+port. API Host must match its authority. Forwarded headers are not trusted.
+`GET /api/v1/session` returns a random CSRF token and sets an independent 256-bit
+`ENGINE_SESSION` HttpOnly, SameSite=Strict, path `/` cookie. Neither secret is
+logged or persisted. Sessions expire after 30 minutes and restart invalidates
+them; capacity is 32 without eviction of live sessions. Reuse the cookie for
+bootstrap to avoid allocating another slot. Cross-site fetch metadata and
+nonmatching/duplicate Origin or Host headers are denied. Mutations require the
+exact Origin, cookie, `X-CSRF-Token`, UTF-8 JSON and one of four concurrent slots.
+API responses disable caching and MIME sniffing. This boundary trusts local
+processes and same-origin scripts; it is not public-hosting authentication.
 
 Bind to loopback; use one origin for release frontend/backend where practical. Validate Host, Origin, content type, body size, and local session identity on mutation endpoints. Use an unpredictable local application session/CSRF token stored with appropriate browser restrictions rather than treating a fixed custom header as authentication. Do not enable wildcard CORS.
 

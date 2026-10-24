@@ -815,7 +815,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 
 **Depends on:** P03–P04; uses completed P05.1–P05.5 foundations, not P05.6/P05.7 integration. **Areas:** campaign services/API, knowledge projections, creation UI.
 
-- [ ] P06.1 Create campaigns atomically from immutable pack snapshots and validated character choices.
+- [x] P06.1 Create campaigns atomically from immutable pack snapshots and validated character choices.
   **Requires tasks:** P05.5.
   - Verified internal creation-core checkpoint (24 October 2026): owner/adventure
     authorization, sealed-byte/ruleset reload, bounded preset/custom budgets and atomic
@@ -835,9 +835,23 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     limit uses a simulated aggregate size over real stored revisions.
     Full pinned packaged verification passes 281 tests with zero failures/skips;
     all 22 repository policy tests pass and repository scans have zero findings.
-    Public creation transport/session/CSRF admission remains unimplemented;
-    keep P06.1 open. No starting narration,
-    public projection or full restart/consultation acceptance is claimed.
+    Local HTTP admission now has exact configured loopback Host/Origin checks,
+    a server-configured owner, 32 fixed-lived 30-minute sessions, independent
+    CSRF proofs, restricted cookies and a four-mutation concurrency cap.
+    Four focused admission tests and five real HTTP/PostgreSQL creation tests
+    pass. Strict 16 KiB JSON creation rejects coercions, duplicate/unknown fields,
+    foreign scopes, invalid budgets and changed retries without partial writes.
+    A focused real process-restart check passes: create two genre campaigns,
+    gracefully stop/start separate application JVMs, reject old sessions and
+    return both original request results with unchanged counters and grants.
+    Expanded checks also cover bounded chunked input, concurrent admission and
+    capacity release after writer failures. Final pinned Java 21/Maven 3.10
+    `clean verify -Ppackaged-ui` passes 290 tests on PostgreSQL 18.6 with zero
+    failures, errors or skips. All 22 repository policy tests pass; scans report
+    zero findings. Resumed-session review and a fresh full packaged build confirm
+    the same 290 passing tests and clean policy checks before commit.
+    P06.1 creation, ownership and process-restart checks are complete.
+    Starting narration, public projections and consultation acceptance remain later tasks.
   - Scheduling correction (24 October 2026): the completed P05.1–P05.5
     foundation permits P06/P07 API development; P05.6 waits explicitly for P06.2
     and P07.5, then becomes eligible again in roadmap order. All 117 task IDs

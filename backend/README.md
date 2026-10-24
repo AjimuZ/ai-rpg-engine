@@ -45,7 +45,7 @@ disposable database: the test requires exactly the twenty-nine domain tables cre
 `V5__campaign_mutation_leases.sql` (P03.5) and
 `V6__durable_jobs_and_planning.sql` (P03.6), `V7__pack_registration.sql` (P04.4) and
 `V8__localized_pack_reports.sql` (P04.6, report-version constraint only) and
-`V9__campaign_creation.sql` (partial P06.1, character state, grants and request identities), with no
+`V9__campaign_creation.sql` (P06.1, character state, grants and request identities), with no
 rows, and Hibernate validates the entities against them (`ddl-auto=validate`).
 The persistence tests truncate these tables before and after each test, so never
 point `verify` at a database whose data you want to keep.
@@ -290,7 +290,7 @@ ADR 0009 retains Java refresh as a release requirement. Account readiness,
 canonical campaign recovery and full QA-28 remain later gates.
 
 
-## Internal campaign creation checkpoint (partial P06.1)
+## Atomic campaign creation (P06.1)
 
 `CampaignCreationService.create(ownerId, adventureId, request)` accepts trusted owner
 context, a sealed content revision, a request UUID, title, narrative locale and
@@ -311,6 +311,26 @@ Skill allocation keys and persisted references qualify dependency IDs as
 `pack#definition`; root-local IDs stay bare. Profile-owned rules determine
 attributes/resources, and dependency skill/stack bounds are rechecked from bytes.
 See [closure limits and version conflict policy](../docs/09-adventure-packs.md).
-There is no creation HTTP endpoint yet: session/CSRF admission and actual
-application restart acceptance remain P06.1 work. Listing, public
+`GET /api/v1/session` and `POST /api/v1/campaigns` now expose protected local
+creation. Set `ENGINE_HTTP_OWNER_ID` to a pre-existing owner UUID; absent owner
+configuration leaves both routes unavailable. Set `ENGINE_HTTP_ORIGIN` to the
+exact browser origin when using a port/host other than `http://127.0.0.1:8080`.
+Only HTTP loopback origins with explicit ports are accepted. The server derives
+ownership from this configuration; the browser cannot select it. This opt-in
+does not create owners/workspaces or import packs. Those remain internal setup.
+These environment variables configure host backend execution. Root Compose does
+not forward them automatically; enabling this API there requires an explicit
+engine-service environment override and the same pre-existing database setup.
+Bootstrap returns a CSRF token and a separate HttpOnly SameSite=Strict cookie;
+send both plus the exact Origin with UTF-8 JSON creation requests. Sessions
+expire after 30 minutes or process restart, with at most 32 live sessions and
+four concurrent mutations. See the [public request schema and error codes](
+../docs/13-api-and-ui.md) and [security boundary](../docs/14-security-and-operations.md#4-application-http-boundary).
+The strict 16 KiB decoder reuses the data-only parser in JSON mode to reject
+duplicate keys, trailing documents and invalid UTF-8 without coercion.
+Process restart acceptance launches separate application JVMs, creates two genre
+campaigns, stops/restarts the application, rejects the expired process session,
+then verifies both durable results and unchanged counters/grants. Listing, public
 projections, starting narration and pending decisions remain later P06 tasks.
+Pinned packaged backend verification passes all 290 tests on PostgreSQL 18.6,
+including five real HTTP tests and four admission tests, with no failures/skips.
