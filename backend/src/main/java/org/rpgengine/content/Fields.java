@@ -227,6 +227,21 @@ final class Fields {
      * The caller validates the keys semantically (attribute or skill IDs) using {@link #keyPointer}.
      */
     Map<String, Integer> intMap(String key, int min, int max, int maxEntries) {
+        return integerMap(key, min, max, maxEntries, false);
+    }
+
+    /**
+     * Bounded integer map keyed by typed local or dependency references. Invalid syntax,
+     * undeclared/missing IDs and wrong definition kinds produce located pack diagnostics.
+     */
+    Map<String, Integer> intRefs(String key, int min, int max, int maxEntries, Set<String> kinds) {
+        Map<String, Integer> result = integerMap(key, min, max, maxEntries, true);
+        result.keySet().forEach(ref -> resolve(keyPointer(key, ref), ref, kinds));
+        return result;
+    }
+
+    /** Read integer values with identifier or reference keys; never relax ordinary attribute/property keys. */
+    private Map<String, Integer> integerMap(String key, int min, int max, int maxEntries, boolean references) {
         Object value = raw(key, false);
         Map<String, Integer> result = new LinkedHashMap<>();
         if (value == null) {
@@ -238,8 +253,9 @@ final class Fields {
         for (var entry : object.entrySet()) {
             String name = (String) entry.getKey();
             String entryPointer = keyPointer(key, name);
-            if (!ID.matcher(name).matches()) {
-                throw new PackException("SCHEMA", document.location(entryPointer), "Expected a lowercase stable identifier key");
+            if (references ? name.isBlank() || name.length() > 300 : !ID.matcher(name).matches()) {
+                throw new PackException("SCHEMA", document.location(entryPointer),
+                        references ? "Expected a reference key" : "Expected a lowercase stable identifier key");
             }
             result.put(name, exactInt(entry.getValue(), entryPointer, min, max));
         }

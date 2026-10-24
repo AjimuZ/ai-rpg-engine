@@ -5,6 +5,10 @@ Partial P06.1 implements an internal owner-scoped creation service and durable
 request results, but `POST /api/v1/campaigns` remains proposed. The trusted owner
 argument must come from future session admission, never a client owner field.
 No HTTP creation route is exposed before Host/Origin/session/CSRF protections.
+Internal creation accepts external profiles and grants through a verified pinned
+dependency closure. Custom skill keys use root-local IDs or `pack#definition`
+for dependency skills, including skills local to an external creation profile;
+bare equal IDs from other packs are rejected. This does not expose a public DTO.
 
 ## 1. Contract status
 

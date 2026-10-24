@@ -305,6 +305,12 @@ Creation leaves canonical counters at zero and creates no event, draw or job.
 budgets, caps, loadouts, two same-ID genre snapshots, independent campaigns,
 owner rejection, concurrent retries and rollback of deferred COMMIT failures.
 The populated upgrade test preserves V8 rows and creates no fictional backfill.
-There is no creation HTTP endpoint yet: session/CSRF admission and mechanical
-resolution of pinned external dependencies remain P06.1 work. Listing, public
+Creation now verifies a bounded transitive closure of sealed dependencies and
+resolves external profiles, skills, locations and grants in their declaring pack.
+Skill allocation keys and persisted references qualify dependency IDs as
+`pack#definition`; root-local IDs stay bare. Profile-owned rules determine
+attributes/resources, and dependency skill/stack bounds are rechecked from bytes.
+See [closure limits and version conflict policy](../docs/09-adventure-packs.md).
+There is no creation HTTP endpoint yet: session/CSRF admission and actual
+application restart acceptance remain P06.1 work. Listing, public
 projections, starting narration and pending decisions remain later P06 tasks.

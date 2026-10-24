@@ -125,12 +125,15 @@ are scoped to the adventure; exact retries return stored identities and changed
 payloads fail. Creation starts at revision/turn/time/event zero and makes no draw,
 job or narration call. Legacy campaigns receive no invented character rows.
 
-The full backend packaged verification passes 275 tests on PostgreSQL 18.6,
+The full backend packaged verification passes 281 tests on PostgreSQL 18.6,
 including creation/rollback/retry and populated upgrade coverage. Mutable inventory/progression commands,
 equipment, starting presentation and the protected HTTP boundary remain later work.
-Dependency-provided mechanical definitions fail closed at creation until their
-pinned definition closure is supported; local mechanics can use registered pack
-metadata dependencies. Initial grants are explicit authored grants, not ability
+Creation verifies the complete pinned sealed dependency closure before writing;
+external profiles, skills, locations and grants resolve in their declaring pack.
+Dependency IDs persist as `pack#definition`; root IDs retain their local form.
+An external profile uses its own pack's attribute/resource rules. Closure bounds
+and conflicting-version rejection are defined in the [pack contract](09-adventure-packs.md).
+Initial grants are explicit authored grants, not ability
 use. Attribute cost is above declared minima, skill cost is total ranks; omitted
 values use minima/zero and unspent points are allowed. Repeated starting item
 grants aggregate into one bounded stack, so duplication cannot bypass `maxStack`.

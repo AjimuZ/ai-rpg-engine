@@ -824,8 +824,19 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     includes all four new tables. Full pinned Java/Maven packaged verification passes
     275 tests on PostgreSQL 18.6; 22 repository policy tests and 8 backup tests pass
     (one Windows symlink case skips); repository scans have zero findings.
-    Public creation transport/session/CSRF admission and pinned external mechanical
-    dependency loading remain unimplemented; keep P06.1 open. No starting narration,
+    Verified dependency checkpoint: bounded transitive sealed dependency loading
+    preserves declaring-pack namespaces, profile rules and canonical grant IDs.
+    Preset skill maps accept typed dependency references; creation rechecks actual
+    pinned rank and stack caps before inserting campaign rows.
+    Closure limits are 32 revisions, depth 16 and 250 MiB of sealed bytes;
+    shared subtree heights prevent cached diamond paths evading the depth limit.
+    Conflicting versions of one pack ID fail closed. PostgreSQL integration tests
+    cover these bounds, namespaces, immutable pins and invalid grants; the byte
+    limit uses a simulated aggregate size over real stored revisions.
+    Full pinned packaged verification passes 281 tests with zero failures/skips;
+    all 22 repository policy tests pass and repository scans have zero findings.
+    Public creation transport/session/CSRF admission remains unimplemented;
+    keep P06.1 open. No starting narration,
     public projection or full restart/consultation acceptance is claimed.
   - Scheduling correction (24 October 2026): the completed P05.1–P05.5
     foundation permits P06/P07 API development; P05.6 waits explicitly for P06.2

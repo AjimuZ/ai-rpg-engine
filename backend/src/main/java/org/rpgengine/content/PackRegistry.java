@@ -204,15 +204,27 @@ public class PackRegistry {
     }
 
     /**
-     * Reload and recompile one sealed adventure-owned revision inside a caller's transaction.
+     * Reload and recompile a sealed adventure-owned revision and its bounded pinned dependency
+     * closure inside a caller's transaction.
      * The caller must authorize the owner first. Returns privileged immutable definitions;
      * never expose them as a public projection. Missing/unsealed revisions, changed hashes
-     * or an unavailable pinned ruleset fail before campaign writes. No filesystem is read.
+     * or an unavailable pinned ruleset fail before campaign writes. Conflicting pack versions,
+     * cycles and aggregate closure limits also fail closed. No filesystem is read.
      */
-    public CompiledPack loadForCampaign(UUID adventureId, UUID revisionId) {
+    public CampaignPackSnapshot loadForCampaign(UUID adventureId, UUID revisionId) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("campaign content loading requires a transaction");
         }
+        var closure = new CampaignClosure(adventureId);
+        CompiledPack root = closure.load(revisionId, 0);
+        return new CampaignPackSnapshot(root, closure.packs);
+    }
+
+    /**
+     * Load one sealed revision under the caller's authorized transaction. Reparse and recompile
+     * its exact bytes; missing rows, incompatible rulesets or mismatched hashes fail closed.
+     */
+    private CompiledPack loadRevision(UUID adventureId, UUID revisionId) {
         var hashes = jdbc.query("select c.content_hash, c.ruleset_hash from content_revision c "
                 + "join content_revision_report r on r.content_revision_id = c.id "
                 + "where c.adventure_id = ? and c.id = ?",
@@ -232,6 +244,77 @@ public class PackRegistry {
             throw new IllegalStateException("stored pack files do not match the pinned content hash");
         }
         return new PackCompiler(new Catalog(adventureId), contract).compile(parsed);
+    }
+
+    /**
+     * Per-load bounded traversal, never shared between campaigns. Exact dependency coordinates
+     * come only from sealed manifests, so later registrations cannot move an existing snapshot.
+     * Conflicting versions of one pack ID are rejected because public definition references use
+     * pack IDs rather than versions and must remain unambiguous throughout a campaign.
+     */
+    private final class CampaignClosure {
+        private final UUID adventureId;
+        private final Map<String, CompiledPack> packs = new LinkedHashMap<>();
+        private final Map<UUID, CompiledPack> loaded = new LinkedHashMap<>();
+        private final Map<UUID, Integer> heights = new LinkedHashMap<>();
+        private final java.util.Set<UUID> visiting = new java.util.HashSet<>();
+        private long bytes;
+
+        /** Initialize an empty traversal scoped to an already authorized adventure. */
+        CampaignClosure(UUID adventureId) {
+            this.adventureId = adventureId;
+        }
+
+        /**
+         * Verify a revision and its transitive dependencies once. Reject cycles, ambiguous pack
+         * versions, more than 32 revisions, depth above 16 or over 250 MiB before parsing more
+         * bytes. These aggregate limits prevent many individually bounded packs exhausting memory.
+         */
+        CompiledPack load(UUID revisionId, int depth) {
+            if (depth + heights.getOrDefault(revisionId, 0) > 16) {
+                throw new IllegalArgumentException("campaign dependency depth limit exceeded");
+            }
+            if (loaded.containsKey(revisionId)) {
+                return loaded.get(revisionId);
+            }
+            if (!visiting.add(revisionId)) {
+                throw new IllegalArgumentException("campaign dependency cycle detected");
+            }
+            if (loaded.size() + visiting.size() > 32) {
+                throw new IllegalArgumentException("campaign dependency count limit exceeded");
+            }
+            bytes += jdbc.queryForObject("select coalesce(sum(byte_size), 0) from content_revision_file "
+                    + "where content_revision_id = ?", Long.class, revisionId);
+            if (bytes > 250L * 1024 * 1024) {
+                throw new IllegalArgumentException("campaign dependency byte limit exceeded");
+            }
+            CompiledPack pack = loadRevision(adventureId, revisionId);
+            String packId = pack.parsed().manifest().id();
+            CompiledPack previous = packs.putIfAbsent(packId, pack);
+            if (previous != null) {
+                throw new IllegalArgumentException("campaign dependency has conflicting versions: " + packId);
+            }
+            int height = 0;
+            for (var dependency : CampaignPackSnapshot.dependencies(pack)) {
+                var revisions = jdbc.query("select c.id from content_revision c "
+                        + "join content_revision_report r on r.content_revision_id = c.id "
+                        + "where c.adventure_id = ? and c.pack_id = ? and c.pack_version = ? and c.content_hash = ?",
+                        (row, index) -> row.getObject(1, UUID.class), adventureId, dependency.get("id"),
+                        dependency.get("version"), dependency.get("hash"));
+                if (revisions.isEmpty()) {
+                    throw new IllegalArgumentException("pinned sealed dependency is unavailable in this adventure");
+                }
+                UUID child = revisions.getFirst();
+                load(child, depth + 1);
+                // A shared subtree loaded earlier at a shallower depth must not let a longer
+                // diamond path evade the depth cap when its bytes are reused from this cache.
+                height = Math.max(height, 1 + heights.get(child));
+            }
+            visiting.remove(revisionId);
+            loaded.put(revisionId, pack);
+            heights.put(revisionId, height);
+            return pack;
+        }
     }
 
     /** Parse the staged bytes and check every asset; no database access, so no lock is held meanwhile. */

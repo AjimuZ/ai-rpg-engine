@@ -1,6 +1,12 @@
 package org.rpgengine.campaign;
 
 import java.nio.file.Path;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.TreeMap;
+import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -22,6 +28,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -165,6 +172,198 @@ class CampaignCreationPersistenceTest {
         jdbc.execute("drop trigger p061_fail on campaign_creation");
         assertNotNull(service.create(owner, adventure, request));
         assertEquals(1, count("campaign_creation"));
+    }
+
+    /** Equal local IDs cannot override external mechanics, and later versions cannot move a pin. */
+    @Test
+    void usesPinnedDependencyMechanicsAndRejectsTheirActualCaps() throws Exception {
+        var dependency = fixture("fantasy-exploration");
+        // The root still has a maxRank of three, so a rank of two detects wrong-pack lookup.
+        dependency.put("skills.json", new String(dependency.get("skills.json"), java.nio.charset.StandardCharsets.UTF_8)
+                .replace("\"maxRank\": 3", "\"maxRank\": 1").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var pinned = registerVariant(dependency, "test:mechanics", "1.0.0", List.of());
+        var root = fixture("fantasy-exploration");
+        root.put("creation.json", new String(root.get("creation.json"), java.nio.charset.StandardCharsets.UTF_8)
+                .replace("fieldwork", "test:mechanics#fieldwork")
+                .replace("\"kit\"", "\"test:mechanics#kit\"")
+                .replace("\"steady\"", "\"test:mechanics#steady\"")
+                .replace("\"skillBudget\": 1", "\"skillBudget\": 5").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var imported = registerVariant(root, "test:root", "1.0.0", List.of(pin(pinned)));
+        registerVariant(fixture("fantasy-exploration"), "test:mechanics", "2.0.0", List.of());
+        var invalid = new CampaignCreationService.Request(UUID.randomUUID(), imported.revisionId(), "Campaign",
+                SupportedLocale.EN, new CharacterChoices("Player", null, Map.of(),
+                Map.of("test:mechanics#fieldwork", 2), null, null));
+        assertThrows(IllegalArgumentException.class, () -> service.create(owner, adventure, invalid));
+        assertEquals(0, count("campaign"));
+        var invalidPreset = new TreeMap<>(root);
+        invalidPreset.put("creation.json", new String(root.get("creation.json"), java.nio.charset.StandardCharsets.UTF_8)
+                .replace("\"test:mechanics#fieldwork\": 1", "\"test:mechanics#fieldwork\": 2")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var importedPreset = registerVariant(invalidPreset, "test:root", "2.0.0", List.of(pin(pinned)));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.create(owner, adventure, request(importedPreset.revisionId(), UUID.randomUUID())));
+        var invalidLoadout = new TreeMap<>(root);
+        invalidLoadout.put("creation.json", new String(root.get("creation.json"), java.nio.charset.StandardCharsets.UTF_8)
+                .replace("\"quantity\": 1", "\"quantity\": 2").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var importedLoadout = registerVariant(invalidLoadout, "test:root", "3.0.0", List.of(pin(pinned)));
+        var stackFailure = assertThrows(IllegalArgumentException.class,
+                () -> service.create(owner, adventure, request(importedLoadout.revisionId(), UUID.randomUUID())));
+        assertEquals("starting loadout exceeds its stack limit", stackFailure.getMessage());
+        assertEquals(0, count("campaign"));
+        var created = service.create(owner, adventure, request(imported.revisionId(), UUID.randomUUID()));
+        assertEquals("1", jdbc.queryForObject("select skills ->> 'test:mechanics#fieldwork' from character_state "
+                + "where actor_id = ?", String.class, created.actorId()));
+        assertEquals("test:mechanics#kit", jdbc.queryForObject("select definition_id from item_instance", String.class));
+        assertEquals("test:mechanics#steady", jdbc.queryForObject("select definition_id from learned_ability", String.class));
+    }
+
+    /** A dependency-owned profile uses its own rules and qualifies its local grants and preset skills. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void resolvesExternalProfileAndLocationInTheirDeclaringPack() throws Exception {
+        var dependency = registerVariant(fixture("science-fiction-salvage"), "test:profile", "1.0.0", List.of());
+        var root = fixture("fantasy-exploration");
+        var manifest = document(root, "adventure.json");
+        var entry = (Map<String, Object>) manifest.get("entrypoint");
+        entry.put("creationProfile", "test:profile#traveler");
+        entry.put("location", "test:profile#dock");
+        root.put("adventure.json", JsonMapper.builder().build().writeValueAsBytes(manifest));
+        var imported = registerVariant(root, "test:root", "1.0.0", List.of(pin(dependency)));
+        var created = service.create(owner, adventure, request(imported.revisionId(), UUID.randomUUID()));
+        assertEquals("test:profile#traveler", jdbc.queryForObject("select definition_id from actor", String.class));
+        assertEquals("test:profile#dock", jdbc.queryForObject("select location_id from actor", String.class));
+        assertEquals("3", jdbc.queryForObject("select attributes ->> 'logic' from character_state", String.class));
+        assertEquals("2", jdbc.queryForObject("select skills ->> 'test:profile#fieldwork' from character_state", String.class));
+        assertEquals("test:profile#kit", jdbc.queryForObject("select definition_id from item_instance", String.class));
+        // Custom payloads also use canonical skill identities; a bare equal ID is not an alias.
+        var custom = new CampaignCreationService.Request(UUID.randomUUID(), imported.revisionId(), "Custom",
+                SupportedLocale.IT, new CharacterChoices("Player", null, Map.of(),
+                Map.of("test:profile#fieldwork", 1), null, null));
+        assertNotNull(service.create(owner, adventure, custom));
+        var ambiguous = new CampaignCreationService.Request(UUID.randomUUID(), imported.revisionId(), "Custom",
+                SupportedLocale.EN, new CharacterChoices("Player", null, Map.of(), Map.of("fieldwork", 1), null, null));
+        assertThrows(IllegalArgumentException.class, () -> service.create(owner, adventure, ambiguous));
+        assertNotNull(created.campaignId());
+    }
+
+    /** A diamond reuses the same sealed leaf; two different versions of its pack ID are ambiguous. */
+    @Test
+    void verifiesTransitivePinsAndRejectsConflictingVersions() throws Exception {
+        var files = fixture("fantasy-exploration");
+        var leaf = registerVariant(files, "test:leaf", "1.0.0", List.of());
+        var left = registerVariant(files, "test:left", "1.0.0", List.of(pin(leaf)));
+        var right = registerVariant(files, "test:right", "1.0.0", List.of(pin(leaf)));
+        var root = registerVariant(files, "test:root", "1.0.0", List.of(pin(left), pin(right)));
+        var snapshot = new TransactionTemplate(manager).execute(status -> registry.loadForCampaign(adventure, root.revisionId()));
+        assertEquals(4, snapshot.packs().size());
+        assertThrows(IllegalArgumentException.class, () -> snapshot.resolve(snapshot.root(), "test:leaf#kit", "item"));
+        assertThrows(IllegalArgumentException.class, () -> snapshot.resolve(snapshot.root(), "test:left#kit", "skill"));
+        assertNotNull(service.create(owner, adventure, request(root.revisionId(), UUID.randomUUID())));
+        var newer = registerVariant(files, "test:leaf", "2.0.0", List.of());
+        var conflicting = registerVariant(files, "test:right", "2.0.0", List.of(pin(newer)));
+        var invalid = registerVariant(files, "test:root", "2.0.0", List.of(pin(left), pin(conflicting)));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.create(owner, adventure, request(invalid.revisionId(), UUID.randomUUID())));
+        assertEquals(1, count("campaign"));
+    }
+
+    /** Chains of admitted packs cannot bypass the aggregate campaign traversal depth bound. */
+    @Test
+    void boundsDependencyDepthBeforeWriting() throws Exception {
+        var files = fixture("fantasy-exploration");
+        var last = registerVariant(files, "test:layer0", "1.0.0", List.of());
+        PackRegistry.Registration shared = last;
+        for (int index = 1; index <= 16; index++) {
+            last = registerVariant(files, "test:layer" + index, "1.0.0", List.of(pin(last)));
+            if (index == 14) {
+                shared = last;
+            }
+        }
+        assertNotNull(service.create(owner, adventure, request(last.revisionId(), UUID.randomUUID())));
+        last = registerVariant(files, "test:layer17", "1.0.0", List.of(pin(last)));
+        UUID root = last.revisionId();
+        assertThrows(IllegalArgumentException.class,
+                () -> service.create(owner, adventure, request(root, UUID.randomUUID())));
+        var side = registerVariant(files, "test:side", "1.0.0", List.of(pin(last)));
+        // Resolve the shared subtree first at shallow depth, then encounter it on a longer path.
+        var diamond = registerVariant(files, "test:diamond", "1.0.0", List.of(pin(shared), pin(side)));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.create(owner, adventure, request(diamond.revisionId(), UUID.randomUUID())));
+        assertEquals(1, count("campaign"));
+    }
+
+    /** Shared nodes count once; a root plus 32 distinct dependencies exceeds the revision cap. */
+    @Test
+    void boundsDistinctDependencyCount() throws Exception {
+        var files = fixture("fantasy-exploration");
+        List<Map<String, Object>> dependencies = new java.util.ArrayList<>();
+        for (int index = 0; index < 31; index++) {
+            dependencies.add(pin(registerVariant(files, "test:leaf" + index, "1.0.0", List.of())));
+        }
+        var allowed = registerVariant(files, "test:root", "1.0.0", dependencies);
+        assertNotNull(service.create(owner, adventure, request(allowed.revisionId(), UUID.randomUUID())));
+        dependencies.add(pin(registerVariant(files, "test:leaf31", "1.0.0", List.of())));
+        var rejected = registerVariant(files, "test:root", "2.0.0", dependencies);
+        assertThrows(IllegalArgumentException.class,
+                () -> service.create(owner, adventure, request(rejected.revisionId(), UUID.randomUUID())));
+        assertEquals(1, count("campaign"));
+    }
+
+    /** Reject an oversized aggregate before reading byte arrays; no giant fixture allocation is necessary. */
+    @Test
+    void boundsDependencyBytesBeforeParsing() {
+        var oversized = org.mockito.Mockito.spy(jdbc);
+        org.mockito.Mockito.doReturn(250L * 1024 * 1024 + 1).when(oversized).queryForObject(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq(Long.class),
+                org.mockito.ArgumentMatchers.any(UUID.class));
+        var bounded = new CampaignCreationService(jdbc, new PackRegistry(oversized, manager), manager);
+        var failure = assertThrows(IllegalArgumentException.class,
+                () -> bounded.create(owner, adventure, request(revision, UUID.randomUUID())));
+        assertEquals("campaign dependency byte limit exceeded", failure.getMessage());
+        assertEquals(0, count("campaign"));
+    }
+
+    /** Load a mutable fixture inventory; staging failures fail test setup. */
+    private Map<String, byte[]> fixture(String genre) throws Exception {
+        return new TreeMap<>(new PackStaging(PackStaging.Limits.standard()).directory(
+                Path.of(getClass().getResource("/packs/" + genre).toURI())).files());
+    }
+
+    /** Parse one fixture JSON object for controlled mutations; malformed fixture input fails setup. */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> document(Map<String, byte[]> files, String path) {
+        return JsonMapper.builder().build().readValue(files.get(path), Map.class);
+    }
+
+    /** Preserve each dependency's exact registered coordinates in a new manifest declaration. */
+    private static Map<String, Object> pin(PackRegistry.Registration registration) {
+        var pack = registration.pack();
+        return Map.of("id", pack.packId(), "version", pack.packVersion(), "hash", pack.contentHash());
+    }
+
+    /**
+     * Register an isolated fixture variant through real ZIP staging and sealing, without bypassing
+     * any database protections. Uncompressed ZIP entries keep archive ratio limits irrelevant here.
+     */
+    private PackRegistry.Registration registerVariant(Map<String, byte[]> original, String id, String version,
+            List<Map<String, Object>> dependencies) throws Exception {
+        var files = new TreeMap<>(original);
+        var manifest = document(files, "adventure.json");
+        manifest.put("id", id);
+        manifest.put("version", version);
+        manifest.put("dependencies", dependencies);
+        files.put("adventure.json", JsonMapper.builder().build().writeValueAsBytes(manifest));
+        var output = new ByteArrayOutputStream();
+        try (var zip = new ZipOutputStream(output)) {
+            zip.setLevel(0);
+            for (var file : files.entrySet()) {
+                zip.putNextEntry(new ZipEntry(file.getKey()));
+                zip.write(file.getValue());
+                zip.closeEntry();
+            }
+        }
+        return registry.register(adventure, new PackStaging(PackStaging.Limits.standard())
+                .archive(new ByteArrayInputStream(output.toByteArray())));
     }
 
     /** Register exact bundled bytes in this adventure; staging or semantic failures fail test setup. */

@@ -14,9 +14,10 @@ retain their standard precedence; configtree is not a secret manager.
 
 
 Partial P06.1 has verified internal creation foundations but no public creation
-admission. Session/CSRF protection and mechanical dependency-closure loading must
-be completed before its roadmap box closes; dependency mechanics currently fail
-closed. Service reconstruction tests durable retries, not full application/browser
+admission. Session/CSRF protection and actual restart acceptance must be completed
+before its roadmap box closes. Dependency mechanics now reload a bounded sealed
+closure; conflicting versions of one pack ID are rejected rather than aliased.
+Service reconstruction tests durable retries, not full application/browser
 restart acceptance. Existing campaigns receive no invented character-state backfill.
 
 ## 1. Risk register

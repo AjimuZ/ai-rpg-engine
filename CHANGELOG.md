@@ -9,7 +9,10 @@ This changelog records delivered project artifacts. Future functionality belongs
   Persist immutable scoped request identities for durable, concurrent safe retries.
 - Add V9 character/loadout storage and recovery allowlist coverage; preserve
   populated older schemas without inventing character choices or advancing counters.
-- Keep public creation transport and external dependency mechanics unfinished;
+- Load bounded transitive sealed dependency snapshots, resolve external creation
+  profiles and mechanics in their declaring namespace, and enforce actual pinned caps.
+  Reject ambiguous dependency versions and keep existing root-local identities stable.
+- Keep public creation transport unfinished;
   no creation endpoint or starting narration is exposed by this checkpoint.
 
 ## Unreleased — Staged interface integration dependencies, 24 October 2026

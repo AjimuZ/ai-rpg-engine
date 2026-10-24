@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.rpgengine.content.CompiledPack;
+import org.rpgengine.content.CampaignPackSnapshot;
 import org.rpgengine.content.Definition;
 
 /**
@@ -25,11 +26,21 @@ public final class CharacterCreation {
      * Starting grants come exclusively from the profile, never from player payload fields.
      */
     public static InitialCharacter resolve(CompiledPack pack, CharacterChoices choices) {
-        var entry = object(pack.parsed().manifest().values().get("entrypoint"));
-        String profileId = (String) entry.get("creationProfile");
-        String location = (String) entry.get("location");
-        requireDefinition(pack, location, "location");
-        var profile = requireDefinition(pack, profileId, "creation").data();
+        return resolve(CampaignPackSnapshot.local(pack), choices);
+    }
+
+    /**
+     * Resolve a registry-verified closure. References inside a dependency profile use that pack's
+     * namespace and rules; persisted skill, location and grant IDs are canonical root-relative
+     * references. Invalid choices or missing pinned mechanics fail before any persistence.
+     */
+    public static InitialCharacter resolve(CampaignPackSnapshot snapshot, CharacterChoices choices) {
+        var entry = object(snapshot.root().parsed().manifest().values().get("entrypoint"));
+        var creation = snapshot.resolve(snapshot.root(), (String) entry.get("creationProfile"), "creation");
+        String profileId = creation.id();
+        String location = snapshot.resolve(snapshot.root(), (String) entry.get("location"), "location").id();
+        CompiledPack source = creation.source();
+        var profile = creation.definition().data();
         Map<String, Integer> selectedAttributes = choices.attributes();
         Map<String, Integer> selectedSkills = choices.skills();
         if (choices.archetypeId() != null) {
@@ -37,19 +48,25 @@ public final class CharacterCreation {
                     .filter(value -> choices.archetypeId().equals(value.get("id"))).findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("unknown archetype"));
             selectedAttributes = integers(preset.getOrDefault("attributes", Map.of()));
-            selectedSkills = integers(preset.getOrDefault("skills", Map.of()));
+            selectedSkills = canonicalSkills(snapshot, source, integers(preset.getOrDefault("skills", Map.of())));
         }
         requireOption(profile, "backgrounds", choices.background());
         requireOption(profile, "roles", choices.role());
         List<String> allowedAttributes = strings(profile, "attributes");
-        List<String> allowedSkills = strings(profile, "skills");
+        Map<String, Definition> allowedSkills = new TreeMap<>();
+        for (String reference : strings(profile, "skills")) {
+            var resolved = snapshot.resolve(source, reference, "skill");
+            allowedSkills.put(resolved.id(), resolved.definition());
+        }
         if (!allowedAttributes.containsAll(selectedAttributes.keySet())
-                || !allowedSkills.containsAll(selectedSkills.keySet())) {
+                || !allowedSkills.keySet().containsAll(selectedSkills.keySet())) {
             throw new IllegalArgumentException("allocation is not allowed by the creation profile");
         }
         Map<String, Map<String, Object>> ranges = new TreeMap<>();
         Map<String, Integer> resources = new TreeMap<>();
-        for (Definition definition : pack.definitions()) {
+        // Attribute/resource vocabularies belong to the profile's declaring pack. Merging all
+        // dependency rules would silently overwrite equal keys from independent authored worlds.
+        for (Definition definition : source.definitions()) {
             if (definition.kind().equals("rule")) {
                 var data = definition.data();
                 if ("attributes".equals(data.get("ruleType"))) {
@@ -68,7 +85,7 @@ public final class CharacterCreation {
         for (String id : allowedAttributes) {
             var range = ranges.get(id);
             if (range == null) {
-                throw new IllegalArgumentException("attribute has no local rule definition");
+                throw new IllegalArgumentException("attribute has no profile rule definition");
             }
             int minimum = number(range, "min", 0);
             int value = selectedAttributes.getOrDefault(id, minimum);
@@ -80,8 +97,9 @@ public final class CharacterCreation {
         }
         Map<String, Integer> skills = new TreeMap<>();
         int skillCost = 0;
-        for (String id : allowedSkills) {
-            var skill = requireDefinition(pack, id, "skill");
+        for (var entrySkill : allowedSkills.entrySet()) {
+            String id = entrySkill.getKey();
+            var skill = entrySkill.getValue();
             int rank = selectedSkills.getOrDefault(id, 0);
             if (rank < 0 || rank > number(skill.data(), "maxRank", 2)) {
                 throw new IllegalArgumentException("skill is outside its declared bounds");
@@ -95,9 +113,11 @@ public final class CharacterCreation {
         }
         List<StartingItem> items = new ArrayList<>();
         Map<String, Integer> quantities = new TreeMap<>();
+        Map<String, Integer> maxima = new TreeMap<>();
         for (var grant : objects(profile, "startingItems")) {
-            String id = (String) grant.get("item");
-            var item = requireDefinition(pack, id, "item");
+            var resolved = snapshot.resolve(source, (String) grant.get("item"), "item");
+            String id = resolved.id();
+            var item = resolved.definition();
             int quantity = number(grant, "quantity", 1);
             int maximum = number(item.data(), "maxStack", 1);
             // Repeated grants cannot bypass a stack limit by becoming indistinguishable stacks.
@@ -105,24 +125,21 @@ public final class CharacterCreation {
             if (quantity < 1 || total > maximum) {
                 throw new IllegalArgumentException("starting loadout exceeds its stack limit");
             }
+            maxima.put(id, maximum);
         }
-        quantities.forEach((id, quantity) -> items.add(new StartingItem(id, quantity,
-                number(requireDefinition(pack, id, "item").data(), "maxStack", 1))));
-        List<String> abilities = strings(profile, "startingAbilities");
-        for (String id : abilities) {
-            requireDefinition(pack, id, "ability");
-        }
+        quantities.forEach((id, quantity) -> items.add(new StartingItem(id, quantity, maxima.get(id))));
+        List<String> abilities = strings(profile, "startingAbilities").stream()
+                .map(id -> snapshot.resolve(source, id, "ability").id()).toList();
         // Explicit authored grants do not run action predicates or spend resources during creation.
         return new InitialCharacter(profileId, location, attributes, skills, resources, items, abilities);
     }
 
-    /** Return a local definition of the required kind; external mechanics fail closed in this checkpoint. */
-    private static Definition requireDefinition(CompiledPack pack, String id, String kind) {
-        Definition definition = pack.byId().get(id);
-        if (definition == null || !definition.kind().equals(kind)) {
-            throw new IllegalArgumentException("creation requires a local " + kind + " definition: " + id);
-        }
-        return definition;
+    /** Qualify authored preset skill keys, preserving their ranks and rejecting unresolved references. */
+    private static Map<String, Integer> canonicalSkills(CampaignPackSnapshot snapshot, CompiledPack source,
+            Map<String, Integer> skills) {
+        Map<String, Integer> result = new TreeMap<>();
+        skills.forEach((id, rank) -> result.put(snapshot.resolve(source, id, "skill").id(), rank));
+        return result;
     }
 
     /** Require an optional choice to match an authored label exactly; absence is allowed. */

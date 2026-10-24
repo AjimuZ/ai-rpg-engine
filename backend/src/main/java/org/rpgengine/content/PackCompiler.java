@@ -718,11 +718,11 @@ public final class PackCompiler {
         /** Check skill ranks against each skill's maxRank; returns the total ranks. */
         private int skillRanks(Fields f, String key) {
             int total = 0;
-            for (var entry : f.intMap(key, 0, 10, LIST_MAX).entrySet()) {
+            for (var entry : f.intRefs(key, 0, 10, LIST_MAX, SKILL).entrySet()) {
                 String pointer = f.keyPointer(key, entry.getKey());
-                f.resolve(pointer, entry.getKey(), SKILL);
-                Object declared = byId.get(entry.getKey()) == null ? null : byId.get(entry.getKey()).data().get("maxRank");
-                int max = declared instanceof Number n ? n.intValue() : 2;
+                // Import sees only dependency export kinds. Campaign loading checks the actual
+                // pinned cap; until then use the same global bound as other external skill refs.
+                int max = skillMax(entry.getKey());
                 if (entry.getValue() > max) {
                     throw new PackException("RANGE", f.document().location(pointer), "Rank exceeds the skill's maxRank " + max);
                 }
@@ -765,7 +765,7 @@ public final class PackCompiler {
                 if (attributeValues(archetype, "attributes") > attributeBudget) {
                     throw archetype.fail("RANGE", "attributes", "Archetype exceeds the attribute budget");
                 }
-                for (String key : archetype.intMap("skills", 0, 10, LIST_MAX).keySet()) {
+                for (String key : archetype.intRefs("skills", 0, 10, LIST_MAX, SKILL).keySet()) {
                     if (!allowedSkills.contains(key)) {
                         throw new PackException("REFERENCE_UNKNOWN", archetype.document().location(archetype.keyPointer("skills", key)),
                                 "Skill is not allowed by this creation profile");

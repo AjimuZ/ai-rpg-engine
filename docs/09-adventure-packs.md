@@ -4,8 +4,26 @@
 Partial P06.1 adds an internal snapshot consumer for creation: it loads only a
 sealed revision in the selected adventure, verifies the byte inventory hash and
 current ruleset contract, and recompiles it inside the creation transaction.
-Player allocations cannot supply grants. Referenced external mechanical definitions
-fail closed in this checkpoint; loading their pinned closure remains unfinished.
+Player allocations cannot supply grants. Creation reloads the transitive dependency
+closure using exact adventure-scoped ID/version/hash pins, verifies every sealed
+inventory and ruleset, and recompiles each pack. No filesystem or network is read.
+The closure permits at most 32 revisions, traversal depth 16 (root depth zero),
+and 250 MiB of stored file bytes in total. Cycles and different versions of the
+same pack ID fail closed; `pack#definition` references cannot distinguish versions.
+These are campaign loading limits; registration can admit a larger dependency graph.
+
+Creation references are resolved relative to their declaring pack and only its
+direct declared dependencies. An external creation profile uses its own attribute
+and resource rules; rules from unrelated packs are never merged. Persisted IDs and
+custom skill allocation keys keep root-local IDs bare and qualify all other IDs
+as `pack#definition`. Preset skills and starting grants receive the same canonical
+identities. Actual dependency skill/stack caps are checked at creation, even when
+registration validated only export metadata. The immutable root manifest and its
+transitive sealed manifests pin the closure; no mutable dependency index is saved.
+Preset skill maps accept the same typed qualified references as skill allowlists;
+attribute/property map keys remain local identifiers. With export metadata alone,
+the compiler checks external preset ranks against the global cap of ten; creation
+then enforces each dependency skill's actual maximum before committing any state.
 
 ## 1. Purpose and contract status
 

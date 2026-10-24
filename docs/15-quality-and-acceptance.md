@@ -6,6 +6,13 @@ loadout checks, real PostgreSQL atomic creation, ownership, same-ID genre isolat
 durable and concurrent retries, deferred COMMIT rollback, and populated V8-to-V9
 upgrade without backfill. This is internal-service evidence, not full P06 public
 campaign reload/consultation or browser acceptance.
+The dependency checkpoint adds real sealed transitive/diamond loading, exact
+version pinning after later imports, namespace separation for external profiles,
+preset/custom actual skill caps, external stack caps, conflicting-version rejection
+and aggregate count/depth bounds. The byte-cap case substitutes only the aggregate
+size query to avoid allocating a giant fixture; all other persistence stays real.
+Packaged backend verification passes all 281 tests on PostgreSQL 18.6; all 22
+repository policy tests pass and repository scans report zero findings.
 
 ## 1. Evidence policy
 

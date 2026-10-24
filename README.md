@@ -63,8 +63,8 @@ See the [pack contract](docs/09-adventure-packs.md).
 
 The partial P06.1 checkpoint adds internal atomic campaign creation from sealed
 pack bytes, validated character budgets and authored grants, with durable retries
-and V9 storage. Public creation transport/session protection and external
-mechanical dependency resolution remain unfinished; no playable creation route
+and V9 storage. Pinned external mechanics now load from a bounded sealed dependency
+closure. Public creation transport/session protection remains unfinished; no playable creation route
 is exposed. See [backend scope](backend/README.md#internal-campaign-creation-checkpoint-partial-p061).
 
 ## Why this engine exists
