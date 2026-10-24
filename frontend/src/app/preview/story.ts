@@ -19,12 +19,12 @@ import { UiIcon } from './ui-kit';
         @if (state.readingLayout() === 'visual-novel') {
         <figure class="scene">
           @if (!imageFailed()) { <img [src]="adventure.scene" [alt]="adventure.sceneAlt" (error)="imageFailed.set(true)" width="1200" height="640" /> }
-          @else { <p class="scene-fallback">Scene illustration unavailable. {{ adventure.sceneAlt }}</p> }
-          <figcaption>Illustrative scene · local preview</figcaption>
+          @else { <p class="scene-fallback" i18n="@@story.sceneUnavailable">Scene illustration unavailable. {{ adventure.sceneAlt }}</p> }
+          <figcaption i18n="@@story.sceneCaption">Illustrative scene · local preview</figcaption>
         </figure>
         } @else { <p class="scene-description">{{ adventure.sceneAlt }}</p> }
         @if (passage(); as current) {
-          <section #dialogue class="dialogue" tabindex="-1" aria-label="Current passage" aria-live="polite" aria-atomic="true">
+          <section #dialogue class="dialogue" tabindex="-1" aria-label="Current passage" i18n-aria-label="@@story.passageLabel" aria-live="polite" aria-atomic="true">
             @if (current.speaker === 'character' && state.readingLayout() === 'visual-novel') {
               <div class="portrait-frame">
                 @if (speaker()?.portrait && !portraitFailed()) {
@@ -33,49 +33,62 @@ import { UiIcon } from './ui-kit';
               </div>
             }
             <div class="dialogue-text"><p class="speaker">{{ speakerName(current) }}
-              <span class="muted">{{ current.speaker === 'character' ? 'Character' : current.speaker === 'player' ? 'Player' : 'Narration' }}</span>
+              <span class="muted">{{ current.speaker === 'character' ? labels.character : current.speaker === 'player' ? labels.player : labels.narration }}</span>
             </p>
             <p class="passage">{{ current.text }}</p></div>
           </section>
-          <div class="reading-controls"><button (click)="advance(dialogue)" [disabled]="atEnd()" aria-describedby="reading-progress"><app-ui-icon name="continue" />Continue</button>
-            <span id="reading-progress">Passage {{ state.position(adventure.id) + 1 }} of {{ adventure.passages.length }} · {{ atEnd() ? 'End of available passages' : 'reading only' }}</span>
+          <div class="reading-controls"><button (click)="advance(dialogue)" [disabled]="atEnd()" aria-describedby="reading-progress" i18n="@@story.continue"><app-ui-icon name="continue" />Continue</button>
+            <span id="reading-progress" i18n="@@story.progress">Passage {{ state.position(adventure.id) + 1 }} of {{ adventure.passages.length }} · {{ atEnd() ? labels.end : labels.readingOnly }}</span>
           </div>
         } @else {
-          <p role="status">No passages are available.</p>
+          <p role="status" i18n="@@story.empty">No passages are available.</p>
         }
-        <details class="chronicle"><summary>Chronicle</summary>
+        <details class="chronicle"><summary><span i18n="@@story.chronicle">Chronicle</span> · <span i18n="@@story.revealedCount">{revealedCount(), plural, =0 {No passages} =1 {One passage} other {{{ revealedCount() }} passages}}</span></summary>
           <ol>
-          @for (entry of adventure.passages.slice(0, state.position(adventure.id) + 1); track $index) {
-            <li><p><strong>{{ speakerName(entry) }} ({{ entry.speaker === 'character' ? 'Character' : entry.speaker === 'player' ? 'Player' : 'Narration' }}):</strong> {{ entry.text }}</p></li>
+          @for (entry of adventure.passages.slice(0, revealedCount()); track $index) {
+            <li><p><strong>{{ speakerName(entry) }} ({{ entry.speaker === 'character' ? labels.character : entry.speaker === 'player' ? labels.player : labels.narration }}):</strong> {{ entry.text }}</p></li>
           }
           </ol>
         </details>
         <div class="composer">
           <p role="status" aria-live="polite">{{ statusMessage() }}</p>
-          <p id="suggestion-help" class="muted">Suggestions fill an empty draft. Edit freely; clear your draft before choosing another.</p>
-          <ul class="quick-replies" aria-label="Suggestions">
+          <p id="suggestion-help" class="muted" i18n="@@story.suggestionHelp">Suggestions fill an empty draft. Edit freely; clear your draft before choosing another.</p>
+          <ul class="quick-replies" aria-label="Suggestions" i18n-aria-label="@@story.suggestionsLabel">
             @for (reply of input.suggestions(); track reply.id) {
               <li><button type="button" data-suggestion [disabled]="!canChoose()" aria-describedby="suggestion-help"
-                (click)="choose(reply, playerInput)">{{ reply.kind === 'question' ? 'Question' : reply.kind === 'speech' ? 'Speech' : 'Action' }}: {{ reply.text }}</button>
-                <button type="button" data-dismiss [attr.aria-label]="'Dismiss suggestion: ' + reply.text"
-                  (click)="dismiss(reply.id, playerInput)">Dismiss</button></li>
+                (click)="choose(reply, playerInput)">{{ reply.kind === 'question' ? labels.question : reply.kind === 'speech' ? labels.speech : labels.action }}: {{ reply.text }}</button>
+                <button type="button" data-dismiss [attr.aria-label]="dismissLabel(reply.text)"
+                  (click)="dismiss(reply.id, playerInput)" i18n="@@story.dismiss">Dismiss</button></li>
             }
           </ul>
-          <label for="player-input">What do you say or do?</label>
+          <label for="player-input" i18n="@@story.inputLabel">What do you say or do?</label>
           <textarea #playerInput id="player-input" [value]="input.draft().text" maxlength="4000"
-            placeholder="Write a draft…" rows="3" aria-describedby="draft-status composer-help"
+            placeholder="Write a draft…" i18n-placeholder="@@story.draftPlaceholder" rows="3" aria-describedby="draft-status composer-help"
             (input)="saveDraft(playerInput)" (select)="saveDraft(playerInput)" (keyup)="saveDraft(playerInput)"
             (click)="saveDraft(playerInput)" (focus)="restoreSelection(playerInput)"></textarea>
-          <div class="composer-actions"><button type="button" data-send disabled><app-ui-icon name="send" />Send</button>
-            <button type="button" (click)="clearDraft(playerInput)" [disabled]="input.draft().text === ''">Clear draft</button></div>
-          <p id="draft-status" class="muted">{{ input.persistence() === 'saved' ? 'Draft saved on this device.' : input.persistence() === 'invalid' ? 'Saved draft could not be restored. New edits will replace it.' : 'Draft kept in this tab only. Device storage is unavailable.' }}</p>
-          <p id="composer-help" class="muted">Reading and suggestions never submit an action. No campaign is connected; Send is unavailable.</p>
+          <div class="composer-actions"><button type="button" data-send disabled i18n="@@story.send"><app-ui-icon name="send" />Send</button>
+            <button type="button" (click)="clearDraft(playerInput)" [disabled]="input.draft().text === ''" i18n="@@story.clear">Clear draft</button></div>
+          <p id="draft-status" class="muted">{{ input.persistence() === 'saved' ? labels.saved : input.persistence() === 'invalid' ? labels.invalid : labels.unavailable }}</p>
+          <p id="composer-help" class="muted" i18n="@@story.composerHelp">Reading and suggestions never submit an action. No campaign is connected; Send is unavailable.</p>
         </div>
       </section>
     }
   `,
 })
 export class Story {
+  readonly labels = {
+    unavailable: $localize`:@@story.unavailable:Draft kept in this tab only. Device storage is unavailable.`,
+    invalid: $localize`:@@story.invalid:Saved draft could not be restored. New edits will replace it.`,
+    saved: $localize`:@@story.saved:Draft saved on this device.`,
+    readingOnly: $localize`:@@story.readingOnly:reading only`,
+    end: $localize`:@@story.end:End of available passages`,
+    action: $localize`:@@story.action:Action`,
+    speech: $localize`:@@story.speech:Speech`,
+    question: $localize`:@@story.question:Question`,
+    narration: $localize`:@@story.narration:Narration`,
+    player: $localize`:@@story.player:Player`,
+    character: $localize`:@@story.character:Character`,
+  };
   readonly context = inject(WorkspaceContext);
   readonly state = inject(PreviewState);
   readonly input = inject(StoryInputState);
@@ -84,17 +97,17 @@ export class Story {
     this.input.draft().text === '' && ['preview', 'ready'].includes(this.input.status()));
   readonly statusMessage = computed(/** Use safe local wording; raw transport errors never reach live regions. */ () => {
     const messages: Record<StoryStatus, string> = {
-      loading: 'Loading current context. You can keep drafting.',
-      preview: 'Local preview. Drafting is available; no campaign is connected.',
-      ready: 'Current context is available. No campaign transport is connected.',
-      disconnected: 'Connection unavailable. Your last context and draft remain available.',
-      reconnecting: 'Connection restored. Operation status must be checked before any retry. Your draft will not be sent.',
-      error: 'Context could not be refreshed. Your last context and draft remain available.',
-      'stale-revision': 'The world has changed. Refresh current context before sending; your draft is preserved.',
-      clarification: 'Clarification is needed. Review the pending operation before sending another action.',
-      cancelled: 'The operation was cancelled before commit. Your draft is preserved.',
-      'narration-pending': 'The action was saved; narration is pending. Do not resend the action.',
-      'restore-required': 'Campaign recovery is required before sending. Your draft is preserved.',
+      loading: $localize`:@@story.status.loading:Loading current context. You can keep drafting.`,
+      preview: $localize`:@@story.status.preview:Local preview. Drafting is available; no campaign is connected.`,
+      ready: $localize`:@@story.status.ready:Current context is available. No campaign transport is connected.`,
+      disconnected: $localize`:@@story.status.disconnected:Connection unavailable. Your last context and draft remain available.`,
+      reconnecting: $localize`:@@story.status.reconnecting:Connection restored. Operation status must be checked before any retry. Your draft will not be sent.`,
+      error: $localize`:@@story.status.error:Context could not be refreshed. Your last context and draft remain available.`,
+      'stale-revision': $localize`:@@story.status.staleRevision:The world has changed. Refresh current context before sending; your draft is preserved.`,
+      clarification: $localize`:@@story.status.clarification:Clarification is needed. Review the pending operation before sending another action.`,
+      cancelled: $localize`:@@story.status.cancelled:The operation was cancelled before commit. Your draft is preserved.`,
+      'narration-pending': $localize`:@@story.status.narrationPending:The action was saved; narration is pending. Do not resend the action.`,
+      'restore-required': $localize`:@@story.status.restoreRequired:Campaign recovery is required before sending. Your draft is preserved.`,
     };
     return messages[this.input.status()];
   });
@@ -115,6 +128,11 @@ export class Story {
         }
       });
     });
+  }
+
+  /** Produce a localized accessible name for literal reply text; interpolation never parses HTML. */
+  dismissLabel(reply: string): string {
+    return $localize`:@@story.dismissLabel:Dismiss suggestion: ${reply}:reply:`;
   }
 
   /** Save literal draft text and native selection; storage failures remain visible without blocking editing. */
@@ -170,13 +188,17 @@ export class Story {
     const adventure = this.context.adventure();
     return !adventure || this.state.position(adventure.id) >= adventure.passages.length - 1;
   });
+  readonly revealedCount = computed(/** Count only already revealed public passages; missing content remains an empty chronicle. */ () => {
+    const adventure = this.context.adventure();
+    return adventure ? Math.min(this.state.position(adventure.id) + 1, adventure.passages.length) : 0;
+  });
 
   /** Resolve an attributed passage label; unknown public people use their supplied label or neutral wording. */
   speakerName(entry: Passage): string {
-    if (entry.speaker === 'player') return 'You';
-    if (entry.speaker === 'narrator') return 'Narrator';
+    if (entry.speaker === 'player') return $localize`:@@story.you:You`;
+    if (entry.speaker === 'narrator') return $localize`:@@story.narrator:Narrator`;
     const known = entry.speakerId ? this.context.adventure()?.speakers[entry.speakerId] : undefined;
-    return known?.name.trim() || entry.name.trim() || 'Unknown character';
+    return known?.name.trim() || entry.name.trim() || $localize`:@@story.unknown:Unknown character`;
   }
 
   /** Reveal supplied text only; at the end, move focus before Continue disables to avoid losing keyboard position. */

@@ -31,41 +31,42 @@ export interface AdventurePreview {
   readonly content: ContentMetadata;
 }
 
-/** Hand-authored public projections; fixture terms are mirrored, while registered pack APIs belong to P06. */
+/** Reviewed locale-specific public preview text; stable titles, IDs and artwork are unchanged.
+ * Hand-authored public projections; fixture terms are mirrored, while registered pack APIs belong to P06. */
 const previews: readonly AdventurePreview[] = [
   {
-    id: 'mosslight', title: 'Mosslight Trail', description: 'A woodland exploration preview.',
-    scene: '/scenes/woodland.svg', sceneAlt: 'A winding trail crosses a quiet grove beneath layered green canopies.',
-    location: 'Trailhead', passages: [
-      { speaker: 'narrator', name: 'Narrator', text: 'The trail opens into a quiet grove. Pale light settles on the path ahead.',
-        suggestions: [{ id: 'observe', kind: 'action', text: 'Look around the grove.' }, { id: 'listen', kind: 'action', text: 'Listen to the sounds nearby.' }] },
-      { speaker: 'character', speakerId: 'keeper', name: 'Trail keeper', text: 'The path continues through the trees. What would you like to know?',
-        suggestions: [{ id: 'ask', kind: 'question', text: 'What lies along the trail?' }] },
+    id: 'mosslight', title: 'Mosslight Trail', description: $localize`:@@preview.woodlandDescription:A woodland exploration preview.`,
+    scene: '/scenes/woodland.svg', sceneAlt: $localize`:@@preview.woodlandAlt:A winding trail crosses a quiet grove beneath layered green canopies.`,
+    location: $localize`:@@preview.trailhead:Trailhead`, passages: [
+      { speaker: 'narrator', name: $localize`:@@preview.narrator:Narrator`, text: $localize`:@@preview.grovePassage:The trail opens into a quiet grove. Pale light settles on the path ahead.`,
+        suggestions: [{ id: 'observe', kind: 'action', text: $localize`:@@preview.observeGrove:Look around the grove.` }, { id: 'listen', kind: 'action', text: $localize`:@@preview.listenGrove:Listen to the sounds nearby.` }] },
+      { speaker: 'character', speakerId: 'keeper', name: $localize`:@@preview.keeper:Trail keeper`, text: $localize`:@@preview.keeperPassage:The path continues through the trees. What would you like to know?`,
+        suggestions: [{ id: 'ask', kind: 'question', text: $localize`:@@preview.askTrail:What lies along the trail?` }] },
     ],
-    speakers: { keeper: { name: 'Trail keeper', portrait: '/portraits/keeper.svg' } },
+    speakers: { keeper: { name: $localize`:@@preview.keeper:Trail keeper`, portrait: '/portraits/keeper.svg' } },
     content: {
-      attributes: [{ id: 'awareness', name: 'Awareness' }],
-      resources: [{ id: 'vigor', name: 'Vigor' }],
+      attributes: [{ id: 'awareness', name: $localize`:@@preview.awareness:Awareness` }],
+      resources: [{ id: 'vigor', name: $localize`:@@preview.vigor:Vigor` }],
       // Preview-only configuration does not enable the authored-pack compiler's module runtime.
-      modules: { guide: { title: 'Trail guide', description: 'A place for public exploration guidance.' } },
+      modules: { guide: { title: $localize`:@@preview.guide:Trail guide`, description: $localize`:@@preview.guideDescription:A place for public exploration guidance.` } },
     },
   },
   {
-    id: 'relay', title: 'Silent Relay', description: 'A science-fiction salvage preview.',
-    scene: '/scenes/station.svg', sceneAlt: 'A blue-lit station corridor leads from the docking ring toward a silent relay.',
-    location: 'Dock', passages: [
-      { speaker: 'narrator', name: 'Narrator', text: 'Beyond the docking ring, a line of blue lamps marks the station corridor.',
-        suggestions: [{ id: 'observe', kind: 'action', text: 'Look along the station corridor.' }] },
-      { speaker: 'character', speakerId: 'attendant', name: 'Dock attendant', text: 'The relay is quiet. Where would you like to begin your survey?',
-        suggestions: [{ id: 'ask', kind: 'question', text: 'What is known about the relay?' }] },
+    id: 'relay', title: 'Silent Relay', description: $localize`:@@preview.relayDescription:A science-fiction salvage preview.`,
+    scene: '/scenes/station.svg', sceneAlt: $localize`:@@preview.stationAlt:A blue-lit station corridor leads from the docking ring toward a silent relay.`,
+    location: $localize`:@@preview.dock:Dock`, passages: [
+      { speaker: 'narrator', name: $localize`:@@preview.narrator:Narrator`, text: $localize`:@@preview.stationPassage:Beyond the docking ring, a line of blue lamps marks the station corridor.`,
+        suggestions: [{ id: 'observe', kind: 'action', text: $localize`:@@preview.observeStation:Look along the station corridor.` }] },
+      { speaker: 'character', speakerId: 'attendant', name: $localize`:@@preview.attendant:Dock attendant`, text: $localize`:@@preview.attendantPassage:The relay is quiet. Where would you like to begin your survey?`,
+        suggestions: [{ id: 'ask', kind: 'question', text: $localize`:@@preview.askRelay:What is known about the relay?` }] },
     ],
-    speakers: { attendant: { name: 'Dock attendant', portrait: '/portraits/attendant.svg' } },
+    speakers: { attendant: { name: $localize`:@@preview.attendant:Dock attendant`, portrait: '/portraits/attendant.svg' } },
     content: {
-      terms: { sheet: 'Crew profile', inventory: 'Cargo', journal: 'Mission log', characterName: 'Specialist name',
-        abilities: 'Techniques', equipment: 'Installed equipment', quests: 'Known assignments' },
-      attributes: [{ id: 'logic', name: 'Logic' }],
-      resources: [{ id: 'charge', name: 'Charge' }],
-      modules: { creativeAbilities: { title: 'Field techniques', description: 'A place to inspect supported custom techniques.' } },
+      terms: { sheet: $localize`:@@preview.crew:Crew profile`, inventory: $localize`:@@preview.cargo:Cargo`, journal: $localize`:@@preview.missionLog:Mission log`, characterName: $localize`:@@preview.specialist:Specialist name`,
+        abilities: $localize`:@@preview.techniques:Techniques`, equipment: $localize`:@@preview.equipment:Installed equipment`, quests: $localize`:@@preview.assignments:Known assignments` },
+      attributes: [{ id: 'logic', name: $localize`:@@preview.logic:Logic` }],
+      resources: [{ id: 'charge', name: $localize`:@@preview.charge:Charge` }],
+      modules: { creativeAbilities: { title: $localize`:@@preview.fieldTechniques:Field techniques`, description: $localize`:@@preview.fieldDescription:A place to inspect supported custom techniques.` } },
     },
   },
 ];

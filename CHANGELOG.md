@@ -4,13 +4,18 @@ This changelog records delivered project artifacts. Future functionality belongs
 
 ## Unreleased — Localization review foundation (partial P05.6), 24 October 2026
 
+- Extend to 212 unique reviewed messages across every local preview screen,
+  public sample passages/metadata, forms, preview receipts, recovery, kit and
+  accessibility. Preserve IDs, proper adventure titles and literal player drafts.
+- Add chronicle ICU plurals and locale-formatted resource text without changing
+  numeric ARIA/protocol values. Verify native localized reading/form journeys.
 - Pin Angular localize 22.2.3 and add separate English/Italian review builds with
   26 reviewed navigation/Settings messages, accessible labels and page titles.
 - Reject missing, blank, stale, extra or duplicate translations and mismatched
   placeholders before compilation; run checker tests and review builds in CI.
 - Verify both Settings variants in Chrome, including narrow layouts, keyboard
   focus, locale bases, same-origin resource hashes, notices and missing-file 404s.
-- Keep the packaged English preview while remaining screens, localized errors,
+- Keep the packaged English preview while real transport errors/receipts,
   safe persisted language reload and real localized packaging are implemented.
 
 ## Unreleased — Complete local interface graphic kit (P05.5), 24 October 2026

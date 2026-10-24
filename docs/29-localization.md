@@ -2,8 +2,9 @@
 
 ## 1. Status and supported release
 
-P04.6 implements pack text catalogs and EN/IT fixture resources; localized UI and
-narration remain later work. P03.1 stores
+P04.6 implements pack text catalogs and EN/IT fixture resources; P05.6 provides
+separate EN/IT review variants for all local preview screens. Persisted language,
+safe reload, packaged localized delivery and narration remain later work. P03.1 stores
 the owner's UI locale, each campaign's narrative locale and the locale, glossary
 and media generations outside the canonical counters. English is
 the default; English and Italian are both required for the first playable MVP
@@ -14,8 +15,9 @@ English-only initial UI assumption in the earlier vision, under [ADR 0015](adr/0
 ## 2. A small preference model
 
 P05.2's typed local presentation metadata supplies scoped names/terminology and
-neutral English fallbacks only. It does not resolve compiled text catalogs, select
-a language or persist preferences; those UI/catalog bindings remain P05.6/P06.
+neutral fallbacks. P05.6 localizes the local preview metadata and neutral terms
+through compiled catalogs. Pack catalog bindings remain P06; language selection
+and persistence remain pending in P05.6.
 Stable definition IDs remain separate from their displayed names.
 
 | Value | Scope and purpose | Change behavior |
@@ -52,18 +54,22 @@ language-scoped thread/context generation handles future output.
 Choose Angular's built-in extraction and compile-time localized variants with
 stable semantic message IDs. Keep source English and reviewed Italian XLIFF
 resources, ICU plurals/selects and placeholder types. P05.6 pins `@angular/localize`
-to the existing Angular 22.2.3 baseline. Translation coverage and localized
-packaging remain in progress. Mark missing required translations as build failures. Avoid string
+to the existing Angular 22.2.3 baseline. Localized packaging and language-switch
+restoration remain in progress. Mark missing required translations as build failures. Avoid string
 concatenation, inline hardcoded error prose and HTML returned by a model.
 
-The first P05.6 checkpoint marks/reviews 26 shell messages (navigation, Settings,
-its accessible navigation name, reading-size placeholder, credits and two browser
-titles). `npm run build:locales` checks fresh extracted IDs, exact source freshness,
+The second P05.6 checkpoint reviews 212 unique messages covering every local
+preview screen, public sample passages/metadata/suggestions, neutral terminology,
+validation, unsaved receipts, recovery states, kit, fallbacks and accessibility.
+Adventure titles, stable IDs, asset paths, technical icon inventory identifiers
+and user drafts remain unchanged. Chronicle counts use reviewed ICU zero/one/many
+branches, and numeric meter text uses the compiled locale without changing numeric
+ARIA/protocol values. `npm run build:locales` checks fresh extracted IDs, exact source freshness,
 nonempty Italian targets and placeholder occurrence parity before compiling review
 variants into `dist/engine-ui-localized/browser/{en,it}/`. Missing/duplicate
 translations are build errors. [Resource instructions](../frontend/src/locale/README.md)
-describe the review scope and tests. English outside this marked shell remains
-untranslated. These separate review builds do not replace the default production
+describe the review scope and tests. Real backend error/receipt and source-pack
+fallback bindings await campaign transport. These separate review builds do not replace the default production
 build or establish localized jar delivery, safe language switching or full QA-35.
 
 Build `/en/` and `/it/` static variants into the same Spring application artifact.
@@ -81,16 +87,16 @@ the selected design uses an explicit safe reload, not a promised instantaneous
 runtime language switch. A third-party runtime translation framework is deferred
 unless a measured requirement makes this approach inadequate.
 
-P05.4 supplies the English-only local foundation: versioned adventure/campaign
+P05.4 supplies the local foundation: versioned adventure/campaign
 scoped draft text and selection persistence across reload, without submission.
 Reading preferences/positions remain tab-lifetime; no operation is created or
-persisted by the preview composer. Language resources, locale-generation guards,
+persisted by the preview composer. P05.6 review resources cover both languages; locale-generation guards,
 operation identity and full language-switch restoration remain P05.6/P06/P07.
 
-P05.5 adds the English-only graphic-kit review and credits/source inventory.
+P05.5 adds the graphic-kit review and credits/source inventory.
 Its control, meter, rarity and fallback labels remain live text beside decorative
-SVG geometry; no translated text is embedded in artwork. Localizing those labels,
-review examples and accessible names is part of P05.6, with the existing screens.
+SVG geometry; no translated text is embedded in artwork. P05.6 review variants
+localize those labels, review examples and accessible names with the other screens.
 
 Before reload, persist the adventure/campaign-scoped input draft, operation ID,
 last stream cursor and reading position. Wait for or reconcile an outstanding

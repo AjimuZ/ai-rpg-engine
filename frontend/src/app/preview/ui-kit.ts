@@ -1,5 +1,6 @@
 /** Original scalable UI primitives: fixed geometry only; labels and values always remain live text. */
 import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 
 /** Original 24-unit line drawings; no URLs, markup or pack-provided path data are accepted. */
 export const ICONS = {
@@ -40,15 +41,15 @@ export class UiIcon {
 
 /** Render bounded finite resource values; missing/invalid data yields labeled unavailability rather than a false zero. */
 @Component({
-  selector: 'app-ui-meter', changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-ui-meter', imports: [DecimalPipe], changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<div class="resource-meter"><span>{{ label() }}</span>
     @if (range(); as current) {
-      <span>{{ current.value }} / {{ current.max }}</span>
+      <span>{{ current.value | number }} / {{ current.max | number }}</span>
       <div class="meter-track" role="meter" [attr.aria-label]="label()" aria-valuemin="0"
         [attr.aria-valuenow]="current.value" [attr.aria-valuemax]="current.max">
         <span class="meter-fill" [style.width.%]="current.percent"></span>
       </div>
-    } @else { <span>Not connected</span><div class="meter-track unavailable" aria-hidden="true"></div> }
+    } @else { <span i18n="@@kit.disconnected">Not connected</span><div class="meter-track unavailable" aria-hidden="true"></div> }
   </div>`,
 })
 export class UiMeter {
@@ -79,43 +80,45 @@ export class UiMeter {
   </figure>`,
 })
 export class UiItem {
-  readonly label = input('Empty slot');
-  readonly rarity = input('No item');
+  readonly label = input($localize`:@@kit.emptySlot:Empty slot`);
+  readonly rarity = input($localize`:@@kit.noItem:No item`);
   readonly sample = input(false);
 }
 
 /** Local review surface exercises the production theme without fabricating campaign balances or item ownership. */
 @Component({
   selector: 'app-graphic-kit', imports: [UiIcon, UiMeter, UiItem], changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<section class="panel graphic-kit"><h1>Interface graphic kit</h1>
-    <p>Theme samples only. Values and items below are examples, independent of any playthrough.</p>
-    <h2>Controls</h2><div class="kit-row">
-      <button type="button" (click)="selected.set(!selected())" [attr.aria-pressed]="selected()"><app-ui-icon name="creative" />{{ selected() ? 'Selected' : 'Select sample' }}</button>
-      <button type="button" disabled>Unavailable</button><button type="button" disabled aria-busy="true"><app-ui-icon name="loading" />Loading</button>
-    </div><div class="quick-replies"><button type="button">Reply sample</button></div>
-    <label for="kit-field">Sample field</label><input id="kit-field" placeholder="Write here" />
-    <label for="kit-error">Invalid field</label><input id="kit-error" aria-invalid="true" aria-describedby="kit-error-help" value="Invalid sample" />
-    <p id="kit-error-help" class="error-text">Enter a supported value.</p>
-    <label for="kit-disabled">Unavailable field</label><input id="kit-disabled" disabled value="Not connected" />
-    <label class="toggle"><input type="checkbox" />Sample preference</label>
-    <h2>Bars</h2><app-ui-meter label="Health example" [value]="18" [max]="24" />
-    <app-ui-meter label="Focus example" [value]="3" [max]="8" /><app-ui-meter label="XP example" [value]="40" [max]="100" />
-    <app-ui-meter label="Unavailable resource" />
-    <label for="kit-progress">Loading example</label><progress id="kit-progress" aria-label="Loading example"></progress>
-    <label for="kit-determinate">Transfer example: 60%</label><progress id="kit-determinate" value="60" max="100">60%</progress>
-    <h2>Frames and fallback</h2><div class="kit-row">
-      <app-ui-item label="Signal crystal example" rarity="Uncommon example" [sample]="true" /><app-ui-item />
-      <div class="portrait-frame"><span class="portrait-fallback" role="img" aria-label="Portrait unavailable">?</span></div>
-    </div><div class="dialogue"><div class="dialogue-text"><p class="speaker">Speaker nameplate</p><p class="passage">Dialogue text stays selectable and resizes with reading preferences.</p></div></div>
-    <details class="kit-help"><summary>About item rarity</summary><p>Rarity is always written beside its symbol. Colour alone never conveys an item category or status.</p></details>
-    <h2>Status</h2><p class="kit-status"><app-ui-icon name="saved" />Saved example</p>
-    <p class="kit-status" role="status"><app-ui-icon name="loading" />Loading example; text remains available.</p>
-    <p class="kit-status error-text"><app-ui-icon name="error" />Error example; keep your draft and retry when connected.</p>
-    <h2>Icons</h2><ul class="icon-inventory">@for (name of names; track name) { <li><app-ui-icon [name]="name" />{{ name }}</li> }</ul>
-    <h2>Sources and rights</h2><p>Original editable SVG and CSS geometry under the project MIT license. No external artwork or fonts. See Settings credits and the distributed UI source inventory.</p>
+  template: `<section class="panel graphic-kit"><h1 i18n="@@kit.title">Interface graphic kit</h1>
+    <p i18n="@@kit.intro">Theme samples only. Values and items below are examples, independent of any playthrough.</p>
+    <h2 i18n="@@kit.controls">Controls</h2><div class="kit-row">
+      <button type="button" (click)="selected.set(!selected())" [attr.aria-pressed]="selected()"><app-ui-icon name="creative" />{{ selected() ? selectedLabel : selectLabel }}</button>
+      <button type="button" disabled i18n="@@kit.unavailable">Unavailable</button><button type="button" disabled aria-busy="true" i18n="@@kit.loading"><app-ui-icon name="loading" />Loading</button>
+    </div><div class="quick-replies"><button type="button" i18n="@@kit.reply">Reply sample</button></div>
+    <label for="kit-field" i18n="@@kit.field">Sample field</label><input id="kit-field" placeholder="Write here" i18n-placeholder="@@kit.placeholder" />
+    <label for="kit-error" i18n="@@kit.invalid">Invalid field</label><input id="kit-error" aria-invalid="true" aria-describedby="kit-error-help" value="Invalid sample" i18n-value="@@kit.invalidValue" />
+    <p id="kit-error-help" class="error-text" i18n="@@kit.error">Enter a supported value.</p>
+    <label for="kit-disabled" i18n="@@kit.disabled">Unavailable field</label><input id="kit-disabled" disabled value="Not connected" i18n-value="@@kit.disabledValue" />
+    <label class="toggle" i18n="@@kit.preference"><input type="checkbox" />Sample preference</label>
+    <h2 i18n="@@kit.bars">Bars</h2><app-ui-meter label="Health example" i18n-label="@@kit.health" [value]="18" [max]="24" />
+    <app-ui-meter label="Focus example" i18n-label="@@kit.focus" [value]="3" [max]="8" /><app-ui-meter label="XP example" i18n-label="@@kit.xp" [value]="40" [max]="100" />
+    <app-ui-meter label="Unavailable resource" i18n-label="@@kit.resource" />
+    <label for="kit-progress" i18n="@@kit.loadingExample">Loading example</label><progress id="kit-progress" aria-label="Loading example" i18n-aria-label="@@kit.progressName"></progress>
+    <label for="kit-determinate" i18n="@@kit.transfer">Transfer example: 60%</label><progress id="kit-determinate" value="60" max="100">60%</progress>
+    <h2 i18n="@@kit.frames">Frames and fallback</h2><div class="kit-row">
+      <app-ui-item label="Signal crystal example" i18n-label="@@kit.item" rarity="Uncommon example" i18n-rarity="@@kit.itemRarity" [sample]="true" /><app-ui-item />
+      <div class="portrait-frame"><span class="portrait-fallback" role="img" aria-label="Portrait unavailable" i18n-aria-label="@@kit.portrait">?</span></div>
+    </div><div class="dialogue"><div class="dialogue-text"><p class="speaker" i18n="@@kit.speaker">Speaker nameplate</p><p class="passage" i18n="@@kit.dialogue">Dialogue text stays selectable and resizes with reading preferences.</p></div></div>
+    <details class="kit-help"><summary i18n="@@kit.rarity">About item rarity</summary><p i18n="@@kit.rarityHelp">Rarity is always written beside its symbol. Colour alone never conveys an item category or status.</p></details>
+    <h2 i18n="@@kit.status">Status</h2><p class="kit-status" i18n="@@kit.saved"><app-ui-icon name="saved" />Saved example</p>
+    <p class="kit-status" role="status" i18n="@@kit.loadingHelp"><app-ui-icon name="loading" />Loading example; text remains available.</p>
+    <p class="kit-status error-text" i18n="@@kit.errorHelp"><app-ui-icon name="error" />Error example; keep your draft and retry when connected.</p>
+    <h2 i18n="@@kit.icons">Icons</h2><ul class="icon-inventory">@for (name of names; track name) { <li><app-ui-icon [name]="name" /><code>{{ name }}</code></li> }</ul>
+    <h2 i18n="@@kit.sources">Sources and rights</h2><p i18n="@@kit.rights">Original editable SVG and CSS geometry under the project MIT license. No external artwork or fonts. See Settings credits and the distributed UI source inventory.</p>
   </section>`,
 })
 export class GraphicKit {
+  readonly selectedLabel = $localize`:@@kit.selected:Selected`;
+  readonly selectLabel = $localize`:@@kit.select:Select sample`;
   readonly selected = signal(false);
   readonly names = Object.keys(ICONS);
 }

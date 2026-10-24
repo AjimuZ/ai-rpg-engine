@@ -1,10 +1,12 @@
 # Browser interface previews
 
 P05.6 currently provides separate [English/Italian review builds](src/locale/README.md)
-for navigation and Settings (26 messages). Run `npm run test:i18n` and
+for all local preview screens (212 unique messages), public sample text, forms,
+preview receipts, recovery and accessibility. Chronicle ICU plurals and localized
+numeric meter formatting retain stable IDs and numeric protocol values. Run `npm run test:i18n` and
 `npm run build:locales`, then `node tools/browser-smoke.mjs --locales` after
 `npm run build`. These builds do not replace the packaged English preview.
-Other screens, errors/receipts, persisted language selection, safe reload and
+Real API errors/receipts, persisted language selection, safe reload and
 localized Spring/jar/container serving remain open.
 
 This is a standalone Angular interface with SCSS, strict TypeScript/templates,
@@ -47,9 +49,9 @@ The default story uses separate original [vector scene assets](public/scenes/REA
 and attributed public sample passages. Continue reveals only supplied text;
 Chronicle shows already revealed passages. Reading positions remain independent
 per sample while the tab is open. Settings adjusts story text from 15–24 px;
-reload resets all preferences/positions. UI resources are currently English-only;
-full localization, the complete graphic kit and safe presentation events remain
-P05.5–P05.7. No submitted player dialogue is fabricated.
+reload resets all preferences/positions. Separate review variants cover English
+and Italian; persisted locale, safe language reload and packaged localization
+remain P05.6. Safe presentation events remain P05.7. No submitted player dialogue is fabricated.
 
 P05.3 adds a Settings layout choice: default scene-led visual novel or a narrow
 text-focused column with a live scene description and no artwork requests.

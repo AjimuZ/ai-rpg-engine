@@ -202,6 +202,14 @@ remains disabled in every preview state; this increment implements no command
 submission, operation-status endpoint, automatic replay or retry. Real durable
 operation identity/submitted-text separation and reconciliation remain P06/P07.
 
+P05.6 review variants provide English/Italian public sample passages, attribution,
+suggestion types/dismiss names, media fallbacks, status/persistence notices and
+native form validation/unsaved receipts. Every local preview screen and neutral
+term has reviewed resources. Chronicle counts use ICU plural branches; meter
+text uses the compiled locale while numeric ARIA values remain unchanged. These
+are local presentation messages, not implemented backend error-code or operation
+receipt contracts. Persisted language and safe reload remain pending.
+
 ## 9. Accessibility and responsive behavior
 
 - All controls support keyboard navigation and visible focus.

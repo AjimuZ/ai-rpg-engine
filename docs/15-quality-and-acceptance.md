@@ -3,18 +3,23 @@
 ## 1. Evidence policy
 
 Partial P05.6 evidence (24 October 2026, Windows 11, Chrome 155): four resource
-checker tests and 30 frontend tests pass, with strict typecheck, production and
-separate EN/IT review builds and a zero-vulnerability dependency audit. All 26
-marked navigation/Settings messages have reviewed Italian targets and exact
+checker tests and 33 frontend tests pass, with strict typecheck, production and
+separate EN/IT review builds and a zero-vulnerability dependency audit. All 212
+unique messages across the local preview have reviewed Italian targets and exact
 source/ID/placeholder parity. Browser checks cover localized titles, navigation
 and form labels, keyboard focus, four viewport sizes, locale bases, same-origin
-script/style/notice hashes and missing resource/route 404s. The loopback test
-server is a review harness, not Spring packaging evidence. Other screens,
-errors/receipts, ICU/formatting, persisted locale and draft/operation/cursor-safe
-reload remain unimplemented; QA-35 and independent bilingual playtests stay open.
+script/style/notice hashes and missing resource/route 404s. Bilingual story journeys
+also cover one/many passage plurals, recovery guidance, media fallback, native
+validation and escaped unsaved receipts while preserving literal input/selection.
+Unit tests cover all preview recovery states and locale-formatted meter text with
+invariant numeric ARIA values. The loopback test server is a review harness, not
+Spring packaging evidence. Persisted locale and draft/operation/cursor-safe reload,
+real API errors/receipts and pack-source fallback integration remain unimplemented;
+QA-35 and independent bilingual playtests stay open.
 All 22 repository-checker tests pass; docs/secrets/workflows/images scans have
-zero findings. Desktop English and mobile Italian Settings screenshots were
-visually reviewed. No backend behavior or packaged output layout changes here.
+zero findings. Desktop English and mobile Italian Settings screenshots, plus
+desktop/mobile Italian story screenshots, were visually reviewed. No backend
+behavior or packaged output layout changes here.
 
 P04.6 evidence (24 October 2026, Windows 11/Docker Desktop, pinned JDK 21 and
 PostgreSQL 18.6): 45 focused checks pass (40 text-catalog cases, four genre-import

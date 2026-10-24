@@ -27,11 +27,11 @@ export interface ContentMetadata {
   };
 }
 
-/** Neutral English fallbacks; language selection and catalog resolution belong to P05.6. */
+/** Reviewed neutral locale fallbacks; supplied public names remain literal content, never instructions. */
 const defaults: Readonly<Record<ContentTerm, string>> = {
-  story: 'Story', sheet: 'Character', inventory: 'Inventory', journal: 'Journal',
-  characterName: 'Character name', attributes: 'Attributes', resources: 'Resources',
-  skills: 'Skills', abilities: 'Abilities', conditions: 'Conditions', equipment: 'Equipment', quests: 'Known quests',
+  story: $localize`:@@terms.story:Story`, sheet: $localize`:@@terms.sheet:Character`, inventory: $localize`:@@terms.inventory:Inventory`, journal: $localize`:@@terms.journal:Journal`,
+  characterName: $localize`:@@terms.characterName:Character name`, attributes: $localize`:@@terms.attributes:Attributes`, resources: $localize`:@@terms.resources:Resources`,
+  skills: $localize`:@@terms.skills:Skills`, abilities: $localize`:@@terms.abilities:Abilities`, conditions: $localize`:@@terms.conditions:Conditions`, equipment: $localize`:@@terms.equipment:Equipment`, quests: $localize`:@@terms.quests:Known quests`,
 };
 
 /** Resolve optional text using a fallback for absent/blank values; never interpret markup. */

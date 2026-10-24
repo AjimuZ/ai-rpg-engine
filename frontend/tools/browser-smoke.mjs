@@ -26,9 +26,9 @@ const server = createServer(async (request, response) => {
       response.writeHead(403).end();
       return;
     }
-    // Review variants expose only their actual shell routes. Never disguise an
-    // absent localized asset or API resource as a successful settings document.
-    if (locale && !extname(requested) && !new RegExp(`^/${locale}/(?:settings|library)?$`).test(pathname)) {
+    // Review variants expose known preview routes only. Missing resources and API
+    // paths must remain 404s rather than becoming successful localized HTML.
+    if (locale && !extname(requested) && !new RegExp(`^/${locale}/(?:settings|library|interface-kit|adventures/[^/]+/(?:story|create|sheet|inventory|journal|guide|creative))?$`).test(pathname)) {
       response.writeHead(404).end();
       return;
     }
@@ -364,6 +364,78 @@ try {
           await writeFile(resolve(artifacts, `p056-settings-${locale}-${width}.png`), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
         }
       }
+      // Exercise real compiled translations, not runtime replacement of English
+      // strings. Draft bytes and stable IDs remain shared across both variants.
+      const italian = locale === 'it';
+      await evaluate('localStorage.clear()');
+      await command('Page.navigate', { url: `${origin}/${locale}/adventures/mosslight/story` });
+      await waitFor(`document.querySelector('#player-input') !== null`);
+      assert.equal(await evaluate('document.title'), italian ? 'Storia | Motore di avventure' : 'Story | Adventure engine');
+      assert.equal(await evaluate(`document.querySelector('.workspace-heading p').textContent.includes('Mosslight Trail')`), true);
+      assert.equal(await evaluate(`document.querySelector('.dialogue').getAttribute('aria-label')`), italian ? 'Brano corrente' : 'Current passage');
+      assert.equal(await evaluate(`document.querySelector('#player-input').placeholder`), italian ? 'Scrivi una bozza…' : 'Write a draft…');
+      assert.ok((await evaluate(`document.querySelector('.chronicle summary').textContent`)).includes(italian ? 'Un brano' : 'One passage'));
+      assert.ok((await evaluate(`document.querySelector('[data-dismiss]').getAttribute('aria-label')`)).startsWith(italian ? 'Nascondi suggerimento: ' : 'Dismiss suggestion: '));
+      await evaluate(`document.querySelector('[data-suggestion]').click()`);
+      await waitFor(`document.querySelector('#player-input').value === ${JSON.stringify(italian ? 'Osserva il boschetto.' : 'Look around the grove.')}`);
+      await evaluate(`(/** Save literal player input and a nonterminal selection; DOM failures reject the browser check. */ () => {
+        const field = document.querySelector('#player-input');
+        field.value = 'My words <b>restano</b>';
+        field.setSelectionRange(3, 8);
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+      })()`);
+      await command('Page.reload');
+      await waitFor(`document.querySelector('#player-input')?.value === 'My words <b>restano</b>'`);
+      await evaluate(`document.querySelector('#player-input').focus()`);
+      assert.deepEqual(await evaluate(`(/** Read native UTF-16 selection offsets; missing input fails the browser check. */ () => { const field = document.querySelector('#player-input'); return [field.selectionStart, field.selectionEnd]; })()`), [3, 8]);
+      assert.equal(await evaluate(`document.querySelector('.composer b') === null`), true);
+      await evaluate(`document.querySelector('.reading-controls button').click()`);
+      await waitFor(`document.querySelector('.reading-controls button').disabled`);
+      assert.ok((await evaluate(`document.querySelector('.speaker').textContent`)).includes(italian ? 'Custode del sentiero' : 'Trail keeper'));
+      assert.ok((await evaluate(`document.querySelector('.chronicle summary').textContent`)).includes(italian ? '2 brani' : '2 passages'));
+      assert.ok((await evaluate(`document.querySelector('#reading-progress').textContent`)).includes(italian ? 'Brano 2 di 2' : 'Passage 2 of 2'));
+      assert.equal(await evaluate(`document.activeElement.classList.contains('dialogue')`), true);
+      await evaluate(`window.dispatchEvent(new Event('offline'))`);
+      await waitFor(`document.querySelector('.composer [role=status]').textContent.includes(${JSON.stringify(italian ? 'Connessione non disponibile' : 'Connection unavailable')})`);
+      await evaluate(`window.dispatchEvent(new Event('online'))`);
+      await waitFor(`document.querySelector('.composer [role=status]').textContent.includes(${JSON.stringify(italian ? 'Prima di riprovare' : 'before any retry')})`);
+      assert.equal(await evaluate(`document.querySelector('#player-input').value`), 'My words <b>restano</b>');
+      assert.equal(await evaluate(`document.querySelector('[data-send]').disabled`), true);
+      for (const [width, height] of [[1440, 1100], [390, 844], [320, 740], [740, 320]]) {
+        await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
+        assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+        if (width === 1440 || width === 390) {
+          await writeFile(resolve(artifacts, `p056-story-${locale}-${width}.png`), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
+        }
+      }
+      await evaluate(`document.querySelector('.scene img').dispatchEvent(new Event('error'))`);
+      await waitFor(`document.querySelector('.scene-fallback') !== null`);
+      assert.ok((await evaluate(`document.querySelector('.scene-fallback').textContent`)).includes(italian ? 'Illustrazione della scena non disponibile' : 'Scene illustration unavailable'));
+      // Native constraint/receipt text must be translated while user names stay
+      // literal and the preview remains unable to create a campaign.
+      await command('Page.navigate', { url: `${origin}/${locale}/adventures/relay/create` });
+      await waitFor(`document.querySelector('#character-name') !== null`);
+      assert.equal(await evaluate(`document.querySelector('#character-name').labels[0].textContent`), italian ? 'Nome dello specialista' : 'Specialist name');
+      await evaluate(`document.querySelector('button[type=submit]').click()`);
+      await waitFor(`document.querySelector('[role=alert]') !== null`);
+      assert.equal(await evaluate(`document.querySelector('[role=alert]').textContent`), italian ? 'Inserisci un nome da 1 a 60 caratteri.' : 'Enter a name of 1–60 characters.');
+      await evaluate(`(/** Enter a literal markup-looking name; native input errors reject the receipt check. */ () => {
+        const field = document.querySelector('#character-name');
+        field.value = '<b>Alex</b>';
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+      })()`);
+      await evaluate(`document.querySelector('button[type=submit]').click()`);
+      await waitFor(`document.querySelector('[role=status]') !== null`);
+      assert.equal(await evaluate(`document.querySelector('[role=status]').textContent`), italian ? '<b>Alex</b> è pronto per l’anteprima. Nessuna campagna è stata creata.' : '<b>Alex</b> is ready to preview. No campaign has been created.');
+      assert.equal(await evaluate(`document.querySelector('[role=status] b') === null`), true);
+      await command('Page.navigate', { url: `${origin}/${locale}/interface-kit` });
+      await waitFor(`document.querySelector('.graphic-kit') !== null`);
+      assert.equal(await evaluate(`document.querySelector('#kit-error-help').textContent`), italian ? 'Inserisci un valore supportato.' : 'Enter a supported value.');
+      assert.ok((await evaluate(`document.querySelector('.item-frame').textContent`)).includes(italian ? 'non comune' : 'Uncommon'));
+      await evaluate(`document.querySelector('button[aria-pressed]').click()`);
+      await waitFor(`document.querySelector('button[aria-pressed]').textContent.includes(${JSON.stringify(italian ? 'Selezionato' : 'Selected')})`);
+      await command('Page.navigate', { url: `${origin}/${locale}/adventures/missing/story` });
+      await waitFor(`document.querySelector('h1')?.textContent === ${JSON.stringify(italian ? 'Avventura non disponibile' : 'Adventure unavailable')}`);
       // Compare actual HTTP bytes with the production files, including notices;
       // a misleading HTML fallback cannot pass a hash comparison.
       const html = await readFile(resolve(localizedRoot, locale, 'index.html'), 'utf8');
@@ -384,7 +456,7 @@ try {
   }
   assert.deepEqual(exceptions, []);
   assert.equal(requests.some(/** Reject world/API writes or remote media requests during preview journeys. */ (request) => request.method !== 'GET' || !request.url.startsWith(origin + '/')), false);
-  console.log(`Browser smoke passed: ${version.product}; responsive reading/drafts/recovery and graphic kit${reviewLocales ? ', EN/IT review shells and resource hashes/404s' : ''}; no page exceptions or nonlocal/action requests.`);
+  console.log(`Browser smoke passed: ${version.product}; responsive reading/drafts/recovery and graphic kit${reviewLocales ? ', EN/IT story/plurals/forms/receipts/fallbacks and resource hashes/404s' : ''}; no page exceptions or nonlocal/action requests.`);
 } finally {
   browser.kill();
   await new Promise(/** Release the loopback listener before completing; no background server survives. */ (accept) => server.close(accept));

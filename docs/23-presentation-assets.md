@@ -44,7 +44,9 @@ editable runtime geometry; no raster generation, third-party library or external
 reference is needed. The public inventory records these decisions and all source
 families, including existing scenes/portraits. Settings credits and the bundled
 `/ui/LICENSE.txt` preserve the complete project MIT notice. No mockup is sliced
-or shipped as production controls. English labels remain P05.6 localization work.
+or shipped as production controls. P05.6 review builds translate kit labels,
+validation, rarity text and accessible names into Italian; packaged localized
+delivery remains open.
 
 QA-30 local-kit verification passes 30 frontend tests, strict typecheck/build and
 Chrome 155 desktop/mobile review, plus 320px/landscape overflow checks, keyboard

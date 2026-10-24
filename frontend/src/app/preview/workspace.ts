@@ -28,8 +28,8 @@ export class WorkspaceContext {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.adventure(); as adventure) {
-      <header class="workspace-heading"><p>{{ adventure.title }} <span class="badge">Preview</span></p>
-        <nav aria-label="Adventure">
+      <header class="workspace-heading"><p>{{ adventure.title }} <span class="badge" i18n="@@workspace.preview">Preview</span></p>
+        <nav aria-label="Adventure" i18n-aria-label="@@workspace.navigation">
           @for (page of pages(); track page.path) {
             <a [routerLink]="page.path" routerLinkActive="selected" ariaCurrentWhenActive="page"><app-ui-icon [name]="page.path" />{{ page.label }}</a>
           }
@@ -37,7 +37,7 @@ export class WorkspaceContext {
       </header>
       <router-outlet />
     } @else {
-      <section class="panel"><h1>Adventure unavailable</h1><p>This preview identity is unknown.</p><a routerLink="/library">Return to library</a></section>
+      <section class="panel"><h1 i18n="@@workspace.missing">Adventure unavailable</h1><p i18n="@@workspace.unknown">This preview identity is unknown.</p><a routerLink="/library" i18n="@@workspace.return">Return to library</a></section>
     }
   `,
 })
@@ -48,9 +48,9 @@ export class Workspace {
     return [
       ...(['story', 'sheet', 'inventory', 'journal'] as const).map(
         /** Labels never change the stable route identity. */ (path) => ({ path, label: this.context.term(path) })),
-      ...(modules?.guide ? [{ path: 'guide', label: displayLabel(modules.guide.title, 'Guide') }] : []),
-      ...(modules?.creativeAbilities ? [{ path: 'creative', label: displayLabel(modules.creativeAbilities.title, 'Creative abilities') }] : []),
-      { path: 'create', label: 'New playthrough' },
+      ...(modules?.guide ? [{ path: 'guide', label: displayLabel(modules.guide.title, $localize`:@@terms.guide:Guide`) }] : []),
+      ...(modules?.creativeAbilities ? [{ path: 'creative', label: displayLabel(modules.creativeAbilities.title, $localize`:@@terms.creative:Creative abilities`) }] : []),
+      { path: 'create', label: $localize`:@@workspace.create:New playthrough` },
     ];
   });
 }

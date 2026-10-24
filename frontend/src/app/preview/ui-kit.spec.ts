@@ -1,5 +1,8 @@
 /** Verify safe presentation primitives and review-route isolation; failed assertions identify contract regressions. */
 import { TestBed } from '@angular/core/testing';
+import { LOCALE_ID } from '@angular/core';
+import { registerLocaleData } from '@angular/common';
+import italian from '@angular/common/locales/it';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { describe, expect, it } from 'vitest';
@@ -7,6 +10,19 @@ import { routes } from '../app.routes';
 import { ICONS, UiIcon, UiItem, UiMeter } from './ui-kit';
 
 describe('Graphic kit', /** Register numeric, allowlist and live-label contracts. */ () => {
+  it.each([['en-US', '1,234.5 / 2,500'], ['it-IT', '1.234,5 / 2.500']])('formats %s values without changing numeric accessibility data', /** Locale formatting affects live text only; finite protocol values and meter bounds stay numeric. */ (locale, expected) => {
+    registerLocaleData(italian);
+    TestBed.configureTestingModule({ providers: [{ provide: LOCALE_ID, useValue: locale }] });
+    const fixture = TestBed.createComponent(UiMeter);
+    fixture.componentRef.setInput('label', 'Resource');
+    fixture.componentRef.setInput('value', 1234.5);
+    fixture.componentRef.setInput('max', 2500);
+    fixture.detectChanges();
+    const root: HTMLElement = fixture.nativeElement;
+    expect(root.textContent).toContain(expected);
+    expect(root.querySelector('[role=meter]')?.getAttribute('aria-valuenow')).toBe('1234.5');
+    expect(root.querySelector('[role=meter]')?.getAttribute('aria-valuemax')).toBe('2500');
+  });
   it('bounds numeric meters and replaces invalid data with unavailable text', /** Malformed public values cannot yield NaN styles, false zeros or invalid ARIA ranges. */ () => {
     const fixture = TestBed.createComponent(UiMeter);
     fixture.componentRef.setInput('label', 'Health');

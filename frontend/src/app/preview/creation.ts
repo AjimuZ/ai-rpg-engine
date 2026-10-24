@@ -8,19 +8,19 @@ import { WorkspaceContext } from './workspace';
 @Component({
   selector: 'app-creation', imports: [FormField], changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="panel narrow"><h1>New playthrough</h1><p>Character creation preview for {{ context.adventure()?.title }}.</p>
-      <p>Pack choices, budgets and campaign creation will appear when campaign services are connected.</p>
+    <section class="panel narrow"><h1 i18n="@@creation.title">New playthrough</h1><p i18n="@@creation.intro">Character creation preview for {{ context.adventure()?.title }}.</p>
+      <p i18n="@@creation.unavailable">Pack choices, budgets and campaign creation will appear when campaign services are connected.</p>
       <form (submit)="preview($event)" novalidate>
         <label for="character-name">{{ context.term('characterName') }}</label>
         <input id="character-name" [formField]="fields.name" aria-describedby="name-help" />
-        <p id="name-help">Enter a name of 1–60 characters. This preview does not save it.</p>
-        @if (attempted() && fields.name().invalid()) { <p role="alert">Enter a name of 1–60 characters.</p> }
-        <button type="submit">Preview character</button>
+        <p id="name-help" i18n="@@creation.help">Enter a name of 1–60 characters. This preview does not save it.</p>
+        @if (attempted() && fields.name().invalid()) { <p role="alert" i18n="@@creation.nameError">Enter a name of 1–60 characters.</p> }
+        <button type="submit" i18n="@@creation.preview">Preview character</button>
       </form>
       @if (summary(); as character) {
-        @if (character.adventureId === context.adventure()?.id) { <p role="status">{{ character.name }} is ready to preview. No campaign has been created.</p> }
+        @if (character.adventureId === context.adventure()?.id) { <p role="status" i18n="@@creation.receipt">{{ character.name }} is ready to preview. No campaign has been created.</p> }
       }
-      <button disabled>Create campaign</button>
+      <button disabled i18n="@@creation.create">Create campaign</button>
     </section>
   `,
 })
@@ -43,7 +43,7 @@ export class Creation {
   readonly fields = form(this.model, /** Enforce whitespace-aware required input and a bounded preview name. */ (path) => {
     validate(path.name, /** Match service validation after trimming so padding never changes name validity. */ ({ value }) => {
       const name = value().trim();
-      return name.length > 0 && name.length <= 60 ? undefined : { kind: 'name', message: 'Enter a name of 1–60 characters.' };
+      return name.length > 0 && name.length <= 60 ? undefined : { kind: 'name', message: $localize`:@@creation.nameError:Enter a name of 1–60 characters.` };
     });
   });
 
