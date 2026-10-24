@@ -78,10 +78,14 @@ built; these checks use the existing pinned Java 21 development image.
 The clean build without `-Ppackaged-ui` also passes six tests and skips its three
 interface tests, using the same packaged runtime profile for database access.
 
-The development server binds to `127.0.0.1:8080`. Only `/actuator/health` is exposed,
-returning status without components/details. There are no gameplay APIs or account
-integration. Ordinary builds contain no browser assets. Full readiness/failure
-contracts are P02.5. Engine image/service integration is covered by the
+The development server binds to `127.0.0.1:8080`. Only status-only health is exposed
+(no components/details): `/actuator/health` (root, storage health), `/actuator/health/liveness`
+(process only), `/actuator/health/readiness` (database reachable and schema matches the shipped
+migrations; HTTP 503 otherwise) and `/actuator/health/gameplay` (always 503/`UNKNOWN` until a
+narration runtime adapter exists). Startup failures for an unreachable database, rejected
+credentials or schema mismatch print a fixed, secret-free description and action
+(`StartupFailureAnalyzer`). There are no gameplay APIs or account integration. Ordinary
+builds contain no browser assets. Engine image/service integration is covered by the
 [packaging suite](../tools/container_packaging/README.md). No
 Testcontainers dependency or test-library helper image is used. The CI job runs `./mvnw -B -ntp verify` against a job-local disposable PostgreSQL 18 ([workflow](../.github/workflows/ci.yml)); a style linter is not configured.
 

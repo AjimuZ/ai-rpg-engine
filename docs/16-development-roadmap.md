@@ -370,7 +370,14 @@ content/assets and full container integration remain open; P02.3 stays unchecked
   No workflow, application code or credentials changed during this verification.
   Dependency license inventory remains P19.1; automated pin refresh, gameplay gates,
   launcher/account readiness and full QA-28 are not established by this CI run.
-- [ ] P02.5 Provide health/readiness contracts and useful startup failure states.
+- [x] P02.5 Provide health/readiness contracts and useful startup failure states.
+  Added `liveness`, `readiness` (database + Flyway schema) and `gameplay` health groups
+  (`backend/.../health/`), where gameplay reports `UNKNOWN`/503 until a runtime adapter exists, and a
+  `StartupFailureAnalyzer` for unreachable database, rejected credentials and schema mismatch.
+  Verified in JDK 21 against disposable PostgreSQL 18.6: `./mvnw verify` BUILD SUCCESS, 13 tests (3
+  packaged-UI tests skipped by design); live unreachable-database startup prints the description.
+  Not run: the Docker packaging suite after relaxing its exact-body health assertion (syntax-checked
+  only), a live wrong-password run, and hosted CI for this commit. Gameplay readiness itself stays P01/P14.
 - [ ] P02.6 Implement root `start.sh` with prerequisite checks, secure configuration initialization, cached builds, health-based startup, supported sign-in, status/log/stop commands, and nonzero failure results.
 - [ ] P02.7 Verify idempotent launch, supported Windows shell behavior, interruption, graceful stop, and campaign preservation across restart/image recreation; record QA-28 evidence.
 

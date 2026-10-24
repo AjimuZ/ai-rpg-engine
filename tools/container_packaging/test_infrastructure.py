@@ -96,7 +96,10 @@ class InfrastructureTest(unittest.TestCase):
                 body = response.read()
                 self.assertTrue(body)
                 if asset == "actuator/health":
-                    self.assertEqual({"status": "UP"}, json.loads(body))
+                    health = json.loads(body)
+                    # Status-only: group names are allowed, components and details are not.
+                    self.assertEqual("UP", health["status"])
+                    self.assertLessEqual(set(health), {"status", "groups"})
         for path in ("api/missing", ".env", "auth.json", "run/secrets/postgres_password",
                      "actuator/env", "var/lib/engine/content/.packaging-check"):
             with self.assertRaises(HTTPError) as error:

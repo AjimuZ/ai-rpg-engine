@@ -167,6 +167,20 @@ Normal startup must:
 7. Distinguish API/storage readiness from gameplay readiness. Check runtime account/capability availability without generating a scene or consuming a gameplay turn. Never perform a live inference merely as an automatic health check.
 8. Print the local browser URL, effective status, and supported stop/log commands. Report failure with a nonzero exit code and bounded, redacted diagnostics. Never print secrets or raw account files.
 
+**Health contract (P02.5):** status-only Actuator groups, each HTTP 200 when `UP` and 503 otherwise:
+`liveness` (process only, never touches the database), `readiness` (storage readiness: `readinessState`,
+database connection and Flyway schema validity with no pending migration) and `gameplay`
+(narration runtime/account). The root `/actuator/health` aggregates storage health and lists
+the group names; it exposes no components or details. `gameplay` currently reports `UNKNOWN`
+mapped to 503 because no runtime adapter exists; `UNKNOWN` ranks lowest so it never lowers
+the root or readiness status. A later task replaces it with a no-inference account/capability
+check. Startup failures (unreachable database, rejected credentials, schema/migration mismatch)
+abort with a fixed message and action that never echo driver text or credentials; a missing
+secret tree is reported by Boot's configuration-data analyzer. The container health check
+still proves root availability only. Verified live: an unreachable database prints the
+description; rejected credentials are covered by unit tests (the disposable server trusted
+its own network namespace, so a live wrong-password run was not possible).
+
 Missing runtime authentication must lead to the supported sign-in instructions and a clear incomplete-gameplay status. Saved-data inspection can remain available while narration is unavailable. A successful packaged-gameplay readiness result requires the runtime gate to pass; starting the web server alone is insufficient.
 
 No startup, restart, log, or stop action may reset campaigns, regenerate existing secrets, prune unrelated resources, or delete persistent volumes. Partial startup and interruption must be recoverable by rerunning the launcher. A data reset, if introduced later, is a separate explicitly destructive owner operation, never an automatic repair.

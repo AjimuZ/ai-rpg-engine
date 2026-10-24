@@ -43,7 +43,9 @@ class EngineApplicationTest {
                     URI.create("http://127.0.0.1:" + port + "/actuator/health")).GET().build(),
                     HttpResponse.BodyHandlers.ofString());
             assertEquals(200, response.statusCode());
-            assertEquals("{\"status\":\"UP\"}", response.body());
+            // Boot lists the group names on the root; no component or detail is exposed.
+            assertEquals("{\"groups\":[\"gameplay\",\"liveness\",\"readiness\"],\"status\":\"UP\"}",
+                    response.body());
             var hidden = client.send(HttpRequest.newBuilder(
                     URI.create("http://127.0.0.1:" + port + "/actuator/env")).GET().build(),
                     HttpResponse.BodyHandlers.discarding());
@@ -62,5 +64,29 @@ class EngineApplicationTest {
         assertEquals(0, jdbc.queryForObject(
                 "select count(*) from information_schema.tables where table_schema = 'public' "
                         + "and table_name <> 'flyway_schema_history'", Integer.class));
+    }
+
+    /** GET a path on the running server; returns {status, body}. Transport errors fail the test. */
+    private String[] get(String path) throws Exception {
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            var r = client.send(HttpRequest.newBuilder(
+                    URI.create("http://127.0.0.1:" + port + path)).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            return new String[] {String.valueOf(r.statusCode()), r.body()};
+        }
+    }
+
+    /** Liveness and readiness are UP with a ready database; gameplay is never claimed ready. */
+    @Test
+    void separatesLivenessStorageReadinessAndGameplay() throws Exception {
+        assertEquals("200", get("/actuator/health/liveness")[0]);
+        assertEquals("{\"status\":\"UP\"}", get("/actuator/health/liveness")[1]);
+        assertEquals("200", get("/actuator/health/readiness")[0]);
+        assertEquals("{\"status\":\"UP\"}", get("/actuator/health/readiness")[1]);
+        // The shell has no narration runtime: gameplay must be 503 while the root stays UP.
+        var gameplay = get("/actuator/health/gameplay");
+        assertEquals("503", gameplay[0]);
+        assertEquals("{\"status\":\"UNKNOWN\"}", gameplay[1]);
+        assertEquals("200", get("/actuator/health")[0]);
     }
 }
