@@ -2,6 +2,11 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Hosted CI verification (P02.4), 24 October 2026
+
+- Confirm [hosted run 40028086153](https://github.com/AjimuZ/ai-rpg-engine/actions/runs/40028086153) on commit `09a6311d9557be01f2fee9abeb119206f0b02e34`: all four repository, frontend, backend and container jobs completed successfully. Record its exact source revision and completion time, complete P02.4 and remove the stale manual-confirmation blocker.
+- Verify hosted evidence through read-only GitHub run/jobs queries; change no application or workflow code and make no new gameplay, launcher or account-readiness claim.
+
 ## Unreleased — Ordinary credential-free CI (P02.4), 23 October 2026
 
 - Add a GitHub Actions workflow with read-only permissions, no secrets, SHA-pinned
@@ -12,7 +17,7 @@ This changelog records delivered project artifacts. Future functionality belongs
 - Make `PackagedSecretsTest` independent of exported `SPRING_DATASOURCE_*` variables, which
   otherwise override the mounted secret file and failed the backend build under CI-style
   environment settings; the job was replayed in JDK 21 and PostgreSQL 18 containers.
-- Not yet confirmed by a hosted run; the dependency license inventory moves to P19.1.
+- At this implementation checkpoint the hosted run was unconfirmed; the later hosted-verification entry above supplies that evidence. The dependency license inventory remains P19.1.
 
 ## Unreleased — Containerized application shell (P02.3), 23 October 2026
 

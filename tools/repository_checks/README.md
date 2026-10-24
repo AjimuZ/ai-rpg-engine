@@ -35,5 +35,4 @@ raises an error instead of passing.
   build credential-like strings from fragments so this suite passes its own scan.
 - `npm audit` in CI contacts the public advisory database and sends the dependency
   list, not credentials; an advisory published after a commit can fail a later run.
-- The workflow has not been executed on GitHub from the development environment; the
-  same commands were run locally (see the roadmap entry for P02.4).
+- [Hosted CI run 40028086153](https://github.com/AjimuZ/ai-rpg-engine/actions/runs/40028086153) completed successfully on commit `09a6311d9557be01f2fee9abeb119206f0b02e34` with all four jobs passing. Read-only run/jobs queries confirmed that evidence on 24 October 2026; local replay remains separate evidence (see P02.4 in the roadmap).

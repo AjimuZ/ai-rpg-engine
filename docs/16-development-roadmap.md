@@ -2,9 +2,9 @@
 
 ## 1. Status and planning rules
 
-**Current status: P00, P01.1–P01.5 and P02.1–P02.2 complete; P02.3 partial.** Angular and Spring development shells, runtime compatibility probes and partial packaging infrastructure exist; gameplay remains unimplemented. P01.2 now includes owner-authenticated neutral output and thread resume; P01.3 adds the verified runtime isolation profile ([ADR 0013](adr/0013-narration-runtime-isolation.md)); P01.4 adds process lifecycle checks and P01.5 retains neutral fixtures and compatibility limits; P01.6 is the next protocol task. P02.3 can resume local image/integration work under ADR 0009's development-only Java revision below. Predecessor milestones and repository housekeeping do not complete an engine implementation work package.
+**Current status: P00, P01.1–P01.7 and P02.1–P02.4 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. P02.5 health/readiness is the next task; launcher and full QA-28 remain pending. Design specifications and predecessor milestones do not establish completed gameplay.
 
-The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.6 follows the completed P01.1–P01.5 tasks; the live isolation re-check remains a P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
+The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
 **Setup prerequisite (23 October 2026):** the owner-authenticated P01.2 check used ChatGPT device-code login. Users of this container login flow must first enable device-code login in their account's security settings, or obtain managed-workspace administrator permission. P02.6 must surface this prerequisite and the supported instructions when authorization is unavailable; it must not assume a desktop sign-in initializes the isolated runtime. P02.7 verifies the guidance/error path. See [runtime account setup](../tools/runtime_probe/README.md#owner-account-setup-for-the-live-check). This documents the required account setting for this login method, not an implemented launcher.
 
@@ -336,7 +336,7 @@ Docker Hub still reports zero 21.0.13 tags and both required
 JDK/JRE tags return not found. Engine image/service, secret mounts, durable
 content/assets and full container integration remain open; P02.3 stays unchecked.
 
-- [ ] P02.4 Add build/test/documentation/secret checks without Codex credentials in ordinary CI.
+- [x] P02.4 Add build/test/documentation/secret checks without Codex credentials in ordinary CI.
   **Partial (23 October 2026):** `.github/workflows/ci.yml` defines four jobs with read-only
   contents permission, no secrets, no write-token triggers, SHA-pinned actions and a
   job-local PostgreSQL 18 whose password is generated and masked inside the job:
@@ -359,11 +359,17 @@ content/assets and full container integration remain open; P02.3 stays unchecked
   Boot configuration through an environment without process variables; the replay then
   reports BUILD SUCCESS (9 tests, 3 packaged-interface tests skipped as designed). The four
   pinned action SHAs were re-resolved from their upstream release tags and match.
-  **Not verified:** the workflow has never run on GitHub (it cannot be run from the
-  development environment); the hosted run is the remaining exit check and needs the owner
-  to publish the branch. Not delivered: the dependency license
-  inventory (moved to P19.1) and automated action/image pin refresh. Left unchecked until the
-  first hosted run of all four jobs succeeds.
+  **Hosted verification (confirmed 24 October 2026):** [CI run 40028086153](https://github.com/AjimuZ/ai-rpg-engine/actions/runs/40028086153)
+  ran from the `push` of `09a6311d9557be01f2fee9abeb119206f0b02e34` on `main` and completed successfully
+  on 23 October 2026 at 21:37:59 UTC (23:37:59 Europe/Rome). GitHub's run and jobs
+  APIs confirm all four jobs completed with `success`: repository hygiene/documentation/
+  workflow policy (including account-free runtime checks), Angular typecheck/test/build/
+  audit, Spring Boot build/tests against disposable PostgreSQL, and container context/
+  Compose boundaries. No job was skipped or merely queued. This supplies the missing
+  P02.4 exit evidence; the former owner-push/manual-confirmation blocker is resolved.
+  No workflow, application code or credentials changed during this verification.
+  Dependency license inventory remains P19.1; automated pin refresh, gameplay gates,
+  launcher/account readiness and full QA-28 are not established by this CI run.
 - [ ] P02.5 Provide health/readiness contracts and useful startup failure states.
 - [ ] P02.6 Implement root `start.sh` with prerequisite checks, secure configuration initialization, cached builds, health-based startup, supported sign-in, status/log/stop commands, and nonzero failure results.
 - [ ] P02.7 Verify idempotent launch, supported Windows shell behavior, interruption, graceful stop, and campaign preservation across restart/image recreation; record QA-28 evidence.

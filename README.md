@@ -1,5 +1,7 @@
 # AI RPG Engine
 
+P02.4 ordinary CI is verified by [hosted run 40028086153](https://github.com/AjimuZ/ai-rpg-engine/actions/runs/40028086153), with all four jobs passing on the recorded source revision. This validates the current repository/shell checks, not gameplay or full packaged readiness.
+
 P01.7 selects [serialized inference](tools/runtime_probe/CONCURRENCY.md): one
 active turn installation-wide. Bounded scripted dispatch/cancellation evidence
 does not prove live simultaneity, headroom or throughput; production scheduling
