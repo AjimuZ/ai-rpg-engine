@@ -1,25 +1,31 @@
 package org.rpgengine.content;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Semantic validation of a {@link ParsedPack}: stable IDs, dependency resolution, cross-references,
- * creation profiles, item rarity/appearance identities, skills, abilities and initial world definitions.
+ * creation profiles, item rarity/appearance identities, skills, abilities, conditions, quests and
+ * initial world definitions (P04.2), plus bounded expressions/effects, relation cycles, engine and
+ * ruleset compatibility, module support, hash conflicts and the generation policy (P04.3).
  *
- * <p>Boundaries: this stage reads only the immutable parser output and a caller-supplied
- * {@link DependencyCatalog}; it performs no I/O. Kinds whose semantics belong to later tasks
- * (quest, encounter, anchor, progression) fail closed with UNSUPPORTED_KIND instead of being
- * accepted unchecked. Expression/effect depth limits, graph cycles and version-range
- * compatibility are P04.3; path/archive protections and registration are P04.4.
+ * <p>Boundaries: this stage reads only the immutable parser output, a caller-supplied
+ * {@link DependencyCatalog} and the {@link EngineContract}; it performs no I/O. Kinds whose
+ * semantics belong to later tasks (encounter, anchor, progression) fail closed with
+ * UNSUPPORTED_KIND instead of being accepted unchecked. Path/archive protections and
+ * registration are P04.4. Decisions are recorded in ADR 0017.
  *
  * <p>Failure behavior: the first violation throws a {@link PackException} with file, line and
- * pointer. Success never admits content; it returns a {@link CompiledPack}.
+ * pointer. Non-blocking findings are returned as {@link PackWarning}s, never as guarantees.
+ * Success never admits content; it returns a {@link CompiledPack}.
  */
 public final class PackCompiler {
     private static final Map<String, String> CATEGORY_KINDS = Map.ofEntries(
@@ -38,15 +44,33 @@ public final class PackCompiler {
     private static final Set<String> ITEM_TYPES = Set.of("weapon", "armor", "tool", "consumable", "treasure", "key", "misc");
     private static final Set<String> TARGET_POLICIES = Set.of("self", "single", "multiple", "area");
     private static final Set<String> EFFECT_TYPES = Set.of("damage", "heal", "move", "applyCondition",
-            "removeCondition", "modifyResource", "reveal", "createItem");
+            "removeCondition", "modifyResource", "reveal", "createItem", "conditional");
+    /** Kinds a generation constraint may name: every kind of a known content category. */
+    private static final Set<String> ALL_KINDS = Set.copyOf(CATEGORY_KINDS.values());
     private static final int LIST_MAX = 64;
     private static final int VALUE_MAX = 1_000_000;
+    /** Effect nodes per ability or condition tick list, nested conditional nodes included (docs/09 section 7). */
+    static final int EFFECT_NODES = 20;
+    /** Nesting levels of conditional effects; deeper trees are hard to explain and cost more to resolve. */
+    static final int EFFECT_DEPTH = 4;
 
     private final DependencyCatalog catalog;
+    private final EngineContract contract;
 
-    /** Create a compiler using the given trusted catalog of installed dependency packs. */
-    public PackCompiler(DependencyCatalog catalog) {
+    /**
+     * Create a compiler for an explicit engine contract.
+     *
+     * @param catalog trusted catalog of installed dependency packs
+     * @param contract engine, ruleset and module versions packs are checked against
+     */
+    public PackCompiler(DependencyCatalog catalog, EngineContract contract) {
         this.catalog = java.util.Objects.requireNonNull(catalog, "catalog");
+        this.contract = java.util.Objects.requireNonNull(contract, "contract");
+    }
+
+    /** Create a compiler for this engine build using the given trusted catalog of installed dependency packs. */
+    public PackCompiler(DependencyCatalog catalog) {
+        this(catalog, EngineContract.current());
     }
 
     /** Create a compiler with no installed dependencies. */
@@ -59,8 +83,21 @@ public final class PackCompiler {
         return new Run(pack).execute();
     }
 
+    /**
+     * Content category holding a kind, e.g. {@code npc -> npcs}; used by the generation gate to find
+     * the policy of an authored definition. Unknown kinds map to themselves and so stay disabled.
+     */
+    static String categoryOf(String kind) {
+        for (var entry : CATEGORY_KINDS.entrySet()) {
+            if (entry.getValue().equals(kind)) {
+                return entry.getKey();
+            }
+        }
+        return kind;
+    }
+
     /** Per-compilation mutable state; never shared, so the compiler itself stays stateless. */
-    private final class Run implements Fields.Resolver {
+    private final class Run implements Expressions.Context {
         private final ParsedPack pack;
         private final PackDocument manifestDocument;
         private final Map<String, Definition> byId = new LinkedHashMap<>();
@@ -68,10 +105,18 @@ public final class PackCompiler {
         private final Map<String, Map<String, String>> external = new HashMap<>();
         /** Attribute ID to {min, max}; filled from "attributes" rule definitions. */
         private final Map<String, int[]> attributes = new HashMap<>();
-        private final Set<String> resources = new HashSet<>();
+        /** Resource ID to its maximum; filled from "resources" rule definitions. */
+        private final Map<String, Integer> resources = new HashMap<>();
         private final Set<String> rarityTiers = new HashSet<>();
         /** Appearance identities must be unique across items so artwork binds to exactly one item. */
         private final Set<String> appearances = new HashSet<>();
+        /** "Requires" relations whose cycles would make content unsatisfiable or loop forever. */
+        private final DependencyGraph abilityGraph = new DependencyGraph();
+        private final DependencyGraph conditionGraph = new DependencyGraph();
+        private final DependencyGraph questGraph = new DependencyGraph();
+        private final List<PackWarning> warnings = new ArrayList<>();
+        /** Effect nodes counted so far in the current ability effect list or condition tick list. */
+        private int effectNodes;
 
         /** Capture the immutable input. */
         Run(ParsedPack pack) {
@@ -86,6 +131,7 @@ public final class PackCompiler {
 
         /** Run all passes in dependency order. */
         CompiledPack execute() {
+            compatibility();
             resolveDependencies();
             List<Definition> all = collect();
             // Rules first: they define the attribute/resource/rarity vocabularies others reference.
@@ -100,7 +146,81 @@ public final class PackCompiler {
                 }
             }
             entrypoint();
-            return new CompiledPack(pack, all, byId);
+            // Graphs are complete only after every definition was read, so cycles are checked last.
+            abilityGraph.rejectCycles("ability prerequisite");
+            conditionGraph.rejectCycles("condition application");
+            questGraph.rejectCycles("quest requirement");
+            GenerationPolicy policy = generationPolicy();
+            reachability();
+            return new CompiledPack(pack, all, byId, policy, warnings);
+        }
+
+        /**
+         * Check the pack's own version, engine range, ruleset, policy profile and modules against the
+         * engine contract, and reject an already installed ID/version whose bytes differ.
+         *
+         * <p>The manifest schema already guaranteed the field types, so casts here cannot fail.
+         */
+        @SuppressWarnings("unchecked")
+        private void compatibility() {
+            var values = pack.manifest().values();
+            String version = (String) values.get("version");
+            version("/version", version);
+            String engine = (String) values.get("engineCompatibility");
+            if (!range("/engineCompatibility", engine).contains(Versions.version(contract.engineVersion()))) {
+                throw new PackException("INCOMPATIBLE_ENGINE", manifestDocument.location("/engineCompatibility"),
+                        "Pack requires engine " + engine + "; this engine is " + contract.engineVersion()
+                                + " (pack contract " + EngineContract.PACK_CONTRACT + ")");
+            }
+            var ruleset = (Map<String, Object>) values.get("ruleset");
+            if (!contract.rulesetId().equals(ruleset.get("id"))) {
+                throw new PackException("INCOMPATIBLE_RULESET", manifestDocument.location("/ruleset/id"),
+                        "Ruleset '" + ruleset.get("id") + "' is not provided; this engine provides '"
+                                + contract.rulesetId() + "'");
+            }
+            String rulesetRange = (String) ruleset.get("version");
+            if (!range("/ruleset/version", rulesetRange).contains(Versions.version(contract.rulesetVersion()))) {
+                throw new PackException("INCOMPATIBLE_RULESET", manifestDocument.location("/ruleset/version"),
+                        "Pack requires ruleset " + rulesetRange + "; this engine provides " + contract.rulesetVersion());
+            }
+            if (!contract.policyProfiles().contains((String) ruleset.get("policyProfile"))) {
+                throw new PackException("INCOMPATIBLE_RULESET", manifestDocument.location("/ruleset/policyProfile"),
+                        "Policy profile must be one of " + new TreeSet<>(contract.policyProfiles()));
+            }
+            var modules = (List<Map<String, Object>>) values.getOrDefault("modules", List.of());
+            for (int index = 0; index < modules.size(); index++) {
+                String module = (String) modules.get(index).get("id");
+                if (!contract.modules().contains(module)) {
+                    throw new PackException("UNSUPPORTED_MODULE", manifestDocument.location("/modules/" + index + "/id"),
+                            "Module '" + module + "' is not supported by engine " + contract.engineVersion()
+                                    + " (pack contract " + EngineContract.PACK_CONTRACT + ")");
+                }
+            }
+            // One ID and version must always mean the same bytes; changed content needs a new release.
+            var installed = catalog.installedHash(pack.manifest().id(), version);
+            if (installed.isPresent() && !installed.get().equals(pack.contentHash())) {
+                throw new PackException("HASH_CONFLICT", manifestDocument.location("/version"),
+                        "Pack " + pack.manifest().id() + " " + version + " is installed with hash " + installed.get()
+                                + " but these files hash to " + pack.contentHash() + "; publish a new version");
+            }
+        }
+
+        /** Parse an exact SemVer manifest value; malformed text is a located VERSION_SYNTAX error. */
+        private Versions.Version version(String pointer, String text) {
+            try {
+                return Versions.version(text);
+            } catch (IllegalArgumentException exception) {
+                throw new PackException("VERSION_SYNTAX", manifestDocument.location(pointer), exception.getMessage());
+            }
+        }
+
+        /** Parse a manifest version range; malformed text is a located VERSION_SYNTAX error. */
+        private Versions.Range range(String pointer, String text) {
+            try {
+                return Versions.range(text);
+            } catch (IllegalArgumentException exception) {
+                throw new PackException("VERSION_SYNTAX", manifestDocument.location(pointer), exception.getMessage());
+            }
         }
 
         /** Resolve every declared dependency through the catalog; duplicates, self-reference and misses fail. */
@@ -116,7 +236,17 @@ public final class PackCompiler {
                     throw new PackException("DEPENDENCY", manifestDocument.location(pointer + "/id"),
                             "A pack cannot depend on itself or declare a dependency twice");
                 }
-                var exports = catalog.exports(id, (String) dependency.get("version"), (String) dependency.get("hash"));
+                // Dependencies pin one exact release; a range would let resolved content drift.
+                String version = (String) dependency.get("version");
+                version(pointer + "/version", version);
+                String hash = (String) dependency.get("hash");
+                var exports = catalog.exports(id, version, hash);
+                var installed = catalog.installedHash(id, version);
+                if (exports.isEmpty() && installed.isPresent() && !installed.get().equals(hash)) {
+                    throw new PackException("HASH_CONFLICT", manifestDocument.location(pointer + "/hash"),
+                            "Dependency " + id + " " + version + " is installed with hash " + installed.get()
+                                    + " but this manifest pins " + hash);
+                }
                 if (exports.isEmpty()) {
                     throw new PackException("DEPENDENCY", manifestDocument.location(pointer),
                             "No installed pack matches this id, version and hash");
@@ -178,8 +308,54 @@ public final class PackCompiler {
             }
             if (!kinds.contains(kind)) {
                 throw new PackException("REFERENCE_KIND", document.location(pointer),
-                        "'" + ref + "' is a " + kind + "; expected " + new java.util.TreeSet<>(kinds));
+                        "'" + ref + "' is a " + kind + "; expected " + new TreeSet<>(kinds));
             }
+        }
+
+        /** Range of a rule-defined attribute, or null. */
+        @Override
+        public int[] attributeRange(String id) {
+            return attributes.get(id);
+        }
+
+        /** Maximum of a rule-defined resource, or null. */
+        @Override
+        public Integer resourceMax(String id) {
+            return resources.get(id);
+        }
+
+        /**
+         * Maximum rank of a resolved skill: the local maxRank (default 2), or the global rank cap 10
+         * for external skills whose data is not visible here. Out-of-range local values fail in skill().
+         */
+        @Override
+        public int skillMax(String ref) {
+            Definition skill = byId.get(ref);
+            if (skill == null) {
+                return 10;
+            }
+            return skill.data().get("maxRank") instanceof Number n ? n.intValue() : 2;
+        }
+
+        /**
+         * Objective IDs of a local quest read from raw data, so quests may refer to each other in any
+         * file order; malformed objectives are rejected when that quest itself is validated.
+         */
+        @Override
+        public Set<String> objectives(String questRef) {
+            Definition quest = byId.get(questRef);
+            if (quest == null) {
+                return null;
+            }
+            Set<String> ids = new HashSet<>();
+            if (quest.data().get("objectives") instanceof List<?> list) {
+                for (Object objective : list) {
+                    if (objective instanceof Map<?, ?> map && map.get("id") instanceof String id) {
+                        ids.add(id);
+                    }
+                }
+            }
+            return ids;
         }
 
         /** Check the manifest entrypoint's location and creation profile references. */
@@ -203,8 +379,9 @@ public final class PackCompiler {
                 case "item" -> item(f);
                 case "skill" -> skill(f);
                 case "ability" -> ability(f, definition);
-                case "condition" -> condition(f);
+                case "condition" -> condition(f, definition);
                 case "creation" -> creation(f);
+                case "quest" -> quest(f, definition);
                 default -> throw new PackException("UNSUPPORTED_KIND", document.location(definition.pointer() + "/kind"),
                         "Kind " + definition.kind() + " has no semantic schema in this pack contract revision");
             }
@@ -234,9 +411,9 @@ public final class PackCompiler {
                     for (Fields r : f.objects("resources", 1, 16)) {
                         String id = r.id("id", true);
                         r.text("name", true);
-                        r.integer("max", 1, VALUE_MAX, null);
+                        int max = r.integer("max", 1, VALUE_MAX, null);
                         r.close();
-                        if (!resources.add(id)) {
+                        if (resources.putIfAbsent(id, max) != null) {
                             throw r.fail("DUPLICATE", "id", "Resource ID already defined");
                         }
                     }
@@ -358,16 +535,40 @@ public final class PackCompiler {
             f.integer("maxRank", 1, 10, 2);
         }
 
-        /** Condition: identity, stacking policy and optional duration; modifiers arrive with P04.3. */
-        private void condition(Fields f) {
+        /**
+         * Condition: identity, stacking policy, duration, bounded attribute modifiers and an optional
+         * per-round tick effect list. Conditions applied by ticks become condition-graph edges, so a
+         * condition can never (transitively) re-apply itself every round.
+         */
+        private void condition(Fields f, Definition self) {
             f.text("name", true);
             f.text("description", true);
             f.choice("stacking", Set.of("none", "refresh", "stack"), "refresh");
             f.integer("durationRounds", 1, 10_000, 1);
+            Set<String> modified = new HashSet<>();
+            for (Fields modifier : f.objects("modifiers", 0, 8)) {
+                String attribute = modifier.id("attribute", true);
+                if (!attributes.containsKey(attribute)) {
+                    throw modifier.fail("REFERENCE_UNKNOWN", "attribute", "Unknown attribute '" + attribute + "'");
+                }
+                if (!modified.add(attribute)) {
+                    throw modifier.fail("DUPLICATE", "attribute", "Attribute already modified by this condition");
+                }
+                // Attribute ranges are at most 0..100, so a larger modifier could only saturate.
+                modifier.integer("amount", -100, 100, null);
+                modifier.close();
+            }
+            conditionGraph.node(self.id());
+            effectNodes = 0;
+            effects(f, "tick", 0, null, 1, self.id());
         }
 
-        /** Ability: prerequisites, costs, target policy and a shallowly typed effect list (depth rules: P04.3). */
+        /**
+         * Ability: prerequisites (ability prerequisites become cycle-checked graph edges), costs,
+         * target policy and a bounded effect tree of at most {@link #EFFECT_NODES} nodes.
+         */
         private void ability(Fields f, Definition self) {
+            abilityGraph.node(self.id());
             f.text("name", true);
             f.text("description", true);
             f.ids("tags", 32);
@@ -386,19 +587,22 @@ public final class PackCompiler {
                     }
                     need.close();
                 }
-                for (String other : prerequisites.refs("abilities", ABILITY, 16)) {
-                    if (other.equals(self.id())) {
+                List<String> required = prerequisites.refs("abilities", ABILITY, 16);
+                for (int index = 0; index < required.size(); index++) {
+                    if (required.get(index).equals(self.id())) {
                         throw prerequisites.fail("abilities", "An ability cannot require itself");
                     }
+                    abilityGraph.edge(self.id(), required.get(index), prerequisites.document()
+                            .location(PackDocument.child(prerequisites.at("abilities"), String.valueOf(index))));
                 }
                 prerequisites.close();
             }
             Set<String> costed = new HashSet<>();
             for (Fields cost : f.objects("costs", 0, 8)) {
                 String resource = cost.id("resource", true);
-                if (!resources.contains(resource)) {
+                if (!resources.containsKey(resource)) {
                     throw cost.fail("REFERENCE_UNKNOWN", "resource", "Unknown resource '" + resource
-                            + "'; defined resources: " + new java.util.TreeSet<>(resources));
+                            + "'; defined resources: " + new TreeSet<>(resources.keySet()));
                 }
                 if (!costed.add(resource)) {
                     throw cost.fail("resource", "Duplicate cost for one resource");
@@ -411,26 +615,75 @@ public final class PackCompiler {
             // Eight targets per normal action (docs/09 section 7).
             target.integer("maxTargets", 1, 8, 1);
             target.close();
-            for (Fields effect : f.objects("effects", 1, 20)) {
-                effect(effect);
+            effectNodes = 0;
+            effects(f, "effects", 1, null, 1, null);
+        }
+
+        /**
+         * Validate an effect list.
+         *
+         * @param f object holding the list
+         * @param key list field name
+         * @param min minimum entries (the global node budget bounds the maximum)
+         * @param parentTiming timing of the enclosing conditional, or null at the top level
+         * @param depth conditional nesting level, 1 at the top level
+         * @param owner condition whose ticks hold this list (for cycle edges), or null for abilities
+         */
+        private void effects(Fields f, String key, int min, String parentTiming, int depth, String owner) {
+            for (Fields effect : f.objects(key, min, EFFECT_NODES)) {
+                effect(effect, parentTiming, depth, owner);
             }
         }
 
-        /** Validate one effect node's declared type and the references that type requires. */
-        private void effect(Fields e) {
+        /**
+         * Validate one effect node: its type, timing, expression-valued amount and the references the
+         * type requires. A {@code conditional} node branches on an actor boolean expression; nested
+         * nodes inherit and must agree with its timing, so a node cannot resolve before its own guard.
+         *
+         * @throws PackException LIMIT when the node budget or conditional depth is exceeded
+         */
+        private void effect(Fields e, String parentTiming, int depth, String owner) {
+            if (++effectNodes > EFFECT_NODES) {
+                throw e.fail("LIMIT", null, "More than " + EFFECT_NODES + " effect nodes in one list");
+            }
             String type = e.choice("type", EFFECT_TYPES, null);
+            String timing = e.choice("timing", Set.of("pre", "post"), parentTiming == null ? "post" : parentTiming);
+            if (parentTiming != null && !timing.equals(parentTiming)) {
+                throw e.fail("timing", "A nested effect must use its conditional's timing '" + parentTiming + "'");
+            }
+            if (type.equals("conditional")) {
+                if (depth > EFFECT_DEPTH) {
+                    throw e.fail("LIMIT", null, "Conditional effects nest deeper than " + EFFECT_DEPTH + " levels");
+                }
+                Expressions.analyze(e.document(), e.at("when"), e.value("when", true), Expressions.Scope.ACTOR,
+                        Expressions.Type.BOOLEAN, this);
+                effects(e, "then", 1, timing, depth + 1, owner);
+                effects(e, "else", 0, timing, depth + 1, owner);
+                e.close();
+                return;
+            }
             e.choice("target", Set.of("self", "target", "targets"), "target");
-            e.choice("timing", Set.of("pre", "post"), "post");
             boolean amount = type.equals("damage") || type.equals("heal") || type.equals("modifyResource");
             if (amount) {
-                e.integer("amount", 0, VALUE_MAX, null);
+                // Amounts are expressions; their proven bounds must stay inside the value bound,
+                // and only resource modification may be negative.
+                var result = Expressions.analyze(e.document(), e.at("amount"), e.value("amount", true),
+                        Expressions.Scope.ACTOR, Expressions.Type.NUMBER, this);
+                long low = type.equals("modifyResource") ? -VALUE_MAX : 0;
+                if (result.min() < low || result.max() > VALUE_MAX) {
+                    throw e.fail("RANGE", "amount", "Amount may range " + result.min() + ".." + result.max()
+                            + "; allowed " + low + ".." + VALUE_MAX);
+                }
             }
             if (type.equals("applyCondition") || type.equals("removeCondition")) {
-                e.ref("condition", CONDITION, true);
+                String condition = e.ref("condition", CONDITION, true);
+                if (owner != null && type.equals("applyCondition")) {
+                    conditionGraph.edge(owner, condition, e.document().location(e.at("condition")));
+                }
             }
             if (type.equals("modifyResource")) {
                 String resource = e.id("resource", true);
-                if (!resources.contains(resource)) {
+                if (!resources.containsKey(resource)) {
                     throw e.fail("REFERENCE_UNKNOWN", "resource", "Unknown resource '" + resource + "'");
                 }
             }
@@ -535,6 +788,250 @@ public final class PackCompiler {
                 loadout.close();
             }
             f.refs("startingAbilities", ABILITY, LIST_MAX);
+        }
+
+        /**
+         * Quest: identity, issuer, discovery state, world-scope availability, objectives and outcomes.
+         * Every condition is a bounded WORLD boolean expression. References to other quests' status or
+         * objectives become quest-graph edges, so no quest can (transitively) wait on itself;
+         * references to the quest's own objectives are the normal way outcomes resolve and are kept
+         * out of the graph.
+         */
+        private void quest(Fields f, Definition self) {
+            questGraph.node(self.id());
+            f.text("name", true);
+            f.text("summary", true);
+            f.choice("visibility", VISIBILITY, "public");
+            f.choice("initialStatus", Set.of("undiscovered", "available"), "undiscovered");
+            f.ref("issuer", Set.of("npc"), false);
+            f.ref("faction", FACTION, false);
+            f.ids("tags", 32);
+            if (f.has("availableWhen")) {
+                questCondition(f, "availableWhen", self);
+            }
+            Set<String> objectiveIds = new HashSet<>();
+            for (Fields objective : f.objects("objectives", 1, 32)) {
+                if (!objectiveIds.add(objective.id("id", true))) {
+                    throw objective.fail("DUPLICATE", "id", "Duplicate objective ID");
+                }
+                objective.text("description", true);
+                objective.bool("optional", false);
+                questCondition(objective, "when", self);
+                objective.close();
+            }
+            Set<String> outcomeIds = new HashSet<>();
+            boolean success = false;
+            for (Fields outcome : f.objects("outcomes", 1, 8)) {
+                if (!outcomeIds.add(outcome.id("id", true))) {
+                    throw outcome.fail("DUPLICATE", "id", "Duplicate outcome ID");
+                }
+                success |= outcome.choice("kind", Set.of("success", "failure", "alternative"), null).equals("success");
+                outcome.text("description", false);
+                questCondition(outcome, "when", self);
+                Fields settlement = outcome.object("settlement", false);
+                if (settlement != null) {
+                    for (Fields reward : settlement.objects("rewards", 0, 8)) {
+                        reward.ref("item", ITEM, true);
+                        reward.integer("quantity", 1, 9999, 1);
+                        reward.close();
+                    }
+                    settlement.texts("consequences", 8);
+                    settlement.close();
+                }
+                outcome.close();
+            }
+            // A quest the player can never succeed at is an authoring error, not a design choice.
+            if (!success) {
+                throw f.fail("outcomes", "A quest needs at least one success outcome");
+            }
+        }
+
+        /** Analyze one quest condition and record its references to other quests as graph edges. */
+        private void questCondition(Fields f, String key, Definition self) {
+            var result = Expressions.analyze(f.document(), f.at(key), f.value(key, true), Expressions.Scope.WORLD,
+                    Expressions.Type.BOOLEAN, this);
+            for (var requirement : result.requirements()) {
+                if (!requirement.quest().equals(self.id())) {
+                    questGraph.edge(self.id(), requirement.quest(), f.document().location(requirement.pointer()));
+                }
+            }
+        }
+
+        /**
+         * Compile the generation policy file (docs/09 sections 8 and 11) into a {@link GenerationPolicy}.
+         *
+         * <p>Categories are opt-in: an absent category stays disabled. Every listed template, required
+         * entity and fixed entity must be an authored local definition, and every fixed field must be an
+         * authored field, so constraints cannot silently point at nothing. An excluded tag that a
+         * bounded category allows, or that a required entity carries, is a CONSTRAINT_CONFLICT: the
+         * author's constraints must be satisfiable before any generator runs.
+         *
+         * @throws PackException SCHEMA, RANGE, REFERENCE_UNKNOWN, DUPLICATE or CONSTRAINT_CONFLICT
+         */
+        private GenerationPolicy generationPolicy() {
+            String path = (String) pack.manifest().values().get("generationPolicy");
+            PackDocument document = pack.documents().get(path);
+            if (document == null) {
+                throw new PackException("SCHEMA", manifestDocument.location("/generationPolicy"),
+                        "The generation policy must be a structured JSON or YAML file");
+            }
+            Fields root = new Fields(document, "", document.value(), this);
+            Map<String, GenerationPolicy.Category> categories = new HashMap<>();
+            Fields listed = root.object("categories", false);
+            if (listed != null) {
+                // Sorted so the first reported problem does not depend on hash order.
+                for (String name : new TreeSet<>(GenerationPolicy.CATEGORIES)) {
+                    Fields category = listed.object(name, false);
+                    if (category != null) {
+                        categories.put(name, category(category, name));
+                    }
+                }
+                listed.close();
+            }
+            Set<String> required = new HashSet<>();
+            Map<String, Set<String>> fixed = new HashMap<>();
+            Set<String> excluded = Set.of();
+            Fields constraints = root.object("constraints", false);
+            if (constraints != null) {
+                List<String> requiredRefs = constraints.refs("required", ALL_KINDS, LIST_MAX);
+                for (int index = 0; index < requiredRefs.size(); index++) {
+                    local(constraints, PackDocument.child(constraints.at("required"), String.valueOf(index)),
+                            requiredRefs.get(index));
+                }
+                required.addAll(requiredRefs);
+                for (Fields entry : constraints.objects("fixed", 0, LIST_MAX)) {
+                    String entity = entry.ref("entity", ALL_KINDS, true);
+                    local(entry, entry.at("entity"), entity);
+                    List<String> fields = entry.texts("fields", 32);
+                    if (fields.isEmpty()) {
+                        throw entry.fail("fields", "List at least one fixed field");
+                    }
+                    for (String field : fields) {
+                        // Fixing protects an authored value; a name that is not authored is a typo.
+                        if (!byId.get(entity).data().containsKey(field)) {
+                            throw entry.fail("REFERENCE_UNKNOWN", "fields", "'" + entity + "' has no authored field '" + field + "'");
+                        }
+                    }
+                    if (fixed.putIfAbsent(entity, Set.copyOf(fields)) != null) {
+                        throw entry.fail("DUPLICATE", "entity", "Fixed fields of '" + entity + "' are already listed");
+                    }
+                    entry.close();
+                }
+                excluded = Set.copyOf(constraints.ids("excludedTags", LIST_MAX));
+                constraints.close();
+            }
+            root.close();
+            conflicts(document, categories, required, excluded);
+            return new GenerationPolicy(categories, required, fixed, excluded);
+        }
+
+        /** Compile one category policy; only bounded categories carry budgets, tags, templates and ranges. */
+        private GenerationPolicy.Category category(Fields f, String name) {
+            String mode = f.choice("mode", Set.of("disabled", "catalogOnly", "bounded"), null);
+            if (!mode.equals("bounded")) {
+                f.close();
+                return mode.equals("disabled") ? GenerationPolicy.Category.DISABLED
+                        : new GenerationPolicy.Category(GenerationPolicy.Mode.CATALOG_ONLY, 0, 0, Set.of(), Set.of(), Map.of());
+            }
+            int perScene = f.integer("maxNewPerScene", 1, 8, null);
+            int perCampaign = f.integer("maxNewPerCampaign", 1, 1000, null);
+            if (perCampaign < perScene) {
+                throw f.fail("RANGE", "maxNewPerCampaign", "Campaign budget must not be below the scene budget");
+            }
+            List<String> tags = f.ids("tags", 32);
+            List<String> templates = f.refs("templates", Set.of(CATEGORY_KINDS.get(name)), LIST_MAX);
+            Map<String, GenerationPolicy.Range> ranges = new HashMap<>();
+            Object raw = f.value("ranges", false);
+            if (raw != null) {
+                if (!(raw instanceof Map<?, ?> map) || map.size() > 16) {
+                    throw f.fail("ranges", "Expected object with at most 16 entries");
+                }
+                for (Object key : map.keySet()) {
+                    String property = (String) key;
+                    String pointer = f.keyPointer("ranges", property);
+                    if (!Fields.ID.matcher(property).matches()) {
+                        throw new PackException("SCHEMA", f.document().location(pointer), "Expected a lowercase stable identifier key");
+                    }
+                    Fields range = new Fields(f.document(), pointer, map.get(key), this);
+                    int min = range.integer("min", -VALUE_MAX, VALUE_MAX, null);
+                    int max = range.integer("max", -VALUE_MAX, VALUE_MAX, null);
+                    if (max < min) {
+                        throw range.fail("RANGE", "max", "Range maximum is below its minimum");
+                    }
+                    range.close();
+                    ranges.put(property, new GenerationPolicy.Range(min, max));
+                }
+            }
+            f.close();
+            return new GenerationPolicy.Category(GenerationPolicy.Mode.BOUNDED, perScene, perCampaign,
+                    Set.copyOf(tags), Set.copyOf(templates), ranges);
+        }
+
+        /** Constraints govern this pack's own content; dependency content is constrained by its own pack. */
+        private void local(Fields f, String pointer, String ref) {
+            if (ref.indexOf('#') >= 0) {
+                throw new PackException("SCHEMA", f.document().location(pointer),
+                        "Constraints may only name definitions of this pack");
+            }
+        }
+
+        /** Reject excluded tags that a bounded category allows or a required entity carries. */
+        private void conflicts(PackDocument document, Map<String, GenerationPolicy.Category> categories,
+                Set<String> required, Set<String> excluded) {
+            for (String name : new TreeSet<>(categories.keySet())) {
+                for (String tag : new TreeSet<>(categories.get(name).tags())) {
+                    if (excluded.contains(tag)) {
+                        throw new PackException("CONSTRAINT_CONFLICT",
+                                document.location("/categories/" + name + "/tags"),
+                                "Tag '" + tag + "' is allowed for " + name + " but excluded by constraints");
+                    }
+                }
+            }
+            for (String entity : new TreeSet<>(required)) {
+                if (byId.get(entity).data().get("tags") instanceof List<?> tags) {
+                    for (Object tag : tags) {
+                        if (excluded.contains(tag)) {
+                            throw new PackException("CONSTRAINT_CONFLICT", document.location("/constraints/required"),
+                                    "Required '" + entity + "' carries excluded tag '" + tag + "'");
+                        }
+                    }
+                }
+            }
+        }
+
+        /**
+         * Warn about local locations that no authored link chain reaches from the entrypoint. This is a
+         * heuristic, not a guarantee: move effects, unlocks and generated links are not modeled, so
+         * locked links still count as paths and a warning never blocks compilation.
+         */
+        @SuppressWarnings("unchecked")
+        private void reachability() {
+            var entrypoint = (Map<String, Object>) pack.manifest().values().get("entrypoint");
+            String start = (String) entrypoint.get("location");
+            if (start.indexOf('#') >= 0) {
+                return;
+            }
+            Set<String> reached = new HashSet<>(Set.of(start));
+            Deque<String> queue = new ArrayDeque<>(List.of(start));
+            while (!queue.isEmpty()) {
+                if (byId.get(queue.poll()).data().get("links") instanceof List<?> links) {
+                    for (Object link : links) {
+                        // External targets are skipped: their links live in another pack.
+                        if (((Map<String, Object>) link).get("to") instanceof String to && byId.containsKey(to)
+                                && reached.add(to)) {
+                            queue.add(to);
+                        }
+                    }
+                }
+            }
+            for (Definition definition : byId.values()) {
+                if (definition.kind().equals("location") && !reached.contains(definition.id())) {
+                    warnings.add(new PackWarning("UNREACHABLE_LOCATION",
+                            pack.documents().get(definition.file()).location(definition.pointer()),
+                            "Location '" + definition.id() + "' is not linked from the entrypoint '" + start
+                                    + "' (heuristic: move effects and unlocks are not modeled)"));
+                }
+            }
         }
     }
 }

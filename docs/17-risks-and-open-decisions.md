@@ -17,7 +17,7 @@ retain their standard precedence; configtree is not a secret manager.
 P04.1 adds an in-memory parsing boundary only. Its schemas and raw hashes cannot
 establish safe filesystem/archive extraction, allowed media, licensing, correct
 mechanics or playable references. `ParsedPack` must never be registered as an
-admitted revision without the remaining P04.3–P04.4 gates; P04.2 `CompiledPack` output is still not an admitted revision. The preliminary
+admitted revision without the remaining P04.4 gate; P04.2–P04.3 `CompiledPack` output is still not an admitted revision. The P04.3 ruleset contract 1.0.0 is provisional until P07, reachability is a heuristic warning, and no runtime caller enforces the generation gate before P10/P12. The preliminary
 definition schema deliberately leaves `data` semantics to those gates. Fixed
 parser budgets bound text work; archive expansion/media budgets and import
 isolation still require the protected staging layer. The 63-case parser/schema/hash

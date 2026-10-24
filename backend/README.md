@@ -102,6 +102,15 @@ tests pass, three packaged-interface profile tests skip, and the built jar conta
 both contract schemas (24 October 2026).
 See the [contract and hash protocol](../docs/09-adventure-packs.md#3-manifest-fields).
 
+P04.2–P04.3 add `content.PackCompiler`, which turns a `ParsedPack` into a `CompiledPack`.
+The compiler checks typed references, bounded expressions/effects, quests, dependency
+cycles, engine/ruleset/module compatibility and hash conflicts. It also compiles a
+`GenerationPolicy`, and `content.GenerationGate` checks generated proposals against it.
+`CompiledPack` output is not yet a registered revision (P04.4). The compiler suite runs
+with `./mvnw -B -ntp -Dtest=PackCompilerTest test` without PostgreSQL: 19 tests pass.
+The full backend `verify` passes 198 tests with three profile skips (24 October 2026).
+See [ADR 0017](../docs/adr/0017-bounded-pack-semantics.md).
+
 ## Packaged runtime configuration (P02.3)
 
 Activate the Spring runtime profile with `--spring.profiles.active=packaged`.

@@ -2,6 +2,13 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Bounded pack semantics and generation gate (P04.3), 24 October 2026
+
+- Add a statically analyzed, data-only expression language with depth/node/dice/overflow/division limits; typed effects with bounded conditional nesting and inherited timing; condition stacking, duration, modifiers and ticks; and quest definitions with world-scope predicates and outcomes.
+- Detect ability-prerequisite, condition-tick and quest-dependency cycles with path diagnostics; check SemVer engine/ruleset ranges, modules and same-version hash conflicts against a local engine contract (ruleset 1.0.0 provisional until P07).
+- Compile generation policies with opt-in categories, budgets, tags, templates, ranges and fixed/required/excluded author constraints. A deterministic `GenerationGate` rejects proposals that override them. Add an unreachable-location warning. ADR 0017 records the decisions.
+- 19 compiler tests and the full pinned backend verification pass (198 tests, three profile skips). Encounter/anchor/progression kinds, runtime gate callers and import registration remain future work.
+
 ## Unreleased — Semantic pack compiler (P04.2), 24 October 2026
 
 - Add `PackCompiler`, `CompiledPack`, `Definition` and a local `DependencyCatalog`: unique IDs, category/kind agreement, typed cross-references (including `packId#id` for declared dependencies), rule-defined attributes/resources/rarity tiers, unique item appearance identities, creation budgets, skills, abilities and initial world definitions, with closed objects and located diagnostics.

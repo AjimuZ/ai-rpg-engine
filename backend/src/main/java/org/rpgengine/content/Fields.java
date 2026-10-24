@@ -265,6 +265,14 @@ final class Fields {
         }
     }
 
+    /**
+     * Fetch an untyped child value (e.g. an expression tree analyzed elsewhere), marking it consumed.
+     * Returns null when absent; a missing required key is a located SCHEMA error.
+     */
+    Object value(String key, boolean required) {
+        return raw(key, required);
+    }
+
     /** Fetch a child value, marking it consumed; a missing required key is a located SCHEMA error. */
     private Object raw(String key, boolean required) {
         seen.add(key);

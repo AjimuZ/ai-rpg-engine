@@ -589,7 +589,32 @@ content/assets and full container integration remain open; P02.3 stays unchecked
     Limitations: expression and effect depth/graph limits, cycles, version-range
     compatibility and quest/encounter/progression semantics are P04.3; archive/path
     protections and registration are P04.4. Nothing is admitted or playable yet.
-- [ ] P04.3 Implement bounded expressions/effects, graph/cycle limits, fixed author/required-entity constraints, version compatibility and conflict diagnostics; generated gap filling cannot override them.
+- [x] P04.3 Implement bounded expressions/effects, graph/cycle limits, fixed author/required-entity constraints, version compatibility and conflict diagnostics; generated gap filling cannot override them.
+  - Session 1: add a closed, typed integer/boolean expression language (`Expressions`)
+    with actor and world scopes, interval analysis that proves divisors non-zero and
+    results in range, and limits of depth 12, 200 nodes, 40 dice and |value| ≤ 10⁹
+    (`LIMIT`, `COST`, `OVERFLOW`, `DIVISION_BY_ZERO`, `RANGE`). Effects gain timing,
+    targets, resource/condition/item/move effects and guarded `conditional` effects
+    (nesting depth 4, 20 nodes per list tree). Ability prerequisites, condition ticks and
+    unconditional quest requirements are cycle-checked graphs (`CYCLE` names the path).
+    Quests now compile: objectives, outcomes with settlements and world predicates.
+    Manifests are checked against an `EngineContract` using a closed SemVer range
+    grammar (`VERSION_SYNTAX`, `INCOMPATIBLE_ENGINE`, `INCOMPATIBLE_RULESET`,
+    `UNSUPPORTED_MODULE`); `HASH_CONFLICT` rejects different bytes under an installed
+    pack or dependency version. The generation policy file compiles into
+    `GenerationPolicy` (disabled/catalog-only/bounded categories, budgets, tags,
+    templates, ranges, required entities, fixed authored fields, excluded tags;
+    contradictions are `CONSTRAINT_CONFLICT`). The pure `GenerationGate` rejects
+    generated entities or gap fills that reuse authored IDs, fill fixed or authored
+    fields, exceed budgets or ranges, carry excluded tags or retire required entities.
+    Unreachable locations are located `UNREACHABLE_LOCATION` warnings. ADR 0017 records
+    the choices. The compiler suite grows to 19 tests; full pinned JDK 21/PostgreSQL 18.6
+    backend `verify` passes 198 tests with three packaging-profile skips; repository
+    tests and policy checks pass.
+    Limitations: encounter, anchor and progression kinds remain `UNSUPPORTED_KIND`;
+    ruleset 1.0.0 is a provisional contract until P07; the gate is not yet called by any
+    runtime path (P10/P12 must use it); reachability ignores locks and move effects.
+    Archive/path protections and registration are P04.4.
 - [ ] P04.4 Add path/archive/type/size protections and immutable registration.
 - [ ] P04.5 Create two minimal neutral genre fixtures and prove import without source edits.
 - [ ] P04.6 Validate optional ID-based English/Italian text overlays, glossary/quote policies, locale coverage and source-language fallback; localized fields cannot alter mechanics or visibility, and both neutral genre fixtures include reviewed EN/IT resources.

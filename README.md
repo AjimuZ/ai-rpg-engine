@@ -33,9 +33,11 @@ See the [backend scope](backend/README.md) and [P03 evidence](docs/15-quality-an
 
 P04.1 adds the internal contract-1 manifest/parsing stage, structural schemas,
 explicit file categories and deterministic raw-byte hashes. Parsed data cannot
-be admitted or played yet; semantic compilation and safe directory/ZIP import
-remain P04.3–P04.4. P04.2 adds the semantic compiler for IDs, dependencies,
-cross-references, creation profiles, items, skills, abilities and world definitions.
+be admitted or played yet; safe directory/ZIP import and registration
+remain P04.4. P04.2 adds the semantic compiler for IDs, dependencies,
+cross-references, creation profiles, items, skills, abilities and world definitions;
+P04.3 adds bounded expressions/effects, quests, cycle checks, version/hash
+compatibility and a generation gate that cannot override fixed author constraints.
 See the [pack contract](docs/09-adventure-packs.md).
 
 ## Why this engine exists
