@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "kit",
+      "kind": "item",
+      "data": {
+        "name": "Insulated Scanner",
+        "description": "A handheld diagnostic tool.",
+        "itemType": "tool",
+        "maxStack": 1,
+        "rarity": "standard",
+        "appearance": {
+          "id": "kit.scanner",
+          "summary": "A blue meter with insulated probes."
+        }
+      }
+    }
+  ]
+}

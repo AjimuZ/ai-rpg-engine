@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "rules.attributes",
+      "kind": "rule",
+      "data": {
+        "ruleType": "attributes",
+        "attributes": [
+          {
+            "id": "logic",
+            "name": "Logic",
+            "min": 0,
+            "max": 4
+          }
+        ]
+      }
+    },
+    {
+      "id": "rules.resources",
+      "kind": "rule",
+      "data": {
+        "ruleType": "resources",
+        "resources": [
+          {
+            "id": "charge",
+            "name": "Charge",
+            "max": 12
+          }
+        ]
+      }
+    },
+    {
+      "id": "rules.rarity",
+      "kind": "rule",
+      "data": {
+        "ruleType": "rarityTiers",
+        "tiers": [
+          {
+            "id": "standard",
+            "name": "Standard",
+            "token": "tier-standard"
+          }
+        ]
+      }
+    }
+  ]
+}

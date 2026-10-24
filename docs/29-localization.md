@@ -99,8 +99,10 @@ terms, grammatical hints and pronunciation; one entity has one identity.
 Lookup order is exact selected locale, declared pack source text, then an
 explicit missing-content diagnostic. Required engine UI never relies on a
 partially translated pack. Import reports list language coverage and source
-fallbacks. Both bundled neutral genre fixtures have reviewed English and Italian
-text. External untranslated packs are allowed with a clear source-language
+fallbacks. Both bundled neutral genre fixtures must have reviewed English and Italian
+text for P04.6. P04.5 supplies English source inventories only; overlays, coverage
+reports and fallback validation remain unimplemented. External untranslated packs
+are allowed with a clear source-language
 badge before play; no claim of full authored translation is made. The owner may
 review/publish an explicit translation revision later through ordinary authoring.
 

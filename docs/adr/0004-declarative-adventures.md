@@ -1,6 +1,6 @@
 # ADR 0004: Declarative, Immutable Adventure Packs
 
-**Status:** Declarative boundary accepted; parsing, semantic compilation and protected immutable registration implemented in P04.1–P04.4. Genre fixtures, locale overlays and gameplay remain pending. Adventure independence is an owner requirement. [ADR 0010](0010-name-scope-format-licensing.md) fixes the concrete file syntax of pack contract 1; [ADR 0018](0018-protected-pack-registration.md) records admission/storage boundaries. **Date:** 22 October 2026 (implementation status updated 24 October 2026).
+**Status:** Declarative boundary accepted; parsing, semantic compilation and protected immutable registration implemented in P04.1–P04.4. P04.5 adds two neutral genre fixtures and unchanged-engine import evidence; locale overlays and gameplay remain pending. Adventure independence is an owner requirement. [ADR 0010](0010-name-scope-format-licensing.md) fixes the concrete file syntax of pack contract 1; [ADR 0018](0018-protected-pack-registration.md) records admission/storage boundaries. **Date:** 22 October 2026 (implementation status updated 24 October 2026).
 
 ## Context
 

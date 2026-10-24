@@ -636,7 +636,21 @@ content/assets and full container integration remain open; P02.3 stays unchecked
     genre/localization acceptance remain open.
     Final review adds direct payload-CRC, trailing-deflate and unsigned-descriptor
     cases to the staging corpus; their focused rerun passes all 12 tests.
-- [ ] P04.5 Create two minimal neutral genre fixtures and prove import without source edits.
+- [x] P04.5 Create two minimal neutral genre fixtures and prove import without source edits.
+  - Add standalone English Mosslight Trail (fantasy exploration) and Silent Relay
+    (science-fiction salvage) inventories with distinct world graphs, vocabulary,
+    skills/resources, creation budgets, tools, abilities, quests and original
+    MIT-licensed schematic PNGs. No production source or dependency changes.
+    Two PostgreSQL integration cases pass: read-only preview, unchanged directory/ZIP
+    import, exact sealed byte/hash/report preservation, idempotency, stored recompile,
+    independent adventure imports, shared local-ID separation and located broken
+    reference rejection with no partial writes. The test first failed on absent
+    fixture directories, then passed with the authored inventories.
+    Full pinned JDK 21/PostgreSQL 18.6 `verify` passes 220 tests with three separate
+    packaging-profile skips (223 total) and builds the jar. Repository checker tests
+    pass 22; docs/secrets/workflows/images have zero findings. Optional modules stay
+    disabled because no runtime exists; distinct guide/creative behavior, playable
+    QA-01, full QA-33 isolation and reviewed EN/IT resources remain later gates.
 - [ ] P04.6 Validate optional ID-based English/Italian text overlays, glossary/quote policies, locale coverage and source-language fallback; localized fields cannot alter mechanics or visibility, and both neutral genre fixtures include reviewed EN/IT resources.
 
 **Exit:** valid packs compile; invalid/malicious packs fail with file/field context. No arbitrary executable pack plugins. **Checks:** schema/reference/limit/path corpus, hash conflicts, dependency resolution, two-pack integration. **Suggested commit:** `Add validated versioned adventure packs`.

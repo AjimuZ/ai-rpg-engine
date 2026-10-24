@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "traveler",
+      "kind": "creation",
+      "data": {
+        "name": "Salvager",
+        "attributeBudget": 3,
+        "skillBudget": 2,
+        "attributes": [
+          "logic"
+        ],
+        "skills": [
+          "fieldwork"
+        ],
+        "archetypes": [
+          {
+            "id": "surveyor",
+            "name": "Technician",
+            "attributes": {
+              "logic": 3
+            },
+            "skills": {
+              "fieldwork": 2
+            }
+          }
+        ],
+        "startingItems": [
+          {
+            "item": "kit",
+            "quantity": 1
+          }
+        ],
+        "startingAbilities": [
+          "steady"
+        ]
+      }
+    }
+  ]
+}

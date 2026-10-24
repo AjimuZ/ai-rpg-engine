@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "survey",
+      "kind": "quest",
+      "data": {
+        "name": "Find the Waystone",
+        "summary": "Visit the grove and survey its waystone.",
+        "initialStatus": "available",
+        "objectives": [
+          {
+            "id": "reach",
+            "description": "Reach the survey site.",
+            "when": {
+              "visited": "grove"
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "id": "surveyed",
+            "kind": "success",
+            "when": {
+              "objective": {
+                "quest": "survey",
+                "id": "reach"
+              }
+            },
+            "settlement": {
+              "consequences": [
+                "The survey site is now known."
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

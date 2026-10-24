@@ -17,6 +17,12 @@ The library's primary cards represent adventures. “New adventure” creates a 
 
 ## 2. Separate managed folders
 
+P04.5 imports both [neutral genre fixtures](../backend/src/test/resources/packs/README.md)
+into one workspace and independently into fresh workspaces, preserving distinct
+revision identities and exact inventories despite shared local definition IDs.
+This is registry evidence only; campaign/library switching and full QA-33
+restart/restore isolation remain unimplemented.
+
 P04.4 stores imported original files and sealed reports in PostgreSQL alongside
 their adventure-owned revision. Dependencies cannot resolve through another
 adventure. Re-import is idempotent for identical bytes and never replaces an

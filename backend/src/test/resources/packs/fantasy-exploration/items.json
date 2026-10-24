@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "kit",
+      "kind": "item",
+      "data": {
+        "name": "Trail Kit",
+        "description": "A canvas pouch of surveying tools.",
+        "itemType": "tool",
+        "maxStack": 1,
+        "rarity": "ordinary",
+        "appearance": {
+          "id": "kit.canvas",
+          "summary": "A green pouch with wooden markers."
+        }
+      }
+    }
+  ]
+}

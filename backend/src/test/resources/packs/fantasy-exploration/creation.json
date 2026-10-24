@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "traveler",
+      "kind": "creation",
+      "data": {
+        "name": "Wayfarer",
+        "attributeBudget": 2,
+        "skillBudget": 1,
+        "attributes": [
+          "awareness"
+        ],
+        "skills": [
+          "fieldwork"
+        ],
+        "archetypes": [
+          {
+            "id": "surveyor",
+            "name": "Pathfinder",
+            "attributes": {
+              "awareness": 2
+            },
+            "skills": {
+              "fieldwork": 1
+            }
+          }
+        ],
+        "startingItems": [
+          {
+            "item": "kit",
+            "quantity": 1
+          }
+        ],
+        "startingAbilities": [
+          "steady"
+        ]
+      }
+    }
+  ]
+}

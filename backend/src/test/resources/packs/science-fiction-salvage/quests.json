@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "survey",
+      "kind": "quest",
+      "data": {
+        "name": "Survey the Core",
+        "summary": "Reach the cold reactor without assuming the station is safe.",
+        "initialStatus": "available",
+        "objectives": [
+          {
+            "id": "reach",
+            "description": "Reach the survey site.",
+            "when": {
+              "visited": "reactor"
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "id": "surveyed",
+            "kind": "success",
+            "when": {
+              "objective": {
+                "quest": "survey",
+                "id": "reach"
+              }
+            },
+            "settlement": {
+              "consequences": [
+                "The survey site is now known."
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -38,7 +38,10 @@ P04.3 adds bounded expressions/effects, quests, cycle checks, version/hash
 compatibility and a generation gate that cannot override fixed author constraints.
 P04.4 adds bounded directory/ZIP staging, media header checks and immutable
 transactional pack registration with original files and reports. These are internal
-APIs; import screens, playable genre fixtures and locale overlays remain pending.
+APIs. P04.5 adds standalone [fantasy exploration and science-fiction salvage
+fixtures](backend/src/test/resources/packs/README.md) with directory/ZIP import
+checks on the same engine build; import screens, playable campaigns and locale
+overlays remain pending.
 See the [pack contract](docs/09-adventure-packs.md).
 
 ## Why this engine exists

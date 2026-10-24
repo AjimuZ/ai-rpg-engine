@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "id": "sample:science-fiction-salvage",
+  "version": "1.0.0",
+  "title": "Silent Relay",
+  "summary": "A neutral station salvage survey.",
+  "authors": [
+    "Project contributors"
+  ],
+  "license": "MIT",
+  "engineCompatibility": ">=0.1.0 <1.0.0",
+  "ruleset": {
+    "id": "skirmish",
+    "version": ">=1.0.0 <2.0.0",
+    "policyProfile": "standard"
+  },
+  "contentLocale": "en",
+  "narrativeMode": "emergent",
+  "entrypoint": {
+    "situation": "The salvage berth has just opened. Choose whether to inspect the junction or review your scanner.",
+    "location": "dock",
+    "creationProfile": "traveler"
+  },
+  "files": [
+    {
+      "path": "rules.json",
+      "category": "rules"
+    },
+    {
+      "path": "locations.json",
+      "category": "locations"
+    },
+    {
+      "path": "skills.json",
+      "category": "skills"
+    },
+    {
+      "path": "abilities.json",
+      "category": "abilities"
+    },
+    {
+      "path": "items.json",
+      "category": "items"
+    },
+    {
+      "path": "creation.json",
+      "category": "creation"
+    },
+    {
+      "path": "quests.json",
+      "category": "quests"
+    },
+    {
+      "path": "generation.json",
+      "category": "generationPolicy"
+    },
+    {
+      "path": "lore.md",
+      "category": "lore"
+    },
+    {
+      "path": "CREDITS.md",
+      "category": "credits"
+    },
+    {
+      "path": "LICENSE.md",
+      "category": "license"
+    },
+    {
+      "path": "assets/map.png",
+      "category": "asset"
+    }
+  ],
+  "modules": [],
+  "generationPolicy": "generation.json",
+  "contentGuidance": {
+    "tone": "Curious and non-romantic",
+    "themes": [
+      "exploration"
+    ],
+    "exclusions": [
+      "mandatory romance"
+    ],
+    "audience": "general"
+  },
+  "provenance": {
+    "source": "Original project fixture",
+    "notice": "See CREDITS.md and LICENSE.md"
+  }
+}

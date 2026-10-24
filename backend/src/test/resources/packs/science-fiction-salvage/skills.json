@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "fieldwork",
+      "kind": "skill",
+      "data": {
+        "name": "Systems",
+        "description": "Diagnose isolated machinery.",
+        "attribute": "logic",
+        "maxRank": 4
+      }
+    }
+  ]
+}

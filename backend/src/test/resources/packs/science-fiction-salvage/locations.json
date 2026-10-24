@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "dock",
+      "kind": "location",
+      "data": {
+        "name": "Service Dock",
+        "description": "A sealed berth faces a silent relay station.",
+        "links": [
+          {
+            "to": "junction",
+            "accessible": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "junction",
+      "kind": "location",
+      "data": {
+        "name": "Cable Junction",
+        "description": "Two service corridors meet under an unlit status panel.",
+        "links": [
+          {
+            "to": "dock",
+            "accessible": true
+          },
+          {
+            "to": "reactor",
+            "accessible": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "reactor",
+      "kind": "location",
+      "data": {
+        "name": "Cold Reactor",
+        "description": "An isolated power core waits for a safe diagnostic survey.",
+        "links": [
+          {
+            "to": "junction",
+            "accessible": true
+          }
+        ]
+      }
+    }
+  ]
+}

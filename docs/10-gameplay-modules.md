@@ -6,6 +6,12 @@ Every module uses typed intentions, deterministic prerequisites, effects, domain
 
 The engine distinguishes **attributes** (broad capacities), **skills** (trained competencies), **derived statistics** (calculated values), **resources** (spendable pools), **abilities** (performable actions), **traits** (passive rules), and **conditions** (temporary effects). Pack terminology can differ without collapsing these concepts into an unvalidated generic number map.
 
+P04.5's [neutral genre fixtures](../backend/src/test/resources/packs/README.md)
+compile Trailcraft/Vigor and Systems/Charge, distinct creation budgets, recovery
+abilities and exploration objectives through the same engine. This is content
+import evidence only. No loadable module runtime exists yet; both fixtures leave
+guide, creative abilities and romance disabled, without claiming gameplay checks.
+
 ## 2. Exploration and action resolution
 
 Locations form a directed graph with traversal requirements and durations. A character's actual position is separate from map discovery. Moving checks accessibility, presence, hazards, and equipment. Travel can produce a proposed encounter, but the engine must admit that encounter before reporting an attack.

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "steady",
+      "kind": "ability",
+      "data": {
+        "name": "Emergency Cell",
+        "description": "Restore one unit of charge.",
+        "target": {
+          "policy": "self"
+        },
+        "effects": [
+          {
+            "type": "modifyResource",
+            "resource": "charge",
+            "amount": 1
+          }
+        ]
+      }
+    }
+  ]
+}

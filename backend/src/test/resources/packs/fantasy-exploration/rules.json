@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "rules.attributes",
+      "kind": "rule",
+      "data": {
+        "ruleType": "attributes",
+        "attributes": [
+          {
+            "id": "awareness",
+            "name": "Awareness",
+            "min": 0,
+            "max": 4
+          }
+        ]
+      }
+    },
+    {
+      "id": "rules.resources",
+      "kind": "rule",
+      "data": {
+        "ruleType": "resources",
+        "resources": [
+          {
+            "id": "vigor",
+            "name": "Vigor",
+            "max": 8
+          }
+        ]
+      }
+    },
+    {
+      "id": "rules.rarity",
+      "kind": "rule",
+      "data": {
+        "ruleType": "rarityTiers",
+        "tiers": [
+          {
+            "id": "ordinary",
+            "name": "Ordinary",
+            "token": "tier-ordinary"
+          }
+        ]
+      }
+    }
+  ]
+}

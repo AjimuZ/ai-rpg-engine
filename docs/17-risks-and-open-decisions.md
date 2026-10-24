@@ -27,8 +27,11 @@ PostgreSQL, increasing database/backup size; moving them to managed folders late
 requires a coherent migration. See [ADR 0018](adr/0018-protected-pack-registration.md).
 Ruleset 1.0.0 and its descriptor digest remain provisional until P07. Reachability
 is a heuristic, and no runtime caller enforces the generation gate before P10/P12.
-Genre fixtures, bilingual overlays and playable acceptance remain P04.5/P04.6
-and later milestones; the focused 23 admission tests do not establish those exits.
+P04.5 adds standalone fantasy/salvage fixtures and PostgreSQL checks for unchanged
+directory/ZIP import, sealed byte preservation and invalid-reference rollback.
+Optional modules remain disabled because no runtime exists. Bilingual overlays,
+playable two-genre acceptance and full workspace isolation remain P04.6 and later
+milestones; successful fixture import does not establish those exits.
 
 P03.6 verifies scoped durable jobs, complete snapshot manifests, fenced admission,
 query-epoch races, cancellation/restart metadata and generation retirement on restore.

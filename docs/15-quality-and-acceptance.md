@@ -2,6 +2,20 @@
 
 ## 1. Evidence policy
 
+P04.5 evidence (24 October 2026, Windows 11/Docker Desktop, pinned JDK 21 and
+PostgreSQL 18.6): `NeutralGenreImportTest` passes both cases using standalone
+fantasy exploration and science-fiction salvage resource directories, without
+production source edits or replacement engine contracts. The tests cover read-only
+preview, directory/ZIP equivalence, idempotency, exact sealed byte/hash/report
+preservation, recompile, distinct vocabulary/mechanics/assets despite shared local
+IDs, independent adventure imports and located invalid-reference rejection with
+no partial rows. This supplies two-pack import evidence toward QA-01 and QA-02.
+Both fixtures disable optional modules; gameplay, distinct module behavior,
+reviewed bilingual resources and full QA-33 isolation remain later gates.
+Full backend `verify` passes 220 tests, skips three separate packaging-profile
+tests (223 total), and builds the jar. All 22 repository-checker tests pass;
+docs/secrets/workflows/images checks report zero findings.
+
 P04.4 evidence (24 October 2026, Windows 11/Docker Desktop, pinned JDK 21 and
 PostgreSQL 18.6): all 23 focused staging/registration tests pass. Cases cover
 paths/devices/case aliases, links and special entries, conflicting archive views,
@@ -134,8 +148,8 @@ passes 176 tests, skips three separate packaged-interface profile tests (179 tot
 and builds the executable jar containing both schemas. Repository-checker tests pass
 22/22 and all repository policy checks report zero findings. This establishes only
 the parser/schema/hash portion of QA-02; semantic references, cycles, effects,
-archive extraction, media and immutable admission remain P04.2–P04.4, and the two
-playable genre fixtures of QA-01 remain P04.5. The definition envelope deliberately
+archive extraction, media and immutable admission were addressed in P04.2–P04.4.
+Playable two-genre QA-01 remains beyond P04.5's import checks. The definition envelope deliberately
 does not validate its `data` mechanics. No complete pack-import acceptance is claimed.
 
 ## 2. Verification layers

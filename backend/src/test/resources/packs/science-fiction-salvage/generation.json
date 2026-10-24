@@ -1,0 +1,17 @@
+{
+  "categories": {
+    "items": {
+      "mode": "catalogOnly"
+    },
+    "locations": {
+      "mode": "catalogOnly"
+    }
+  },
+  "constraints": {
+    "required": [
+      "dock",
+      "reactor",
+      "kit"
+    ]
+  }
+}

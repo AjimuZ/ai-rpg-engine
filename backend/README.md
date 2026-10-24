@@ -136,6 +136,23 @@ separate packaged-interface profile tests (221 total), and builds the jar
 (24 October 2026). The initial full run exposed a V6-latest fixture assumption;
 the V1→V7 extension and subsequent full rerun both pass.
 
+## Neutral genre imports (P04.5)
+
+Two standalone [contract-1 fixtures](src/test/resources/packs/README.md) cover
+fantasy exploration and science-fiction salvage with distinct locations,
+terminology, resource caps, creation budgets, tools, abilities, quests and
+original MIT-licensed PNG schematics. No production code or dependency changes
+are needed to import either pack. They live in test resources and are not bundled
+in the production jar.
+
+`./mvnw -B -ntp -Dtest=NeutralGenreImportTest test` runs two PostgreSQL-backed
+cases: unchanged directory/ZIP imports, read-only preview, sealed byte/hash/report
+round trips, recompile, idempotency, independent adventure imports and located
+invalid-reference rejection with no partial writes. Optional modules stay
+disabled; campaign gameplay, UI and reviewed EN/IT overlays remain later work.
+Pinned JDK 21/PostgreSQL 18.6 full `verify` passes 220 tests with three separate
+packaging-profile skips (223 total) and builds the jar (24 October 2026).
+
 ## Packaged runtime configuration (P02.3)
 
 Activate the Spring runtime profile with `--spring.profiles.active=packaged`.

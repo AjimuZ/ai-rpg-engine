@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "trailhead",
+      "kind": "location",
+      "data": {
+        "name": "Mosslight Trailhead",
+        "description": "A footpath leaves a public shelter beneath bright leaves.",
+        "links": [
+          {
+            "to": "grove",
+            "accessible": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "grove",
+      "kind": "location",
+      "data": {
+        "name": "Lantern Grove",
+        "description": "Pale flowers surround a weathered waystone.",
+        "links": [
+          {
+            "to": "trailhead",
+            "accessible": true
+          }
+        ]
+      }
+    }
+  ]
+}

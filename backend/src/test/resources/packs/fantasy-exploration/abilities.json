@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "steady",
+      "kind": "ability",
+      "data": {
+        "name": "Catch Breath",
+        "description": "Recover one point of vigor.",
+        "target": {
+          "policy": "self"
+        },
+        "effects": [
+          {
+            "type": "modifyResource",
+            "resource": "vigor",
+            "amount": 1
+          }
+        ]
+      }
+    }
+  ]
+}

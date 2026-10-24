@@ -2,6 +2,13 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Neutral genre import fixtures (P04.5), 24 October 2026
+
+- Add standalone fantasy exploration and science-fiction salvage packs with distinct world graphs, vocabulary, skills, resource caps, creation profiles, abilities, quests and original MIT-licensed schematic PNG assets.
+- Prove unchanged directory/ZIP imports, read-only preview, exact sealed byte/hash/report preservation, idempotency, recompilation and independent adventure imports on the same engine. Broken starting-item references in both real fixtures fail with source context and no partial rows.
+- Keep optional modules disabled under the existing engine contract. These are English import/compiler fixtures; playable campaigns, guide/creative runtime, full adventure isolation and reviewed EN/IT overlays remain later gates.
+- Verification: two focused PostgreSQL integration tests pass; full pinned JDK 21/PostgreSQL 18.6 `verify` passes 220 tests with three packaging-profile skips (223 total) and builds the jar; 22 repository-checker tests pass and all four policy checks have zero findings.
+
 ## Unreleased — Protected pack registration (P04.4), 24 October 2026
 
 - Add bounded directory/ZIP staging with portable path/device/case guards, link/special-file rejection, consistent archive headers/descriptors, CRC verification and actual inflation limits; retain immutable staged byte copies without disk extraction.

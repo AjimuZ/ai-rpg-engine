@@ -2,7 +2,7 @@
 
 ## 1. Purpose and contract status
 
-An adventure pack is a versioned set of declarative files describing playable content and supported rules configuration. It is not a script that can command the host computer. P04.1–P04.4 implement parsing, semantic compilation, protected directory/ZIP staging and immutable registration through internal Java APIs. Only `PackRegistry` admits staged bytes as a sealed `ContentRevision`; `ParsedPack` and `CompiledPack` alone do not establish admission. Import UI/endpoints, playable genre fixtures and locale overlays remain later work. The concrete file syntax of pack contract 1 (`schemaVersion: 1`) is fixed by [ADR 0010](adr/0010-name-scope-format-licensing.md#decision-initial-pack-file-format-pack-contract-1). It covers UTF-8 encoding, YAML 1.2 core-schema `.yaml` files without anchors, aliases, tags, or duplicate keys, `.json` as an equivalent, CommonMark `.md` prose without front matter or rendered HTML, and directory or `.zip` distribution.
+An adventure pack is a versioned set of declarative files describing playable content and supported rules configuration. It is not a script that can command the host computer. P04.1–P04.4 implement parsing, semantic compilation, protected directory/ZIP staging and immutable registration through internal Java APIs. Only `PackRegistry` admits staged bytes as a sealed `ContentRevision`; `ParsedPack` and `CompiledPack` alone do not establish admission. P04.5 adds two standalone neutral genre fixtures and import checks; import UI/endpoints, playable campaigns and locale overlays remain later work. The concrete file syntax of pack contract 1 (`schemaVersion: 1`) is fixed by [ADR 0010](adr/0010-name-scope-format-licensing.md#decision-initial-pack-file-format-pack-contract-1). It covers UTF-8 encoding, YAML 1.2 core-schema `.yaml` files without anchors, aliases, tags, or duplicate keys, `.json` as an equivalent, CommonMark `.md` prose without front matter or rendered HTML, and directory or `.zip` distribution.
 
 The engine must not need a fixed plot. A minimal pack supplies world principles, a starting location/situation, character creation, a ruleset, and generation boundaries. Quests, endings, a prologue, companions, and a guide are optional.
 
@@ -340,6 +340,18 @@ Author-specified facts, required entities and supported constraints are fixed in
 
 One neutral fantasy exploration pack and one science-fiction salvage pack must differ in vocabulary, world structure, skills, resources, assets, and optional guide/creative-ability settings. Both must run with the same built engine. Neither needs a full authored plot. Shared mechanics can remain AI RPG Skirmish while their presentation and supported numerical configuration differ.
 
+P04.5 supplies [Mosslight Trail and Silent Relay](../backend/src/test/resources/packs/README.md)
+as complete contract-1 test-resource directories with explicit inventories,
+connected location graphs, creation profiles, abilities, quests, original MIT
+map assets and source-language prose. `NeutralGenreImportTest` imports both
+unchanged through the same registry and recompiles stored bytes; it also proves
+directory/ZIP equivalence, idempotency, adventure-local revision identities and
+located rejection of broken references without partial writes. Production source
+and the engine contract are unchanged. This establishes the import portion of
+QA-01/02, not gameplay or full QA-33. The current contract has no module runtime,
+so both packs keep `modules: []`; distinct guide/creative settings and their
+behavior remain deferred until supported. Reviewed bilingual resources are P04.6.
+
 ## 13. Export and migration
 
 Export an admitted campaign-generated NPC or ability only through a review that removes private runtime identifiers, selects rights/provenance, resolves dependencies, and creates stable content IDs. Do not copy the live save into an adventure pack and call it reusable content.
@@ -391,9 +403,10 @@ adds graphical preview and round-trip tests over exactly this interchange format
 
 The optional `localizations` map and text-only overlays are specified in
 [localization](29-localization.md). Stable IDs and mechanical values remain
-language-independent; the compiler reports coverage, glossary and source-text
-fallbacks and includes overlays in revision hashes. Both neutral fixtures ship
-reviewed EN/IT text; untranslated external content is labeled explicitly.
+language-independent. P04.6 will add compiler coverage, glossary and source-text
+fallback reporting and include overlays in revision hashes. Both neutral fixtures
+currently ship English source text; reviewed EN/IT overlays and explicit labels
+for untranslated external content remain P04.6 work.
 
 Authors may define flexible quest premises, allowed planning categories, protected
 facts/required entities, forbidden developments and supported conditional beats.

@@ -12,6 +12,12 @@ This is an implementation specification, not delivered frontend or image-generat
 
 ## 2. Development-time UI asset kit
 
+P04.5 includes original MIT-licensed 48×32 woodland/station PNG schematics in the
+[neutral import fixtures](../backend/src/test/resources/packs/README.md), with
+per-pack license and credit inventories. Integration checks preserve their exact
+bytes and verify admitted image metadata. These are import corpus assets;
+production scene art, catalogs, delivery routes and UI kit acceptance remain open.
+
 P04.4 delivers authored-pack media admission only: PNG/JPEG/WebP image and
 Ogg/MP3/WAV audio signatures, byte/dimension ceilings, original immutable bytes
 and hashes in PostgreSQL, and an import report. It does not decode or serve media,
