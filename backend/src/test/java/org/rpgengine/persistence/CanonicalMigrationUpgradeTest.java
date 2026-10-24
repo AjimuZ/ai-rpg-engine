@@ -15,7 +15,7 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V9 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V10 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -172,6 +172,16 @@ class CanonicalMigrationUpgradeTest {
                         assertEquals(0, jdbc.queryForObject("select count(*) from " + table, Integer.class));
                     }
                     assertEquals(0, v9.migrate().migrationsExecuted);
+                    // V10 adds audience knowledge without turning authored secrets into player knowledge.
+                    Flyway v10 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("10").load();
+                    assertEquals(1, v10.migrate().migrationsExecuted);
+                    assertTrue(v10.validateWithResult().validationSuccessful);
+                    assertEquals(v6Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
+                    assertEquals(journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o", String.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from campaign_known_fact", Integer.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from campaign_known_quest", Integer.class));
+                    assertEquals(0, v10.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

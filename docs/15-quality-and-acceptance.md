@@ -8,7 +8,7 @@ upgrade without backfill. The local HTTP corpus now verifies Host/Origin,
 session/CSRF, owner isolation, strict bounded JSON, illegal budgets, sanitized
 errors and durable retries. Separate application JVMs preserve two genre campaigns
 and exact retry results after restart, reject the prior process session and retain
-initial counters/grants. This is not full P06 public campaign projections,
+initial counters/grants. These creation checks alone do not establish full P06
 consultation or browser acceptance.
 The dependency checkpoint adds real sealed transitive/diamond loading, exact
 version pinning after later imports, namespace separation for external profiles,
@@ -18,6 +18,19 @@ size query to avoid allocating a giant fixture; all other persistence stays real
 Final packaged backend verification passes all 290 tests on PostgreSQL 18.6
 (zero failures, errors or skips), including five HTTP and four admission tests; all 22
 repository policy tests pass and repository scans report zero findings.
+
+P06.2 extends packaged verification to 296 passing backend tests (zero failures,
+errors or skips) on PostgreSQL 18.6, including eleven real HTTP tests. Evidence
+covers owner listing/keyset bounds, every section's foreign-owner rejection,
+same-name cross-genre and explicit audience isolation, hidden NPC/decision
+exclusion, legacy saves, oversized collections and exact whole-database equality
+across reads (QA-06's no-world-effect invariant). A competing committed writer
+proves revision/data consistency under read-only repeatable-read isolation.
+Separate application JVMs preserve both public genre snapshots across restart;
+populated V1-to-V10 upgrade invents no player knowledge. All 22 repository policy
+tests and zero-finding repository scans pass. This covers backend projections,
+not P06.3 starting decisions, P06.4 text/transcript consultations or full QA-33
+frontend/media/draft/restore isolation.
 
 ## 1. Evidence policy
 

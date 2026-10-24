@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 36/117 tasks verified.** The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6 and P05.1–P05.5. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.1 is the next executable task after the scheduling correction below. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 38/117 tasks verified.** The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5 and P06.1–P06.2. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.3 is the next executable task after the scheduling correction below. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -861,7 +861,22 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     Local scheduling verification passes all 60 temporary-repository tests,
     including eight new exact-prerequisite/cycle/retained-human-blocker cases;
     repository policy and Markdown checks report zero findings.
-- [ ] P06.2 Add owner-scoped campaign listing, continue, known state, inventory, quest, and ability projections.
+- [x] P06.2 Add owner-scoped campaign listing, continue, known state, inventory, quest, and ability projections.
+  - Authorize the exact owner/adventure/campaign scope before child reads; use
+    detached player DTOs and independent read-only repeatable-read snapshots.
+    Bounded UUID-keyset listing never exposes another owner's campaigns.
+    V10 adds explicit actor-audience facts/quests with no legacy backfill;
+    owned inventory/learned abilities never join by equal display names.
+    Raw pending decisions, hidden NPCs, pack bodies and plans stay private.
+  - Verified on 24 October 2026: pinned PostgreSQL 18.6 and packaged backend
+    `clean verify -Ppackaged-ui` pass all 296 tests with zero failures/errors/skips.
+    Eleven real HTTP tests cover both genres, foreign/mismatched scopes across
+    all sections, whole-database no-write comparisons, separate-JVM restart,
+    concurrent committed snapshots, collection limits and legacy characters.
+    Populated V1-to-V10 upgrade preserves old saves without inventing knowledge.
+    All 22 repository policy tests pass; repository scans report zero findings.
+    Typed starting decisions, exact text consultations, frontend binding and
+    full QA-33 media/draft/restore isolation remain P06.3–P06.5/P05 integration.
 - [ ] P06.3 Show a pack-defined starting situation and pending decision without hardcoded prologue text.
 - [ ] P06.4 Keep exact status/inventory consultations local and separate transcript delivery from world state.
 - [ ] P06.5 Implement separate adventure specifications/media folders and library switching; prove same-name entity, draft, memory, artwork and restart/restore isolation under QA-33.

@@ -140,6 +140,20 @@ use. Attribute cost is above declared minima, skill cost is total ranks; omitted
 values use minima/zero and unspent points are allowed. Repeated starting item
 grants aggregate into one bounded stack, so duplication cannot bypass `maxStack`.
 
+### Player read projections (P06.2)
+
+`CampaignProjectionService` authorizes owner/adventure/campaign before reading
+children and resolves the player through immutable `campaign_creation`, never
+by display name or a client-supplied actor. Reads use an independent read-only
+repeatable-read transaction. The response allowlist excludes raw pending
+decisions, internal events, seed references, planning artifacts and other actors.
+V10 adds bounded `campaign_known_fact` and `campaign_known_quest` records with
+composite actor/campaign foreign keys, audience indexes and version guards.
+These hold only explicitly revealed player text and confidence/objective/status;
+secret authored truth and quest graphs stay elsewhere. No legacy knowledge is
+backfilled. Canonical reveal/progression writers remain later command work and
+must persist their evidence and these audience records atomically.
+
 ## 4. Mandatory invariants
 
 ### Campaign and operations

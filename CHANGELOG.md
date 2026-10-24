@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Scoped player projections (P06.2), 24 October 2026
+
+- Add bounded owner campaign listing and scoped read-only continue/state,
+  inventory, learned ability, known fact and known quest endpoints.
+- Add explicit audience knowledge storage and public response allowlists;
+  extend local session admission across the campaign API subtree.
+- Verify all 296 packaged backend tests on PostgreSQL 18.6, including eleven
+  real HTTP tests, concurrent snapshot consistency, whole-database no-write
+  checks, process restart and populated migration upgrade; all 22 repository
+  policy tests and repository scans pass. Frontend binding, starting decisions and exact
+  text consultations remain later tasks.
+
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
 ## Unreleased — Atomic campaign creation (P06.1), 24 October 2026

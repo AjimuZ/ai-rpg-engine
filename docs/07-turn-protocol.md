@@ -17,6 +17,12 @@ Speaking to an in-world participant during a fight is a combat command, not a re
 
 ## 2. Operation lifecycle
 
+P06.2 HTTP state/continue and known-state/inventory/quest/ability reads use a
+consistent committed player snapshot with explicit scope/revision tokens. They
+create no operation, transcript, event, random draw or narration job. Continue
+only reloads the save; it cannot choose the pending decision. Exact text command
+consultations and separate transcript delivery remain P06.4.
+
 ```mermaid
 stateDiagram-v2
     [*] --> Accepted

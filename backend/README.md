@@ -38,21 +38,22 @@ From `backend/`, with those variables set:
 `verify` starts an ephemeral HTTP server and checks minimal health, hidden diagnostic
 endpoints, PostgreSQL major version, Flyway validation, and the canonical schema.
 A missing database fails tests; nothing silently skips or uses H2. Use a new
-disposable database: the test requires exactly the twenty-nine domain tables created by
+disposable database: the test requires exactly the thirty-one domain tables created by
 `src/main/resources/db/migration/V1__canonical_foundations.sql` (P03.1),
 `V2__campaign_bounds_and_versions.sql` (P03.2, adding `actor_resource`) and
 `V3__canonical_outbox.sql` (P03.3), `V4__deterministic_random_draws.sql` (P03.4) and
 `V5__campaign_mutation_leases.sql` (P03.5) and
 `V6__durable_jobs_and_planning.sql` (P03.6), `V7__pack_registration.sql` (P04.4) and
 `V8__localized_pack_reports.sql` (P04.6, report-version constraint only) and
-`V9__campaign_creation.sql` (P06.1, character state, grants and request identities), with no
+`V9__campaign_creation.sql` (P06.1, character state, grants and request identities) and
+`V10__player_knowledge.sql` (P06.2, explicit player-audience facts and quests), with no
 rows, and Hibernate validates the entities against them (`ddl-auto=validate`).
 The persistence tests truncate these tables before and after each test, so never
 point `verify` at a database whose data you want to keep.
 P03.2 adds storage row versions separate from canonical counters, frozen ownership,
 bounded actor resources and complete write-once journal outcomes. Integration tests
 include cross-campaign rejection, scoped reads, concurrent duplicate inserts and
-stale-writer rollback, plus populated V1-to-V9 upgrade in a disposable schema.
+stale-writer rollback, plus populated V1-to-V10 upgrade in a disposable schema.
 P03.3 adds an internal `CanonicalCommitService` consuming immutable `ResolvedCommit`
 values from trusted backend resolution. It atomically saves world/resource changes,
 events, settlements, a backend receipt and reference-only outbox intents, and returns
@@ -330,7 +331,25 @@ The strict 16 KiB decoder reuses the data-only parser in JSON mode to reject
 duplicate keys, trailing documents and invalid UTF-8 without coercion.
 Process restart acceptance launches separate application JVMs, creates two genre
 campaigns, stops/restarts the application, rejects the expired process session,
-then verifies both durable results and unchanged counters/grants. Listing, public
-projections, starting narration and pending decisions remain later P06 tasks.
+then verifies both durable results and unchanged counters/grants. Starting
+narration and public pending decisions remain later P06 tasks.
 Pinned packaged backend verification passes all 290 tests on PostgreSQL 18.6,
 including five real HTTP tests and four admission tests, with no failures/skips.
+
+## Player projections (P06.2)
+
+`CampaignProjectionService` provides bounded owner listing and independently
+authorized read snapshots at repeatable-read isolation. Protected GET routes
+include campaign `state`, `continue`, `known-state`, `inventory`, `quests` and
+`abilities`; see the [exact request/response contract](../docs/13-api-and-ui.md#campaign-projections-p062).
+Each read requires an adventure ID and returns scope/revision tokens. The player
+comes from the creation receipt, so equal actor/item names cannot join worlds.
+Only owned resource/item/ability rows and explicit player-audience knowledge are
+returned. Legacy campaigns expose an unavailable player as null. Continue has
+no write, narration or session-renewal effect; browser API binding remains P05.6.
+V10 creates empty knowledge/quest tables without promoting authored secrets.
+Pinned `clean verify -Ppackaged-ui` passes all 296 backend tests on PostgreSQL
+18.6 with no failures/errors/skips. Eleven HTTP tests include whole-database
+no-write comparisons, owner/audience isolation, concurrent snapshot consistency,
+collection bounds, legacy saves and separate-JVM restart. Migration acceptance
+preserves populated old saves through V10. All 22 repository policy tests pass.

@@ -70,6 +70,13 @@ including two-genre campaign preservation across application process restart.
 UI integration and starting narration remain later tasks.
 See [backend scope](backend/README.md#atomic-campaign-creation-p061).
 
+P06.2 adds protected owner campaign listing and scoped continue/state, inventory,
+learned ability and player-known fact/quest projections. Reads return one
+consistent committed snapshot with no game effects; equal names cannot cross
+campaign audiences. Starting decisions, text consultations and frontend API
+binding remain later tasks. All 296 packaged backend tests pass on PostgreSQL
+18.6, including eleven real HTTP tests; see [projection contracts](docs/13-api-and-ui.md#campaign-projections-p062).
+
 ## Why this engine exists
 
 A long RPG campaign needs more than a conversation history. Inventory must remain consistent, unfinished promises must survive a new AI session, combat must use actual abilities and resources, and the narrator must respect what each character knows. AI RPG Engine is designed to make these responsibilities explicit and testable.

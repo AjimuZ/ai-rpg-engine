@@ -46,9 +46,46 @@ capacity with 429 and unavailable configuration/storage/content with 503.
 Failures return only a stable `code`; raw pack, SQL and exception messages are
 excluded. Retry uncertain responses with the original request and payload.
 
+### Campaign projections (P06.2)
+
+The read adapters use the same configured local owner, Host/Origin checks and
+session cookie as creation. GET needs no CSRF token and returns `Cache-Control:
+no-store`. `GET /api/v1/campaigns` returns `{campaigns, nextAfter}`. Optional
+`adventureId` filters the owner page; `after` is an exclusive campaign UUID
+cursor and `limit` defaults to 50 (1–100). Ordering is by campaign UUID; null
+`nextAfter` ends the page. A foreign adventure produces an empty owner page.
+
+`GET /api/v1/campaigns/{id}/{section}?adventureId={uuid}` requires the exact
+owned adventure/campaign pair. Sections are `state`, `continue`, `known-state`,
+`inventory`, `quests` and `abilities`. State and continue return the same
+snapshot: `scope`, `campaign`, `player`, `resources`, `inventory`, `abilities`,
+`knownFacts`, `quests`. Other sections return `{scope, data}` for that collection.
+Scope carries adventure, campaign and content revision IDs plus state revision.
+Campaign metadata carries title, mode, four world counters, update timestamp
+and `pendingDecisionAvailable`. Raw decision JSON, seed identity, NPC state,
+internal events, plans and pack definitions are never returned. Starting text
+and a typed public pending decision remain P06.3.
+
+Player includes identity, display name, own location, integer attributes/skills,
+background and role. Legacy campaigns without a creation-bound character return
+`player: null`. Resources expose exact current/minimum/maximum values. Inventory
+exposes item UUID, pinned definition ID and quantity; abilities expose learned
+definition ID and rank, without claiming current legal use. Known facts retain
+`KNOWN`, `BELIEVED` or `RUMORED` confidence; quests expose only known title,
+objective and status. Unrevealed records are absent, never inferred from lore.
+Definition labels/artwork and action legality remain later projection work.
+
+All sections share one read-only repeatable-read snapshot per request. A section
+over 1,000 records fails closed rather than returning a misleading partial list.
+Continue performs no activation, narration, transcript delivery or world write.
+Missing required input or malformed/noncanonical scope/cursor/limit returns 400;
+nonexistent/foreign/mismatched scope shares 404; admission returns 403;
+unavailable storage/content returns 503.
+Errors contain only a stable `code`. Frontend API binding remains P05.6.
+
 ## 1. Contract status
 
-Except for the session/creation endpoints above, the following endpoints and DTO
+Except for the session/creation/projection endpoints above, the following endpoints and DTO
 fields are proposed v1 contracts. There are no generated OpenAPI definitions.
 API and content versions are separate. Use an `/api/v1` namespace and explicit
 schema versions for persisted/imported data.

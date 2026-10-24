@@ -48,9 +48,20 @@ P01.5 retains only [projected account-free protocol evidence](../tools/runtime_p
 
 ## 4. Application HTTP boundary
 
+P06.2 applies the local admission filter to every method in the campaign API
+subtree, including unsupported sections and malformed identities. Listing and
+all read sections require a live configured-owner session and exact Host; any
+supplied Origin/fetch metadata must also pass. GET requires no CSRF proof.
+Responses are non-cacheable. Owner/adventure/campaign authorization precedes
+child queries, and public DTOs never serialize persistence entities, internal
+events, raw pending decisions, planning artifacts or seed identities. Independent
+read-only repeatable-read transactions prevent torn revision/data snapshots.
+Bounded collections fail closed; missing and foreign save scopes share 404.
+
 `engine.http.owner-id` selects a pre-existing local owner server-side; absent
-configuration disables session/creation routes with 503. Unknown API paths still
-return 404; future API controllers must join this admission boundary explicitly.
+configuration disables session and campaign routes with 503. The whole campaign
+subtree passes admission before routing; admitted unknown routes return 404.
+Future APIs outside that subtree must join the admission boundary explicitly.
 `engine.http.origin` defaults to
 `http://127.0.0.1:8080` and accepts only an exact HTTP loopback origin with explicit
 port. API Host must match its authority. Forwarded headers are not trusted.

@@ -16,7 +16,12 @@ row lock serializes registration and creation; same request UUIDs are scoped by
 adventure. Separate campaign and actor identities isolate same-ID genre definitions
 and initial grants. Protected HTTP creation derives the owner from local server
 configuration and verifies the selected adventure before any retry lookup.
-Public workspace administration/switching remains unfinished.
+P06.2 public reads authorize owner/adventure/campaign together and resolve only
+the creation-bound player's items, abilities and audience knowledge. Every
+section reply includes the full scope and state revision. Owner listing is
+bounded and can filter by adventure. Continue reloads the committed save without
+changing an active adventure or world counters. Public workspace
+administration/frontend switching remains unfinished.
 
 ## 1. Meaning and status
 
@@ -44,14 +49,16 @@ folders, cross-tab merging or complete QA-33. Operation reconciliation remains P
 P05.1 adds a library shell with two local genre preview cards and a separate
 installed-packs section. Scoped URLs reject unknown preview identities; reading
 positions are independent in memory. These samples are not persisted workspaces
-or campaigns. Workspace creation, real library listing/continue and full restart/
-restore isolation remain pending; frontend previews do not establish QA-33.
+or campaigns. Workspace creation, frontend binding to the P06.2 listing/continue
+APIs and full restart/restore isolation remain pending; frontend previews do not
+establish QA-33.
 
 P05.2 derives terminology, attribute/resource names and optional panel visibility
 from each local preview's typed public metadata. Reused routes replace their
 labels/configuration on adventure changes; direct disabled panel routes show an
 unavailable state. This is presentation scoping only, not persisted campaign state
-or authored-pack module execution; real library/pack projections remain P06.
+or authored-pack module execution; binding real campaign projections and exposing
+public pack metadata remain later integration work.
 
 P04.5 imports both [neutral genre fixtures](../backend/src/test/resources/packs/README.md)
 into one workspace and independently into fresh workspaces, preserving distinct

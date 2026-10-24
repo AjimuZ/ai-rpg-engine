@@ -89,7 +89,7 @@ class CanonicalCommitServiceTest {
             jdbc.execute("drop trigger if exists p033_fault on " + table);
         }
         jdbc.execute("drop function if exists p033_fail()");
-        jdbc.execute("truncate campaign_creation, character_state, item_instance, learned_ability, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
+        jdbc.execute("truncate campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
                 + "operation_journal, actor_resource, actor, presentation_campaign_settings, campaign, "
                 + "content_revision_report, content_revision_file, content_revision, adventure_workspace, identity_owner_profile");
     }
