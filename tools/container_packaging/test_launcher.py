@@ -3,8 +3,10 @@
 Inputs are the tracked launcher, Compose file and example environment. Outputs are
 test assertions. Pure-Bash helpers (version comparison, .env parsing, redaction)
 are exercised by sourcing the script in a temporary copy, so nothing touches the
-real checkout's private state. The command-surface tests that need a Docker daemon
-skip when none is reachable. The full build/start/stop path is verified manually
+real checkout's private state. Command-surface tests inject strict Docker metadata
+fixtures instead of depending on the host's Docker version or daemon. Real BuildKit
+contexts and Compose rendering remain in their separate integration tests.
+The full build/start/stop path is verified manually
 and documented in docs/22-container-deployment-and-startup.md, not here: it needs
 the loopback port, minutes of build time and a developer's Docker state.
 """
@@ -13,6 +15,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import socket
 import subprocess
 import tempfile
 import unittest
@@ -54,7 +57,7 @@ def run_bash(*args: str, cwd: Path, extra_env: dict | None = None) -> subprocess
 
 
 def docker_daemon_available() -> bool:
-    """Report whether `docker info` succeeds; used to skip daemon-dependent checks."""
+    """Report daemon reachability for the separate opt-in lifecycle check."""
     try:
         return subprocess.run(["docker", "info"], capture_output=True, timeout=30,
                               check=False).returncode == 0
@@ -119,6 +122,36 @@ class LauncherStaticTest(unittest.TestCase):
 class LauncherCommandSurfaceTest(unittest.TestCase):
     """Run the real script for commands that need no Docker daemon."""
 
+    def run_check(self, launcher: Path, cwd: Path,
+                  extra_env: dict | None = None) -> subprocess.CompletedProcess:
+        """Execute --check with explicit Docker metadata, refusing mutation calls."""
+        with tempfile.TemporaryDirectory(prefix="launcher docker fixture ") as tmp:
+            startup = Path(tmp) / "docker-fixture.sh"
+            startup.write_text('''docker() {
+    case "$*" in
+        'context show') printf 'fixture\\n' ;;
+        'info --format '*)
+            [ "${FIXTURE_DAEMON:-ready}" = ready ] || return 1
+            printf '%s %s\\n' "${FIXTURE_OS:-linux}" "${FIXTURE_ENGINE:-29.0.0}" ;;
+        'compose version --short') printf '%s\\n' "${FIXTURE_COMPOSE:-5.0.0}" ;;
+        'buildx version') [ "${FIXTURE_BUILDX:-present}" = present ] ;;
+        'compose --file compose.yaml config --quiet') return 0 ;;
+        *) printf 'Unexpected Docker call: %s\\n' "$*" >&2; return 97 ;;
+    esac
+}
+''', encoding="utf-8", newline="\n")
+            # Pick a currently unused port instead of assuming 8080 is free.
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = str(probe.getsockname()[1])
+            env = {"APP_PORT": port, "BASH_ENV": startup.as_posix(),
+                   "FIXTURE_OS": "linux", "FIXTURE_ENGINE": "29.0.0",
+                   "FIXTURE_COMPOSE": "5.0.0", "FIXTURE_DAEMON": "ready",
+                   "FIXTURE_BUILDX": "present"}
+            if extra_env:
+                env.update(extra_env)
+            return run_bash(str(launcher), "--check", cwd=cwd, extra_env=env)
+
     def test_help_and_usage_errors(self) -> None:
         """`--help` exits 0 with every command; unknown or extra arguments exit 2."""
         result = run_bash(str(LAUNCHER), "--help", cwd=Path(tempfile.gettempdir()))
@@ -137,7 +170,6 @@ class LauncherCommandSurfaceTest(unittest.TestCase):
         self.assertLess(guard, text.index("set -euo pipefail"))
         self.assertLess(guard, text.index("local -a"))
 
-    @unittest.skipUnless(docker_daemon_available(), "needs a reachable Docker daemon")
     def test_check_is_read_only_and_works_from_a_spaced_path(self) -> None:
         """`--check` from another directory creates no file in a path with spaces."""
         with tempfile.TemporaryDirectory(prefix="launcher check ") as tmp:
@@ -146,23 +178,44 @@ class LauncherCommandSurfaceTest(unittest.TestCase):
             for name in ("start.sh", "compose.yaml", ".env.example"):
                 shutil.copyfile(ROOT / name, copy / name)
             shutil.copytree(ROOT / "docker", copy / "docker")
-            before = sorted(p.name for p in copy.iterdir())
-            result = run_bash(str(copy / "start.sh"), "--check", cwd=Path(tmp))
+            before = {p.relative_to(copy): p.read_bytes() for p in copy.rglob("*") if p.is_file()}
+            result = self.run_check(copy / "start.sh", cwd=Path(tmp))
             self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-            self.assertEqual(before, sorted(p.name for p in copy.iterdir()))
+            self.assertEqual(before, {p.relative_to(copy): p.read_bytes()
+                                      for p in copy.rglob("*") if p.is_file()})
+            self.assertFalse((copy / ".local").exists())
             self.assertIn("check passed", result.stdout)
 
-    @unittest.skipUnless(docker_daemon_available(), "needs a reachable Docker daemon")
     def test_check_reports_an_invalid_port(self) -> None:
         """A non-numeric APP_PORT is a nonzero, actionable failure."""
         with tempfile.TemporaryDirectory(prefix="launcher port ") as tmp:
             copy = Path(tmp)
             for name in ("start.sh", "compose.yaml", ".env.example"):
                 shutil.copyfile(ROOT / name, copy / name)
-            result = run_bash(str(copy / "start.sh"), "--check", cwd=copy,
-                              extra_env={"APP_PORT": "abc"})
+            result = self.run_check(copy / "start.sh", cwd=copy,
+                                    extra_env={"APP_PORT": "abc"})
             self.assertEqual(1, result.returncode)
             self.assertIn("APP_PORT", result.stderr)
+
+    def test_check_rejects_unsupported_docker_prerequisites(self) -> None:
+        """Old/missing prerequisites must fail before configuration inspection."""
+        cases = [
+            ({"FIXTURE_ENGINE": "28.0.4"}, "Docker Engine 28.0.4"),
+            ({"FIXTURE_COMPOSE": "2.40.0"}, "Docker Compose 2.40.0"),
+            ({"FIXTURE_OS": "windows"}, "Linux containers"),
+            ({"FIXTURE_DAEMON": "unreachable"}, "daemon is not reachable"),
+            ({"FIXTURE_BUILDX": "missing"}, "Buildx plugin was not found"),
+        ]
+        with tempfile.TemporaryDirectory(prefix="launcher prerequisites ") as tmp:
+            copy = Path(tmp)
+            shutil.copyfile(LAUNCHER, copy / "start.sh")
+            for env, message in cases:
+                with self.subTest(env=env):
+                    result = self.run_check(copy / "start.sh", cwd=copy, extra_env=env)
+                    self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+                    self.assertIn(message, result.stderr)
+                    self.assertNotIn("APP_PORT:", result.stdout)
+                    self.assertFalse((copy / ".local").exists())
 
 
 class LauncherFunctionTest(unittest.TestCase):

@@ -2,6 +2,16 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Portable launcher command checks, 24 October 2026
+
+- Make launcher path/port checks independent of the runner's Docker version by
+  injecting strict test-only Docker metadata. Check unsupported Engine/Compose,
+  non-Linux containers, unreachable daemons and missing Buildx explicitly.
+- Verify read-only file preservation recursively and use an available test port.
+  Keep production Engine 29/Compose 5 minimums and real BuildKit/Compose checks.
+  The Docker 28.0.4 reproduction now passes; local packaging tests pass 21 with
+  two existing opt-in skips. Hosted verification is recorded separately.
+
 ## Unreleased — Combat dialogue design, 24 October 2026
 
 - Extend the combat/UI, command and interpretation specifications with a persistent

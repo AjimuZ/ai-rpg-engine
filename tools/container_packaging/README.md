@@ -21,7 +21,16 @@ reviewed managed-profile files. Both exclude nested private paths. New inputs
 must update the relevant policy and fixtures. These checks do not inspect account
 files or detect secrets embedded in otherwise admitted source files.
 `test_compose.py` checks rendered service boundaries without starting services.
-`test_launcher.py` checks the root `start.sh` contract (static rules, redaction, refusal paths and, when a Docker daemon is reachable, the read-only `--check` command) without starting or stopping services.
+`test_launcher.py` checks the root `start.sh` contract (static rules, redaction,
+refusal paths and read-only `--check`) without starting or stopping services.
+Command-surface cases inject strict Docker metadata through a test-only Bash
+startup file: they run without a daemon and do not assume the runner meets the
+launcher's Engine 29 / Compose 5 minimum. Unsupported Engine/Compose versions,
+non-Linux containers, an unreachable daemon and missing Buildx are tested as
+explicit failures. The path-with-spaces case checks file bytes recursively and
+refuses creation of private state. This fixture does not establish real Docker
+compatibility; actual BuildKit/Compose checks and opt-in lifecycle checks remain
+separate. The launcher minimum versions and production checks are unchanged.
 Missing Docker/BuildKit and build failures fail these checks; Ordinary CI runs this default suite ([workflow](../../.github/workflows/ci.yml), P02.4); the opt-in `PACKAGING_DOCKER=1` recreation check stays out of CI until native Linux secret-mount ownership is qualified.
 
 ## Real packaged-shell recreation

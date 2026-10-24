@@ -434,6 +434,19 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 
 **Exit:** clean clone builds and runs shells/database with documented commands; no private data tracked. **Checks:** frontend build/default test, backend health test, database connectivity, docs links, ignore/secret checks. **Suggested commit:** `Establish the Angular and Spring Boot workspace`.
 
+**CI maintenance (24 October 2026):** [hosted run 40088839023](https://github.com/AjimuZ/ai-rpg-engine/actions/runs/40088839023)
+passed the frontend, backend and repository jobs, but two launcher command tests
+failed because its Docker Engine 28.0.4 is below the production minimum 29.0.
+The tests checked only daemon reachability and therefore never reached their
+intended path/port assertions. Replace that host dependency with strict test-only
+Docker metadata and keep real BuildKit/Compose integration checks separate.
+Add explicit refusal cases for old Engine/Compose, non-Linux containers,
+unreachable daemon and missing Buildx; preserve launcher minimums and production
+behavior. The old-runner reproduction fails both original cases before the fix
+and passes after it. Local packaging verification passes 21 tests with the two
+existing opt-in lifecycle/recreation skips (23 total); no new lifecycle result or
+hosted success is inferred from that local result. No roadmap checkbox changes.
+
 ## 6. P03 — Canonical domain, migrations, and event receipts
 
 **Depends on:** P02. **Areas:** campaign/domain/persistence, migrations.
