@@ -8,7 +8,15 @@ measured appearance/voice consistency.
 
 ## 1. Status and intent
 
-This is an implementation specification, not delivered frontend or image-generation code. The default story screen is the visual novel described in [API and UI](13-api-and-ui.md#6-interface-direction). The owner requires a complete graphical UI kit and persistent character/item artwork, including supported generation during play. The [concept image](mockups/visual-novel-ui-v1.png) demonstrates composition only; do not slice its baked-in labels into production controls.
+This specification is partially implemented: P05.1 delivers preview shells and two
+original vector environments with live passage text and a missing-image fallback.
+The [asset inventory](../frontend/public/scenes/README.md) records editable sources
+and MIT licensing; no external art or service is used. Full UI kit and runtime
+image-generation code remain pending. The default story screen is the visual novel
+described in [API and UI](13-api-and-ui.md#6-interface-direction). The owner requires
+a complete graphical UI kit and persistent character/item artwork, including
+supported generation during play. The [concept image](mockups/visual-novel-ui-v1.png)
+demonstrates composition only; do not slice its baked-in labels into production controls.
 
 ## 2. Development-time UI asset kit
 

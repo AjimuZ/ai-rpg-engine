@@ -108,6 +108,27 @@ No ordinary extra attack is granted just because prose describes several blows. 
 
 A normal ability must consume at least one AP. A zero-AP exception requires an explicit once-per-activation or once-per-encounter limit and cannot restore its own availability. End activation and changing a permitted predeclared reaction policy are control commands, not repeatable free-effect abilities. Bound automatic effect processing per operation and fail safely on an unsupported cycle.
 
+### 7.1 Dialogue and scene-changing intent during combat
+
+The player can keep talking and describing intentions inside combat through a persistent [dialogue/action composer](13-api-and-ui.md#71-combat-chat). They can address a visible/known participant, call to an ally, ask a question, threaten, bargain, offer surrender, or attempt a supported interaction with the surroundings. Combat is not limited to attack buttons. Words can change subsequent events when their resolved consequences justify it: an agreement can end hostilities, an ally can receive a request, or an interaction can alter an existing zone feature. Requested outcomes are attempts, not established facts.
+
+The following are provisional default policies to implement and playtest, rather than demonstrated balance. Supported adventure profiles can configure their bounds while preserving the scheduler, explicit player decisions and deterministic authority.
+
+| Intent | Default resolution and cost |
+| --- | --- |
+| Brief speech without a mechanical benefit | One bounded utterance per player activation, 0 AP; persist the player's words and any admitted public reply without advancing initiative, world time or RNG. Enforce text/response bounds; this cannot repeat indefinitely or grant modifiers, reveal undiscovered facts or force cooperation. |
+| Persuade, intimidate, negotiate, distract or request a tactical benefit | A supported social/interaction definition, using Interact's 1 AP baseline unless the pinned definition declares another cost. Validate recipient, communication, knowledge, objective/morale policy and any required check. Show known costs and request confirmation before applying an interpretation the player has not chosen. |
+| Change the situation through a physical/ability action | Resolve the existing legal action, such as Move, Interact, an ability or item use, with its normal targets, prerequisites, costs and recorded draws. Describing it in chat does not make it free. |
+| Ambiguous, unsupported or stale request | Clarify or reject without spending AP, resources, time or draws; preserve the draft/attempt and explain the public reason. |
+
+In-world speech is a saved event even when it costs no AP; it can update the public transcript and canonical revision, while leaving the combat cursor and clock intact. A social effect needs an admitted definition/policy; if unavailable, return an explanation or a speech-only alternative for the player's explicit selection. Do not silently downgrade a consequential request to harmless speech. A combined request such as “drop your weapon while I move behind the crates” must be clarified into supported decisions or an explicitly defined compound action, not executed as several free actions. Speaking to an NPC is distinct from consulting the optional read-only guide.
+
+NPC replies use only the recipient's authorized knowledge and established personality/goals. A reply cannot take a second activation, spend an NPC's resources, move them, reveal secrets or grant an undeclared status. Such effects must use their own legal resolution boundary. Negotiation can fail, be refused or produce a counteroffer. Never accept binding terms for the protagonist. Evaluate accepted agreements, surrender and other terminal predicates through sections 13–14; settlement and rewards still occur once. An unsuccessful or declined negotiation leaves combat active at the correctly resolved actor/AP cursor.
+
+Submission is allowed only at an eligible player decision boundary, normally the player's activation in v1. During NPC resolution, the chat remains readable and editable but cannot interrupt an atomic action or secretly enqueue a future command. This adds no manual reaction window. Limit each admitted response and return to the player decision; reading or generating prose cannot skip turns or stall an unresolved scheduler indefinitely. Missing dialogue generation leaves the last committed state and deterministic actions available, with an honest pending/unavailable status.
+
+Requests to “change events” mean attempting a causally supported new event. They do not rewrite completed damage, restore spent resources, add unbudgeted reinforcements, replace frozen encounter definitions or change the rules from prose. Reinforcements and scene changes still satisfy their predeclared phase/trigger and generation bounds. Explicit owner canon corrections remain separate audited administrative operations.
+
 ## 8. Checks and attacks
 
 The default attack score is:
@@ -184,7 +205,7 @@ Use original terminology, formulas, writing, ability definitions, creature desig
 
 ## 16. Required acceptance cases
 
-Invalid targets spend nothing; legal misses spend declared costs; armor can absorb all damage; Guard/Brace stacking is bounded; reaction refresh happens once; a poisoned defeated actor cannot act; no random redraw occurs on retry; renewal preserves the exact actor/AP/effect state; escape does not imply death; a party defeat reaches the configured recovery state; settlement is idempotent; every outcome returns to a valid campaign mode.
+Invalid targets spend nothing; legal misses spend declared costs; armor can absorb all damage; Guard/Brace stacking is bounded; reaction refresh happens once; a poisoned defeated actor cannot act; no random redraw occurs on retry; renewal preserves the exact actor/AP/effect state; escape does not imply death; a party defeat reaches the configured recovery state; settlement is idempotent; every outcome returns to a valid campaign mode. Combat dialogue additionally verifies bounded no-benefit speech, declared social-action costs and checks, refused/counteroffered/accepted negotiation, NPC knowledge isolation, supported scene interactions, no out-of-turn submission, no prose-based event rewrites, transcript recovery and duplicate-safe agreement settlement. See [the worked example](20-worked-scenarios.md#9-talk-and-change-the-situation-during-a-fight).
 
 ## 17. Provisional numerical defaults
 
@@ -202,6 +223,7 @@ The confirmation has two parts:
 | Derived pools and defenses | Health `18 + 3 × Force + 2 × (level - 1)`; Focus `6 + 2 × Resolve + (level - 1)`; Guard `10 + Finesse + equipment`; Resistance `10 + Resolve + modifier` | [§4](#4-default-actor-profile) | P11, P18.3 |
 | Defense caps | Armor 0–4; equipment Guard cap +3; situational Guard cap +4; Guard action and Brace +2 under one stacking key; partial cover +2 | [§4](#4-default-actor-profile), [§5](#5-space-zones), [§7](#7-action-economy) | P11, P18.3 |
 | Action economy | 3 AP per activation; 1 reaction per round; Move 1 per edge (difficult terrain 2); Strike 2; Guard 1; Use item 2; Ready/equip 1; Interact 1; Assess 1; Withdraw 2 | [§4](#4-default-actor-profile), [§7](#7-action-economy) | P11, P18.3 |
+| Combat dialogue | One bounded speech-only utterance per player activation at 0 AP; consequential social actions use the supported Interact 1 AP baseline or their explicit definition cost | [§7.1](#71-dialogue-and-scene-changing-intent-during-combat) | P11–P12, P18.3 |
 | Checks | `2d10 + attribute + skill + modifier`; situational modifier clamped to -3..+3; difficulties 8/12/16/20/24; strong hit at margin 6 or more | [§8](#8-checks-and-attacks), [exploration](10-gameplay-modules.md#2-exploration-and-action-resolution) | P11, P18.3 |
 | Damage | Strong-hit bonus 1d4; neutral sample weapons `1d6 + Force` and `1d6 + Finesse` with one charge | [§9](#9-damage-and-healing) | P11, P18.3 |
 | Initiative and time | `2d10 + Finesse + Insight`, rolled once; 8 in-world seconds per round; round cap 30 | [§4](#4-default-actor-profile), [§6](#6-initiative-and-round-order), [§13](#13-terminal-conditions) | P11, P18.3 |

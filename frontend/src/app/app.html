@@ -1,4 +1,11 @@
-<main>
-  <h1>Adventure engine</h1>
-  <p>The application shell is ready.</p>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="app-header">
+  <a class="brand" routerLink="/library">Adventure engine</a>
+  <nav aria-label="Application">
+    <a routerLink="/library" routerLinkActive="selected" ariaCurrentWhenActive="page">Library</a>
+    <a routerLink="/settings" routerLinkActive="selected" ariaCurrentWhenActive="page">Settings</a>
+  </nav>
+</header>
+<main id="main" tabindex="-1">
+  <router-outlet />
 </main>

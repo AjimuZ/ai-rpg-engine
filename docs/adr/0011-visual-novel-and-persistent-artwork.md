@@ -1,6 +1,6 @@
 # ADR 0011 — Visual-novel presentation and persistent artwork
 
-- Status: Accepted design requirement; implementation pending
+- Status: Accepted design requirement; P05.1 preview shells implemented, full presentation and persistent artwork pending
 - Date: 23 October 2026
 - Owner direction: immersive visual-novel play, editable quick replies, a complete graphic asset kit, and persistent generated character/item images
 
@@ -18,4 +18,4 @@ Known item rarity is explicit validated data with accessible labels and shared p
 
 ## Consequences and verification
 
-Update P01 capability proof, P04 item data, P05 UI/graphics, P08 narration contracts, P10/P13 rarity semantics, P16 asset recovery and P17 generation. UI and image code remain unimplemented. Verify QA-29–31 and the linked [interface](../13-api-and-ui.md) and [asset specification](../23-presentation-assets.md). No third-party runtime art is bundled by this decision.
+Update P01 capability proof, P04 item data, P05 UI/graphics, P08 narration contracts, P10/P13 rarity semantics, P16 asset recovery and P17 generation. P05.1 now supplies local visual-novel shells, attributed sample passages and original vector environments; full UI behavior, graphic kit and runtime image code remain pending. Verify QA-29–31 and the linked [interface](../13-api-and-ui.md) and [asset specification](../23-presentation-assets.md). No third-party runtime art is bundled by this decision.

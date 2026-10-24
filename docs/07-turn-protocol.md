@@ -7,11 +7,13 @@
 | Deterministic consultation | Sheet, inventory, legal abilities, known quests, current combat options | None; no Codex required |
 | AI consultation | Ask a guide to explain a discovered clue | Read-only response; no world/turn/time/RNG changes |
 | Narrative action | Speak, travel, investigate, use an item, attempt an uncertain action | One validated canonical operation if resolved |
-| Combat action | Move, strike, guard, use ability, react, end turn | Validated encounter transition and recorded consequences |
+| Combat action | Move, strike, guard, use ability, speak, negotiate, interact with the scene, react, end turn | Validated encounter transition and recorded consequences; chat uses the same turn/cost checks |
 | Administrative operation | Export, restore preview, migrate pack, apply explicit correction | Separate permissions and audit rules |
 | Presentation preference | Text size, theme, audio enabled | Preference store; no world effects |
 
 Typing “inventory” inside a sentence must not accidentally become a command. Prefer explicit UI modes and structured command types, with a small documented exact-command parser as convenience.
+
+Speaking to an in-world participant during a fight is a combat command, not a read-only guide consultation. The [combat dialogue policy](11-combat-system.md#71-dialogue-and-scene-changing-intent-during-combat) distinguishes bounded speech from a negotiation or other consequential action. Free text supplies the player's attempted words/action and intended recipient; it never directly rewrites a past event or the encounter. Identify the supported action, current actor, encounter and revision before resolution. Clarify unknown costs, ambiguous recipients or a combined speech/action request before spending anything. Outside an eligible player decision, keep an editable draft without submitting or silently queuing it for a future activation. A rejected, busy or stale submission leaves the fight unchanged and requires explicit review/resubmission; reconnect cannot send the draft.
 
 ## 2. Operation lifecycle
 

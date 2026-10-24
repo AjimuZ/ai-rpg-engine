@@ -28,7 +28,7 @@
 | FR-012 | Renew an AI thread independently from a campaign and public chronicle | Required | Renewal in exploration and mid-combat preserves state |
 | FR-013 | Keep canonical facts, beliefs, rumors, plans, and private knowledge distinct | Required | Secret markers never reach player projections |
 | FR-014 | Generate bounded encounter proposals from actual campaign state | Simple templates | Validate dynamic composition, terrain, abilities, and budget |
-| FR-015 | Run deterministic turn-based combat using stats, equipment, abilities, and resources | Required | Legal actions, initiative, reactions, conditions, settlement |
+| FR-015 | Run deterministic turn-based combat using stats, equipment, abilities, resources and an in-combat dialogue/action composer | Required | Legal actions, initiative, reactions, conditions, settlement; talk, negotiate or attempt scene changes through validated commands without leaving combat |
 | FR-016 | Support victory, escape, surrender, agreement, objective completion, and defeat | Required | Every terminal path leaves a resumable narrative state |
 | FR-017 | Apply configurable advancement and reward policies | Basic | Thresholds, skill purchases, caps, and duplicate prevention |
 | FR-018 | Track NPC goals, knowledge, presence, relationships, and party membership | Minimal NPCs | Schedules, companion control policy, scoped private data |

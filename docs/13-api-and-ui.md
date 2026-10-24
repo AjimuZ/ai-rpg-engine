@@ -54,6 +54,16 @@ The SSE stream is at-least-once delivery, not exactly-once gameplay. Durable ope
 
 ## 5. Screens
 
+P05.1 implements these seven initial shells in the [frontend](../frontend/README.md):
+library, character creation, visual-novel story, sheet, inventory, journal and
+settings. Two hand-authored local genre previews provide original vector scenes
+and narrator/character passages, bounded read-only Continue and a revealed-text
+chronicle. Character-name validation produces an unsaved preview only. Library
+adventures and installed packs remain distinct; unknown preview identities fail
+closed. No campaign/pack API binding, canonical stats/items/quests, playable input,
+full graphic kit or bilingual interface is claimed. Later P05/P06 tasks retain
+the full contracts below; the shells do not satisfy full QA-29/30/35.
+
 | Screen | Responsibilities |
 | --- | --- |
 | Library | Independent adventure workspaces and create/continue playthroughs; reusable installed packs managed separately |
@@ -61,7 +71,7 @@ The SSE stream is at-least-once delivery, not exactly-once gameplay. Durable ope
 | Narrative play | Default visual-novel scene, attributed narrator/character/player passages, editable quick replies, persistent composer and expandable chronicle |
 | Character/inventory | Authoritative stats, skills, equipment, resources, conditions, item actions |
 | Journal/world | Known quests, discoveries, map knowledge, promises, event history |
-| Combat | Initiative, active actor, AP/reactions, zones, legal actions, targets, consequences |
+| Combat | Initiative, active actor, AP/reactions, zones, legal actions, targets, consequences and persistent dialogue/action chat |
 | Advancement | Pending entitlements, legal purchases, cost/effect preview |
 | Settings | Reading, theme, sound, Codex readiness, routing, context renewal |
 | Author/owner tools | Validation, export, restore/correction previews, credits and diagnostics |
@@ -103,6 +113,16 @@ Show active actor, initiative order, remaining action points, available reaction
 Free text can express intent, but ambiguous targets or resource spending produce a clarification. Selecting a suggestion only prepares input unless the control is explicitly a named action button with a clear cost and submit behavior. No auto-attack, automatic protagonist dialogue, or automatic build choice occurs merely because Codex proposes it.
 
 During NPC activations, show resolved public consequences. Maintain a pause/interrupt control for AI work, with accurate wording after a state commit. Rule-only NPC fallback may finish a bounded activation; the next player decision must remain explicit.
+
+### 7.1 Combat chat
+
+Keep a readable attributed conversation and editable composer available alongside tactical controls throughout the fight. The player can address known participants, speak to allies/enemies, negotiate, offer surrender or describe actions that could change the scene. Distinguish player words, NPC replies, narrator descriptions and mechanical receipts without relying on color. On desktop use a compact expandable panel or lower dialogue area; on mobile use a reachable dialogue/tactics switch that preserves draft, target and reading position. Conversation must not cover the active actor, remaining AP or the explicit end-turn control. Both views remain keyboard/screen-reader usable, and the public conversation joins the campaign chronicle after combat.
+
+Show an optional recipient selector from permitted public identities, plus free input and a separate Send control. Do not invent a recipient for ambiguous text. Contextual quick replies such as “Why are you attacking us?”, “Let's negotiate” or “Mira, cover the exit” fill an editable draft only. An ally's reply does not itself execute that ally's requested movement or attack. Name the supported action and disclose known AP/resource costs and targets before confirming a consequential interpretation. Speech-only input follows the bounded policy in [combat section 7.1](11-combat-system.md#71-dialogue-and-scene-changing-intent-during-combat); the chat is not an unlimited free-action channel.
+
+During an NPC activation or a pending operation, keep reading/drafting available and explain why Send is unavailable; never queue a draft for automatic submission on the next turn. A recipient can refuse or counteroffer. Agreement terms require an explicit player decision. Only an accepted receipt updates the battle, and a negotiated ending uses the usual settlement/return-to-story path. Rejection, clarification, stale revision, provider failure and committed-but-narration-pending states retain the draft/operation identity and a usable mechanical recap. Retry/reconnect/renewal cannot duplicate speech costs, checks, effects or settlement. Suggestions and recipient projections refresh with the encounter revision without silently replacing the player's draft.
+
+This is a planned P11/P12 contract. The P05.1 preview shells do not implement playable combat chat.
 
 ## 8. Loading, empty, error, and recovery states
 

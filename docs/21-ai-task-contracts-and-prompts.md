@@ -49,6 +49,8 @@ An intent proposal cannot dictate dice, damage, cost, loot, relationship deltas,
 
 An exact structured action from the UI can skip this task entirely. The model is not needed to translate an already identified ability and target into the same identifiers.
 
+In combat, the same intent proposal interprets submitted speech and scene-changing attempts using the current encounter/actor cursor and only authorized recipients, public facts and supported social/interaction candidates. Distinguish bounded speech from negotiation, distraction, a request to an ally, a physical interaction or an ability; clarify ambiguous recipients, binding terms, combined actions and unconfirmed costs. The model cannot select a free cost, establish compliance, override initiative or rewrite resolved events. See the [combat dialogue policy](11-combat-system.md#71-dialogue-and-scene-changing-intent-during-combat). A disabled social mechanic yields an unavailable/clarification result, not an invented check.
+
 ## 5. Content proposal
 
 The body identifies a generation category, existing template references, proposed definitions/facts, references to established entities, intended visibility, source motivation, and bounded novelty. Each new entity uses a temporary proposal-local ID; the backend assigns canonical IDs only on admission.
@@ -72,6 +74,8 @@ Do not request or publish chain-of-thought. The action candidates already contai
 ## 8. Resolved narration
 
 The input is a public resolved-event bundle: action cause, visible participants, known outcome, exact resource changes permitted to display, discoveries, current scene, and next decision. Include authoritative display snippets for important calculations so the narrator does not need to recompute them.
+
+Combat conversation replies are attributed to their known speaker and grounded in that recipient's authorized knowledge plus the resolved dialogue/social outcome. Do not manufacture the protagonist's acceptance, NPC compliance, a morale modifier, movement, new participant or combat ending in the reply. A public refusal or counteroffer returns the pending decision to the player. Optional dialogue generation never holds a database transaction open, advances the scheduler, or prevents inspecting committed combat state when unavailable.
 
 The body includes ordered bounded passages with a stable message ID, kind (`narration` or `characterSpeech`), optional known public speaker ID, text and referenced public event/fact IDs. Display names/portraits resolve from the authorized projection. Player passages are derived from submitted player text/command identity, not invented by the narrator. Mechanical UI values are rendered from the receipt, not parsed back out of prose.
 

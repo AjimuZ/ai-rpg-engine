@@ -676,7 +676,19 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 
 **Depends on:** P02 and stable P04 contracts. **Areas:** frontend feature services/components, theme tokens.
 
-- [ ] P05.1 Build library, character-creation, default visual-novel story, sheet, inventory, journal and settings shells with dominant scene art and attributed speaker passages.
+- [x] P05.1 Build library, character-creation, default visual-novel story, sheet, inventory, journal and settings shells with dominant scene art and attributed speaker passages.
+  - Local routed previews now cover all seven shells for two neutral genre samples,
+    with separate adventure/pack library sections, bounded character-name preview,
+    original vector scenes, explicit speaker labels and local-only Continue/chronicle.
+    Acceptance checks pass: typecheck, 11 form/routing/service tests, production build,
+    dependency audit (zero vulnerabilities), 22 repository tests and
+    docs/secrets/workflows/images (zero findings). Chrome 155 desktop/mobile smoke
+    verifies navigation, keyboard Continue, chronicle, name form, settings and unknown
+    identity handling without remote/action requests or page exceptions; screenshots
+    were visually reviewed. Trimmed-name boundaries, returned-route summary clearing
+    and missing-image recovery have regression coverage. Campaign APIs, real pack
+    binding, persistent drafts/locales, full reading/accessibility behavior and the
+    complete graphic kit remain later tasks; P05 overall is not yet accepted.
 - [ ] P05.2 Bind display names, resources, panels, and terminology to content metadata.
 - [ ] P05.3 Implement the default visual-novel and alternative text-focused responsive layouts, local passage advancement, chronicle, speaker portraits and keyboard/focus support.
 - [ ] P05.4 Define revision-aware projection state, persistent free-input drafts, editable contextual quick replies and connection/error states; choosing a suggestion must not submit or advance the world.
@@ -756,11 +768,11 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 **Depends on:** P10. **Areas:** combat domain, rules, persistence, fixtures.
 
 - [ ] P11.1 Implement encounter lifecycle, frozen per-adventure profiles around the default ruleset, zone graph, objectives and opening-action policy; validate supported customization without changing the scheduler kernel.
-- [ ] P11.2 Implement initiative, rounds, activations, AP, movement, legal targeting, and explicit end activation.
+- [ ] P11.2 Implement initiative, rounds, activations, AP, movement, legal targeting and explicit end activation; enforce bounded speech and declared social/scene-action eligibility/costs at player decision boundaries.
 - [ ] P11.3 Implement attack/defense/strong-hit/armor/healing calculations with recorded draws.
 - [ ] P11.4 Implement predeclared reactions, stacking caps, effect phases, durations, cooldowns, and no-chain limits.
-- [ ] P11.5 Implement defeat, escape, surrender/agreement predicates, stalemate policy, and idempotent settlement.
-- [ ] P11.6 Persist/recover every combat cursor and partial-round time boundary.
+- [ ] P11.5 Implement defeat, escape, surrender/agreement predicates, refused/counteroffered/explicitly accepted negotiation, stalemate policy and idempotent settlement; prose alone cannot establish an outcome.
+- [ ] P11.6 Persist/recover every combat cursor, partial-round time boundary and combat-dialogue operation/transcript without duplicate social effects or settlement.
 
 **Exit:** seeded fights produce reproducible legal outcomes and all terminal paths return to a valid narrative state. **Checks:** QA-09, QA-11–13, effect properties and restore mid-round. **Suggested commit:** `Implement deterministic turn-based combat`.
 
@@ -769,10 +781,21 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 **Depends on:** P11 and P08; UI foundation P05. **Areas:** legal-action API, combat panels, NPC task contract.
 
 - [ ] P12.1 Show initiative, AP, zones, known defenses/conditions, costs, targets, and objective without leaking hidden data.
-- [ ] P12.2 Allow named actions and clarified free-text intent; preserve explicit player decisions.
+- [ ] P12.2 Allow named actions and a persistent combat dialogue/action chat with known recipients, attributed replies and editable quick replies; validate talk, negotiation and scene-changing intent, preview consequential costs and preserve explicit player submission/decisions.
 - [ ] P12.3 Provide actor-knowledge-scoped legal candidates to Codex for NPC/companion choices.
-- [ ] P12.4 Add deterministic tactic fallback, interruption messages, and outcome narration.
-- [ ] P12.5 Verify mobile/keyboard play and session renewal inside a fight.
+- [ ] P12.4 Add deterministic tactic fallback, interruption messages, bounded knowledge-scoped combat replies and outcome narration; dialogue failure leaves committed state and tactical controls available.
+- [ ] P12.5 Verify mobile/keyboard play, chat/tactics switching, draft preservation, no out-of-turn/automatic submission and session renewal/reconnect inside a fight, including negotiated settlement retries.
+
+**Requirement update (24 October 2026):** the owner requests free-input chat during
+combat to talk to participants and influence subsequent events. The design now
+defines bounded speech, rule-validated social/scene actions, explicit agreement
+decisions and transcript recovery in [combat](11-combat-system.md#71-dialogue-and-scene-changing-intent-during-combat),
+[UI](13-api-and-ui.md#71-combat-chat), command/AI contracts and QA-09/11/13.
+This is documented future work for P11/P12; it does not mark implementation or
+acceptance complete, add a new task, or require combat in the P05.1 preview shells.
+Documentation checks pass for repository policy, relative links/anchors and Markdown
+fences. All 117 task identities and their 31 checked statuses are unchanged by
+this update. No combat runtime/browser result is claimed.
 
 **Exit:** the complete fight is playable through the actual UI, including reconnect and resume. **Checks:** real-browser combat path, QA-07, QA-09, QA-16, tactic-invalid/provider-unavailable fallback. **Suggested commit:** `Add tactical combat UI and constrained opponent tactics`.
 

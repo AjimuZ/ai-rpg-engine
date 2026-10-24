@@ -17,6 +17,12 @@ The library's primary cards represent adventures. “New adventure” creates a 
 
 ## 2. Separate managed folders
 
+P05.1 adds a library shell with two local genre preview cards and a separate
+installed-packs section. Scoped URLs reject unknown preview identities; reading
+positions are independent in memory. These samples are not persisted workspaces
+or campaigns. Workspace creation, real library listing/continue and full restart/
+restore isolation remain pending; frontend previews do not establish QA-33.
+
 P04.5 imports both [neutral genre fixtures](../backend/src/test/resources/packs/README.md)
 into one workspace and independently into fresh workspaces, preserving distinct
 revision identities and exact inventories despite shared local definition IDs.

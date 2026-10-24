@@ -1,0 +1,20 @@
+<!-- Original MIT-licensed preview environment; geometry is decorative, never an authoritative map. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" role="img" aria-label="Silent relay docking corridor">
+  <defs>
+    <linearGradient id="hull" x2="0" y2="1"><stop stop-color="#121b36"/><stop offset="1" stop-color="#425878"/></linearGradient>
+    <linearGradient id="deck" x2="0" y2="1"><stop stop-color="#304461"/><stop offset="1" stop-color="#141c32"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#b1e0ef"/><stop offset="1" stop-color="#426687"/></radialGradient>
+  </defs>
+  <path fill="url(#hull)" d="M0 0h1200v640H0z"/>
+  <path fill="#080f23" d="M0 0h1200L750 220H450z"/>
+  <path fill="#253953" d="m0 0 450 220v200L0 640zM1200 0 750 220v200l450 220z"/>
+  <path fill="url(#deck)" d="M0 640 450 420h300l450 220z"/>
+  <path fill="url(#glow)" d="M450 220h300v200H450z"/>
+  <path fill="#1a2c45" d="M500 245h200v175H500z"/>
+  <path fill="#749ab0" d="M592 245h16v175h-16z"/>
+  <g fill="none" stroke="#617492" stroke-width="14"><path d="M100 590V65l100 49v425M335 480V180l60 28v244M1100 590V65l-100 49v425M865 480V180l-60 28v244"/></g>
+  <g fill="none" stroke="#9cdce6" stroke-width="6"><path d="m42 560 392-160M1158 560 766 400M150 93l270 132M1050 93 780 225"/></g>
+  <g fill="none" stroke="#445976" stroke-width="3"><path d="m250 640 270-220M950 640 680 420M600 640V420M180 555h840M335 480h530"/></g>
+  <path fill="#1a273e" d="M45 430v115l175-75v-90zM990 380v90l165 75V430z"/>
+  <g fill="#cdbf95"><path d="m75 444 65-24v8l-65 24zM1060 420l65 24v8l-65-24z"/></g>
+</svg>

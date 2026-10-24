@@ -52,6 +52,12 @@ A long RPG campaign needs more than a conversation history. Inventory must remai
 
 The design primarily derives from **The World I Can Develop**: Angular, Spring Boot, Java 21, PostgreSQL, modular RPG panels, backend-owned rules, and layered memory. Its playable demo contributes practical improvements: Codex app-server integration, renewable AI threads, public state projections, local consultations, request deduplication, checkpoint validation, and selective media updates. [The source analysis](docs/02-source-analysis.md) distinguishes observed implementation from plans and new proposals.
 
+P05.1 adds [routed interface previews](frontend/README.md) for the library,
+character creation, visual-novel story, sheet, inventory, journal and settings.
+Two local genre samples use original scene illustrations and attributed passages;
+Continue reads supplied text only. These shells have no connected campaigns or
+world-action API. Full pack binding, input, localization and graphics remain later P05 work.
+
 ## Planned capabilities
 
 The [research and gap review](docs/27-competitive-analysis-and-gaps.md) informs

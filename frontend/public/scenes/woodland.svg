@@ -1,0 +1,18 @@
+<!-- Original MIT-licensed preview landscape; no text, scripts, external references or game facts. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" role="img" aria-label="Quiet woodland trail">
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#43586c"/><stop offset="1" stop-color="#b5ccba"/></linearGradient>
+    <linearGradient id="ground" x2="0" y2="1"><stop stop-color="#4b7766"/><stop offset="1" stop-color="#142a30"/></linearGradient>
+    <radialGradient id="light"><stop stop-color="#f5e4b0" stop-opacity=".75"/><stop offset="1" stop-color="#f5e4b0" stop-opacity="0"/></radialGradient>
+  </defs>
+  <path fill="url(#sky)" d="M0 0h1200v640H0z"/>
+  <ellipse fill="url(#light)" cx="730" cy="185" rx="350" ry="340"/>
+  <path fill="#6c9181" d="M0 340 160 260 330 320 520 250 700 310 920 210 1200 300v340H0z"/>
+  <path fill="url(#ground)" d="M0 425Q280 330 550 415T1200 380v260H0z"/>
+  <path fill="#acb392" d="M680 375q-180 60-80 120t-40 145h280q-180-80-170-150t10-115"/>
+  <g fill="#284b49"><path d="m110 0 40 0 30 470-85 0zM325 0h30l20 410-58 0zM1040 0h48l45 505-100-10zM889 0h26l-8 402-55 0z"/>
+    <ellipse cx="170" cy="40" rx="280" ry="125"/><ellipse cx="430" cy="0" rx="240" ry="100"/><ellipse cx="1030" cy="70" rx="310" ry="150"/></g>
+  <g fill="#172f36"><path d="M0 0h70l38 550L0 590zM1160 0h40v640l-94-70z"/><ellipse cx="20" cy="60" rx="190" ry="160"/><ellipse cx="1200" cy="10" rx="250" ry="180"/></g>
+  <g fill="#527b65"><ellipse cx="220" cy="525" rx="150" ry="40"/><ellipse cx="990" cy="555" rx="170" ry="45"/></g>
+  <g fill="#cad4a6"><ellipse cx="404" cy="470" rx="5" ry="2"/><ellipse cx="841" cy="510" rx="6" ry="2"/><ellipse cx="712" cy="440" rx="4" ry="2"/></g>
+</svg>

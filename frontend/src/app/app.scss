@@ -1,7 +1,5 @@
-// Keep the neutral shell readable without introducing a product design system.
+// Keep the root structural; story and feature surfaces share the global preview tokens.
 :host {
   display: block;
-  margin: 2rem auto;
-  max-width: 60rem;
-  padding: 0 1rem;
+  min-height: 100dvh;
 }

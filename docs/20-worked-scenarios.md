@@ -89,3 +89,37 @@ No resource is spent, no creature moves, no combat event occurs, and no reusable
 ## 8. Content upgrade during an active campaign
 
 An author changes a weapon formula in pack version 1.1. A campaign pinned to 1.0 retains its original formula. The owner can preview migration, including equipped items, derived statistics, active encounter dependencies, and affected summaries. Migration is blocked during an incompatible active encounter or waits for settlement. A verified backup and audited revision accompany an applied upgrade.
+
+## 9. Talk and change the situation during a fight
+
+This example specifies future P11/P12 behavior, not a runnable encounter fixture.
+The player is active with 3 AP. Mira and a hostile captain are known participants
+in communicating range. The frozen encounter permits a negotiated ending and
+defines an interaction with an existing dock gate; no new ability is improvised.
+
+1. The player writes to the captain, “Why are you attacking us?” and explicitly
+   sends it as their bounded speech-only utterance. The engine records the words
+   and the admitted public reply. AP stays at 3, initiative/world time/RNG do not
+   advance, and the captain reveals only what the public knowledge policy permits.
+   Another speech-only submission in that activation hits the declared limit.
+2. “Let us pass and we will stop fighting” is a negotiation attempt. The UI
+   identifies the supported definition, recipient and 1 AP cost, and asks for
+   confirmation if that interpretation/cost has not been chosen. The backend
+   checks eligibility, applies the defined social check with recorded draws if
+   required, and commits the resolved attempt once. AP becomes 2. The captain may
+   refuse or offer terms; neither response silently ends combat or accepts terms
+   for the protagonist.
+3. If a counteroffer requires another consequential action or binding transfer,
+   disclose its definition/cost and obtain the player's explicit decision. An
+   accepted, validated agreement triggers one settlement and returns to narrative
+   play with the attributed conversation preserved. Refresh after a lost response
+   returns the same receipt, without paying twice or repeating rewards.
+4. On a branch where negotiations fail, “I close the dock gate” resolves the
+   predeclared scene interaction with its normal range, cost and effect. “Actually,
+   that last attack never hit me” cannot rewrite committed damage. “Mira, cover
+   the exit” may be spoken as permitted, but Mira's movement still requires her
+   legal activation and control policy.
+5. During an NPC activation, the player may read or edit a draft. It is not sent
+   until a fresh eligible decision and explicit Send; no reaction window or
+   automatic future action is created. If reply generation fails, show the saved
+   receipt/pending narration and retain usable deterministic combat controls.

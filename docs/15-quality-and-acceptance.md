@@ -202,11 +202,11 @@ Do not require live inference for ordinary CI. Test fixtures must not contain pr
 | QA-06 | Read-only inspection | Sheet/journal/guide reads leave revision, turn, time, events, and RNG unchanged | FR-008 |
 | QA-07 | Player agency | Narration adds no unchosen travel, promise, attack, or resource use | FR-007 |
 | QA-08 | Fresh thread resume | New role thread knows current pending decision without replaying old scene | FR-011–012 |
-| QA-09 | Combat renewal | Mid-fight renewal preserves initiative, AP, reactions, effects, resources, RNG cursor | FR-012, FR-015 |
+| QA-09 | Combat renewal | Mid-fight renewal preserves initiative, AP, reactions, effects, resources, RNG cursor and dialogue operation/transcript; reconnect cannot submit a draft or repeat a social effect | FR-012, FR-015 |
 | QA-10 | Inventory coupling | Potion quantity and capped healing commit together; equipment cannot duplicate ownership | FR-009 |
-| QA-11 | Combat arithmetic | Miss costs, armor absorption, strong hits, cover, and Guard/Brace stacking match rules | FR-015 |
+| QA-11 | Combat arithmetic and dialogue | Miss costs, armor absorption, strong hits, cover and Guard/Brace stacking match rules; bounded speech spends no AP/time/RNG, consequential social/scene actions use declared costs/checks, ambiguous/unsupported/out-of-turn input changes nothing | FR-015 |
 | QA-12 | Effect clocks | Start/end effects and durations tick exactly once through defeat and renewal | FR-015 |
-| QA-13 | Terminal outcomes | Victory, defeat, escape, surrender, agreement, and objective success settle once | FR-016–017 |
+| QA-13 | Terminal outcomes | Victory, defeat, escape, surrender, agreement and objective success settle once; test refused negotiation, a counteroffer, explicit player acceptance and lost-response retry of a negotiated ending | FR-015–017 |
 | QA-14 | Dynamic encounter bounds | Invalid roster, unreachable objective, hidden hard counter, and over-budget phase rejected | FR-014 |
 | QA-15 | Progression | Crossing multiple thresholds grants exact entitlements with no automatic refill | FR-017 |
 | QA-16 | Knowledge isolation | Secret sentinels absent from player API, narrative, guide, media metadata, and UI diagnostics | FR-013 |
@@ -235,6 +235,29 @@ Do not require live inference for ordinary CI. Test fixtures must not contain pr
 | QA-39 | Bilingual narrative comparisons | Paired baseline/planner/planner+reviewer studies with source-grounded coherence/motivation/agency rubric, 100/500-turn continuity, quota/latency/usage/waste/replanning metrics and explicit unrun/disabled cells; human EN/IT review distinct from objective invariants | FR-007, FR-011–013, FR-033–034, NFR-008, NFR-013 |
 | QA-40 | Safe presentation events | Allowlisted public scene/actor/expression/line/asset references only; no executable/raw-URL cues, no hidden-actor or language leak, deduplicated skip/reconnect, persistent visual/voice identities and fallback without world changes | FR-022, FR-030, FR-035–036, NFR-004, NFR-014 |
 | QA-41 | Portable stories between owners | Export/import both genres and EN/IT overlays on a clean second installation; IDs/hashes/compatibility/dependencies/credits preserved; missing/unshareable assets handled, hostile ZIP rejected, conflicting revisions previewed; no credentials/private playthrough/live jobs or recipient-save overwrite | FR-001, FR-024, FR-028, FR-037, NFR-012 |
+
+P05.1 shell acceptance passes 11 frontend form/routing/service tests, strict
+typecheck and production build. Chrome 155 desktop/mobile smoke verifies both
+neutral local previews, route navigation, keyboard Continue, revealed chronicle,
+character-name preview, text-size selection and unknown-identity fallback without
+page exceptions or nonlocal/action requests. Tests also cover trimmed-name bounds,
+literal markup, scope clearing, independent bounded reading and missing-image
+recovery. Both scene layouts were visually reviewed. These are shell checks only;
+full QA-29 (reading/input), QA-30 (graphic kit), QA-33 (persisted isolation) and
+QA-35 (bilingual UI) remain pending. Commands and scope are in the
+[frontend guide](../frontend/README.md).
+
+Combat-chat acceptance for P11/P12 also includes a real-browser English/Italian
+path with visible speaker/recipient, editable suggestions and explicit Send;
+desktop/mobile keyboard access to both chat and tactics; draft preservation while
+an NPC acts; no hidden submission at the next activation; public-only NPC replies;
+and a supported scene interaction versus a rejected attempt to rewrite a resolved
+event. Verify the per-activation speech limit, no automatic ally action, clarification
+before compound actions or unknown costs, insufficient-AP rejection, provider
+unavailability with usable tactical controls, and committed narration recovery.
+Renew/reconnect during a social check and after an accepted agreement must reuse
+the original operation/draws and settle once. These are planned checks, not results
+claimed by the current preview shells.
 
 ## 4. Long-campaign evaluation
 

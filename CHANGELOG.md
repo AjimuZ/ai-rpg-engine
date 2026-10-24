@@ -2,6 +2,34 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Combat dialogue design, 24 October 2026
+
+- Extend the combat/UI, command and interpretation specifications with a persistent
+  in-combat composer for participant dialogue, negotiation and supported scene
+  interactions, including public speaker/recipient identities and editable replies.
+- Specify bounded speech, declared social-action costs, explicit agreement decisions,
+  turn eligibility, duplicate-safe recovery and causal event changes. Add a worked
+  example, acceptance cases and P11/P12 scope. This delivers documentation only;
+  playable combat chat and numerical-policy calibration remain future work.
+
+## Unreleased — Interface preview shells (P05.1), 24 October 2026
+
+- Add routed library, character-creation, visual-novel story, sheet, inventory,
+  journal and settings shells with explicit local preview/unconnected states.
+- Separate adventure cards from installed packs; validate bounded character-name
+  previews without saving. Keep supplied-text reading positions independent per
+  sample, attribute narrator/character passages and expose a read-only chronicle.
+- Include original MIT-licensed woodland/station SVG scenes, live accessible text,
+  responsive styles and bounded tab-local reading size. Real pack/campaign binding,
+  playable input, full localization and the complete graphic kit remain later tasks.
+- Align name validation with trimmed service input and clear unsaved summaries on
+  adventure changes, including return navigation; add regression and settings tests.
+- Verify typecheck, 11 form/routing/service tests, production build, dependency
+  audit (zero vulnerabilities), 22 repository tests and all four repository scans
+  (zero findings). Desktop/mobile Chrome smoke passes navigation, keyboard reading,
+  chronicle, forms, settings and unknown-identity handling without remote/action
+  requests or page exceptions; visually review both scene layouts.
+
 ## Unreleased — Validated pack localization (P04.6), 24 October 2026
 
 - Add optional closed EN/IT overlays and source-owned text resources, stable ID/field bindings, glossary proper-name/term hints, explicit quote policies, placeholder parity and source-language fallback. Resolve text through a separate immutable catalog; mechanics, identities, visibility and dependency exports remain source-authoritative.

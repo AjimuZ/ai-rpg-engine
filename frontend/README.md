@@ -1,7 +1,29 @@
-# Browser development shell
+# Browser interface previews
 
-This is a neutral standalone Angular shell, with SCSS, strict TypeScript/templates,
-zoneless change detection, and no adventure data, runtime calls, or credentials.
+This is a standalone Angular interface with SCSS, strict TypeScript/templates,
+zoneless change detection, and no runtime calls or credentials. P05.1 provides
+library, character-creation, story, sheet, inventory, journal and settings shells.
+The library contains explicitly local Mosslight Trail and Silent Relay samples,
+inspired by the neutral import fixtures; these are hand-authored display previews,
+not registered workspaces or compiled pack projections. Real metadata binding is P05.2.
+
+Open `/library`, `/settings`, or `/adventures/mosslight/story` (also `relay`).
+Each adventure has `create`, `story`, `sheet`, `inventory` and `journal` routes.
+Unknown adventure IDs show an unavailable screen. Creation validates a 1–60
+character trimmed name and previews it without saving. Changing adventures clears
+both the form and unsaved summary, including when returning to an earlier preview.
+Sheet/inventory/journal
+show explicit unconnected states, never invented authoritative statistics.
+New adventure, pack import, campaign creation and Send are disabled until their
+services exist. There is no playable campaign or continue-saved-game claim.
+
+The default story uses separate original [vector scene assets](public/scenes/README.md)
+and attributed public sample passages. Continue reveals only supplied text;
+Chronicle shows already revealed passages. Reading positions remain independent
+per sample while the tab is open. Settings adjusts story text from 15–24 px;
+reload resets all preferences/positions. English-only resources, full localization,
+text-focused layout, portraits, persistent drafts, revision-aware input and the
+complete graphic kit remain P05.2–P05.7. No submitted player dialogue is fabricated.
 Use Node.js 24.22.1 and npm 11.19.1 from [ADR 0009](../docs/adr/0009-toolchain-baseline.md).
 
 From `frontend/`:
@@ -21,6 +43,17 @@ The production output is `dist/engine-ui/browser/`. The backend's opt-in
 embeds this output and the adjacent extracted license notices in one executable
 jar; engine container integration remains P02.3.
 No lint target exists; CI runs `npm ci`, `typecheck`, `test`, `build` and `npm audit` ([workflow](../.github/workflows/ci.yml)).
+
+After building, run `node tools/browser-smoke.mjs` for a production-browser smoke
+check. It uses installed Chrome on Windows by default; set `BROWSER_PATH` to an
+installed Chromium executable elsewhere. No browser download or owner profile is
+used. An ephemeral loopback server and fresh profile are stopped/removed on exit;
+desktop/mobile screenshots stay under ignored `.local/scratch/`. The check covers
+navigation, keyboard Continue, chronicle, character preview, reading settings and
+unknown identities, and rejects page exceptions and nonlocal/action requests.
+The P05.1 acceptance run passed all 11 tests, typecheck, build and audit, plus this
+smoke check in Chrome 155.0.8059.85 at 1440×1100 and 390×844; screenshots were
+visually reviewed. These checks do not establish full QA-29/30/35 acceptance.
 
 Vite is overridden to 8.3.5 to fix the development-server advisories in Angular
 build's 8.3.0 dependency while preserving Angular 22.2.3; see ADR 0009.
