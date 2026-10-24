@@ -97,6 +97,14 @@ These establish the enabled storage/outbox/admission portions of QA-36/37; they 
 not complete semantic plan validation, fair scheduling, runtime cancellation,
 player-facing fallback, author/secret checks or narrative-quality evaluation.
 
+P04.2 evidence (24 October 2026): the 8-test `PackCompilerTest` suite compiles a valid
+reference pack and rejects duplicate IDs, category/kind mismatch, unknown/wrong-kind/
+undeclared references, unresolved dependencies, unknown rarity tiers, shared appearance
+identities, creation budget and stack overflows, unknown attributes/resources, rank
+overflow, stray or unknown effect fields, unknown fields and unsupported kinds. Full
+Maven `verify` on pinned JDK 21/PostgreSQL 18.6 passes 184 tests with three skips (187 total).
+Expression limits, cycles and version compatibility remain untested until P04.3.
+
 P04.1 evidence (24 October 2026): the 63-case in-memory parsing corpus covers the
 closed contract-1 manifest, YAML 1.2 core resolution, tags/anchors/aliases/merge
 rejection, strict JSON, encoding, immutable values, field coordinates, resource

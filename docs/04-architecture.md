@@ -59,7 +59,9 @@ migration and the canonical foundation entities in the `identity`, `adventure`,
 P04.1 adds a data-only manifest/parsing/hash stage in `content`, using fixed
 classpath schemas and no I/O ports. Its immutable `ParsedPack` is distinct from
 an admitted `ContentRevision`; semantic compilation and protected staging/registry
-operations remain P04.2–P04.4. See the [pack contract](09-adventure-packs.md).
+operations remain P04.3–P04.4. P04.2 adds the pure `PackCompiler` semantic stage
+(IDs, dependencies through a local catalog, cross-references, creation, items,
+skills, abilities and world definitions) producing a `CompiledPack`. See the [pack contract](09-adventure-packs.md).
 
 | Module | Responsibility | Main dependencies |
 | --- | --- | --- |

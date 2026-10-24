@@ -2,6 +2,11 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Semantic pack compiler (P04.2), 24 October 2026
+
+- Add `PackCompiler`, `CompiledPack`, `Definition` and a local `DependencyCatalog`: unique IDs, category/kind agreement, typed cross-references (including `packId#id` for declared dependencies), rule-defined attributes/resources/rarity tiers, unique item appearance identities, creation budgets, skills, abilities and initial world definitions, with closed objects and located diagnostics.
+- Reject kinds without a semantic schema instead of ignoring them. Expression/effect limits, cycles and version compatibility stay in P04.3; archive protections and registration in P04.4. The 8-test compiler suite and the full pinned backend verification pass; no playable-pack admission is claimed.
+
 ## Unreleased — Contract-1 parsing foundations (P04.1), 24 October 2026
 
 - Add a closed versioned manifest and preliminary definition-envelope JSON Schemas, explicit file categories and source-located diagnostics.

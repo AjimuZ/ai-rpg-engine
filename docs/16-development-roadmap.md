@@ -574,7 +574,21 @@ content/assets and full container integration remain open; P02.3 stays unchecked
     Definition categories validate a preliminary envelope; semantic data, policy/module
     compatibility, filesystem/archive/media protection and registration remain
     P04.2–P04.4. This stage does not admit packs or close the overall P04 exit.
-- [ ] P04.2 Implement IDs, dependencies, cross-references, creation profiles, item rarity/appearance identities, skills, abilities, and initial world definitions.
+- [x] P04.2 Implement IDs, dependencies, cross-references, creation profiles, item rarity/appearance identities, skills, abilities, and initial world definitions.
+  - Session 1: add `PackCompiler`, a pure semantic stage over `ParsedPack` that returns a
+    `CompiledPack`. It enforces category/kind agreement, unique IDs, rule-defined
+    attribute/resource/rarity vocabularies, pinned dependencies resolved through an
+    injected local `DependencyCatalog` (`packId#id` cross-pack references; no fetching),
+    typed cross-references, creation budgets and starting stacks, unique item appearance
+    identities, skill ranks, ability prerequisites/costs/targets and shallow typed effects,
+    and the manifest entrypoint. Unknown fields, unknown rule types and kinds without a
+    schema (quest, encounter, anchor, progression) fail closed with located diagnostics.
+    The 8-test compiler suite covers a valid pack and each failure code. Full pinned
+    JDK 21/PostgreSQL 18.6 backend `verify` passes 184 tests with three
+    packaging-profile skips; repository tests and policy checks pass.
+    Limitations: expression and effect depth/graph limits, cycles, version-range
+    compatibility and quest/encounter/progression semantics are P04.3; archive/path
+    protections and registration are P04.4. Nothing is admitted or playable yet.
 - [ ] P04.3 Implement bounded expressions/effects, graph/cycle limits, fixed author/required-entity constraints, version compatibility and conflict diagnostics; generated gap filling cannot override them.
 - [ ] P04.4 Add path/archive/type/size protections and immutable registration.
 - [ ] P04.5 Create two minimal neutral genre fixtures and prove import without source edits.

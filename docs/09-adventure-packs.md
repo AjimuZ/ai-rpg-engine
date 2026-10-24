@@ -170,6 +170,10 @@ must preserve this framing or introduce an explicit new digest protocol.
 | Character creation | Allowed names/backgrounds/roles, attribute budget, skills, starting items and abilities |
 | Progression profile | Thresholds, rewards, purchase choices, unlock requirements, caps |
 
+P04.2 implements the semantic shapes for rule (`attributes`, `resources`, `rarityTiers`), location, faction, NPC, item, skill, ability, condition and creation definitions in `PackCompiler`; each `data` object is closed, so unknown fields are errors. Rule definitions supply the attribute, resource and rarity vocabularies that items, creation profiles and abilities are checked against. Item appearance identities are unique per pack and items must name a defined rarity tier when tiers exist. Creation profiles bound attribute and skill budgets, archetype presets and starting stacks. Quest, encounter, narrative anchor and progression definitions have no semantic schema yet and are rejected (`UNSUPPORTED_KIND`) rather than ignored; expressions, effect graphs and version-range checks arrive with P04.3.
+
+References are plain local IDs, or `packId#definitionId` for a definition exported by a declared dependency. A dependency (`id`, `version`, `hash`) must be resolved by a locally installed pack through the `DependencyCatalog`; the compiler never downloads anything, and an unresolved, duplicated or self-referencing dependency is a `DEPENDENCY` error. Reference diagnostics use `REFERENCE_UNKNOWN` and `REFERENCE_KIND`; other codes are `DUPLICATE_ID`, `KIND_MISMATCH`, `RANGE`, `DUPLICATE` and `SCHEMA`.
+
 Definitions reference stable IDs, never display-name matching. A label can be localized. Unknown optional data must be in a namespaced extension block validated by an enabled module; arbitrary unknown mechanical fields are errors.
 
 ## 5. Markdown versus structured data
