@@ -60,6 +60,17 @@ or cost authorization; bounded policy alone cannot override this refusal.
 
 ## 6. Secrets and audience separation
 
+P03.4 stores private 32-byte campaign random seeds in `campaign_random_seed`,
+separate from canonical entities and receipt/outbox projections. These are gameplay
+secrets: database/backups remain trusted and require the same access protections as
+hidden world data; this is not encryption at rest. Never log/export seed bytes to
+runtime contexts or owner-facing diagnostics. Uncommitted draw values are internal
+preparation data; only a committed receipt exposes its operation's values/references.
+Seeds and immutable draw reservations must be retained together in backups; preserve
+the pinned algorithm/version when restoring. No backup/restore workflow is delivered
+by P03.4. Application authorization and equivalent-new-attempt policy remain future
+gates; durable same-operation reuse alone does not prevent new-operation reroll fishing.
+
 Never put Codex credentials, database passwords, `.env` files, auth stores, private saves, personal notes, or raw provider traces in Git. Diagnostic exports redact keys, tokens, absolute personal paths, private content, and RPC identifiers unless an owner explicitly selects a suitably protected full diagnostic mode.
 
 The tracked root [`.env.example`](../.env.example) contains only the consumed loopback application port and neutral database labels. The labels do not configure authentication. Supply passwords through private secret files and account state through the supported owner-controlled sign-in flow; never add either to a public example. Ignore rules are a staging safeguard, not a secret scanner or a substitute for reviewing the staged content. The root and independent runtime `.dockerignore` policies now default-deny build inputs and recursively exclude private names inside admitted source trees. Real BuildKit fixture exports verify both policies (`py -B -m unittest discover -s tools/container_packaging -v`); they do not scan arbitrary source content or establish full application containment.

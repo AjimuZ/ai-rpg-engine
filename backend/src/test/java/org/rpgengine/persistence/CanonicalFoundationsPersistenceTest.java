@@ -679,7 +679,7 @@ class CanonicalFoundationsPersistenceTest {
 
     /** Remove all rows; TRUNCATE bypasses the row-level immutability triggers by design. */
     private void truncateAll() {
-        jdbc.execute("truncate table canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, operation_journal, "
+        jdbc.execute("truncate table operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, operation_journal, "
                 + "actor_resource, actor, presentation_campaign_settings, campaign, content_revision, "
                 + "adventure_workspace, identity_owner_profile");
     }

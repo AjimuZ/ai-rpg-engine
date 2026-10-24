@@ -32,6 +32,17 @@ and do not replace, the short atomic transaction and lease/fencing checks of P03
 
 ## Verification
 
+P03.4 decision (24 October 2026): reserve immutable operation/ordinal draws in their
+own bounded transaction before canonical commit. Use lazy private 256-bit campaign
+seed material and explicitly framed HMAC-SHA-256 v1 with rejection sampling, rather
+than JDK generator implementation/cursor state. This gives portable test vectors and
+independent operation draws without changing canonical counters. Persist seed bytes
+and algorithm/version with the reservation ledger; never derive a secret from the
+public campaign seed label. Canonical receipts read stored reservations under the
+campaign lock, while a failed world commit retains the earlier draws. There is no
+speculative-planner draw API. Later command policy must prevent equivalent unresolved
+attempts from acquiring new operation identities solely to reroll.
+
 P03.3 implementation decision (24 October 2026): the internal commit boundary accepts
 an immutable bounded resolved value, never an executable callback. It rejects ambient
 transactions, locks campaign then journal, rechecks exact revision/content/operation

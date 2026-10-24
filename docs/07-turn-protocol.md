@@ -67,6 +67,29 @@ Validate shape, operation allowlist, actor ownership, turn eligibility, target s
 
 The rules service produces a resolved mechanical plan. Random draws are allocated by the backend in a short durable planning transaction, keyed by operation and draw ordinal, before final resolution. Their values are private until relevant output is committed. A same-operation retry reuses them. A new deliberate attempt is a new action only if allowed by the game state. Cancelling after allocation does not permit reroll fishing: the reserved draw remains bound to the attempt and the attempt policy must prevent recreating an equivalent unresolved action solely to reroll.
 
+P03.4 implements `RandomDrawService.reserve(context, ordinal, sides)` as a backend-only
+database boundary for an already journaled `VALIDATING` operation. Call it outside any
+ambient transaction, before canonical commit. It locks campaign then journal, checks
+adventure/campaign/payload scope and reuses an existing ordinal before freshness checks.
+Changing a reserved bound is a conflict. New ordinals require the exact current
+revision/content/operation version; stale, cancelled or committed attempts cannot add
+draws. A matching existing reservation remains readable internally after cancellation
+or commit. Each call returns detached evidence only after its own COMMIT, uses the
+same 2s lock/5s statement/10s transaction limits as canonical commit, and changes no
+world or journal counters. This is not the speculative narrative planner: that planner
+has no access to this primitive or its private seed data.
+
+Canonical receipts now contain an ordinal-ordered backend-owned `randomDraws` array
+with each operation reservation's ID, ordinal, sides, value, algorithm and version;
+no draws produces an empty array. Caller `details` cannot override this array. The
+receipt captures all reservations belonging to that committed operation, so the trusted
+resolver must reserve only draws appropriate for its committed mechanical outcome.
+Exact stored old receipts replay unchanged, including receipts predating this field.
+Event-level calculation/reference schemas belong to later rules work. Seed bytes and
+uncommitted values never enter outbox envelopes or runtime contexts. The service has
+no public endpoint; future command authorization and equivalent-attempt cancellation
+policy are still required to prevent reroll fishing with new operation IDs.
+
 ## 5. Canonical commit
 
 Open a short PostgreSQL transaction and re-check the revision, lease/fencing token, current encounter actor, selected ruleset, and affected resources. If stale, do not reuse the proposal against new state; fail or explicitly replan before committing.
@@ -104,7 +127,7 @@ timeout. Plans allow at most 128 resources, 128 events (at least one), 128 settl
 and 32 KiB receipt details; existing stored JSONB limits remain authoritative.
 
 This internal primitive does not accept player/model proposals directly. Command
-acceptance/authorization, semantic rules, encounter checks, random draw reservation,
+acceptance/authorization, semantic rules, encounter checks,
 leases/fences, cancellation coordination and outbox dispatch/recovery remain their
 later roadmap tasks. New domain effect types must join the same explicit commit path.
 

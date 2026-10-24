@@ -60,6 +60,23 @@ Definition entities are immutable per revision. Campaign instances may extend th
 
 ## 3. Database organization
 
+P03.4 adds V4 `campaign_random_seed` and `operation_random_draw`. Seeds are created
+lazily from JDK `SecureRandom`, retained as private database bytes and resolved by
+campaign; `Campaign.seedIdentity` remains an opaque pinned label, never key material.
+No seeds or historical draws are backfilled on upgrade. Both tables reject UPDATE
+and DELETE. Draws have a unique `(campaign_id, operation_id, ordinal)`, a scoped
+journal foreign key, bounded ordinal/value and a seed algorithm/version foreign key.
+Reservation changes neither world counters nor journal versions. No mutable RNG
+cursor is needed: the durable operation/ordinal set is the reservation ledger.
+
+The protocol `HMAC-SHA-256`, version 1, maps a private 32-byte campaign seed
+and operation UUID/ordinal/bound to an unbiased integer in `1..sides`. The message
+is ASCII `engine-draw-v1` followed by NUL, UUID high/low 64-bit words, ordinal,
+sides and rejection counter (three 32-bit integers), all big endian. Counter starts
+at zero; take the first unsigned 32 bits of each HMAC and reject samples at or above
+`2^32 - (2^32 mod sides)` before modulo mapping. Ordinals are 0..127; sides are
+1..2,147,483,647. Identity/version changes require a new protocol, never silent drift.
+
 Proposed table families: `content_*`, `campaign_*`, `actor_*`, `inventory_*`, `quest_*`, `world_*`, `knowledge_*`, `combat_*`, `memory_*`, `ai_*`, `operation_*`, and `presentation_*`. Use explicit foreign keys and campaign-scoped unique constraints.
 
 P03.1 implements the first migration, `V1__canonical_foundations.sql`, with ten foundation tables: `identity_owner_profile`, `adventure_workspace`, `content_revision`, `campaign`, `presentation_campaign_settings`, `actor`, `operation_journal`, `campaign_event`, `reward_settlement` and `campaign_checkpoint`. Campaign-owned relationships use composite `(campaign_id, id)` foreign keys, and a campaign pins a content revision of its own adventure, so cross-campaign and cross-adventure references fail in PostgreSQL. The canonical counters of section 1 live only on the campaign row; locale and presentation generations live in `presentation_campaign_settings`. Events, content revisions, checkpoints and reward settlements are immutable rows.
@@ -68,7 +85,7 @@ P03.2 adds `V2__campaign_bounds_and_versions.sql` without changing V1. The seven
 
 V2 freezes row identities, owner/adventure/campaign associations and creation provenance after insert; campaign content revision and seed are pinned. Resource identity, actor and content key are fixed. `actor_resource` has a composite actor/campaign foreign key, uniqueness on `(campaign_id, actor_id, resource_key)` and inclusive `minimum_value <= current_value <= maximum_value` bounds. Integer values and declared bounds use BIGINT; adjustments reject overflow or an out-of-range result without clamping, and unknown values are never inserted as zero. Resource revision cannot rewind. Rules/content determine the declared bounds and available resource keys; debt and inventory ownership are separate later entities.
 
-Canonical counters and presentation generations cannot decrease, and a campaign state revision advances by at most one per row update. Committed journal statuses require both revision and receipt; other statuses require neither. Commit outcomes are write-once, terminal statuses cannot reopen, and `(campaign_id, committed_revision)` is unique while uncommitted NULL revisions remain distinct. Checkpoints and settlements also expose composite campaign/identity unique keys for later relationships. P03.3 adds the internal atomic commit/revision/outbox boundary described below; acceptance APIs, leases, draw records and recovery remain later tasks. Java owns the full lifecycle transition table. Scoped repository methods are persistence primitives; future application boundaries must authorize owner/adventure/campaign before calling them, and must not expose inherited unscoped repository methods.
+Canonical counters and presentation generations cannot decrease, and a campaign state revision advances by at most one per row update. Committed journal statuses require both revision and receipt; other statuses require neither. Commit outcomes are write-once, terminal statuses cannot reopen, and `(campaign_id, committed_revision)` is unique while uncommitted NULL revisions remain distinct. Checkpoints and settlements also expose composite campaign/identity unique keys for later relationships. P03.3 adds the internal atomic commit/revision/outbox boundary described below; P03.4 adds draw records above. Acceptance APIs, leases and recovery remain later tasks. Java owns the full lifecycle transition table. Scoped repository methods are persistence primitives; future application boundaries must authorize owner/adventure/campaign before calling them, and must not expose inherited unscoped repository methods.
 
 JSONB object bounds use UTF-8 bytes of PostgreSQL's normalized text rendering: pending decision and reward payload 16,384 bytes, receipt and event payload 65,536 bytes, checkpoint snapshot 8,388,608 bytes. Java rejects oversized input early; JSONB whitespace/escape normalization can change the byte count, so the database remains authoritative. Larger exports/media belong outside these payloads. The constraints, boundary values, races and populated-upgrade checks pass in the full backend verification on PostgreSQL 18.6 (24 October 2026); see the [evidence scope](15-quality-and-acceptance.md#1-evidence-policy). The other table families above remain later work.
 

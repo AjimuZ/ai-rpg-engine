@@ -14,6 +14,13 @@ retain their standard precedence; configtree is not a secret manager.
 
 ## 1. Risk register
 
+P03.4 adds durable same-operation random reuse and pinned HMAC-SHA-256 v1 identity.
+Private campaign seeds are trusted database/backup material, never runtime context.
+Reservation survives failed/cancelled canonical work, but future command policy must
+still prevent equivalent unresolved actions from using fresh operation IDs to fish
+for rerolls. Backup/restore and lease/fencing checks remain P03.5; seed/draw ledgers
+must be preserved together and protocol changes must retain old replay support.
+
 Owners below are implementation responsibilities, not assigned people. The project owner can combine roles in a solo project.
 
 | Risk | Impact | Mitigation and evidence required | Owner / gate |

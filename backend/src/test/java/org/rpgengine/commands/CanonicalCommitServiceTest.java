@@ -53,6 +53,7 @@ class CanonicalCommitServiceTest {
     private static final List<String> TABLES = List.of("campaign", "actor_resource", "operation_journal",
             "campaign_event", "reward_settlement", "canonical_outbox");
     @Autowired private CanonicalCommitService commits;
+    @Autowired private RandomDrawService draws;
     @Autowired private EntityManager entities;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager manager;
@@ -77,7 +78,7 @@ class CanonicalCommitServiceTest {
             jdbc.execute("drop trigger if exists p033_fault on " + table);
         }
         jdbc.execute("drop function if exists p033_fail()");
-        jdbc.execute("truncate canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
+        jdbc.execute("truncate operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
                 + "operation_journal, actor_resource, actor, presentation_campaign_settings, campaign, "
                 + "content_revision, adventure_workspace, identity_owner_profile");
     }
@@ -125,6 +126,132 @@ class CanonicalCommitServiceTest {
                 c.expectedOperationVersion()), plan.world(), plan.resources(), plan.events(), plan.rewards(), "{}", true);
         assertThrows(IllegalStateException.class, () -> commits.commit(changedPayload));
         assertEquals(before, snapshot());
+    }
+
+    /** Reservation survives canonical rollback and a fresh service instance; receipts use durable references. */
+    @Test
+    void reusesDrawAfterFailedCommitAndServiceRestart() {
+        var plan = plan(fixture, fixture.operation());
+        var before = snapshot();
+        var draw = draws.reserve(plan.context(), 0, 10);
+        assertEquals(before, snapshot());
+        assertEquals("HMAC-SHA-256", draw.algorithm());
+        assertEquals(1, draw.version());
+        installFailure("deferred_commit");
+        assertThrows(RuntimeException.class, () -> commits.commit(plan));
+        assertEquals(before, snapshot());
+        var restarted = new RandomDrawService(entities, new JdbcTemplate(dataSource), manager);
+        assertEquals(draw, restarted.reserve(plan.context(), 0, 10));
+        jdbc.execute("drop trigger p033_fault on canonical_outbox");
+        jdbc.execute("drop function p033_fail()");
+        var receipt = commits.commit(plan);
+        var references = JsonMapper.builder().build().readTree(receipt.json()).get("randomDraws");
+        assertEquals(draw.id().toString(), references.get(0).get("id").asString());
+        assertEquals(draw.value(), references.get(0).get("value").asInt());
+        assertFalse(receipt.json().contains("seed"));
+        assertEquals(draw, restarted.reserve(plan.context(), 0, 10));
+        assertEquals(receipt, commits.commit(plan));
+        assertThrows(IllegalStateException.class, () -> draws.reserve(plan.context(), 1, 10));
+    }
+
+    /** Concurrent duplicate allocation returns one immutable record without advancing world or journal counters. */
+    @Test
+    void serializesConcurrentDrawRetriesAndRejectsChangedBounds() throws Exception {
+        var context = plan(fixture, fixture.operation()).context();
+        var before = snapshot();
+        var results = race(() -> draws.reserve(context, 0, 10), () -> draws.reserve(context, 0, 10));
+        assertInstanceOf(RandomDrawService.Draw.class, results.get(0));
+        assertEquals(results.get(0), results.get(1));
+        assertEquals(1, count("operation_random_draw"));
+        assertEquals(1, count("campaign_random_seed"));
+        assertEquals(before, snapshot());
+        assertThrows(IllegalStateException.class, () -> draws.reserve(context, 0, 20));
+        assertThrows(RuntimeException.class, () -> jdbc.update("update operation_random_draw set value = 1"));
+        assertThrows(RuntimeException.class, () -> jdbc.update("delete from campaign_random_seed"));
+    }
+
+    /** Scope/hash/version checks precede new allocation; no outer transaction may delay reservation durability. */
+    @Test
+    void rejectsInvalidDrawContextAndAmbientTransactions() {
+        var c = plan(fixture, fixture.operation()).context();
+        assertThrows(RuntimeException.class, () -> draws.reserve(new ResolvedCommit.Context(UUID.randomUUID(),
+                c.campaignId(), c.operationId(), c.contentRevisionId(), HASH, 0, 2), 0, 10));
+        assertThrows(RuntimeException.class, () -> draws.reserve(new ResolvedCommit.Context(c.adventureId(),
+                c.campaignId(), UUID.randomUUID(), c.contentRevisionId(), HASH, 0, 2), 0, 10));
+        assertThrows(IllegalStateException.class, () -> draws.reserve(new ResolvedCommit.Context(c.adventureId(),
+                c.campaignId(), c.operationId(), c.contentRevisionId(), "d".repeat(64), 0, 2), 0, 10));
+        assertThrows(IllegalStateException.class, () -> draws.reserve(new ResolvedCommit.Context(c.adventureId(),
+                c.campaignId(), c.operationId(), c.contentRevisionId(), HASH, 0, 99), 0, 10));
+        assertThrows(IllegalStateException.class, () -> new TransactionTemplate(manager)
+                .execute(status -> draws.reserve(c, 0, 10)));
+        assertEquals(0, count("operation_random_draw"));
+        assertEquals(0, count("campaign_random_seed"));
+    }
+
+    /** Failed allocation rolls back its lazy seed too; no partly initialized randomness survives. */
+    @Test
+    void rollsBackSeedWhenDrawInsertFails() {
+        var c = plan(fixture, fixture.operation()).context();
+        installFailure("operation_random_draw");
+        try {
+            assertThrows(RuntimeException.class, () -> draws.reserve(c, 0, 10));
+            assertEquals(0, count("operation_random_draw"));
+            assertEquals(0, count("campaign_random_seed"));
+        } finally {
+            jdbc.execute("drop trigger p033_fault on operation_random_draw");
+        }
+    }
+
+    /** Cancellation preserves an attempt's existing evidence but cannot allocate a replacement ordinal. */
+    @Test
+    void preservesCancelledDrawAndRejectsNewAllocation() {
+        var c = plan(fixture, fixture.operation()).context();
+        var draw = draws.reserve(c, 0, 10);
+        new TransactionTemplate(manager).executeWithoutResult(status ->
+                entities.find(CampaignOperation.class, c.operationId()).transitionTo(OperationStatus.CANCELLED, NOW));
+        assertEquals(draw, draws.reserve(c, 0, 10));
+        assertThrows(IllegalStateException.class, () -> draws.reserve(c, 1, 10));
+        assertThrows(RuntimeException.class, () -> jdbc.update("delete from operation_random_draw"));
+        assertThrows(RuntimeException.class, () -> jdbc.update("update campaign_random_seed set algorithm_version = 1"));
+    }
+
+    /** Full legal reservation and detail sizes fit the receipt limit; ordinal order is stable even with reverse allocation. */
+    @Test
+    void commitsMaximumDrawSetWithBoundedDetails() {
+        var original = plan(fixture, fixture.operation());
+        for (int ordinal = 127; ordinal >= 0; ordinal--) {
+            var draw = draws.reserve(original.context(), ordinal, Integer.MAX_VALUE);
+            assertTrue(draw.value() >= 1 && draw.value() <= draw.sides());
+        }
+        var plan = new ResolvedCommit(original.context(), original.world(), original.resources(), original.events(),
+                original.rewards(), "{\"text\":\"" + "x".repeat(32757) + "\"}", true);
+        var receipt = JsonMapper.builder().build().readTree(commits.commit(plan).json());
+        assertEquals(128, receipt.get("randomDraws").size());
+        assertEquals(0, receipt.get("randomDraws").get(0).get("ordinal").asInt());
+        assertEquals(127, receipt.get("randomDraws").get(127).get("ordinal").asInt());
+        assertThrows(IllegalArgumentException.class, () -> draws.reserve(plan.context(), 128, 10));
+    }
+
+    /** Raw SQL cannot cross campaign scope, change identity, exceed bounds or duplicate an ordinal. */
+    @Test
+    void databaseGuardsDrawScopeIdentityAndBounds() {
+        var c = plan(fixture, fixture.operation()).context();
+        draws.reserve(c, 0, 10);
+        Fixture other = createFixture();
+        var otherContext = plan(other, other.operation()).context();
+        draws.reserve(otherContext, 0, 10);
+        assertThrows(RuntimeException.class, () -> draws.reserve(new ResolvedCommit.Context(c.adventureId(),
+                c.campaignId(), otherContext.operationId(), c.contentRevisionId(), HASH, 0, 2), 0, 10));
+        String insert = "insert into operation_random_draw values (?, ?, ?, ?, ?, ?, ?, ?, now())";
+        assertThrows(RuntimeException.class, () -> jdbc.update(insert, UUID.randomUUID(), c.campaignId(),
+                otherContext.operationId(), 1, 10, 1, "HMAC-SHA-256", 1));
+        for (int[] shape : List.of(new int[]{0, 10, 1}, new int[]{128, 10, 1},
+                new int[]{1, 0, 0}, new int[]{1, 10, 11}, new int[]{1, 10, 0})) {
+            assertThrows(RuntimeException.class, () -> jdbc.update(insert, UUID.randomUUID(), c.campaignId(),
+                    c.operationId(), shape[0], shape[1], shape[2], "HMAC-SHA-256", 1));
+        }
+        assertThrows(RuntimeException.class, () -> jdbc.update(insert, UUID.randomUUID(), c.campaignId(),
+                c.operationId(), 1, 10, 1, "HMAC-SHA-256", 2));
     }
 
     /** Failure in any persisted component leaves the exact accepted baseline, with no partial effects. */
@@ -237,7 +364,7 @@ class CanonicalCommitServiceTest {
                 assertThrows(IllegalStateException.class, () -> commits.commit(plan(fixture, fixture.operation()))));
         assertEquals(before, snapshot());
         for (var field : CanonicalCommitService.class.getDeclaredFields()) {
-            assertTrue(Set.of(EntityManager.class, TransactionTemplate.class, JsonMapper.class).contains(field.getType()),
+            assertTrue(Set.of(EntityManager.class, JdbcTemplate.class, TransactionTemplate.class, JsonMapper.class).contains(field.getType()),
                     "Review transaction dependency: " + field);
         }
     }

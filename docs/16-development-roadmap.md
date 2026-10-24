@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: P00, P01.1–P01.7, P02.1–P02.7 and P03.1–P03.3 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; P03.1–P03.3 add the canonical schema, bounded resources, ownership constraints, storage versions and internal atomic commit boundary, and gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. The root launcher and its Windows lifecycle checks (P02.7) are verified for Docker Desktop with Git Bash only; Linux/macOS, interactive Ctrl+C, owner sign-in, campaign persistence beyond these foundations (P03.4–P03.6) and full QA-28 remain pending. P03.4 is the next task. Design specifications and predecessor milestones do not establish completed gameplay.
+**Current status: P00, P01.1–P01.7, P02.1–P02.7 and P03.1–P03.4 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; P03.1–P03.4 add the canonical schema, bounded resources, ownership constraints, storage versions, internal atomic commit boundary and versioned deterministic draw reservations, and gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. The root launcher and its Windows lifecycle checks (P02.7) are verified for Docker Desktop with Git Bash only; Linux/macOS, interactive Ctrl+C, owner sign-in, campaign persistence beyond these foundations (P03.5–P03.6) and full QA-28 remain pending. P03.5 is the next task. Design specifications and predecessor milestones do not establish completed gameplay.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -501,7 +501,22 @@ content/assets and full container integration remain open; P02.3 stays unchecked
   opt-in checks skipped; repository policy checks report no findings. Dependency pins
   are unchanged. No API, dispatcher, lease/recovery or full QA-20/QA-33 claim; remaining
   package exits belong to P03.4–P03.6 and later gameplay work. Hosted CI is unconfirmed.
-- [ ] P03.4 Add deterministic random-draw records and algorithm/version identity.
+- [x] P03.4 Add deterministic random-draw records and algorithm/version identity.
+  Completed 24 October 2026: V4 adds private immutable campaign seeds and scoped
+  operation/ordinal reservations with explicit HMAC-SHA-256 v1 identity. Pin binary
+  framing and unbiased rejection sampling; reserve in a separate bounded database
+  transaction, replay matching draws before freshness checks, reject bound conflicts
+  and new stale/terminal allocations. Canonical receipts read ordered stored draws
+  without seed disclosure; reservation leaves world and journal counters untouched.
+  Independent vectors (including rejection), 128-draw receipt capacity, concurrent
+  duplicates, failed reservation/canonical commit, fresh-service reuse, cancellation,
+  scope/constraint checks and populated V1-to-V4 upgrade pass. Full backend `verify`
+  on Windows 11/Docker Desktop/pinned JDK 21/PostgreSQL 18.6 passes 81 tests with
+  three packaged-interface profile skips and builds the jar. Repository-checker tests
+  pass 22/22; default packaging checks pass 20/20 with two opt-in skips; repository
+  policy checks report no findings. Dependency pins are unchanged. Equivalent-new-
+  attempt policy, gameplay authorization, leases/recovery and full package acceptance
+  remain later work; no hosted-CI or backup/restore result is claimed.
 - [ ] P03.5 Implement startup journal reconciliation, lease/fencing foundations, and baseline backup/restore.
 - [ ] P03.6 Add durable AI jobs, immutable planning snapshots, versioned plan/dependency records, query epochs and recovery generations; persist locale preferences separately from world revisions and test atomic outbox/admission foundations.
 

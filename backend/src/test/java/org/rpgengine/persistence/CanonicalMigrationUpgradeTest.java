@@ -81,13 +81,24 @@ class CanonicalMigrationUpgradeTest {
                     String journal = jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
                             String.class);
                     Flyway v3 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
-                            .locations("classpath:db/migration").load();
+                            .locations("classpath:db/migration").target("3").load();
                     assertEquals(1, v3.migrate().migrationsExecuted);
                     assertTrue(v3.validateWithResult().validationSuccessful);
                     assertEquals(journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
                             String.class));
                     assertEquals(0, jdbc.queryForObject("select count(*) from canonical_outbox", Integer.class));
                     assertEquals(0, v3.migrate().migrationsExecuted);
+                    // V4 must retain existing outcomes and counters, never invent old randomness.
+                    Flyway v4 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").load();
+                    assertEquals(1, v4.migrate().migrationsExecuted);
+                    assertTrue(v4.validateWithResult().validationSuccessful);
+                    assertEquals(journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
+                            String.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from operation_random_draw", Integer.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from campaign_random_seed", Integer.class));
+                    assertEquals(7L, jdbc.queryForObject("select state_revision from campaign", Long.class));
+                    assertEquals(0, v4.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

@@ -54,6 +54,21 @@ transaction-level QA-20 and scope-level QA-33 evidence; full acceptance still ne
 command/API authorization, draw reuse, lease/recovery and delivery work. No live
 inference, gameplay or hosted-CI result is claimed for this checkpoint.
 
+P03.4 evidence (24 October 2026, Windows 11/Docker Desktop, pinned JDK 21 and
+PostgreSQL 18.6): full offline backend `verify` passes 81 tests, with three
+packaged-interface profile skips, and builds the executable jar. Seven added
+PostgreSQL cases verify concurrent draw reuse, unchanged world/journal state,
+durability across failed canonical commit and a fresh service instance, allocation
+rollback including lazy seed creation, cancelled reuse/new-allocation rejection,
+128-draw receipt capacity and SQL scope/bounds/identity guards. Two pure protocol
+tests pin independently computed HMAC vectors, rejection sampling and invalid inputs.
+Populated V1-to-V4 upgrade preserves outcomes/counters without invented seed/draw rows.
+Repository checks pass 22 unit tests and zero policy findings; default packaging
+passes 20 tests with two opt-in skips. This adds the same-operation draw-retention
+part of QA-17; startup reconciliation, backup/restore, lease/fencing, equivalent-new-
+attempt reroll policy and full QA-17/QA-20/QA-33 remain later gates. No live runtime,
+gameplay or hosted-CI claim is made.
+
 ## 2. Verification layers
 
 | Layer | Purpose | Proposed tools |

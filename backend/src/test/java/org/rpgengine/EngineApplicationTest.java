@@ -32,10 +32,11 @@ class EngineApplicationTest {
     @Autowired
     private Flyway flyway;
 
-    /** Tables created by V1–V3, sorted by name; identifiers are constants, never user input. */
+    /** Tables created by V1–V4, sorted by name; identifiers are constants, never user input. */
     private static final List<String> CANONICAL_TABLES = List.of(
             "actor", "actor_resource", "adventure_workspace", "campaign", "campaign_checkpoint", "campaign_event",
-            "canonical_outbox", "content_revision", "identity_owner_profile", "operation_journal",
+            "campaign_random_seed", "canonical_outbox", "content_revision", "identity_owner_profile", "operation_journal",
+            "operation_random_draw",
             "presentation_campaign_settings", "reward_settlement");
 
     /** Construct the framework-managed test fixture; injection failures fail setup. */

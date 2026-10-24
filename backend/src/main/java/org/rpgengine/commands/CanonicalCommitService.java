@@ -12,6 +12,7 @@ import org.rpgengine.characters.ActorResource;
 import org.rpgengine.content.ContentRevision;
 import org.rpgengine.progression.RewardSettlement;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -28,12 +29,14 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class CanonicalCommitService {
     private final EntityManager entities;
+    private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final JsonMapper json = JsonMapper.builder().build();
 
-    /** Wire database dependencies only; fail application startup if either dependency is absent. */
-    public CanonicalCommitService(EntityManager entities, PlatformTransactionManager manager) {
+    /** Wire database dependencies only; missing infrastructure fails application startup. */
+    public CanonicalCommitService(EntityManager entities, PlatformTransactionManager manager, JdbcTemplate jdbc) {
         this.entities = Objects.requireNonNull(entities, "entities");
+        this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
         transaction = new TransactionTemplate(manager);
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         transaction.setTimeout(10);
@@ -136,6 +139,18 @@ public class CanonicalCommitService {
         receipt.put("firstEventSequence", firstSequence);
         receipt.put("lastEventSequence", counters.eventSequence());
         receipt.set("details", details);
+        // Read durable reservations under the same campaign lock. Caller details
+        // cannot forge this list or disclose seed material; failed commits retain draws.
+        var randomDraws = receipt.putArray("randomDraws");
+        for (var draw : RandomDrawService.recorded(jdbc, campaign.getId(), operation.getId())) {
+            var reference = randomDraws.addObject();
+            reference.put("id", draw.id().toString());
+            reference.put("ordinal", draw.ordinal());
+            reference.put("sides", draw.sides());
+            reference.put("value", draw.value());
+            reference.put("algorithm", draw.algorithm());
+            reference.put("version", draw.version());
+        }
         operation.recordCommit(counters.stateRevision(), json.writeValueAsString(receipt), now);
         entities.persist(new OutboxMessage(operation, OutboxMessage.Kind.PUBLIC_STATE, now));
         if (plan.narrationRequired()) {

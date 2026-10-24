@@ -41,6 +41,11 @@ PostgreSQL remains authoritative for state, events, ownership and saved asset as
 
 ## 3. Scope every operation
 
+P03.4 reservations lock the campaign in its requested adventure and then the scoped
+journal operation. Draw rows use a composite campaign/operation foreign key; seed
+material belongs to exactly one campaign and never appears in receipts/outbox.
+Cross-adventure/campaign attempts fail before allocating or reading reservations.
+
 `AdventureWorkspace` owns ID, title/genre/locale, authored specifications, admitted content revisions and presentation/generation policy. Each campaign belongs to exactly one adventure. Every mutable query, job, thread, summary, image association and export verifies adventure/campaign ownership. Existing campaign routes can derive the adventure server-side but reject mismatched selected-adventure context.
 
 The P03.2 database foundations freeze the workspace owner, campaign adventure and

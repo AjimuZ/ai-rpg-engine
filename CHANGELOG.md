@@ -2,6 +2,14 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Deterministic draw reservations (P03.4), 24 October 2026
+
+- Add private lazy campaign seeds and immutable operation/ordinal draw records in forward-only V4, with scoped foreign keys, uniqueness and bounds. Preserve historical outcomes without backfilling randomness.
+- Pin HMAC-SHA-256 v1 binary framing and unbiased rejection sampling. Reserve in a separate bounded transaction without world/journal changes; replay matching retries, reject changed bounds and new stale/cancelled/committed allocations.
+- Add backend-owned ordered draw references/values to canonical receipts; keep seeds private and retain reserved values after failed canonical commits. No public draw endpoint or speculative planner access is exposed.
+- Pass full offline backend verification on pinned JDK 21/PostgreSQL 18.6: 81 tests pass, three packaged-interface profile tests skip, and the executable jar builds. Cover independent vectors/rejection, maximum receipt capacity, concurrent reuse, cancellation, allocation/commit rollback, fresh-service reuse, database constraints and populated upgrade. Repository-checker tests pass 22/22, default packaging checks pass 20/20 with two opt-in skips, and repository policy checks report zero findings. Dependency pins are unchanged.
+- Equivalent-new-attempt reroll policy, gameplay authorization, leases/fencing, backup/restore and full recovery acceptance remain later work; hosted CI for this change is unconfirmed.
+
 ## Unreleased — Atomic canonical commits (P03.3), 24 October 2026
 
 - Add an internal bounded commit service for world counters/mode/decision, resource changes, sequenced events, reward settlements, journal receipts and public-state/narration outbox intents in one database transaction.
