@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/root/.npm npm ci --no-fund --no-audit
 COPY frontend/ ./
 # Type checks and unit tests stay in the build, so cached production output was
 # checked with the same pinned tools. Audit is a separate online verification.
-RUN npm run typecheck && npm test && npm run build
+RUN npm run typecheck && npm test && npm run test:i18n && npm run build:locales
 
 FROM eclipse-temurin:21.0.12.1_1-jdk-resolute@sha256:3b59c79a788985965c89203cca233c53893f62293108bb825264740fac926724 AS verification
 # The checksum-verified Maven wrapper requires unzip to select its pinned ZIP.

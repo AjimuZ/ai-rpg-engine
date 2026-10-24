@@ -756,7 +756,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     26 navigation/Settings messages, including accessible navigation, titles,
     reading-size placeholders and credits. Exact ID/source/placeholder parity
     rejects missing, blank, stale (including whitespace), extra and duplicate translations. Separate
-    EN/IT review builds compile; the existing packaged English build stays in use.
+    EN/IT review builds compile; the first checkpoint retains packaged English output.
     Second checkpoint extends review to 212 unique messages across all local
     screens, public preview passages/metadata, neutral terminology, native forms,
     unsaved preview receipts, recovery states, media fallbacks and kit/ARIA text.
@@ -774,8 +774,17 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     Reload refuses
     unresolved recovery, real campaign contexts and unsaved/conflicting drafts,
     including after route detachment. No operation/cursor transport is invented.
-    Remaining: actual operation/cursor reconciliation and real Spring/jar/container
-    localized packaging; the default unlocalized build does not offer switching.
+    Fourth checkpoint packages both compiled locale trees, a device-preference
+    root selector and finite Spring preview GET routes. Shared artwork/notices
+    retain root URLs; localized resources retain their locale prefixes. Packaging
+    checks pass: 22 packaging tests (one separate launcher lifecycle test skips),
+    full PostgreSQL-backed packaged backend verification including four HTTP tests,
+    and Chrome 155 bilingual journeys against the actual container. Root preference,
+    denied/unsupported storage, direct links and opaque query/hash preserve drafts;
+    both locale resource/notice/artwork hashes survive recreation. An initial
+    root-artwork 404 was fixed by copying shared assets from compiled output.
+    An offline negative build rejects missing localized output with build instructions.
+    Actual operation/cursor reconciliation remains open.
     Four checker tests, 42 frontend tests, strict typecheck, both build commands
     (218 reviewed messages),
     zero-vulnerability audit and Chrome 155 review smoke pass. Browser checks

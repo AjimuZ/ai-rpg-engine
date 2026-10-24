@@ -10,6 +10,15 @@ import { createHash } from 'node:crypto';
 const root = fileURLToPath(new URL('../dist/engine-ui/browser/', import.meta.url));
 const localizedRoot = fileURLToPath(new URL('../dist/engine-ui-localized/browser/', import.meta.url));
 const reviewLocales = process.argv.includes('--locales');
+const packagedArgument = process.argv.find(/** Read an optional owned fixture origin; no remote endpoint is inferred. */ (value) => value.startsWith('--packaged-origin='));
+const packagedOrigin = packagedArgument?.slice('--packaged-origin='.length);
+if (packagedOrigin) {
+  const url = new URL(packagedOrigin);
+  assert.equal(url.protocol, 'http:');
+  assert.equal(url.hostname, '127.0.0.1');
+  assert.equal(url.origin, packagedOrigin);
+  assert.ok(reviewLocales, 'Packaged smoke requires --locales');
+}
 const artifacts = fileURLToPath(new URL('../../.local/scratch/', import.meta.url));
 await mkdir(artifacts, { recursive: true });
 const profile = await mkdtemp(resolve(artifacts, 'ui-smoke-'));
@@ -40,11 +49,11 @@ const server = createServer(async (request, response) => {
     response.writeHead(404).end();
   }
 });
-await new Promise(/** Resolve once the ephemeral loopback listener is ready; reject bind failures. */ (accept, reject) => {
+if (!packagedOrigin) await new Promise(/** Resolve once the ephemeral loopback listener is ready; reject bind failures. */ (accept, reject) => {
   server.once('error', reject);
   server.listen(0, '127.0.0.1', accept);
 });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const origin = packagedOrigin ?? `http://127.0.0.1:${server.address().port}`;
 // A newly created profile and private debugging pipes never reuse owner account state.
 const browser = spawn(browserPath, ['--headless=new', '--no-first-run', '--no-default-browser-check',
   '--disable-background-networking', '--remote-debugging-pipe', `--user-data-dir=${profile}`, 'about:blank'],
@@ -130,219 +139,226 @@ try {
   await command('Runtime.enable');
   await command('Network.enable');
   await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
-  await command('Page.navigate', { url: origin + '/library' });
-  await waitFor(`document.querySelector('h1')?.textContent === 'Your adventures'`);
-  await clickLink('Open story preview', '/adventures/mosslight/story');
-  await waitFor(`document.querySelector('.scene img')?.naturalWidth > 0`);
-  assert.equal(await evaluate(`document.querySelector('.speaker').textContent.includes('Narrator')`), true);
-  assert.equal(await evaluate(`document.querySelector('.scene').getBoundingClientRect().height > document.querySelector('.dialogue').getBoundingClientRect().height * 2`), true);
-  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', windowsVirtualKeyCode: 9 });
-  await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', windowsVirtualKeyCode: 9 });
-  assert.equal(await evaluate(`document.activeElement !== document.body`), true);
-  await evaluate(`document.querySelector('.reading-controls button').focus()`);
-  assert.equal(await evaluate(`document.activeElement === document.querySelector('.reading-controls button')`), true);
-  // Chromium needs the native carriage-return text as well as the key code to activate a button.
-  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 });
-  await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
-  await waitFor(`document.querySelector('.speaker').textContent.includes('Trail keeper')`);
-  assert.equal(await evaluate(`document.querySelector('.reading-controls button').disabled`), true);
-  assert.equal(await evaluate(`document.activeElement === document.querySelector('.dialogue')`), true);
-  await waitFor(`document.querySelector('.portrait')?.naturalWidth > 0`);
-  // Tab must skip the now-disabled Continue and reach the next reading control.
-  await pressKey('Tab', 'Tab', 9);
-  assert.equal(await evaluate(`document.activeElement === document.querySelector('summary')`), true);
-  assert.equal(await evaluate(`getComputedStyle(document.activeElement).outlineStyle !== 'none'`), true);
-  await pressKey(' ', 'Space', 32, ' ');
-  assert.equal(await evaluate(`document.querySelector('details').open`), true);
-  await pressKey('Enter', 'Enter', 13, '\r');
-  assert.equal(await evaluate(`document.querySelector('details').open`), false);
-  await pressKey('Enter', 'Enter', 13, '\r');
-  await writeFile(resolve(artifacts, 'p053-desktop.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
-  for (const [label, path] of [['Character', 'sheet'], ['Inventory', 'inventory'], ['Journal', 'journal'], ['New playthrough', 'create']]) {
-    await clickLink(label, `/adventures/mosslight/${path}`);
-    await waitFor(`!!document.querySelector('h1')`);
+  if (!packagedOrigin) {
+      await command('Page.navigate', { url: origin + '/library' });
+      await waitFor(`document.querySelector('h1')?.textContent === 'Your adventures'`);
+      await clickLink('Open story preview', '/adventures/mosslight/story');
+      await waitFor(`document.querySelector('.scene img')?.naturalWidth > 0`);
+      assert.equal(await evaluate(`document.querySelector('.speaker').textContent.includes('Narrator')`), true);
+      assert.equal(await evaluate(`document.querySelector('.scene').getBoundingClientRect().height > document.querySelector('.dialogue').getBoundingClientRect().height * 2`), true);
+      await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', windowsVirtualKeyCode: 9 });
+      await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', windowsVirtualKeyCode: 9 });
+      assert.equal(await evaluate(`document.activeElement !== document.body`), true);
+      await evaluate(`document.querySelector('.reading-controls button').focus()`);
+      assert.equal(await evaluate(`document.activeElement === document.querySelector('.reading-controls button')`), true);
+      // Chromium needs the native carriage-return text as well as the key code to activate a button.
+      await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13 });
+      await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+      await waitFor(`document.querySelector('.speaker').textContent.includes('Trail keeper')`);
+      assert.equal(await evaluate(`document.querySelector('.reading-controls button').disabled`), true);
+      assert.equal(await evaluate(`document.activeElement === document.querySelector('.dialogue')`), true);
+      await waitFor(`document.querySelector('.portrait')?.naturalWidth > 0`);
+      // Tab must skip the now-disabled Continue and reach the next reading control.
+      await pressKey('Tab', 'Tab', 9);
+      assert.equal(await evaluate(`document.activeElement === document.querySelector('summary')`), true);
+      assert.equal(await evaluate(`getComputedStyle(document.activeElement).outlineStyle !== 'none'`), true);
+      await pressKey(' ', 'Space', 32, ' ');
+      assert.equal(await evaluate(`document.querySelector('details').open`), true);
+      await pressKey('Enter', 'Enter', 13, '\r');
+      assert.equal(await evaluate(`document.querySelector('details').open`), false);
+      await pressKey('Enter', 'Enter', 13, '\r');
+      await writeFile(resolve(artifacts, 'p053-desktop.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
+      for (const [label, path] of [['Character', 'sheet'], ['Inventory', 'inventory'], ['Journal', 'journal'], ['New playthrough', 'create']]) {
+        await clickLink(label, `/adventures/mosslight/${path}`);
+        await waitFor(`!!document.querySelector('h1')`);
+      }
+      await evaluate(`(() => { const input = document.querySelector('#character-name'); input.value = 'River'; input.dispatchEvent(new Event('input', {bubbles:true})); })()`);
+      await evaluate(`document.querySelector('form button').click()`);
+      await waitFor(`document.querySelector('[role="status"]')?.textContent.includes('River')`);
+      await clickLink('Trail guide', '/adventures/mosslight/guide');
+      await waitFor(`document.querySelector('h1')?.textContent === 'Trail guide'`);
+      await clickLink('Settings', '/settings');
+      await evaluate(`(() => { const select = document.querySelector('#text-size'); select.value = '24'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
+      await clickLink('Library', '/library');
+      await evaluate(`document.querySelector('a[href="/adventures/relay/story"]').click()`);
+      await waitFor(`location.pathname === '/adventures/relay/story' && document.querySelector('.scene img')?.naturalWidth > 0`);
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('.passage')).fontSize`), '24px');
+      await clickLink('Crew profile', '/adventures/relay/sheet');
+      await waitFor(`document.querySelector('h1')?.textContent === 'Crew profile'`);
+      assert.equal(await evaluate(`document.querySelector('[data-resource="charge"]')?.textContent.includes('Not connected')`), true);
+      assert.equal(await evaluate(`document.querySelector('nav[aria-label="Adventure"]').textContent.includes('Trail guide')`), false);
+      await clickLink('Cargo', '/adventures/relay/inventory');
+      await waitFor(`document.querySelector('h1')?.textContent === 'Cargo'`);
+      await clickLink('Mission log', '/adventures/relay/journal');
+      await waitFor(`document.querySelector('h1')?.textContent === 'Mission log'`);
+      await clickLink('Field techniques', '/adventures/relay/creative');
+      await waitFor(`document.querySelector('h1')?.textContent === 'Field techniques'`);
+      await command('Page.navigate', { url: origin + '/adventures/relay/guide' });
+      await waitFor(`document.querySelector('h1')?.textContent === 'Panel unavailable'`);
+      await clickLink('Story', '/adventures/relay/story');
+      await waitFor(`document.querySelector('.scene img')?.naturalWidth > 0`);
+      await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+      assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+      await evaluate(`document.querySelector('.reading-controls button').focus()`);
+      await pressKey(' ', 'Space', 32, ' ');
+      await waitFor(`document.querySelector('.speaker').textContent.includes('Dock attendant')`);
+      await waitFor(`document.querySelector('.portrait')?.naturalWidth > 0`);
+      assert.equal(await evaluate(`document.activeElement === document.querySelector('.dialogue')`), true);
+      await writeFile(resolve(artifacts, 'p053-mobile.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
+      // A blocked media load preserves labels, passage and reading controls.
+      await evaluate(`document.querySelector('.portrait').dispatchEvent(new Event('error')); document.querySelector('.scene img').dispatchEvent(new Event('error'))`);
+      await waitFor(`!!document.querySelector('.portrait-fallback') && !!document.querySelector('.scene-fallback')`);
+      assert.equal(await evaluate(`document.querySelector('.speaker').textContent.includes('Dock attendant')`), true);
+      await clickLink('Settings', '/settings');
+      await evaluate(`(() => { const select = document.querySelector('#reading-layout'); select.value = 'text-focused'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
+      // Reading preferences survive full-page direct routes; reselecting an existing size is idempotent.
+      await evaluate(`(() => { const select = document.querySelector('#text-size'); select.value = '24'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
+      await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+      await clickLink('Library', '/library');
+      await waitFor(`document.querySelector('h1')?.textContent === 'Your adventures'`);
+      const textRequestsStart = requests.length;
+      await evaluate(`document.querySelector('a[href="/adventures/relay/story"]').click()`);
+      await waitFor(`!!document.querySelector('.story.text-focused')`);
+      assert.equal(await evaluate(`document.querySelectorAll('.story img').length`), 0);
+      assert.equal(await evaluate(`document.querySelector('.speaker').textContent.includes('Dock attendant')`), true);
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('.passage')).fontSize`), '24px');
+      assert.equal(await evaluate(`document.querySelector('.scene-description').textContent.includes('station corridor')`), true);
+      // Exercise the no-artwork reading column at a narrow 320px width and landscape.
+      for (const [width, height] of [[320, 740], [844, 390]]) {
+        await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+        assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+      }
+      await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+      await evaluate(`document.querySelector('summary').focus()`);
+      await pressKey('Enter', 'Enter', 13, '\r');
+      await waitFor(`document.querySelector('details').open`);
+      assert.equal(await evaluate(`document.querySelectorAll('.chronicle li').length`), 2);
+      assert.equal(requests.slice(textRequestsStart).some(/** Text layout must not initiate scene or portrait loads. */ (request) => /\/(scenes|portraits)\/.*\.svg/.test(request.url)), false);
+      await writeFile(resolve(artifacts, 'p053-text-mobile.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
+      await clickLink('Crew profile', '/adventures/relay/sheet');
+      assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+      // Hard reload verifies device persistence independently of the root service's in-memory cache.
+      for (const mobile of [false, true]) {
+        await command('Emulation.setDeviceMetricsOverride', { width: mobile ? 390 : 1440, height: mobile ? 844 : 1100, deviceScaleFactor: 1, mobile });
+        // Each independent draft journey begins at the first supplied passage, rather than relying on reload to reset reading.
+        await evaluate(`sessionStorage.removeItem('engine.preview-reading.v1')`);
+        await command('Page.navigate', { url: origin + '/adventures/mosslight/story' });
+        await waitFor(`!!document.querySelector('#player-input')`);
+        await evaluate(`document.querySelector('.composer-actions button:last-child').click()`);
+        const reading = await evaluate(`document.querySelector('#reading-progress').textContent`);
+        await evaluate(`document.querySelector('[data-suggestion]').focus()`);
+        await pressKey('Enter', 'Enter', 13, '\r');
+        await waitFor(`document.querySelector('#player-input').value.includes('grove')`);
+        assert.equal(await evaluate(`document.activeElement.id`), 'player-input');
+        assert.equal(await evaluate(`document.querySelector('#reading-progress').textContent`), reading);
+        await evaluate(`document.querySelector('#player-input').select()`);
+        await command('Input.insertText', { text: 'My edited response' });
+        await pressKey('Enter', 'Enter', 13, '\r');
+        await command('Input.insertText', { text: 'Still drafting.' });
+        const draft = 'My edited response\nStill drafting.';
+        await waitFor(`document.querySelector('#player-input').value === ${JSON.stringify(draft)}`);
+        // Native input updates before zoneless rendering; await the guard's DOM update before asserting it.
+        await waitFor(`document.querySelector('[data-suggestion]').disabled`);
+        assert.equal(await evaluate(`document.querySelector('[data-suggestion]').disabled`), true);
+        await evaluate(`document.querySelector('[data-dismiss]').focus(); document.querySelector('[data-dismiss]').click()`);
+        await waitFor(`document.querySelectorAll('[data-dismiss]').length === 1`);
+        assert.equal(await evaluate(`document.activeElement.id`), 'player-input');
+        assert.equal(await evaluate(`document.querySelector('#player-input').value`), draft);
+        await evaluate(`(() => { const field = document.querySelector('#player-input'); field.setSelectionRange(2,5); field.dispatchEvent(new Event('select')); })()`);
+        await command('Page.reload');
+        await waitFor(`document.querySelector('#player-input')?.value === ${JSON.stringify(draft)}`);
+        await evaluate(`document.querySelector('#player-input').focus()`);
+        assert.deepEqual(await evaluate(`(() => { const field = document.querySelector('#player-input'); return [field.selectionStart, field.selectionEnd]; })()`), [2, 5]);
+        // Browser signals are hints only; online cannot silently assert operation readiness or replay a draft.
+        await command('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+        await waitFor(`document.querySelector('.composer [role="status"]').textContent.includes('Connection unavailable')`);
+        assert.equal(await evaluate(`document.querySelector('#player-input').value`), draft);
+        await command('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+        await waitFor(`document.querySelector('.composer [role="status"]').textContent.includes('Operation status must be checked')`);
+        assert.equal(await evaluate(`document.querySelector('[data-send]').disabled`), true);
+        assert.equal(await evaluate(`document.querySelector('#reading-progress').textContent`), reading);
+        await clickLink('Library', '/library');
+        await evaluate(`document.querySelector('a[href="/adventures/relay/story"]').click()`);
+        await waitFor(`location.pathname === '/adventures/relay/story' && !!document.querySelector('#player-input')`);
+        assert.equal(await evaluate(`document.querySelector('#player-input').value`), '');
+        await clickLink('Library', '/library');
+        await evaluate(`document.querySelector('a[href="/adventures/mosslight/story"]').click()`);
+        await waitFor(`document.querySelector('#player-input')?.value === ${JSON.stringify(draft)}`);
+        assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+        if (mobile) await writeFile(resolve(artifacts, 'p054-composer-mobile.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
+        await evaluate(`document.querySelector('.composer-actions button:last-child').click()`);
+        await command('Page.reload');
+        await waitFor(`document.querySelector('#player-input')?.value === ''`);
+      }
+      // Review shared primitives independently of campaign content; samples cannot create world actions.
+      await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
+      await command('Page.navigate', { url: origin + '/settings' });
+      await waitFor(`!!document.querySelector('a[href="/interface-kit"]')`);
+      await clickLink('Review interface graphic kit', '/interface-kit');
+      await waitFor(`!!document.querySelector('button[aria-pressed]')`);
+      assert.equal(await evaluate(`document.querySelectorAll('[role=meter]').length`), 3);
+      assert.equal(await evaluate(`document.querySelectorAll('.icon-inventory li').length`), 20);
+      assert.equal(await evaluate(`document.querySelector('button[aria-busy]').disabled`), true);
+      assert.equal(await evaluate(`document.querySelector('input[aria-invalid]').getAttribute('aria-describedby')`), 'kit-error-help');
+      await evaluate(`document.querySelector('button[aria-pressed]').focus()`);
+      await pressKey('Enter', 'Enter', 13, '\r');
+      await waitFor(`document.querySelector('button[aria-pressed]').getAttribute('aria-pressed') === 'true'`);
+      assert.equal(await evaluate(`document.querySelector('button[aria-pressed]').getAttribute('aria-pressed')`), 'true');
+      assert.equal(await evaluate(`getComputedStyle(document.activeElement).outlineStyle`), 'solid');
+      await evaluate(`document.querySelector('.toggle input').focus()`);
+      await pressKey(' ', 'Space', 32, ' ');
+      assert.equal(await evaluate(`document.querySelector('.toggle input').checked`), true);
+      await evaluate(`document.querySelector('.kit-help summary').focus()`);
+      await pressKey('Enter', 'Enter', 13, '\r');
+      assert.equal(await evaluate(`document.querySelector('.kit-help').open`), true);
+      // Measure contrast from rendered opaque colours instead of duplicating palette estimates.
+      assert.equal(await evaluate(`(() => {
+        /** Convert computed RGB to relative luminance; all sampled theme colours are opaque. */
+        const luminance = colour => colour.match(/[\\d.]+/g).slice(0, 3).map(Number).map(/** Linearize one sRGB byte for the WCAG luminance formula. */ v => { const c = v / 255; return c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4; }).reduce(/** Weight linear channels into relative luminance. */ (sum, c, i) => sum + c * [.2126, .7152, .0722][i], 0);
+        /** Return the WCAG contrast ratio for two opaque computed colours. */
+        const ratio = (a, b) => { const x = luminance(a), y = luminance(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+        const panel = getComputedStyle(document.querySelector('.graphic-kit')).backgroundColor;
+        const field = getComputedStyle(document.querySelector('#kit-field'));
+        const placeholder = getComputedStyle(document.querySelector('#kit-field'), '::placeholder');
+        const button = getComputedStyle(document.querySelector('button[aria-pressed]'));
+        const text = [...document.querySelectorAll('.graphic-kit p, .graphic-kit label, .speaker')].every(/** Check each visible label against its shared opaque panel surface. */ el => ratio(getComputedStyle(el).color, panel) >= 4.5);
+        return text && ratio(placeholder.color, field.backgroundColor) >= 4.5 && ratio(field.color, field.backgroundColor) >= 4.5 && ratio(field.borderTopColor, field.backgroundColor) >= 3 && ratio(button.color, button.backgroundColor) >= 4.5 && ratio(button.outlineColor, panel) >= 3;
+      })()`), true);
+      // Pointer states must remain distinguishable without an animated transition.
+      await evaluate(`document.querySelector('.quick-replies button').scrollIntoView({block: 'center'})`);
+      const point = await evaluate(`(() => { const r = document.querySelector('.quick-replies button').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+      const normal = await evaluate(`getComputedStyle(document.querySelector('.quick-replies button')).backgroundColor`);
+      await command('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+      const hover = await evaluate(`getComputedStyle(document.querySelector('.quick-replies button')).backgroundColor`);
+      assert.notEqual(hover, normal);
+      await command('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point });
+      assert.notEqual(await evaluate(`getComputedStyle(document.querySelector('.quick-replies button')).backgroundColor`), hover);
+      await command('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point });
+      for (const [width, height] of [[1440, 1100], [390, 844], [320, 740], [740, 320]]) {
+        await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
+        assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+        if (width === 1440 || width === 390) {
+          const { cssContentSize } = await command('Page.getLayoutMetrics');
+          await writeFile(resolve(artifacts, `p055-kit-${width}.png`), Buffer.from((await command('Page.captureScreenshot', { captureBeyondViewport: true, clip: { x: 0, y: 0, width, height: cssContentSize.height, scale: 1 } })).data, 'base64'));
+        }
+      }
+      await command('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }, { name: 'prefers-reduced-motion', value: 'reduce' }] });
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('.meter-fill')).forcedColorAdjust`), 'none');
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('progress:indeterminate')).appearance`), 'none');
+      assert.equal(await evaluate(`document.querySelector('[role=meter]').getAttribute('aria-valuenow')`), '18');
+      await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-contrast', value: 'more' }] });
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('#kit-field')).borderTopWidth`), '2px');
+      await command('Emulation.setEmulatedMedia', { features: [] });
+      assert.equal(await evaluate(`fetch('/ui/LICENSE.txt').then(r => r.text()).then(text => text.includes('MIT License') && text.includes('Copyright (c) 2026 Azim Ben Othman'))`), true);
+      assert.equal(await evaluate(`fetch('/ui/README.md').then(r => r.text()).then(text => text.includes('src/app/preview/ui-kit.ts') && text.includes('No third-party artwork'))`), true);
+      await command('Page.navigate', { url: origin + '/adventures/missing/story' });
+      await waitFor(`document.querySelector('h1')?.textContent === 'Adventure unavailable'`);
+  } else {
+    // The original journeys target the optional unlocalized build. Packaged
+    // journeys below use explicit prefixes and the real Spring resource server.
+    await command('Page.navigate', { url: origin + '/en/settings' });
+    await waitFor(`document.querySelector('h1')?.textContent === 'Settings'`);
   }
-  await evaluate(`(() => { const input = document.querySelector('#character-name'); input.value = 'River'; input.dispatchEvent(new Event('input', {bubbles:true})); })()`);
-  await evaluate(`document.querySelector('form button').click()`);
-  await waitFor(`document.querySelector('[role="status"]')?.textContent.includes('River')`);
-  await clickLink('Trail guide', '/adventures/mosslight/guide');
-  await waitFor(`document.querySelector('h1')?.textContent === 'Trail guide'`);
-  await clickLink('Settings', '/settings');
-  await evaluate(`(() => { const select = document.querySelector('#text-size'); select.value = '24'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
-  await clickLink('Library', '/library');
-  await evaluate(`document.querySelector('a[href="/adventures/relay/story"]').click()`);
-  await waitFor(`location.pathname === '/adventures/relay/story' && document.querySelector('.scene img')?.naturalWidth > 0`);
-  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.passage')).fontSize`), '24px');
-  await clickLink('Crew profile', '/adventures/relay/sheet');
-  await waitFor(`document.querySelector('h1')?.textContent === 'Crew profile'`);
-  assert.equal(await evaluate(`document.querySelector('[data-resource="charge"]')?.textContent.includes('Not connected')`), true);
-  assert.equal(await evaluate(`document.querySelector('nav[aria-label="Adventure"]').textContent.includes('Trail guide')`), false);
-  await clickLink('Cargo', '/adventures/relay/inventory');
-  await waitFor(`document.querySelector('h1')?.textContent === 'Cargo'`);
-  await clickLink('Mission log', '/adventures/relay/journal');
-  await waitFor(`document.querySelector('h1')?.textContent === 'Mission log'`);
-  await clickLink('Field techniques', '/adventures/relay/creative');
-  await waitFor(`document.querySelector('h1')?.textContent === 'Field techniques'`);
-  await command('Page.navigate', { url: origin + '/adventures/relay/guide' });
-  await waitFor(`document.querySelector('h1')?.textContent === 'Panel unavailable'`);
-  await clickLink('Story', '/adventures/relay/story');
-  await waitFor(`document.querySelector('.scene img')?.naturalWidth > 0`);
-  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-  assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
-  await evaluate(`document.querySelector('.reading-controls button').focus()`);
-  await pressKey(' ', 'Space', 32, ' ');
-  await waitFor(`document.querySelector('.speaker').textContent.includes('Dock attendant')`);
-  await waitFor(`document.querySelector('.portrait')?.naturalWidth > 0`);
-  assert.equal(await evaluate(`document.activeElement === document.querySelector('.dialogue')`), true);
-  await writeFile(resolve(artifacts, 'p053-mobile.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
-  // A blocked media load preserves labels, passage and reading controls.
-  await evaluate(`document.querySelector('.portrait').dispatchEvent(new Event('error')); document.querySelector('.scene img').dispatchEvent(new Event('error'))`);
-  await waitFor(`!!document.querySelector('.portrait-fallback') && !!document.querySelector('.scene-fallback')`);
-  assert.equal(await evaluate(`document.querySelector('.speaker').textContent.includes('Dock attendant')`), true);
-  await clickLink('Settings', '/settings');
-  await evaluate(`(() => { const select = document.querySelector('#reading-layout'); select.value = 'text-focused'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
-  // Reading preferences survive full-page direct routes; reselecting an existing size is idempotent.
-  await evaluate(`(() => { const select = document.querySelector('#text-size'); select.value = '24'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`);
-  await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-  await clickLink('Library', '/library');
-  await waitFor(`document.querySelector('h1')?.textContent === 'Your adventures'`);
-  const textRequestsStart = requests.length;
-  await evaluate(`document.querySelector('a[href="/adventures/relay/story"]').click()`);
-  await waitFor(`!!document.querySelector('.story.text-focused')`);
-  assert.equal(await evaluate(`document.querySelectorAll('.story img').length`), 0);
-  assert.equal(await evaluate(`document.querySelector('.speaker').textContent.includes('Dock attendant')`), true);
-  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.passage')).fontSize`), '24px');
-  assert.equal(await evaluate(`document.querySelector('.scene-description').textContent.includes('station corridor')`), true);
-  // Exercise the no-artwork reading column at a narrow 320px width and landscape.
-  for (const [width, height] of [[320, 740], [844, 390]]) {
-    await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
-    assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
-  }
-  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-  await evaluate(`document.querySelector('summary').focus()`);
-  await pressKey('Enter', 'Enter', 13, '\r');
-  await waitFor(`document.querySelector('details').open`);
-  assert.equal(await evaluate(`document.querySelectorAll('.chronicle li').length`), 2);
-  assert.equal(requests.slice(textRequestsStart).some(/** Text layout must not initiate scene or portrait loads. */ (request) => /\/(scenes|portraits)\/.*\.svg/.test(request.url)), false);
-  await writeFile(resolve(artifacts, 'p053-text-mobile.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
-  await clickLink('Crew profile', '/adventures/relay/sheet');
-  assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
-  // Hard reload verifies device persistence independently of the root service's in-memory cache.
-  for (const mobile of [false, true]) {
-    await command('Emulation.setDeviceMetricsOverride', { width: mobile ? 390 : 1440, height: mobile ? 844 : 1100, deviceScaleFactor: 1, mobile });
-    // Each independent draft journey begins at the first supplied passage, rather than relying on reload to reset reading.
-    await evaluate(`sessionStorage.removeItem('engine.preview-reading.v1')`);
-    await command('Page.navigate', { url: origin + '/adventures/mosslight/story' });
-    await waitFor(`!!document.querySelector('#player-input')`);
-    await evaluate(`document.querySelector('.composer-actions button:last-child').click()`);
-    const reading = await evaluate(`document.querySelector('#reading-progress').textContent`);
-    await evaluate(`document.querySelector('[data-suggestion]').focus()`);
-    await pressKey('Enter', 'Enter', 13, '\r');
-    await waitFor(`document.querySelector('#player-input').value.includes('grove')`);
-    assert.equal(await evaluate(`document.activeElement.id`), 'player-input');
-    assert.equal(await evaluate(`document.querySelector('#reading-progress').textContent`), reading);
-    await evaluate(`document.querySelector('#player-input').select()`);
-    await command('Input.insertText', { text: 'My edited response' });
-    await pressKey('Enter', 'Enter', 13, '\r');
-    await command('Input.insertText', { text: 'Still drafting.' });
-    const draft = 'My edited response\nStill drafting.';
-    await waitFor(`document.querySelector('#player-input').value === ${JSON.stringify(draft)}`);
-    // Native input updates before zoneless rendering; await the guard's DOM update before asserting it.
-    await waitFor(`document.querySelector('[data-suggestion]').disabled`);
-    assert.equal(await evaluate(`document.querySelector('[data-suggestion]').disabled`), true);
-    await evaluate(`document.querySelector('[data-dismiss]').focus(); document.querySelector('[data-dismiss]').click()`);
-    await waitFor(`document.querySelectorAll('[data-dismiss]').length === 1`);
-    assert.equal(await evaluate(`document.activeElement.id`), 'player-input');
-    assert.equal(await evaluate(`document.querySelector('#player-input').value`), draft);
-    await evaluate(`(() => { const field = document.querySelector('#player-input'); field.setSelectionRange(2,5); field.dispatchEvent(new Event('select')); })()`);
-    await command('Page.reload');
-    await waitFor(`document.querySelector('#player-input')?.value === ${JSON.stringify(draft)}`);
-    await evaluate(`document.querySelector('#player-input').focus()`);
-    assert.deepEqual(await evaluate(`(() => { const field = document.querySelector('#player-input'); return [field.selectionStart, field.selectionEnd]; })()`), [2, 5]);
-    // Browser signals are hints only; online cannot silently assert operation readiness or replay a draft.
-    await command('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
-    await waitFor(`document.querySelector('.composer [role="status"]').textContent.includes('Connection unavailable')`);
-    assert.equal(await evaluate(`document.querySelector('#player-input').value`), draft);
-    await command('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
-    await waitFor(`document.querySelector('.composer [role="status"]').textContent.includes('Operation status must be checked')`);
-    assert.equal(await evaluate(`document.querySelector('[data-send]').disabled`), true);
-    assert.equal(await evaluate(`document.querySelector('#reading-progress').textContent`), reading);
-    await clickLink('Library', '/library');
-    await evaluate(`document.querySelector('a[href="/adventures/relay/story"]').click()`);
-    await waitFor(`location.pathname === '/adventures/relay/story' && !!document.querySelector('#player-input')`);
-    assert.equal(await evaluate(`document.querySelector('#player-input').value`), '');
-    await clickLink('Library', '/library');
-    await evaluate(`document.querySelector('a[href="/adventures/mosslight/story"]').click()`);
-    await waitFor(`document.querySelector('#player-input')?.value === ${JSON.stringify(draft)}`);
-    assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
-    if (mobile) await writeFile(resolve(artifacts, 'p054-composer-mobile.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
-    await evaluate(`document.querySelector('.composer-actions button:last-child').click()`);
-    await command('Page.reload');
-    await waitFor(`document.querySelector('#player-input')?.value === ''`);
-  }
-  // Review shared primitives independently of campaign content; samples cannot create world actions.
-  await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
-  await command('Page.navigate', { url: origin + '/settings' });
-  await waitFor(`!!document.querySelector('a[href="/interface-kit"]')`);
-  await clickLink('Review interface graphic kit', '/interface-kit');
-  await waitFor(`!!document.querySelector('button[aria-pressed]')`);
-  assert.equal(await evaluate(`document.querySelectorAll('[role=meter]').length`), 3);
-  assert.equal(await evaluate(`document.querySelectorAll('.icon-inventory li').length`), 20);
-  assert.equal(await evaluate(`document.querySelector('button[aria-busy]').disabled`), true);
-  assert.equal(await evaluate(`document.querySelector('input[aria-invalid]').getAttribute('aria-describedby')`), 'kit-error-help');
-  await evaluate(`document.querySelector('button[aria-pressed]').focus()`);
-  await pressKey('Enter', 'Enter', 13, '\r');
-  await waitFor(`document.querySelector('button[aria-pressed]').getAttribute('aria-pressed') === 'true'`);
-  assert.equal(await evaluate(`document.querySelector('button[aria-pressed]').getAttribute('aria-pressed')`), 'true');
-  assert.equal(await evaluate(`getComputedStyle(document.activeElement).outlineStyle`), 'solid');
-  await evaluate(`document.querySelector('.toggle input').focus()`);
-  await pressKey(' ', 'Space', 32, ' ');
-  assert.equal(await evaluate(`document.querySelector('.toggle input').checked`), true);
-  await evaluate(`document.querySelector('.kit-help summary').focus()`);
-  await pressKey('Enter', 'Enter', 13, '\r');
-  assert.equal(await evaluate(`document.querySelector('.kit-help').open`), true);
-  // Measure contrast from rendered opaque colours instead of duplicating palette estimates.
-  assert.equal(await evaluate(`(() => {
-    /** Convert computed RGB to relative luminance; all sampled theme colours are opaque. */
-    const luminance = colour => colour.match(/[\\d.]+/g).slice(0, 3).map(Number).map(/** Linearize one sRGB byte for the WCAG luminance formula. */ v => { const c = v / 255; return c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4; }).reduce(/** Weight linear channels into relative luminance. */ (sum, c, i) => sum + c * [.2126, .7152, .0722][i], 0);
-    /** Return the WCAG contrast ratio for two opaque computed colours. */
-    const ratio = (a, b) => { const x = luminance(a), y = luminance(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
-    const panel = getComputedStyle(document.querySelector('.graphic-kit')).backgroundColor;
-    const field = getComputedStyle(document.querySelector('#kit-field'));
-    const placeholder = getComputedStyle(document.querySelector('#kit-field'), '::placeholder');
-    const button = getComputedStyle(document.querySelector('button[aria-pressed]'));
-    const text = [...document.querySelectorAll('.graphic-kit p, .graphic-kit label, .speaker')].every(/** Check each visible label against its shared opaque panel surface. */ el => ratio(getComputedStyle(el).color, panel) >= 4.5);
-    return text && ratio(placeholder.color, field.backgroundColor) >= 4.5 && ratio(field.color, field.backgroundColor) >= 4.5 && ratio(field.borderTopColor, field.backgroundColor) >= 3 && ratio(button.color, button.backgroundColor) >= 4.5 && ratio(button.outlineColor, panel) >= 3;
-  })()`), true);
-  // Pointer states must remain distinguishable without an animated transition.
-  await evaluate(`document.querySelector('.quick-replies button').scrollIntoView({block: 'center'})`);
-  const point = await evaluate(`(() => { const r = document.querySelector('.quick-replies button').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
-  const normal = await evaluate(`getComputedStyle(document.querySelector('.quick-replies button')).backgroundColor`);
-  await command('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
-  const hover = await evaluate(`getComputedStyle(document.querySelector('.quick-replies button')).backgroundColor`);
-  assert.notEqual(hover, normal);
-  await command('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', clickCount: 1, ...point });
-  assert.notEqual(await evaluate(`getComputedStyle(document.querySelector('.quick-replies button')).backgroundColor`), hover);
-  await command('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', clickCount: 1, ...point });
-  for (const [width, height] of [[1440, 1100], [390, 844], [320, 740], [740, 320]]) {
-    await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
-    assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
-    if (width === 1440 || width === 390) {
-      const { cssContentSize } = await command('Page.getLayoutMetrics');
-      await writeFile(resolve(artifacts, `p055-kit-${width}.png`), Buffer.from((await command('Page.captureScreenshot', { captureBeyondViewport: true, clip: { x: 0, y: 0, width, height: cssContentSize.height, scale: 1 } })).data, 'base64'));
-    }
-  }
-  await command('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }, { name: 'prefers-reduced-motion', value: 'reduce' }] });
-  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.meter-fill')).forcedColorAdjust`), 'none');
-  assert.equal(await evaluate(`getComputedStyle(document.querySelector('progress:indeterminate')).appearance`), 'none');
-  assert.equal(await evaluate(`document.querySelector('[role=meter]').getAttribute('aria-valuenow')`), '18');
-  await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-contrast', value: 'more' }] });
-  assert.equal(await evaluate(`getComputedStyle(document.querySelector('#kit-field')).borderTopWidth`), '2px');
-  await command('Emulation.setEmulatedMedia', { features: [] });
-  assert.equal(await evaluate(`fetch('/ui/LICENSE.txt').then(r => r.text()).then(text => text.includes('MIT License') && text.includes('Copyright (c) 2026 Azim Ben Othman'))`), true);
-  assert.equal(await evaluate(`fetch('/ui/README.md').then(r => r.text()).then(text => text.includes('src/app/preview/ui-kit.ts') && text.includes('No third-party artwork'))`), true);
-  await command('Page.navigate', { url: origin + '/adventures/missing/story' });
-  await waitFor(`document.querySelector('h1')?.textContent === 'Adventure unavailable'`);
   if (reviewLocales) {
     for (const [locale, heading, navigation, title] of [
       ['en', 'Settings', 'Application', 'Settings | Adventure engine'],
@@ -521,13 +537,38 @@ try {
     assert.equal(await evaluate('location.pathname'), '/en/settings');
     assert.equal(await evaluate(`document.querySelector('#ui-language').value`), 'en');
     await evaluate(`Storage.prototype.setItem = window.restoreStorageWrite; delete window.restoreStorageWrite`);
+    if (packagedOrigin) {
+      // Exercise the actual root selector, retaining the draft/storage bytes that
+      // the native EN→IT→EN journey above already verified across full reloads.
+      const drafts = await evaluate(`JSON.stringify(Object.entries(localStorage).filter(([key]) => key !== 'engine.ui-locale.v1').sort())`);
+      for (const [saved, locale] of [[null, 'en'], ['it-IT', 'it'], ['fr-FR', 'en'], ['//example.invalid', 'en']]) {
+        await evaluate(saved === null ? `localStorage.removeItem('engine.ui-locale.v1')` : `localStorage.setItem('engine.ui-locale.v1', ${JSON.stringify(saved)})`);
+        await command('Page.navigate', { url: origin + '/?opaque=%2Fit%2F#reading' });
+        await waitFor(`location.pathname === '/${locale}/library' && document.documentElement.lang === '${locale}'`);
+        assert.equal(await evaluate('location.search + location.hash'), '?opaque=%2Fit%2F#reading');
+        assert.equal(await evaluate(`JSON.stringify(Object.entries(localStorage).filter(([key]) => key !== 'engine.ui-locale.v1').sort())`), drafts);
+      }
+      await evaluate(`localStorage.setItem('engine.ui-locale.v1', 'it')`);
+      await command('Page.navigate', { url: origin + '/settings?opaque=1#reading' });
+      await waitFor(`location.pathname === '/it/settings' && document.querySelector('#ui-language')`);
+      assert.equal(await evaluate('location.search + location.hash'), '?opaque=1#reading');
+      await command('Page.navigate', { url: origin + '/en/settings' });
+      await waitFor(`document.documentElement.lang === 'en' && document.querySelector('#ui-language')`);
+      assert.equal(await evaluate(`localStorage.getItem('engine.ui-locale.v1')`), 'it');
+      const denial = await command('Page.addScriptToEvaluateOnNewDocument', {
+        source: `Object.defineProperty(window, 'localStorage', { get() { throw new Error('Storage denied'); } });`,
+      });
+      await command('Page.navigate', { url: origin + '/' });
+      await waitFor(`location.pathname === '/en/library' && document.documentElement.lang === 'en'`);
+      await command('Page.removeScriptToEvaluateOnNewDocument', { identifier: denial.identifier });
+    }
   }
   assert.deepEqual(exceptions, []);
   assert.equal(requests.some(/** Reject world/API writes or remote media requests during preview journeys. */ (request) => request.method !== 'GET' || !request.url.startsWith(origin + '/')), false);
-  console.log(`Browser smoke passed: ${version.product}; responsive reading/drafts/recovery and graphic kit${reviewLocales ? ', EN/IT story/plurals/forms/receipts/fallbacks, safe language reload/focus/storage and resource hashes/404s' : ''}; no page exceptions or nonlocal/action requests.`);
+  console.log(`Browser smoke passed: ${version.product}; ${packagedOrigin ? 'packaged root preference/fallback/deep links' : 'responsive reading/drafts/recovery and graphic kit'}${reviewLocales ? ', EN/IT story/plurals/forms/receipts/fallbacks, safe language reload/focus/storage and resource hashes/404s' : ''}; no page exceptions or nonlocal/action requests.`);
 } finally {
   browser.kill();
-  await new Promise(/** Release the loopback listener before completing; no background server survives. */ (accept) => server.close(accept));
+  if (!packagedOrigin) await new Promise(/** Release the loopback listener before completing; no background server survives. */ (accept) => server.close(accept));
   // Remove only the freshly created contained browser profile, never any pre-existing owner data.
   if (profile.startsWith(resolve(artifacts) + sep)) await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

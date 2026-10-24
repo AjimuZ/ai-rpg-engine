@@ -19,14 +19,25 @@ equivalent-control focus, plus unsupported saved locale and storage-denial notic
 Nine unit tests cover reload/storage boundaries, corrupt snapshots, recovery across
 detachment, conflicting draft writes and old callback/reply invalidation. A browser
 failure exposed restored text-size options selecting the first value; option-level
-selection and a routed regression assertion correct that behavior. Real localized
-packaging, operation/cursor reconciliation, API errors/receipts and pack-source
+selection and a routed regression assertion correct that behavior. Operation/cursor
+reconciliation, API errors/receipts and pack-source
 fallback integration remain unimplemented;
 QA-35 and independent bilingual playtests stay open.
 All 22 repository-checker tests pass; docs/secrets/workflows/images scans have
 zero findings. Desktop English and mobile Italian Settings screenshots, plus
-desktop/mobile Italian story screenshots, were visually reviewed. No backend
-behavior or packaged output layout changes here.
+desktop/mobile Italian story screenshots, were visually reviewed.
+
+The fourth P05.6 checkpoint packages both variants into the jar/container. All 22
+packaging/context/launcher checks pass with real recreation; the separate opt-in
+launcher lifecycle test skips. The complete PostgreSQL-backed packaged backend
+suite passes, including four HTTP tests for both locale trees, exact classpath
+resource bytes, legal notices, deep links, POST rejection and missing-resource/API
+404s. Chrome 155 runs bilingual story/forms/receipt/reload journeys against that
+actual container, plus root preference/default/denied/unsupported storage, explicit
+locale links and query/hash preservation without draft changes. Resource SHA-256
+maps match before/after recreation. An initial root-artwork 404 exposed a missing
+build-stage input; shared artwork now copies only from compiled English resources.
+No runtime account or inference request is used, and all owned services stop.
 
 P04.6 evidence (24 October 2026, Windows 11/Docker Desktop, pinned JDK 21 and
 PostgreSQL 18.6): 45 focused checks pass (40 text-catalog cases, four genre-import

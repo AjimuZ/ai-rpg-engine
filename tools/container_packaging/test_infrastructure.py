@@ -7,6 +7,7 @@ are deliberately retained. Docker, health, permission or persistence errors fail
 """
 
 import json
+import hashlib
 import os
 from pathlib import Path
 import secrets
@@ -87,27 +88,66 @@ class InfrastructureTest(unittest.TestCase):
             self.assertIn("text/html", response.headers["Content-Type"])
             index = response.read().decode("utf-8")
         self.assertIn("<title>Adventure engine</title>", index)
-        assets = re.findall(r'(?:src|href)="([^"]+\.(?:js|css))"', index)
-        self.assertGreaterEqual(len(assets), 2)
-        for asset in assets + ["3rdpartylicenses.txt", "actuator/health"]:
+        self.assertIn('href="/en/"', index)
+        self.assertIn('href="/it/"', index)
+        assets = ["locale-entry.js", "3rdpartylicenses.txt", "actuator/health", "ui/LICENSE.txt"]
+        for locale in ("en", "it"):
+            with client.open(urljoin(origin, f"{locale}/settings"), timeout=10) as response:
+                localized = response.read().decode("utf-8")
+                self.assertEqual("no-store", response.headers["Cache-Control"])
+            self.assertIn(f'<base href="/{locale}/">', localized)
+            self.assertIn(f'lang="{locale}"', localized)
+            bundles = re.findall(r'(?:src|href)="([^"]+\.(?:js|css))"', localized)
+            self.assertGreaterEqual(len(bundles), 2)
+            for bundle in bundles:
+                self.assertRegex(bundle, r"^[a-zA-Z0-9_-]+-[a-zA-Z0-9]+\.(js|css)$")
+                assets.append(f"{locale}/{bundle}")
+            assets.extend(f"{locale}/{path}" for path in
+                          ("3rdpartylicenses.txt", "ui/LICENSE.txt", "ui/README.md",
+                           "portraits/keeper.svg", "scenes/woodland.svg"))
+        hashes = {}
+        for asset in assets:
             url = urljoin(origin, asset)
             self.assertEqual(urlparse(origin).netloc, urlparse(url).netloc)
-            with client.open(url, timeout=10) as response:
+            with self.subTest(resource=asset), client.open(url, timeout=10) as response:
                 body = response.read()
                 self.assertTrue(body)
+                if asset.endswith(".js"):
+                    self.assertIn("javascript", response.headers["Content-Type"])
+                elif asset.endswith(".css"):
+                    self.assertIn("text/css", response.headers["Content-Type"])
+                if asset != "actuator/health":
+                    hashes[asset] = hashlib.sha256(body).hexdigest()
                 if asset == "actuator/health":
                     health = json.loads(body)
                     # Status-only: group names are allowed, components and details are not.
                     self.assertEqual("UP", health["status"])
                     self.assertLessEqual(set(health), {"status", "groups"})
+        # Compare actual production resource bytes across recreation; port changes
+        # are irrelevant, while a stale/missing locale tree must fail the fixture.
+        if hasattr(self, "resource_hashes"):
+            self.assertEqual(self.resource_hashes, hashes)
+        self.resource_hashes = hashes
         for path in ("api/missing", ".env", "auth.json", "run/secrets/postgres_password",
-                     "actuator/env", "var/lib/engine/content/.packaging-check"):
+                     "actuator/env", "var/lib/engine/content/.packaging-check",
+                     "api/v1/missing", "fr/settings", "en/missing.js", "it/missing.css",
+                     "en/api/v1/missing", "it/.env", "it/unknown",
+                     "it/adventures/relay/unknown"):
             with self.assertRaises(HTTPError) as error:
                 client.open(urljoin(origin, path), timeout=10)
             try:
                 self.assertEqual(404, error.exception.code, path)
             finally:
                 error.exception.close()
+        if os.environ.get("PACKAGING_BROWSER") == "1" and not hasattr(self, "browser_checked"):
+            # Opt-in host Chrome exercises real compiled reload and root preference
+            # routing against this owned container; its fresh profile is removed.
+            result = subprocess.run(
+                ["node", "tools/browser-smoke.mjs", "--locales", f"--packaged-origin={origin.rstrip('/') }"],
+                cwd=ROOT / "frontend", capture_output=True, text=True, timeout=180, check=False,
+            )
+            self.assertEqual(0, result.returncode, (result.stdout + result.stderr)[-4000:])
+            self.browser_checked = True
 
     def verify_backend(self) -> None:
         """Run all backend tests in the pinned JDK target against a separate fixture DB.
@@ -134,10 +174,15 @@ class InfrastructureTest(unittest.TestCase):
                  "--env", "SPRING_PROFILES_ACTIVE=packaged",
                  "--env", "SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/packaging_backend_checks",
                  "--env", "SPRING_DATASOURCE_USERNAME=engine", image],
-                capture_output=True, text=True, timeout=300, check=False,
+                capture_output=True, text=True, timeout=600, check=False,
             )
             self.assertEqual(0, result.returncode, (result.stdout + result.stderr)[-4000:])
-            self.assertIn("Tests run: 9, Failures: 0, Errors: 0, Skipped: 0", result.stdout)
+            # The suite grows with the roadmap. Require the actual final Maven
+            # summary, rather than freezing the count at the original shell tests.
+            summaries = re.findall(r"Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)", result.stdout)
+            self.assertTrue(summaries, "Maven must report the executed test suite")
+            self.assertGreater(int(summaries[-1][0]), 0)
+            self.assertEqual(("0", "0", "0"), summaries[-1][1:])
         finally:
             self.database("DROP DATABASE packaging_backend_checks")
 

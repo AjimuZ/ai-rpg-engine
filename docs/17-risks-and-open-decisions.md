@@ -21,9 +21,10 @@ and accessible names are reviewed; real transport errors and receipts remain ope
 Review variants now persist device language and validate reading/draft state before
 reload, restoring equivalent-control focus and invalidating old callbacks/replies.
 Unsaved/conflicting drafts, unresolved recovery and real campaign contexts block
-reload. They do not establish durable operation/cursor reconciliation. The review
-builds must not replace the packaged preview until real Spring/jar/container
-checks pass. Real API localization remains a transport gate. Resource review does not establish independent bilingual playtest
+reload. They do not establish durable operation/cursor reconciliation. Both
+variants now enter the jar/container with finite route handling and a root
+device-preference selector; production resource/recreation checks cover both trees.
+Real API localization remains a transport gate. Resource review does not establish independent bilingual playtest
 acceptance or complete QA-35.
 
 P05.5 reduces local UI asset/rights risk with original editable MIT SVG/CSS,

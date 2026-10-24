@@ -89,12 +89,17 @@
       <id>packaged-ui</id>
       <properties>
         <!-- Consume production output only; never expose frontend source as resources. -->
-        <ui.dist.directory>${project.basedir}/../frontend/dist/engine-ui/browser</ui.dist.directory>
+        <ui.dist.directory>${project.basedir}/../frontend/dist/engine-ui-localized/browser</ui.dist.directory>
       </properties>
       <build>
         <resources>
           <resource>
             <directory>src/main/resources</directory>
+            <filtering>false</filtering>
+          </resource>
+          <resource>
+            <!-- Root selection is shipped only with the compiled locale trees. -->
+            <directory>src/packaged-ui/resources</directory>
             <filtering>false</filtering>
           </resource>
           <resource>
@@ -104,10 +109,33 @@
             <filtering>false</filtering>
           </resource>
           <resource>
+            <!-- Locale-independent artwork and legal links use stable root URLs. -->
+            <directory>${ui.dist.directory}/en</directory>
+            <includes>
+              <include>portraits/**</include>
+              <include>scenes/**</include>
+              <include>ui/**</include>
+            </includes>
+            <targetPath>static</targetPath>
+            <filtering>false</filtering>
+          </resource>
+          <resource>
             <!-- Angular emits extracted dependency licenses next to browser/. -->
             <directory>${ui.dist.directory}/..</directory>
             <includes><include>3rdpartylicenses.txt</include></includes>
             <targetPath>static</targetPath>
+            <filtering>false</filtering>
+          </resource>
+          <resource>
+            <directory>${ui.dist.directory}/..</directory>
+            <includes><include>3rdpartylicenses.txt</include></includes>
+            <targetPath>static/en</targetPath>
+            <filtering>false</filtering>
+          </resource>
+          <resource>
+            <directory>${ui.dist.directory}/..</directory>
+            <includes><include>3rdpartylicenses.txt</include></includes>
+            <targetPath>static/it</targetPath>
             <filtering>false</filtering>
           </resource>
         </resources>
@@ -127,9 +155,16 @@
                     <requireFilesExist>
                       <files>
                         <file>${project.build.outputDirectory}/static/index.html</file>
+                        <file>${project.build.outputDirectory}/static/locale-entry.js</file>
+                        <file>${project.build.outputDirectory}/static/en/index.html</file>
+                        <file>${project.build.outputDirectory}/static/it/index.html</file>
+                        <file>${project.build.outputDirectory}/static/en/ui/LICENSE.txt</file>
+                        <file>${project.build.outputDirectory}/static/it/ui/LICENSE.txt</file>
+                        <file>${project.build.outputDirectory}/static/en/3rdpartylicenses.txt</file>
+                        <file>${project.build.outputDirectory}/static/it/3rdpartylicenses.txt</file>
                         <file>${project.build.outputDirectory}/static/3rdpartylicenses.txt</file>
                       </files>
-                      <message>Build the production interface with npm ci and npm run build in frontend/ first.</message>
+                      <message>Build both production locales with npm ci and npm run build:locales in frontend/ first.</message>
                     </requireFilesExist>
                   </rules>
                 </configuration>

@@ -4,7 +4,10 @@
 
 **Application shell packaging and root launcher implemented; gameplay pending.** P02.3
 provides the pinned engine/runtime images and root Compose services, serving the
-neutral Angular shell and health from one loopback origin. Account-free build,
+neutral Angular shell and health from one loopback origin. P05.6 extends that
+artifact with compiled `/en/` and `/it/` variants, root device language selection,
+finite preview GET routes and shared root artwork/notices. Missing bundles and
+API routes remain errors, and no command selects a locale. Account-free build,
 secret, IPC and storage recreation checks pass. P02.6 adds the root `start.sh`
 entry point (see the launcher contract in section 5). Its Windows/Git Bash idempotence,
 interruption, graceful-stop and restart-preservation verification is recorded in P02.7 (section 8);

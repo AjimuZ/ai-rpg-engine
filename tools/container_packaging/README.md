@@ -41,17 +41,28 @@ py -B -m unittest discover -s tools/container_packaging -v
 Remove-Item Env:PACKAGING_DOCKER
 ```
 
+For host Chrome browser journeys against the actual packaged fixture, also set
+`PACKAGING_BROWSER=1` before the same command (remove it afterward). This requires
+the host localized build from `npm run build:locales` for exact resource comparisons
+and an installed Chromium browser (`BROWSER_PATH` can select it). It uses a fresh
+temporary profile, performs no action/API writes and closes the browser. Root
+device-language/default/unsupported/denied-storage paths and direct locale links
+preserve opaque query/hash and draft bytes. Ordinary CI leaves this flag unset.
+
 The opt-in check uses only `engine-packaged-shell-check` and refuses existing
 containers. It builds the pinned images, starts all three services with a random
 loopback port, and checks actual identity, networks, mounts, socket permissions,
 authenticated database TCP and rejection of passwordless access. HTTP checks
-cover the entry point, hashed JS/CSS, notices, minimal health and unavailable
-sensitive/configuration/API routes before and after recreation. A WebSocket
+cover the root selector, both `/en/` and `/it/` preview indexes, hashed JS/CSS,
+locale/shared notices and artwork, minimal health and unavailable
+sensitive/configuration/API routes before and after recreation. Resource SHA-256
+maps must match across recreation; the backend HTTP tests also compare bytes to
+packaged classpath resources. A WebSocket
 upgrade through the read-only shared socket proves engine-to-runtime IPC without
 an account or inference request. A missing packaged secret must fail startup.
 
 The engine Dockerfile's `verification` target retains source and an offline Maven
-cache solely for checks. Nine backend tests run in that target against a separate
+cache solely for checks. The full backend suite runs in that target against a separate
 fixture database on the internal data network. The final JRE image contains only
 the packaged jar, and builds also run frontend type checks, tests and compilation.
 Neutral markers in the fixture database schema, runtime home/workspace and

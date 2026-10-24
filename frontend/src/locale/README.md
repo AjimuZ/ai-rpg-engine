@@ -28,12 +28,17 @@ fail the check. Tests use Angular's pinned parser rather than a second XML
 implementation or a new dependency.
 
 Review output is `dist/engine-ui-localized/browser/{en,it}/`, with localized
-document languages and base paths. It is deliberately separate from the existing
-`npm run build` output consumed by the backend. `node tools/browser-smoke.mjs
+document languages and base paths. The backend `packaged-ui` profile and engine
+image consume these variants; `npm run build` remains the unlocalized development
+preview. `node tools/browser-smoke.mjs
 --locales` checks both review variants as well as the original English journeys;
 it requires both builds. The test server exposes known preview routes only,
 compares actual HTTP resource hashes and checks missing-resource 404s. It does
-not establish Spring routing or jar/container localization.
+not establish Spring routing on its own. Add `--packaged-origin=http://127.0.0.1:PORT`
+to run the bilingual journeys against an owned packaged fixture, including root
+preference, unsupported/denied storage, direct locale links and query/hash preservation.
+The packaging fixture runs this with `PACKAGING_BROWSER=1`; only loopback HTTP
+origins are accepted and each browser uses a fresh temporary profile.
 
 Review Settings offers English/Italian language selection. The preference is saved
 as `engine.ui-locale.v1` on the device; draft bytes/selection remain under their
@@ -50,7 +55,7 @@ Browser checks perform native keyboard EN→IT→EN reloads with two independent
 draft scopes, selection, reading layout/size/positions, focus, unsupported locale
 and storage denial. Unit tests additionally reject corrupt snapshots, pending
 recovery, real campaign contexts, conflicting writes and obsolete callbacks.
-Root preference routing, real API errors/receipts, explicit source-pack fallback,
-operation/stream-cursor reconciliation and localized Spring/jar/container checks
+Real API errors/receipts, explicit source-pack fallback,
+operation/stream-cursor reconciliation and independent release acceptance
 remain open. These samples create no operation/cursor; they do not establish
 full QA-35 or independent human bilingual/screen-reader acceptance.

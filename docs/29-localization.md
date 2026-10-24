@@ -4,8 +4,9 @@
 
 P04.6 implements pack text catalogs and EN/IT fixture resources; P05.6 provides
 separate EN/IT review variants for all local preview screens, with persisted device
-language and verified safe local-preview reload. Packaged localized
-delivery, operation/cursor reconciliation and narration remain later work. P03.1 stores
+language and verified safe local-preview reload. The fourth checkpoint adds localized
+jar/container assembly and finite preview routes, verified against the actual image.
+Operation/cursor reconciliation and narration remain later work. P03.1 stores
 the owner's UI locale, each campaign's narrative locale and the locale, glossary
 and media generations outside the canonical counters. English is
 the default; English and Italian are both required for the first playable MVP
@@ -55,7 +56,7 @@ language-scoped thread/context generation handles future output.
 Choose Angular's built-in extraction and compile-time localized variants with
 stable semantic message IDs. Keep source English and reviewed Italian XLIFF
 resources, ICU plurals/selects and placeholder types. P05.6 pins `@angular/localize`
-to the existing Angular 22.2.3 baseline. Localized packaging remains in progress;
+to the existing Angular 22.2.3 baseline. Localized packaging/recreation checks pass;
 local preview language-switch restoration is browser-verified. Mark missing required translations as build failures. Avoid string
 concatenation, inline hardcoded error prose and HTML returned by a model.
 
@@ -70,15 +71,25 @@ nonempty Italian targets and placeholder occurrence parity before compiling revi
 variants into `dist/engine-ui-localized/browser/{en,it}/`. Missing/duplicate
 translations are build errors. [Resource instructions](../frontend/src/locale/README.md)
 describe the review scope and tests. Real backend error/receipt and source-pack
-fallback bindings await campaign transport. These separate review builds do not replace the default production
-build or establish localized jar delivery or full QA-35.
+fallback bindings await campaign transport. The `packaged-ui` Maven profile and
+engine image now consume this localized production output. The optional default
+`npm run build` remains an unlocalized development preview; full QA-35 stays open.
 
 Build `/en/` and `/it/` static variants into the same Spring application artifact.
 `/api/v1` and authorized asset routes remain unlocalized. Root entry chooses the
 saved locale or English, never redirects POST/API requests and never sends a
 missing resource to a misleading success page. Preserve notice files in both
 variants and test exact resource hashes/404s. P05.6 extends the P02 single-origin
-packaging checks rather than claiming the current jar already has both variants.
+packaging checks. The root selector reads only the allowlisted device locale,
+defaults to English on missing/invalid/denied storage and preserves query/hash.
+It never reads browser language headers or changes persisted drafts. Native EN/IT
+links remain available without scripting. Known unprefixed preview GET routes use
+the same selector; direct locale links override the saved preference for that visit.
+Spring serves only the finite preview route grammar and leaves missing assets,
+unsupported locale prefixes and API routes as 404s; POST requests never select a locale.
+Locale indexes are sent with `no-store`; content-hashed bundles remain static.
+Shared artwork and project notices retain stable root URLs and are also available
+under both locale prefixes. Extracted dependency notices ship at all three roots.
 
 Angular documents [compiled variants](https://angular.dev/guide/i18n/merge) and
 [locale subdirectories](https://angular.dev/guide/i18n/deploy). Its
@@ -102,7 +113,7 @@ state and a one-use equivalent-control focus marker, then saves `engine.ui-local
 on the device. Unsupported stored tags produce a visible English-default notice;
 supported region tags normalize to `en`/`it`. Persisted data never supplies a URL.
 The trusted same-origin `/en/` or `/it/` prefix changes while route/query/hash stay
-intact. Direct locale links remain explicit; root preference routing awaits packaging.
+intact. Direct locale links remain explicit; packaged root entry selects the saved locale.
 Old callbacks and suggestion objects are invalidated before navigation; drafts
 are never translated or submitted. Reload refuses unsaved/conflicting drafts,
 unresolved recovery even after detachment, and every real campaign context until
@@ -113,6 +124,15 @@ guarantees, including unsupported saved values, storage denial, two scoped draft
 selection, restored native text-size selection, layout, reading position and focus.
 The catalog now contains 218 reviewed messages (224 extracted occurrences).
 These checks do not establish full operation/stream-cursor preservation.
+
+The fourth checkpoint runs the same bilingual journeys against the real Spring
+container, including root missing/Italian-region/unsupported/denied preferences,
+explicit locale links and opaque query/hash preservation. Four packaged HTTP tests
+compare locale bundles, shared artwork and notices to actual classpath bytes,
+probe deep links and reject POST redirects/missing-resource fallbacks. The full
+PostgreSQL-backed backend suite and 22 container/context/launcher checks pass;
+the separate opt-in launcher lifecycle test skips. Real resource SHA-256 maps match
+before/after service recreation. No account or narration request is involved.
 
 P05.5 adds the graphic-kit review and credits/source inventory.
 Its control, meter, rarity and fallback labels remain live text beside decorative

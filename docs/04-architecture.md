@@ -135,7 +135,11 @@ The app binds to loopback by default. GitHub publication distributes source; it 
 
 The root Compose file packages the neutral shell as `engine`, `postgres` and
 `codex`. The digest-pinned multi-stage engine build embeds Angular assets/notices
-in the jar; a JRE-only non-root service serves them on loopback. Only engine and
+in the jar; a JRE-only non-root service serves them on loopback. P05.6 packages
+`/en/` and `/it/` with a root browser selector reading the saved device locale or
+defaulting to English. Finite preview GET routes serve compiled indexes; APIs and
+missing files keep their own HTTP semantics. Shared artwork/notices retain stable
+root URLs. Only engine and
 postgres join internal `data`; only runtime joins `inference`; engine alone joins
 `web` for published HTTP. Engine and runtime share UID 10001 for private socket
 access, but never account/data mounts. Engine mounts socket IPC read-only and

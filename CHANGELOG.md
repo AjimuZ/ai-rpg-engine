@@ -4,6 +4,12 @@ This changelog records delivered project artifacts. Future functionality belongs
 
 ## Unreleased — Localization review foundation (partial P05.6), 24 October 2026
 
+- Assemble both locale variants into the jar/container; select the saved device
+  language at root and support explicit localized preview GET routes. Preserve
+  shared artwork/notices, opaque query/hash and missing-resource/API 404s.
+  Verify bilingual browser journeys against the actual container, exact jar
+  resource bytes and resource hashes across recreation; full QA-35 remains open.
+
 - Add persisted English/Italian selection to compiled review Settings, safe reload
   with scoped literal drafts/selections, validated tab reading preferences/positions
   and equivalent-control keyboard focus; invalidate old callbacks and reply objects.
@@ -22,8 +28,8 @@ This changelog records delivered project artifacts. Future functionality belongs
   placeholders before compilation; run checker tests and review builds in CI.
 - Verify both Settings variants in Chrome, including narrow layouts, keyboard
   focus, locale bases, same-origin resource hashes, notices and missing-file 404s.
-- Keep the packaged English preview while real transport errors/receipts,
-  operation/cursor reconciliation and localized packaging are implemented.
+- Keep real transport errors/receipts and operation/cursor reconciliation open;
+  the packaged interface now consumes both localized variants.
 
 ## Unreleased — Complete local interface graphic kit (P05.5), 24 October 2026
 

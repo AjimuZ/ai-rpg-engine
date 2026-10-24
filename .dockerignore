@@ -12,6 +12,10 @@ frontend/**
 !frontend/tsconfig.spec.json
 !frontend/src/
 !frontend/src/**
+!frontend/tools/
+frontend/tools/**
+!frontend/tools/check-localization.mjs
+!frontend/tools/check-localization.test.mjs
 !frontend/public/
 !frontend/public/**
 !backend/

@@ -59,12 +59,14 @@ class BuildContextTest(unittest.TestCase):
             "frontend/angular.json", "frontend/tsconfig.json", "frontend/tsconfig.app.json",
             "frontend/tsconfig.spec.json", "frontend/src/main.ts",
             "frontend/src/app/app.ts", "frontend/public/icon.svg",
+            "frontend/tools/check-localization.mjs", "frontend/tools/check-localization.test.mjs",
             "backend/pom.xml", "backend/mvnw", "backend/mvnw.cmd",
             "backend/.mvn/maven.config", "backend/.mvn/settings.xml",
             "backend/.mvn/wrapper/maven-wrapper.properties",
             "backend/src/main/java/org/rpgengine/EngineApplication.java",
             "backend/src/main/resources/application.properties",
             "backend/src/test/java/org/rpgengine/EngineApplicationTest.java",
+            "backend/src/packaged-ui/resources/static/index.html",
             "docker/engine/Dockerfile",
         }
         denied = {"README.md", "docs/private.md", "tools/private.py", "unknown/future.txt",
@@ -72,7 +74,8 @@ class BuildContextTest(unittest.TestCase):
                   "frontend/node_modules/example/index.js", "frontend/.angular/cache/data",
                   "docker/codex-runtime/private.txt", "docker/engine/private.txt",
                   "frontend/README.md", "backend/README.md", "backend/.mvn/private.txt",
-                  "backend/.mvn/wrapper/private.txt"}
+                  "backend/.mvn/wrapper/private.txt", "frontend/tools/private.mjs",
+                  "frontend/tools/browser-smoke.mjs"}
         # Repeat sensitive names under admitted source trees: root-only patterns
         # would miss developer instructions or credentials placed in nested folders.
         private = [".git/config", ".agents/hooks/private.py", ".claude/settings.json",

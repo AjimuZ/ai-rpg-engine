@@ -5,8 +5,9 @@ provide 218 English/Italian messages across all local screens, sample passages,
 validation, preview receipts, recovery and accessibility, with strict resource parity.
 The compiled review variants support persisted language selection and safe preview
 reload, retaining scoped drafts/selections and tab reading preferences/positions.
-Real operation/cursor reconciliation and localized single-origin packaging remain
-pending; the packaged interface still uses the English preview.
+The jar/container packages both variants, with device-language selection at root
+and explicit `/en/` and `/it/` preview routes. Real operation/cursor reconciliation,
+transport localization and independent bilingual/accessibility acceptance remain open.
 
 P05.5 delivers the original MIT [UI graphic kit](frontend/public/ui/README.md):
 scalable controls, bars, icons, frames, independent sample item art and fallback
@@ -56,7 +57,7 @@ fixtures](backend/src/test/resources/packs/README.md) with directory/ZIP import
 checks on the same engine build. P04.6 adds optional EN/IT text overlays, source
 fallback, glossary/quote policies and sealed coverage reports without changing
 mechanics or visibility. Both fixtures include bilingual catalog resources; import
-screens, localized UI, runtime narration and playable campaigns remain pending.
+screens, transport-localized UI, runtime narration and playable campaigns remain pending.
 See the [pack contract](docs/09-adventure-packs.md).
 
 ## Why this engine exists

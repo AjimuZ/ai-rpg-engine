@@ -239,27 +239,38 @@ Testcontainers dependency or test-library helper image is used. The CI job runs 
 ## Single-origin jar assembly (P02.3)
 
 Build the reviewed production interface in `frontend/` with `npm ci` and
-`npm run build`, then return to `backend/` and run against the disposable database:
+`npm run build:locales`, then return to `backend/` and run against the disposable database:
 
 ```sh
 ./mvnw -B -ntp clean verify -Ppackaged-ui
 java -jar target/engine-0.1.0.jar
 ```
 
-The opt-in profile copies `frontend/dist/engine-ui/browser/` into the jar's
-`static/` directory and copies the adjacent `3rdpartylicenses.txt` alongside it.
-Spring serves the index, hashed JavaScript/CSS and license notices at the same
+The opt-in profile copies `frontend/dist/engine-ui-localized/browser/{en,it}/`
+into the jar's `static/{en,it}/` directories, with extracted dependency notices
+at root and under both prefixes. Shared artwork/project notices are also copied
+from compiled English output to stable root URLs. No source tree is served.
+Spring serves the root language selector, locale indexes, hashed bundles and notices at the same
 origin as `/actuator/health`; it needs no separate frontend server or CORS
 exception. Unknown API, source/configuration and asset URLs remain 404. No broad
-SPA fallback is installed: the current shell has no client routes.
+SPA fallback is installed. Only known preview GET routes under `/en/` and `/it/`
+receive the corresponding compiled index (`no-store`). Known unprefixed preview
+GET routes use the root selector, preserving route/query/hash; unsupported paths
+and locale prefixes remain 404. Root chooses the saved allowlisted device locale
+or English, never browser headers; native locale links work without scripting.
+POST/API requests never redirect to a locale or receive a successful index.
 
 Always use `clean` when changing profiles or rebuilding for distribution so old
 assets cannot survive in `target/`. A guard checks the copied index and notices
 before tests/package; missing production output fails the build with frontend
 build instructions. `ui.dist.directory` may select a different browser output
 path, with extracted notices in its parent. The HTTP tests also fail on missing
-bundles or notices. Without this profile, the three interface tests skip and the
-two ordinary backend integration tests still run.
+bundles or notices, compare served bytes with packaged resources and probe both
+locale route trees. Without this profile, the four packaged-interface tests skip
+and ordinary backend tests remain independent of frontend output.
+
+The P05.6 verification also runs an offline negative build with a missing locale
+output directory; the guard rejects assembly with the localized build instructions.
 
 On 23 October 2026 all five profile tests passed with real PostgreSQL 18 and the
 existing pinned Java 21 development image. The ordinary build passed two tests

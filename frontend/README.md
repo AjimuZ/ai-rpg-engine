@@ -5,12 +5,15 @@ for all local preview screens (218 unique messages), public sample text, forms,
 preview receipts, recovery and accessibility. Chronicle ICU plurals and localized
 numeric meter formatting retain stable IDs and numeric protocol values. Run `npm run test:i18n` and
 `npm run build:locales`, then `node tools/browser-smoke.mjs --locales` after
-`npm run build`. These builds do not replace the packaged English preview.
+`npm run build`. The jar/container consumes both localized production variants;
+the default unlocalized build remains available for development review.
 Review Settings persists device language and safely reloads EN/IT with scoped
 drafts/selections, tab reading preferences/positions and equivalent-control focus.
 Reload blocks on unsaved/conflicting drafts or unresolved recovery, including
 after leaving the story. Real API errors/receipts, operation/cursor reconciliation
-and localized Spring/jar/container serving remain open.
+and independent bilingual/accessibility acceptance remain open. Spring serves
+explicit locale preview routes and selects the device preference at root; see
+the [jar assembly instructions](../backend/README.md#single-origin-jar-assembly-p023).
 
 This is a standalone Angular interface with SCSS, strict TypeScript/templates,
 zoneless change detection, and no runtime calls or credentials. P05.1 provides
@@ -55,7 +58,7 @@ per sample in validated tab storage. Settings adjusts story text from 15–24 px
 reload restores the supported layout, size and known passage indexes. Storage
 failures retain the in-memory view with a Settings notice and block language reload.
 Separate review variants cover English and Italian with safe persisted language
-reload; packaged localization remains P05.6. These samples have no operation or
+reload in both the review harness and packaged locale variants. These samples have no operation or
 stream cursor; real campaign contexts block reload pending transport reconciliation.
 Safe presentation events remain P05.7. No submitted player dialogue is fabricated.
 
