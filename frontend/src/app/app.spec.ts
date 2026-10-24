@@ -2,8 +2,9 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { routes } from './app.routes';
+import { PreviewState } from './preview/preview-state';
 
 /** Return a routed screen for a URL; routing/bootstrap errors reject the promise. */
 async function open(url: string) {
@@ -12,6 +13,87 @@ async function open(url: string) {
 }
 
 describe('Preview screens', /** Register user-facing route checks; assertions fail normally. */ () => {
+  it('keeps content with no optional modules or definitions usable', /** Empty public metadata must not invent resource meters or optional panels. */ async () => {
+    const harness = await open('/library');
+    const state = TestBed.inject(PreviewState);
+    const original = state.find('mosslight')!;
+    vi.spyOn(state, 'find').mockReturnValue({ ...original, content: { attributes: [], resources: [] } });
+    await harness.navigateByUrl('/adventures/mosslight/sheet');
+    const root = harness.routeNativeElement!;
+    expect(root.querySelector('h1')?.textContent).toBe('Character');
+    expect(root.textContent).toContain('No resource definitions');
+    expect(root.querySelector('[data-resource]')).toBeNull();
+    expect(root.querySelector('a[href$="/guide"], a[href$="/creative"]')).toBeNull();
+    await harness.navigateByUrl('/adventures/mosslight/guide');
+    expect(root.querySelector('h1')?.textContent).toBe('Panel unavailable');
+    await harness.navigateByUrl('/adventures/mosslight/creative');
+    expect(root.querySelector('h1')?.textContent).toBe('Panel unavailable');
+  });
+
+  it('uses neutral fallbacks and renders metadata as literal text', /** Missing names and markup cannot create empty headings or executable DOM. */ async () => {
+    const harness = await open('/library');
+    const state = TestBed.inject(PreviewState);
+    const original = state.find('relay')!;
+    vi.spyOn(state, 'find').mockReturnValue({ ...original, title: '<em>Relay</em>', content: {
+      terms: { sheet: '  ', inventory: '<b>Cargo</b>' }, attributes: [],
+      resources: [{ id: 'reserve', name: ' ' }, { id: 'second', name: '<img src=x>' }],
+      modules: { guide: { title: ' ', description: '<script>untrusted()</script>' },
+        creativeAbilities: { description: 'Public text only.' } },
+    } });
+    await harness.navigateByUrl('/adventures/relay/sheet');
+    const root = harness.routeNativeElement!;
+    expect(root.querySelector('h1')?.textContent).toBe('Character');
+    expect(root.textContent).toContain('reserve');
+    expect(root.textContent).toContain('<img src=x>');
+    expect(root.textContent).toContain('No attribute definitions');
+    expect(root.querySelector('nav')?.textContent).toContain('<b>Cargo</b>');
+    expect(root.querySelector('b, em, img, script')).toBeNull();
+    await harness.navigateByUrl('/adventures/relay/guide');
+    expect(root.querySelector('h1')?.textContent).toBe('Guide');
+    expect(root.textContent).toContain('<script>untrusted()</script>');
+    expect(root.querySelector('script')).toBeNull();
+    await harness.navigateByUrl('/adventures/relay/creative');
+    expect(root.querySelector('h1')?.textContent).toBe('Creative abilities');
+  });
+
+  it('binds terminology and resource definitions to the scoped content', /** Reused screens must replace labels without inventing balances. */ async () => {
+    const harness = await open('/adventures/mosslight/sheet');
+    const root = harness.routeNativeElement!;
+    expect(root.textContent).toContain('Awareness');
+    expect(root.textContent).toContain('Vigor');
+    expect(root.querySelector('nav')?.textContent).toContain('Trail guide');
+    expect(root.querySelector('nav')?.textContent).not.toContain('Field techniques');
+    await harness.navigateByUrl('/adventures/relay/sheet');
+    expect(root.querySelector('h1')?.textContent).toBe('Crew profile');
+    expect(root.textContent).toContain('Logic');
+    expect(root.textContent).toContain('Charge');
+    expect(root.textContent).not.toContain('Vigor');
+    expect(root.textContent).not.toContain('Awareness');
+    expect(root.querySelector('nav')?.textContent).not.toContain('Trail guide');
+    expect(root.querySelector('nav')?.textContent).toContain('Field techniques');
+    expect(root.querySelector('[data-resource="charge"]')?.textContent).toContain('Not connected');
+    await harness.navigateByUrl('/adventures/relay/inventory');
+    expect(root.querySelector('h1')?.textContent).toBe('Cargo');
+    await harness.navigateByUrl('/adventures/relay/journal');
+    expect(root.querySelector('h1')?.textContent).toBe('Mission log');
+    await harness.navigateByUrl('/adventures/relay/create');
+    expect(root.querySelector('label')?.textContent).toBe('Specialist name');
+  });
+
+  it('renders configured optional panels and refuses disabled direct routes', /** Visibility is a metadata capability, including after route reuse. */ async () => {
+    const harness = await open('/adventures/mosslight/guide');
+    const root = harness.routeNativeElement!;
+    expect(root.querySelector('h1')?.textContent).toBe('Trail guide');
+    await harness.navigateByUrl('/adventures/relay/guide');
+    expect(root.querySelector('h1')?.textContent).toBe('Panel unavailable');
+    expect(root.textContent).not.toContain('Trail guide');
+    await harness.navigateByUrl('/adventures/relay/creative');
+    expect(root.querySelector('h1')?.textContent).toBe('Field techniques');
+    expect(root.querySelector('button')?.disabled).toBe(true);
+    await harness.navigateByUrl('/adventures/mosslight/creative');
+    expect(root.querySelector('h1')?.textContent).toBe('Panel unavailable');
+  });
+
   it('lists adventure workspaces separately from installed packs', /** Require both neutral previews and explicit scope. */ async () => {
     const harness = await open('/library');
     const text = harness.routeNativeElement?.textContent;

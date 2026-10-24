@@ -247,6 +247,16 @@ full QA-29 (reading/input), QA-30 (graphic kit), QA-33 (persisted isolation) and
 QA-35 (bilingual UI) remain pending. Commands and scope are in the
 [frontend guide](../frontend/README.md).
 
+P05.2 extends local preview acceptance to 15 passing frontend tests, strict
+typecheck/build and a zero-finding dependency audit. Regressions cover scoped
+attribute/resource names, terminology, absent/blank fallback labels, literal markup,
+empty metadata and optional-panel visibility/direct routes after adventure changes.
+Chrome 155 desktop/mobile smoke additionally checks resource labels and enabled/
+disabled panels with no page exceptions or nonlocal/action requests; three screenshots
+were visually reviewed. All 22 repository tests and docs/secrets/workflows/images
+scans pass. This verifies a typed local public projection contract, not registered
+pack/campaign APIs, authored-pack module execution or full QA-29/30/33/35.
+
 Combat-chat acceptance for P11/P12 also includes a real-browser English/Italian
 path with visible speaker/recipient, editable suggestions and explicit Send;
 desktop/mobile keyboard access to both chat and tactics; draft preservation while

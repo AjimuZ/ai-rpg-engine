@@ -1,5 +1,6 @@
 /** Local, public sample content and reading preferences; never an authoritative game projection. */
 import { Injectable, signal } from '@angular/core';
+import { ContentMetadata } from './content-metadata';
 
 /** A display-only passage; player text must come from an explicit player submission. */
 export interface Passage {
@@ -17,9 +18,10 @@ export interface AdventurePreview {
   readonly sceneAlt: string;
   readonly location: string;
   readonly passages: readonly Passage[];
+  readonly content: ContentMetadata;
 }
 
-/** Hand-authored public samples; real pack/catalog binding belongs to P05.2 and P06. */
+/** Hand-authored public projections; fixture terms are mirrored, while registered pack APIs belong to P06. */
 const previews: readonly AdventurePreview[] = [
   {
     id: 'mosslight', title: 'Mosslight Trail', description: 'A woodland exploration preview.',
@@ -28,6 +30,12 @@ const previews: readonly AdventurePreview[] = [
       { speaker: 'narrator', name: 'Narrator', text: 'The trail opens into a quiet grove. Pale light settles on the path ahead.' },
       { speaker: 'character', name: 'Trail keeper', text: 'The path continues through the trees. What would you like to know?' },
     ],
+    content: {
+      attributes: [{ id: 'awareness', name: 'Awareness' }],
+      resources: [{ id: 'vigor', name: 'Vigor' }],
+      // Preview-only configuration does not enable the authored-pack compiler's module runtime.
+      modules: { guide: { title: 'Trail guide', description: 'A place for public exploration guidance.' } },
+    },
   },
   {
     id: 'relay', title: 'Silent Relay', description: 'A science-fiction salvage preview.',
@@ -36,6 +44,13 @@ const previews: readonly AdventurePreview[] = [
       { speaker: 'narrator', name: 'Narrator', text: 'Beyond the docking ring, a line of blue lamps marks the station corridor.' },
       { speaker: 'character', name: 'Dock attendant', text: 'The relay is quiet. Where would you like to begin your survey?' },
     ],
+    content: {
+      terms: { sheet: 'Crew profile', inventory: 'Cargo', journal: 'Mission log', characterName: 'Specialist name',
+        abilities: 'Techniques', equipment: 'Installed equipment', quests: 'Known assignments' },
+      attributes: [{ id: 'logic', name: 'Logic' }],
+      resources: [{ id: 'charge', name: 'Charge' }],
+      modules: { creativeAbilities: { title: 'Field techniques', description: 'A place to inspect supported custom techniques.' } },
+    },
   },
 ];
 

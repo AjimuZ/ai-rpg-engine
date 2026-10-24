@@ -2,6 +2,20 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Content-bound interface metadata (P05.2), 24 October 2026
+
+- Bind navigation, headings, character-name terminology and attribute/resource
+  definitions to typed scoped public metadata with stable identities and neutral
+  English fallbacks. Render metadata as literal text and leave balances unconnected.
+- Configure optional guide/creative panels independently in the local genre samples;
+  hide absent navigation and refuse disabled direct routes after adventure switching.
+  This adds a frontend projection contract; pack module execution, registered
+  pack/campaign APIs and localized UI remain later tasks.
+- Verify 15 frontend tests, strict typecheck, production build, dependency audit
+  (zero vulnerabilities), 22 repository tests and all four policy scans. Extended
+  Chrome desktop/mobile smoke passes with no page exceptions or remote/action
+  requests; visually review story and resource-panel screenshots.
+
 ## Unreleased — Portable launcher command checks, 24 October 2026
 
 - Make launcher path/port checks independent of the runner's Docker version by

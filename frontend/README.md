@@ -5,10 +5,20 @@ zoneless change detection, and no runtime calls or credentials. P05.1 provides
 library, character-creation, story, sheet, inventory, journal and settings shells.
 The library contains explicitly local Mosslight Trail and Silent Relay samples,
 inspired by the neutral import fixtures; these are hand-authored display previews,
-not registered workspaces or compiled pack projections. Real metadata binding is P05.2.
+not registered workspaces or compiled pack projections. P05.2 binds these shells
+to typed public metadata in `src/app/preview/content-metadata.ts`: terminology,
+attribute/resource names and optional guide/creative-ability panel configuration.
+Mosslight uses Awareness/Vigor and a Trail guide; Relay uses Logic/Charge, Crew
+profile/Cargo/Mission log and Field techniques. Names are literal text; missing
+labels fall back to neutral English (or a definition's stable ID). Navigation and
+direct routes both respect optional module presence, including after scope changes.
+This preview contract does not change the pack schema or execute pack modules;
+registered pack/campaign projections remain P06. Current resource values are never
+invented from definitions.
 
 Open `/library`, `/settings`, or `/adventures/mosslight/story` (also `relay`).
-Each adventure has `create`, `story`, `sheet`, `inventory` and `journal` routes.
+Each adventure has `create`, `story`, `sheet`, `inventory` and `journal` routes;
+`guide` and `creative` render only when their public configuration is present.
 Unknown adventure IDs show an unavailable screen. Creation validates a 1–60
 character trimmed name and previews it without saving. Changing adventures clears
 both the form and unsaved summary, including when returning to an earlier preview.
@@ -23,7 +33,7 @@ Chronicle shows already revealed passages. Reading positions remain independent
 per sample while the tab is open. Settings adjusts story text from 15–24 px;
 reload resets all preferences/positions. English-only resources, full localization,
 text-focused layout, portraits, persistent drafts, revision-aware input and the
-complete graphic kit remain P05.2–P05.7. No submitted player dialogue is fabricated.
+complete graphic kit remain P05.3–P05.7. No submitted player dialogue is fabricated.
 Use Node.js 24.22.1 and npm 11.19.1 from [ADR 0009](../docs/adr/0009-toolchain-baseline.md).
 
 From `frontend/`:
@@ -54,6 +64,13 @@ unknown identities, and rejects page exceptions and nonlocal/action requests.
 The P05.1 acceptance run passed all 11 tests, typecheck, build and audit, plus this
 smoke check in Chrome 155.0.8059.85 at 1440×1100 and 390×844; screenshots were
 visually reviewed. These checks do not establish full QA-29/30/35 acceptance.
+
+P05.2 passes 15 tests, typecheck, production build and audit (zero vulnerabilities).
+The browser smoke now also checks metadata terminology/resources, configured panels
+and disabled direct routes, including responsive navigation at the same sizes;
+all three screenshots were visually reviewed. Tests cover empty metadata, literal
+markup, blank-label fallbacks and scope changes without fabricated resource values.
+Repository tests pass 22/22 and all four policy scans report zero findings.
 
 Vite is overridden to 8.3.5 to fix the development-server advisories in Angular
 build's 8.3.0 dependency while preserving Angular 22.2.3; see ADR 0009.

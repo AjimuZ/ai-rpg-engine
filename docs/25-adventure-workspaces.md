@@ -23,6 +23,12 @@ positions are independent in memory. These samples are not persisted workspaces
 or campaigns. Workspace creation, real library listing/continue and full restart/
 restore isolation remain pending; frontend previews do not establish QA-33.
 
+P05.2 derives terminology, attribute/resource names and optional panel visibility
+from each local preview's typed public metadata. Reused routes replace their
+labels/configuration on adventure changes; direct disabled panel routes show an
+unavailable state. This is presentation scoping only, not persisted campaign state
+or authored-pack module execution; real library/pack projections remain P06.
+
 P04.5 imports both [neutral genre fixtures](../backend/src/test/resources/packs/README.md)
 into one workspace and independently into fresh workspaces, preserving distinct
 revision identities and exact inventories despite shared local definition IDs.

@@ -64,6 +64,19 @@ closed. No campaign/pack API binding, canonical stats/items/quests, playable inp
 full graphic kit or bilingual interface is claimed. Later P05/P06 tasks retain
 the full contracts below; the shells do not satisfy full QA-29/30/35.
 
+P05.2 binds these shells to typed public content metadata: closed terminology keys,
+stable attribute/resource IDs with display names, and optional guide/creative-ability
+panel configuration. Navigation, headings and character-name labels derive from the
+current adventure's projection; absent or blank labels use neutral English wording
+(definition IDs are the last-resort name). Optional panels appear only when configured;
+direct disabled routes show an unavailable state. Labels/descriptions render as text,
+never markup, route paths or executable directives. Resource definitions show “Not
+connected” instead of fabricated balances. Local samples mirror fixture resource
+names (Awareness/Vigor and Logic/Charge) and demonstrate different terminology and
+optional panels. They are public preview projections, not a new authored-pack schema
+or an implementation of pack module execution. Registered pack/campaign API binding
+remains P06, catalog locale resolution and bilingual UI remain P05.6.
+
 | Screen | Responsibilities |
 | --- | --- |
 | Library | Independent adventure workspaces and create/continue playthroughs; reusable installed packs managed separately |

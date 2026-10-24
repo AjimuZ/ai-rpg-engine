@@ -702,7 +702,17 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     and missing-image recovery have regression coverage. Campaign APIs, real pack
     binding, persistent drafts/locales, full reading/accessibility behavior and the
     complete graphic kit remain later tasks; P05 overall is not yet accepted.
-- [ ] P05.2 Bind display names, resources, panels, and terminology to content metadata.
+- [x] P05.2 Bind display names, resources, panels, and terminology to content metadata.
+  - Typed local public metadata now drives scoped terminology, attribute/resource
+    definitions and optional guide/creative panels. Neutral fallbacks, literal text,
+    stable route IDs and disabled direct-route handling preserve generic behavior.
+    Strict typecheck, all 15 frontend tests, production build and dependency audit
+    pass (zero vulnerabilities), as do 22 repository tests and all four policy scans.
+    Chrome 155 desktop/mobile smoke covers metadata/resource labels, optional and
+    disabled panels, navigation and reading without page exceptions or remote/action
+    requests; three screenshots were visually reviewed. Empty metadata and literal
+    markup have regression coverage. Registered pack/campaign APIs remain P06;
+    these definitions never imply current balances or enable pack module execution.
 - [ ] P05.3 Implement the default visual-novel and alternative text-focused responsive layouts, local passage advancement, chronicle, speaker portraits and keyboard/focus support.
 - [ ] P05.4 Define revision-aware projection state, persistent free-input drafts, editable contextual quick replies and connection/error states; choosing a suggestion must not submit or advance the world.
 - [ ] P05.5 Create or license and integrate the complete UI graphic kit, including buttons, bars, icons, frames and required interaction/fallback states; register sources, notices and generated-asset provenance.

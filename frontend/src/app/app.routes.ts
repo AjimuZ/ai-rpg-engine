@@ -4,7 +4,7 @@ import { Library } from './preview/library';
 import { Workspace } from './preview/workspace';
 import { Creation } from './preview/creation';
 import { Story } from './preview/story';
-import { Sheet, Inventory, Journal } from './preview/panels';
+import { Sheet, Inventory, Journal, ContentPanel } from './preview/panels';
 import { Settings } from './preview/settings';
 
 /** Route screens and browser titles; unmatched paths return to the local library. */
@@ -19,6 +19,8 @@ export const routes: Routes = [
     { path: 'sheet', component: Sheet, title: 'Character | Adventure engine' },
     { path: 'inventory', component: Inventory, title: 'Inventory | Adventure engine' },
     { path: 'journal', component: Journal, title: 'Journal | Adventure engine' },
+    { path: 'guide', component: ContentPanel, data: { panel: 'guide' }, title: 'Guide | Adventure engine' },
+    { path: 'creative', component: ContentPanel, data: { panel: 'creativeAbilities' }, title: 'Creative abilities | Adventure engine' },
   ] },
   { path: '**', redirectTo: 'library' },
 ];

@@ -11,7 +11,7 @@ import { WorkspaceContext } from './workspace';
     <section class="panel narrow"><h1>New playthrough</h1><p>Character creation preview for {{ context.adventure()?.title }}.</p>
       <p>Pack choices, budgets and campaign creation will appear when campaign services are connected.</p>
       <form (submit)="preview($event)" novalidate>
-        <label for="character-name">Character name</label>
+        <label for="character-name">{{ context.term('characterName') }}</label>
         <input id="character-name" [formField]="fields.name" aria-describedby="name-help" />
         <p id="name-help">Enter a name of 1–60 characters. This preview does not save it.</p>
         @if (attempted() && fields.name().invalid()) { <p role="alert">Enter a name of 1–60 characters.</p> }

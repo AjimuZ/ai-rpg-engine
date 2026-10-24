@@ -13,6 +13,11 @@ English-only initial UI assumption in the earlier vision, under [ADR 0015](adr/0
 
 ## 2. A small preference model
 
+P05.2's typed local presentation metadata supplies scoped names/terminology and
+neutral English fallbacks only. It does not resolve compiled text catalogs, select
+a language or persist preferences; those UI/catalog bindings remain P05.6/P06.
+Stable definition IDs remain separate from their displayed names.
+
 | Value | Scope and purpose | Change behavior |
 | --- | --- | --- |
 | `uiLocale` | Owner preference, allowlist `en`, `it`; default `en` | Settings Language selector persists; safe UI reload |

@@ -56,7 +56,10 @@ P05.1 adds [routed interface previews](frontend/README.md) for the library,
 character creation, visual-novel story, sheet, inventory, journal and settings.
 Two local genre samples use original scene illustrations and attributed passages;
 Continue reads supplied text only. These shells have no connected campaigns or
-world-action API. Full pack binding, input, localization and graphics remain later P05 work.
+world-action API. P05.2 binds terminology, attribute/resource names and optional
+guide/creative panels to typed local public metadata, with neutral fallbacks and
+scope-aware route checks. Registered pack/campaign binding remains P06; input,
+localization and graphics remain later P05 work.
 
 ## Planned capabilities
 
