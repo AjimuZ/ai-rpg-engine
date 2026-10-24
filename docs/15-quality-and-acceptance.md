@@ -97,6 +97,20 @@ These establish the enabled storage/outbox/admission portions of QA-36/37; they 
 not complete semantic plan validation, fair scheduling, runtime cancellation,
 player-facing fallback, author/secret checks or narrative-quality evaluation.
 
+P04.1 evidence (24 October 2026): the 63-case in-memory parsing corpus covers the
+closed contract-1 manifest, YAML 1.2 core resolution, tags/anchors/aliases/merge
+rejection, strict JSON, encoding, immutable values, field coordinates, resource
+budgets, explicit categories and raw inventory hashes. Whole-value schema patterns
+reject trailing line terminators; an independently computed Python digest vector
+pins the portable framing. Full Maven `verify` on pinned JDK 21/PostgreSQL 18.6
+passes 176 tests, skips three separate packaged-interface profile tests (179 total),
+and builds the executable jar containing both schemas. Repository-checker tests pass
+22/22 and all repository policy checks report zero findings. This establishes only
+the parser/schema/hash portion of QA-02; semantic references, cycles, effects,
+archive extraction, media and immutable admission remain P04.2–P04.4, and the two
+playable genre fixtures of QA-01 remain P04.5. The definition envelope deliberately
+does not validate its `data` mechanics. No complete pack-import acceptance is claimed.
+
 ## 2. Verification layers
 
 | Layer | Purpose | Proposed tools |

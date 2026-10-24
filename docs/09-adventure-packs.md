@@ -2,7 +2,7 @@
 
 ## 1. Purpose and contract status
 
-An adventure pack is a versioned set of declarative files describing playable content and supported rules configuration. It is not a script that can command the host computer. This document defines the proposed v1 authoring contract; no parser, validator, JSON Schema file, or pack compiler exists yet. The concrete file syntax of pack contract 1 (`schemaVersion: 1`) is fixed by [ADR 0010](adr/0010-name-scope-format-licensing.md#decision-initial-pack-file-format-pack-contract-1). It covers UTF-8 encoding, YAML 1.2 core-schema `.yaml` files without anchors, aliases, tags, or duplicate keys, `.json` as an equivalent, CommonMark `.md` prose without front matter or rendered HTML, and directory or `.zip` distribution.
+An adventure pack is a versioned set of declarative files describing playable content and supported rules configuration. It is not a script that can command the host computer. P04.1 implements the in-memory manifest/parsing/hash stage and publishes structural JSON Schemas; semantic compilation, protected directory/archive import and immutable registration remain P04.2–P04.4. A `ParsedPack` is not a valid playable pack or an admitted `ContentRevision`. The concrete file syntax of pack contract 1 (`schemaVersion: 1`) is fixed by [ADR 0010](adr/0010-name-scope-format-licensing.md#decision-initial-pack-file-format-pack-contract-1). It covers UTF-8 encoding, YAML 1.2 core-schema `.yaml` files without anchors, aliases, tags, or duplicate keys, `.json` as an equivalent, CommonMark `.md` prose without front matter or rendered HTML, and directory or `.zip` distribution.
 
 The engine must not need a fixed plot. A minimal pack supplies world principles, a starting location/situation, character creation, a ruleset, and generation boundaries. Quests, endings, a prologue, companions, and a guide are optional.
 
@@ -68,7 +68,91 @@ Only `adventure.yaml` and the files it requires are mandatory. Files can be spli
 | `dependencies` | No | Locally installed, explicitly versioned content packages |
 | `provenance` | No | Source/authoring information and inherited material |
 
-The compiler produces a normalized internal manifest and a content digest covering referenced files and asset hashes in sorted relative-path order. Import timestamps and installation paths are metadata outside that digest. A changed byte in the distributed pack produces a different digest even if the author forgot to bump its version; registration reports the conflict.
+The parser produces a deeply immutable JSON-shaped manifest and a content digest covering the root manifest and every explicitly listed file, including asset bytes, in sorted relative-path order. Import timestamps and installation paths are metadata outside that digest. A changed byte in the distributed pack produces a different digest even if the author forgot to bump its version; future registration must report that conflict. YAML/JSON equivalence means the same schema and values, not the same raw-byte digest.
+
+### 3.1 Concrete manifest shape
+
+The bundled [manifest schema](../backend/src/main/resources/pack-contract/1/manifest.schema.json)
+is JSON Schema draft 2020-12. Unknown fields are errors, including inside nested
+manifest records. This stage requires a nonempty license declaration for every
+pack; checking SPDX/file rights is part of later registration. Version is a
+SemVer release label. Engine/ruleset range strings and policy/module IDs are
+structurally required; support and compatibility are checked in P04.2–P04.3.
+`contentLocale` retains its authored language tag; this stage checks its lexical
+shape without mapping it to a player language or claiming locale coverage.
+
+```yaml
+schemaVersion: 1
+id: example:harbor
+version: 1.0.0
+title: Harbor
+summary: A quiet harbor.
+authors: [Example Authors]
+license: MIT
+engineCompatibility: '>=0.1.0 <1.0.0'
+ruleset: {id: skirmish, version: '>=1.0.0 <2.0.0', policyProfile: standard}
+contentLocale: en
+narrativeMode: emergent
+entrypoint: {situation: arrival, location: harbor, creationProfile: visitor}
+files:
+  - {path: world.yaml, category: locations}
+  - {path: generation.json, category: generationPolicy}
+modules: []
+generationPolicy: generation.json
+```
+
+This illustrates manifest syntax, not a complete playable fixture. `files` is an
+array of unique `{path, category}` records. The root is exactly one of
+`adventure.yaml`/`adventure.json`, excluded from `files`. Every other supplied file
+must be listed; hidden/unreferenced extra bytes are rejected. Logical paths use
+portable ASCII names, `/`, at most 240 characters, and no empty, `.` or `..`
+segments. Absolute paths, backslashes and case collisions fail. Filesystem
+containment, reparse points, Windows reserved names, ZIP handling and media
+type/size checks still require P04.4; this API receives bytes and opens no paths.
+
+Categories `lore`, `narrativeStyle`, `license`, `credits` require `.md`;
+`asset` holds opaque binary bytes. Structured `.yaml`/`.json` categories are
+`locations`, `factions`, `timeline`, `secrets`, `creation`, `npcs`, `items`,
+`skills`, `abilities`, `conditions`, `progression`, `encounters`, `quests`,
+`rules`, `generationPolicy`, `anchors`, `theme`, `assetCatalog`, `audio`, `guide`,
+`creativeAbilities`. Category never comes from a filename guess.
+`generationPolicy` names a listed file of that category; optional
+`presentationProfile` names a listed `theme`. Modules are `{id, configuration?}`
+records with unique IDs and optional listed structured-file paths. Dependencies
+are `{id, version, hash}` records, where `hash` is lowercase hexadecimal SHA-256;
+resolution/conflicts remain later compiler work. `contentGuidance` accepts
+`tone`, `themes`, `exclusions`, `audience`; `provenance` accepts `source`, `notice`.
+The optional localization map is reserved for P04.6 and rejected until its schema
+and semantic checks exist.
+
+The [definition-envelope schema](../backend/src/main/resources/pack-contract/1/definitions.schema.json)
+publishes `{schemaVersion: 1, definitions: [{id, kind, data}]}`. It checks only
+the envelope; `data` intentionally remains an object awaiting category-specific
+P04.2–P04.3 schemas. Passing this schema cannot validate mechanics, visibility,
+references or author constraints and cannot authorize registration.
+The parser applies it to `locations`, `factions`, `creation`, `npcs`, `items`,
+`skills`, `abilities`, `conditions`, `progression`, `encounters`, `quests`,
+`rules`, `anchors`. Other structured categories currently require an object
+root and safe parsing; their category-specific semantics are still unavailable.
+Whole-value schema patterns require the actual end of input, including rejection
+of a final line terminator in identifiers, versions, locales, paths and hashes.
+They use an ECMAScript-compatible negative any-character assertion because `$`
+alone can match before a final newline.
+
+### 3.2 Normalized hash protocol
+
+Pack raw protocol 1 computes SHA-256 over the UTF-8 domain
+`rpgengine.pack.raw.v1` followed by one NUL byte, then a four-byte unsigned
+big-endian file count. For each ASCII relative path in ascending ordinal order,
+append its four-byte big-endian UTF-8 byte length, its UTF-8 bytes, the eight-byte
+big-endian raw file byte length, and the 32 raw SHA-256 digest bytes of that file.
+The root manifest participates exactly like other files. The result and per-file
+digests use lowercase hexadecimal. No JSON reserialization, whitespace/comment,
+Unicode, BOM or line-ending normalization occurs. Identical inventories have
+identical hashes regardless of caller map order or host root; renamed files,
+changed comments, assets, LF/CRLF or YAML/JSON source representations change them.
+The immutable output does not expose caller-owned byte arrays. Future revisions
+must preserve this framing or introduce an explicit new digest protocol.
 
 ## 4. Definition model
 
@@ -136,6 +220,20 @@ In combat, generated mechanics must use supported templates/effects and fit the 
 10. Register only if no blocking errors remain. Preview is read-only; activation requires the owner's import action.
 
 Initial archive limits: 100 MB compressed, 250 MB expanded, 2,000 files, 1 MB per structured text file, and 50:1 maximum expansion ratio. These are configurable product limits to validate against actual sample packs; images can use a separate per-file asset limit. Allowlisted media types and decompression budgets are mandatory.
+
+The P04.1 in-memory boundary enforces at most 2,000 files/250 MiB total,
+1 MiB per text file (including Markdown), depth 32, 20,000 nodes including mapping
+keys, 65,536 UTF-16 units per scalar, 128 source characters per number and exact
+decimal scale magnitude at most 1,000. YAML uses parser events and an explicit
+[YAML 1.2 core resolver](https://yaml.org/spec/1.2.2/#1032-tag-resolution), never
+the library's YAML 1.1 scalar resolution or object constructors. `yes/no/on/off`,
+timestamps and `1:30` remain strings; `0777` is decimal 777, `0o17` is 15.
+Nonfinite numbers and YAML directives are rejected as contract restrictions;
+quoted scalars stay strings. JSON is strict RFC syntax with one root, no comments,
+trailing commas, duplicate/merge keys or unpaired Unicode surrogates. Diagnostics
+carry a stable code, relative filename, one-based line/column and RFC 6901 pointer;
+raw parser messages and source snippets are not returned. Markdown is returned as
+unrendered text; future rendering must preserve the HTML/remote-fetch restrictions.
 
 ## 10. Diagnostic examples
 

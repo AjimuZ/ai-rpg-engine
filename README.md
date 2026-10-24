@@ -31,6 +31,11 @@ and a populated V6 restore/startup rehearsal pass; scheduling, global budgets,
 complete semantic plan validation and gameplay consumption remain future work.
 See the [backend scope](backend/README.md) and [P03 evidence](docs/15-quality-and-acceptance.md#1-evidence-policy).
 
+P04.1 adds the internal contract-1 manifest/parsing stage, structural schemas,
+explicit file categories and deterministic raw-byte hashes. Parsed data cannot
+be admitted or played yet; semantic compilation and safe directory/ZIP import
+remain P04.2–P04.4. See the [pack contract](docs/09-adventure-packs.md).
+
 ## Why this engine exists
 
 A long RPG campaign needs more than a conversation history. Inventory must remain consistent, unfinished promises must survive a new AI session, combat must use actual abilities and resources, and the narrator must respect what each character knows. AI RPG Engine is designed to make these responsibilities explicit and testable.

@@ -88,6 +88,20 @@ packaged-interface skips; a populated backup/restore and packaged startup rehear
 also passes (24 October 2026).
 The executable jar is `target/engine-0.1.0.jar`; it can also run with `java -jar`.
 
+P04.1 adds internal `content.PackParser.parse(Map<String, byte[]>)` for caller-staged
+inventories: a strict contract-1 manifest, safe bounded YAML/JSON, explicit file
+categories, source diagnostics and sorted raw-byte SHA-256 identities. The
+Boot-managed SnakeYAML dependency is used only for parser events; custom core
+scalar resolution bypasses YAML 1.1 typing and all object constructors. Bundled
+draft-2020-12 schemas describe the manifest and preliminary definition envelope.
+The focused corpus runs with `./mvnw -B -ntp -Dtest=PackParsingTest test` without
+PostgreSQL. `ParsedPack` establishes parsing only: semantic definitions, protected
+filesystem/ZIP import, asset rights/type checks and registration are unavailable.
+The 63 parser cases and full JDK 21/PostgreSQL 18.6 backend `verify` pass: 176
+tests pass, three packaged-interface profile tests skip, and the built jar contains
+both contract schemas (24 October 2026).
+See the [contract and hash protocol](../docs/09-adventure-packs.md#3-manifest-fields).
+
 ## Packaged runtime configuration (P02.3)
 
 Activate the Spring runtime profile with `--spring.profiles.active=packaged`.

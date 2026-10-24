@@ -2,6 +2,13 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Contract-1 parsing foundations (P04.1), 24 October 2026
+
+- Add a closed versioned manifest and preliminary definition-envelope JSON Schemas, explicit file categories and source-located diagnostics.
+- Parse bounded UTF-8 YAML/JSON as immutable data without YAML object constructors, aliases, tags, merge keys or duplicate keys; preserve YAML 1.2 core typing and reject front matter in unrendered Markdown.
+- Define sorted path/length/raw-SHA-256 framing covering all distributed bytes, including manifest/comments/assets, independently of map order or host metadata.
+- Pass the 63-case parser/schema/hash corpus, including an independent digest vector and final-line-terminator regressions. Full pinned JDK 21/PostgreSQL 18.6 backend verification passes 176 tests with three packaged-interface profile skips (179 total) and builds the jar with both schemas; repository tests pass 22 and policy checks report zero findings. Keep semantic definition validation, archive/filesystem/media protections and immutable registration in P04.2–P04.4; no playable-pack admission is claimed.
+
 ## Unreleased — Durable preparation and fenced admission (P03.6), 24 October 2026
 
 - Add V6 scoped jobs/attempts, immutable snapshots, versioned artifacts/dependencies, admission receipts, append-only dispositions, query epochs and campaign recovery generations.

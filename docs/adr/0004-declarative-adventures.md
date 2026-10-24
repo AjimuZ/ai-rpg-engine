@@ -1,6 +1,6 @@
 # ADR 0004: Declarative, Immutable Adventure Packs
 
-**Status:** Proposed format; adventure independence is an owner requirement. [ADR 0010](0010-name-scope-format-licensing.md) fixes the concrete file syntax of pack contract 1. **Date:** 22 October 2026.
+**Status:** Declarative boundary accepted; manifest/parsing foundations implemented in P04.1, semantic compilation and registration pending. Adventure independence is an owner requirement. [ADR 0010](0010-name-scope-format-licensing.md) fixes the concrete file syntax of pack contract 1. **Date:** 22 October 2026.
 
 ## Context
 
@@ -23,3 +23,25 @@ Authors need clear diagnostics and examples. Content migration becomes an explic
 ## Verification
 
 Safe parser/archive corpus, semantic reference checks, immutable hashes, migration tests, and genre-independent execution. See [adventure packs](../09-adventure-packs.md).
+
+## P04.1 implementation decisions (24 October 2026)
+
+Use the existing Boot-managed SnakeYAML dependency for events only, with explicit
+YAML 1.2 core scalar resolution. No YAML object constructor or default YAML 1.1
+resolver processes pack bytes. Jackson streaming tokens enforce the same immutable
+JSON-shaped value model. Fixed budgets and source coordinates belong to each call.
+This avoids adding a second YAML implementation or a general schema dependency.
+
+Publish a closed manifest and a preliminary definition envelope as draft-2020-12
+schemas. A small internal evaluator implements only their assertion vocabulary,
+rejects unsupported keywords, loads fixed classpath resources and resolves only
+local references; user-supplied schemas and remote resolution are unavailable.
+P04.2–P04.3 must add category-specific data constraints before semantic admission.
+This deliberately stages ADR 0010's definition-schema delivery rather than
+claiming that an envelope validates playable mechanics.
+
+Hash the complete explicit inventory using the versioned raw framing in the pack
+specification. Canonical parsed data is for validation, never hash reserialization:
+comments, line endings and asset changes must change revision identity. The stage
+operates only on caller-staged bytes and produces `ParsedPack`; no API accepts it
+as an admitted revision, and no archive/host path is opened.

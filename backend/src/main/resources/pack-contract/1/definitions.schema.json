@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rpgengine:pack:1:definitions",
+  "title": "Contract 1 definition envelope",
+  "description": "Envelope only. The data property is intentionally not semantic validation; P04.2 and P04.3 must supply category-specific schemas before admission.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "definitions"],
+  "properties": {
+    "schemaVersion": {"type": "integer", "const": 1},
+    "definitions": {
+      "type": "array", "maxItems": 10000,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "kind", "data"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z][a-z0-9._:-]*(?![\\s\\S])"},
+          "kind": {"type": "string", "enum": ["location", "npc", "faction", "item", "skill", "ability", "condition", "quest", "encounter", "anchor", "creation", "progression", "rule"]},
+          "data": {"type": "object"}
+        }
+      }
+    }
+  }
+}

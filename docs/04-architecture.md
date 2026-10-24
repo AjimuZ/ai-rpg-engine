@@ -56,6 +56,11 @@ migration and the canonical foundation entities in the `identity`, `adventure`,
 
 ## 3. Backend modules
 
+P04.1 adds a data-only manifest/parsing/hash stage in `content`, using fixed
+classpath schemas and no I/O ports. Its immutable `ParsedPack` is distinct from
+an admitted `ContentRevision`; semantic compilation and protected staging/registry
+operations remain P04.2–P04.4. See the [pack contract](09-adventure-packs.md).
+
 | Module | Responsibility | Main dependencies |
 | --- | --- | --- |
 | `identity` | Local owner identity and administrative privileges | Configuration and storage |

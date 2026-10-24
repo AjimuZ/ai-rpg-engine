@@ -14,6 +14,18 @@ retain their standard precedence; configtree is not a secret manager.
 
 ## 1. Risk register
 
+P04.1 adds an in-memory parsing boundary only. Its schemas and raw hashes cannot
+establish safe filesystem/archive extraction, allowed media, licensing, correct
+mechanics or playable references. `ParsedPack` must never be registered as an
+admitted revision without the remaining P04.2–P04.4 gates. The preliminary
+definition schema deliberately leaves `data` semantics to those gates. Fixed
+parser budgets bound text work; archive expansion/media budgets and import
+isolation still require the protected staging layer. The 63-case parser/schema/hash
+corpus passes, including strict final-terminator boundaries and an independent digest
+vector. Full backend verification passes 176 tests with three packaging-profile skips;
+repository tests pass 22 and policy checks report zero findings. No archive/import
+or semantic admission security claim follows from these parser-stage results.
+
 P03.6 verifies scoped durable jobs, complete snapshot manifests, fenced admission,
 query-epoch races, cancellation/restart metadata and generation retirement on restore.
 These remain internal foundations: every future gameplay writer must identify all

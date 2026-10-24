@@ -563,7 +563,17 @@ content/assets and full container integration remain open; P02.3 stays unchecked
 
 **Depends on:** P03; uses P00 ruleset decisions. **Areas:** content schemas/parser/compiler, neutral content fixtures.
 
-- [ ] P04.1 Implement versioned manifest, safe YAML/JSON parsing, explicit file categories, and normalized hashes.
+- [x] P04.1 Implement versioned manifest, safe YAML/JSON parsing, explicit file categories, and normalized hashes.
+  - Session 1: implement a data-only in-memory parsing boundary, closed contract-1
+    manifest and definition-envelope schemas, explicit categories and sorted raw-byte
+    SHA-256 framing. The 63-case parser/schema/hash corpus covers malicious syntax,
+    resource limits, final-line-terminator regressions and an independent digest vector.
+    Full pinned JDK 21/PostgreSQL 18.6 backend `verify` passes 176 tests with three
+    packaging-profile skips (179 total) and builds the jar with both schemas.
+    Repository tests pass 22 and policy checks report zero findings.
+    Definition categories validate a preliminary envelope; semantic data, policy/module
+    compatibility, filesystem/archive/media protection and registration remain
+    P04.2–P04.4. This stage does not admit packs or close the overall P04 exit.
 - [ ] P04.2 Implement IDs, dependencies, cross-references, creation profiles, item rarity/appearance identities, skills, abilities, and initial world definitions.
 - [ ] P04.3 Implement bounded expressions/effects, graph/cycle limits, fixed author/required-entity constraints, version compatibility and conflict diagnostics; generated gap filling cannot override them.
 - [ ] P04.4 Add path/archive/type/size protections and immutable registration.

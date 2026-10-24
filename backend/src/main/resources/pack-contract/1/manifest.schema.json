@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rpgengine:pack:1:manifest",
+  "title": "Contract 1 manifest",
+  "description": "Structural manifest boundary. Compatibility, references and module semantics require later compilation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "version", "title", "summary", "authors", "license", "engineCompatibility", "ruleset", "contentLocale", "narrativeMode", "entrypoint", "files", "modules", "generationPolicy"],
+  "properties": {
+    "schemaVersion": {"type": "integer", "const": 1},
+    "id": {"type": "string", "minLength": 3, "maxLength": 128, "pattern": "^[a-z][a-z0-9.-]*:[a-z][a-z0-9._-]*(?![\\s\\S])"},
+    "version": {"type": "string", "maxLength": 64, "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?![\\s\\S])"},
+    "title": {"$ref": "#/$defs/text"},
+    "summary": {"$ref": "#/$defs/text"},
+    "authors": {"type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true, "items": {"$ref": "#/$defs/text"}},
+    "license": {"$ref": "#/$defs/text"},
+    "engineCompatibility": {"$ref": "#/$defs/text"},
+    "ruleset": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "version", "policyProfile"],
+      "properties": {"id": {"$ref": "#/$defs/text"}, "version": {"$ref": "#/$defs/text"}, "policyProfile": {"$ref": "#/$defs/text"}}
+    },
+    "contentLocale": {"type": "string", "maxLength": 64, "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*(?![\\s\\S])"},
+    "narrativeMode": {"type": "string", "enum": ["authored", "emergent", "hybrid"]},
+    "entrypoint": {
+      "type": "object", "additionalProperties": false,
+      "required": ["situation", "location", "creationProfile"],
+      "properties": {"situation": {"$ref": "#/$defs/text"}, "location": {"$ref": "#/$defs/text"}, "creationProfile": {"$ref": "#/$defs/text"}}
+    },
+    "files": {"type": "array", "minItems": 1, "maxItems": 1999, "items": {"$ref": "#/$defs/file"}},
+    "modules": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/module"}},
+    "generationPolicy": {"$ref": "#/$defs/path"},
+    "presentationProfile": {"$ref": "#/$defs/path"},
+    "contentGuidance": {
+      "type": "object", "additionalProperties": false,
+      "properties": {"tone": {"$ref": "#/$defs/text"}, "themes": {"$ref": "#/$defs/texts"}, "exclusions": {"$ref": "#/$defs/texts"}, "audience": {"$ref": "#/$defs/text"}}
+    },
+    "dependencies": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/dependency"}},
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "properties": {"source": {"$ref": "#/$defs/text"}, "notice": {"$ref": "#/$defs/text"}}
+    }
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "\\S"},
+    "texts": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/text"}},
+    "path": {"type": "string", "minLength": 1, "maxLength": 240, "pattern": "^[A-Za-z0-9_][A-Za-z0-9_./-]*(?![\\s\\S])"},
+    "file": {
+      "type": "object", "additionalProperties": false, "required": ["path", "category"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "category": {"type": "string", "enum": ["lore", "locations", "factions", "timeline", "secrets", "creation", "npcs", "items", "skills", "abilities", "conditions", "progression", "encounters", "quests", "rules", "narrativeStyle", "generationPolicy", "anchors", "theme", "assetCatalog", "audio", "guide", "creativeAbilities", "asset", "license", "credits"]}
+      }
+    },
+    "module": {
+      "type": "object", "additionalProperties": false, "required": ["id"],
+      "properties": {"id": {"$ref": "#/$defs/text"}, "configuration": {"$ref": "#/$defs/path"}}
+    },
+    "dependency": {
+      "type": "object", "additionalProperties": false, "required": ["id", "version", "hash"],
+      "properties": {"id": {"$ref": "#/$defs/text"}, "version": {"$ref": "#/$defs/text"}, "hash": {"type": "string", "pattern": "^[0-9a-f]{64}(?![\\s\\S])"}}
+    }
+  }
+}
