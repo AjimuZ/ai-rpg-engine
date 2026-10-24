@@ -877,6 +877,15 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     All 22 repository policy tests pass; repository scans report zero findings.
     Typed starting decisions, exact text consultations, frontend binding and
     full QA-33 media/draft/restore isolation remain P06.3–P06.5/P05 integration.
+  - CI recovery (24 October 2026): exact run 40122681346 failed the backup
+    migration-scope regression after V10 was added. Extend the reviewed recovery
+    allowlist to V10 and both actor-audience knowledge tables; retain strict
+    version/catalog checks. Local reproduction confirmed the V9/V10 mismatch;
+    all nine backup tests now complete with eight passes and the existing Windows
+    symlink-privilege skip. All 22 repository tests pass; runtime probes pass
+    98 cases with 18 opt-in skips. No live V10 restore is claimed. No task
+    completion marks change. Repository scans report zero findings; all 117
+    task IDs, titles and checked states match the incident commit.
 - [ ] P06.3 Show a pack-defined starting situation and pending decision without hardcoded prologue text.
 - [ ] P06.4 Keep exact status/inventory consultations local and separate transcript delivery from world state.
 - [ ] P06.5 Implement separate adventure specifications/media folders and library switching; prove same-name entity, draft, memory, artwork and restart/restore isolation under QA-33.

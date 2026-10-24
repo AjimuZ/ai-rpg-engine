@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Backup scope recovery, 24 October 2026
+
+- Extend the strict backup schema/catalog allowlist to V10 and the two explicit
+  player knowledge tables after reproducing the exact P06.2 CI failure. Preserve
+  rejection of older schemas, unknown tables and unsuccessful migrations.
+- Verify the backup suite (eight passes, one existing Windows symlink-privilege
+  skip), 22 repository tests and 98 account-free runtime cases (18 opt-in skips).
+  Repository scans report zero findings; all 117 roadmap task definitions and
+  checked states are preserved. No live V10 restore is claimed.
+
 ## Unreleased — Scoped player projections (P06.2), 24 October 2026
 
 - Add bounded owner campaign listing and scoped read-only continue/state,
