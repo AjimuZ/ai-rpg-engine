@@ -2,6 +2,13 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Validated pack localization (P04.6), 24 October 2026
+
+- Add optional closed EN/IT overlays and source-owned text resources, stable ID/field bindings, glossary proper-name/term hints, explicit quote policies, placeholder parity and source-language fallback. Resolve text through a separate immutable catalog; mechanics, identities, visibility and dependency exports remain source-authoritative.
+- Include reviewed EN/IT resources for all approved catalog leaves in both neutral genre fixtures, with explicit verbatim English quotes and honest coverage of source-only prose. UI resources, narration and independent human bilingual playtests remain later work.
+- Seal deterministic localization coverage in report version 2. Add preservation-only V8 support for old/new report versions, extend the strict database-backup allowlist and verify exact recovery of fixture bytes, hashes, exports and both report formats.
+- Verification: 45 focused cases pass; full pinned JDK 21/PostgreSQL 18.6 `verify` passes 262 tests with three packaging-profile skips (265 total), builds the jar and checks populated V1→V8 preservation. Backup tests pass eight with one Windows symlink skip; a disposable V8 dump/restore passes. All 22 repository tests pass and docs/secrets/workflows/images have zero findings; jar inspection confirms trusted schemas/V8 and excludes test inventories.
+
 ## Unreleased — Neutral genre import fixtures (P04.5), 24 October 2026
 
 - Add standalone fantasy exploration and science-fiction salvage packs with distinct world graphs, vocabulary, skills, resource caps, creation profiles, abilities, quests and original MIT-licensed schematic PNG assets.

@@ -21,6 +21,8 @@ public final class PackSchemas {
             "maxItems", "minLength", "maxLength", "pattern", "uniqueItems");
     private static final Map<String, Object> MANIFEST = load("manifest");
     private static final Map<String, Object> DEFINITIONS = load("definitions");
+    private static final Map<String, Object> LOCALIZATION = load("localization");
+    private static final Map<String, Object> TEXT_RESOURCES = load("text-resources");
 
     /** Prevent construction of this fixed-schema utility. */
     private PackSchemas() {
@@ -34,6 +36,16 @@ public final class PackSchemas {
     /** Validate the definition envelope only; success does not establish semantic validity or authorize admission. */
     public static void definitions(PackDocument document) {
         validate(DEFINITIONS, DEFINITIONS, document.value(), document, "");
+    }
+
+    /** Validate a text-only overlay shape; invalid structure throws a source-located PackException. */
+    public static void localization(PackDocument document) {
+        validate(LOCALIZATION, LOCALIZATION, document.value(), document, "");
+    }
+
+    /** Validate source resource/policy structure; target ownership and protection require semantic compilation. */
+    public static void textResources(PackDocument document) {
+        validate(TEXT_RESOURCES, TEXT_RESOURCES, document.value(), document, "");
     }
 
     /** Load one fixed schema as data; missing or unreadable packaged schemas are internal build errors. */

@@ -35,7 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class PackRegistry {
     /** Report schema revision stored with every registration; bump it when the document shape changes. */
-    static final int REPORT_VERSION = 1;
+    static final int REPORT_VERSION = 2;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
     private final TransactionTemplate reads;
@@ -260,6 +260,7 @@ public class PackRegistry {
         }
         report.put("files", files);
         report.put("definitions", kinds);
+        report.put("localization", compiled.localization().report());
         List<Map<String, Object>> warnings = new ArrayList<>();
         for (PackWarning warning : compiled.warnings()) {
             warnings.add(ordered("code", warning.code(), "file", warning.location().file(), "line",

@@ -15,7 +15,7 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V7 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V8 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -140,6 +140,25 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(0, jdbc.queryForObject("select count(*) from content_revision_file", Integer.class));
                     assertEquals(0, jdbc.queryForObject("select count(*) from content_revision_report", Integer.class));
                     assertEquals(0, v7.migrate().migrationsExecuted);
+                    // Seal an explicit tiny V7 inventory, then prove V8 changes only allowed report
+                    // versions. Previously sealed bytes, exports, reports and campaign pins stay exact.
+                    jdbc.update("insert into content_revision_file (content_revision_id, path, category, byte_size, "
+                            + "sha256, content) values (?, 'source.md', 'lore', 1, encode(sha256(?::bytea), 'hex'), ?)",
+                            revision, new byte[] {65}, new byte[] {65});
+                    jdbc.update("insert into content_revision_report (content_revision_id, report_version, file_count, "
+                            + "total_bytes, report, exports) values (?, 1, 1, 1, '{\"reportVersion\":1}', '{}')", revision);
+                    String oldReport = jdbc.queryForObject("select to_jsonb(r)::text from content_revision_report r", String.class);
+                    String oldFile = jdbc.queryForObject("select to_jsonb(f)::text from content_revision_file f", String.class);
+                    Flyway v8 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("8").load();
+                    assertEquals(1, v8.migrate().migrationsExecuted);
+                    assertTrue(v8.validateWithResult().validationSuccessful);
+                    assertEquals(oldReport, jdbc.queryForObject("select to_jsonb(r)::text from content_revision_report r", String.class));
+                    assertEquals(oldFile, jdbc.queryForObject("select to_jsonb(f)::text from content_revision_file f", String.class));
+                    assertEquals(legacyRevision, jdbc.queryForObject("select to_jsonb(c)::text from content_revision c", String.class));
+                    assertEquals(v6Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
+                    assertEquals(journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o", String.class));
+                    assertEquals(0, v8.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

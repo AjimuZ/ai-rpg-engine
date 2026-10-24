@@ -1,4 +1,4 @@
-# Database backup and restore (P03.6 foundation)
+# Database backup and restore (V8 scope)
 
 A trusted-owner disaster-recovery tool for the canonical PostgreSQL database. It
 uses only the Python standard library and the `pg_dump`/`pg_restore` clients inside
@@ -19,7 +19,7 @@ py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
 ## What it does
 
 - **Backup** checks the exact server and client version, the exact table set and
-  successful migrations V1–V6. It then creates the target directory, which must
+  successful migrations V1–V8, including immutable pack bytes and sealed reports. It then creates the target directory, which must
   not already exist, and writes `database.dump` (custom format, no owners or
   privileges). It re-reads the catalog and writes `manifest.json` last. The manifest
   holds the format, schema and PostgreSQL versions, the scope, the byte count, the
@@ -42,8 +42,11 @@ py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
 
 ## Limits
 
-- The scope is the database only. Asset files, content packs and configuration are
-  not included yet. A future migration or table makes the tool refuse until it is
+- The scope is the database only. Registered pack bytes (including declared assets
+  and EN/IT resources), hashes, exports and immutable version 1/2 reports are included.
+  External assets, unregistered pack directories and configuration are not included.
+  Earlier-schema archives require a separately reviewed recovery procedure; this
+  tool accepts only the current exact schema. A future migration or table makes the tool refuse until it is
   reviewed, and `test_scope_matches_backend_migrations` enforces that.
 - The checksum detects corruption, not deliberate tampering by someone who can
   rewrite the manifest. Restore only archives you created and stored privately.
@@ -58,6 +61,12 @@ py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
   consistent snapshot.
 - A failed restore leaves the new database in place but offline, for diagnosis.
   The tool never deletes it automatically.
+- The P04.6 V8 rehearsal (24 October 2026) seeded both complete bilingual fixture
+  inventories with sealed report versions 1 and 2, then backed up and restored into
+  a new disposable database. Original bytes, aggregate/per-file hashes, revision
+  metadata, exports, reports and migration catalogs matched exactly; the source
+  remained unchanged. These were explicit recovery rows, not historical registry
+  imports. This check does not extend gameplay/startup acceptance.
 - The P03.5 rehearsal ran manually against PostgreSQL 18.6 (backup, tamper
   rejection, restore, data comparison, lease retirement and engine startup
   reconciliation). CI runs only the offline unit tests.

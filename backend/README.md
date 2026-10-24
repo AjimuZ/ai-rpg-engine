@@ -43,14 +43,15 @@ disposable database: the test requires exactly the twenty-five domain tables cre
 `V2__campaign_bounds_and_versions.sql` (P03.2, adding `actor_resource`) and
 `V3__canonical_outbox.sql` (P03.3), `V4__deterministic_random_draws.sql` (P03.4) and
 `V5__campaign_mutation_leases.sql` (P03.5) and
-`V6__durable_jobs_and_planning.sql` (P03.6) and `V7__pack_registration.sql` (P04.4), with no
+`V6__durable_jobs_and_planning.sql` (P03.6), `V7__pack_registration.sql` (P04.4) and
+`V8__localized_pack_reports.sql` (P04.6, report-version constraint only), with no
 rows, and Hibernate validates the entities against them (`ddl-auto=validate`).
 The persistence tests truncate these tables before and after each test, so never
 point `verify` at a database whose data you want to keep.
 P03.2 adds storage row versions separate from canonical counters, frozen ownership,
 bounded actor resources and complete write-once journal outcomes. Integration tests
 include cross-campaign rejection, scoped reads, concurrent duplicate inserts and
-stale-writer rollback, plus populated V1-to-V7 upgrade in a disposable schema.
+stale-writer rollback, plus populated V1-to-V8 upgrade in a disposable schema.
 P03.3 adds an internal `CanonicalCommitService` consuming immutable `ResolvedCommit`
 values from trusted backend resolution. It atomically saves world/resource changes,
 events, settlements, a backend receipt and reference-only outbox intents, and returns
@@ -145,13 +146,47 @@ original MIT-licensed PNG schematics. No production code or dependency changes
 are needed to import either pack. They live in test resources and are not bundled
 in the production jar.
 
-`./mvnw -B -ntp -Dtest=NeutralGenreImportTest test` runs two PostgreSQL-backed
+`./mvnw -B -ntp -Dtest=NeutralGenreImportTest test` runs PostgreSQL-backed
 cases: unchanged directory/ZIP imports, read-only preview, sealed byte/hash/report
 round trips, recompile, idempotency, independent adventure imports and located
 invalid-reference rejection with no partial writes. Optional modules stay
-disabled; campaign gameplay, UI and reviewed EN/IT overlays remain later work.
+disabled; campaign gameplay and UI remain later work. P04.6 adds reviewed EN/IT
+catalog resources and two localization-specific integration cases described below.
 Pinned JDK 21/PostgreSQL 18.6 full `verify` passes 220 tests with three separate
 packaging-profile skips (223 total) and builds the jar (24 October 2026).
+
+## Pack text catalogs (P04.6)
+
+Verification: 45 focused compiler/import/upgrade cases pass. Full pinned backend
+`verify` passes 262 tests with three packaged-interface profile skips (265 total)
+and builds the jar. The V8 backup/restore rehearsal preserves registered fixture
+bytes, hashes, exports and both sealed report versions; see the
+[backup tool scope](../tools/database_backup/README.md).
+
+Optional contract-1 `localizations` and `textResources` declarations compile into
+`CompiledPack.localization()`, separate from mechanics and author constraints.
+The [localization contract](../docs/29-localization.md#4-pack-localization-contract)
+defines closed schemas, stable child-ID paths, owner/visibility inheritance,
+proper-name/quote policies, named-placeholder parity and bounds. Partial or absent
+overlays fall back to exact source text; a verbatim quote retains source language.
+The immutable result includes actual locale, fallback, source owner/visibility,
+kind and quote policy. Missing text is an explicit diagnostic.
+
+The catalog is internal content: authorize source owner and field **before** lookup.
+Reports add privileged `localization` coverage/counts and fallback keys, without
+private prose or hints. Original overlay/resource files and reports are sealed
+through the existing registry and raw-byte hashes. New reports use version 2; V8
+permits versions 1 and 2 while preserving old seals. Identical re-imports keep the
+original report; new inspection may supply current coverage. No dependency change
+is needed. Markdown and prose arrays without stable child IDs stay source-only.
+This implements pack validation, not localized UI, ICU, rendering or narrative quality.
+
+Run `./mvnw -B -ntp -Dtest=PackLocalizationTest,NeutralGenreImportTest test`
+against disposable PostgreSQL. The corpus covers both reviewed bilingual fixtures,
+unknown/mechanical/audience targets, source policies and visibility, placeholder
+changes, duplicates/path/locale/size errors, stable-ID reordering, fallback and
+unchanged mechanics. Integration checks preserve localized bytes/reports on reload,
+reject changed-overlay hash conflicts and admit no rows after hostile overlay errors.
 
 ## Packaged runtime configuration (P02.3)
 

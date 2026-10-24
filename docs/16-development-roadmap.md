@@ -651,7 +651,24 @@ content/assets and full container integration remain open; P02.3 stays unchecked
     pass 22; docs/secrets/workflows/images have zero findings. Optional modules stay
     disabled because no runtime exists; distinct guide/creative behavior, playable
     QA-01, full QA-33 isolation and reviewed EN/IT resources remain later gates.
-- [ ] P04.6 Validate optional ID-based English/Italian text overlays, glossary/quote policies, locale coverage and source-language fallback; localized fields cannot alter mechanics or visibility, and both neutral genre fixtures include reviewed EN/IT resources.
+- [x] P04.6 Validate optional ID-based English/Italian text overlays, glossary/quote policies, locale coverage and source-language fallback; localized fields cannot alter mechanics or visibility, and both neutral genre fixtures include reviewed EN/IT resources.
+  - Add closed source-owned resources and separate immutable catalogs with stable-ID
+    text leaves, proper-name/quote policies, placeholder parity and exact EN/IT
+    fallback. Mechanics, visibility and exports remain source-authoritative.
+    Both fixtures include reviewed EN/IT resources for all 24/26 catalog leaves;
+    each protected English motto remains the one Italian fallback. Source-only
+    prose is excluded from coverage; UI, narration and human playtests stay later.
+    All 45 focused checks pass, including hostile authority changes, hash conflicts,
+    sealed reload and populated V1→V8 preservation. Report version 2 uses stable
+    ordered coverage; V8 retains old seals without rewriting bytes or identities.
+    Full pinned JDK 21/PostgreSQL 18.6 `verify` passes 262 tests with three separate
+    packaging-profile skips (265 total) and builds the jar with trusted schemas/V8
+    and no test inventories. Backup tests pass eight with one Windows symlink skip;
+    a real V8 dump/restore preserves fixture bytes, hashes, exports and report
+    versions 1/2. All 22 repository tests pass; docs/secrets/workflows/images report
+    zero findings. The strict backup allowlist now includes all reviewed V8 tables.
+
+
 
 **Exit:** valid packs compile; invalid/malicious packs fail with file/field context. No arbitrary executable pack plugins. **Checks:** schema/reference/limit/path corpus, hash conflicts, dependency resolution, two-pack integration. **Suggested commit:** `Add validated versioned adventure packs`.
 

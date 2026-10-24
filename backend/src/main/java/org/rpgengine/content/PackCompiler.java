@@ -152,7 +152,7 @@ public final class PackCompiler {
             questGraph.rejectCycles("quest requirement");
             GenerationPolicy policy = generationPolicy();
             reachability();
-            return new CompiledPack(pack, all, byId, policy, warnings);
+            return new CompiledPack(pack, all, byId, policy, PackLocalization.compile(pack, byId), warnings);
         }
 
         /**

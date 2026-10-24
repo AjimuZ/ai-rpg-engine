@@ -40,8 +40,10 @@ P04.4 adds bounded directory/ZIP staging, media header checks and immutable
 transactional pack registration with original files and reports. These are internal
 APIs. P04.5 adds standalone [fantasy exploration and science-fiction salvage
 fixtures](backend/src/test/resources/packs/README.md) with directory/ZIP import
-checks on the same engine build; import screens, playable campaigns and locale
-overlays remain pending.
+checks on the same engine build. P04.6 adds optional EN/IT text overlays, source
+fallback, glossary/quote policies and sealed coverage reports without changing
+mechanics or visibility. Both fixtures include bilingual catalog resources; import
+screens, localized UI, runtime narration and playable campaigns remain pending.
 See the [pack contract](docs/09-adventure-packs.md).
 
 ## Why this engine exists

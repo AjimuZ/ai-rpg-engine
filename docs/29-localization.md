@@ -2,7 +2,8 @@
 
 ## 1. Status and supported release
 
-Accepted design requirement, not implemented translation resources. P03.1 stores
+P04.6 implements pack text catalogs and EN/IT fixture resources; localized UI and
+narration remain later work. P03.1 stores
 the owner's UI locale, each campaign's narrative locale and the locale, glossary
 and media generations outside the canonical counters. English is
 the default; English and Italian are both required for the first playable MVP
@@ -82,29 +83,79 @@ locale tools without changing numeric command payloads or mechanics.
 
 ## 4. Pack localization contract
 
-Retain pack-contract-1 `contentLocale`. Add an optional `localizations` map keyed
-by supported locale, each naming explicit manifest-relative overlay files; the
-P04.6 schema defines allowed fields before any import accepts them. Existing
-single-language packs stay interpretable and retain their pinned content hashes.
-New overlays are included in a new normalized revision digest, never hot-loaded
-into a running campaign. The existing YAML/JSON/path/size restrictions apply.
+Pack contract 1 retains `contentLocale`; compilation supports exact `en` and `it`.
+Both additions are optional: `localizations` maps `en`/`it` to arrays of explicit
+manifest-relative overlay paths, and `textResources` names one source-owned text
+and policy file. List these files under the `localization` and `textResources`
+categories, respectively. Every such file must be bound, and an overlay path
+cannot be reused across locales. Each locale permits 1–64 distinct paths. Existing
+single-language inventories retain their original hashes. Added or edited files
+produce a new revision through the existing raw-byte hash protocol; no digest
+normalization change or hot reload is introduced. YAML/JSON/path/staging budgets
+continue to apply. The closed [overlay schema](../backend/src/main/resources/pack-contract/1/localization.schema.json)
+and [source-resource schema](../backend/src/main/resources/pack-contract/1/text-resources.schema.json)
+are bundled with the backend.
 
-An overlay references stable definition IDs and approved text fields only:
-display labels, public descriptions, authored dialogue, tutorials and terminology.
-It cannot change ability costs, IDs, rarity, objectives, visibility or links.
-Private text remains private in every locale. Do not use localized names as
-database keys. Pack glossary entries distinguish proper names, translatable
-terms, grammatical hints and pronunciation; one entity has one identity.
+An overlay has `{schemaVersion: 1, entries: [{id, field, text}]}`. Its `(id, field)`
+keys must be unique across all files for one locale and resolve to existing local
+source text. External/dependency IDs cannot be patched. Each file permits at most
+10,000 entries; strings are nonblank and at most 4,096 characters. Named `{token}`
+placeholder identities and occurrence counts must match source; the compiler does
+not execute templates or implement ICU parsing.
 
-Lookup order is exact selected locale, declared pack source text, then an
-explicit missing-content diagnostic. Required engine UI never relies on a
-partially translated pack. Import reports list language coverage and source
-fallbacks. Both bundled neutral genre fixtures must have reviewed English and Italian
-text for P04.6. P04.5 supplies English source inventories only; overlays, coverage
-reports and fallback validation remain unimplemented. External untranslated packs
-are allowed with a clear source-language
-badge before play; no claim of full authored translation is made. The owner may
-review/publish an explicit translation revision later through ordinary authoring.
+Approved fields are `$pack` `/title`, `/summary`, `/entrypoint/situation`;
+existing definition `/name`, `/description`, `/summary`; NPC `/role`; and item
+`/appearance/summary`. Nested fields use child IDs, never numeric offsets:
+rule `/attributes/<id>/name`, `/resources/<id>/name`, `/tiers/<id>/name`;
+creation `/archetypes/<id>/name`; quest `/objectives/<id>/description` and
+`/outcomes/<id>/description`. Only existing source leaves qualify. Overlay text
+cannot change IDs, costs, formulas, rarity tokens, references, predicates,
+objectives, consequences, visibility, owner or policy. Markdown prose and text
+inside arrays without stable child IDs (facts, goals, backgrounds, settlement
+consequences) remain source-only. Coverage does not claim these are translated.
+
+The optional source resource has `schemaVersion: 1` and optional `texts`,
+`glossary`, `quotes` arrays (each at most 10,000 entries):
+
+- `texts`: `{id, owner, kind, visibility, text}`. A unique local text ID, distinct
+  from definition IDs, binds `/text` to an existing local definition owner.
+  Kinds are `dialogue`, `tutorial`, `quote`; visibility is `public` or `secret`.
+  A secret owner cannot acquire public text. Localized text inherits the source
+  owner, visibility and kind without altering the compiled definition.
+- `glossary`: `{id, field, kind, grammar?, pronunciation?}`. Kinds are `properName`
+  or `term`; optional hint maps accept only `en` and `it` bounded nonblank text.
+  A proper name must remain exactly identical to source in every overlay.
+- `quotes`: `{id, field, policy}`. Policies are `verbatim` and `translate`; every
+  source text of kind `quote` requires one. Policy targets must be unique existing
+  text leaves. A proper name cannot require translation. `verbatim` preserves the
+  exact source string and source language even if an overlay repeats it.
+
+`CompiledPack.localization()` returns an immutable catalog beside the unchanged
+mechanical definitions. `resolve(id, field, locale)` selects an exact overlay,
+then declared source text. It returns text, actual language, fallback flag,
+source owner/visibility/kind and quote policy. Missing keys produce `MISSING_TEXT`;
+unsupported selected locale arguments fail. There is no invented text or silent
+locale normalization. Translation syntax cannot establish semantic truth: human
+review remains necessary to catch misleading prose.
+
+This catalog is internal content, **not an audience projection**. A consumer must
+authorize the source owner and field before lookup; access to a localized key or
+glossary never grants knowledge. Import reports add privileged `localization`
+metadata in report version 2: source locale, sorted EN/IT totals, overlay counts, source-fallback keys,
+and source-only Markdown paths. V8 accepts report versions 1 and 2 without rewriting
+old seals; identical re-imports retain their originally stored report. Newly
+serialized report object keys have stable lexical order within localization.
+Reports contain no translated/source private
+prose or glossary hints, but key inventories themselves remain import metadata.
+
+Both neutral fixtures now contain reviewed EN/IT entries for every catalog leaf,
+including a tutorial, terminology hints and a protected quote. Italian coverage
+explicitly reports the preserved English quote as source fallback. The resource
+review checks meaning, terminology, IDs, numeric claims and quote preservation;
+it is not independent human bilingual playtest or narrative-quality evidence.
+External partial/source-only packs remain valid; future import/play screens must
+show their source language and fallback coverage before play. UI localization,
+ICU/formatting, runtime narration and those screens remain later gates.
 
 Generated prose is created **directly in the selected narrative language** from
 authorized source facts and a stable glossary. This avoids a second translation
@@ -168,5 +219,5 @@ round-trips, same numeric mechanics in EN/IT, protected names, source-pack
 fallback, drafts/cursor/operation preservation on switch, wrong-locale stale
 callbacks, translated errors and keyboard/screen-reader labels. QA-39 and the
 [evaluation protocol](31-research-validation-and-evaluations.md) assess narrative
-quality separately in both languages. No localization tests or translation
-quality measurements have been run by creating this specification.
+quality separately in both languages. P04.6 supplies compiler/import localization
+tests, not UI coverage, human narrative-quality measurements or full QA-35.

@@ -55,7 +55,12 @@ length and match report count/total. A failed seal rolls back everything; reload
 recomputes the normalized pack hash. Administrative database bypass is outside
 these application integrity guarantees.
 
-Report version 1 excludes timestamps, source paths and archive packaging details.
+P04.6 report version 2 adds privileged EN/IT localization coverage to version 1.
+V8 widens the allowed report versions to 1 and 2 without rewriting sealed reports,
+bytes, exports or revision identities. Identical retries retain their original
+report; a fresh preview may expose current coverage. Localization report maps
+preserve lexical field order across JVMs. Both versions exclude timestamps,
+source paths and archive packaging details.
 JSONB key ordering is not significant. The provisional ruleset digest frames
 contract version, ruleset ID/version and sorted policy profiles; P07 must define
 the mechanics identity before gameplay can rely on that digest.

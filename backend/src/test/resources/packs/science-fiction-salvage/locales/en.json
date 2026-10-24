@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "$pack",
+      "field": "/title",
+      "text": "Silent Relay"
+    },
+    {
+      "id": "$pack",
+      "field": "/summary",
+      "text": "A neutral station salvage survey."
+    },
+    {
+      "id": "$pack",
+      "field": "/entrypoint/situation",
+      "text": "The salvage berth has just opened. Choose whether to inspect the junction or review your scanner."
+    },
+    {
+      "id": "rules.attributes",
+      "field": "/attributes/logic/name",
+      "text": "Logic"
+    },
+    {
+      "id": "rules.resources",
+      "field": "/resources/charge/name",
+      "text": "Charge"
+    },
+    {
+      "id": "rules.rarity",
+      "field": "/tiers/standard/name",
+      "text": "Standard"
+    },
+    {
+      "id": "dock",
+      "field": "/name",
+      "text": "Service Dock"
+    },
+    {
+      "id": "dock",
+      "field": "/description",
+      "text": "A sealed berth faces a silent relay station."
+    },
+    {
+      "id": "junction",
+      "field": "/name",
+      "text": "Cable Junction"
+    },
+    {
+      "id": "junction",
+      "field": "/description",
+      "text": "Two service corridors meet under an unlit status panel."
+    },
+    {
+      "id": "reactor",
+      "field": "/name",
+      "text": "Cold Reactor"
+    },
+    {
+      "id": "reactor",
+      "field": "/description",
+      "text": "An isolated power core waits for a safe diagnostic survey."
+    },
+    {
+      "id": "fieldwork",
+      "field": "/name",
+      "text": "Systems"
+    },
+    {
+      "id": "fieldwork",
+      "field": "/description",
+      "text": "Diagnose isolated machinery."
+    },
+    {
+      "id": "steady",
+      "field": "/name",
+      "text": "Emergency Cell"
+    },
+    {
+      "id": "steady",
+      "field": "/description",
+      "text": "Restore one unit of charge."
+    },
+    {
+      "id": "kit",
+      "field": "/name",
+      "text": "Insulated Scanner"
+    },
+    {
+      "id": "kit",
+      "field": "/description",
+      "text": "A handheld diagnostic tool."
+    },
+    {
+      "id": "kit",
+      "field": "/appearance/summary",
+      "text": "A blue meter with insulated probes."
+    },
+    {
+      "id": "traveler",
+      "field": "/name",
+      "text": "Salvager"
+    },
+    {
+      "id": "traveler",
+      "field": "/archetypes/surveyor/name",
+      "text": "Technician"
+    },
+    {
+      "id": "survey",
+      "field": "/name",
+      "text": "Survey the Core"
+    },
+    {
+      "id": "survey",
+      "field": "/summary",
+      "text": "Reach the cold reactor without assuming the station is safe."
+    },
+    {
+      "id": "survey",
+      "field": "/objectives/reach/description",
+      "text": "Reach the survey site."
+    },
+    {
+      "id": "opening.help",
+      "field": "/text",
+      "text": "Choose your next step; no action has been taken yet."
+    },
+    {
+      "id": "station.motto",
+      "field": "/text",
+      "text": "Look before you leap."
+    }
+  ]
+}

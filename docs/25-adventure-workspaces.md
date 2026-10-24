@@ -20,7 +20,9 @@ The library's primary cards represent adventures. “New adventure” creates a 
 P04.5 imports both [neutral genre fixtures](../backend/src/test/resources/packs/README.md)
 into one workspace and independently into fresh workspaces, preserving distinct
 revision identities and exact inventories despite shared local definition IDs.
-This is registry evidence only; campaign/library switching and full QA-33
+P04.6 also verifies sealed localization reports, original overlay/resource bytes
+and changed-translation hash conflicts without replacing existing revisions.
+These are registry checks only; campaign/library switching and full QA-33
 restart/restore isolation remain unimplemented.
 
 P04.4 stores imported original files and sealed reports in PostgreSQL alongside

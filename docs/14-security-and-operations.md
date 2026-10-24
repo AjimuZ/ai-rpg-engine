@@ -63,6 +63,10 @@ later files or mutations. Failed registration rolls back all bytes. These guards
 protect ordinary application writes, not a database administrator disabling
 triggers or truncating tables. License declarations are preserved, not evidence
 of redistribution rights; export still requires provenance/rights review.
+P04.6 keeps localized text in a separate catalog: callers must authorize the source
+owner/field before resolving it. Neither locale coverage nor glossary metadata is
+an audience projection. Report version 2 adds deterministic coverage; V8 widens
+only the accepted version constraint and retains version 1 seals unchanged.
 
 Serve registered assets with validated MIME type, content hash, containment checks, and `nosniff`. Disallow active SVG scripts or use a validated static subset; a file extension is insufficient. Default CSP permits only required local sources. Remote audio/image origins require an explicit configured allowlist and owner preference, with no arbitrary model-generated URL fetch.
 
@@ -148,8 +152,14 @@ in one transaction. It compares the migration catalog and retires every saved
 mutation lease; engine startup reconciliation then runs before HTTP. A manual
 PostgreSQL 18.6 rehearsal checked backup, refusal to reuse a directory, tamper
 rejection, restore, data equality, lease retirement and reconciliation on startup.
-Assets, content packs, campaign-identity restore, replacement preview and the full
-QA-23 rehearsal remain later work (P16, P18).
+External assets, unregistered packs, campaign-identity restore, replacement preview
+and the full QA-23 rehearsal remain later work (P16, P18). P04.6 extends the exact
+backup allowlist to V8, including registered original pack bytes, hashes, exports
+and both sealed report versions; it does not rewrite old seals or accept older
+archive schemas implicitly. A disposable V8 dump/restore rehearsal preserved both
+complete bilingual fixture inventories, raw hashes, exports, metadata and sealed
+report versions 1/2 exactly, with the source unchanged. Reports were explicit
+recovery fixtures; this does not establish a historical pack import or full QA-23.
 
 P03.6 extends that tool to V6 and all preparation tables. After verified restore,
 one transaction increments recovery generations/storage versions, appends an

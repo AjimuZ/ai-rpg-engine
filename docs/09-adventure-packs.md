@@ -2,7 +2,7 @@
 
 ## 1. Purpose and contract status
 
-An adventure pack is a versioned set of declarative files describing playable content and supported rules configuration. It is not a script that can command the host computer. P04.1–P04.4 implement parsing, semantic compilation, protected directory/ZIP staging and immutable registration through internal Java APIs. Only `PackRegistry` admits staged bytes as a sealed `ContentRevision`; `ParsedPack` and `CompiledPack` alone do not establish admission. P04.5 adds two standalone neutral genre fixtures and import checks; import UI/endpoints, playable campaigns and locale overlays remain later work. The concrete file syntax of pack contract 1 (`schemaVersion: 1`) is fixed by [ADR 0010](adr/0010-name-scope-format-licensing.md#decision-initial-pack-file-format-pack-contract-1). It covers UTF-8 encoding, YAML 1.2 core-schema `.yaml` files without anchors, aliases, tags, or duplicate keys, `.json` as an equivalent, CommonMark `.md` prose without front matter or rendered HTML, and directory or `.zip` distribution.
+An adventure pack is a versioned set of declarative files describing playable content and supported rules configuration. It is not a script that can command the host computer. P04.1–P04.4 implement parsing, semantic compilation, protected directory/ZIP staging and immutable registration through internal Java APIs. Only `PackRegistry` admits staged bytes as a sealed `ContentRevision`; `ParsedPack` and `CompiledPack` alone do not establish admission. P04.5 adds two standalone neutral genre fixtures and import checks; P04.6 adds optional validated EN/IT text catalogs, policies and source-fallback reports. Import UI/endpoints and playable campaigns remain later work. The concrete file syntax of pack contract 1 (`schemaVersion: 1`) is fixed by [ADR 0010](adr/0010-name-scope-format-licensing.md#decision-initial-pack-file-format-pack-contract-1). It covers UTF-8 encoding, YAML 1.2 core-schema `.yaml` files without anchors, aliases, tags, or duplicate keys, `.json` as an equivalent, CommonMark `.md` prose without front matter or rendered HTML, and directory or `.zip` distribution.
 
 The engine must not need a fixed plot. A minimal pack supplies world principles, a starting location/situation, character creation, a ruleset, and generation boundaries. Quests, endings, a prologue, companions, and a guide are optional.
 
@@ -82,8 +82,9 @@ SemVer release label. Engine/ruleset range strings and policy/module IDs are
 structurally required; support and compatibility are checked by the compiler.
 `contentLocale` retains its authored language tag; this stage checks its lexical
 shape without mapping it to a player language or claiming locale coverage.
-Registration currently accepts source locales supported by the engine (`en`, `it`);
-text overlays and coverage validation remain P04.6.
+Compilation and registration accept supported source locales (`en`, `it`). P04.6
+validates optional text overlays, glossary/quote policies and coverage separately
+from the language-independent mechanical definitions.
 
 ```yaml
 schemaVersion: 1
@@ -127,8 +128,11 @@ records with unique IDs and optional listed structured-file paths. Dependencies
 are `{id, version, hash}` records, where `hash` is lowercase hexadecimal SHA-256;
 resolution/conflicts remain later compiler work. `contentGuidance` accepts
 `tone`, `themes`, `exclusions`, `audience`; `provenance` accepts `source`, `notice`.
-The optional localization map is reserved for P04.6 and rejected until its schema
-and semantic checks exist.
+P04.6 adds structured `localization` and `textResources` categories. Optional
+`localizations: {en: [path], it: [path]}` binds unique listed overlay files; optional
+`textResources: path` binds one listed source-resource file. Unbound text files,
+unsupported locales and reused overlay paths fail. See the exact
+[localization contract](29-localization.md#4-pack-localization-contract).
 
 The [definition-envelope schema](../backend/src/main/resources/pack-contract/1/definitions.schema.json)
 publishes `{schemaVersion: 1, definitions: [{id, kind, data}]}`. It checks only
@@ -290,9 +294,11 @@ are rejected. A seal checks count/total size, each file's digest/size is recompu
 by the database, and late insertion is forbidden. Failed sealing rolls back the
 entire registration. `PackRegistry.files` verifies the full content hash on reload.
 
-Report version 1 records pack/ruleset coordinates, source locale, file hashes,
+Report version 2 adds localization coverage to the version-1 pack/ruleset
+coordinates, source locale, file hashes,
 sizes/categories/media types/dimensions, definition counts and compiler warnings.
-It excludes host paths, timestamps and archive metadata; PostgreSQL JSONB may
+V8 accepts versions 1 and 2 without rewriting seals; identical re-imports retain
+the original report, while a new preview can report current coverage. It excludes host paths, timestamps and archive metadata; PostgreSQL JSONB may
 reorder object keys without changing its meaning. The provisional ruleset hash
 frames the ruleset ID/version and sorted policy profiles with SHA-256; it is a
 contract descriptor until P07 pins executable mechanics, not a kernel code hash.
@@ -350,7 +356,9 @@ located rejection of broken references without partial writes. Production source
 and the engine contract are unchanged. This establishes the import portion of
 QA-01/02, not gameplay or full QA-33. The current contract has no module runtime,
 so both packs keep `modules: []`; distinct guide/creative settings and their
-behavior remain deferred until supported. Reviewed bilingual resources are P04.6.
+behavior remain deferred until supported. P04.6 adds reviewed EN/IT resources
+for every approved catalog leaf, source-owned tutorial/quote text and explicit
+English quote fallback in Italian. Source-only prose remains outside that coverage.
 
 ## 13. Export and migration
 
@@ -401,12 +409,18 @@ adds graphical preview and round-trip tests over exactly this interchange format
 
 ## 15. Localized content and narrative plans
 
-The optional `localizations` map and text-only overlays are specified in
-[localization](29-localization.md). Stable IDs and mechanical values remain
-language-independent. P04.6 will add compiler coverage, glossary and source-text
-fallback reporting and include overlays in revision hashes. Both neutral fixtures
-currently ship English source text; reviewed EN/IT overlays and explicit labels
-for untranslated external content remain P04.6 work.
+P04.6 implements the optional `localizations` map and source-owned `textResources`
+in [localization](29-localization.md#4-pack-localization-contract). Catalog lookup
+never patches definitions: stable IDs, formulas, references and source visibility
+remain authoritative. Nested text keys use stable child IDs rather than array
+offsets. Closed fields, placeholder parity and glossary/quote policy are validated
+with source locations. The sealed import report includes EN/IT coverage, fallback
+keys and source-only Markdown paths; every listed overlay/policy byte participates
+in the existing revision hash. Both neutral fixtures include reviewed EN/IT
+catalog resources. Partial external translations are valid, with source-language
+fallback; import/play labels and runtime audience-filtered rendering remain future
+consumer responsibilities. The internal catalog and its reports are not public
+projections or semantic translation-quality guarantees.
 
 Authors may define flexible quest premises, allowed planning categories, protected
 facts/required entities, forbidden developments and supported conditional beats.

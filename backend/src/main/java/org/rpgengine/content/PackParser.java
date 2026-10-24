@@ -61,6 +61,10 @@ public final class PackParser {
                 PackDocument parsed = text.parse(reference.path(), bytes);
                 if (DEFINITIONS.contains(reference.category())) {
                     PackSchemas.definitions(parsed);
+                } else if (reference.category().equals("localization")) {
+                    PackSchemas.localization(parsed);
+                } else if (reference.category().equals("textResources")) {
+                    PackSchemas.textResources(parsed);
                 } else if (!(parsed.value() instanceof Map)) {
                     throw new PackException("SCHEMA", parsed.location(""), "Structured content requires an object root");
                 }
@@ -73,6 +77,7 @@ public final class PackParser {
         }
         categoryReference(document, categories, "generationPolicy", "generationPolicy");
         categoryReference(document, categories, "presentationProfile", "theme");
+        categoryReference(document, categories, "textResources", "textResources");
         moduleReferences(document, categories);
         PackHashes.Inventory hashes = PackHashes.calculate(files);
         return new ParsedPack(manifest, documents, prose, hashes.contentHash(), hashes.fileHashes());

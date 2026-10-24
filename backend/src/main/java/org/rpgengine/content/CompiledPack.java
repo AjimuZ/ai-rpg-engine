@@ -5,22 +5,24 @@ import java.util.Map;
 
 /**
  * Pack whose definitions, dependencies, cross-references, bounded expressions/effects, relation
- * graphs, version compatibility and generation policy were semantically validated (P04.2, P04.3).
- * It is still not an admitted ContentRevision: path/archive protections and immutable registration
- * (P04.4) are outstanding.
+ * graphs, compatibility, generation and localization policies were semantically validated.
+ * This is internal content, including secret text; consumers must authorize source fields before
+ * localization. Only protected registry admission can create an immutable ContentRevision.
  *
  * @param parsed parser output the compilation read
  * @param definitions definitions in manifest file order
  * @param byId definitions keyed by local ID
  * @param generationPolicy compiled generation modes, budgets and fixed author constraints
+ * @param localization immutable text catalog with source fallback, policies and locale coverage
  * @param warnings non-blocking findings, kept distinct from guaranteed checks
  */
 public record CompiledPack(ParsedPack parsed, List<Definition> definitions, Map<String, Definition> byId,
-        GenerationPolicy generationPolicy, List<PackWarning> warnings) {
+        GenerationPolicy generationPolicy, PackLocalization localization, List<PackWarning> warnings) {
     /** Copy the indexes so callers cannot mutate the validated result. */
     public CompiledPack {
         java.util.Objects.requireNonNull(parsed, "parsed");
         java.util.Objects.requireNonNull(generationPolicy, "generationPolicy");
+        java.util.Objects.requireNonNull(localization, "localization");
         definitions = List.copyOf(definitions);
         byId = Map.copyOf(byId);
         warnings = List.copyOf(warnings);

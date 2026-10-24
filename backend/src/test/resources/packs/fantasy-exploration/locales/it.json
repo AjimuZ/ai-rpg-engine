@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "$pack",
+      "field": "/title",
+      "text": "Il sentiero di Mosslight"
+    },
+    {
+      "id": "$pack",
+      "field": "/summary",
+      "text": "Una ricognizione esplorativa in un bosco, senza ambientazione obbligatoria."
+    },
+    {
+      "id": "$pack",
+      "field": "/entrypoint/situation",
+      "text": "Arrivi al riparo lungo il sentiero. Scegli se esaminare il tuo kit o seguire il sentiero fino al boschetto."
+    },
+    {
+      "id": "rules.attributes",
+      "field": "/attributes/awareness/name",
+      "text": "Consapevolezza"
+    },
+    {
+      "id": "rules.resources",
+      "field": "/resources/vigor/name",
+      "text": "Vigore"
+    },
+    {
+      "id": "rules.rarity",
+      "field": "/tiers/ordinary/name",
+      "text": "Ordinario"
+    },
+    {
+      "id": "trailhead",
+      "field": "/name",
+      "text": "Inizio del sentiero di Mosslight"
+    },
+    {
+      "id": "trailhead",
+      "field": "/description",
+      "text": "Un sentiero parte da un riparo pubblico sotto un fogliame luminoso."
+    },
+    {
+      "id": "grove",
+      "field": "/name",
+      "text": "Boschetto delle lanterne"
+    },
+    {
+      "id": "grove",
+      "field": "/description",
+      "text": "Fiori pallidi circondano una pietra segnavia consumata dal tempo."
+    },
+    {
+      "id": "fieldwork",
+      "field": "/name",
+      "text": "Conoscenza dei sentieri"
+    },
+    {
+      "id": "fieldwork",
+      "field": "/description",
+      "text": "Interpreta i sentieri e i segni della natura."
+    },
+    {
+      "id": "steady",
+      "field": "/name",
+      "text": "Riprendere fiato"
+    },
+    {
+      "id": "steady",
+      "field": "/description",
+      "text": "Recupera un punto di vigore."
+    },
+    {
+      "id": "kit",
+      "field": "/name",
+      "text": "Kit da escursione"
+    },
+    {
+      "id": "kit",
+      "field": "/description",
+      "text": "Una sacca di tela con strumenti da ricognizione."
+    },
+    {
+      "id": "kit",
+      "field": "/appearance/summary",
+      "text": "Una sacca verde con paletti di legno."
+    },
+    {
+      "id": "traveler",
+      "field": "/name",
+      "text": "Viandante"
+    },
+    {
+      "id": "traveler",
+      "field": "/archetypes/surveyor/name",
+      "text": "Esploratore"
+    },
+    {
+      "id": "survey",
+      "field": "/name",
+      "text": "Trova la pietra segnavia"
+    },
+    {
+      "id": "survey",
+      "field": "/summary",
+      "text": "Visita il boschetto ed esamina la sua pietra segnavia."
+    },
+    {
+      "id": "survey",
+      "field": "/objectives/reach/description",
+      "text": "Raggiungi il sito da esaminare."
+    },
+    {
+      "id": "opening.help",
+      "field": "/text",
+      "text": "Scegli il prossimo passo; non è stata ancora compiuta alcuna azione."
+    },
+    {
+      "id": "trail.motto",
+      "field": "/text",
+      "text": "Look before you leap."
+    }
+  ]
+}

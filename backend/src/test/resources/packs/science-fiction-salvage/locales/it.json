@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "$pack",
+      "field": "/title",
+      "text": "Il ripetitore silenzioso"
+    },
+    {
+      "id": "$pack",
+      "field": "/summary",
+      "text": "Una ricognizione per il recupero di materiali in una stazione, senza ambientazione obbligatoria."
+    },
+    {
+      "id": "$pack",
+      "field": "/entrypoint/situation",
+      "text": "L’attracco per il recupero è appena stato aperto. Scegli se esaminare lo snodo o controllare il tuo scanner."
+    },
+    {
+      "id": "rules.attributes",
+      "field": "/attributes/logic/name",
+      "text": "Logica"
+    },
+    {
+      "id": "rules.resources",
+      "field": "/resources/charge/name",
+      "text": "Carica"
+    },
+    {
+      "id": "rules.rarity",
+      "field": "/tiers/standard/name",
+      "text": "Standard"
+    },
+    {
+      "id": "dock",
+      "field": "/name",
+      "text": "Attracco di servizio"
+    },
+    {
+      "id": "dock",
+      "field": "/description",
+      "text": "Un attracco sigillato si affaccia su una stazione ripetitrice silenziosa."
+    },
+    {
+      "id": "junction",
+      "field": "/name",
+      "text": "Snodo dei cavi"
+    },
+    {
+      "id": "junction",
+      "field": "/description",
+      "text": "Due corridoi di servizio si incontrano sotto un pannello di stato spento."
+    },
+    {
+      "id": "reactor",
+      "field": "/name",
+      "text": "Reattore freddo"
+    },
+    {
+      "id": "reactor",
+      "field": "/description",
+      "text": "Un nucleo energetico isolato attende una ricognizione diagnostica in sicurezza."
+    },
+    {
+      "id": "fieldwork",
+      "field": "/name",
+      "text": "Sistemi"
+    },
+    {
+      "id": "fieldwork",
+      "field": "/description",
+      "text": "Esegui la diagnosi di macchinari isolati."
+    },
+    {
+      "id": "steady",
+      "field": "/name",
+      "text": "Cella di emergenza"
+    },
+    {
+      "id": "steady",
+      "field": "/description",
+      "text": "Ripristina una unità di carica."
+    },
+    {
+      "id": "kit",
+      "field": "/name",
+      "text": "Scanner isolato"
+    },
+    {
+      "id": "kit",
+      "field": "/description",
+      "text": "Uno strumento diagnostico portatile."
+    },
+    {
+      "id": "kit",
+      "field": "/appearance/summary",
+      "text": "Uno strumento di misura blu con sonde isolate."
+    },
+    {
+      "id": "traveler",
+      "field": "/name",
+      "text": "Recuperatore"
+    },
+    {
+      "id": "traveler",
+      "field": "/archetypes/surveyor/name",
+      "text": "Tecnico"
+    },
+    {
+      "id": "survey",
+      "field": "/name",
+      "text": "Esamina il nucleo"
+    },
+    {
+      "id": "survey",
+      "field": "/summary",
+      "text": "Raggiungi il reattore freddo senza dare per scontato che la stazione sia sicura."
+    },
+    {
+      "id": "survey",
+      "field": "/objectives/reach/description",
+      "text": "Raggiungi il sito da esaminare."
+    },
+    {
+      "id": "opening.help",
+      "field": "/text",
+      "text": "Scegli il prossimo passo; non è stata ancora compiuta alcuna azione."
+    },
+    {
+      "id": "station.motto",
+      "field": "/text",
+      "text": "Look before you leap."
+    }
+  ]
+}

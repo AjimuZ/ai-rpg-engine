@@ -1,4 +1,4 @@
-"""Create/restore private P03 database recovery snapshots using the pinned Docker database.
+"""Create/restore private versioned database recovery snapshots using the pinned Docker database.
 
 Inputs are an operator-selected container, role, database and private directory.
 Outputs are a custom-format dump plus a version/checksum manifest, or a newly
@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 POSTGRES_VERSION = "18.6"
-SCHEMA_VERSION = "6"
+SCHEMA_VERSION = "8"
 # Flyway versions this tool understands; test_backup.py fails when a new backend
 # migration or table appears, so the archive scope can never silently drift.
 MIGRATIONS = [str(version) for version in range(1, int(SCHEMA_VERSION) + 1)]
@@ -24,7 +24,7 @@ MAX_DUMP_BYTES = 2 * 1024**3
 TABLES = sorted([
     "actor", "actor_resource", "adventure_workspace", "campaign", "campaign_checkpoint",
     "campaign_event", "campaign_mutation_lease", "campaign_random_seed", "canonical_outbox",
-    "content_revision", "flyway_schema_history", "identity_owner_profile", "operation_journal",
+    "content_revision", "content_revision_file", "content_revision_report", "flyway_schema_history", "identity_owner_profile", "operation_journal",
     "operation_random_draw", "presentation_campaign_settings", "reward_settlement",
     "ai_job", "ai_job_attempt", "planning_snapshot", "query_epoch", "quest_plan_artifact",
     "plan_dependency", "plan_admission", "plan_disposition",
@@ -88,7 +88,7 @@ class Database:
         schemas = self.sql("select nspname from pg_namespace where nspname <> 'public' "
                            "and nspname <> 'information_schema' and nspname not like 'pg_%'")
         if tables != TABLES or schemas:
-            raise ValueError("unsupported database scope; expected only the P03.6 schema")
+            raise ValueError("unsupported database scope; expected only the reviewed V8 schema")
         migrations = json.loads(self.sql(
             "select coalesce(json_agg(json_build_object('version', version, 'checksum', checksum, "
             "'success', success) order by installed_rank), '[]') from flyway_schema_history where type = 'SQL'"))

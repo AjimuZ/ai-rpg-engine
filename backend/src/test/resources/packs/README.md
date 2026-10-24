@@ -46,5 +46,27 @@ work. The current engine supports no loadable modules: both manifests use
 `modules: []`, so guide, creative abilities and romance are disabled. Distinct
 optional module behavior must be demonstrated after those runtimes exist;
 unvalidated configuration files would not establish it. English is the source
-language; reviewed English/Italian overlays and fallback/coverage checks belong
-to P04.6. The ruleset descriptor is provisional until P07.
+language. P04.6 adds `locales/en.json`, `locales/it.json` and
+`text-resources.json` to each explicit inventory. The ruleset descriptor is
+provisional until P07.
+
+## Bilingual resource review (P04.6)
+
+All 24 fantasy and 26 salvage catalog leaves have EN/IT entries. Review compares
+the source/English/Italian pairs for equivalent meaning, stable identity, correct
+resource terminology and unchanged numeric claims (one Vigor/Charge restored).
+Trailcraft/Conoscenza dei sentieri and Systems/Sistemi stay under `fieldwork`;
+Awareness/Consapevolezza and Logic/Logica retain their rule child IDs. Tutorials
+state that choosing a next step has not yet performed an action. Both authored
+mottos use explicit `verbatim` policy: “Look before you leap.” remains English,
+including in the Italian overlay, and is the one reported Italian source fallback.
+This is resource/contract review, not independent human bilingual playtest.
+
+Coverage counts only approved catalog leaves. Lore, credits/license and
+settlement consequence arrays remain source-language prose; no complete authored
+translation or localized UI/narration claim is made. `PackLocalizationTest` checks
+both inventories, policy enforcement, placeholder parity, immutable mechanics and
+source visibility. The registry suite also checks exact sealed localized inventories,
+coverage, stored recompilation, altered-overlay hash conflicts and atomic hostile
+overlay rejection. Run both with
+`./mvnw -B -ntp -Dtest=PackLocalizationTest,NeutralGenreImportTest test`.

@@ -125,6 +125,56 @@ class NeutralGenreImportTest {
         assertEquals(4, (int) jdbc.queryForObject("select count(*) from content_revision_report", Integer.class));
     }
 
+    /** Locale files are sealed and reported unchanged; editing only Italian text requires a new revision. */
+    @Test
+    void sealsLocaleCoverageAndRejectsChangedTranslationVersion() throws Exception {
+        UUID adventure = workspace();
+        for (String name : new String[] {"fantasy-exploration", "science-fiction-salvage"}) {
+            var staged = STAGING.directory(fixture(name));
+            var result = registry.register(adventure, staged);
+            var report = JSON.readTree(registry.report(result.revisionId()).orElseThrow());
+            var compiled = new PackCompiler().compile(new PackParser().parse(staged.files()));
+            assertEquals(2, report.path("reportVersion").asInt());
+            assertEquals(2, (int) jdbc.queryForObject("select report_version from content_revision_report "
+                    + "where content_revision_id = ?", Integer.class, result.revisionId()));
+            assertEquals(JSON.readTree(JSON.writeValueAsString(compiled.localization().report())), report.path("localization"));
+            for (var coverage : report.path("localization").path("coverage")) {
+                assertEquals(coverage.path("total"), coverage.path("overlaid"));
+            }
+            Map<String, byte[]> changed = new TreeMap<>(staged.files());
+            String italian = new String(changed.get("locales/it.json"), StandardCharsets.UTF_8);
+            changed.put("locales/it.json", italian.replace("Raggiungi il sito da esaminare.",
+                    "Raggiungi il luogo della ricognizione.").getBytes(StandardCharsets.UTF_8));
+            assertNotEquals(PackHashes.calculate(staged.files()).contentHash(), PackHashes.calculate(changed).contentHash());
+            var archive = STAGING.archive(new ByteArrayInputStream(zip(changed)));
+            var error = assertThrows(PackException.class, () -> registry.register(adventure, archive));
+            assertEquals("HASH_CONFLICT", error.code());
+            assertArrayEquals(staged.files().get("locales/it.json"),
+                    registry.files(result.revisionId()).orElseThrow().get("locales/it.json"));
+        }
+        assertEquals(2, (int) jdbc.queryForObject("select count(*) from content_revision", Integer.class));
+    }
+
+    /** A localized visibility patch in either fixture fails atomically with the overlay's field coordinates. */
+    @Test
+    void rejectsLocalizedVisibilityChangesAtomically() throws Exception {
+        UUID adventure = workspace();
+        for (String name : new String[] {"fantasy-exploration", "science-fiction-salvage"}) {
+            Map<String, byte[]> files = new TreeMap<>(STAGING.directory(fixture(name)).files());
+            String overlay = new String(files.get("locales/it.json"), StandardCharsets.UTF_8);
+            files.put("locales/it.json", overlay.replace("\"field\": \"/name\"", "\"field\": \"/visibility\"")
+                    .getBytes(StandardCharsets.UTF_8));
+            var archive = STAGING.archive(new ByteArrayInputStream(zip(files)));
+            var error = assertThrows(PackException.class, () -> registry.register(adventure, archive));
+            assertEquals("TEXT_TARGET", error.code());
+            assertEquals("locales/it.json", error.location().file());
+            assertTrue(error.location().pointer().endsWith("/field"));
+        }
+        assertEquals(0, (int) jdbc.queryForObject("select count(*) from content_revision", Integer.class));
+        assertEquals(0, (int) jdbc.queryForObject("select count(*) from content_revision_report", Integer.class));
+        assertEquals(0, (int) jdbc.queryForObject("select count(*) from content_revision_file", Integer.class));
+    }
+
     /** A broken reference in either real fixture fails at its source field without admitting a row. */
     @Test
     void rejectsBrokenFixtureReferencesAtomically() throws Exception {

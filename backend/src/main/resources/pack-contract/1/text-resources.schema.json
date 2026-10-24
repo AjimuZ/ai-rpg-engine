@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rpgengine:pack:1:text-resources",
+  "title": "Contract 1 source texts and language policies",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "texts": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "owner",
+          "kind",
+          "visibility",
+          "text"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[a-z][a-z0-9._:-]*(?![\\s\\S])"
+          },
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[a-z][a-z0-9._:-]*(?![\\s\\S])"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "dialogue",
+              "tutorial",
+              "quote"
+            ]
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "secret"
+            ]
+          },
+          "text": {
+            "$ref": "#/$defs/text"
+          }
+        }
+      }
+    },
+    "glossary": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "field",
+          "kind"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/text"
+          },
+          "field": {
+            "$ref": "#/$defs/text"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "properName",
+              "term"
+            ]
+          },
+          "grammar": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [],
+            "properties": {
+              "en": {
+                "$ref": "#/$defs/text"
+              },
+              "it": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          },
+          "pronunciation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [],
+            "properties": {
+              "en": {
+                "$ref": "#/$defs/text"
+              },
+              "it": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        }
+      }
+    },
+    "quotes": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "field",
+          "policy"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/text"
+          },
+          "field": {
+            "$ref": "#/$defs/text"
+          },
+          "policy": {
+            "type": "string",
+            "enum": [
+              "verbatim",
+              "translate"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "\\S"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # ADR 0004: Declarative, Immutable Adventure Packs
 
-**Status:** Declarative boundary accepted; parsing, semantic compilation and protected immutable registration implemented in P04.1–P04.4. P04.5 adds two neutral genre fixtures and unchanged-engine import evidence; locale overlays and gameplay remain pending. Adventure independence is an owner requirement. [ADR 0010](0010-name-scope-format-licensing.md) fixes the concrete file syntax of pack contract 1; [ADR 0018](0018-protected-pack-registration.md) records admission/storage boundaries. **Date:** 22 October 2026 (implementation status updated 24 October 2026).
+**Status:** Declarative boundary accepted; parsing, semantic compilation and protected immutable registration implemented in P04.1–P04.4. P04.5 adds two neutral genre fixtures and unchanged-engine import evidence; P04.6 adds validated optional bilingual text catalogs. Gameplay remains pending. Adventure independence is an owner requirement. [ADR 0010](0010-name-scope-format-licensing.md) fixes the concrete file syntax of pack contract 1; [ADR 0018](0018-protected-pack-registration.md) records admission/storage boundaries. **Date:** 22 October 2026 (implementation status updated 24 October 2026).
 
 ## Context
 
@@ -45,3 +45,24 @@ specification. Canonical parsed data is for validation, never hash reserializati
 comments, line endings and asset changes must change revision identity. The stage
 operates only on caller-staged bytes and produces `ParsedPack`; no API accepts it
 as an admitted revision, and no archive/host path is opened.
+
+## P04.6 text catalog decisions (24 October 2026)
+
+Compile optional EN/IT overlays beside immutable definitions, never by merging
+patches into rule or world data. Source-owned resource files bind text identities,
+owner/audience, glossary and quote policy. An overlay can replace only an existing
+approved text leaf, with identical named placeholder slots. Nested leaves use
+child IDs rather than array offsets; unidentified list prose and Markdown remain
+source-only instead of acquiring unstable translation keys.
+
+Protected proper names and verbatim quotes must equal source exactly. A verbatim
+quote retains its source-language provenance even when repeated in an overlay.
+Missing translations return source text with actual locale and an explicit
+fallback flag. Reports expose privileged coverage keys/counts, not private prose;
+future consumers must authorize source owner/field before resolving text.
+
+Reuse the existing contract-1 raw-file hash and sealed registration protocol.
+Optional declarations require no dependency or new hashing format. Report version
+2 adds coverage; V8 permits versions 1 and 2 without rewriting existing seals.
+Unmodified inventories keep their digest; edited overlays or policies create a
+different immutable revision. See the [exact schema and limits](../29-localization.md#4-pack-localization-contract).

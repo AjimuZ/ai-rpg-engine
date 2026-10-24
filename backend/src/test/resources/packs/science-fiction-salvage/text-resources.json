@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "texts": [
+    {
+      "id": "opening.help",
+      "owner": "dock",
+      "kind": "tutorial",
+      "visibility": "public",
+      "text": "Choose your next step; no action has been taken yet."
+    },
+    {
+      "id": "station.motto",
+      "owner": "dock",
+      "kind": "quote",
+      "visibility": "public",
+      "text": "Look before you leap."
+    }
+  ],
+  "glossary": [
+    {
+      "id": "fieldwork",
+      "field": "/name",
+      "kind": "term",
+      "grammar": {
+        "en": "skill name",
+        "it": "nome di abilità"
+      }
+    },
+    {
+      "id": "$pack",
+      "field": "/title",
+      "kind": "term"
+    }
+  ],
+  "quotes": [
+    {
+      "id": "station.motto",
+      "field": "/text",
+      "policy": "verbatim"
+    }
+  ]
+}

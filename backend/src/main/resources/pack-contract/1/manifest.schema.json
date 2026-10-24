@@ -31,6 +31,14 @@
     "modules": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/module"}},
     "generationPolicy": {"$ref": "#/$defs/path"},
     "presentationProfile": {"$ref": "#/$defs/path"},
+    "localizations": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "en": {"type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/$defs/path"}},
+        "it": {"type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/$defs/path"}}
+      }
+    },
+    "textResources": {"$ref": "#/$defs/path"},
     "contentGuidance": {
       "type": "object", "additionalProperties": false,
       "properties": {"tone": {"$ref": "#/$defs/text"}, "themes": {"$ref": "#/$defs/texts"}, "exclusions": {"$ref": "#/$defs/texts"}, "audience": {"$ref": "#/$defs/text"}}
@@ -49,7 +57,7 @@
       "type": "object", "additionalProperties": false, "required": ["path", "category"],
       "properties": {
         "path": {"$ref": "#/$defs/path"},
-        "category": {"type": "string", "enum": ["lore", "locations", "factions", "timeline", "secrets", "creation", "npcs", "items", "skills", "abilities", "conditions", "progression", "encounters", "quests", "rules", "narrativeStyle", "generationPolicy", "anchors", "theme", "assetCatalog", "audio", "guide", "creativeAbilities", "asset", "license", "credits"]}
+        "category": {"type": "string", "enum": ["lore", "locations", "factions", "timeline", "secrets", "creation", "npcs", "items", "skills", "abilities", "conditions", "progression", "encounters", "quests", "rules", "narrativeStyle", "generationPolicy", "anchors", "theme", "assetCatalog", "audio", "guide", "creativeAbilities", "asset", "license", "credits", "localization", "textResources"]}
       }
     },
     "module": {

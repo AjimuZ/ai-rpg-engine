@@ -2,6 +2,28 @@
 
 ## 1. Evidence policy
 
+P04.6 evidence (24 October 2026, Windows 11/Docker Desktop, pinned JDK 21 and
+PostgreSQL 18.6): 45 focused checks pass (40 text-catalog cases, four genre-import
+cases and one populated migration case). They cover optional/partial EN/IT
+resources, Italian source fallback, stable nested IDs, closed schemas, unknown or
+mechanical/audience targets, placeholders, proper names, explicit quote policies,
+immutable glossary hints, deterministic coverage, translation-only hash conflicts,
+sealed reload and rollback. Both neutral fixtures have reviewed EN/IT resources
+for every approved catalog leaf (24 fantasy, 26 salvage), retaining one verbatim
+English motto as the Italian fallback. Source-only prose is explicitly excluded.
+Full backend `verify` passes 262 tests with three packaged-interface profile skips
+(265 total) and builds the jar. V8 permits new version-2 reports while preserving
+populated V1→V8 canonical data and old seals exactly. The backup allowlist now
+requires V8; eight offline tests pass with one Windows symlink-privilege skip.
+A real disposable V8 dump/restore preserves both fixture inventories, raw hashes,
+exports, metadata and sealed report versions 1/2 without changing the source.
+These are compiler/resource-review and recovery-fixture results toward QA-02 and
+the pack portion of QA-35; they do not establish UI coverage, independent human
+bilingual playtests, runtime narration quality, public projection authorization,
+full QA-23 or full QA-35. All 22 repository-checker tests pass and docs/secrets/workflows/images have zero
+findings. Jar inspection confirms the four trusted schemas and V8 are packaged,
+with test inventories excluded. No new dependency or toolchain version was introduced.
+
 P04.5 evidence (24 October 2026, Windows 11/Docker Desktop, pinned JDK 21 and
 PostgreSQL 18.6): `NeutralGenreImportTest` passes both cases using standalone
 fantasy exploration and science-fiction salvage resource directories, without

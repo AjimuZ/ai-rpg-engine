@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "texts": [
+    {
+      "id": "opening.help",
+      "owner": "trailhead",
+      "kind": "tutorial",
+      "visibility": "public",
+      "text": "Choose your next step; no action has been taken yet."
+    },
+    {
+      "id": "trail.motto",
+      "owner": "trailhead",
+      "kind": "quote",
+      "visibility": "public",
+      "text": "Look before you leap."
+    }
+  ],
+  "glossary": [
+    {
+      "id": "fieldwork",
+      "field": "/name",
+      "kind": "term",
+      "grammar": {
+        "en": "skill name",
+        "it": "nome di abilità"
+      }
+    },
+    {
+      "id": "$pack",
+      "field": "/title",
+      "kind": "term"
+    }
+  ],
+  "quotes": [
+    {
+      "id": "trail.motto",
+      "field": "/text",
+      "policy": "verbatim"
+    }
+  ]
+}

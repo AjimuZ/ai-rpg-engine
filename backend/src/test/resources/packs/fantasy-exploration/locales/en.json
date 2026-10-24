@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "$pack",
+      "field": "/title",
+      "text": "Mosslight Trail"
+    },
+    {
+      "id": "$pack",
+      "field": "/summary",
+      "text": "A neutral woodland exploration survey."
+    },
+    {
+      "id": "$pack",
+      "field": "/entrypoint/situation",
+      "text": "You arrive at the trail shelter. Choose whether to inspect your kit or follow the path to the grove."
+    },
+    {
+      "id": "rules.attributes",
+      "field": "/attributes/awareness/name",
+      "text": "Awareness"
+    },
+    {
+      "id": "rules.resources",
+      "field": "/resources/vigor/name",
+      "text": "Vigor"
+    },
+    {
+      "id": "rules.rarity",
+      "field": "/tiers/ordinary/name",
+      "text": "Ordinary"
+    },
+    {
+      "id": "trailhead",
+      "field": "/name",
+      "text": "Mosslight Trailhead"
+    },
+    {
+      "id": "trailhead",
+      "field": "/description",
+      "text": "A footpath leaves a public shelter beneath bright leaves."
+    },
+    {
+      "id": "grove",
+      "field": "/name",
+      "text": "Lantern Grove"
+    },
+    {
+      "id": "grove",
+      "field": "/description",
+      "text": "Pale flowers surround a weathered waystone."
+    },
+    {
+      "id": "fieldwork",
+      "field": "/name",
+      "text": "Trailcraft"
+    },
+    {
+      "id": "fieldwork",
+      "field": "/description",
+      "text": "Read paths and natural signs."
+    },
+    {
+      "id": "steady",
+      "field": "/name",
+      "text": "Catch Breath"
+    },
+    {
+      "id": "steady",
+      "field": "/description",
+      "text": "Recover one point of vigor."
+    },
+    {
+      "id": "kit",
+      "field": "/name",
+      "text": "Trail Kit"
+    },
+    {
+      "id": "kit",
+      "field": "/description",
+      "text": "A canvas pouch of surveying tools."
+    },
+    {
+      "id": "kit",
+      "field": "/appearance/summary",
+      "text": "A green pouch with wooden markers."
+    },
+    {
+      "id": "traveler",
+      "field": "/name",
+      "text": "Wayfarer"
+    },
+    {
+      "id": "traveler",
+      "field": "/archetypes/surveyor/name",
+      "text": "Pathfinder"
+    },
+    {
+      "id": "survey",
+      "field": "/name",
+      "text": "Find the Waystone"
+    },
+    {
+      "id": "survey",
+      "field": "/summary",
+      "text": "Visit the grove and survey its waystone."
+    },
+    {
+      "id": "survey",
+      "field": "/objectives/reach/description",
+      "text": "Reach the survey site."
+    },
+    {
+      "id": "opening.help",
+      "field": "/text",
+      "text": "Choose your next step; no action has been taken yet."
+    },
+    {
+      "id": "trail.motto",
+      "field": "/text",
+      "text": "Look before you leap."
+    }
+  ]
+}

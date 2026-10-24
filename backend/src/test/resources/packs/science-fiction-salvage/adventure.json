@@ -69,6 +69,18 @@
     {
       "path": "assets/map.png",
       "category": "asset"
+    },
+    {
+      "path": "locales/en.json",
+      "category": "localization"
+    },
+    {
+      "path": "locales/it.json",
+      "category": "localization"
+    },
+    {
+      "path": "text-resources.json",
+      "category": "textResources"
     }
   ],
   "modules": [],
@@ -86,5 +98,14 @@
   "provenance": {
     "source": "Original project fixture",
     "notice": "See CREDITS.md and LICENSE.md"
-  }
+  },
+  "localizations": {
+    "en": [
+      "locales/en.json"
+    ],
+    "it": [
+      "locales/it.json"
+    ]
+  },
+  "textResources": "text-resources.json"
 }
