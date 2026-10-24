@@ -273,6 +273,36 @@ falls back to Italian subtitles/text, never an English voice reading Italian.
 
 ## 6. Acceptance and ownership
 
+### P05.6 integration prerequisites (24 October 2026 audit)
+
+The remaining transport work cannot be verified against the current application.
+`InterfaceRoutes` is the only application MVC controller and serves preview GETs;
+the campaign, operation and stream endpoints in [the API contract](13-api-and-ui.md)
+remain proposed. Internal operation journals and compiled localization catalogs
+do not supply an authorized browser transport. The frontend uses hand-authored
+public previews, with no campaign HTTP or event-stream connection.
+
+Resume P05.6 integration after these concrete prerequisites are available:
+
+| Remaining requirement | Prerequisite | Required integration evidence |
+| --- | --- | --- |
+| Real campaign reload | P06.1–P06.2 campaign creation and authorized projections; P07.1 durable operation queries; P07.5 resumable public stream | EN→IT→EN retains operation identity and cursor, reconciles pending/committed work, deduplicates delivery and never submits the draft |
+| Localized API errors and receipts | The same campaign/command transport with stable codes, typed parameters and public receipts | Known errors localize in both variants; unknown codes use safe generic guidance; numeric effects and committed identities remain unchanged |
+| Visible source-pack fallback | P06 public pack/campaign projection of authorized resolved text and actual source language | Partial/source-only packs disclose fallback and protected quotations without exposing private catalog keys or text |
+| Full QA-35 acceptance | Integrated journeys plus independent bilingual and screen-reader review | Record reviewer evidence for both languages; resource/unit/browser automation alone cannot close this gate |
+
+P06 lists P05 as a dependency, while full P05.6 acceptance requires P06/P07
+transport. This is a scheduling dependency across milestones: the delivered
+interface foundation is available, but full P05.6/QA-35 must remain unchecked
+while prerequisite transport is developed. Repeating preview-only sessions cannot
+close it. Do not invent operations/cursors, expose an internal pack catalog or
+relax the real-campaign reload guard to simulate acceptance.
+
+This audit reran all 42 frontend tests, strict type checks and four resource
+checker tests. Existing tests confirm that a real campaign or unresolved recovery
+still refuses language reload after route detachment. No new transport or human
+acceptance evidence is claimed.
+
 P03.1 persists preferences and generations (`identity_owner_profile.ui_locale`,
 `presentation_campaign_settings`); P04.6 validates overlays; P05.6 owns
 UI resources, locale serving/reload and bilingual forms; P08.2/P08.4 enforce

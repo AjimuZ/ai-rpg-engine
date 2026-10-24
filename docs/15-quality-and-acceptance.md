@@ -23,6 +23,11 @@ selection and a routed regression assertion correct that behavior. Operation/cur
 reconciliation, API errors/receipts and pack-source
 fallback integration remain unimplemented;
 QA-35 and independent bilingual playtests stay open.
+The 24 October prerequisite audit reran 42 frontend tests, strict type checks
+and four resource checker tests. It confirms that campaign/operation/stream HTTP
+contracts remain proposed; see the [P05.6 integration prerequisites](29-localization.md#p056-integration-prerequisites-24-october-2026-audit).
+These checks preserve the preview safety boundary and do not establish real
+operation/cursor reconciliation or independent screen-reader acceptance.
 All 22 repository-checker tests pass; docs/secrets/workflows/images scans have
 zero findings. Desktop English and mobile Italian Settings screenshots, plus
 desktop/mobile Italian story screenshots, were visually reviewed.

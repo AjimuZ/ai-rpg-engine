@@ -752,6 +752,16 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     asset delivery/ownership, Italian resources and runtime artwork remain later
     tasks. No sample value or item implies canonical state.
 - [ ] P05.6 Deliver reviewed English-default/Italian UI variants, localized receipts/errors/accessibility, persisted language selection and draft/cursor-safe reload; extend single-origin packaging/resource checks under QA-35.
+  - Integration prerequisite audit (24 October 2026): remaining acceptance is
+    blocked on P06.1–P06.2 authorized campaign projections and P07.1/P07.5
+    operation queries/resumable stream. Only preview GET controllers exist;
+    internal journals/catalogs are not browser APIs. P06's P05 dependency and
+    P05.6's transport gate require staged scheduling rather than repeatedly
+    selecting this preview task. Keep the real-campaign reload guard and this
+    checkbox intact. See the [requirement/prerequisite/evidence matrix](29-localization.md#p056-integration-prerequisites-24-october-2026-audit).
+    All 42 frontend tests, strict type checks and four resource checker tests
+    pass again. Independent bilingual and screen-reader acceptance still requires
+    human review after integration; no runtime changes were made in this audit.
   - Partial checkpoint: pin `@angular/localize` to Angular 22.2.3 and extract/review
     26 navigation/Settings messages, including accessible navigation, titles,
     reading-size placeholders and credits. Exact ID/source/placeholder parity

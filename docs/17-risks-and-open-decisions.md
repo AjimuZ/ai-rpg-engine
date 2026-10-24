@@ -27,6 +27,15 @@ device-preference selector; production resource/recreation checks cover both tre
 Real API localization remains a transport gate. Resource review does not establish independent bilingual playtest
 acceptance or complete QA-35.
 
+P05.6 scheduling audit (24 October 2026): real campaign reload, API localization
+and source-pack fallback depend on the still-proposed P06/P07 browser transports.
+P06 also lists P05 as a dependency; requiring full P05.6 acceptance before any
+P06 work would deadlock delivery. Schedule prerequisite campaign/projection and
+operation/stream work using the delivered interface contracts, then resume the
+[P05.6 integration evidence matrix](29-localization.md#p056-integration-prerequisites-24-october-2026-audit).
+Do not treat preview receipts or internal persistence tests as transport evidence.
+Independent bilingual and screen-reader reviews remain human acceptance gates.
+
 P05.5 reduces local UI asset/rights risk with original editable MIT SVG/CSS,
 a complete public source inventory and shipped notice, without external art/font
 dependencies. Browser-reviewed control/meter/frame fallbacks preserve text,
