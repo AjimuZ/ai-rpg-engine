@@ -53,8 +53,9 @@ count. PostgreSQL permits multiple uncommitted NULL revisions, but only one
 operation per `(campaign_id, committed_revision)`. Committed statuses carry both
 receipt and revision; other statuses carry neither. Once recorded, neither commit
 field can change, and terminal statuses cannot reopen. These are database bounds;
-the atomic acceptance/commit service, revision checks, leases and outbox are still
-pending P03.3/P03.5. See [domain constraints](05-domain-model.md#3-database-organization).
+P03.3 now adds the internal commit service, exact revision checks and durable outbox.
+Acceptance API, leases/fencing and gameplay authorization remain later tasks.
+See [domain constraints](05-domain-model.md#3-database-organization).
 
 ## 4. Planning and validation
 
@@ -81,6 +82,31 @@ Commit together:
 - Outbox messages for public state and required narration.
 
 If this transaction fails, no canonical effects are visible. Durable operation and draw records may remain for diagnosis/retry, but are not world state. The save acknowledgment includes operation ID and committed revision; it is produced by the backend, never accepted from model prose.
+
+P03.3 implements this persistence boundary for the currently available world,
+resource, event and settlement types. `CanonicalCommitService.commit(ResolvedCommit)`
+requires an already journaled `VALIDATING` operation, trusted backend-resolved data
+and no ambient transaction. It locks campaign then operation, checks adventure scope,
+payload hash, exact base/current revision, operation version and pinned content, and
+checks resource scope/version/bounds. JPA also catches an intervening resource writer.
+Fresh commits increment revision once; turn advancement is explicit and world duration
+is supplied by deterministic resolution. Event sequence/provenance and receipt identity
+are assigned inside the transaction. Matching retries return the exact stored receipt,
+even after later world changes; changed payload hashes fail before replay.
+
+Each commit writes one `PUBLIC_STATE` intent and, when requested, one
+`NARRATION_REQUIRED` intent. These immutable outbox records carry only campaign,
+operation and revision references. They neither publish data nor grant audience access.
+No network client, callback or delivery listener participates in the transaction;
+the caller receives detached receipt data after COMMIT. Database contention is bounded
+by a 2-second lock timeout, a 5-second statement timeout and a 10-second transaction
+timeout. Plans allow at most 128 resources, 128 events (at least one), 128 settlements
+and 32 KiB receipt details; existing stored JSONB limits remain authoritative.
+
+This internal primitive does not accept player/model proposals directly. Command
+acceptance/authorization, semantic rules, encounter checks, random draw reservation,
+leases/fences, cancellation coordination and outbox dispatch/recovery remain their
+later roadmap tasks. New domain effect types must join the same explicit commit path.
 
 ## 6. Narration after authority
 

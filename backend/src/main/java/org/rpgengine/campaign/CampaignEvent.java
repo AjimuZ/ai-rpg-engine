@@ -22,7 +22,7 @@ import org.rpgengine.persistence.CanonicalValues;
  * composite foreign keys enforce. A database trigger rejects UPDATE and DELETE.
  *
  * <p>This class only shapes and stores the envelope. Assigning sequences atomically
- * with state changes, receipts and the outbox is the commit path of P03.3.
+ * with state changes, receipts and the outbox is handled by CanonicalCommitService (P03.3).
  */
 @Entity
 @Immutable

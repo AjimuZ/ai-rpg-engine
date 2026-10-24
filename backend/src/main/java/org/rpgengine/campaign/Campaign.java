@@ -24,7 +24,7 @@ import org.rpgengine.persistence.VersionedEntity;
  *
  * <p>The canonical counters are embedded here; presentation preferences are not, so a
  * locale change can never rewrite this row. Counter advancement belongs to the atomic
- * commit path (P03.3) and is intentionally not exposed yet. The database already
+ * commit path (P03.3). The database also
  * guards it (V2): counters never decrease, {@code stateRevision} advances by at most
  * one per update, and the adventure, content revision and seed identity are fixed.
  */
@@ -99,6 +99,36 @@ public class Campaign extends VersionedEntity {
         campaign.createdAt = CanonicalValues.timestamp(now, "now");
         campaign.updatedAt = campaign.createdAt;
         return campaign;
+    }
+
+    /**
+     * Apply a resolved world's counters, mode and decision within the canonical commit.
+     * Inputs are the exact base revision, resolved turn/time effects, positive event
+     * count and new decision (null clears it). Returns the new counters. Rejects stale
+     * revisions, malformed values or arithmetic overflow before changing this entity.
+     * The caller must persist events, journal and outbox in the same transaction.
+     */
+    public CampaignCounters commitWorld(long expectedRevision, boolean advancesTurn, long elapsedSeconds,
+            int eventCount, CampaignMode nextMode, String nextDecision, Instant now) {
+        if (counters.stateRevision() != expectedRevision) {
+            throw new IllegalStateException("stale campaign revision");
+        }
+        CanonicalValues.requireNonNegative(elapsedSeconds, "elapsedSeconds");
+        CanonicalValues.requirePositive(eventCount, "eventCount");
+        Objects.requireNonNull(nextMode, "nextMode");
+        if (nextDecision != null) {
+            CanonicalValues.requireJsonObject(nextDecision, "pendingDecision", 16_384);
+        }
+        Instant changedAt = CanonicalValues.timestamp(now, "now");
+        CampaignCounters next = CampaignCounters.of(Math.addExact(expectedRevision, 1),
+                Math.addExact(counters.gameTurn(), advancesTurn ? 1 : 0),
+                Math.addExact(counters.worldTimeSeconds(), elapsedSeconds),
+                Math.addExact(counters.eventSequence(), eventCount));
+        counters = next;
+        mode = nextMode;
+        pendingDecision = nextDecision;
+        updatedAt = changedAt;
+        return next;
     }
 
     /** @return owning adventure ID */

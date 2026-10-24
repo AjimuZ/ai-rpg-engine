@@ -36,7 +36,23 @@ The repository checker passes 22 unit tests and all policy checks; the default
 packaging suite passes 20 checks with two opt-in lifecycle/recreation checks skipped.
 This is storage-level evidence toward QA-03/QA-04, QA-10 and QA-20; no command API,
 inventory gameplay, owner authorization, full QA-20/QA-33 acceptance, atomic outbox,
-draw reuse or recovery is claimed. Those remain later tasks in P03 and beyond.
+draw reuse or recovery is claimed by that checkpoint.
+
+P03.3 adds internal atomic-commit evidence on 24 October 2026 in the same pinned
+Windows 11/Docker Desktop/JDK 21/PostgreSQL 18.6 environment. Full backend `verify`
+passes 72 tests, with three packaged-interface tests skipped outside their profile.
+Its 27 commit integration cases cover state, events, reward settlements, journal
+receipt and outbox rollback at each write boundary and at deferred commit; exact
+receipt replay after later state changes; simultaneous duplicate and competing
+operations; stale revision/content/resource versions; cross-scope references; and
+an intervening resource writer after inserts flush. Tests reject ambient transactions,
+check the service's database-only dependency surface and immutable input bounds,
+and verify populated V3 upgrade without fabricated historical outbox messages.
+Repository-checker tests pass 22/22, default packaging checks pass 20/20 with two
+opt-in checks skipped, and repository policy checks report no findings. This adds
+transaction-level QA-20 and scope-level QA-33 evidence; full acceptance still needs
+command/API authorization, draw reuse, lease/recovery and delivery work. No live
+inference, gameplay or hosted-CI result is claimed for this checkpoint.
 
 ## 2. Verification layers
 

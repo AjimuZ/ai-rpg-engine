@@ -38,16 +38,25 @@ From `backend/`, with those variables set:
 `verify` starts an ephemeral HTTP server and checks minimal health, hidden diagnostic
 endpoints, PostgreSQL major version, Flyway validation, and the canonical schema.
 A missing database fails tests; nothing silently skips or uses H2. Use a new
-disposable database: the test requires exactly the eleven tables created by
-`src/main/resources/db/migration/V1__canonical_foundations.sql` (P03.1) and
-`V2__campaign_bounds_and_versions.sql` (P03.2, adding `actor_resource`), with no
+disposable database: the test requires exactly the twelve tables created by
+`src/main/resources/db/migration/V1__canonical_foundations.sql` (P03.1),
+`V2__campaign_bounds_and_versions.sql` (P03.2, adding `actor_resource`) and
+`V3__canonical_outbox.sql` (P03.3), with no
 rows, and Hibernate validates the entities against them (`ddl-auto=validate`).
 The persistence tests truncate these tables before and after each test, so never
 point `verify` at a database whose data you want to keep.
 P03.2 adds storage row versions separate from canonical counters, frozen ownership,
 bounded actor resources and complete write-once journal outcomes. Integration tests
 include cross-campaign rejection, scoped reads, concurrent duplicate inserts and
-stale-writer rollback, plus populated V1-to-V2 upgrade in a disposable schema.
+stale-writer rollback, plus populated V1-to-V2-to-V3 upgrade in a disposable schema.
+P03.3 adds an internal `CanonicalCommitService` consuming immutable `ResolvedCommit`
+values from trusted backend resolution. It atomically saves world/resource changes,
+events, settlements, a backend receipt and reference-only outbox intents, and returns
+only after commit succeeds. It rejects ambient transactions and has no network ports
+or executable callbacks. Operation acceptance, gameplay authorization/rules, leases,
+outbox delivery and narration remain later tasks; no command endpoint is exposed.
+`CanonicalCommitServiceTest` uses real PostgreSQL failure triggers (including deferred
+commit failures), duplicate/stale races and scoped references; no runtime account is needed.
 See [database invariants and payload limits](../docs/05-domain-model.md#3-database-organization).
 The executable jar is `target/engine-0.1.0.jar`; it can also run with `java -jar`.
 

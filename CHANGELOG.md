@@ -2,6 +2,14 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Atomic canonical commits (P03.3), 24 October 2026
+
+- Add an internal bounded commit service for world counters/mode/decision, resource changes, sequenced events, reward settlements, journal receipts and public-state/narration outbox intents in one database transaction.
+- Lock scoped campaign and journal rows, recheck revision/content/resource versions, replay the exact stored receipt on duplicate completion, and reject ambient transactions. Accept immutable resolved data without network clients or executable callbacks; use bounded lock, statement and transaction timeouts.
+- Add forward-only V3 with immutable reference-only outbox rows, unique operation/kind keys and a deferred campaign/operation/committed-revision foreign key. Preserve historical outcomes without fabricating delivery work on upgrade.
+- Pass full backend compilation, tests and jar build against PostgreSQL 18.6: 72 tests pass and three packaged-interface tests skip outside their profile. Cover every write boundary and deferred-commit rollback, duplicate/competing operations, intervening resource writes, scope/version guards and populated upgrades. Repository-checker tests pass 22/22, default packaging checks pass 20/20 with two opt-in checks skipped, and repository policy checks report no findings. Dependency pins are unchanged.
+- Command/API authorization and semantic rules, deterministic draws, leases/recovery, outbox delivery and full QA-20/QA-33 acceptance remain later tasks; no gameplay endpoint is exposed.
+
 ## Unreleased — Campaign constraints and storage versions (P03.2), 24 October 2026
 
 - Add forward-only V2 with bounded actor resources, campaign/actor foreign keys and unique resource keys; freeze ownership and provenance after insert.

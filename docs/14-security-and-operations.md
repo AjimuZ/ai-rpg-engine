@@ -95,6 +95,15 @@ Store application data outside the source checkout. The packaged profile uses se
 
 Default retention proposal: committed state/events until owner deletion; five rolling recovery snapshots plus daily backups according to configured retention; ordinary diagnostic logs seven days; raw AI prompts/traces off by default; expired temporary workspaces cleaned after task reconciliation. Retention is configurable and recorded in settings. Do not claim deletion from the local disk also deletes provider-side data; account/service policies are separate.
 
+P03.3's internal canonical commit accepts bounded, already-resolved backend data and
+rejects ambient transactions. Only database/JSON dependencies execute inside it;
+inference and delivery must run outside. Campaign/journal locks, exact revision and
+resource version checks protect atomic state/events/settlements/receipt/outbox writes.
+Immutable outbox envelopes contain scoped references only; future workers must build
+authorized projections and deduplicate delivery by message identity. No worker,
+acknowledgment, pruning policy, owner authorization endpoint or lease/fence is delivered
+here. See [commit limits and timeout contract](07-turn-protocol.md#5-canonical-commit).
+
 ## 8. Backups and restore
 
 An independently restorable backup includes database data, referenced immutable content revisions, registered asset files, schema/version manifest, and checksums. A copy of one summary or a checkpoint in the same database is not sufficient.

@@ -51,6 +51,23 @@ class CampaignFoundationsTest {
         assertThrows(IllegalArgumentException.class, () -> CampaignCounters.of(0, 0, 0, -1));
     }
 
+    /** Counter overflow and stale revisions must leave every world field unchanged, even in memory. */
+    @Test
+    void rejectsWorldOverflowWithoutPartialMutation() {
+        UUID adventure = UUID.randomUUID();
+        Campaign campaign = Campaign.start(adventure, revision(adventure), "Campaign", "seed", NOW);
+        var before = campaign.commitWorld(0, false, Long.MAX_VALUE, 1,
+                CampaignMode.EXPLORATION, "{\"kind\":\"choose\"}", NOW);
+        assertThrows(ArithmeticException.class, () -> campaign.commitWorld(1, true, 1, 1,
+                CampaignMode.EXPLORATION, null, NOW.plusSeconds(1)));
+        assertEquals(before, campaign.getCounters());
+        assertEquals("{\"kind\":\"choose\"}", campaign.getPendingDecision());
+        assertEquals(campaign.getCreatedAt(), campaign.getUpdatedAt());
+        assertThrows(IllegalStateException.class, () -> campaign.commitWorld(0, true, 0, 1,
+                CampaignMode.EXPLORATION, null, NOW));
+        assertEquals(before, campaign.getCounters());
+    }
+
     /** Event envelopes and bodies reject malformed values before reaching SQL. */
     @Test
     void validatesEventRecords() {

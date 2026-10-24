@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: P00, P01.1–P01.7, P02.1–P02.7 and P03.1–P03.2 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; P03.1–P03.2 add the canonical schema, bounded resources, ownership constraints and storage versions, and gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. The root launcher and its Windows lifecycle checks (P02.7) are verified for Docker Desktop with Git Bash only; Linux/macOS, interactive Ctrl+C, owner sign-in, campaign persistence beyond these foundations (P03.3–P03.6) and full QA-28 remain pending. P03.3 is the next task. Design specifications and predecessor milestones do not establish completed gameplay.
+**Current status: P00, P01.1–P01.7, P02.1–P02.7 and P03.1–P03.3 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; P03.1–P03.3 add the canonical schema, bounded resources, ownership constraints, storage versions and internal atomic commit boundary, and gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. The root launcher and its Windows lifecycle checks (P02.7) are verified for Docker Desktop with Git Bash only; Linux/macOS, interactive Ctrl+C, owner sign-in, campaign persistence beyond these foundations (P03.4–P03.6) and full QA-28 remain pending. P03.4 is the next task. Design specifications and predecessor milestones do not establish completed gameplay.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -487,7 +487,20 @@ content/assets and full container integration remain open; P02.3 stays unchecked
   change. Atomic state/event/receipt/outbox commit, expected canonical revision, random
   draws, leases and recovery remain P03.3–P03.6; future API authorization and full
   QA-20/QA-33 acceptance remain unverified. Hosted CI for this commit is unconfirmed.
-- [ ] P03.3 Commit state, events, receipts, and outbox messages together; no network waits in transactions.
+- [x] P03.3 Commit state, events, receipts, and outbox messages together; no network waits in transactions.
+  Add a bounded internal resolved-commit service, scoped campaign/journal locking,
+  revision/resource checks, exact stored receipt replay and reference-only immutable
+  outbox migration. Reject ambient transactions and executable inputs; persist all
+  canonical effects and public-state/narration intents in one short database transaction.
+  On Windows 11/Docker Desktop with pinned JDK 21/PostgreSQL 18.6, full backend
+  `verify` passes 72 tests (three packaged-interface tests skip outside their profile).
+  The 27 commit integration cases include every write boundary, deferred commit failure,
+  simultaneous duplicates/competing operations, intervening resource writers and scope
+  guards; populated V1-to-V2-to-V3 upgrade preserves existing outcomes without backfill.
+  Repository-checker tests pass 22/22; default packaging checks pass 20/20 with two
+  opt-in checks skipped; repository policy checks report no findings. Dependency pins
+  are unchanged. No API, dispatcher, lease/recovery or full QA-20/QA-33 claim; remaining
+  package exits belong to P03.4–P03.6 and later gameplay work. Hosted CI is unconfirmed.
 - [ ] P03.4 Add deterministic random-draw records and algorithm/version identity.
 - [ ] P03.5 Implement startup journal reconciliation, lease/fencing foundations, and baseline backup/restore.
 - [ ] P03.6 Add durable AI jobs, immutable planning snapshots, versioned plan/dependency records, query epochs and recovery generations; persist locale preferences separately from world revisions and test atomic outbox/admission foundations.

@@ -24,9 +24,8 @@ import org.rpgengine.persistence.VersionedEntity;
  * world counter and never feeds {@code stateRevision}. It is also not the optimistic-lock
  * token: that is the inherited row version, which every update advances (V2). The
  * database additionally keeps terminal statuses final and the commit outcome
- * write-once. Leases and fencing tokens arrive with P03.5; the atomic commit that
- * sets {@code committedRevision} with state
- * and events in one transaction arrives with P03.3.
+ * write-once. {@link CanonicalCommitService} sets the outcome with state, events,
+ * settlements and outbox in one transaction. Leases and fencing arrive with P03.5.
  */
 @Entity
 @Table(name = "operation_journal")

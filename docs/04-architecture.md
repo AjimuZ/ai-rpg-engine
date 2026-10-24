@@ -51,7 +51,7 @@ status-only health; runtime integration, packaged assets and full readiness
 contracts were later P02 tasks. P03.1 adds Spring Data JPA, the first Flyway
 migration and the canonical foundation entities in the `identity`, `adventure`,
 `content`, `campaign`, `commands`, `characters`, `progression`, `memory`,
-`presentation` and `persistence` packages; no application services use them yet. See the
+`presentation` and `persistence` packages. P03.3 adds an internal canonical commit service with a durable reference-only outbox; command APIs, semantic rules, runtime orchestration and outbox delivery remain later work. See the
 [frontend](../frontend/README.md) and [backend](../backend/README.md) build/test commands.
 
 ## 3. Backend modules

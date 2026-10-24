@@ -32,4 +32,19 @@ and do not replace, the short atomic transaction and lease/fencing checks of P03
 
 ## Verification
 
+P03.3 implementation decision (24 October 2026): the internal commit boundary accepts
+an immutable bounded resolved value, never an executable callback. It rejects ambient
+transactions, locks campaign then journal, rechecks exact revision/content/operation
+and resource versions, and returns detached receipt data only after database commit.
+The initial typed effects cover world counters/mode/decision, resource adjustments,
+events and reward settlements. New domain effects must extend that explicit boundary.
+The outbox stores immutable scoped operation/revision references, not event payloads;
+its deferred foreign key requires a committed journal outcome. Dispatch and audience
+filtering remain later worker work. No network client or delivery hook is injected into
+the transaction. Populated upgrade and 27 focused PostgreSQL cases pass, including
+deferred commit failure and an intervening resource writer after inserts flush.
+Full backend verification passes 72 tests, with three packaged-interface tests skipped
+outside their profile. Leases/fencing remain P03.5 and gameplay
+semantic/owner authorization remains P07/the application boundary.
+
 Duplicate/crash/concurrency fault tests, resource/ownership constraints, one-time settlement, narration-only retries, and fresh-storage recovery. See [turn protocol](../07-turn-protocol.md).

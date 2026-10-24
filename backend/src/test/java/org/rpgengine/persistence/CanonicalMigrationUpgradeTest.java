@@ -15,7 +15,7 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade a populated V1 schema to V2 on real PostgreSQL without touching the shared public schema. */
+/** Upgrade populated V1 through V2/V3 on real PostgreSQL without touching the shared public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -25,7 +25,7 @@ class CanonicalMigrationUpgradeTest {
     CanonicalMigrationUpgradeTest() {
     }
 
-    /** Preserve owner/adventure/content/campaign/journal identities and initialize versions on upgrade. */
+    /** Preserve identities/outcomes, initialize versions and add an empty outbox; migration errors fail the test. */
     @Test
     void upgradesPopulatedFoundationsWithoutChangingCanonicalCounters() throws Exception {
         String schema = "p032_upgrade_" + UUID.randomUUID().toString().replace("-", "");
@@ -63,7 +63,7 @@ class CanonicalMigrationUpgradeTest {
                     String before = jdbc.queryForObject("select to_jsonb(c)::text from campaign c where id = ?",
                             String.class, campaign);
                     Flyway v2 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
-                            .locations("classpath:db/migration").load();
+                            .locations("classpath:db/migration").target("2").load();
                     assertEquals(1, v2.migrate().migrationsExecuted);
                     assertTrue(v2.validateWithResult().validationSuccessful);
                     assertEquals(before, jdbc.queryForObject(
@@ -76,6 +76,18 @@ class CanonicalMigrationUpgradeTest {
                             + "where id = ? and row_version = 0", campaign));
                     assertEquals(6L, jdbc.queryForObject("select operation_version from operation_journal", Long.class));
                     assertEquals(0, v2.migrate().migrationsExecuted);
+                    // A populated committed journal also survives V3 unchanged; the
+                    // new outbox starts empty rather than fabricating historic delivery.
+                    String journal = jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
+                            String.class);
+                    Flyway v3 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").load();
+                    assertEquals(1, v3.migrate().migrationsExecuted);
+                    assertTrue(v3.validateWithResult().validationSuccessful);
+                    assertEquals(journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
+                            String.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from canonical_outbox", Integer.class));
+                    assertEquals(0, v3.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

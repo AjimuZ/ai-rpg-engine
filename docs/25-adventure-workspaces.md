@@ -51,6 +51,13 @@ UPDATE. Scoped repository queries have negative isolation tests; application
 authorization, routes, media and job isolation remain later work. These storage
 checks alone do not complete QA-33.
 
+P03.3's internal commit service additionally locks the campaign in the requested
+adventure and reads the operation/resources in that campaign. Event actor/causation
+and outbox committed-operation references retain composite database constraints.
+Wrong-adventure and cross-campaign commit tests verify rollback without effects;
+outbox envelopes expose no narrative or private event body. These are backend scope
+checks, not proof of UI switching, owner authorization or future delivery isolation.
+
 Proposed additions are `GET /api/v1/adventures`, `POST /api/v1/adventures` and `GET /api/v1/adventures/{adventureId}`. The existing campaign-creation envelope requires `adventureId` and an admitted pack revision belonging to it. Continue/list operations expose only its campaigns. These are design contracts, not running endpoints.
 
 Scope client projections, drafts, quick replies, reading cursor and media to adventure/campaign. Switching detaches old subscriptions and rejects stale callbacks in the new view, without submitting an old draft. The header identifies the selected adventure/playthrough. Memory and narrative threads never cross adventures because character names match. Generated images stay in their originating folders; no global search-by-name cache is allowed. Public engine UI assets may be shared read-only; reuse of authored/private material requires explicit rights-aware export/import and identity remapping.
