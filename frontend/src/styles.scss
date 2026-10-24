@@ -115,3 +115,9 @@ summary { cursor: pointer; color: var(--focus); padding: .4rem 0; }
   nav a.selected { border-bottom: 2px solid LinkText; }
   .dialogue, .scene, .panel { border: 1px solid CanvasText; }
 }
+
+/* Wrapping native reply controls preserve editable input and touch access on narrow reading layouts. */
+.quick-replies { display: flex; flex-wrap: wrap; gap: .6rem; padding: 0; list-style: none; }
+.quick-replies li { display: flex; flex-wrap: wrap; gap: .3rem; max-width: 100%; }
+.quick-replies button { white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.composer-actions { display: flex; flex-wrap: wrap; gap: .6rem; }

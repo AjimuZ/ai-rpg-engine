@@ -726,7 +726,18 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     report zero findings. Full QA-29 input/reconnect behavior,
     bilingual resources, the complete graphic kit and assistive-technology review
     remain outside this local reading increment; no campaign actions are enabled.
-- [ ] P05.4 Define revision-aware projection state, persistent free-input drafts, editable contextual quick replies and connection/error states; choosing a suggestion must not submit or advance the world.
+- [x] P05.4 Define revision-aware projection state, persistent free-input drafts, editable contextual quick replies and connection/error states; choosing a suggestion must not submit or advance the world.
+  - Separate scoped public projections from bounded persistent draft text/selection;
+    reject stale revisions, callbacks and suggestion identities, including after
+    detachment/return. Editable typed suggestions fill only an empty draft and
+    never submit or advance the world. Connection/recovery states preserve input.
+    All 26 frontend tests, strict typecheck, production build, zero-vulnerability
+    audit and 22 repository tests pass; docs/secrets/workflows/images scans report
+    zero findings. Chrome 155 desktop/mobile verifies keyboard editing/dismissal,
+    reload/selection, scope isolation, offline/reconnecting and clear persistence
+    with no exceptions or nonlocal/action requests; mobile composer visually reviewed.
+    Send and retry await P06/P07 campaign/operation transport; full accessibility
+    and bilingual acceptance remain later gates.
 - [ ] P05.5 Create or license and integrate the complete UI graphic kit, including buttons, bars, icons, frames and required interaction/fallback states; register sources, notices and generated-asset provenance.
 - [ ] P05.6 Deliver reviewed English-default/Italian UI variants, localized receipts/errors/accessibility, persisted language selection and draft/cursor-safe reload; extend single-origin packaging/resource checks under QA-35.
 - [ ] P05.7 Define and render bounded typed public presentation events for scene, pose/expression and optional line audio hooks; reject executable/raw-URL directives, deduplicate delivery and preserve text-only/keyboard/reduced-motion behavior under QA-40.

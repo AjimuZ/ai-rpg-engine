@@ -100,7 +100,7 @@ The ordered chronicle contains only revealed passages and explicit speaker roles
 Native Continue and Chronicle controls support Enter/Space and visible focus;
 on the final advancement, focus moves to the dialogue before Continue disables.
 There are no global reading shortcuts to intercept input. No animation or audio
-is used. Persistent projections/drafts and real player submissions remain later work.
+is used. P05.4 adds persisted drafts below; durable campaign projections and real player submissions remain later work.
 
 Retain the first project's structured RPG panels and readable dark-theme option. Its obsidian, violet, gold, and cyan palette can become the default theme. It is not mandatory for all packs; support neutral and high-contrast profiles. Content terminology and visible panels derive from enabled modules.
 
@@ -155,6 +155,43 @@ Every panel defines loading, empty, unavailable, and error states. Last committe
 Distinguish no installed pack, invalid pack, no campaign, missing asset, disconnected Codex, stale revision, awaiting clarification, cancelled before commit, committed with narration pending, and restore required. These are actionable states, not one generic “AI error.”
 
 After reconnect, fetch operation status before enabling a retry. Reusing the original request identity is a retry; editing the action creates a new request. Keep an unsent draft separate from submitted text so a refresh cannot accidentally replay it.
+
+P05.4 implements this foundation in the local previews with a separate
+`StoryInputState` feature service. Public deliveries carry stable adventure/campaign
+IDs, a nonnegative canonical revision and an independent presentation revision;
+reading changes only the presentation revision. Scope activation gives callbacks
+an epoch, including when leaving the story and returning to the same scope. Detachment
+invalidates callbacks and reactivation refreshes reply references. Wrong-scope, old-epoch,
+older and duplicate deliveries leave the accepted snapshot intact. Accepted
+revision history survives route changes in memory. A newer snapshot replaces
+contextual replies without replacing the unsent draft; recovery states retain the
+last accepted snapshot. A projection is public display data, never a world write.
+
+The composer stores up to 4,000 UTF-16 code units and bounded selection offsets
+in versioned same-origin device storage keyed by the pair of stable IDs. Local
+samples use the reserved `local-preview` campaign identity. Drafts survive route
+changes/reload; no operation, receipt, submitted text, credential or hidden world
+state is persisted by this service. Corrupt/incompatible data produces a visible
+fallback; denied/quota storage keeps the new draft in memory with an explicit
+warning. Device storage is local convenience, not a campaign backup or cross-tab
+merge protocol (the latest device write wins). Shared-device users can explicitly
+clear each draft. P05.6 retains full language-switch/cursor-safe reload acceptance.
+
+Suggestions are at most three unique typed speech/question/action plain-text replies (240 code units each),
+supplied by revealed public fixture context. Choosing requires an empty composer
+and the exact current reply object; old deliveries, dismissed chips and recovery
+states cannot populate it. Existing authored text must be explicitly cleared
+before replacement. Choosing focuses editable text, dismissal changes no text,
+and neither action advances reading, canonical revision, time or the world.
+
+The screen distinguishes loading, local preview, current context, disconnected,
+reconnecting, refresh error, stale revision, clarification, cancelled-before-commit,
+narration pending and restore required. Browser connectivity is only a hint:
+returning online requires future operation-status reconciliation before retry.
+Raw errors are never rendered. All states preserve drafting and reading. Send
+remains disabled in every preview state; this increment implements no command
+submission, operation-status endpoint, automatic replay or retry. Real durable
+operation identity/submitted-text separation and reconciliation remain P06/P07.
 
 ## 9. Accessibility and responsive behavior
 

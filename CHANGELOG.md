@@ -2,6 +2,21 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Revision-aware drafts and quick replies (P05.4), 24 October 2026
+
+- Separate scoped public projection state from unsent drafts, with canonical and
+  presentation revision ordering, callback epochs and stale/duplicate rejection.
+- Persist bounded device-local draft text/selection per adventure/campaign; retain
+  edits with visible fallback on unavailable, corrupt or full storage.
+- Add typed contextual speech/question/action suggestions that fill an empty
+  editable composer; dismissal preserves text and restores keyboard focus.
+- Present specific connection/recovery states without clearing accepted context
+  or replaying input. Send stays disabled until campaign operations exist.
+- Pass 26 frontend tests, strict typecheck/build, a zero-vulnerability audit,
+  22 repository tests and Chrome desktop/mobile draft/reload/connection smoke;
+  visually review the mobile composer. Actual operation reconciliation remains
+  in P06/P07 and full accessibility acceptance remains pending.
+
 ## Unreleased — Responsive reading layouts (P05.3), 24 October 2026
 
 - Add a tab-lifetime text-focused reading preference alongside the default visual

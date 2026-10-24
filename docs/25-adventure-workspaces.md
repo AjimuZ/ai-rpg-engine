@@ -19,8 +19,18 @@ The library's primary cards represent adventures. “New adventure” creates a 
 
 P05.3 scopes public portrait lookup to each local preview's speaker registry.
 Reading/layout changes do not merge positions; switching scenes replaces speaker
-artwork and clears asset-failure state. These tab-lifetime checks do not prove
+artwork and clears asset-failure state. These tab-lifetime reading checks do not prove
 persisted workspace isolation or runtime media ownership.
+
+P05.4 persists bounded unsent drafts and selections per stable adventure/campaign
+ID pair in versioned same-origin device storage. Preview campaigns use the
+reserved `local-preview` identity. Switching scopes restores independent text;
+public projection callbacks require the active scope and activation epoch,
+including after returning to a previous scope. Accepted revision history stays
+in memory and stale/duplicate delivery cannot replace current suggestions.
+Storage failure retains edits in memory with visible status. These checks cover
+preview draft/reload isolation, not real campaign restart/restore, managed media
+folders, cross-tab merging or complete QA-33. Operation reconciliation remains P07.
 
 P05.1 adds a library shell with two local genre preview cards and a separate
 installed-packs section. Scoped URLs reject unknown preview identities; reading

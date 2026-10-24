@@ -71,6 +71,12 @@ the selected design uses an explicit safe reload, not a promised instantaneous
 runtime language switch. A third-party runtime translation framework is deferred
 unless a measured requirement makes this approach inadequate.
 
+P05.4 supplies the English-only local foundation: versioned adventure/campaign
+scoped draft text and selection persistence across reload, without submission.
+Reading preferences/positions remain tab-lifetime; no operation is created or
+persisted by the preview composer. Language resources, locale-generation guards,
+operation identity and full language-switch restoration remain P05.6/P06/P07.
+
 Before reload, persist the adventure/campaign-scoped input draft, operation ID,
 last stream cursor and reading position. Wait for or reconcile an outstanding
 operation, restore by IDs and deduplicate messages. Do not submit the draft.

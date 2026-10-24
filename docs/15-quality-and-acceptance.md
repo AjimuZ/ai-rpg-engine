@@ -268,6 +268,20 @@ exceptions, nonlocal requests or action requests occur. This covers the local
 reading portion of QA-29; playable drafts/suggestions, reconnect deduplication,
 assistive-technology review and full QA-29/30/33/35 remain later gates.
 
+P05.4 passes 26 frontend tests, strict typecheck/build, a zero-vulnerability
+audit and all 22 repository tests. Service regressions cover revision ordering,
+scoped callback epochs (including detach/return), suggestion identity and bounds,
+recovery-state preservation, and unavailable/corrupt storage. Routed tests verify
+literal rendering, editable suggestions and disabled submission. Chrome 155 on
+desktop/mobile verifies keyboard selection/editing/dismissal, multiline input,
+draft/selection restoration after reload, scope isolation, offline/reconnecting
+states and explicit clearing. The mobile composer screenshot was visually reviewed;
+no page exceptions, nonlocal requests or action requests occur. Repository
+policy scans cover docs, secrets, workflows and images. This establishes the local
+draft/projection portion of QA-29; actual campaign operation reconciliation,
+reconnect deduplication, assistive-technology review and full QA-29/30/33/35 remain
+later gates. Send remains disabled until P06/P07 provide campaign operations.
+
 Combat-chat acceptance for P11/P12 also includes a real-browser English/Italian
 path with visible speaker/recipient, editable suggestions and explicit Send;
 desktop/mobile keyboard access to both chat and tactics; draft preservation while

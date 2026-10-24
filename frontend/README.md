@@ -31,9 +31,9 @@ The default story uses separate original [vector scene assets](public/scenes/REA
 and attributed public sample passages. Continue reveals only supplied text;
 Chronicle shows already revealed passages. Reading positions remain independent
 per sample while the tab is open. Settings adjusts story text from 15–24 px;
-reload resets all preferences/positions. English-only resources, full localization,
-persistent drafts, revision-aware input and the complete graphic kit remain
-P05.4–P05.7. No submitted player dialogue is fabricated.
+reload resets all preferences/positions. UI resources are currently English-only;
+full localization, the complete graphic kit and safe presentation events remain
+P05.5–P05.7. No submitted player dialogue is fabricated.
 
 P05.3 adds a Settings layout choice: default scene-led visual novel or a narrow
 text-focused column with a live scene description and no artwork requests.
@@ -49,6 +49,30 @@ final-passage focus/Tab, portrait/scene failures, text mode without artwork load
 mobile and text-mobile screenshots were visually reviewed. All 22 repository
 tests pass. This is local reading acceptance; full QA-29 input/reconnect behavior
 and an assistive-technology audit remain pending.
+
+P05.4 adds an editable composer with up to three typed contextual quick replies.
+Selecting requires an empty draft; explicit Clear draft permits replacement.
+Selecting, editing, dismissing and pressing Enter in the textarea never submit,
+advance reading or mutate a world. Dismissal restores focus to the composer.
+The separate `StoryInputState` service guards adventure/campaign IDs, callback
+epochs and monotonic canonical/presentation revisions; stale/duplicate deliveries
+cannot overwrite context or drafts. Reading changes only presentation context.
+
+Unsent text (4,000 UTF-16 code units) and selection offsets persist in versioned
+same-origin localStorage, keyed by adventure/campaign ID. Samples use the reserved
+`local-preview` campaign ID. Reload/navigation restores drafts; reading/layout
+preferences remain tab-lifetime. Storage denial/quota/corruption shows a visible
+fallback and preserves current edits in memory. Clear draft saves an empty value.
+This device-local convenience has no cross-tab merge, backup or encryption claim;
+latest device write wins. It stores no operations, credentials or hidden state.
+
+Specific loading, offline/reconnect, refresh error, stale, clarification,
+cancelled, narration-pending and restore-required states preserve last context
+and editing. Browser online is only a hint and never enables Send/retry or replays
+text. Campaign operation status/idempotency wiring belongs to P06/P07. P05.6
+retains bilingual language switching and complete reload/reading-cursor acceptance.
+Full QA-29/33/35 and assistive-technology review remain pending.
+
 Use Node.js 24.22.1 and npm 11.19.1 from [ADR 0009](../docs/adr/0009-toolchain-baseline.md).
 
 From `frontend/`:
@@ -86,6 +110,14 @@ and disabled direct routes, including responsive navigation at the same sizes;
 all three screenshots were visually reviewed. Tests cover empty metadata, literal
 markup, blank-label fallbacks and scope changes without fabricated resource values.
 Repository tests pass 22/22 and all four policy scans report zero findings.
+
+P05.4 passes 26 tests, strict typecheck/build and a zero-vulnerability audit.
+Chrome desktop/mobile also checks keyboard suggestion editing/dismissal, native
+multiline input, draft/selection reload, adventure isolation, offline/reconnecting
+states and explicit clear, with no page exceptions or nonlocal/action requests.
+The mobile composer screenshot was visually reviewed. All 22 repository tests
+pass; campaign submission/reconciliation and full accessibility acceptance remain
+later gates.
 
 Vite is overridden to 8.3.5 to fix the development-server advisories in Angular
 build's 8.3.0 dependency while preserving Angular 22.2.3; see ADR 0009.

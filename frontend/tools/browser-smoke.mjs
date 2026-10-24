@@ -216,11 +216,60 @@ try {
   await writeFile(resolve(artifacts, 'p053-text-mobile.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
   await clickLink('Crew profile', '/adventures/relay/sheet');
   assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+  // Hard reload verifies device persistence independently of the root service's in-memory cache.
+  for (const mobile of [false, true]) {
+    await command('Emulation.setDeviceMetricsOverride', { width: mobile ? 390 : 1440, height: mobile ? 844 : 1100, deviceScaleFactor: 1, mobile });
+    await command('Page.navigate', { url: origin + '/adventures/mosslight/story' });
+    await waitFor(`!!document.querySelector('#player-input')`);
+    await evaluate(`document.querySelector('.composer-actions button:last-child').click()`);
+    const reading = await evaluate(`document.querySelector('#reading-progress').textContent`);
+    await evaluate(`document.querySelector('[data-suggestion]').focus()`);
+    await pressKey('Enter', 'Enter', 13, '\r');
+    await waitFor(`document.querySelector('#player-input').value.includes('grove')`);
+    assert.equal(await evaluate(`document.activeElement.id`), 'player-input');
+    assert.equal(await evaluate(`document.querySelector('#reading-progress').textContent`), reading);
+    await evaluate(`document.querySelector('#player-input').select()`);
+    await command('Input.insertText', { text: 'My edited response' });
+    await pressKey('Enter', 'Enter', 13, '\r');
+    await command('Input.insertText', { text: 'Still drafting.' });
+    const draft = 'My edited response\nStill drafting.';
+    await waitFor(`document.querySelector('#player-input').value === ${JSON.stringify(draft)}`);
+    assert.equal(await evaluate(`document.querySelector('[data-suggestion]').disabled`), true);
+    await evaluate(`document.querySelector('[data-dismiss]').focus(); document.querySelector('[data-dismiss]').click()`);
+    await waitFor(`document.querySelectorAll('[data-dismiss]').length === 1`);
+    assert.equal(await evaluate(`document.activeElement.id`), 'player-input');
+    assert.equal(await evaluate(`document.querySelector('#player-input').value`), draft);
+    await evaluate(`(() => { const field = document.querySelector('#player-input'); field.setSelectionRange(2,5); field.dispatchEvent(new Event('select')); })()`);
+    await command('Page.reload');
+    await waitFor(`document.querySelector('#player-input')?.value === ${JSON.stringify(draft)}`);
+    await evaluate(`document.querySelector('#player-input').focus()`);
+    assert.deepEqual(await evaluate(`(() => { const field = document.querySelector('#player-input'); return [field.selectionStart, field.selectionEnd]; })()`), [2, 5]);
+    // Browser signals are hints only; online cannot silently assert operation readiness or replay a draft.
+    await command('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+    await waitFor(`document.querySelector('.composer [role="status"]').textContent.includes('Connection unavailable')`);
+    assert.equal(await evaluate(`document.querySelector('#player-input').value`), draft);
+    await command('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+    await waitFor(`document.querySelector('.composer [role="status"]').textContent.includes('Operation status must be checked')`);
+    assert.equal(await evaluate(`document.querySelector('[data-send]').disabled`), true);
+    assert.equal(await evaluate(`document.querySelector('#reading-progress').textContent`), reading);
+    await clickLink('Library', '/library');
+    await evaluate(`document.querySelector('a[href="/adventures/relay/story"]').click()`);
+    await waitFor(`location.pathname === '/adventures/relay/story' && !!document.querySelector('#player-input')`);
+    assert.equal(await evaluate(`document.querySelector('#player-input').value`), '');
+    await clickLink('Library', '/library');
+    await evaluate(`document.querySelector('a[href="/adventures/mosslight/story"]').click()`);
+    await waitFor(`document.querySelector('#player-input')?.value === ${JSON.stringify(draft)}`);
+    assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+    if (mobile) await writeFile(resolve(artifacts, 'p054-composer-mobile.png'), Buffer.from((await command('Page.captureScreenshot')).data, 'base64'));
+    await evaluate(`document.querySelector('.composer-actions button:last-child').click()`);
+    await command('Page.reload');
+    await waitFor(`document.querySelector('#player-input')?.value === ''`);
+  }
   await command('Page.navigate', { url: origin + '/adventures/missing/story' });
   await waitFor(`document.querySelector('h1')?.textContent === 'Adventure unavailable'`);
   assert.deepEqual(exceptions, []);
   assert.equal(requests.some(/** Reject world/API writes or remote media requests during preview journeys. */ (request) => request.method !== 'GET' || !request.url.startsWith(origin + '/')), false);
-  console.log(`Browser smoke passed: ${version.product}; desktop/mobile and narrow/landscape text layouts, portraits/failures, Enter/Space reading and chronicle, final focus/Tab, reduced motion, metadata/panels, form/settings; no page exceptions or nonlocal/action requests.`);
+  console.log(`Browser smoke passed: ${version.product}; desktop/mobile and narrow/landscape text layouts, portraits/failures, Enter/Space reading and chronicle, final focus/Tab, reduced motion, metadata/panels, form/settings, draft editing/reload/selection/isolation, offline/online recovery; no page exceptions or nonlocal/action requests.`);
 } finally {
   browser.kill();
   await new Promise(/** Release the loopback listener before completing; no background server survives. */ (accept) => server.close(accept));

@@ -218,7 +218,7 @@ describe('Preview screens', /** Register user-facing route checks; assertions fa
     expect(root.querySelector('.speaker')?.textContent).toContain('Trail keeper');
     expect(root.querySelector('.speaker')?.textContent).toContain('Character');
     expect(root.querySelector<HTMLButtonElement>('.reading-controls button')?.disabled).toBe(true);
-    expect(root.querySelector<HTMLButtonElement>('.composer button')?.disabled).toBe(true);
+    expect(root.querySelector<HTMLButtonElement>('.composer button[data-send]')?.disabled).toBe(true);
     await harness.navigateByUrl('/adventures/relay/story');
     expect(root.querySelector('.speaker')?.textContent).toContain('Narrator');
     expect(root.querySelector('.chronicle')?.textContent).not.toContain('Trail keeper');

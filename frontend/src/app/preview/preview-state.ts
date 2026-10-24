@@ -1,5 +1,6 @@
 /** Local, public sample content and reading preferences; never an authoritative game projection. */
 import { Injectable, signal } from '@angular/core';
+import { QuickReply } from './story-input-state';
 import { ContentMetadata } from './content-metadata';
 
 /** A display-only passage; player text must come from an explicit player submission. */
@@ -8,6 +9,7 @@ export interface Passage {
   readonly name: string;
   readonly text: string;
   readonly speakerId?: string;
+  readonly suggestions?: readonly QuickReply[];
 }
 
 /** Public portrait identity within one preview; absent artwork leaves attribution usable. */
@@ -35,8 +37,10 @@ const previews: readonly AdventurePreview[] = [
     id: 'mosslight', title: 'Mosslight Trail', description: 'A woodland exploration preview.',
     scene: '/scenes/woodland.svg', sceneAlt: 'A winding trail crosses a quiet grove beneath layered green canopies.',
     location: 'Trailhead', passages: [
-      { speaker: 'narrator', name: 'Narrator', text: 'The trail opens into a quiet grove. Pale light settles on the path ahead.' },
-      { speaker: 'character', speakerId: 'keeper', name: 'Trail keeper', text: 'The path continues through the trees. What would you like to know?' },
+      { speaker: 'narrator', name: 'Narrator', text: 'The trail opens into a quiet grove. Pale light settles on the path ahead.',
+        suggestions: [{ id: 'observe', kind: 'action', text: 'Look around the grove.' }, { id: 'listen', kind: 'action', text: 'Listen to the sounds nearby.' }] },
+      { speaker: 'character', speakerId: 'keeper', name: 'Trail keeper', text: 'The path continues through the trees. What would you like to know?',
+        suggestions: [{ id: 'ask', kind: 'question', text: 'What lies along the trail?' }] },
     ],
     speakers: { keeper: { name: 'Trail keeper', portrait: '/portraits/keeper.svg' } },
     content: {
@@ -50,8 +54,10 @@ const previews: readonly AdventurePreview[] = [
     id: 'relay', title: 'Silent Relay', description: 'A science-fiction salvage preview.',
     scene: '/scenes/station.svg', sceneAlt: 'A blue-lit station corridor leads from the docking ring toward a silent relay.',
     location: 'Dock', passages: [
-      { speaker: 'narrator', name: 'Narrator', text: 'Beyond the docking ring, a line of blue lamps marks the station corridor.' },
-      { speaker: 'character', speakerId: 'attendant', name: 'Dock attendant', text: 'The relay is quiet. Where would you like to begin your survey?' },
+      { speaker: 'narrator', name: 'Narrator', text: 'Beyond the docking ring, a line of blue lamps marks the station corridor.',
+        suggestions: [{ id: 'observe', kind: 'action', text: 'Look along the station corridor.' }] },
+      { speaker: 'character', speakerId: 'attendant', name: 'Dock attendant', text: 'The relay is quiet. Where would you like to begin your survey?',
+        suggestions: [{ id: 'ask', kind: 'question', text: 'What is known about the relay?' }] },
     ],
     speakers: { attendant: { name: 'Dock attendant', portrait: '/portraits/attendant.svg' } },
     content: {

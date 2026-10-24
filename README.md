@@ -58,10 +58,14 @@ Two local genre samples use original scene illustrations and attributed passages
 Continue reads supplied text only. These shells have no connected campaigns or
 world-action API. P05.2 binds terminology, attribute/resource names and optional
 guide/creative panels to typed local public metadata, with neutral fallbacks and
-scope-aware route checks. Registered pack/campaign binding remains P06; input,
+scope-aware route checks. Registered pack/campaign binding remains P06; playable input,
 localization and the full graphic kit remain later P05 work. P05.3 adds default
 visual-novel and no-artwork text layouts, scoped speaker portraits, attributed
-chronicle and keyboard focus handling for the end of available passages.
+chronicle and keyboard focus handling for the end of available passages. P05.4
+adds device-persisted scoped drafts/selection, editable typed contextual replies,
+revision/callback guards and connection/recovery states. Choosing/dismissing a
+suggestion never submits or advances reading/world state. Send remains disabled;
+real campaign operations and status reconciliation remain P06/P07.
 
 ## Planned capabilities
 
