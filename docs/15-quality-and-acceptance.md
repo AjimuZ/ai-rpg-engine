@@ -10,7 +10,7 @@ Angular entry point, hashed assets and notices, nine backend tests against
 PostgreSQL, missing-secret rejection, network/mount/identity isolation and
 durable markers across three-service recreation. The 116 runtime checks also
 pass without account access. This verifies packaging, not launcher, sign-in,
-campaign recovery or full QA-28 acceptance. Native Linux bind-secret ownership
+campaign recovery or full QA-28 acceptance. P02.7 adds an opt-in launcher lifecycle check (Windows 11, Docker Desktop, Git Bash): idempotent launch, graceful stop, interruption exit 130, restart and image-recreation preservation of neutral markers. It is partial QA-28 evidence only: no real campaign or combat data, no interactive Ctrl+C, no Linux/macOS host and no sign-in. Native Linux bind-secret ownership
 and the Java release refresh remain separate gates; see the
 [packaging checks](../tools/container_packaging/README.md).
 

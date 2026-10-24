@@ -2,6 +2,11 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Launcher lifecycle verification (P02.7), 24 October 2026
+
+- Add the opt-in `test_lifecycle.py` and a sanitized Windows report. On Windows 11 with Docker Desktop and Git Bash it verified repeated launch (containers and password unchanged), a 3.5 s graceful stop (exit codes 0, 0 and 143 for the engine), restart and image-recreation preservation of neutral database and content markers, and exit 130 after interrupts during build and startup.
+- Not verified: an interactive Ctrl+C, Linux/macOS hosts, WSL, owner sign-in, a cold build, real campaign data and engine draining of in-flight commands. The check is partial QA-28 evidence; no application behavior changed.
+
 ## Unreleased — Root launcher (P02.6), 24 October 2026
 
 - Add the root `start.sh` (Bash 4.4+, mode 100755): prerequisite checks against the documented Docker floors, one-time `.env` and random database-secret creation, cached builds, health-based startup, and `--check`, `--status`, `--logs`, `--stop` and `--login` commands with nonzero exit codes on failure.

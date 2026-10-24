@@ -1,0 +1,47 @@
+{
+  "host": "Windows 11",
+  "phases": {
+    "gracefulStop": {
+      "exitCodes": {
+        "codex": "0",
+        "engine": "143",
+        "postgres": "0"
+      },
+      "seconds": 3.5,
+      "volumesKept": true
+    },
+    "imageRecreation": {
+      "markersIntact": true,
+      "newImage": true,
+      "seconds": 7.3,
+      "secretUnchanged": true
+    },
+    "interruptDuringBuild": {
+      "exitCode": 130,
+      "marker": "building images",
+      "messageShown": true,
+      "seconds": 16.8
+    },
+    "interruptDuringStart": {
+      "exitCode": 130,
+      "marker": "starting services",
+      "messageShown": true,
+      "seconds": 12.8
+    },
+    "repeatStart": {
+      "containersUnchanged": true,
+      "seconds": 7.1,
+      "secretUnchanged": true
+    },
+    "restart": {
+      "markersIntact": true,
+      "seconds": 14.0,
+      "secretUnchanged": true
+    },
+    "start": {
+      "firstInstallation": false,
+      "seconds": 14.1
+    }
+  },
+  "shell": "Git Bash"
+}

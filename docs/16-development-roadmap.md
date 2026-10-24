@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: P00, P01.1–P01.7 and P02.1–P02.4 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. P02.5 health/readiness is the next task; launcher and full QA-28 remain pending. Design specifications and predecessor milestones do not establish completed gameplay.
+**Current status: P00, P01.1–P01.7 and P02.1–P02.7 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. The root launcher and its Windows lifecycle checks (P02.7) are verified for Docker Desktop with Git Bash only; Linux/macOS, interactive Ctrl+C, owner sign-in, campaign data (P03) and full QA-28 remain pending. P03.1 is the next task. Design specifications and predecessor milestones do not establish completed gameplay.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -64,7 +64,7 @@ Evidence: registry digests resolved with `docker buildx imagetools inspect`; Ado
 - **Results:** host checks confirmed the served Angular index, Java 21.0.12.1, PostgreSQL 18.6 with a Flyway migration, health `UP`, an unpublished database, and no external route from the data network. Startup took 32 s to healthy on the first run and 8 s on the unchanged second run.
 - **Findings recorded as rules:** MSYS path rewriting, `docker compose port` printing `:0` with exit status 0, Docker Desktop presenting secret files as `0777`, and an npm install-script warning for P02.2.
 
-The probe stack, image, and scratch files were removed. No volume was created. No WSL user distribution is installed, so the WSL shell candidate is not verified. Launcher behavior was added in P02.6 and is verified further in P02.7.
+The probe stack, image, and scratch files were removed. No volume was created. No WSL user distribution is installed, so the WSL shell candidate is not verified. Launcher behavior was added in P02.6 and verified further in P02.7.
 
 **Progress (23 October 2026):** P00.4 is complete. [ADR 0006](adr/0006-original-combat.md) is accepted: AI RPG Skirmish is the implementable default ruleset. A review of the combat, gameplay, encounter, and worked-scenario documents found every formula and value needed for the first implementation. The worked fight's derived values match the formulas: Health 24, Focus 10, Guard 12, threat capacity 8, level-2 maxima 26 and 11, and 16 seconds of world time. The new [provisional numerical defaults register](11-combat-system.md#17-provisional-numerical-defaults) separates two things:
 
@@ -398,9 +398,39 @@ content/assets and full container integration remain open; P02.3 stays unchecked
   `python -B tools/repository_checks/checks.py all` reports 0 findings.
   Not verified: Linux and macOS hosts; native Linux secret-file ownership/permissions (NTFS ignores
   the chmod modes); a completed owner sign-in (human-only, never automated); gameplay readiness
-  (P14); Ctrl+C on a real Git Bash terminal, graceful-stop timing and image-recreation campaign
-  preservation (P02.7); fresh-image build duration; hosted CI for this commit.
-- [ ] P02.7 Verify idempotent launch, supported Windows shell behavior, interruption, graceful stop, and campaign preservation across restart/image recreation; record QA-28 evidence.
+  (P14); fresh-image build duration; hosted CI for this commit. Stop timing, interruption exit
+  codes and image-recreation preservation were verified later in P02.7.
+- [x] P02.7 Verify idempotent launch, supported Windows shell behavior, interruption, graceful stop, and campaign preservation across restart/image recreation; record QA-28 evidence.
+  Added the opt-in `tools/container_packaging/test_lifecycle.py` (`PACKAGING_LIFECYCLE=1`, needs a
+  Docker daemon; it uses a disposable copy of the tracked files on port 18480 and never removes
+  volumes) and retained its sanitized report
+  [`evidence/launcher-lifecycle-windows.json`](../tools/container_packaging/evidence/launcher-lifecycle-windows.json).
+  Verified on Windows 11, Docker Desktop 4.96.3 (Engine 29.9.2, Compose v5.6.1), Git Bash 5.3.15,
+  real `./start.sh`, warm layer cache (the copy was reused, so no cold build was timed):
+  - Idempotent launch: a second `./start.sh` kept every container ID and the database-password
+    hash; `--status` exited 3 with `storage: ready` (gameplay readiness is P14). Start took 7-14 s.
+  - Graceful stop: `--stop` finished in 3.5 s (limit 40 s). Exit codes from Docker die events:
+    database 0, runtime-support service 0, engine 143 (SIGTERM handled by the JVM shutdown hook;
+    137 would mean SIGKILL). No containers remained and the volume set was unchanged.
+  - Restart: database container recreated; a neutral database row, a content-volume file and the
+    password were intact.
+  - Interruption: SIGINT sent to the launcher while it was building images and again while
+    starting services; both exited 130 with the "nothing was reset, rerun" message and left no
+    containers; the next run completed.
+  - Image recreation: a frontend source change rebuilt the engine image (new image ID); the markers,
+    password and volumes survived.
+  Campaign data is represented by those neutral markers: no campaign schema exists before P03, so
+  campaign and combat preservation (QA-28) must be rerun against real data in P03 and later.
+  Limits: the signal came from a Git Bash job-control shell, and Bash ran the trap after the
+  in-flight Docker command finished, so a human Ctrl+C on an interactive terminal and prompt
+  cancellation of a running build were not verified; Linux and macOS hosts, native Linux secret
+  ownership, WSL Bash, a completed owner sign-in and gameplay readiness are unverified; the
+  device-code guidance is confirmed only in `--help` text and by reading the `--login` failure path,
+  not by a live rejected sign-in; the engine does not drain in-flight commands (application-level
+  draining remains P03/P16, `server.shutdown=graceful` is not configured); a cold build was not
+  timed; hosted CI for the P02.5-P02.7 commits is unconfirmed. The default suites pass
+  (`tools/container_packaging` 22 tests with 2 skipped by design, `tools/repository_checks` 22
+  tests, repository checks 0 findings).
 
 **Exit:** clean clone builds and runs shells/database with documented commands; no private data tracked. **Checks:** frontend build/default test, backend health test, database connectivity, docs links, ignore/secret checks. **Suggested commit:** `Establish the Angular and Spring Boot workspace`.
 

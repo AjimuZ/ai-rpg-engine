@@ -59,6 +59,32 @@ integration check skips. The completed Windows Docker Desktop run passed all
 five packaging checks and the separate 116 runtime checks. This evidence does
 not establish sign-in, campaign recovery or full QA-28 acceptance.
 
+## Real launcher lifecycle (P02.7)
+
+`test_lifecycle.py` runs the actual root `start.sh` against Docker and is skipped
+unless `PACKAGING_LIFECYCLE=1` is set and a daemon is reachable; ordinary CI does not
+run it. It works in a disposable copy of the tracked files under
+`.local/scratch/lifecycle check` (a path with a space, port 18480) and always stops the
+services at the end. It never removes volumes, so reruns reuse the copy's installation
+and warm build cache. It checks, in order: start and repeated start (same container IDs
+and password hash, `--status` exit 3 with storage ready); neutral markers in the
+database and content volume; `--stop` within 40 s with the die-event exit codes (0 for
+the database and runtime-support service, 0 or 143 for the engine; 137 would be
+SIGKILL) and an unchanged volume set; restart with markers and password intact; SIGINT
+during the image build and during service startup (exit 130, message shown, nothing
+left running); and a rebuilt engine image keeping the markers, password and volumes.
+
+```text
+PACKAGING_LIFECYCLE=1 PACKAGING_LIFECYCLE_REPORT=report.json \
+  python -B -m unittest discover -s tools/container_packaging -p test_lifecycle.py
+```
+
+The report holds timings, exit codes and booleans only; the retained Windows run is
+[`evidence/launcher-lifecycle-windows.json`](evidence/launcher-lifecycle-windows.json).
+The signal comes from a Git Bash job-control shell and the trap runs after the in-flight
+Docker command ends, so this does not prove a human Ctrl+C cancels a build. Markers stand
+in for campaign data until P03; Linux, macOS, WSL and sign-in are not covered.
+
 ## Manual development shell
 
 Create an owner-restricted password file at `.local/secrets/postgres-password`
