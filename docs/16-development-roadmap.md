@@ -2,9 +2,9 @@
 
 ## 1. Status and planning rules
 
-**Current status: P00, P01.1–P01.7, P02.1–P02.7 and P03.1–P03.5 complete.** The packaged application shell, developer protocol proofs and ordinary hosted CI have scoped verification; P03.1–P03.5 add the canonical schema, bounded resources, ownership constraints, storage versions, internal atomic commit boundary, versioned deterministic draw reservations, fenced mutation leases, startup journal reconciliation and a baseline database backup tool, and gameplay remains unimplemented. P01 retains its separate managed-profile live isolation recheck and package-exit limits. The root launcher and its Windows lifecycle checks (P02.7) are verified for Docker Desktop with Git Bash only; Linux/macOS, interactive Ctrl+C, owner sign-in, campaign persistence beyond these foundations (P03.6) and full QA-28 remain pending. P03.6 is the next task. Design specifications and predecessor milestones do not establish completed gameplay.
+**Current status: 36/117 tasks verified.** The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6 and P05.1–P05.5. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.1 is the next executable task after the scheduling correction below. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
-The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
+The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
 **Setup prerequisite (23 October 2026):** the owner-authenticated P01.2 check used ChatGPT device-code login. Users of this container login flow must first enable device-code login in their account's security settings, or obtain managed-workspace administrator permission. P02.6 must surface this prerequisite and the supported instructions when authorization is unavailable; it must not assume a desktop sign-in initializes the isolated runtime. P02.7 verifies the guidance/error path. See [runtime account setup](../tools/runtime_probe/README.md#owner-account-setup-for-the-live-check). This documents the required account setting for this login method; the P02.6 launcher surfaces it in `--login` and `--help` without changing account settings.
 
@@ -752,12 +752,13 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     asset delivery/ownership, Italian resources and runtime artwork remain later
     tasks. No sample value or item implies canonical state.
 - [ ] P05.6 Deliver reviewed English-default/Italian UI variants, localized receipts/errors/accessibility, persisted language selection and draft/cursor-safe reload; extend single-origin packaging/resource checks under QA-35.
+  **Requires tasks:** P06.2, P07.5.
   - Integration prerequisite audit (24 October 2026): remaining acceptance is
     blocked on P06.1–P06.2 authorized campaign projections and P07.1/P07.5
     operation queries/resumable stream. Only preview GET controllers exist;
-    internal journals/catalogs are not browser APIs. P06's P05 dependency and
-    P05.6's transport gate require staged scheduling rather than repeatedly
-    selecting this preview task. Keep the real-campaign reload guard and this
+    internal journals/catalogs are not browser APIs. The original package-wide
+    P06→P05 dependency formed a scheduling cycle; the correction below separates
+    UI foundations from integration. Keep the real-campaign reload guard and this
     checkbox intact. See the [requirement/prerequisite/evidence matrix](29-localization.md#p056-integration-prerequisites-24-october-2026-audit).
     All 42 frontend tests, strict type checks and four resource checker tests
     pass again. Independent bilingual and screen-reader acceptance still requires
@@ -812,9 +813,19 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 
 ## 9. P06 — Campaign creation and deterministic consultations
 
-**Depends on:** P03–P05. **Areas:** campaign services/API, knowledge projections, creation UI.
+**Depends on:** P03–P04; uses completed P05.1–P05.5 foundations, not P05.6/P05.7 integration. **Areas:** campaign services/API, knowledge projections, creation UI.
 
 - [ ] P06.1 Create campaigns atomically from immutable pack snapshots and validated character choices.
+  **Requires tasks:** P05.5.
+  - Scheduling correction (24 October 2026): the completed P05.1–P05.5
+    foundation permits P06/P07 API development; P05.6 waits explicitly for P06.2
+    and P07.5, then becomes eligible again in roadmap order. All 117 task IDs
+    and 36 completion marks are preserved. The dependency simulation selects
+    P06.1 first and returns to P05.6/P05.7 after P07.5; this is scheduling
+    evidence, not proof that those future implementations or reviews pass.
+    Local scheduling verification passes all 60 temporary-repository tests,
+    including eight new exact-prerequisite/cycle/retained-human-blocker cases;
+    repository policy and Markdown checks report zero findings.
 - [ ] P06.2 Add owner-scoped campaign listing, continue, known state, inventory, quest, and ability projections.
 - [ ] P06.3 Show a pack-defined starting situation and pending decision without hardcoded prologue text.
 - [ ] P06.4 Keep exact status/inventory consultations local and separate transcript delivery from world state.

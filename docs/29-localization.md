@@ -291,12 +291,15 @@ Resume P05.6 integration after these concrete prerequisites are available:
 | Visible source-pack fallback | P06 public pack/campaign projection of authorized resolved text and actual source language | Partial/source-only packs disclose fallback and protected quotations without exposing private catalog keys or text |
 | Full QA-35 acceptance | Integrated journeys plus independent bilingual and screen-reader review | Record reviewer evidence for both languages; resource/unit/browser automation alone cannot close this gate |
 
-P06 lists P05 as a dependency, while full P05.6 acceptance requires P06/P07
-transport. This is a scheduling dependency across milestones: the delivered
-interface foundation is available, but full P05.6/QA-35 must remain unchecked
-while prerequisite transport is developed. Repeating preview-only sessions cannot
-close it. Do not invent operations/cursors, expose an internal pack catalog or
-relax the real-campaign reload guard to simulate acceptance.
+The original P06 dependency on the whole P05 package prevented developing the
+transport required by P05.6. Scheduling was corrected on 24 October 2026: P06
+requires P03/P04 and the completed P05.5 foundation; P05.6 explicitly requires
+P06.2 and P07.5, whose preceding tasks include creation and operation queries.
+Develop P06/P07 first, then return to the pending integration task in roadmap
+order. P05.7 still follows P05.6. Full P05.6/QA-35 remains unchecked until its
+actual checks pass, including the required human reviews. Repeating preview-only
+sessions cannot close it. Do not invent operations/cursors, expose an internal
+pack catalog or relax the real-campaign reload guard to simulate acceptance.
 
 This audit reran all 42 frontend tests, strict type checks and four resource
 checker tests. Existing tests confirm that a real campaign or unresolved recovery

@@ -2,6 +2,15 @@
 
 This changelog records delivered project artifacts. Future functionality belongs in [the roadmap](docs/16-development-roadmap.md), not in completed release notes.
 
+## Unreleased — Staged interface integration dependencies, 24 October 2026
+
+- Correct the roadmap dependency cycle between localized interface integration
+  and campaign/operation APIs. P06 waits for the completed UI foundation;
+  P05.6 waits for P06.2 and P07.5 before integration can resume.
+- Document exact-task prerequisite syntax, preserving all 117 task identities,
+  the 36 completion marks, real-campaign reload protection and human review gates.
+  This changes scheduling documentation, not delivered gameplay functionality.
+
 ## Unreleased — Localization review foundation (partial P05.6), 24 October 2026
 
 - Assemble both locale variants into the jar/container; select the saved device
