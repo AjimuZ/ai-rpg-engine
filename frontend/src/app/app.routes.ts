@@ -1,4 +1,4 @@
-/** Preview-only routes; adventure identity is explicit and never inferred from display names. */
+/** Preview and saved-library routes; adventure identity is explicit and never inferred from display names. */
 import { Routes } from '@angular/router';
 import { Library } from './preview/library';
 import { Workspace } from './preview/workspace';
@@ -7,6 +7,7 @@ import { Story } from './preview/story';
 import { Sheet, Inventory, Journal, ContentPanel } from './preview/panels';
 import { Settings } from './preview/settings';
 import { GraphicKit } from './preview/ui-kit';
+import { SavedAdventureView } from './library/saved-library';
 
 /** Route screens and browser titles; unmatched paths return to the local library. */
 export const routes: Routes = [
@@ -14,6 +15,8 @@ export const routes: Routes = [
   { path: 'library', component: Library, title: $localize`:@@shell.libraryTitle:Library | Adventure engine` },
   { path: 'settings', component: Settings, title: $localize`:@@shell.settingsTitle:Settings | Adventure engine` },
   { path: 'interface-kit', component: GraphicKit, title: $localize`:@@shell.kitTitle:Interface kit | Adventure engine` },
+  // Saved adventures are addressed by server UUID only; the playthrough is an optional query parameter.
+  { path: 'saved/:adventureId', component: SavedAdventureView, title: $localize`:@@shell.savedTitle:Saved adventure | Adventure engine` },
   { path: 'adventures/:adventureId', component: Workspace, children: [
     { path: '', pathMatch: 'full', redirectTo: 'story' },
     { path: 'story', component: Story, title: $localize`:@@shell.storyTitle:Story | Adventure engine` },

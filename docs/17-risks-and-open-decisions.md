@@ -10,8 +10,11 @@ startup. Post-commit projection failure preserves registered content and require
 storage repair/retry. Roots must be private and quiescent; static-link rejection
 does not protect against a hostile local process swapping ancestors. Failed private
 staging folders require offline operator cleanup, never automatic deletion.
-QA-33 remains open for memory, artwork, stale callbacks, owner-wide job limits
-and combined restart/restore evidence. Later pages are fresh snapshots, so
+The browser library is now bound read-only, and stale replies are aborted when
+switching adventures. However, packaged reload of `/saved/...` is not yet allowlisted.
+QA-33 remains open for memory, artwork, owner-wide job limits and combined
+restart/restore evidence, which come from packages that already depend on P06.
+The roadmap therefore needs an owner decision to split this evidence into a later task. Later pages are fresh snapshots, so
 concurrent additions may require refreshing the library from its first page.
 
 P06.2 introduces explicit public DTOs and player-audience fact/quest storage;

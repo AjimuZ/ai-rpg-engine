@@ -1,17 +1,19 @@
-/** Library shell separates adventure previews from reusable installed pack management. */
+/** Library shell lists saved adventures, local previews and, separately, reusable installed packs. */
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PreviewState } from './preview-state';
+import { SavedLibrary } from '../library/saved-library';
 
-/** Render local sample adventures; all links navigate without creating saved state. */
+/** Render saved adventures and local samples; no link here creates or selects saved state. */
 @Component({
-  selector: 'app-library', imports: [RouterLink], changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-library', imports: [RouterLink, SavedLibrary], changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="page-heading"><h1 i18n="@@library.title">Your adventures</h1>
       <p i18n="@@library.intro">Independent worlds, each with its own playthroughs.</p>
-      <p class="notice" i18n="@@library.notice">Preview library. These samples are local to this interface; saved adventures are not connected yet.</p>
+      <p class="notice" i18n="@@library.notice">Preview samples below are local to this interface and are never saved.</p>
       <button disabled i18n="@@library.new">New adventure</button>
     </section>
+    <app-saved-library />
     <div class="library-grid">
       @for (adventure of state.adventures; track adventure.id) {
         <article class="adventure-card">

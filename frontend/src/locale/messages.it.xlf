@@ -1155,8 +1155,8 @@
         <note category="location">src/app/preview/library.ts:12,13</note>
       </notes>
       <segment>
-        <source>Preview library. These samples are local to this interface; saved adventures are not connected yet.</source>
-      <target>Biblioteca di anteprima. Questi esempi sono locali all’interfaccia; le avventure salvate non sono ancora collegate.</target>
+        <source>Preview samples below are local to this interface and are never saved.</source>
+      <target>Gli esempi di anteprima qui sotto sono locali all’interfaccia e non vengono mai salvati.</target>
       </segment>
     </unit>
     <unit id="library.new">
@@ -1919,6 +1919,205 @@
       <segment>
         <source>Language reload is paused because drafts are not safely saved or recovery is unresolved. Keep this tab open and resolve recovery before trying again.</source>
       <target>Il ricaricamento della lingua è sospeso perché le bozze non sono salvate in sicurezza o il ripristino è ancora in sospeso. Tieni aperta questa scheda e completa il ripristino prima di riprovare.</target></segment>
+    </unit>
+    <unit id="shell.savedTitle">
+      <notes>
+        <note category="location">src/app/app.routes.ts:19</note>
+      </notes>
+      <segment>
+        <source>Saved adventure | Adventure engine</source>
+      <target>Avventura salvata | Motore di avventure</target>
+      </segment>
+    </unit>
+    <unit id="saved.title">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:37,38</note>
+      </notes>
+      <segment>
+        <source>Saved adventures</source>
+      <target>Avventure salvate</target>
+      </segment>
+    </unit>
+    <unit id="saved.loading">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:39,40</note>
+      </notes>
+      <segment>
+        <source>Loading saved adventures…</source>
+      <target>Caricamento delle avventure salvate…</target>
+      </segment>
+    </unit>
+    <unit id="saved.empty">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:42,43</note>
+      </notes>
+      <segment>
+        <source>No saved adventures yet.</source>
+      <target>Nessuna avventura salvata.</target>
+      </segment>
+    </unit>
+    <unit id="saved.reference">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:47,48</note>
+        <note category="location">src/app/library/saved-library.ts:127,128</note>
+      </notes>
+      <segment>
+        <source>Reference <ph id="0" equiv="INTERPOLATION" disp="{{ tag(adventure.adventureId) }}"/></source>
+      <target>Riferimento <ph id="0" equiv="INTERPOLATION" disp="{{ tag(adventure.adventureId) }}"/></target>
+      </segment>
+    </unit>
+    <unit id="saved.open">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:48,50</note>
+      </notes>
+      <segment>
+        <source>Open saved adventure</source>
+      <target>Apri avventura salvata</target>
+      </segment>
+    </unit>
+    <unit id="saved.more">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:52,53</note>
+      </notes>
+      <segment>
+        <source>Show more saved adventures</source>
+      <target>Mostra altre avventure salvate</target>
+      </segment>
+    </unit>
+    <unit id="saved.loadingMore">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:53,54</note>
+      </notes>
+      <segment>
+        <source>Loading more…</source>
+      <target>Caricamento…</target>
+      </segment>
+    </unit>
+    <unit id="saved.missing">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:20</note>
+      </notes>
+      <segment>
+        <source>This saved adventure is unavailable.</source>
+      <target>Questa avventura salvata non è disponibile.</target>
+      </segment>
+    </unit>
+    <unit id="saved.unconfigured">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:21</note>
+      </notes>
+      <segment>
+        <source>The local owner is not configured, so saved adventures cannot be read.</source>
+      <target>Il proprietario locale non è configurato, quindi le avventure salvate non possono essere lette.</target>
+      </segment>
+    </unit>
+    <unit id="saved.denied">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:22</note>
+      </notes>
+      <segment>
+        <source>This browser session was not admitted. Reload the page to try again.</source>
+      <target>Questa sessione del browser non è stata ammessa. Ricarica la pagina per riprovare.</target>
+      </segment>
+    </unit>
+    <unit id="saved.invalid">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:23</note>
+      </notes>
+      <segment>
+        <source>The saved library sent data this interface cannot verify, so nothing was shown.</source>
+      <target>La biblioteca salvata ha inviato dati che questa interfaccia non può verificare, quindi non è stato mostrato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="saved.unavailable">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:24</note>
+      </notes>
+      <segment>
+        <source>Saved adventures are unavailable right now.</source>
+      <target>Le avventure salvate non sono disponibili al momento.</target>
+      </segment>
+    </unit>
+    <unit id="saved.selected">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:129,130</note>
+      </notes>
+      <segment>
+        <source>Playthrough: <ph id="0" equiv="INTERPOLATION" disp="{{ playthrough.title }}"/></source>
+      <target>Partita: <ph id="0" equiv="INTERPOLATION" disp="{{ playthrough.title }}"/></target>
+      </segment>
+    </unit>
+    <unit id="saved.noneSelected">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:131,134</note>
+      </notes>
+      <segment>
+        <source>No playthrough selected</source>
+      <target>Nessuna partita selezionata</target>
+      </segment>
+    </unit>
+    <unit id="saved.unknownPlaythrough">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:134,135</note>
+      </notes>
+      <segment>
+        <source>That playthrough does not belong to this adventure.</source>
+      <target>Questa partita non appartiene a questa avventura.</target>
+      </segment>
+    </unit>
+    <unit id="saved.playthroughs">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:135,136</note>
+      </notes>
+      <segment>
+        <source>Playthroughs</source>
+      <target>Partite</target>
+      </segment>
+    </unit>
+    <unit id="saved.readOnly">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:136,137</note>
+      </notes>
+      <segment>
+        <source>Saved metadata only. Playing a saved adventure in the browser is not connected yet.</source>
+      <target>Solo metadati salvati. Giocare un’avventura salvata nel browser non è ancora collegato.</target>
+      </segment>
+    </unit>
+    <unit id="saved.noPlaythroughs">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:137,138</note>
+      </notes>
+      <segment>
+        <source>This adventure has no playthroughs yet.</source>
+      <target>Questa avventura non ha ancora partite.</target>
+      </segment>
+    </unit>
+    <unit id="saved.turn">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:142,143</note>
+      </notes>
+      <segment>
+        <source>Turn <ph id="0" equiv="INTERPOLATION" disp="{{ playthrough.gameTurn }}"/></source>
+      <target>Turno <ph id="0" equiv="INTERPOLATION" disp="{{ playthrough.gameTurn }}"/></target>
+      </segment>
+    </unit>
+    <unit id="saved.pending">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:143,145</note>
+      </notes>
+      <segment>
+        <source>Decision pending</source>
+      <target>Decisione in sospeso</target>
+      </segment>
+    </unit>
+    <unit id="saved.loadingOne">
+      <notes>
+        <note category="location">src/app/library/saved-library.ts:150,152</note>
+      </notes>
+      <segment>
+        <source>Loading saved adventure…</source>
+      <target>Caricamento dell’avventura salvata…</target>
+      </segment>
     </unit>
   </file>
 </xliff>

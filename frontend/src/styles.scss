@@ -70,6 +70,12 @@ main { max-width: 78rem; margin: auto; padding: 1.25rem; }
 .adventure-card > div { padding: 1.25rem; }
 .adventure-card h2 { margin-top: 0; }
 .adventure-card a { margin: .4rem .8rem .4rem 0; }
+/* Saved adventures are text-only cards keyed by identity; they never borrow preview artwork. */
+.saved-library { margin-bottom: 1.5rem; }
+.saved-list { list-style: none; padding: 0; display: grid; gap: .75rem; }
+.saved-card { background: var(--raised); border: 1px solid var(--line); border-radius: .6rem; padding: 1rem 1.25rem; }
+.saved-card h3 { margin: 0 0 .4rem; }
+.saved-card .badge { margin-left: 0; }
 .panel { background: var(--raised); border: 1px solid var(--line); border-radius: .5rem; padding: clamp(1rem, 3vw, 2rem); margin: 1.5rem 0; }
 .narrow { max-width: 48rem; }
 .muted { color: var(--muted); }

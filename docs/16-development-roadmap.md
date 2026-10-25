@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 40/121 tasks verified.** The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5 and P06.1–P06.4. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.5 is in progress. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 40/121 tasks verified.** The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5 and P06.1–P06.4. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.5 is in progress and blocked on a dependency correction: full QA-33 needs memory, generated art, job limits and purchase/equip from later packages that already depend on P06. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -948,6 +948,27 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     eight with one Windows symlink-privilege skip; repository scans have no findings.
     Real browser switching, generated media, memory, owner-wide job limits and
     complete QA-33 draft/artwork/job restart/restore evidence remain unfinished.
+  - Verified third partial checkpoint (25 October 2026): the browser library now reads
+    persisted adventures through a validating same-origin client (session bootstrap,
+    one re-bootstrap after 403, strict UUID/bounded payload checks, foreign/duplicate
+    rows rejected). `/library` lists saved cards keyed by UUID; `/saved/:adventureId`
+    shows one scope with read-only playthrough selection through `?playthrough=`.
+    Switching aborts and discards the previous adventure's reads. Seven new Vitest
+    cases cover equal titles, foreign playthroughs, outages, non-UUID routes and a
+    late reply after switching. Frontend typecheck, 49 tests, i18n parity (240
+    reviewed) and 4 i18n tests, both builds, and EN/IT Chrome smoke pass. Repository
+    policy tests pass 22 cases; repository scans have no findings. Packaged backend
+    `clean verify -Ppackaged-ui` was not run because the local container daemon was
+    unavailable. The packaged jar does not yet allowlist `/saved/...` for reload or
+    direct links (in-app navigation only). Saved playthroughs are not playable in the
+    browser.
+  - Dependency finding: full QA-33 needs memory (P09), generated art (P17.6),
+    owner-wide job limits (P08.6/P09.3), purchase/equip (P10.2) and a combined
+    reboot/restore. P07 depends on P06 and P14 on P00–P13, so a `Requires tasks:`
+    line from P06.5 to those tasks would form a cycle. Proposed correction: narrow
+    P06.5 to workspace folders, browser switching and authored/draft isolation, and
+    move the combined QA-33 memory/art/job/purchase/restore evidence to a new
+    later task (for example in P17 or P18). This needs an owner roadmap decision.
 
 **Exit:** two independent campaigns survive restart and read-only use changes no game counters. **Checks:** creation budget/loadout validation, ownership isolation, restart, and no-AI consultations. **Suggested commit:** `Add persistent campaigns and local RPG consultations`.
 

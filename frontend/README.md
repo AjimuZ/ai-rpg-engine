@@ -32,6 +32,13 @@ registered pack/campaign projections remain P06. Current resource values are nev
 invented from definitions.
 
 Open `/library`, `/settings`, or `/adventures/mosslight/story` (also `relay`).
+P06.5 adds a "Saved adventures" panel to `/library` that reads the local
+persisted library (`src/app/library/`). It uses the same-origin session cookie and
+sends no credentials of its own. Cards are keyed by adventure UUID, so equal titles
+stay separate. `/saved/<adventureId>?playthrough=<campaignId>` shows one adventure
+and selects only playthroughs listed under it. Switching aborts earlier reads.
+Malformed or foreign payloads show an explained failure instead of data. The view
+is read-only, and the packaged jar does not yet serve `/saved/...` on reload.
 P05.5 adds `/interface-kit`, linked from Settings, for the shared original MIT
 SVG/CSS theme: control states, 20 icons, bounded numeric meters, progress,
 dialogue/portrait/item frames, empty slots and independent sample item artwork.

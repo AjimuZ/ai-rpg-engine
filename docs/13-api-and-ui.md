@@ -138,8 +138,13 @@ malformed inputs return 400 `ADVENTURE_READ_INPUT_INVALID`. Missing and foreign
 workspaces share 404 `ADVENTURE_SCOPE_UNAVAILABLE`; storage failures return 503
 `ADVENTURE_READ_STORAGE_UNAVAILABLE`. Reads neither create nor activate a
 workspace. Use the existing campaign listing with `adventureId` and scoped
-continue to read its saves. Workspace creation, browser library binding and
-managed specification/media folders are still pending.
+continue to read its saves. The browser binds these reads read-only: `/library`
+lists saved cards by UUID and `/saved/<adventureId>?playthrough=<campaignId>`
+shows one scope and selects only playthroughs listed under that adventure.
+Malformed, foreign or duplicate rows are rejected rather than rendered, and a 403
+triggers one session re-bootstrap. Switching adventures aborts the previous reads.
+The packaged jar does not yet serve `/saved/...` on reload or as a direct link.
+Workspace creation and browser play of saved campaigns are still pending.
 
 ## 1. Contract status
 

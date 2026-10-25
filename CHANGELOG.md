@@ -9,6 +9,14 @@
 - Add work package P20 (P20.1–P20.4, 117 to 121 tasks) before P18 hardening and make P08.1 and P08.4 runtime-neutral. The MVP stays Codex-only.
 - No adapter, image, launcher option, setting or Claude test result is delivered by this documentation change.
 
+## Unreleased — Saved library browser binding checkpoint, 25 October 2026
+
+- Show persisted adventures on the library page and add a read-only
+  `/saved/<adventureId>` view with playthrough selection scoped to that adventure.
+- Validate every library payload strictly and re-bootstrap the local session once
+  after a denial. Abort and discard earlier reads when switching adventures.
+- Packaged reload of `/saved/...`, saved-campaign play and complete QA-33 remain open.
+
 ## Unreleased — Recoverable workspace folders checkpoint, 25 October 2026
 
 - Add opt-in adventure/revision folders separating sealed specifications and authored
