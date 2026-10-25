@@ -5,7 +5,12 @@ all 296 packaged backend tests pass on PostgreSQL 18.6, including eleven real
 HTTP tests, concurrent snapshot consistency and separate-JVM public-view restart.
 It deliberately withholds raw pending decisions,
 NPCs, pack bodies and planning artifacts. Learned abilities do not imply legal
-current actions. Reveal/progression writers, typed starting decisions, frontend
+current actions. P06.3 adds only a versioned starting-decision allowlist and
+localized public entrypoint projection; unsupported decisions remain private and
+no choices are synthesized. Missing translations explicitly fall back to the
+source locale. All 299 packaged backend tests pass on 25 October 2026, including
+EN/IT, fallback, authored revision pinning and restart; browser delivery remains
+unimplemented. Reveal/progression writers, further decision types, frontend
 API binding and full QA-33 media/draft/restore isolation remain later tasks.
 
 P02.3 packaging evidence (23 October 2026): pinned engine/runtime images and root

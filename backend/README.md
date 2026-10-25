@@ -336,6 +336,24 @@ narration and public pending decisions remain later P06 tasks.
 Pinned packaged backend verification passes all 290 tests on PostgreSQL 18.6,
 including five real HTTP tests and four admission tests, with no failures/skips.
 
+## Starting presentation (P06.3)
+
+Atomic creation saves a versioned pending marker with no world-counter advance.
+State/continue resolve only the public pinned root entrypoint in the saved narrative
+locale and expose actual language/fallback plus typed free-input decision metadata.
+Unknown/cleared markers and legacy saves receive null presentation/decision fields;
+creation retries never replay or restore a decision. No schema migration, runtime
+call, fixed story, forced choice or frontend binding is introduced. The exact DTO
+contract is documented in [campaign projections](../docs/13-api-and-ui.md#campaign-projections-p062).
+On 25 October 2026, pinned Java 21/PostgreSQL 18.6 `clean verify -Ppackaged-ui`
+passes all 299 backend tests with zero failures/errors/skips. The 24 focused
+campaign tests also pass, covering EN/IT in both genres, source fallback, authored
+revision pinning, unknown/cleared markers, no-write reads and separate-JVM restart.
+All 22 repository policy tests pass; repository scans report zero findings.
+
+The real HTTP test helper preserves byte offsets while decoding chunk framing,
+then decodes UTF-8, including accented Italian entrypoint text.
+
 ## Player projections (P06.2)
 
 `CampaignProjectionService` provides bounded owner listing and independently

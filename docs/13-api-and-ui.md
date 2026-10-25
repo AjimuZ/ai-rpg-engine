@@ -63,8 +63,17 @@ snapshot: `scope`, `campaign`, `player`, `resources`, `inventory`, `abilities`,
 Scope carries adventure, campaign and content revision IDs plus state revision.
 Campaign metadata carries title, mode, four world counters, update timestamp
 and `pendingDecisionAvailable`. Raw decision JSON, seed identity, NPC state,
-internal events, plans and pack definitions are never returned. Starting text
-and a typed public pending decision remain P06.3.
+internal events, plans and pack definitions are never returned. P06.3 adds nullable
+`startingSituation: {text, locale, fallback}` and `pendingDecision: {type, inputMode}`
+to state/continue. New campaigns store a version-1 `STARTING_SITUATION` marker;
+its public type is `STARTING_SITUATION` and input mode is `FREE_TEXT`. Text resolves
+only `$pack` `/entrypoint/situation` from the sealed pinned root in the campaign's
+narrative locale. Missing overlays explicitly fall back to the source language.
+There are no invented choices, prologue, guide or accepted action. Unknown decision
+shapes/versions, cleared decisions and legacy characters return null for both
+fields; `pendingDecisionAvailable` still indicates any stored pending decision.
+Reads never recreate a cleared marker or backfill old saves. Frontend binding and
+command submission remain P05.6/P07. Pending-content failures return sanitized 503.
 
 Player includes identity, display name, own location, integer attributes/skills,
 background and role. Legacy campaigns without a creation-bound character return

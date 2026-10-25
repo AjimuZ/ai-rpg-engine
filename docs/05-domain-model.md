@@ -129,7 +129,12 @@ The full backend packaged verification passes 290 tests on PostgreSQL 18.6,
 including creation/rollback/retry, populated upgrade, protected HTTP and separate-JVM
 restart coverage. HTTP ownership is server-configured, never selected by a client;
 see [local admission](14-security-and-operations.md#4-application-http-boundary).
-Mutable inventory/progression commands, equipment and starting presentation remain later work.
+P06.3 stores a versioned `STARTING_SITUATION` pending marker atomically at creation.
+It contains no prose, selected action or branching script. State/continue resolve
+only the pinned public entrypoint in the saved narrative locale, retaining actual
+language/fallback metadata and typed free-input decision metadata. Cleared or
+unsupported decisions and legacy saves receive no invented starting presentation.
+Mutable inventory/progression commands and equipment remain later work.
 Creation verifies the complete pinned sealed dependency closure before writing;
 external profiles, skills, locations and grants resolve in their declaring pack.
 Dependency IDs persist as `pack#definition`; root IDs retain their local form.

@@ -10,6 +10,7 @@ import java.util.Objects;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import org.rpgengine.content.PackRegistry;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -33,11 +34,13 @@ public class CampaignProjectionService {
             + "c.pending_decision is not null as decision_available from campaign c "
             + "join adventure_workspace a on a.id=c.adventure_id ";
     private final JdbcTemplate jdbc;
+    private final PackRegistry packs;
     private final TransactionTemplate transaction;
     private final JsonMapper json = JsonMapper.builder().build();
 
     /** Require persistence infrastructure; configure independent consistent snapshots or fail construction. */
-    public CampaignProjectionService(JdbcTemplate jdbc, PlatformTransactionManager manager) {
+    public CampaignProjectionService(JdbcTemplate jdbc, PlatformTransactionManager manager, PackRegistry packs) {
+        this.packs = Objects.requireNonNull(packs, "packs");
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
         transaction = new TransactionTemplate(Objects.requireNonNull(manager, "manager"));
         transaction.setReadOnly(true);
@@ -92,7 +95,7 @@ public class CampaignProjectionService {
                             numbers(rs.getString("skills")), rs.getString("background"), rs.getString("role")),
                     adventure, campaign);
             if (players.isEmpty()) {
-                return new State(scope, summary, null, List.of(), List.of(), List.of(), List.of(), List.of());
+                return new State(scope, summary, null, List.of(), List.of(), List.of(), List.of(), List.of(), null, null);
             }
             Player player = players.getFirst();
             UUID actor = player.actorId();
@@ -114,8 +117,32 @@ public class CampaignProjectionService {
                     + "where campaign_id=? and actor_id=? and updated_revision<=? order by id limit 1001",
                     (rs, n) -> new Quest(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4)),
                     campaign, actor, scope.stateRevision()));
-            return new State(scope, summary, player, resources, items, abilities, facts, quests);
+            StartingSituation situation = startingSituation(scope);
+            return new State(scope, summary, player, resources, items, abilities, facts, quests, situation,
+                    situation == null ? null : new StartingDecision("STARTING_SITUATION", "FREE_TEXT"));
         });
+    }
+
+    /**
+     * Resolve only the public root entrypoint while its exact starting marker is pending.
+     * Inputs are already authorized scope tokens; output retains actual locale/fallback.
+     * Unsupported decisions return null. Corrupt pinned content fails closed as unavailable,
+     * never as client input, and no lore, location descriptions or translation metadata escape.
+     */
+    private StartingSituation startingSituation(Scope scope) {
+        String stored = jdbc.queryForObject("select pending_decision::text from campaign where id=?",
+                String.class, scope.campaignId());
+        if (!StartingDecision.supports(stored == null ? null : json.readTree(stored))) { return null; }
+        try {
+            String locale = jdbc.queryForObject("select narrative_locale from presentation_campaign_settings "
+                    + "where campaign_id=?", String.class, scope.campaignId());
+            var pack = packs.loadForCampaign(scope.adventureId(), scope.contentRevisionId()).root();
+            // Visibility is granted by this fixed public field, never by arbitrary catalog lookup.
+            var text = pack.localization().resolve("$pack", "/entrypoint/situation", locale);
+            return new StartingSituation(text.text(), text.locale(), text.fallback());
+        } catch (IllegalArgumentException failure) {
+            throw new IllegalStateException("starting content unavailable", failure);
+        }
     }
 
     /** Reject ambient transactions: callers cannot downgrade snapshot isolation or mix reads with writes. */
@@ -167,7 +194,10 @@ public class CampaignProjectionService {
     public record Quest(UUID questId, String title, String objective, String status) { }
     /** Complete detached snapshot at one revision; empty knowledge lists mean no revealed records. */
     public record State(Scope scope, Summary campaign, Player player, List<Resource> resources,
-            List<Item> inventory, List<Ability> abilities, List<KnownFact> knownFacts, List<Quest> quests) { }
+            List<Item> inventory, List<Ability> abilities, List<KnownFact> knownFacts, List<Quest> quests,
+            StartingSituation startingSituation, StartingDecision pendingDecision) { }
+    /** Literal public entrypoint text with its actual language and explicit source-language fallback. */
+    public record StartingSituation(String text, String locale, boolean fallback) { }
     /** Section response retains scope tokens for independent panel/reconnect requests. */
     public record Section<T>(Scope scope, T data) { }
     /** Uniform missing/foreign/mismatched scope signal; never retains private identities or diagnostics. */

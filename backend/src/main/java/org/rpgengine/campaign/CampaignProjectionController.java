@@ -39,8 +39,8 @@ public class CampaignProjectionController {
 
     /**
      * Read the selected campaign/section without advancing or activating gameplay. Continue
-     * and state share the same snapshot contract. Raw pending decisions remain private until
-     * a typed public decision contract exists; known-state includes only revealed fact rows.
+     * and state share the same snapshot contract. Only the supported starting decision has
+     * a typed public projection; known-state includes only revealed fact rows.
      */
     @GetMapping({"/api/v1/campaigns/{campaignId}/state", "/api/v1/campaigns/{campaignId}/continue",
             "/api/v1/campaigns/{campaignId}/known-state", "/api/v1/campaigns/{campaignId}/inventory",

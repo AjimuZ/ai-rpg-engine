@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Starting presentation, 25 October 2026
+
+- Persist the pack-defined starting decision during campaign creation and project
+  only its localized public entrypoint and typed free-input metadata on state/continue.
+  Preserve pinned text, explicit source fallback, unknown-decision privacy and
+  read-only/retry behavior without injecting a fixed prologue or player choice.
+
 ## Unreleased — Backup scope recovery, 24 October 2026
 
 - Extend the strict backup schema/catalog allowlist to V10 and the two explicit

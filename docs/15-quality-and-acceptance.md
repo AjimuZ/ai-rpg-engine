@@ -32,6 +32,17 @@ tests and zero-finding repository scans pass. This covers backend projections,
 not P06.3 starting decisions, P06.4 text/transcript consultations or full QA-33
 frontend/media/draft/restore isolation.
 
+P06.3 packaged verification on 25 October 2026 passes all 299 backend tests
+with zero failures/errors/skips on pinned Java 21 and PostgreSQL 18.6. The 24
+focused campaign cases also pass. Real HTTP coverage checks exact pack-authored
+starting text in both genres and EN/IT, source-language fallback, pinned authored
+variants, unsupported/cleared marker privacy, no-write reads and separate-JVM
+restart preservation. Italian text exposed a test-helper framing defect: removing
+byte-counted HTTP chunks before UTF-8 decoding fixes the regression. All 22
+repository policy tests pass and repository scans report zero findings. Backup
+checks pass eight cases with one Windows symlink-privilege skip. Frontend binding,
+command submission, P06.4 consultations and full QA-33 remain later work.
+
 ## 1. Evidence policy
 
 Partial P05.6 evidence (24 October 2026, Windows 11, Chrome 155): four resource

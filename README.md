@@ -67,8 +67,15 @@ and V9 storage. Pinned external mechanics now load from a bounded sealed depende
 closure. An opt-in local creation API now requires a server-configured owner and
 exact origin, bounded sessions and CSRF proof. All 290 packaged backend tests pass,
 including two-genre campaign preservation across application process restart.
-UI integration and starting narration remain later tasks.
+UI integration remains later work; P06.3 adds deterministic starting presentation.
 See [backend scope](backend/README.md#atomic-campaign-creation-p061).
+
+P06.3 adds a persisted starting decision and pack-defined starting text to protected
+state/continue reads, using the saved narrative locale with explicit source fallback.
+The player remains free to respond; no fixed prologue, guide or choices are injected.
+All 299 packaged backend tests pass on PostgreSQL 18.6, including both genres,
+EN/IT, source fallback, pinned authored text and restart preservation.
+Browser API binding and command submission remain P05.6/P07.
 
 P06.2 adds protected owner campaign listing and scoped continue/state, inventory,
 learned ability and player-known fact/quest projections. Reads return one

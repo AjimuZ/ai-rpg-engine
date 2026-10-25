@@ -875,8 +875,9 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     concurrent committed snapshots, collection limits and legacy characters.
     Populated V1-to-V10 upgrade preserves old saves without inventing knowledge.
     All 22 repository policy tests pass; repository scans report zero findings.
-    Typed starting decisions, exact text consultations, frontend binding and
-    full QA-33 media/draft/restore isolation remain P06.3–P06.5/P05 integration.
+    Typed starting decisions are covered by P06.3. Exact text consultations,
+    frontend binding and full QA-33 media/draft/restore isolation remain
+    P06.4–P06.5/P05 integration.
   - CI recovery (24 October 2026): exact run 40122681346 failed the backup
     migration-scope regression after V10 was added. Extend the reviewed recovery
     allowlist to V10 and both actor-audience knowledge tables; retain strict
@@ -886,7 +887,21 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     98 cases with 18 opt-in skips. No live V10 restore is claimed. No task
     completion marks change. Repository scans report zero findings; all 117
     task IDs, titles and checked states match the incident commit.
-- [ ] P06.3 Show a pack-defined starting situation and pending decision without hardcoded prologue text.
+- [x] P06.3 Show a pack-defined starting situation and pending decision without hardcoded prologue text.
+  - Atomic creation stores a versioned starting marker; authorized state/continue
+    project only the pinned public root entrypoint in the campaign locale with
+    explicit source fallback and typed free-input metadata. Unknown/cleared
+    decisions and legacy saves expose no invented prose; retries never replay it.
+  - Verified on 25 October 2026: pinned Java 21/PostgreSQL 18.6 packaged backend
+    `clean verify -Ppackaged-ui` passes all 299 tests with no failures/errors/skips.
+    All 24 focused campaign tests pass, including EN/IT in both genres, authored
+    revision pinning, fallback, unsupported markers, whole-database no-write reads
+    and separate-JVM restart. Repair the HTTP test helper to remove byte-counted
+    chunk framing before UTF-8 decoding; the Italian regression now passes.
+    All 22 repository policy tests pass; repository scans report zero findings.
+    Backup checks pass eight tests with one Windows symlink-privilege skip.
+    Browser binding and command submission remain P05.6/P07; this completes only
+    the backend starting projection, not full QA-33 or the remaining P06 tasks.
 - [ ] P06.4 Keep exact status/inventory consultations local and separate transcript delivery from world state.
 - [ ] P06.5 Implement separate adventure specifications/media folders and library switching; prove same-name entity, draft, memory, artwork and restart/restore isolation under QA-33.
 

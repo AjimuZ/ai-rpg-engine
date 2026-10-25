@@ -95,7 +95,7 @@ class CampaignCreationPersistenceTest {
         assertEquals(2, jdbc.queryForObject("select count(*) from actor_resource where current_value = maximum_value "
                 + "and minimum_value = 0 and updated_revision = 0", Integer.class));
         assertEquals(2, jdbc.queryForObject("select count(*) from campaign where state_revision = 0 "
-                + "and game_turn = 0 and event_sequence = 0 and world_time_seconds = 0 and pending_decision is null", Integer.class));
+                + "and game_turn = 0 and event_sequence = 0 and world_time_seconds = 0 and pending_decision='{\"type\":\"STARTING_SITUATION\",\"version\":1}'::jsonb", Integer.class));
         for (String table : new String[] {"campaign_event", "operation_journal", "operation_random_draw", "ai_job",
                 "campaign_random_seed", "canonical_outbox"}) {
             assertEquals(0, count(table), table);

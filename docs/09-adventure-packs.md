@@ -25,6 +25,14 @@ attribute/property map keys remain local identifiers. With export metadata alone
 the compiler checks external preset ranks against the global cap of ten; creation
 then enforces each dependency skill's actual maximum before committing any state.
 
+P06.3 consumes the existing required `entrypoint.situation` as the public starting
+presentation. It resolves the fixed `$pack` `/entrypoint/situation` text key in the
+campaign's narrative locale, with explicit source-language fallback. Only the
+root's pinned sealed snapshot supplies prose, including when creation mechanics
+come from a dependency. No new manifest fields, optional prologue, guide, quest
+or hardcoded choice list are required. A versioned pending marker preserves the
+waiting-for-input state across restart without copying privileged pack content.
+
 ## 1. Purpose and contract status
 
 An adventure pack is a versioned set of declarative files describing playable content and supported rules configuration. It is not a script that can command the host computer. P04.1–P04.4 implement parsing, semantic compilation, protected directory/ZIP staging and immutable registration through internal Java APIs. Only `PackRegistry` admits staged bytes as a sealed `ContentRevision`; `ParsedPack` and `CompiledPack` alone do not establish admission. P04.5 adds two standalone neutral genre fixtures and import checks; P04.6 adds optional validated EN/IT text catalogs, policies and source-fallback reports. Import UI/endpoints and playable campaigns remain later work. The concrete file syntax of pack contract 1 (`schemaVersion: 1`) is fixed by [ADR 0010](adr/0010-name-scope-format-licensing.md#decision-initial-pack-file-format-pack-contract-1). It covers UTF-8 encoding, YAML 1.2 core-schema `.yaml` files without anchors, aliases, tags, or duplicate keys, `.json` as an equivalent, CommonMark `.md` prose without front matter or rendered HTML, and directory or `.zip` distribution.

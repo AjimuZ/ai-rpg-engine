@@ -20,7 +20,12 @@ Speaking to an in-world participant during a fight is a combat command, not a re
 P06.2 HTTP state/continue and known-state/inventory/quest/ability reads use a
 consistent committed player snapshot with explicit scope/revision tokens. They
 create no operation, transcript, event, random draw or narration job. Continue
-only reloads the save; it cannot choose the pending decision. Exact text command
+only reloads the save; it cannot choose the pending decision. P06.3 creation
+persists a version-1 starting marker at revision/turn/time/event zero. State/continue
+expose its pinned localized public situation and `STARTING_SITUATION`/`FREE_TEXT`
+metadata without an operation, transcript delivery or automatic player choice.
+Clearing/replacing a marker belongs to a later canonical command; reading or
+retrying creation never restores it. Exact text command
 consultations and separate transcript delivery remain P06.4.
 
 ```mermaid

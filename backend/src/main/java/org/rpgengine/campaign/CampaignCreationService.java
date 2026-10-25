@@ -94,9 +94,11 @@ public class CampaignCreationService {
         var initial = CharacterCreation.resolve(pack, request.choices());
         UUID campaignId = UUID.randomUUID();
         UUID actorId = UUID.randomUUID();
+        // The marker records waiting for player input; prose stays in the immutable pinned pack.
         jdbc.update("insert into campaign (id, adventure_id, content_revision_id, title, seed_identity, mode, "
-                + "created_at, updated_at) values (?, ?, ?, ?, ?, 'EXPLORATION', now(), now())",
-                campaignId, adventureId, request.contentRevisionId(), request.title(), UUID.randomUUID().toString());
+                + "pending_decision, created_at, updated_at) values (?, ?, ?, ?, ?, 'EXPLORATION', ?::jsonb, now(), now())",
+                campaignId, adventureId, request.contentRevisionId(), request.title(), UUID.randomUUID().toString(),
+                StartingDecision.STORED_JSON);
         jdbc.update("insert into presentation_campaign_settings (campaign_id, narrative_locale, updated_at) "
                 + "values (?, ?, now())", campaignId, request.narrativeLocale().tag());
         jdbc.update("insert into actor (id, campaign_id, kind, definition_id, display_name, location_id, "

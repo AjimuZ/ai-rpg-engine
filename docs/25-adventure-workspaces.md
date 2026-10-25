@@ -21,7 +21,10 @@ the creation-bound player's items, abilities and audience knowledge. Every
 section reply includes the full scope and state revision. Owner listing is
 bounded and can filter by adventure. Continue reloads the committed save without
 changing an active adventure or world counters. Public workspace
-administration/frontend switching remains unfinished.
+administration/frontend switching remains unfinished. P06.3 starting text uses
+that same authorized snapshot and the campaign's pinned root revision/locale;
+importing another revision cannot replace an existing starting situation. Typed
+free-input metadata never authorizes another adventure's action or reveals lore.
 
 ## 1. Meaning and status
 

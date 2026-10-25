@@ -90,7 +90,7 @@ class CampaignCreationHttpTest {
         assertEquals(first.body(), post(payload).body());
         assertEquals(409, post(payload.replace("Campaign", "Changed")).status());
         assertEquals(1, jdbc.queryForObject("select count(*) from campaign where state_revision=0 and game_turn=0 "
-                + "and event_sequence=0 and world_time_seconds=0 and pending_decision is null", Integer.class));
+                + "and event_sequence=0 and world_time_seconds=0 and pending_decision='{\"type\":\"STARTING_SITUATION\",\"version\":1}'::jsonb", Integer.class));
         for (String table : new String[] {"campaign_event", "operation_journal", "ai_job", "canonical_outbox", "operation_random_draw"}) {
             assertEquals(0, jdbc.queryForObject("select count(*) from " + table, Integer.class));
         }
@@ -122,6 +122,10 @@ class CampaignCreationHttpTest {
         assertEquals(1, view.get("abilities").size());
         assertTrue(view.get("knownFacts").isEmpty());
         assertTrue(view.get("quests").isEmpty());
+        assertStarting(view, "fantasy-exploration", "en", false);
+        assertEquals(2, view.get("pendingDecision").size());
+        assertEquals("STARTING_SITUATION", view.get("pendingDecision").get("type").asText());
+        assertEquals("FREE_TEXT", view.get("pendingDecision").get("inputMode").asText());
         assertFalse(state.body().contains("seed"));
         for (String section : new String[] {"continue", "state", "inventory", "quests", "abilities", "known-state"}) {
             var response = exchange("GET", base + "/" + section + scope, "", headers());
@@ -131,6 +135,108 @@ class CampaignCreationHttpTest {
         assertEquals(state.body(), exchange("GET", base + "/continue" + scope, "", headers()).body());
         assertEquals(state.body(), exchange("GET", base + "/state" + scope, "", "Cookie: " + cookie + "\r\n").body());
         assertEquals(before, databaseSnapshot(), "reads must not alter any stored row, counter or timestamp");
+    }
+
+    /** Both fixture genres resolve their selected Italian entrypoint without changing any stored row. */
+    @Test
+    void localizesStartingSituations() throws Exception {
+        for (String genre : new String[] {"fantasy-exploration", "science-fiction-salvage"}) {
+            revision = registry.register(adventure, new PackStaging(PackStaging.Limits.standard()).directory(
+                    Path.of(getClass().getResource("/packs/" + genre).toURI()))).revisionId();
+            var response = post(payload(UUID.randomUUID()).replace("\"narrativeLocale\":\"en\"", "\"narrativeLocale\":\"it\""));
+            assertEquals(201, response.status(), response.body());
+            String campaign = json.readTree(response.body()).get("campaignId").asText();
+            var before = databaseSnapshot();
+            var read = exchange("GET", "/api/v1/campaigns/" + campaign + "/continue?adventureId=" + adventure, "", headers());
+            assertEquals(200, read.status(), read.body());
+            assertStarting(json.readTree(read.body()), genre, "it", false);
+            assertEquals(before, databaseSnapshot());
+        }
+    }
+
+    /** A newly authored source and a missing overlay use the pinned text, never an engine prologue or active revision. */
+    @Test
+    void fallsBackToPinnedAuthoredStartingSituation() throws Exception {
+        var files = new java.util.TreeMap<>(new PackStaging(PackStaging.Limits.standard()).directory(
+                Path.of(getClass().getResource("/packs/fantasy-exploration").toURI())).files());
+        var manifest = (tools.jackson.databind.node.ObjectNode) json.readTree(files.get("adventure.json"));
+        manifest.put("version", "1.0.1");
+        ((tools.jackson.databind.node.ObjectNode) manifest.get("entrypoint")).put("situation", "An unfamiliar signal awaits your response.");
+        files.put("adventure.json", json.writeValueAsBytes(manifest));
+        var overlay = (tools.jackson.databind.node.ObjectNode) json.readTree(files.get("locales/it.json"));
+        var entries = (tools.jackson.databind.node.ArrayNode) overlay.get("entries");
+        for (int i = entries.size() - 1; i >= 0; i--) {
+            if (entries.get(i).get("field").asText().equals("/entrypoint/situation")) { entries.remove(i); }
+        }
+        files.put("locales/it.json", json.writeValueAsBytes(overlay));
+        var output = new java.io.ByteArrayOutputStream();
+        try (var zip = new java.util.zip.ZipOutputStream(output)) {
+            zip.setLevel(0);
+            for (var file : files.entrySet()) {
+                zip.putNextEntry(new java.util.zip.ZipEntry(file.getKey()));
+                zip.write(file.getValue());
+                zip.closeEntry();
+            }
+        }
+        revision = registry.register(adventure, new PackStaging(PackStaging.Limits.standard())
+                .archive(new java.io.ByteArrayInputStream(output.toByteArray()))).revisionId();
+        String campaign = json.readTree(post(payload(UUID.randomUUID()).replace("\"narrativeLocale\":\"en\"",
+                "\"narrativeLocale\":\"it\"")).body()).get("campaignId").asText();
+        // Importing another revision cannot replace a campaign's pinned source or its decision.
+        registry.register(adventure, new PackStaging(PackStaging.Limits.standard()).directory(
+                Path.of(getClass().getResource("/packs/fantasy-exploration").toURI())));
+        var before = databaseSnapshot();
+        var response = exchange("GET", "/api/v1/campaigns/" + campaign + "/state?adventureId=" + adventure, "", headers());
+        assertEquals(200, response.status(), response.body());
+        var situation = json.readTree(response.body()).get("startingSituation");
+        assertEquals("An unfamiliar signal awaits your response.", situation.get("text").asText());
+        assertEquals("en", situation.get("locale").asText());
+        assertTrue(situation.get("fallback").asBoolean());
+        assertEquals(before, databaseSnapshot());
+    }
+
+    /** Continue/retry cannot resurrect cleared decisions; unsupported versions and private extras never become public. */
+    @Test
+    void withholdsUnsupportedDecisionsAndNeverReplaysTheStart() throws Exception {
+        String payload = payload(UUID.randomUUID());
+        String campaign = json.readTree(post(payload).body()).get("campaignId").asText();
+        for (String decision : new String[] {null, "{\"type\":\"STARTING_SITUATION\",\"version\":2}",
+                "{\"type\":\"STARTING_SITUATION\",\"version\":4294967297}",
+                "{\"type\":\"STARTING_SITUATION\",\"version\":1,\"secret\":\"PRIVATE\"}"}) {
+            jdbc.update("update campaign set pending_decision=?::jsonb, row_version=row_version+1 where id=?::uuid", decision, campaign);
+            var before = databaseSnapshot();
+            assertEquals(201, post(payload).status());
+            var response = exchange("GET", "/api/v1/campaigns/" + campaign + "/continue?adventureId=" + adventure, "", headers());
+            assertEquals(200, response.status(), response.body());
+            var view = json.readTree(response.body());
+            assertTrue(view.get("startingSituation").isNull());
+            assertTrue(view.get("pendingDecision").isNull());
+            assertEquals(decision != null, view.get("campaign").get("pendingDecisionAvailable").asBoolean());
+            assertFalse(response.body().contains("PRIVATE"));
+            assertEquals(before, databaseSnapshot());
+        }
+    }
+
+    /** Compare only the authorized fixture leaf and language metadata; malformed resources fail the test. */
+    private void assertStarting(JsonNode view, String genre, String locale, boolean fallback) throws Exception {
+        String expected;
+        try (var source = getClass().getResourceAsStream("/packs/" + genre
+                + (locale.equals("en") ? "/adventure.json" : "/locales/it.json"))) {
+            var document = json.readTree(source);
+            expected = locale.equals("en") ? document.get("entrypoint").get("situation").asText() : null;
+            if (expected == null) {
+                for (var entry : document.get("entries")) {
+                    if (entry.get("field").asText().equals("/entrypoint/situation")) { expected = entry.get("text").asText(); }
+                }
+            }
+        }
+        assertNotNull(expected);
+        var situation = view.get("startingSituation");
+        assertEquals(3, situation.size());
+        assertEquals(expected, situation.get("text").asText());
+        assertEquals(locale, situation.get("locale").asText());
+        assertEquals(fallback, situation.get("fallback").asBoolean());
+        assertEquals("STARTING_SITUATION", view.get("pendingDecision").get("type").asText());
     }
 
     /** Explicit audience rows, not equal names or hidden NPC state, determine known facts and quest results. */
@@ -176,6 +282,8 @@ class CampaignCreationHttpTest {
         assertFalse(response.body().contains("hidden-vault"));
         JsonNode view = json.readTree(response.body());
         assertTrue(view.get("campaign").get("pendingDecisionAvailable").asBoolean());
+        assertTrue(view.get("pendingDecision").isNull());
+        assertTrue(view.get("startingSituation").isNull());
         assertEquals(1, view.get("inventory").size());
         assertEquals(1, view.get("abilities").size());
         assertEquals("The visible rumor", view.get("knownFacts").get(0).get("text").asText());
@@ -295,7 +403,7 @@ class CampaignCreationHttpTest {
                     return result;
                 }
             };
-            var service = new CampaignProjectionService(observed, manager);
+            var service = new CampaignProjectionService(observed, manager, registry);
             var old = service.read(owner, adventure, campaign);
             assertTrue(advanced.get());
             assertEquals(0, old.scope().stateRevision());
@@ -334,6 +442,8 @@ class CampaignCreationHttpTest {
         assertEquals(200, response.status(), response.body());
         var view = json.readTree(response.body());
         assertTrue(view.get("player").isNull());
+        assertTrue(view.get("startingSituation").isNull());
+        assertTrue(view.get("pendingDecision").isNull());
         assertTrue(view.get("resources").isEmpty());
         assertFalse(response.body().contains("private-legacy-seed"));
         assertEquals(before, databaseSnapshot());
@@ -367,6 +477,8 @@ class CampaignCreationHttpTest {
             var secondView = exchange("GET", secondRead, "", headers());
             assertEquals(200, firstView.status(), firstView.body());
             assertEquals(200, secondView.status(), secondView.body());
+            assertStarting(json.readTree(firstView.body()), "fantasy-exploration", "en", false);
+            assertStarting(json.readTree(secondView.body()), "science-fiction-salvage", "en", false);
             stopApplication(process);
             process = startApplication("after");
             assertEquals(403, post(firstPayload).status(), "old sessions must not survive process restart");
@@ -378,7 +490,7 @@ class CampaignCreationHttpTest {
             assertEquals(secondView.body(), exchange("GET", secondRead, "", headers()).body());
             assertEquals(2, json.readTree(exchange("GET", "/api/v1/campaigns", "", headers()).body()).get("campaigns").size());
             assertEquals(2, jdbc.queryForObject("select count(*) from campaign where state_revision=0 and game_turn=0 "
-                    + "and event_sequence=0 and world_time_seconds=0 and pending_decision is null", Integer.class));
+                    + "and event_sequence=0 and world_time_seconds=0 and pending_decision='{\"type\":\"STARTING_SITUATION\",\"version\":1}'::jsonb", Integer.class));
             assertEquals(2, jdbc.queryForObject("select count(*) from character_state", Integer.class));
             assertEquals(2, jdbc.queryForObject("select count(*) from item_instance", Integer.class));
             assertEquals(2, jdbc.queryForObject("select count(*) from learned_ability", Integer.class));
@@ -513,7 +625,7 @@ class CampaignCreationHttpTest {
 
     /**
      * Use a bounded loopback socket to control the external Host independently of the random test port.
-     * Connection-close and explicit byte lengths avoid HTTP client Host rewriting and chunk decoding.
+     * Connection-close and explicit byte lengths avoid HTTP client Host rewriting; decode response chunks as bytes.
      */
     private Reply exchange(String method, String path, String body, String headers) throws Exception {
         return exchange(method, path, body.getBytes(StandardCharsets.UTF_8), headers, false);
@@ -534,7 +646,9 @@ class CampaignCreationHttpTest {
             if (chunked) {
                 socket.getOutputStream().write("\r\n0\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
             }
-            String response = new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            // HTTP chunk sizes count octets, so retain a one-to-one byte mapping until framing is removed.
+            // Decoding UTF-8 first corrupts offsets for accented Italian text and split multibyte characters.
+            String response = new String(socket.getInputStream().readAllBytes(), StandardCharsets.ISO_8859_1);
             String[] parts = response.split("\r\n\r\n", 2);
             String bodyText = parts[1];
             if (parts[0].toLowerCase().contains("transfer-encoding: chunked")) {
@@ -549,6 +663,7 @@ class CampaignCreationHttpTest {
                 }
                 bodyText = decoded.toString();
             }
+            bodyText = new String(bodyText.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
             return new Reply(Integer.parseInt(parts[0].split(" ", 3)[1]), parts[0], bodyText);
         }
     }
