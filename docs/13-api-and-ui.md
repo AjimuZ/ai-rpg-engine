@@ -92,9 +92,35 @@ nonexistent/foreign/mismatched scope shares 404; admission returns 403;
 unavailable storage/content returns 503.
 Errors contain only a stable `code`. Frontend API binding remains P05.6.
 
+### Exact local consultations (P06.4)
+
+`GET /api/v1/campaigns/{id}/consultation?adventureId={uuid}&command={text}`
+uses the same local admission, scope authorization, no-store policy and sanitized
+errors as projection reads. Whole aliases `status`/`stato` and
+`inventory`/`inventario` are accepted after outer whitespace removal and
+locale-neutral case normalization. Input is at most 64 UTF-16 units before
+normalization. Missing, empty, oversized or unsupported text returns 400
+`CAMPAIGN_READ_INPUT_INVALID`; sentences, punctuation and slash commands are
+not interpreted or submitted as actions. Both languages work independently of
+presentation locale. Pack aliases and arbitrary intent interpretation are excluded.
+
+The response is `{type: "DETERMINISTIC_CONSULTATION", scope, passage: {kind, data}}`.
+`STATUS` data contains only `{player, resources}`; `INVENTORY` data is the existing
+owned inventory collection. Scope identifies the committed source snapshot;
+it is not a new revision or delivery sequence. A legacy player remains null.
+The passage can be rendered as a transient transcript entry or panel without
+claiming an accepted action, narrative continuation or legal ability.
+No transcript record is persisted by this GET. Optional durable transcript
+storage/deduplication and browser rendering remain later delivery work; a future
+writer must use its own delivery identity and must not advance world counters.
+Continue/state never deliver or replay this passage automatically. Retries return
+the same data while the committed projection is unchanged; after a world commit,
+a fresh read may legitimately return a newer source revision. No runtime call,
+operation, event, draw, outbox intent, timestamp or game counter is written.
+
 ## 1. Contract status
 
-Except for the session/creation/projection endpoints above, the following endpoints and DTO
+Except for the session/creation/projection/consultation endpoints above, the following endpoints and DTO
 fields are proposed v1 contracts. There are no generated OpenAPI definitions.
 API and content versions are separate. Use an `/api/v1` namespace and explicit
 schema versions for persisted/imported data.

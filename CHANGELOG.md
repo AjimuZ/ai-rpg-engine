@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Exact local consultations, 25 October 2026
+
+- Route bounded exact English/Italian status and inventory aliases through admitted
+  scoped snapshots. Return typed presentation passages without creating operations,
+  runtime calls, transcript writes or world changes; reject prose and unknown commands.
+  Keep optional durable transcript history separate from canonical commits.
+
 ## Unreleased — Starting presentation, 25 October 2026
 
 - Persist the pack-defined starting decision during campaign creation and project

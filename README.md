@@ -70,6 +70,11 @@ including two-genre campaign preservation across application process restart.
 UI integration remains later work; P06.3 adds deterministic starting presentation.
 See [backend scope](backend/README.md#atomic-campaign-creation-p061).
 
+P06.4 adds admitted exact `status`/`stato` and `inventory`/`inventario`
+consultation reads. Responses separate transient typed passages from committed
+source state; no runtime request, transcript write or world advance occurs.
+Browser binding and optional durable transcript history remain later delivery work.
+
 P06.3 adds a persisted starting decision and pack-defined starting text to protected
 state/continue reads, using the saved narrative locale with explicit source fallback.
 The player remains free to respond; no fixed prologue, guide or choices are injected.

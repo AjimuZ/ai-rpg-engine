@@ -43,6 +43,20 @@ repository policy tests pass and repository scans report zero findings. Backup
 checks pass eight cases with one Windows symlink-privilege skip. Frontend binding,
 command submission, P06.4 consultations and full QA-33 remain later work.
 
+P06.4 verification on 25 October 2026 passes all 300 packaged backend tests
+on pinned Java 21/PostgreSQL 18.6 with zero failures/errors/skips, including all
+15 HTTP cases. Exact English/Italian status/inventory reads preserve every
+stored row on a progressed, depleted save, reject prose/oversized/missing input,
+retain admission and foreign-owner isolation, and reconstruct identical detached
+passages for both genres across separate-JVM restart. The new regression first
+failed with a missing-route 404, then passed after implementation. Final coverage
+respects the existing row-version guards after correcting the progressed-save
+fixture. The private packaged wrapper was also corrected to expose existing
+compiled frontend output; neither issue weakened production checks. All 22
+repository policy tests pass and repository scans have zero findings. This adds
+QA-06 deterministic-consultation evidence; guide responses, browser binding,
+optional durable transcript history and full QA-33 remain later work.
+
 ## 1. Evidence policy
 
 Partial P05.6 evidence (24 October 2026, Windows 11, Chrome 155): four resource

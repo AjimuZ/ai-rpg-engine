@@ -371,3 +371,24 @@ Pinned `clean verify -Ppackaged-ui` passes all 296 backend tests on PostgreSQL
 no-write comparisons, owner/audience isolation, concurrent snapshot consistency,
 collection bounds, legacy saves and separate-JVM restart. Migration acceptance
 preserves populated old saves through V10. All 22 repository policy tests pass.
+
+## Exact consultations (P06.4)
+
+The admitted scoped GET `/api/v1/campaigns/{id}/consultation` takes `adventureId`
+and `command`. Exact `status`/`stato` or `inventory`/`inventario` aliases accept
+outer whitespace and ignore case, with a 64 UTF-16-unit input bound. Other text
+is rejected with the existing sanitized 400 read-input code, never interpreted.
+`LocalConsultation` is a pure parser/presentation adapter over the existing
+read-only snapshot. Its `{type, scope, passage}` response contains own character/
+resources or inventory, with source revision rather than a fabricated action or
+delivery revision. It writes no transcript row, operation, job, event or draw.
+Continue does not deliver these passages. Optional durable history and browser
+rendering remain separate later delivery work. Run the focused HTTP corpus with
+`./mvnw -B -ntp -Dtest=CampaignCreationHttpTest test`; full packaged verification
+uses `./mvnw -B -ntp clean verify -Ppackaged-ui`.
+
+Verified on 25 October 2026: all 300 packaged backend tests pass on pinned Java
+21/PostgreSQL 18.6 without failures/errors/skips. All 15 HTTP cases cover exact
+aliases, whole-database equality on progressed/depleted saves, admission/scope
+isolation and reconstruction across separate-JVM restart; repository checks pass.
+No separate Java style linter is configured; compilation supplies type checking.

@@ -137,6 +137,51 @@ class CampaignCreationHttpTest {
         assertEquals(before, databaseSnapshot(), "reads must not alter any stored row, counter or timestamp");
     }
 
+    /** Exact consultations return detached delivery data; retries, rejected prose and foreign scopes write nothing. */
+    @Test
+    void consultsExactCommandsWithoutWorldOrDeliveryWrites() throws Exception {
+        String campaign = json.readTree(post(payload(UUID.randomUUID())).body()).get("campaignId").asText();
+        String root = "/api/v1/campaigns/" + campaign;
+        String path = root + "/consultation?adventureId=" + adventure + "&command=";
+        // A progressed, depleted save catches accidental resets/refills as well as extra advancement.
+        jdbc.update("update campaign set row_version=row_version+1, state_revision=1, game_turn=3, world_time_seconds=90, event_sequence=4 where id=?",
+                UUID.fromString(campaign));
+        jdbc.update("update actor_resource set row_version=row_version+1, current_value=minimum_value where campaign_id=?", UUID.fromString(campaign));
+        var before = databaseSnapshot();
+        JsonNode state = json.readTree(exchange("GET", root + "/state?adventureId=" + adventure, "", headers()).body());
+        for (String command : new String[] {"status", "STATUS", "%20status%20", "stato", "inventory", "inventario"}) {
+            var response = exchange("GET", path + command, "", headers());
+            assertEquals(200, response.status(), response.body());
+            assertTrue(response.headers().toLowerCase().contains("cache-control: no-store"));
+            JsonNode delivery = json.readTree(response.body());
+            assertEquals(3, delivery.size());
+            assertEquals("DETERMINISTIC_CONSULTATION", delivery.get("type").asText());
+            assertEquals(state.get("scope"), delivery.get("scope"));
+            JsonNode passage = delivery.get("passage");
+            if (command.equals("inventory") || command.equals("inventario")) {
+                assertEquals("INVENTORY", passage.get("kind").asText());
+                assertEquals(state.get("inventory"), passage.get("data"));
+            } else {
+                assertEquals("STATUS", passage.get("kind").asText());
+                assertEquals(state.get("player"), passage.get("data").get("player"));
+                assertEquals(state.get("resources"), passage.get("data").get("resources"));
+                assertEquals(2, passage.get("data").size());
+            }
+            assertEquals(response.body(), exchange("GET", path + command, "", headers()).body());
+        }
+        // Only whole aliases qualify: prose, punctuation, slash commands and oversized input never become actions.
+        for (String command : new String[] {"", "check%20inventory", "inventory%20please", "status!", "%2Finventory",
+                "inventory%0Aattack", "unknown", "s".repeat(65)}) {
+            assertEquals(400, exchange("GET", path + command, "", headers()).status(), command);
+        }
+        assertEquals(400, exchange("GET", root + "/consultation?adventureId=" + adventure, "", headers()).status());
+        assertEquals(403, exchange("GET", path + "status", "", "").status());
+        assertEquals(403, exchange("GET", path + "status", "", headers().replace("http://127.0.0.1:8080", "http://evil.test")).status());
+        assertEquals(404, exchange("GET", root + "/consultation?adventureId=" + UUID.randomUUID()
+                + "&command=status", "", headers()).status());
+        assertEquals(before, databaseSnapshot(), "consultations cannot persist transcript, jobs, draws or world changes");
+    }
+
     /** Both fixture genres resolve their selected Italian entrypoint without changing any stored row. */
     @Test
     void localizesStartingSituations() throws Exception {
@@ -345,18 +390,19 @@ class CampaignCreationHttpTest {
         assertFalse(ownerList.toString().contains(foreignCampaign.campaignId().toString()));
         assertTrue(json.readTree(exchange("GET", "/api/v1/campaigns?adventureId=" + foreignAdventure, "", headers())
                 .body()).get("campaigns").isEmpty());
-        for (String section : new String[] {"continue", "state", "known-state", "inventory", "quests", "abilities"}) {
+        for (String section : new String[] {"continue", "state", "known-state", "inventory", "quests", "abilities", "consultation"}) {
             String root = "/api/v1/campaigns/";
+            String query = "?" + (section.equals("consultation") ? "command=status&" : "") + "adventureId=";
             var hidden = exchange("GET", root + foreignCampaign.campaignId() + "/" + section
-                    + "?adventureId=" + foreignAdventure, "", headers());
+                    + query + foreignAdventure, "", headers());
             var missing = exchange("GET", root + UUID.randomUUID() + "/" + section
-                    + "?adventureId=" + adventure, "", headers());
+                    + query + adventure, "", headers());
             assertEquals(404, hidden.status(), hidden.body());
             assertEquals(hidden.body(), missing.body());
             assertEquals(200, exchange("GET", root + first.get("campaignId").asText() + "/" + section
-                    + "?adventureId=" + adventure, "", headers()).status());
+                    + query + adventure, "", headers()).status());
             assertEquals(403, exchange("GET", root + second.get("campaignId").asText() + "/" + section
-                    + "?adventureId=" + adventure, "", headers().replace("http://127.0.0.1:8080", "http://foreign.invalid")).status());
+                    + query + adventure, "", headers().replace("http://127.0.0.1:8080", "http://foreign.invalid")).status());
         }
         assertEquals(before, databaseSnapshot());
     }
@@ -479,6 +525,12 @@ class CampaignCreationHttpTest {
             assertEquals(200, secondView.status(), secondView.body());
             assertStarting(json.readTree(firstView.body()), "fantasy-exploration", "en", false);
             assertStarting(json.readTree(secondView.body()), "science-fiction-salvage", "en", false);
+            String firstConsult = firstRead.replace("/continue?", "/consultation?command=status&");
+            String secondConsult = secondRead.replace("/continue?", "/consultation?command=inventory&");
+            var firstDelivery = exchange("GET", firstConsult, "", headers());
+            var secondDelivery = exchange("GET", secondConsult, "", headers());
+            assertEquals(200, firstDelivery.status(), firstDelivery.body());
+            assertEquals(200, secondDelivery.status(), secondDelivery.body());
             stopApplication(process);
             process = startApplication("after");
             assertEquals(403, post(firstPayload).status(), "old sessions must not survive process restart");
@@ -488,6 +540,9 @@ class CampaignCreationHttpTest {
             assertEquals(second.body(), post(secondPayload).body());
             assertEquals(firstView.body(), exchange("GET", firstRead, "", headers()).body());
             assertEquals(secondView.body(), exchange("GET", secondRead, "", headers()).body());
+            // Delivery is reconstructed from committed facts after restart, never replayed as a world action.
+            assertEquals(firstDelivery.body(), exchange("GET", firstConsult, "", headers()).body());
+            assertEquals(secondDelivery.body(), exchange("GET", secondConsult, "", headers()).body());
             assertEquals(2, json.readTree(exchange("GET", "/api/v1/campaigns", "", headers()).body()).get("campaigns").size());
             assertEquals(2, jdbc.queryForObject("select count(*) from campaign where state_revision=0 and game_turn=0 "
                     + "and event_sequence=0 and world_time_seconds=0 and pending_decision='{\"type\":\"STARTING_SITUATION\",\"version\":1}'::jsonb", Integer.class));

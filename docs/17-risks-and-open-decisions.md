@@ -13,6 +13,15 @@ EN/IT, fallback, authored revision pinning and restart; browser delivery remains
 unimplemented. Reveal/progression writers, further decision types, frontend
 API binding and full QA-33 media/draft/restore isolation remain later tasks.
 
+P06.4 exact consultations are deterministic server reads, not a browser composer
+integration or durable transcript store. Only documented English/Italian whole
+aliases route locally; other text fails closed without runtime interpretation.
+Detached passages carry committed source scope and are safe to repeat without
+world writes. A future transcript writer still needs its own delivery identity,
+deduplication and retention policy, independently of canonical commits. All 300
+packaged backend tests pass on 25 October 2026, including progressed/depleted-save
+no-write comparisons, scope rejection and consultation restart reconstruction.
+
 P02.3 packaging evidence (23 October 2026): pinned engine/runtime images and root
 Compose isolate networks/mounts; only engine/PostgreSQL receive the database
 file secret. Account-free HTTP, IPC, secret consumption and neutral preservation

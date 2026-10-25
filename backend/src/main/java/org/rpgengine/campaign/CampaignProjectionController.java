@@ -38,6 +38,20 @@ public class CampaignProjectionController {
     }
 
     /**
+     * Resolve only exact consultation aliases through the existing admitted scoped snapshot.
+     * Returns a detached presentation envelope; invalid text/scope is sanitized by respond,
+     * and neither success nor failure submits an operation or persists transcript delivery.
+     */
+    @GetMapping("/api/v1/campaigns/{campaignId}/consultation")
+    public ResponseEntity<?> consult(HttpServletRequest request, @PathVariable String campaignId,
+            @RequestParam(required = false) String adventureId, @RequestParam(required = false) String command) {
+        return respond(request, () -> {
+            var kind = LocalConsultation.parse(command);
+            return LocalConsultation.deliver(kind, service.read(owner(request), id(adventureId), id(campaignId)));
+        });
+    }
+
+    /**
      * Read the selected campaign/section without advancing or activating gameplay. Continue
      * and state share the same snapshot contract. Only the supported starting decision has
      * a typed public projection; known-state includes only revealed fact rows.

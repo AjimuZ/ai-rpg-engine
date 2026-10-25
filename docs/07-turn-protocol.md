@@ -26,7 +26,7 @@ expose its pinned localized public situation and `STARTING_SITUATION`/`FREE_TEXT
 metadata without an operation, transcript delivery or automatic player choice.
 Clearing/replacing a marker belongs to a later canonical command; reading or
 retrying creation never restores it. Exact text command
-consultations and separate transcript delivery remain P06.4.
+consultations use the P06.4 exact read adapter described below.
 
 ```mermaid
 stateDiagram-v2
@@ -255,3 +255,17 @@ noncanonical artifact, changing locale, reading a passage or playing audio has
 no world effect. Typed public presentation events are derived after accepted
 narration; replay/cancel/skip cannot resubmit a game command. Locale mismatch or
 optional media failure preserves the original canonical receipt.
+
+## Exact consultation delivery (P06.4)
+
+The admitted consultation GET accepts only whole `status`/`stato` and
+`inventory`/`inventario` aliases (outer whitespace and case ignored, 64 UTF-16
+units maximum). Other text is rejected, never sent to interpretation or treated
+as an action. It returns a detached typed passage plus its source scope/revision
+from the existing read-only snapshot. Presentation delivery is distinct from
+canonical state and operation receipts: no transcript row or delivery counter is
+written, and repeating, displaying or discarding a passage changes no world
+revision, turn, time, event sequence, resource, pending decision or RNG. Optional
+durable transcript history remains a separate later presentation writer; its
+identity/retry policy must not reuse canonical commits to track reading. See the
+[HTTP contract](13-api-and-ui.md#exact-local-consultations-p064).

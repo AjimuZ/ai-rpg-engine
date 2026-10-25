@@ -159,6 +159,16 @@ secret authored truth and quest graphs stay elsewhere. No legacy knowledge is
 backfilled. Canonical reveal/progression writers remain later command work and
 must persist their evidence and these audience records atomically.
 
+### Local consultation presentation (P06.4)
+
+`LocalConsultation` parses a bounded exact alias and transforms an authorized
+committed player snapshot into a detached typed passage. Its source scope/revision
+identifies the facts read, not a new world or delivery revision. No narrative
+record, operation, event, draw or presentation timestamp is persisted by this
+read adapter. Optional durable transcript storage must be a separate presentation
+writer with its own delivery identity; recording a read must never use a
+canonical commit to increment revision, turn, time or event sequence.
+
 ## 4. Mandatory invariants
 
 ### Campaign and operations

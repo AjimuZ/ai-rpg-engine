@@ -902,7 +902,21 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     Backup checks pass eight tests with one Windows symlink-privilege skip.
     Browser binding and command submission remain P05.6/P07; this completes only
     the backend starting projection, not full QA-33 or the remaining P06 tasks.
-- [ ] P06.4 Keep exact status/inventory consultations local and separate transcript delivery from world state.
+- [x] P06.4 Keep exact status/inventory consultations local and separate transcript delivery from world state.
+  - Add the admitted scoped consultation GET with bounded exact English/Italian
+    aliases, detached typed passages and committed source scope/revision. Status
+    exposes own character/resources; inventory exposes owned stacks. Prose and
+    unsupported commands fail closed without runtime interpretation or operations.
+    Delivery/retries write no transcript, timestamp, event, draw, job or world counter;
+    optional durable history remains a separate presentation boundary.
+  - Verified on 25 October 2026: pinned Java 21/PostgreSQL 18.6 packaged
+    `clean verify -Ppackaged-ui` passes all 300 tests, zero failures/errors/skips.
+    All 15 HTTP cases pass, including progressed/depleted-save whole-database
+    equality, repeated bilingual commands, admission/foreign-owner rejection and
+    consultation reconstruction for both genres across separate-JVM restart.
+    All 22 repository policy tests pass and repository scans have zero findings.
+    Browser API binding remains P05.6; full QA-33 and optional durable transcript
+    history are not claimed. No schema/dependency/runtime-account changes.
 - [ ] P06.5 Implement separate adventure specifications/media folders and library switching; prove same-name entity, draft, memory, artwork and restart/restore isolation under QA-33.
 
 **Exit:** two independent campaigns survive restart and read-only use changes no game counters. **Checks:** creation budget/loadout validation, ownership isolation, restart, and no-AI consultations. **Suggested commit:** `Add persistent campaigns and local RPG consultations`.
