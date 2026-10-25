@@ -15,6 +15,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.rpgengine.adventure.AdventureWorkspace;
+import org.rpgengine.adventure.AdventureLibraryService;
 import org.rpgengine.content.PackRegistry;
 import org.rpgengine.content.PackStaging;
 import org.rpgengine.identity.OwnerProfile;
@@ -40,6 +41,7 @@ class CampaignCreationHttpTest {
     @Autowired private PlatformTransactionManager manager;
     @Autowired private PackRegistry registry;
     @Autowired private CampaignCreationService creation;
+    @Autowired private AdventureLibraryService library;
     private final JsonMapper json = JsonMapper.builder().build();
     private UUID adventure;
     private UUID revision;
@@ -407,6 +409,146 @@ class CampaignCreationHttpTest {
         assertEquals(before, databaseSnapshot());
     }
 
+    /** Equal adventure titles remain separate library identities; reads never select or mutate a world. */
+    @Test
+    void listsIndependentAdventureWorkspaces() throws Exception {
+        UUID owner = UUID.fromString("00000000-0000-0000-0000-000000000061");
+        UUID other = workspace(owner, "Harbor", "science-fiction", SupportedLocale.IT);
+        UUID empty = workspace(owner, "Empty workspace", "fantasy", SupportedLocale.EN);
+        UUID foreignOwner = UUID.randomUUID();
+        jdbc.update("insert into identity_owner_profile (id, display_name, ui_locale, created_at, updated_at) "
+                + "values (?, 'Other owner', 'en', now(), now())", foreignOwner);
+        UUID foreign = workspace(foreignOwner, "Harbor", "foreign-private-genre", SupportedLocale.EN);
+        var firstCampaign = json.readTree(post(payload(UUID.randomUUID())).body());
+        UUID otherRevision = registry.register(other, new PackStaging(PackStaging.Limits.standard()).directory(
+                Path.of(getClass().getResource("/packs/science-fiction-salvage").toURI()))).revisionId();
+        var secondCampaign = creation.create(owner, other,
+                new CampaignCreationService.Request(UUID.randomUUID(), otherRevision, "Campaign", SupportedLocale.IT,
+                        new CharacterChoices("Player", "surveyor", Map.of(), Map.of(), null, null)));
+        var before = databaseSnapshot();
+        var response = exchange("GET", "/api/v1/adventures", "", headers());
+        assertEquals(200, response.status(), response.body());
+        assertTrue(response.headers().toLowerCase().contains("cache-control: no-store"));
+        var listing = json.readTree(response.body());
+        assertEquals(2, listing.size());
+        assertEquals(3, listing.get("adventures").size());
+        assertTrue(listing.get("nextAfter").isNull());
+        assertFalse(response.body().contains(foreign.toString()));
+        assertFalse(response.body().contains("foreign-private-genre"));
+        assertFalse(response.body().contains(owner.toString()));
+        var visited = new java.util.HashSet<String>();
+        String cursor = "";
+        for (int index = 0; index < 3; index++) {
+            var page = json.readTree(exchange("GET", "/api/v1/adventures?limit=1" + cursor, "", headers()).body());
+            assertEquals(1, page.get("adventures").size());
+            var summary = page.get("adventures").get(0);
+            String id = summary.get("adventureId").asText();
+            assertTrue(visited.add(id));
+            assertEquals(7, summary.size());
+            assertEquals(summary, json.readTree(exchange("GET", "/api/v1/adventures/" + id, "", headers()).body()));
+            if (id.equals(other.toString())) {
+                assertEquals("science-fiction", summary.get("genre").asText());
+                assertEquals("it", summary.get("sourceLocale").asText());
+            }
+            if (index < 2) {
+                assertEquals(id, page.get("nextAfter").asText());
+                cursor = "&after=" + id;
+            } else {
+                assertTrue(page.get("nextAfter").isNull());
+                assertTrue(json.readTree(exchange("GET", "/api/v1/adventures?after=" + id, "", headers())
+                        .body()).get("adventures").isEmpty());
+            }
+        }
+        assertEquals(java.util.Set.of(adventure.toString(), other.toString(), empty.toString()), visited);
+        // Switching is an explicit request scope, never a process-global active adventure.
+        for (UUID selected : new UUID[] {adventure, other, adventure, empty, other}) {
+            var campaigns = json.readTree(exchange("GET", "/api/v1/campaigns?adventureId=" + selected,
+                    "", headers()).body()).get("campaigns");
+            assertEquals(selected.equals(empty) ? 0 : 1, campaigns.size());
+            if (!selected.equals(empty)) {
+                String expected = selected.equals(adventure) ? firstCampaign.get("campaignId").asText()
+                        : secondCampaign.campaignId().toString();
+                assertEquals(expected, campaigns.get(0).get("campaignId").asText());
+                assertEquals(selected.toString(), campaigns.get(0).get("adventureId").asText());
+            }
+        }
+        var hidden = exchange("GET", "/api/v1/adventures/" + foreign, "", headers());
+        var missing = exchange("GET", "/api/v1/adventures/" + UUID.randomUUID(), "", headers());
+        assertEquals(404, hidden.status());
+        assertEquals(hidden.status(), missing.status());
+        assertEquals(hidden.body(), missing.body());
+        assertEquals(before, databaseSnapshot());
+    }
+
+    /** Library routes use local admission even for unknown paths; invalid input exposes no database details. */
+    @Test
+    void rejectsUnadmittedAndMalformedAdventureReads() throws Exception {
+        var before = databaseSnapshot();
+        for (String path : new String[] {"/api/v1/adventures", "/api/v1/adventures/" + adventure,
+                "/api/v1/adventures/not-a-uuid", "/api/v1/adventures/" + adventure + "/future-section"}) {
+            assertEquals(403, exchange("GET", path, "", "").status(), path);
+            assertEquals(403, exchange("GET", path, "", headers().replace("http://127.0.0.1:8080",
+                    "http://foreign.invalid")).status(), path);
+        }
+        for (String query : new String[] {"limit=0", "limit=101", "limit=x", "limit=2147483648", "after=x",
+                "after=", "after=1-1-1-1-1", "after=AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"}) {
+            var invalid = exchange("GET", "/api/v1/adventures?" + query, "", headers());
+            assertEquals(400, invalid.status(), invalid.body());
+            assertEquals("{\"code\":\"ADVENTURE_READ_INPUT_INVALID\"}", invalid.body());
+        }
+        assertEquals(400, exchange("GET", "/api/v1/adventures/1-1-1-1-1", "", headers()).status());
+        assertEquals(before, databaseSnapshot());
+    }
+
+    /** Persist a workspace fixture with a fresh identity; validation and persistence failures propagate. */
+    private UUID workspace(UUID owner, String title, String genre, SupportedLocale locale) {
+        return new TransactionTemplate(manager).execute(status -> {
+            var workspace = AdventureWorkspace.create(owner, title, genre, locale, Instant.now());
+            entities.persist(workspace);
+            return workspace.getId();
+        });
+    }
+
+    /** Library snapshots exclude ambient writes and return immutable pages; unknown owners see an empty library. */
+    @Test
+    void enforcesIndependentLibrarySnapshots() {
+        UUID owner = UUID.fromString("00000000-0000-0000-0000-000000000061");
+        var before = databaseSnapshot();
+        var page = library.list(owner, null, 100);
+        assertThrows(UnsupportedOperationException.class, () -> page.adventures().clear());
+        assertTrue(library.list(UUID.randomUUID(), null, 100).adventures().isEmpty());
+        new TransactionTemplate(manager).executeWithoutResult(status -> {
+            jdbc.update("update adventure_workspace set title='Uncommitted', row_version=row_version+1 where id=?", adventure);
+            assertThrows(IllegalStateException.class, () -> library.list(owner, null, 50));
+            assertThrows(IllegalStateException.class, () -> library.read(owner, adventure));
+            status.setRollbackOnly();
+        });
+        assertEquals(before, databaseSnapshot());
+    }
+
+    /** Default and maximum page sizes bound real stored libraries without dropping the final continuation row. */
+    @Test
+    void boundsLibraryPages() throws Exception {
+        UUID owner = UUID.fromString("00000000-0000-0000-0000-000000000061");
+        new TransactionTemplate(manager).executeWithoutResult(status -> {
+            for (int index = 0; index < 100; index++) {
+                entities.persist(AdventureWorkspace.create(owner, "Harbor", "fantasy", SupportedLocale.EN, Instant.now()));
+            }
+        });
+        var before = databaseSnapshot();
+        var defaults = json.readTree(exchange("GET", "/api/v1/adventures", "", headers()).body());
+        assertEquals(50, defaults.get("adventures").size());
+        assertFalse(defaults.get("nextAfter").isNull());
+        var maximum = json.readTree(exchange("GET", "/api/v1/adventures?limit=100", "", headers()).body());
+        assertEquals(100, maximum.get("adventures").size());
+        String cursor = maximum.get("nextAfter").asText();
+        assertEquals(maximum.get("adventures").get(99).get("adventureId").asText(), cursor);
+        var last = json.readTree(exchange("GET", "/api/v1/adventures?limit=100&after=" + cursor, "", headers()).body());
+        assertEquals(1, last.get("adventures").size());
+        assertTrue(last.get("nextAfter").isNull());
+        assertEquals(before, databaseSnapshot());
+    }
+
     /** Snapshot every public-schema row deterministically; any consultation side effect fails comparison. */
     private Map<String, String> databaseSnapshot() {
         var snapshot = new java.util.TreeMap<String, String>();
@@ -498,14 +640,17 @@ class CampaignCreationHttpTest {
     /** Two genre campaigns and their exact retry receipts survive stopping and starting the whole JVM. */
     @Test
     void survivesApplicationProcessRestart() throws Exception {
-        UUID science = registry.register(adventure, new PackStaging(PackStaging.Limits.standard()).directory(
+        UUID otherAdventure = workspace(UUID.fromString("00000000-0000-0000-0000-000000000061"),
+                "Harbor", "science-fiction", SupportedLocale.EN);
+        UUID science = registry.register(otherAdventure, new PackStaging(PackStaging.Limits.standard()).directory(
                 Path.of(getClass().getResource("/packs/science-fiction-salvage").toURI()))).revisionId();
         int fixturePort = port;
         try (ServerSocket reservation = new ServerSocket(0)) {
             port = reservation.getLocalPort();
         }
         String firstPayload = payload(UUID.randomUUID());
-        String secondPayload = payload(UUID.randomUUID()).replace(revision.toString(), science.toString());
+        String secondPayload = payload(UUID.randomUUID()).replace(revision.toString(), science.toString())
+                .replace(adventure.toString(), otherAdventure.toString());
         Process process = null;
         try {
             process = startApplication("before");
@@ -518,7 +663,7 @@ class CampaignCreationHttpTest {
             String firstRead = "/api/v1/campaigns/" + json.readTree(first.body()).get("campaignId").asText()
                     + "/continue?adventureId=" + adventure;
             String secondRead = "/api/v1/campaigns/" + json.readTree(second.body()).get("campaignId").asText()
-                    + "/continue?adventureId=" + adventure;
+                    + "/continue?adventureId=" + otherAdventure;
             var firstView = exchange("GET", firstRead, "", headers());
             var secondView = exchange("GET", secondRead, "", headers());
             assertEquals(200, firstView.status(), firstView.body());
@@ -531,11 +676,19 @@ class CampaignCreationHttpTest {
             var secondDelivery = exchange("GET", secondConsult, "", headers());
             assertEquals(200, firstDelivery.status(), firstDelivery.body());
             assertEquals(200, secondDelivery.status(), secondDelivery.body());
+            var libraryBefore = exchange("GET", "/api/v1/adventures", "", headers());
+            var workspaceBefore = exchange("GET", "/api/v1/adventures/" + otherAdventure, "", headers());
+            assertEquals(200, libraryBefore.status(), libraryBefore.body());
+            assertEquals(2, json.readTree(libraryBefore.body()).get("adventures").size());
+            assertEquals(200, workspaceBefore.status(), workspaceBefore.body());
             stopApplication(process);
             process = startApplication("after");
             assertEquals(403, post(firstPayload).status(), "old sessions must not survive process restart");
             assertEquals(403, exchange("GET", firstRead, "", headers()).status());
+            assertEquals(403, exchange("GET", "/api/v1/adventures", "", headers()).status());
             bootstrap();
+            assertEquals(libraryBefore.body(), exchange("GET", "/api/v1/adventures", "", headers()).body());
+            assertEquals(workspaceBefore.body(), exchange("GET", "/api/v1/adventures/" + otherAdventure, "", headers()).body());
             assertEquals(first.body(), post(firstPayload).body());
             assertEquals(second.body(), post(secondPayload).body());
             assertEquals(firstView.body(), exchange("GET", firstRead, "", headers()).body());

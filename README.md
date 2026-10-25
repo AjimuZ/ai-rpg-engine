@@ -70,6 +70,10 @@ including two-genre campaign preservation across application process restart.
 UI integration remains later work; P06.3 adds deterministic starting presentation.
 See [backend scope](backend/README.md#atomic-campaign-creation-p061).
 
+P06.5 now has admitted owner-scoped persisted adventure library/detail reads,
+including empty workspaces and distinct same-title identities. Browser library
+binding, managed specifications/media folders and complete QA-33 remain unfinished.
+
 P06.4 adds admitted exact `status`/`stato` and `inventory`/`inventario`
 consultation reads. Responses separate transient typed passages from committed
 source state; no runtime request, transcript write or world advance occurs.

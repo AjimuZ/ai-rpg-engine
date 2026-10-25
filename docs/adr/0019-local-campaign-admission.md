@@ -33,6 +33,13 @@ Protect every method on the two implemented paths. Unknown API paths retain
 their existing 404 behavior. Future controllers must explicitly join admission
 and independently require authorized owner context before accessing stored data.
 
+P06.2 extended the guard to the whole campaign subtree. P06.5's persisted library
+checkpoint also guards `/api/v1/adventures` and every descendant, for all methods,
+including malformed identities and future sections. Its listing/detail controllers
+independently require the trusted owner attribute and query only that owner's
+workspace metadata. Unimplemented routes inside these subtrees require admission
+before reaching their normal routing failure; unrelated paths retain existing behavior.
+
 ## Consequences and verification
 
 This deliberately trusts local processes and same-origin scripts. It is not a

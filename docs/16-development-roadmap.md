@@ -918,6 +918,19 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     Browser API binding remains P05.6; full QA-33 and optional durable transcript
     history are not claimed. No schema/dependency/runtime-account changes.
 - [ ] P06.5 Implement separate adventure specifications/media folders and library switching; prove same-name entity, draft, memory, artwork and restart/restore isolation under QA-33.
+  - Verified partial checkpoint (25 October 2026): locally admitted owner-scoped adventure listing/detail reads
+    over persisted workspace IDs, including empty workspaces and equal titles.
+    Bounded UUID pages and detached public metadata do not select an active world,
+    expose authored specifications, or change campaign counters. The complete
+    adventure route subtree now receives the same admission guard as campaigns.
+    Pinned Java 21/PostgreSQL 18.6 `clean verify -Ppackaged-ui` passes all 305 tests
+    without failures/errors/skips, including 19 HTTP cases, whole-database no-write
+    comparisons, independent snapshots, bounded pagination and same-title two-genre
+    separate-JVM restart. Two new regressions first failed on missing routes.
+    Repository policy tests pass all 22 cases; backup tests pass eight with one
+    Windows symlink-privilege skip. No live restore rehearsal is claimed.
+    Managed specification/media folders, real browser switching and full QA-33
+    draft/memory/artwork/job restart/restore evidence remain unfinished.
 
 **Exit:** two independent campaigns survive restart and read-only use changes no game counters. **Checks:** creation budget/loadout validation, ownership isolation, restart, and no-AI consultations. **Suggested commit:** `Add persistent campaigns and local RPG consultations`.
 

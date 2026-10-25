@@ -21,12 +21,21 @@ the creation-bound player's items, abilities and audience knowledge. Every
 section reply includes the full scope and state revision. Owner listing is
 bounded and can filter by adventure. Continue reloads the committed save without
 changing an active adventure or world counters. Public workspace
-administration/frontend switching remains unfinished. P06.3 starting text uses
+creation/frontend switching remains unfinished. P06.3 starting text uses
 that same authorized snapshot and the campaign's pinned root revision/locale;
 importing another revision cannot replace an existing starting situation. Typed
 free-input metadata never authorizes another adventure's action or reveals lore.
 
 ## 1. Meaning and status
+
+P06.5's first checkpoint adds persisted library reads: locally admitted
+`GET /api/v1/adventures` returns a bounded owner page and
+`GET /api/v1/adventures/{adventureId}` returns public metadata for exactly one
+owned workspace. Both include empty workspaces and preserve separate identities
+for equal titles. Metadata excludes owner IDs, specifications and child records.
+Campaigns remain separately queried with an explicit adventure ID; reading or
+switching request scope never writes a process-wide active adventure. Workspace
+creation, managed folders, browser binding and complete QA-33 remain unfinished.
 
 The owner requires personalized adventures in parallel, each with its own specifications, content and media folders. An **adventure workspace** is not a quick-save slot. It owns an authored world/configuration and can contain multiple **campaigns** (playthroughs); each campaign can have checkpoints/backups. A reusable imported **pack** is a versioned content source, not the active adventure or a saved campaign. P03.1 delivers the storage foundation only: `adventure_workspace`, adventure-owned `content_revision`, `campaign` rows pinned to a revision of the same adventure, and `campaign_checkpoint` rows. Managed folders, the library UI, backups and workspace commands are not delivered.
 
@@ -131,7 +140,11 @@ Wrong-adventure and cross-campaign commit tests verify rollback without effects;
 outbox envelopes expose no narrative or private event body. These are backend scope
 checks, not proof of UI switching, owner authorization or future delivery isolation.
 
-Proposed additions are `GET /api/v1/adventures`, `POST /api/v1/adventures` and `GET /api/v1/adventures/{adventureId}`. The existing campaign-creation envelope requires `adventureId` and an admitted pack revision belonging to it. Continue/list operations expose only its campaigns. These are design contracts, not running endpoints.
+The adventure listing/detail GETs now run under local admission; workspace
+creation via `POST /api/v1/adventures` remains proposed. The existing
+campaign-creation envelope requires `adventureId` and an admitted pack revision
+belonging to it. Campaign listing filters by selected adventure, and continue
+requires the exact adventure/campaign pair. No route implicitly changes selection.
 
 Scope client projections, drafts, quick replies, reading cursor and media to adventure/campaign. Switching detaches old subscriptions and rejects stale callbacks in the new view, without submitting an old draft. The header identifies the selected adventure/playthrough. Memory and narrative threads never cross adventures because character names match. Generated images stay in their originating folders; no global search-by-name cache is allowed. Public engine UI assets may be shared read-only; reuse of authored/private material requires explicit rights-aware export/import and identity remapping.
 

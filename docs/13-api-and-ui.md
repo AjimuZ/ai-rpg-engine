@@ -118,9 +118,32 @@ the same data while the committed projection is unchanged; after a world commit,
 a fresh read may legitimately return a newer source revision. No runtime call,
 operation, event, draw, outbox intent, timestamp or game counter is written.
 
+### Persisted adventure library (P06.5 checkpoint)
+
+`GET /api/v1/adventures?after=<uuid>&limit=<1..100>` returns
+`{adventures, nextAfter}` for the server-configured owner. The default page size
+is 50; UUID ordering is ascending and `after` is exclusive. A null `nextAfter`
+ends that snapshot's page sequence; later pages use fresh committed snapshots.
+Empty workspaces appear independently of installed packs or saved campaigns.
+`GET /api/v1/adventures/{adventureId}` returns the same detached metadata shape:
+`adventureId`, `title`, `genre`, `sourceLocale`, `metadataRevision`, `createdAt`
+and `updatedAt`. The metadata revision is a storage version, not a world counter.
+Equal titles never merge identities. No owner ID, specification, pack bytes,
+campaign secrets, job state or media path is returned.
+
+Both GETs require local session admission and return `Cache-Control: no-store`.
+All methods below the adventure subtree receive the admission guard, including
+unknown routes. Canonical lowercase UUIDs and bounded controls are required;
+malformed inputs return 400 `ADVENTURE_READ_INPUT_INVALID`. Missing and foreign
+workspaces share 404 `ADVENTURE_SCOPE_UNAVAILABLE`; storage failures return 503
+`ADVENTURE_READ_STORAGE_UNAVAILABLE`. Reads neither create nor activate a
+workspace. Use the existing campaign listing with `adventureId` and scoped
+continue to read its saves. Workspace creation, browser library binding and
+managed specification/media folders are still pending.
+
 ## 1. Contract status
 
-Except for the session/creation/projection/consultation endpoints above, the following endpoints and DTO
+Except for the session/creation/projection/consultation/library endpoints above, the following endpoints and DTO
 fields are proposed v1 contracts. There are no generated OpenAPI definitions.
 API and content versions are separate. Use an `/api/v1` namespace and explicit
 schema versions for persisted/imported data.

@@ -79,10 +79,10 @@ public class LocalHttpAdmission extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        // Guard every method in the campaign subtree, including malformed identities and
-        // unsupported sections, so future campaign controllers cannot omit admission.
-        if (!Set.of("/api/v1/session", "/api/v1/campaigns").contains(path)
-                && !path.startsWith("/api/v1/campaigns/")) {
+        // Guard every method in both scope subtrees, including malformed identities and
+        // unsupported sections, so future workspace/campaign routes cannot omit admission.
+        if (!Set.of("/api/v1/session", "/api/v1/campaigns", "/api/v1/adventures").contains(path)
+                && !path.startsWith("/api/v1/campaigns/") && !path.startsWith("/api/v1/adventures/")) {
             chain.doFilter(request, response);
             return;
         }

@@ -63,6 +63,12 @@ to the transactional service. Durable creation receipts survive process restart,
 while ephemeral browser sessions do not. See [ADR 0019](adr/0019-local-campaign-admission.md)
 for the local trust boundary and explicit future-route admission requirement.
 
+P06.5 adds `adventure.AdventureLibraryService` and its GET controller for
+persisted owner-scoped library metadata. It reuses the local admission boundary,
+which now protects all adventure routes, and independent read-only snapshots.
+No process-global active adventure is stored; campaign reads continue to require
+their explicit selected scope. Managed folders and frontend binding remain open.
+
 P04.1 adds a data-only manifest/parsing/hash stage in `content`, using fixed
 classpath schemas and no I/O ports. Its immutable `ParsedPack` is distinct from
 an admitted `ContentRevision`. P04.2–P04.3 add the pure `PackCompiler` semantic stage

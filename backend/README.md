@@ -372,6 +372,18 @@ no-write comparisons, owner/audience isolation, concurrent snapshot consistency,
 collection bounds, legacy saves and separate-JVM restart. Migration acceptance
 preserves populated old saves through V10. All 22 repository policy tests pass.
 
+## Persisted adventure library (P06.5 checkpoint)
+
+`GET /api/v1/adventures` and `GET /api/v1/adventures/{adventureId}` expose only
+the configured local owner's workspace metadata through the session admission
+boundary. Listing includes empty workspaces, pages by opaque UUID (default 50,
+maximum 100), and never merges equal titles. Detail reads hide missing and
+foreign scopes behind the same 404. Reads use independent read-only snapshots;
+no global active adventure or world counters are changed. See the
+[API contract](../docs/13-api-and-ui.md#persisted-adventure-library-p065-checkpoint).
+No workspace creation or managed specification/media storage is added yet;
+the browser library still uses local preview fixtures.
+
 ## Exact consultations (P06.4)
 
 The admitted scoped GET `/api/v1/campaigns/{id}/consultation` takes `adventureId`

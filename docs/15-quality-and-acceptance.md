@@ -1,5 +1,18 @@
 # Quality Strategy and Acceptance Criteria
 
+P06.5 library checkpoint (25 October 2026): pinned Java 21/PostgreSQL 18.6
+`clean verify -Ppackaged-ui` passes all 305 tests without failures/errors/skips.
+The 19 HTTP cases cover equal-title workspace identities, empty workspaces,
+owner isolation, bounded UUID pagination, strict inputs, whole-database no-write
+comparisons, ambient-transaction rejection and same-title two-genre separate-JVM
+restart. Admission tests cover seven HTTP methods on the adventure subtree, including
+invalid/future routes. The first two library regressions failed on missing routes
+before implementation. Repository policy tests pass all 22 cases; backup tests
+pass eight with one Windows symlink-privilege skip. No live restore rehearsal is
+claimed. This is persisted library API evidence only: managed specification/media
+folders, browser switching,
+draft/memory/artwork/job recovery and complete QA-33 remain unfinished.
+
 
 P06.1 delivers a creation acceptance corpus: pure allocation/minimum/budget/
 loadout checks, real PostgreSQL atomic creation, ownership, same-ID genre isolation,

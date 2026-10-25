@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Persisted adventure library checkpoint, 25 October 2026
+
+- Add bounded owner-scoped adventure listing and detail GETs, preserving empty
+  workspaces and separate identities for equal titles. Extend local admission
+  to the whole adventure subtree; return detached public metadata with no active
+  world selection or writes. Managed specification/media storage, browser binding
+  and full QA-33 remain unfinished.
+
 ## Unreleased — Exact local consultations, 25 October 2026
 
 - Route bounded exact English/Italian status and inventory aliases through admitted

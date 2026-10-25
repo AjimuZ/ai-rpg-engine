@@ -1,5 +1,14 @@
 # Risks and Open Decisions
 
+P06.5's persisted library GETs expose only owner-authorized public workspace
+metadata and never persist an active selection. Guarding the entire adventure
+subtree closes the admission gap before further routes are introduced. This
+checkpoint does not implement managed specification/media folders or browser
+binding; preview draft isolation is still distinct from real workspace recovery.
+QA-33 remains open for memory, artwork, stale callbacks, owner-wide job limits
+and combined restart/restore evidence. Later pages are fresh snapshots, so
+concurrent additions may require refreshing the library from its first page.
+
 P06.2 introduces explicit public DTOs and player-audience fact/quest storage;
 all 296 packaged backend tests pass on PostgreSQL 18.6, including eleven real
 HTTP tests, concurrent snapshot consistency and separate-JVM public-view restart.

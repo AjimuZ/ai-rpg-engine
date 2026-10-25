@@ -58,6 +58,30 @@ class LocalHttpAdmissionTest {
         assertEquals(403, response(filter, mutation).getStatus());
     }
 
+    /** Every adventure method, including future routes, receives the same session and mutation-CSRF boundary. */
+    @Test
+    void guardsAdventureSubtreeBeforeRouting() throws Exception {
+        var filter = new LocalHttpAdmission("http://127.0.0.1:8080", owner.toString());
+        var bootstrap = response(filter, request("GET", "/api/v1/session"));
+        var cookie = bootstrap.getCookie("ENGINE_SESSION");
+        for (String path : new String[] {"/api/v1/adventures", "/api/v1/adventures/invalid", "/api/v1/adventures/id/future"}) {
+            for (String method : new String[] {"GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"}) {
+                assertEquals(403, response(filter, request(method, path)).getStatus(), method + " " + path);
+            }
+            var mutation = request("POST", path);
+            mutation.setCookies(cookie);
+            assertEquals(403, response(filter, mutation).getStatus(), "cookie alone cannot authorize mutations");
+            var read = request("GET", path);
+            read.setCookies(cookie);
+            var admitted = new MockHttpServletResponse();
+            filter.doFilter(read, admitted, (incoming, outgoing) ->
+                    assertEquals(owner, incoming.getAttribute(LocalHttpAdmission.OWNER_ATTRIBUTE)));
+            assertEquals(200, admitted.getStatus());
+            assertEquals("no-store", admitted.getHeader("Cache-Control"));
+            assertEquals("nosniff", admitted.getHeader("X-Content-Type-Options"));
+        }
+    }
+
     /** Exact Host/Origin, fetch metadata and unique headers prevent cross-site admission and rebinding. */
     @Test
     void rejectsUntrustedAndAmbiguousHeaders() throws Exception {
