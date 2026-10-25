@@ -11,7 +11,7 @@ immutable creation requests; older schema archives remain explicitly rejected.
 
 ## 1. Deployment threat model
 
-The initial supported product is a local application for one owner. Relevant threats still include malicious adventure files, prompt injection, generated operations outside rules, secret leakage, unsafe asset paths, cross-origin requests to localhost, corrupted saves, duplicate actions, inherited Codex tooling, and mistaken shutdown of unrelated processes.
+The initial supported product is a local application for one owner. Relevant threats still include malicious adventure files, prompt injection, generated operations outside rules, secret leakage, unsafe asset paths, cross-origin requests to localhost, corrupted saves, duplicate actions, inherited runtime tooling, and mistaken shutdown of unrelated processes.
 
 Publishing the repository does not authorize hosting the backend publicly. Public deployment needs a separate reviewed design. Loopback binding alone is not authentication or full request protection.
 
@@ -19,7 +19,7 @@ Publishing the repository does not authorize hosting the backend publicly. Publi
 
 Treat player text, imported packs, Markdown lore, AI output, remote media, and restored archives as untrusted data. They cannot override engine permissions. Distinguish owner administration from fictional player actions. A character saying “delete the world files” is game input, not an administrative command.
 
-The canonical writer is the backend application service using constrained database credentials. The Codex process receives no database credentials, canonical filesystem write roots, developer repository, or general administrative API. The frontend receives authorized projections, not raw saves.
+The canonical writer is the backend application service using constrained database credentials. The runtime process (Codex or Claude) receives no database credentials, canonical filesystem write roots, developer repository, or general administrative API. The frontend receives authorized projections, not raw saves.
 
 P03.2 hardens the database boundary with immutable owner/adventure/campaign
 associations, campaign-scoped foreign keys and resource keys, explicit optimistic
@@ -33,7 +33,7 @@ covers constraints, scoped persistence queries and creation admission, not futur
 
 ## 3. Codex capability controls
 
-Use a separately scoped runtime directory and an explicit supported restricted capability profile. Verify inherited global/project instructions, plugins, MCP servers, shell tools, filesystem roots, network tools, hooks, and agent delegation rather than assuming they are absent. Record effective policy in diagnostics without secrets.
+These controls apply to every selectable narration runtime; the Claude profile is specified in [Claude runtime integration](33-claude-runtime-integration.md). Use a separately scoped runtime directory and an explicit supported restricted capability profile. Verify inherited global/project instructions, plugins, MCP servers, shell tools, filesystem roots, network tools, hooks, and agent delegation rather than assuming they are absent. Record effective policy in diagnostics without secrets.
 
 Read-only filesystem permission controls writes; it does not by itself establish safe reads, eliminate shell access, or constrain every connected tool. Enforce restricted roots and unavailable tools through supported runtime/OS boundaries. The adapter compatibility gate must prove these controls on each claimed platform. If unsupported, disable AI mutation workflows until a supported isolated profile is available.
 
@@ -128,7 +128,7 @@ the pinned algorithm/version when restoring. The P03.5 database backup captures 
 in one `pg_dump` snapshot. Application authorization and equivalent-new-attempt policy remain future
 gates; durable same-operation reuse alone does not prevent new-operation reroll fishing.
 
-Never put Codex credentials, database passwords, `.env` files, auth stores, private saves, personal notes, or raw provider traces in Git. Diagnostic exports redact keys, tokens, absolute personal paths, private content, and RPC identifiers unless an owner explicitly selects a suitably protected full diagnostic mode.
+Never put runtime credentials (Codex or Claude), database passwords, `.env` files, auth stores, private saves, personal notes, or raw provider traces in Git. Diagnostic exports redact keys, tokens, absolute personal paths, private content, and RPC identifiers unless an owner explicitly selects a suitably protected full diagnostic mode.
 
 The tracked root [`.env.example`](../.env.example) contains only the consumed loopback application port and neutral database labels. The labels do not configure authentication. Supply passwords through private secret files and account state through the supported owner-controlled sign-in flow; never add either to a public example. Ignore rules are a staging safeguard, not a secret scanner or a substitute for reviewing the staged content. The root and independent runtime `.dockerignore` policies now default-deny build inputs and recursively exclude private names inside admitted source trees. Real BuildKit fixture exports verify both policies (`py -B -m unittest discover -s tools/container_packaging -v`); they do not scan arbitrary source content or establish full application containment.
 
@@ -215,11 +215,11 @@ The packaged entry point is the future root `start.sh`. It orchestrates the Comp
 
 Startup order: load configuration → verify filesystem permissions → connect database → validate/apply supported migrations after required backup policy → reconcile unfinished operations, leases and preparation jobs (P03.5–P03.6; a failure aborts startup) → check content dependencies → start HTTP → lazily connect Codex when requested or when an opted-in readiness check runs.
 
-An unavailable Codex process does not prevent local inspection of a valid saved campaign. A missing database or incompatible schema blocks mutation. Startup never silently resets a campaign.
+An unavailable narration runtime does not prevent local inspection of a valid saved campaign. A missing database or incompatible schema blocks mutation. Startup never silently resets a campaign.
 
 For the packaged profile, the backend closes owned turns/connections and Compose stops only that installation's services with an appropriate grace period. Direct child-process termination applies only to the local stdio probe/development profile. Stop and restart preserve persistent volumes; destructive reset and independent backup/restore remain separate owner operations.
 
-Shutdown: reject new mutation requests → stop admitting background jobs → request cancellation of live AI tasks → reconcile receipts → persist final operation states → stop or flush bounded jobs → close owned Codex input and wait → terminate only owned child processes if necessary → stop HTTP and close database pools. Closing a browser tab does not necessarily stop the backend. The UI must explain actual application status.
+Shutdown: reject new mutation requests → stop admitting background jobs → request cancellation of live AI tasks → reconcile receipts → persist final operation states → stop or flush bounded jobs → close owned runtime input and wait → terminate only owned child processes if necessary → stop HTTP and close database pools. Closing a browser tab does not necessarily stop the backend. The UI must explain actual application status.
 
 ## 10. Observability
 
@@ -269,6 +269,6 @@ compatibility and IDs, enforce existing archive limits and create fresh local
 identities. Do not transfer account credentials or private playthrough history
 with a reusable authored adventure. See [portable stories](09-adventure-packs.md#14-portable-stories-and-person-to-person-sharing).
 
-Maintain supported engine, pack schema, ruleset, database, and Codex adapter compatibility tables. Back up before an upgrade that changes persistent formats. Unsupported inputs produce a controlled migration-required state. Do not silently downgrade content or rules.
+Maintain supported engine, pack schema, ruleset, database, and narration runtime adapter compatibility tables (one per supported runtime). Back up before an upgrade that changes persistent formats. Unsupported inputs produce a controlled migration-required state. Do not silently downgrade content or rules.
 
 For a suspected incorrect action, preserve the operation receipt, source event references, and last good backup. Disable further mutation if invariants are violated. Use an explicit correction or restore after diagnosis. Do not edit event history to conceal the fault.

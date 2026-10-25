@@ -57,7 +57,7 @@ The U.S. Copyright Office distinguishes a game's idea/methods from protectable l
 
 Wizards of the Coast publishes specifically licensed System Reference Documents. The existence of an SRD is not permission to reuse every D&D asset or product. If a future pack intentionally incorporates SRD material, record the exact version, licensed material, attribution, and license obligations separately. This design requires no SRD-derived content. [Official SRD page](https://www.dndbeyond.com/srd).
 
-Name, trademark, and any commercial distribution review remain owner publication tasks. No affiliation or official compatibility claim is implied by the engine design.
+Name, trademark, and any commercial distribution review remain owner publication tasks. No affiliation or official compatibility claim is implied by the engine design. Documentation may state in plain text that the engine runs Codex or Claude Code; it must not use their vendors' names or logos in the product name or suggest endorsement.
 
 ## 6. Contribution model
 
@@ -90,6 +90,7 @@ The checklist below also includes gates for a later playable release; those runt
 - [x] Verify repository availability and location for the selected name AI RPG Engine and slug `ai-rpg-engine`.
 - [x] Root MIT license is added; upstream notices retained.
 - [ ] All bundled content/assets have a rights/provenance record.
+- [ ] Narration runtime terms review recorded for each supported runtime and sign-in or billing mode (Codex; Claude under ADR 0020), with accurate account, limit and data-handling statements.
 - [ ] No private source-demo campaign, credentials, logs, or machine-specific paths are included.
 - [ ] README accurately states design/MVP/v1 status.
 - [ ] Internal links and public external references are reviewed.

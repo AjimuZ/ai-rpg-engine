@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 38/117 tasks verified.** The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5 and P06.1–P06.2. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.3 is the next executable task after the scheduling correction below. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 40/121 tasks verified.** The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5 and P06.1–P06.4. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.5 is in progress. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -18,6 +18,8 @@ This is an ordered development roadmap, not a claim of committed delivery dates.
 
 **Research/design revision (23 October 2026):** the owner requests [source-backed competitive analysis](27-competitive-analysis-and-gaps.md), first-release [English/Italian support](29-localization.md), safe [asynchronous narrative planning](28-asynchronous-narrative-planning.md), [optional local speech](30-local-speech-synthesis.md) and portable stories. ADR 0014–0016 record the decisions; [prospective evaluations](31-research-validation-and-evaluations.md) and the [Italian report](32-research-executive-summary-it.md) explain gates and priorities. Eleven new unchecked tasks bring the queue from 106 to 117, preserving all twelve verified completion boxes and the later E01–E06 editor. This is documentation-only work: no new application features, model installation or benchmarks are delivered. Optional deep planning/review and speech must not delay text-only MVP play; their unavailable/disabled qualification outcomes need recorded evidence and tested fallbacks, not a claim that the disabled feature was implemented. No optional capability may bypass its safety/rights/quality gates merely to close a task.
 
+**Runtime selection revision (25 October 2026):** the owner asks to run the engine with Claude as well as Codex, one runtime at a time, with Codex remaining the default. [ADR 0020](adr/0020-selectable-narration-runtime.md) records the decision and the [Claude runtime specification](33-claude-runtime-integration.md) its candidate profile. Four new unchecked tasks (P20.1–P20.4) bring the queue from 117 to 121, and the MVP stays Codex-only. P08.1 and P08.4 now require a runtime-neutral task port. P18 hardening waits for P20, so Claude arrives before the v1 gates. Claude is not called supported until the P20 evidence and an owner review of Anthropic's terms are recorded. This is documentation-only work: no adapter, image, launcher option or setting is delivered, and no Claude result is claimed.
+
 Each work package must be split into small reviewable changes with one main objective. For each change record intended behavior, affected modules/files, required checks, documentation update, completion evidence, and a suggested English commit message. Source paths below describe **future** work; they are not folders scaffolded by this documentation phase.
 
 Do not commit, push, create a remote repository, or publish a release merely because a roadmap task mentions it. Those actions follow the owner's development/publication instructions when execution begins. As of 22 October 2026 the owner authorizes commits and pushes of verified implementation work to `main`, the project's single branch; releases and publication remain owner decisions. Each implementation commit names its roadmap item in a final `Roadmap: <item>` body line so progress can be traced to Git history ([contribution workflow](../CONTRIBUTING.md#git-workflow)).
@@ -29,9 +31,9 @@ Do not commit, push, create a remote repository, or publish a release merely bec
 | D0 — Design | This documentation set | Reviewable engine specification and development plan |
 | F1 — Feasibility | P00–P01 | Supported stack baseline and safe functioning Codex contract |
 | F2 — Foundations | P02–P07 | Validated packs, persistent campaigns, authoritative command pipeline |
-| F3 — Persistent AI play | P08–P10 | Codex narration, renewable context, character/inventory/quest loop |
+| F3 — Persistent AI play | P08–P10 | Narration (Codex by default), renewable context, character/inventory/quest loop |
 | F4 — Playable MVP | P11–P14 | Complete combat, dynamic bounded encounters, progression, recovery, neutral demo |
-| F5 — Complete engine beta | P15–P17 | Full supported modules, author operations, presentation and accessibility |
+| F5 — Complete engine beta | P15–P17, P20 | Full supported modules, author operations, presentation and accessibility, selectable Claude narration runtime |
 | F6 — v1.0 release | P18–P19 | Verified long campaigns, reproducible setup, rights review, release documentation |
 
 Critical dependency chain: compatible stack → safe Codex profile → persistence/content → command validation → AI loop/memory → combat → encounters/progression → hardening → publication. UI styling, sample content, and documentation can be developed alongside stable contracts; they must not conceal unresolved authority or persistence work.
@@ -964,12 +966,12 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 
 ## 11. P08 — Codex orchestration and grounded narration
 
-**Depends on:** P01 and P07. **Areas:** Codex adapter, AI task port, versioned runtime prompts, UI status.
+**Depends on:** P01 and P07. **Areas:** runtime-neutral AI task port, Codex adapter, versioned runtime prompts, UI status.
 
-- [ ] P08.1 Implement the supported Java transport with bounded queues, request/turn correlation, and lifecycle management.
+- [ ] P08.1 Implement the supported Java Codex transport behind a runtime-neutral narration task port ([ADR 0020](adr/0020-selectable-narration-runtime.md)), with bounded queues, request/turn correlation, and lifecycle management; no Codex-specific type may leak into domain or application services.
 - [ ] P08.2 Implement typed intent and attributed narration/quick-reply contracts with structural/semantic validation and one bounded repair; generate directly in selected English/Italian, preserve glossary/locale generations, player agency and public knowledge scope.
 - [ ] P08.3 Scope threads by campaign/role/audience/policy; separate privileged planning from public narration.
-- [ ] P08.4 Resolve logical model profiles against the available catalog and set effective settings on every turn.
+- [ ] P08.4 Resolve logical model profiles against the selected runtime's available catalog or approved allowlist and set effective settings on every turn.
 - [ ] P08.5 Publish only validated final narration; add deterministic receipt fallback and narration-only retry.
 - [ ] P08.6 Implement one durable fair priority queue with isolated logical role/audience threads, interactive reservations, bounded quota/backoff/cancel/restart handling and conservative single-active-turn default; higher concurrency requires P01.7 evidence and QA-37.
 - [ ] P08.7 Add the versioned bounded quest-plan contract and selective dependency validation/replanning with a playable no-plan baseline; prove contract/admission/fallback with deterministic fixtures. A live investigation comparison may be deferred/unavailable without blocking MVP; no forced player choice or waiting for a whole arc.
@@ -1101,7 +1103,7 @@ this update. No combat runtime/browser result is claimed.
 
 ## 21. P18 — Full-engine hardening and balance
 
-**Depends on:** P15–P17. **Areas:** long-run evaluation, concurrency/security, performance, simulations.
+**Depends on:** P15–P17 and P20. **Areas:** long-run evaluation, concurrency/security, performance, simulations.
 
 - [ ] P18.1 Run the complete QA register and 500-turn continuity evaluation with recorded evidence.
 - [ ] P18.2 Run adversarial prompt/content/secret tests and Codex supported-platform isolation checks.
@@ -1125,18 +1127,31 @@ this update. No combat runtime/browser result is claimed.
 
 **Exit:** the published material accurately represents a tested engine and includes no private predecessor campaign. **Suggested commit:** `Prepare engine v1 documentation and release assets`.
 
-## 23. Requirement coverage
+## 23. P20 — Selectable Claude narration runtime
+
+**Depends on:** P01, P02, P08–P09. **Areas:** `docker/` runtime images, `compose.yaml`, `start.sh`, backend Claude adapter and runtime selection, `tools/` fixtures, [Claude runtime integration](33-claude-runtime-integration.md). Decision: [ADR 0020](adr/0020-selectable-narration-runtime.md).
+
+Scheduling: this package follows the core packages in roadmap order and gates P18 hardening and P19 release. The MVP (P14) does not depend on it. Codex stays the default throughout. Claude is not called supported until the P20.1 evidence and the recorded terms review exist.
+
+- [ ] P20.1 Pin and qualify the unmodified Claude Code client without a live account: exact version, installation method and integrity check; the fixed launch profile and supervisor protocol; fixture-based proof (a scripted upstream only if the pinned client documents a supported base-URL override) that tools, MCP, skills, hooks, project and home configuration, and credentials of the other kind are unavailable or refused; the capability matrix, the model and effort readiness approach, and the limit, overage and error signals; session and transcript retention and purge behavior. Record the terms-review inputs for both sign-in modes.
+- [ ] P20.2 Package the optional `claude` runtime service following ADR 0013 and ADR 0008: pinned image, read-only root, dropped capabilities, private account volume and IPC, no database route, no credentials in images or `.env`, startup guards, a Compose service started only when selected, `NARRATION_RUNTIME` handling, and `start.sh --runtime`, `--login`, `--check` and `--status` for the selected runtime. Extend QA-28 evidence and keep Codex behavior unchanged.
+- [ ] P20.3 Implement the Claude adapter behind the runtime-neutral task port: typed tasks with `--json-schema` outputs revalidated by the engine, per-task model and effort from an approved allowlist, session create/resume/retire with purge, bounded readers, SIGINT-first interruption with owned-process shutdown, limit, overage, authentication and billing mapping, selected-runtime diagnostics (`GET /api/v1/runtime/status`), and the startup comparison that retires sessions and records an audit event when the selection changed.
+- [ ] P20.4 Verify parity and the supported claim: run the same neutral fixtures through both adapters (QA-42), including switch and restart, no failover, limit and overage, unknown-setting and unsupported-version refusal, mixed-credential guards and secret sentinels. The owner runs an opt-in live neutral smoke for the chosen sign-in mode. Record the terms-review outcome. If it rejects a mode, document that mode as disabled and keep the rest.
+
+**Exit:** the owner can select Codex or Claude with one setting; exactly one runtime serves tasks; neither can write canonical state or use tools; unavailability never switches runtimes; and the documentation states which Claude sign-in modes are supported and why. **Checks:** QA-42, extended QA-28, QA-16 secret sentinels, and QA-33–35 unaffected by a switch. **Suggested commit:** `Add a selectable second narration runtime`.
+
+## 24. Requirement coverage
 
 | Requirements | Owning packages |
 | --- | --- |
 | FR-001–003 | P03–P06, P08, P16 |
-| FR-004–007 | P07–P08, P12 |
+| FR-004–007 | P07–P08, P12; FR-005 selection also P20 |
 | FR-008–010 | P06, P10 |
 | FR-011–013 | P03, P09, P18 |
 | FR-014–017 | P11–P13, P18 |
 | FR-018–021 | P10, P15 |
 | FR-022 | P17 |
-| FR-023–025 | P01, P03, P07–P09, P16, P18 |
+| FR-023–025 | P01, P03, P07–P09, P16, P18; FR-025 also P20 |
 | FR-026 | P16 |
 | FR-027 | P05, P12, P17 |
 | FR-028 | P02, P14, P19 |
@@ -1149,10 +1164,11 @@ this update. No combat runtime/browser result is claimed.
 | FR-035 | P05.7, P08.2, P17; QA-40 |
 | FR-036 | Optional P17.7, conditional P18.6; QA-38 |
 | FR-037 | P04, P16.2, P16.5 and later E05–E06; QA-41 |
+| FR-038 | P08 (runtime-neutral port), P20; QA-42 |
 | NFR-001–015 | Cross-cutting gates in P01, P03, P07–P09, P16–P19 |
 
-## 24. Explicitly later initiatives
+## 25. Explicitly later initiatives
 
-Semantic retrieval/pgvector after retrieval evidence; visual authoring editor after core v1; advanced voice design/fine-tuning or true streaming after separate rights/quality/runtime proofs; alternative combat schedulers and grid maps; public multiplayer hosting; online marketplace/hosted sharing infrastructure; generic AI providers; mobile-native or desktop packaging. Each needs its own scope, design, risks, and roadmap. None is an implicit requirement for the complete initial engine. Bounded runtime image generation is in v1 under ADR 0011; local EN/IT speech is independently optional under ADR 0016. Portable story-file exchange is a v1 P16 requirement and does not require a hosted marketplace.
+Semantic retrieval/pgvector after retrieval evidence; visual authoring editor after core v1; advanced voice design/fine-tuning or true streaming after separate rights/quality/runtime proofs; alternative combat schedulers and grid maps; public multiplayer hosting; online marketplace/hosted sharing infrastructure; generic AI providers (beyond the two narration runtimes of ADR 0020); mobile-native or desktop packaging. Each needs its own scope, design, risks, and roadmap. None is an implicit requirement for the complete initial engine. Bounded runtime image generation is in v1 under ADR 0011; local EN/IT speech is independently optional under ADR 0016. Portable story-file exchange is a v1 P16 requirement and does not require a hosted marketplace.
 
 The owner explicitly requests the integrated text/graphical adventure editor **after core v1**. Its ordered [E01–E06 roadmap](26-adventure-editor-roadmap.md) covers world/history/requirements, mandatory characters, author-fixed versus generatable gaps, fantasy/cyberpunk content, supported combat-profile controls and validate/publish/migrate previews. It is deliberately outside P00–P19 and does not delay the initial engine release. Fixed author constraints and bounded combat customization remain file-contract requirements now; the future editor writes that same contract. QA-34 validates those semantics independently of an editor UI.

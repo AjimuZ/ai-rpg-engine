@@ -14,6 +14,7 @@ The intended outcome is a coherent, persistent RPG experience with inspectable m
 - Retain its Angular, Spring Boot, Java, PostgreSQL, modular interface, and state-validation direction.
 - Use the demo selectively for practical AI orchestration and continuity improvements.
 - Use Codex as the initial AI integration rather than generic or local model providers.
+- Amended 25 October 2026: also allow Claude (Claude Code) as a selectable alternative narration runtime, one runtime at a time, with Codex remaining the default for now ([ADR 0020](adr/0020-selectable-narration-runtime.md)).
 - Build an adventure-independent engine, with customizable adventure files.
 - Design dynamic turn-based combat informed by familiar tabletop RPG concepts and using original rules and content.
 - Account for inventory, attributes, statistics, abilities, skills, progression, and long campaigns.
@@ -26,7 +27,7 @@ The intended outcome is a coherent, persistent RPG experience with inspectable m
 
 ## 3. Design assumptions
 
-The first supported installation has one human owner and one active player per campaign. It runs on the owner's computer and uses that person's configured Codex access. Many campaigns may exist, but a campaign processes one state-changing operation at a time. The initial supported operating system is Windows, reflecting the available demo; Linux and macOS require explicit support checks before release claims.
+The first supported installation has one human owner and one active player per campaign. It runs on the owner's computer and uses that person's configured narration-runtime access (Codex by default). Many campaigns may exist, but a campaign processes one state-changing operation at a time. The initial supported operating system is Windows, reflecting the available demo; Linux and macOS require explicit support checks before release claims.
 
 Authors initially work with files and import diagnostics. A visual editor is useful later but must not be necessary to author or play a complete adventure. The UI defaults to English and fully supports Italian from MVP; story source language, selected narration and historical passage language are distinct as defined in ADR 0015. Reusable story bundles can be exchanged between owners under their content/asset licenses; private campaign histories and credentials are excluded.
 
@@ -36,7 +37,7 @@ These assumptions are reversible through versioned decisions. They are not reque
 
 | Layer | Owns | Does not own |
 | --- | --- | --- |
-| Engine | Rules execution, transactions, campaigns, knowledge boundaries, turns, Codex adapter, persistence | A mandatory plot or setting |
+| Engine | Rules execution, transactions, campaigns, knowledge boundaries, turns, narration runtime adapters, persistence | A mandatory plot or setting |
 | Ruleset | Attribute definitions, formulas, action economy, conditions, progression policies | A particular campaign's events |
 | Adventure pack | World, initial entities, narrative constraints, authored content, allowed generation, selected ruleset | Credentials, executable host commands, direct SQL |
 | Campaign | A particular playthrough, choices, discoveries, state, encounters, rewards | Mutations of the installed pack |
@@ -46,9 +47,9 @@ One pack can create many isolated campaigns. A campaign pins exact pack and rule
 
 ## 5. Experiences to support
 
-**Authored:** the author provides quests, characters, places, and event conditions. Codex adapts dialogue and description within those boundaries.
+**Authored:** the author provides quests, characters, places, and event conditions. The narration runtime adapts dialogue and description within those boundaries.
 
-**Emergent:** the author provides world principles, factions, generation constraints, and a starting situation. Codex proposes additional content as needed. The engine assigns identities, validates additions, and records them as campaign canon.
+**Emergent:** the author provides world principles, factions, generation constraints, and a starting situation. The narration runtime proposes additional content as needed. The engine assigns identities, validates additions, and records them as campaign canon.
 
 **Hybrid:** authored anchors coexist with generated travel scenes, side objectives, and encounters. This is the recommended default because it offers continuity with room for discovery.
 
@@ -66,7 +67,7 @@ The recommended application has one authoritative backend. A separate Python AI 
 
 ## 7. Naming
 
-**Selected name: AI RPG Engine.** The owner selected this name because it states the program's purpose directly: a reusable engine for AI-powered role-playing adventures. Repository slug: `ai-rpg-engine`. Short description: “A Codex-powered RPG engine with persistent worlds, configurable adventures, and deterministic turn-based combat.”
+**Selected name: AI RPG Engine.** The owner selected this name because it states the program's purpose directly: a reusable engine for AI-powered role-playing adventures. Repository slug: `ai-rpg-engine`. Short description: “A Codex-powered RPG engine, with Claude Code as a selectable alternative, featuring persistent worlds, configurable adventures, and deterministic turn-based combat.”
 
 Use **AI RPG Engine** consistently in public documentation and product presentation, and `ai-rpg-engine` in repository and directory names. The name identifies the software rather than a particular adventure or setting. Repository availability and applicable name/rights checks remain publication tasks; the product name itself is no longer an open design choice.
 

@@ -5,7 +5,7 @@ Records 0001–0005, 0007, and 0008 are **proposed for the AI RPG Engine impleme
 | Record | Decision |
 | --- | --- |
 | [0001](0001-modular-stack.md) | Retain the Angular/Java/PostgreSQL stack and a modular backend |
-| [0002](0002-codex-only.md) | Use Codex app-server as the sole initial AI integration |
+| [0002](0002-codex-only.md) | Use Codex app-server as the initial AI integration; scope extended by [0020](0020-selectable-narration-runtime.md) (Claude as a selectable alternative) |
 | [0003](0003-canonical-transactions.md) | Backend-owned canonical transactions and durable operation receipts |
 | [0004](0004-declarative-adventures.md) | Declarative immutable adventure packs and bounded extension points |
 | [0005](0005-renewable-memory.md) | Canonical memory independent of renewable AI sessions |
@@ -23,5 +23,6 @@ Records 0001–0005, 0007, and 0008 are **proposed for the AI RPG Engine impleme
 | [0017](0017-bounded-pack-semantics.md) | Static bounded expressions/effects, dependency cycles, SemVer compatibility, hash conflicts and a deterministic generation gate for fixed author constraints; implemented in P04.3, runtime callers pending |
 | [0018](0018-protected-pack-registration.md) | Bounded directory/ZIP staging, media headers, transactional original-byte storage and serialized immutable sealing; implemented in P04.4, import UI and decoding pending |
 | [0019](0019-local-campaign-admission.md) | Opt-in configured-owner local admission, bounded session/CSRF proofs and strict atomic campaign creation; implemented in P06.1 |
+| [0020](0020-selectable-narration-runtime.md) | Selectable narration runtime: Codex by default, Claude Code as the alternative, one at a time, no automatic failover; Claude is supported only after P20 evidence and a recorded terms review; accepted design, implementation pending |
 
 When a decision changes, preserve this record and create a superseding one with rationale, compatibility implications, and verification. Do not retroactively edit historical status to make a previous decision disappear.

@@ -168,7 +168,7 @@ schema versions for persisted/imported data.
 | `GET /api/v1/campaigns/{id}/stream` | Resumable authorized event stream | Transport delivery only |
 | `GET /api/v1/campaigns/{id}/encounter` | Public current combat projection | No raw enemy secrets |
 | `POST /api/v1/campaigns/{id}/ai-session/renew` | Renew idle role contexts safely | Does not advance world |
-| `GET /api/v1/codex/status` | Supported runtime and account readiness | No credentials or raw RPC identifiers |
+| `GET /api/v1/runtime/status` | Selected narration runtime (Codex or Claude), version, account and model readiness | No credentials or raw RPC identifiers; read-only, the runtime is changed through the launcher (ADR 0020) |
 | `PUT /api/v1/preferences` | Reading, sound, routing, renewal preferences | No game effects |
 | `POST /api/v1/campaigns/{id}/exports` | Create full-owner or player-facing export | Explicit audience selection |
 | `POST /api/v1/restore/preview` | Validate archive compatibility and integrity | No overwrite |
@@ -178,7 +178,7 @@ schema versions for persisted/imported data.
 | `GET /api/v1/assets/{assetId}` | Serve one registered authorized asset | Path never supplied directly by client |
 | `POST /api/v1/application/shutdown` | Stop local application gracefully | Owner action; owned resources only |
 
-No endpoint proxies arbitrary Codex methods, SQL, filesystem paths, shell commands, or general-purpose AI tools.
+No endpoint proxies arbitrary runtime methods, SQL, filesystem paths, shell commands, or general-purpose AI tools.
 
 ## 3. Command envelope
 
@@ -230,7 +230,7 @@ remains P06, catalog locale resolution and bilingual UI remain P05.6.
 | Journal/world | Known quests, discoveries, map knowledge, promises, event history |
 | Combat | Initiative, active actor, AP/reactions, zones, legal actions, targets, consequences and persistent dialogue/action chat |
 | Advancement | Pending entitlements, legal purchases, cost/effect preview |
-| Settings | Reading, theme, sound, Codex readiness, routing, context renewal |
+| Settings | Reading, theme, sound, narration-runtime readiness (the selected runtime is shown; it is changed through the launcher), routing, context renewal |
 | Author/owner tools | Validation, export, restore/correction previews, credits and diagnostics |
 
 ## 6. Interface direction
@@ -305,7 +305,7 @@ This is a planned P11/P12 contract. The P05.1 preview shells do not implement pl
 
 Every panel defines loading, empty, unavailable, and error states. Last committed state remains inspectable while AI works. Avoid replacing a valid inventory with an empty one when a request times out.
 
-Distinguish no installed pack, invalid pack, no campaign, missing asset, disconnected Codex, stale revision, awaiting clarification, cancelled before commit, committed with narration pending, and restore required. These are actionable states, not one generic “AI error.”
+Distinguish no installed pack, invalid pack, no campaign, missing asset, disconnected narration runtime, stale revision, awaiting clarification, cancelled before commit, committed with narration pending, and restore required. These are actionable states, not one generic “AI error.”
 
 After reconnect, fetch operation status before enabling a retry. Reusing the original request identity is a retry; editing the action creates a new request. Keep an unsent draft separate from submitted text so a refresh cannot accidentally replay it.
 

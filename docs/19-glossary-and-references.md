@@ -21,8 +21,9 @@
 | Game turn | One resolved in-world player action, distinct from AI activity |
 | State revision | Monotonic canonical mutation version |
 | Event sequence | Campaign-scoped append-only ordering of domain events |
-| AI session | Renewable role/audience working context backed by a private Codex thread |
+| AI session | Renewable role/audience working context backed by a private runtime conversation (a Codex thread, or a Claude session when selected) |
 | Codex turn | One submitted task and the agent work that follows; not necessarily a game turn |
+| Narration runtime | The single selected AI backend of an installation, Codex (default) or Claude, behind the runtime-neutral task port ([ADR 0020](adr/0020-selectable-narration-runtime.md)) |
 | Checkpoint | Consistent snapshot and resume metadata derived from canonical state |
 | Summary | Lossy source-linked retrieval aid, never authoritative state |
 | Knowledge scope | Who knows, believes, or is allowed to receive a claim |
@@ -50,6 +51,10 @@ Checked during documentation preparation on **22 October 2026**. URLs can redire
 | [OpenAI: Codex app-server](https://learn.chatgpt.com/docs/app-server) | Official integration surface and protocol | Proposed Java adapter and engine architecture are this project's design, not an OpenAI guarantee |
 | [OpenAI: authentication](https://learn.chatgpt.com/docs/auth) | Supported sign-in categories and account-dependent behavior | Does not prove any particular owner's entitlement or zero cost |
 | [OpenAI: Codex SDK](https://learn.chatgpt.com/docs/codex-sdk) | Alternative server-side TypeScript integration | Not a Java SDK and not selected for the initial backend |
+| [Claude Code: run programmatically](https://code.claude.com/docs/en/headless) | Print mode, output formats, structured output, sessions, permissions, signals | Describes Anthropic's client; the adapter design is this project's |
+| [Claude Code: authentication](https://code.claude.com/docs/en/authentication) | Sign-in methods, precedence, credential storage | Does not prove any owner's entitlement or zero cost |
+| [Claude Code: data usage](https://code.claude.com/docs/en/data-usage) | Training, retention and telemetry switches | Depends on account type and privacy settings |
+| [Claude Code: legal and compliance](https://code.claude.com/docs/en/legal-and-compliance) | Authentication and credential use, running Claude Code in products, naming | Not legal advice; the owner reviews the applicable terms |
 | [OpenAI: noninteractive mode](https://learn.chatgpt.com/docs/non-interactive-mode) | Alternative bounded-job integration | Not the main gameplay transport |
 | [U.S. Copyright Office: Games](https://www.copyright.gov/register/tx-games.html) | Distinction between game methods and expressive material in its guidance | Not worldwide rights/trademark clearance |
 | [Official D&D SRD page](https://www.dndbeyond.com/srd) | Existence and scope of separately licensed reference documents | No SRD text or stat blocks imported into AI RPG Skirmish |
@@ -68,4 +73,4 @@ reusable authored content, not the sender's private playthrough or account.
 
 Observed source facts include package metadata, existing Python behavior, documented memory procedures, and predecessor test definitions. AI RPG Engine is the name selected by the owner. Proposed technical decisions include the Java Codex adapter, operation protocol, adventure schema, zone combat, 2d10 formulas, threat heuristic, advancement tables, and roadmap sequencing.
 
-Numerical gameplay defaults require simulation/playtesting. Performance figures are acceptance targets. Security isolation and Codex compatibility require implementation evidence. No runnable product, account capability, successful runtime test, legal clearance, or public publication is implied by writing this documentation.
+Numerical gameplay defaults require simulation/playtesting. Performance figures are acceptance targets. Security isolation and runtime compatibility (Codex and Claude) require implementation evidence. No runnable product, account capability, successful runtime test, legal clearance, or public publication is implied by writing this documentation.

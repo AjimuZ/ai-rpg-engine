@@ -6,7 +6,7 @@ AI RPG Engine currently contains design documentation, neutral [Angular](fronten
 
 - Keep engine behavior independent of a particular adventure or protagonist.
 - Keep deterministic rules and canonical writes in the backend.
-- Treat Codex output and imported content as untrusted proposals.
+- Treat narration runtime output (Codex or Claude) and imported content as untrusted proposals.
 - Preserve campaign identity, knowledge boundaries, idempotency, and recoverability.
 - Use English for public technical content; story text follows its declared locale.
 - Make small coherent changes with relevant evidence and updated documentation.
@@ -20,7 +20,7 @@ Contributions to project software and documentation must be available under the 
 
 Describe the concrete problem, resulting behavior, affected contracts, verification, and any migration requirements. Changes to architecture, content compatibility, rules, AI authority, or security require a corresponding decision record. Distinguish a supported feature from a proposed extension.
 
-Do not add a new AI provider, executable pack scripting, distributed service, or setting-specific engine constant as incidental implementation work. Raise a scoped proposal and explain its effect on the current design.
+Do not add a new AI provider (beyond the two narration runtimes of [ADR 0020](docs/adr/0020-selectable-narration-runtime.md)), executable pack scripting, distributed service, or setting-specific engine constant as incidental implementation work. Raise a scoped proposal and explain its effect on the current design.
 
 ## Formatting and local configuration
 

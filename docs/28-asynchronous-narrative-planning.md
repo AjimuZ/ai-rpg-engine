@@ -84,7 +84,7 @@ The arrows denote application-owned data movement. Codex has no database, shell,
 
 Role names are not operating-system processes, product personas or a requirement to create more agents. Existing guide, tactic and summary roles retain their own scopes. A narrative reviewer is an ordinary tool-less `turn/start` with a versioned `plan-review` output contract, not Codex's code-oriented `review/start` or a delegated subagent. No additional critic, translator, supervisor or memory-agent chain is justified by this design.
 
-External development orchestration may use Claude or Codex to work on this repository. That developer workflow is separate from the game's initial **Codex-only** inference runtime and cannot silently introduce a gameplay provider, delegated model, paid fallback or broad runtime capability.
+External development orchestration may use Claude or Codex to work on this repository. That developer workflow is separate from the game's narration runtime (Codex by default, Claude as the selectable alternative under [ADR 0020](adr/0020-selectable-narration-runtime.md)) and cannot silently introduce a gameplay provider, delegated model, paid fallback or broad runtime capability. Switching the game's runtime is an explicit owner operation, never an automatic fallback.
 
 ### Alternatives
 

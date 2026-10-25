@@ -2,9 +2,9 @@
 
 ## 1. Architectural style
 
-Use an Angular frontend and a **modular Spring Boot application**. PostgreSQL is the canonical store. The backend owns command processing, rules, persistence, knowledge filtering, and the Codex integration. Start with one deployable backend rather than separate gameplay, memory, and orchestration services.
+Use an Angular frontend and a **modular Spring Boot application**. PostgreSQL is the canonical store. The backend owns command processing, rules, persistence, knowledge filtering, and the narration runtime integration. Start with one deployable backend rather than separate gameplay, memory, and orchestration services.
 
-The primary project's stack is retained. The initial AI adapter is specific to Codex. An internal boundary keeps protocol details out of the domain; it does not imply a generic multi-provider product.
+The primary project's stack is retained. The AI adapters are specific: Codex (default) and, as a selectable alternative, Claude Code ([ADR 0020](adr/0020-selectable-narration-runtime.md)). An internal runtime-neutral boundary keeps protocol details out of the domain; it does not imply a generic multi-provider product, and exactly one runtime is active at a time.
 
 ```mermaid
 flowchart LR
@@ -12,10 +12,10 @@ flowchart LR
     API --> APP[Campaign application services]
     APP --> RULES[Deterministic rules and combat]
     APP --> MEMORY[Knowledge and context assembly]
-    APP --> AI[Codex orchestration port]
-    AI --> BRIDGE[Java app-server adapter]
-    BRIDGE -->|Private IPC| CODEX[Isolated Codex runtime]
-    CODEX --> SERVICE[Configured Codex service]
+    APP --> AI[Narration runtime port]
+    AI --> BRIDGE[Java adapter for the selected runtime]
+    BRIDGE -->|Private IPC| CODEX[Isolated runtime: Codex or Claude]
+    CODEX --> SERVICE[Selected runtime's inference service]
     APP --> DB[(PostgreSQL)]
     RULES --> APP
     DB --> OUTBOX[Committed presentation outbox]
@@ -25,7 +25,7 @@ flowchart LR
     ASSETS[Registered local assets] --> API
 ```
 
-The diagram describes dependencies and data exchange. It does not grant the Codex process database access.
+The diagram describes dependencies and data exchange. It does not grant the runtime process database access.
 
 ## 2. Stack baseline
 
@@ -40,7 +40,7 @@ The diagram describes dependencies and data exchange. It does not grant the Code
 | Migrations | Flyway (open-source edition with the PostgreSQL module) | Flyway 12.4.0 managed by Spring Boot 4.1.2; forward migrations; backup and restore for destructive upgrades |
 | JSON | Jackson with explicit DTOs and strict bounds | Reject unknown operation types and unsafe polymorphic input |
 | Streaming | Server-Sent Events with durable cursor | Polling fallback; no dependency on browser access to Codex |
-| AI | Codex app-server managed by the Java adapter; packaged private IPC and local stdio probe profiles | Versioned adapter/container compatibility matrix; no assumed official Java SDK |
+| AI | Selected narration runtime managed by a Java adapter: Codex app-server (default; packaged private IPC and local stdio probe profiles) or Claude Code in print mode behind an engine-owned supervisor (planned, P20) | Versioned adapter/container compatibility matrix per runtime; no assumed official Java SDK |
 | Environment | Complete Docker Compose installation with root `start.sh`; backend serves compiled Angular assets | Digest-pinned Linux images with a refresh policy. Docker Engine 29.0+, Compose 5.0+, and Buildx; GNU Bash 4.4+. Windows 11 with Docker Desktop on WSL 2 and Git Bash is the first target ([ADR 0009](adr/0009-toolchain-baseline.md)). Verify the isolated runtime, durable volumes, health checks, and the supported shell/host matrix |
 
 Do not select library versions merely by copying an old README or resolving “latest” during a build. Reproducible build versions and actual compatibility tests are required.
@@ -104,8 +104,8 @@ media-serving route is exposed. See [ADR 0018](adr/0018-protected-pack-registrat
 | `progression` | XP, milestones, purchases, stat caps, reward ledger | Rules and events |
 | `knowledge` | Fact scopes, provenance, public projections, disclosure | Campaign and events |
 | `memory` | Checkpoints, summaries, retrieval, context budgets | Knowledge, events |
-| `ai` | Task profiles, prompt contracts, proposal parsing, model routing | Context and Codex adapter |
-| `codex` | Runtime transport/lifecycle, protocol framing, events, cancellation | Private IPC or local process API according to deployment profile; no domain repositories |
+| `ai` | Task profiles, prompt contracts, proposal parsing, model routing | Context and the runtime adapters |
+| `codex`, `claude` | One adapter per runtime: transport/lifecycle, protocol framing, events, cancellation; `claude` is planned (P20) | Private IPC or local process API according to deployment profile; no domain repositories |
 | `presentation` | Narrative records, scene references, safe media cues | Committed events and projections |
 | `operations` | Backups, imports/exports, diagnostics, recovery | All modules through administrative services |
 | `persistence` | Shared entity base, engine-assigned identifiers and canonical value checks | JPA only; no domain rules |
@@ -124,7 +124,7 @@ These are logical packages initially, not separate Maven artifacts or services. 
 
 ## 5. Ports
 
-The proposed `CodexGameMasterPort` exposes task-oriented generation: interpret intent, propose content, choose a legal tactic, narrate resolved events, and summarize an event range. Domain services never send raw arbitrary protocol methods.
+The proposed narration task port (drafted earlier as `CodexGameMasterPort`; runtime-neutral, with one adapter per runtime) exposes task-oriented generation: interpret intent, propose content, choose a legal tactic, narrate resolved events, and summarize an event range. Domain services never send raw arbitrary protocol methods.
 
 `RulesetPort` resolves legal actions and effects from a pinned ruleset. `CampaignRepository` loads canonical state and commits revisions. `KnowledgeQueryPort` provides permitted facts for an audience. `PresentationPublisher` emits committed output through an outbox. `RandomSource` produces and records server-owned draws. Tests can replace these boundaries independently.
 
@@ -134,8 +134,8 @@ The proposed `CodexGameMasterPort` exposes task-oriented generation: interpret i
 | --- | --- |
 | Browser → backend | Validated commands, preferences, content imports selected by owner |
 | Backend → browser | Authorized projections, public narration, legal choices, operation status |
-| Backend → Codex | Minimal task instructions, authorized context, supported structured output contract |
-| Codex → backend | Untrusted structured proposals or narrative, never canonical records |
+| Backend → runtime | Minimal task instructions, authorized context, supported structured output contract |
+| Runtime → backend | Untrusted structured proposals or narrative, never canonical records |
 | Pack → runtime | Compiled, validated content and bounded expressions |
 | Canonical store → summaries | Provenance-linked facts/events; no replacement of the original records |
 
@@ -143,11 +143,11 @@ The player should not see RPC logs, chain-of-thought, command output, unfiltered
 
 ## 7. Local deployment
 
-The packaged installation runs the modular backend with compiled Angular assets, PostgreSQL, and an isolated Codex runtime through Docker Compose. A root `start.sh` validates prerequisites, builds or reuses images, starts services, waits for readiness, and reports the loopback URL. It preserves campaign/content/asset volumes and does not require host build toolchains. A frontend development server and host stdio probe are optional development workflows. This replaces the earlier database-only Compose baseline under [ADR 0008](adr/0008-containerized-startup.md).
+The packaged installation runs the modular backend with compiled Angular assets, PostgreSQL, and an isolated narration runtime (Codex by default, or Claude when selected) through Docker Compose. A root `start.sh` validates prerequisites, builds or reuses images, starts services, waits for readiness, and reports the loopback URL. It preserves campaign/content/asset volumes and does not require host build toolchains. A frontend development server and host stdio probe are optional development workflows. This replaces the earlier database-only Compose baseline under [ADR 0008](adr/0008-containerized-startup.md).
 
 The proposed packaged transport is a private Unix socket in a Linux IPC volume shared only by engine and runtime. Compose owns the runtime service; the backend owns its RPC connections and turns. P01 must prove the selected container, client, permissions, and authentication profile. See [container deployment and startup](22-container-deployment-and-startup.md) for the launcher contract, storage boundaries, and delivery gates.
 
-AI conversations have isolated runtime workspaces outside the source checkout and pack directories. The bridge exposes neither database credentials nor database network access to tools. Authentication needed by Codex remains managed by supported Codex mechanisms. Log and credential handling are detailed in [security and operations](14-security-and-operations.md).
+AI conversations have isolated runtime workspaces outside the source checkout and pack directories. The bridge exposes neither database credentials nor database network access to tools. Authentication needed by the selected runtime remains managed by that runtime's own supported mechanisms; the engine never reads or provisions credentials. Log and credential handling are detailed in [security and operations](14-security-and-operations.md).
 
 The app binds to loopback by default. GitHub publication distributes source; it does not expose a public gameplay server. A public-hosting design needs a separate authentication, tenant isolation, credential, abuse, and deployment review.
 
@@ -169,7 +169,7 @@ See the [backend build instructions](../backend/README.md). ADR 0009's subsequen
 
 ## 8. Concurrency and background work
 
-One campaign admits one state-changing operation at a time using a database-backed lease and fencing token. Queries remain available against the last committed revision. No database transaction stays open while waiting for Codex. At commit time the service verifies the state revision, lease token, current actor, and ruleset hash.
+One campaign admits one state-changing operation at a time using a database-backed lease and fencing token. Queries remain available against the last committed revision. No database transaction stays open while waiting for the narration runtime. At commit time the service verifies the state revision, lease token, current actor, and ruleset hash.
 
 Summary generation and media work occur after canonical commit. The outbox retries publication without replaying gameplay. All background jobs have stable identity, source revision, retry policy, and stale-result handling. Bounded image jobs use the verified image capability, public appearance projections and durable entity/asset associations described in [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) and [presentation assets](23-presentation-assets.md); an image job cannot mutate canonical item rarity, ownership or mechanics. Media failure cannot prevent a valid purchase, save or combat action.
 

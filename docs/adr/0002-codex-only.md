@@ -4,6 +4,8 @@
 
 **Deployment update:** [ADR 0008](0008-containerized-startup.md) supersedes the mandatory child-process/stdio deployment assumption below for the packaged installation. Codex remains the sole initial integration; stdio remains a local compatibility-probe profile.
 
+**Scope update (25 October 2026):** [ADR 0020](0020-selectable-narration-runtime.md) adds Claude as a selectable alternative narration runtime, with Codex remaining the default. The exclusion of generic providers, local models and automatic provider switching below is unchanged.
+
 ## Context
 
 The original project planned local models through Ollama. The owner supersedes that direction and requests the demo's Codex approach for the new engine.

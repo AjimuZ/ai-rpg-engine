@@ -2,17 +2,15 @@
 
 ## 1. Integration decision
 
-The research extension retains this Codex-only runtime and verified ADR 0013
-isolation. [Asynchronous planning](28-asynchronous-narrative-planning.md) uses
-logical role/audience threads and a backend durable queue, not model subagents
-with tools or a replacement production provider. The external development
-orchestrator's Claude/Codex switching is unrelated to this gameplay contract.
+**Runtime selection ([ADR 0020](adr/0020-selectable-narration-runtime.md)).** This document specifies the Codex adapter, the default narration runtime. Claude is a selectable alternative with its own profile in [Claude runtime integration](33-claude-runtime-integration.md). Exactly one runtime is active at a time and there is no automatic failover. Sections 6–11 below (task contracts, isolation, capability policy, routing, timeouts, compatibility gate) apply to whichever runtime is selected. Elsewhere in the documentation, “Codex” in a runtime-neutral statement means the selected narration runtime.
 
-AI RPG Engine uses **Codex app-server** as its initial AI runtime interface. The Java backend manages task-oriented RPC connections. The packaged Docker profile targets an isolated runtime service and a private Unix socket; local protocol probes retain an owned stdio process. The browser communicates only with AI RPG Engine. No desktop UI automation, scraping, generic chat wrapper, Ollama endpoint, or generic provider abstraction is part of this design. [ADR 0008](adr/0008-containerized-startup.md) supersedes the earlier mandatory host-child-process deployment assumption.
+The research extension keeps the verified ADR 0013 isolation for Codex. [Asynchronous planning](28-asynchronous-narrative-planning.md) uses logical role/audience threads and a backend durable queue, not model subagents with tools or a replacement production provider. The external development orchestrator's Claude/Codex switching is unrelated to this gameplay contract.
+
+AI RPG Engine uses **Codex app-server** as its default AI runtime interface; Claude is the only selectable alternative ([ADR 0020](adr/0020-selectable-narration-runtime.md)). The Java backend manages task-oriented RPC connections. The packaged Docker profile targets an isolated runtime service and a private Unix socket; local protocol probes retain an owned stdio process. The browser communicates only with AI RPG Engine. No desktop UI automation, scraping, generic chat wrapper, Ollama endpoint, or generic provider abstraction is part of this design. [ADR 0008](adr/0008-containerized-startup.md) supersedes the earlier mandatory host-child-process deployment assumption.
 
 Official documentation describes app-server as a product integration surface, with a JSON-RPC-style protocol, threads, turns, streamed items, and an initialization handshake. It documents stdio transport, per-turn configuration and structured output, including restricted read-access policies. These capabilities support the proposed adapter; actual version and platform support must be tested. [OpenAI: Codex app-server](https://learn.chatgpt.com/docs/app-server).
 
-The app-server interface has compatibility and maturity risks. The first implementation milestone must establish a supported version and safe capability profile before treating this architecture as release-ready. A protocol failure must not result in an improvised alternative AI provider.
+The app-server interface has compatibility and maturity risks. The first implementation milestone must establish a supported version and safe capability profile before treating this architecture as release-ready. A protocol failure must not result in an improvised alternative AI provider. Selecting the other supported runtime is an explicit owner operation, never an automatic fallback.
 
 The [P01.5 compatibility matrix](../tools/runtime_probe/COMPATIBILITY.md) records
 exact supported versions, retained neutral request/result and event projections,

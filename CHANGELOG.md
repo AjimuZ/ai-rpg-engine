@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Selectable narration runtime (documentation), 25 October 2026
+
+- Record the owner decision to allow Claude Code as a selectable alternative to Codex in [ADR 0020](docs/adr/0020-selectable-narration-runtime.md): one runtime at a time, an installation-wide setting, Codex by default, no automatic failover, and switching through the launcher.
+- Add the [Claude runtime specification](docs/33-claude-runtime-integration.md): sourced facts, a candidate launch profile, authentication and billing modes with startup guards, limit and error mapping, and the isolation evidence required.
+- Make Claude conditional on P20 evidence and a recorded owner review of Anthropic's terms, which restrict routing subscription credentials for users and credential handling by applications.
+- Add FR-038, QA-42, risk and decision rows, a rights-checklist item, glossary and reference entries, and runtime-neutral wording in the requirements, architecture, security, API, memory, deployment and publication documents.
+- Add work package P20 (P20.1–P20.4, 117 to 121 tasks) before P18 hardening and make P08.1 and P08.4 runtime-neutral. The MVP stays Codex-only.
+- No adapter, image, launcher option, setting or Claude test result is delivered by this documentation change.
+
 ## Unreleased — Recoverable workspace folders checkpoint, 25 October 2026
 
 - Add opt-in adventure/revision folders separating sealed specifications and authored

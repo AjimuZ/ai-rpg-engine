@@ -75,7 +75,7 @@ Mandatory state is never silently truncated. If it cannot fit, reduce task scope
 
 The initial completed-task ceiling is **10 AI turns per logical role/audience session**, configurable from 1–100. Local consultations do not count. Every completed provider task, including read-only questions or repairs in that thread, counts. Errors with uncertain context retire the affected thread.
 
-Renew at the earliest safe boundary when the ceiling is reached, context pressure crosses a configured threshold, an explicit owner command requests it, content/policy hashes change, or a prior failure makes context unreliable. Initial warning and renewal thresholds are 75% and 85% of the effective context budget; tune from measurements. The count ceiling is a fallback, not a guarantee of memory quality.
+Renew at the earliest safe boundary when the ceiling is reached, context pressure crosses a configured threshold, an explicit owner command requests it, the selected narration runtime changes ([ADR 0020](adr/0020-selectable-narration-runtime.md)), content/policy hashes change, or a prior failure makes context unreliable. Initial warning and renewal thresholds are 75% and 85% of the effective context budget; tune from measurements. The count ceiling is a fallback, not a guarantee of memory quality.
 
 Renewal steps:
 
@@ -84,7 +84,7 @@ Renewal steps:
 3. Validate the canonical checkpoint and its pending decision.
 4. Refresh required summaries or use a deterministic checkpoint digest if summarization is unavailable.
 5. Mark the previous session retired and create a new session generation.
-6. Start a fresh Codex thread with the same role/audience policy and rehydration envelope.
+6. Start a fresh thread or session of the selected runtime with the same role/audience policy and rehydration envelope.
 7. Verify the source revision/context digest before accepting its first proposal.
 8. Preserve the campaign, public transcript, current encounter, and all committed consequences.
 

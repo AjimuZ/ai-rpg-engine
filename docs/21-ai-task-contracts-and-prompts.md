@@ -2,7 +2,7 @@
 
 ## 1. Purpose and status
 
-This document specifies the application-level contracts that sit above the Codex protocol. It is documentation, not an implemented prompt library or executable schema. During P08, these definitions become versioned DTOs, schemas, prompt templates, and neutral evaluation fixtures.
+This document specifies the application-level contracts that sit above the runtime protocols and are identical for the selected runtime, Codex or Claude ([ADR 0020](adr/0020-selectable-narration-runtime.md)). It is documentation, not an implemented prompt library or executable schema. During P08, these definitions become versioned DTOs, schemas, prompt templates, and neutral evaluation fixtures.
 
 Prompt design must preserve the same authority boundaries as the backend. A precise prompt reduces mistakes; it never substitutes for validation, permissions, transactions, or audience isolation.
 

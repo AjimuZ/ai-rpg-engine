@@ -6,7 +6,7 @@
 
 **MVP — First playable engine:** a local single-player application with pack import, campaign creation, Codex narration, typed state changes, layered memory, AI thread renewal, inventory, character skills, one simple quest flow, and a complete bounded combat loop including rewards and resume. English is the default and English/Italian UI and narration are both supported from this release. Including combat here intentionally differs from the original game's MVP.
 
-**v1.0 — Complete initial engine:** the MVP plus robust authoring validation, multiple isolated campaigns, complete supported gameplay modules, dynamic encounter generation and tuning, configurable progression, campaign export/restore, knowledge-safe projections, accessibility verification, operational documentation, and public release gates.
+**v1.0 — Complete initial engine:** the MVP plus robust authoring validation, multiple isolated campaigns, complete supported gameplay modules, dynamic encounter generation and tuning, configurable progression, campaign export/restore, knowledge-safe projections, a selectable Claude narration runtime once its terms review is recorded (ADR 0020), accessibility verification, operational documentation, and public release gates.
 
 “Complete” means complete against the supported v1 contracts. It does not mean all RPG systems, infinite memory, arbitrary mechanics from prose, or a full virtual tabletop.
 
@@ -18,7 +18,7 @@
 | FR-002 | Create a campaign pinned to pack and ruleset revisions | Required | Two campaigns do not share mutable state |
 | FR-003 | Configure a protagonist using pack-defined options and validated bounds | Required | Names, attributes, starting abilities and equipment persist |
 | FR-004 | Submit structured or free-text player actions through one command pipeline | Required | Ambiguity requests do not consume a turn |
-| FR-005 | Use Codex for supported narrative and interpretation tasks | Required | Real adapter contract smoke; no alternate production provider |
+| FR-005 | Use the selected narration runtime (Codex by default) for supported narrative and interpretation tasks | Required (Codex) | Real adapter contract smoke for each supported runtime; no unlisted production runtime (FR-038) |
 | FR-006 | Commit mechanical effects only after deterministic validation | Required | Invalid AI proposal cannot modify canonical state |
 | FR-007 | Preserve player agency and stop at the next decision | Required | No unchosen agreement, travel, equipment use, or attack |
 | FR-008 | Consult character, inventory, journal, known world, and legal abilities without world advancement | Required | Read-only requests leave game revision, time, and RNG unchanged |
@@ -38,7 +38,7 @@
 | FR-022 | Associate scenes, portraits, maps, identifying item icons and dynamic music/audio cues with committed public state | Static/catalog assets | Stable entity art; optional reviewed online/local soundtrack with public cues, versioned credits, deduplication and fallback; bounded generated artwork is a v1 extension |
 | FR-023 | Interrupt work and recover without duplicating effects | Required | Before/after commit and lost-response scenarios |
 | FR-024 | Export, back up, restore, and migrate campaigns | Basic backup | Integrity checks, separate full/player exports, compatibility gate |
-| FR-025 | Provide diagnostics for Codex account availability, model capabilities, and adapter support | Required | Useful setup failure without leaking credentials |
+| FR-025 | Provide diagnostics for the selected runtime's account availability, model capabilities, and adapter support | Required | Useful setup failure without leaking credentials |
 | FR-026 | Preview and apply explicit canon corrections with an audit trail | Deferred | Administrative change cannot silently rewrite event history |
 | FR-027 | Offer a responsive visual-novel story interface with attributed dialogue, editable quick replies, free input and keyboard access | Required | Real-browser reading/choice/accessibility checks; complete graphic assets and media-free fallback |
 | FR-028 | Publish clear status, contribution, security, licensing, and release documentation | Required | Fresh-clone release rehearsal and public-content audit |
@@ -51,6 +51,7 @@
 | FR-035 | Use validated typed public presentation cues for scene/character/expression and optional dialogue audio | Basic cues | QA-40 proves allowlisted IDs, deduplicated delivery, scope/locale safety, no arbitrary executable frontend instructions and text fallback |
 | FR-036 | Optionally synthesize local English/Italian dialogue with persistent voice identity, admitted rights and bounded resources | Excluded | Optional v1 capability: QA-38 before enabling; disabled/text-only fallback is valid when rights, hardware or bilingual quality gates fail |
 | FR-037 | Import/export reusable adventure bundles for person-to-person sharing, including authored/localized content and permitted assets | Pack import only | P16 exports/clean-imports the versioned story bundle with hashes, dependencies, rights and no private playthrough/account data; later editor E05–E06 uses the same format |
+| FR-038 | Select exactly one supported narration runtime per installation (Codex by default, Claude as an alternative) with no automatic failover; switch only through the launcher, retiring old AI sessions and rebuilding from checkpoints | Codex only; the selection setting may exist | QA-42 proves contract parity on shared fixtures, refusal of unknown values and unsupported versions, no silent switch, switch and restart continuity, per-runtime sign-in and billing guards, and the terms-review gate |
 
 ## 3. Nonfunctional requirements
 
@@ -62,7 +63,7 @@
 | NFR-004 | Campaign isolation | Every mutable query is campaign-scoped; cross-campaign IDs rejected |
 | NFR-005 | Context boundedness | Mandatory context is checked before optional retrieval; overflow fails clearly |
 | NFR-006 | Explainable mechanics | Every resource, damage, loot, and advancement change has a rule and event source |
-| NFR-007 | Controlled Codex capability | No canonical writes or general host automation exposed to gameplay AI |
+| NFR-007 | Controlled narration-runtime capability | No canonical writes or general host automation exposed to gameplay AI |
 | NFR-008 | Usable performance | Local-read and rules budgets measured separately from provider latency |
 | NFR-009 | Graceful degradation | Provider or media failure preserves the latest committed state |
 | NFR-010 | Maintainability | Module boundaries, migrations, versioned prompts, and focused verification |
@@ -78,7 +79,7 @@ The MVP does not include multiplayer, public hosting, arbitrary executable plugi
 
 The integrated editor is scheduled after core v1 in [its separate roadmap](26-adventure-editor-roadmap.md). Manual files already preserve authored facts/mandatory entities and permit completion of allowed gaps across genres. Default combat data is customizable within supported primitives/policies; a new scheduler or arbitrary code is not file/editor-only customization.
 
-An automated test double may replace Codex in tests. It is a verification device, not a user-selectable production AI provider. When Codex is unavailable, the product may serve deterministic consultations and rules explanations; it must not pretend to generate a new AI scene.
+An automated test double may replace the narration runtime in tests. It is a verification device, never a selectable production runtime: the only selectable runtimes are Codex (default) and Claude ([ADR 0020](adr/0020-selectable-narration-runtime.md)). When the selected runtime is unavailable, the product may serve deterministic consultations and rules explanations; it must not pretend to generate a new AI scene.
 
 ## 5. v1 completion boundaries
 
