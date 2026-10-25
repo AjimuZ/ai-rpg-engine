@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 40/121 tasks verified.** The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5 and P06.1–P06.4. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.5 is in progress and blocked on a dependency correction: full QA-33 needs memory, generated art, job limits and purchase/equip from later packages that already depend on P06. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 40/121 tasks verified.** The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5 and P06.1–P06.4. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -920,6 +920,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     Browser API binding remains P05.6; full QA-33 and optional durable transcript
     history are not claimed. No schema/dependency/runtime-account changes.
 - [ ] P06.5 Implement separate adventure specifications/media folders and library switching; prove same-name entity, draft, memory, artwork and restart/restore isolation under QA-33.
+  **Requires tasks:** P05.7, P08.6, P09.3, P10.2.
   - Verified partial checkpoint (25 October 2026): locally admitted owner-scoped adventure listing/detail reads
     over persisted workspace IDs, including empty workspaces and equal titles.
     Bounded UUID pages and detached public metadata do not select an active world,
@@ -962,21 +963,29 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     unavailable. The packaged jar does not yet allowlist `/saved/...` for reload or
     direct links (in-app navigation only). Saved playthroughs are not playable in the
     browser.
-  - Dependency finding: full QA-33 needs memory (P09), generated art (P17.6),
-    owner-wide job limits (P08.6/P09.3), purchase/equip (P10.2) and a combined
-    reboot/restore. P07 depends on P06 and P14 on P00–P13, so a `Requires tasks:`
-    line from P06.5 to those tasks would form a cycle. Proposed correction: narrow
-    P06.5 to workspace folders, browser switching and authored/draft isolation, and
-    move the combined QA-33 memory/art/job/purchase/restore evidence to a new
-    later task (for example in P17 or P18). This needs an owner roadmap decision.
+  - Dependency correction (25 October 2026): full QA-33 at the MVP scope needs
+    playable saved campaigns with pending replies and late media events (P05.6–P05.7),
+    owner-wide job limits (P08.6, P09.3), memory (P09.1–P09.5) and purchase/equip
+    (P10.2). P07 previously depended on the whole P06 package, so declaring these
+    prerequisites formed a cycle and P06.5 could neither finish nor wait. P07 now
+    depends on P03–P04 and uses the completed P06.1–P06.4 foundations through
+    `P07.1 Requires tasks: P06.4`; P06.5 declares the prerequisites above. P14 still
+    depends on the complete P06 package, so the MVP keeps the QA-33 gate. Runtime
+    image generation belongs to v1 under QA-31 ([acceptance scope](15-quality-and-acceptance.md)),
+    so P06.5 proves authored artwork and campaign presentation media; P17.6 must
+    prove that generated images stay in their originating adventure folders across
+    switching and restore, and P18.1 reruns the complete QA-33 scenario. No
+    requirement, task identity, title or checked status changed. The runner's own
+    parser reported a cycle before this correction and accepts the corrected graph.
 
 **Exit:** two independent campaigns survive restart and read-only use changes no game counters. **Checks:** creation budget/loadout validation, ownership isolation, restart, and no-AI consultations. **Suggested commit:** `Add persistent campaigns and local RPG consultations`.
 
 ## 10. P07 — Authoritative command and mutation boundary
 
-**Depends on:** P03, P04, P06. **Areas:** commands, rules, operation API, outbox.
+**Depends on:** P03, P04; uses completed P06.1–P06.4 campaign foundations, not P06.5 isolation acceptance. **Areas:** commands, rules, operation API, outbox.
 
 - [ ] P07.1 Implement durable idempotency with payload hashes, expected revision, lease/fencing, admission limits, and operation statuses.
+  **Requires tasks:** P06.4.
 - [ ] P07.2 Implement typed commands and atomic semantic validation; reject generic field patches.
 - [ ] P07.3 Add resource, ownership, prerequisite, knowledge, and causal validation.
 - [ ] P07.4 Implement local action calculations, durable draws, events, receipts, and pending decisions.
@@ -1118,6 +1127,10 @@ this update. No combat runtime/browser result is claimed.
 - [ ] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.
 - [ ] P17.5 Verify missing art/audio never blocks play and media cannot reveal secrets.
 - [ ] P17.6 Implement bounded runtime scene/portrait/item image jobs using verified capability, public appearance inputs, stable identities, durable saved assets, budget limits, deduplication and restore/stale-result checks under QA-31.
+  - QA-33 scope (25 October 2026): besides QA-31, this task proves that generated
+    images and their associations stay in the originating adventure folder for
+    same-name entities across switching, late job results and backup/restore.
+    P06.5 covers authored artwork and presentation media at the MVP scope.
 - [ ] P17.7 Qualify optional local EN/IT speech with admitted model/voice licenses, stable voice identities, accepted-line audio caching and shared GPU limits under QA-38; ship disabled with tested text-only fallback if hardware/rights/quality gates fail. No TTS prerequisite for core v1.
 
 **Exit:** the graphical visual-novel UI, persistent identifying artwork and bounded image-job pipeline are verified; unsupported generation degrades accurately without blocking play. Optional dynamic music follows [its specification](24-dynamic-music-and-credits.md); no player or audio integration is delivered by adding that document. TTS is not required. **Checks:** QA-16, QA-19, QA-25, QA-29–32, actual visual review and asset/license inventory. **Suggested commit:** `Complete accessible presentation and optional atmosphere`.

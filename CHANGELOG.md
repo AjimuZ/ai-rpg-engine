@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Adventure isolation scheduling correction, 25 October 2026
+
+- Let P07 start from the completed P06.1–P06.4 campaign foundations and give P06.5
+  explicit prerequisites P05.7, P08.6, P09.3 and P10.2. The earlier whole-package
+  P07 dependency made the remaining QA-33 work impossible to schedule without a cycle.
+- Keep the MVP QA-33 gate (P14 still depends on all of P06) and assign generated-image
+  folder isolation to P17.6 with the v1 QA-31 scope. No requirement, task identity,
+  title or checked status changed.
+
 ## Unreleased — Selectable narration runtime (documentation), 25 October 2026
 
 - Record the owner decision to allow Claude Code as a selectable alternative to Codex in [ADR 0020](docs/adr/0020-selectable-narration-runtime.md): one runtime at a time, an installation-wide setting, Codex by default, no automatic failover, and switching through the launcher.
