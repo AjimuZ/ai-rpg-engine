@@ -81,7 +81,7 @@ The demo does not provide a general token-budget estimator or prove a ten-respon
 | Retain backend authority and layered memory | Essential for continuity and testability |
 | Generalize Rune into creative abilities | Preserve expression without requiring a specific fantasy power |
 | Generalize Lyra into optional guide personas | Support tutorials and in-world help without mandatory lore |
-| Replace local LLM/Ollama direction with Codex-only integration | Explicit new project requirement |
+| Replace local LLM/Ollama direction with Codex-only integration | Explicit new project requirement; partly reversed on 25 October 2026 by [ADR 0021](adr/0021-inference-backends-and-model-selection.md), which adds free local models as an optional backend |
 | Replace Markdown-as-live-database with relational transactions | Safer updates, queries, concurrency, and recoverability |
 | Retain Markdown/YAML/JSON for authoring and export | Accessible, versionable files without making AI their authoritative editor |
 | Retain session renewal, local reads, request identity, selective media | Demonstrated practical improvements |

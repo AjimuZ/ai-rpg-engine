@@ -24,5 +24,6 @@ Records 0001–0005, 0007, and 0008 are **proposed for the AI RPG Engine impleme
 | [0018](0018-protected-pack-registration.md) | Bounded directory/ZIP staging, media headers, transactional original-byte storage and serialized immutable sealing; implemented in P04.4, import UI and decoding pending |
 | [0019](0019-local-campaign-admission.md) | Opt-in configured-owner local admission, bounded session/CSRF proofs and strict atomic campaign creation; implemented in P06.1 |
 | [0020](0020-selectable-narration-runtime.md) | Selectable narration runtime: Codex by default, Claude Code as the alternative, one at a time, no automatic failover; Claude is supported only after P20 evidence and a recorded terms review; accepted design, implementation pending |
+| [0021](0021-inference-backends-and-model-selection.md) | Closed protocol set with open models and endpoints; four owner-assigned slots (light, standard, deliberate text and image); free local text and image backends with recommended defaults for the reference host; API-key gateway; hardware advisor; shared GPU admission; accepted design, implementation pending |
 
 When a decision changes, preserve this record and create a superseding one with rationale, compatibility implications, and verification. Do not retroactively edit historical status to make a previous decision disappear.

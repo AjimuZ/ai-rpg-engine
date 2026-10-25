@@ -174,6 +174,8 @@ schema versions for persisted/imported data.
 | `GET /api/v1/campaigns/{id}/encounter` | Public current combat projection | No raw enemy secrets |
 | `POST /api/v1/campaigns/{id}/ai-session/renew` | Renew idle role contexts safely | Does not advance world |
 | `GET /api/v1/runtime/status` | Selected narration runtime (Codex or Claude), version, account and model readiness | No credentials or raw RPC identifiers; read-only, the runtime is changed through the launcher (ADR 0020) |
+| `GET /api/v1/models/status` | Slots, assigned backends and models, billing and privacy classes, probe results, hardware profile and admission state | No keys or endpoint credentials; read-only |
+| `PUT /api/v1/settings/models` | Owner-only slot assignment and same-class fallback lists | Validates, probes and audits; a class change needs acknowledgement; keys are never accepted here (ADR 0021) |
 | `PUT /api/v1/preferences` | Reading, sound, routing, renewal preferences | No game effects |
 | `POST /api/v1/campaigns/{id}/exports` | Create full-owner or player-facing export | Explicit audience selection |
 | `POST /api/v1/restore/preview` | Validate archive compatibility and integrity | No overwrite |
@@ -235,7 +237,7 @@ remains P06, catalog locale resolution and bilingual UI remain P05.6.
 | Journal/world | Known quests, discoveries, map knowledge, promises, event history |
 | Combat | Initiative, active actor, AP/reactions, zones, legal actions, targets, consequences and persistent dialogue/action chat |
 | Advancement | Pending entitlements, legal purchases, cost/effect preview |
-| Settings | Reading, theme, sound, narration-runtime readiness (the selected runtime is shown; it is changed through the launcher), routing, context renewal |
+| Settings | Reading, theme, sound, narration-runtime readiness (the selected runtime is shown; it is changed through the launcher), the Models panel (advisor presets, per-slot backend and model, probe results, class badges, budgets), routing, context renewal |
 | Author/owner tools | Validation, export, restore/correction previews, credits and diagnostics |
 
 ## 6. Interface direction

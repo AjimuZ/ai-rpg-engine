@@ -91,6 +91,7 @@ The checklist below also includes gates for a later playable release; those runt
 - [x] Root MIT license is added; upstream notices retained.
 - [ ] All bundled content/assets have a rights/provenance record.
 - [ ] Narration runtime terms review recorded for each supported runtime and sign-in or billing mode (Codex; Claude under ADR 0020), with accurate account, limit and data-handling statements.
+- [ ] Every catalog model records source, revision, license, notices and attribution; no weights are redistributed by the repository; image-model defaults, sample assets and generated art are reviewed for content and rights (ADR 0021).
 - [ ] No private source-demo campaign, credentials, logs, or machine-specific paths are included.
 - [ ] README accurately states design/MVP/v1 status.
 - [ ] Internal links and public external references are reviewed.

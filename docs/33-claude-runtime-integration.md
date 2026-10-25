@@ -2,7 +2,7 @@
 
 ## 1. Status and scope
 
-**Design specification only.** [ADR 0020](adr/0020-selectable-narration-runtime.md) makes Claude a selectable alternative to Codex for the engine's narration runtime. Nothing here is implemented or has passed a compatibility gate. The launch profile in section 4 is a **candidate**, built from official documentation and from the command-line help of the client installed on the owner's workstation. Package P20 turns candidates into evidence. Until then the engine must not call `claude` supported, and Codex remains the default and the only runtime in the MVP.
+**Design specification only.** [ADR 0020](adr/0020-selectable-narration-runtime.md) makes Claude a selectable alternative to Codex for the engine's narration runtime. Nothing here is implemented or has passed a compatibility gate. The launch profile in section 4 is a **candidate**, built from official documentation and from the command-line help of the client installed on the owner's workstation. Package P20 turns candidates into evidence. Until then the engine must not call `claude` supported, and Codex remains the default and the only runtime in the MVP. [ADR 0021](adr/0021-inference-backends-and-model-selection.md) adds a direct Messages API backend for owner keys, which is the route Anthropic recommends for products; this document covers only the Claude Code client.
 
 This document covers only what differs from Codex. Everything else is shared and defined elsewhere:
 

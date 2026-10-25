@@ -137,7 +137,7 @@ P17.6; it cannot widen narration tools or enable paid/API access implicitly.
 
 ## 9. Model and reasoning routing
 
-Use logical profiles: `light`, `standard`, `deliberate`, and owner-selected `fixedQuality`. Resolve them against the actual Codex catalog and compatible effort levels. Store preferred account model IDs in private application settings; do not hardcode the demo's model names as permanent product requirements.
+Use logical profiles: `light`, `standard`, `deliberate`, and owner-selected `fixedQuality`. Each profile resolves through the owner's slot assignment ([ADR 0021](adr/0021-inference-backends-and-model-selection.md)) to a backend and model; for the agent runtimes, resolve against that runtime's actual catalog and compatible effort levels. Store preferred account model IDs in private application settings; do not hardcode the demo's model names as permanent product requirements.
 
 Classification is local and task-aware. Deterministic consultations bypass Codex. Ordinary narration uses a standard profile. High-impact negotiation, complex content generation, or tactical planning may use a deliberate profile. Combat arithmetic always remains local regardless of profile. Locale-specific keyword heuristics may assist but cannot override structured command types or current encounter state.
 

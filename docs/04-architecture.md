@@ -4,7 +4,7 @@
 
 Use an Angular frontend and a **modular Spring Boot application**. PostgreSQL is the canonical store. The backend owns command processing, rules, persistence, knowledge filtering, and the narration runtime integration. Start with one deployable backend rather than separate gameplay, memory, and orchestration services.
 
-The primary project's stack is retained. The AI adapters are specific: Codex (default) and, as a selectable alternative, Claude Code ([ADR 0020](adr/0020-selectable-narration-runtime.md)). An internal runtime-neutral boundary keeps protocol details out of the domain; it does not imply a generic multi-provider product, and exactly one runtime is active at a time.
+The primary project's stack is retained. The AI adapters are specific: Codex (default) and, as a selectable alternative, Claude Code ([ADR 0020](adr/0020-selectable-narration-runtime.md)). An internal runtime-neutral boundary keeps protocol details out of the domain; it does not imply a generic multi-provider product, and exactly one default runtime is active at a time. Owner-assigned model slots, free local backends and API-key backends are specified in [ADR 0021](adr/0021-inference-backends-and-model-selection.md).
 
 ```mermaid
 flowchart LR
@@ -106,6 +106,7 @@ media-serving route is exposed. See [ADR 0018](adr/0018-protected-pack-registrat
 | `memory` | Checkpoints, summaries, retrieval, context budgets | Knowledge, events |
 | `ai` | Task profiles, prompt contracts, proposal parsing, model routing | Context and the runtime adapters |
 | `codex`, `claude` | One adapter per runtime: transport/lifecycle, protocol framing, events, cancellation; `claude` is planned (P20) | Private IPC or local process API according to deployment profile; no domain repositories |
+| `inference` | Slot assignment, backend catalog and hardware advisor, readiness probes, class and budget rules, GPU and RAM admission coordinator ([ADR 0021](adr/0021-inference-backends-and-model-selection.md)); planned | Settings, `ai` and the adapters; no domain repositories |
 | `presentation` | Narrative records, scene references, safe media cues | Committed events and projections |
 | `operations` | Backups, imports/exports, diagnostics, recovery | All modules through administrative services |
 | `persistence` | Shared entity base, engine-assigned identifiers and canonical value checks | JPA only; no domain rules |

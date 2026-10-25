@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Inference backends and model selection (documentation), 25 October 2026
+
+- Record the owner decision for free local models, API-key backends and owner-chosen model slots in [ADR 0021](docs/adr/0021-inference-backends-and-model-selection.md): a closed set of protocol adapters, an open set of models and endpoints, four slots (light, standard and deliberate text, and image), and recommended defaults that never restrict the owner.
+- Add the [specification](docs/34-inference-backends-and-model-selection.md): measured reference-host facts (RTX 4070 with 12 GB of VRAM, one 16 GB memory module), sourced model facts, recommended defaults (Gemma 4 12B QAT for text; WAI-illustrious-SDXL v17.0 for images, as chosen in the predecessor project), the hardware advisor, the gateway, the local server and image worker profiles, and shared GPU admission.
+- Correct the speech specification, which assumed 32 GB of system RAM and excluded local gameplay text inference.
+- Add FR-039, FR-040, QA-43, QA-44, risk and decision rows, a rights-checklist item, and glossary and reference entries.
+- Add work package P21 (P21.1–P21.6, 121 to 127 tasks) after P09. P17.6 now requires the local image backend and P18 waits for P21.
+- No backend, image worker, launcher option, setting or measurement is delivered by this documentation change.
+
 ## Unreleased — Adventure isolation scheduling correction, 25 October 2026
 
 - Let P07 start from the completed P06.1–P06.4 campaign foundations and give P06.5

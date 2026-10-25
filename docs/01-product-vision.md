@@ -15,6 +15,7 @@ The intended outcome is a coherent, persistent RPG experience with inspectable m
 - Use the demo selectively for practical AI orchestration and continuity improvements.
 - Use Codex as the initial AI integration rather than generic or local model providers.
 - Amended 25 October 2026: also allow Claude (Claude Code) as a selectable alternative narration runtime, one runtime at a time, with Codex remaining the default for now ([ADR 0020](adr/0020-selectable-narration-runtime.md)).
+- Amended 25 October 2026 (later): also allow free local models for narration and image generation, hosted APIs through the owner's key and custom endpoints, with defaults recommended for the owner's hardware (an RTX 4070 with 12 GB of VRAM) and maximum freedom to choose other models for each weight class and for images ([ADR 0021](adr/0021-inference-backends-and-model-selection.md)).
 - Build an adventure-independent engine, with customizable adventure files.
 - Design dynamic turn-based combat informed by familiar tabletop RPG concepts and using original rules and content.
 - Account for inventory, attributes, statistics, abilities, skills, progression, and long campaigns.
@@ -67,7 +68,7 @@ The recommended application has one authoritative backend. A separate Python AI 
 
 ## 7. Naming
 
-**Selected name: AI RPG Engine.** The owner selected this name because it states the program's purpose directly: a reusable engine for AI-powered role-playing adventures. Repository slug: `ai-rpg-engine`. Short description: “A Codex-powered RPG engine, with Claude Code as a selectable alternative, featuring persistent worlds, configurable adventures, and deterministic turn-based combat.”
+**Selected name: AI RPG Engine.** The owner selected this name because it states the program's purpose directly: a reusable engine for AI-powered role-playing adventures. Repository slug: `ai-rpg-engine`. Short description: “A Codex-powered RPG engine, with Claude Code, free local models and API keys as selectable alternatives, featuring persistent worlds, configurable adventures, and deterministic turn-based combat.”
 
 Use **AI RPG Engine** consistently in public documentation and product presentation, and `ai-rpg-engine` in repository and directory names. The name identifies the software rather than a particular adventure or setting. Repository availability and applicable name/rights checks remain publication tasks; the product name itself is no longer an open design choice.
 

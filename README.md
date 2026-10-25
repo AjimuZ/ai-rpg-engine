@@ -27,7 +27,7 @@ formats/invocation and unverified account/cost entitlement. The developer probe
 refuses generation without blocking text discovery; production artwork jobs
 and UI fallbacks remain P17 work.
 
-**A Codex-powered engine for persistent, customizable RPG adventures, with Claude Code as a selectable alternative.**
+**A Codex-powered engine for persistent, customizable RPG adventures, with Claude Code, free local models and API keys as selectable alternatives.**
 
 AI RPG Engine separates the software that runs an adventure from the files that describe its world. Authors supply settings, characters, objectives, abilities, equipment, encounters, and presentation preferences. The engine supplies reliable state, deterministic rules, long-term continuity, turn-based combat, and AI orchestration through the selected narration runtime (Codex by default, Claude Code as a selectable alternative).
 
@@ -135,7 +135,8 @@ model installation or performance result is delivered by this documentation upda
 
 - Load versioned adventure packs without changing engine source code.
 - Run authored, emergent, or hybrid adventures without requiring a fixed plot.
-- Generate narration, dialogue, encounter proposals, and tactical choices through Codex or, as a selectable alternative, Claude Code (one runtime at a time; Codex by default).
+- Generate narration, dialogue, encounter proposals, and tactical choices through Codex by default, or through Claude Code, free local models on the owner's GPU, or an API key, with a model of the owner's choice for each weight class (light, standard, deliberate).
+- Generate scene, portrait and item art locally on the owner's GPU (recommended default: WAI-illustrious-SDXL), through the owner's own image server, or through an API key.
 - Validate every mechanical consequence in the Java backend.
 - Keep character statistics, inventory, skills, equipment, quests, relationships, and world changes persistent.
 - Resume long campaigns from canonical checkpoints after renewing an AI thread.
@@ -153,7 +154,7 @@ model installation or performance result is delivered by this documentation upda
 | Web interface | Angular 22.2 with TypeScript 6.0 on Node.js 24 LTS ([ADR 0009](docs/adr/0009-toolchain-baseline.md)); standalone components; signals; SCSS |
 | Authoritative application | Spring Boot 4.1 on Java 21 LTS; Maven 3.10 through the Maven Wrapper ([ADR 0009](docs/adr/0009-toolchain-baseline.md)) |
 | Persistence | PostgreSQL 18; Flyway 12.4 migrations; relational state and JSONB extension data |
-| AI integration | Backend-managed narration runtime behind one task port: Codex app-server by default (isolated packaged runtime with private IPC, subject to compatibility validation), or Claude Code in print mode, chosen by one setting ([ADR 0020](docs/adr/0020-selectable-narration-runtime.md)); the Claude runtime is planned (P20) |
+| AI integration | Backend-managed narration runtime behind one task port: Codex app-server by default (isolated packaged runtime with private IPC, subject to compatibility validation), or Claude Code in print mode, chosen by one setting ([ADR 0020](docs/adr/0020-selectable-narration-runtime.md)); free local models (a llama.cpp server), a local image worker, hosted APIs through an isolated gateway and custom endpoints are planned as owner-assigned model slots with recommended defaults ([ADR 0021](docs/adr/0021-inference-backends-and-model-selection.md)); the Claude runtime and the slots are planned (P20, P21) |
 | Browser updates | REST commands and resumable Server-Sent Events |
 | Local environment | Docker Compose for the complete packaged application; root `start.sh` entry point; durable storage and isolated runtime |
 | Retrieval | Structured and full-text retrieval first; optional semantic indexing after evidence of need |
@@ -161,7 +162,7 @@ model installation or performance result is delivered by this documentation upda
 
 The frontend, backend, build, and database versions, the container images, and the supported host and shell environment are recorded in [ADR 0009](docs/adr/0009-toolchain-baseline.md). The same record pins the Codex runtime image and executable at version 0.164.0 (P01.1). Thread/turn lifecycle and the signed-in neutral smoke are verified (P01.2), and so is the image's isolation profile (P01.3); runtime lifecycle checks (P01.4) and retained compatibility records (P01.5) cover the developer baseline; authenticated packaged restart and other hosts remain unverified. The source project's package versions are evidence of its choices, not a claim about the newest supported releases.
 
-Campaign data is stored locally. **Inference requires the selected runtime's service and the owner's account access (Codex by default, Claude Code if selected).** Local hosting does not imply offline AI, unlimited usage, or local model inference. Ollama, generic provider routing, local LLMs, a generic chat API, and running both runtimes at once or switching between them automatically are outside the initial release. Claude Code is a selectable alternative to Codex under [ADR 0020](docs/adr/0020-selectable-narration-runtime.md), with its own sign-in, billing and data-handling terms ([Claude runtime specification](docs/33-claude-runtime-integration.md)); it is planned, not implemented.
+Campaign data is stored locally. **Inference requires the selected runtime's service and the owner's account access (Codex by default, Claude Code if selected).** Local hosting does not imply offline AI, unlimited usage, or local model inference. Automatic switching between backends, arbitrary plugin providers and model training are outside the initial release. Claude Code is a selectable alternative to Codex under [ADR 0020](docs/adr/0020-selectable-narration-runtime.md), with its own sign-in, billing and data-handling terms ([Claude runtime specification](docs/33-claude-runtime-integration.md)). Free local text and image models, hosted APIs with the owner's key and custom endpoints are planned under [ADR 0021](docs/adr/0021-inference-backends-and-model-selection.md) as owner-assigned model slots, with defaults recommended for the detected hardware and the freedom to choose any compatible model ([specification](docs/34-inference-backends-and-model-selection.md)). All of this is planned, not implemented.
 
 **ChatGPT device-login prerequisite:** for the container sign-in flow verified by this project, enable device-code login in your ChatGPT account's security settings. In a managed workspace, the administrator must allow this method. Then complete the browser link/code shown by the runtime and retain its dedicated account volume. Signing in to the desktop app alone does not sign in the isolated game runtime. See [account setup](tools/runtime_probe/README.md#owner-account-setup-for-the-live-check) and the [official authentication guide](https://learn.chatgpt.com/docs/auth). This requirement concerns the device-code sign-in method, not every authentication method supported upstream.
 

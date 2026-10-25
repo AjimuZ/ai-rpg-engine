@@ -4,6 +4,8 @@
 - Date: 25 October 2026
 - Builds on: [ADR 0002](0002-codex-only.md) (scope, extended here), [ADR 0013](0013-narration-runtime-isolation.md) (isolation profile), [ADR 0005](0005-renewable-memory.md) (renewable sessions) and [ADR 0007](0007-audience-isolation.md) (audience scoping).
 
+**Extended by [ADR 0021](0021-inference-backends-and-model-selection.md):** the runtime chosen here is the default backend of the three text slots, and each slot may be assigned another backend, including free local models and API keys. Decisions 3, 4, 7 and the terms gate still govern the agent runtimes.
+
 ## Context
 
 ADR 0002 made Codex app-server the only narration runtime of the first release, and ADR 0013 fixed how that runtime is isolated. On 25 October 2026 the owner asked to be able to run the engine with Claude as well, using one runtime or the other, with Codex staying the default for now.
@@ -15,7 +17,7 @@ Claude Code has a documented non-interactive print mode (the command-line form o
 
 ## Decision
 
-1. **Two named runtimes, not a provider framework.** The engine supports exactly `codex` and `claude`. There is no third runtime, no user-defined endpoint, no per-request routing and no plugin discovery. A third runtime needs its own decision record. Local models, a generic chat API and the Messages API stay outside this decision (ADR 0002 alternatives).
+1. **Two named runtimes, not a provider framework.** The engine supports exactly `codex` and `claude`. There is no third runtime, no user-defined endpoint, no per-request routing and no plugin discovery. A third runtime needs its own decision record. Local models, a generic chat API and the Messages API stay outside this decision (ADR 0002 alternatives; ADR 0021 later adds them as separate backends).
 2. **One setting, Codex by default.** The owner chooses the runtime with one installation-wide setting, planned as `NARRATION_RUNTIME=codex|claude` in the private `.env`. Unset means `codex`. Any other value is refused with a clear diagnostic. Only the selected runtime's service is started. The setting is installation-wide because the serialized one-active-turn default (P01.7) is installation-wide.
 3. **No automatic failover.** If the selected runtime is unavailable (usage limit, sign-in, unsupported version), the engine behaves as already specified: local consultations and receipts keep working, narration stays pending, and the status says so. It may tell the owner that the other runtime can be selected. It never switches, falls back or retries on the other runtime by itself. A fallback model inside a runtime is not used either.
 4. **Switching is an owner operation of the launcher.** The owner changes the setting through `./start.sh` (planned `--runtime`) and the stack restarts. The engine, which holds no Docker socket (ADR 0008), cannot start or stop runtime containers. At startup it compares the setting with the runtime recorded in the database. If they differ, it first completes the usual reconciliation, so no unresolved operation, lease or ambiguous turn remains. It then retires every AI session of the previous runtime, creates new ones from canonical checkpoints when needed (ADR 0005), records an audit event with both runtimes and versions, and regenerates narration still pending from committed receipts. Narration-only retry never repeats the action. Campaign state, transcript and pack hashes are untouched.
@@ -34,9 +36,9 @@ Claude Code has a documented non-interactive print mode (the command-line form o
 ## Not decided
 
 - Making Claude the default.
-- Mixing runtimes per campaign, role or task, or running both at once.
+- Mixing runtimes per campaign or task, or running both agent runtimes at once. Per-slot assignment is decided by ADR 0021.
 - Any vendor other than these two.
-- A direct Messages API adapter (see Alternatives).
+- A direct Messages API adapter (decided later by ADR 0021 as the `anthropic-api` backend).
 
 ## Alternatives
 

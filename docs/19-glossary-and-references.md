@@ -24,6 +24,10 @@
 | AI session | Renewable role/audience working context backed by a private runtime conversation (a Codex thread, or a Claude session when selected) |
 | Codex turn | One submitted task and the agent work that follows; not necessarily a game turn |
 | Narration runtime | The single selected AI backend of an installation, Codex (default) or Claude, behind the runtime-neutral task port ([ADR 0020](adr/0020-selectable-narration-runtime.md)) |
+| Slot | A logical use of a model: `text.light`, `text.standard`, `text.deliberate` or `image`. The owner assigns a backend and model to each ([ADR 0021](adr/0021-inference-backends-and-model-selection.md)) |
+| Backend | One of the closed set of protocol adapters that can serve a slot: an agent runtime (Codex, Claude), a local model server, a hosted API, a custom endpoint or a local image worker |
+| Model catalog | Pinned, hash-verified, licensed recommendations that the advisor ranks for the detected hardware; owner-added models are outside it |
+| GPU lease | Time-bounded permission to hold the GPU with one heavy model, granted by the admission coordinator |
 | Checkpoint | Consistent snapshot and resume metadata derived from canonical state |
 | Summary | Lossy source-linked retrieval aid, never authoritative state |
 | Knowledge scope | Who knows, believes, or is allowed to receive a claim |
@@ -55,6 +59,10 @@ Checked during documentation preparation on **22 October 2026**. URLs can redire
 | [Claude Code: authentication](https://code.claude.com/docs/en/authentication) | Sign-in methods, precedence, credential storage | Does not prove any owner's entitlement or zero cost |
 | [Claude Code: data usage](https://code.claude.com/docs/en/data-usage) | Training, retention and telemetry switches | Depends on account type and privacy settings |
 | [Claude Code: legal and compliance](https://code.claude.com/docs/en/legal-and-compliance) | Authentication and credential use, running Claude Code in products, naming | Not legal advice; the owner reviews the applicable terms |
+| [llama.cpp server README](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md) | Router mode, load and unload endpoints, constrained output, prompt-cache controls | Describes the server's documented options; their effect on this host is measured in P21 |
+| [Gemma 4 12B model card](https://huggingface.co/google/gemma-4-12B-it) | Size, license, context, languages, thinking mode, reported scores | Vendor-reported numbers; not an evaluation of this project's narration |
+| [WAI-illustrious-SDXL on CivitAI](https://civitai.com/models/827184) | Checkpoint versions, hashes, recommended settings, declared license flags | Uploader-declared terms; the owner reviews them before use |
+| [Fair AI Public License 1.0-SD](https://freedevproject.org/faipl-1.0-sd/) | License underlying Illustrious-derived checkpoints | Not legal advice; the owner reviews the text |
 | [OpenAI: noninteractive mode](https://learn.chatgpt.com/docs/non-interactive-mode) | Alternative bounded-job integration | Not the main gameplay transport |
 | [U.S. Copyright Office: Games](https://www.copyright.gov/register/tx-games.html) | Distinction between game methods and expressive material in its guidance | Not worldwide rights/trademark clearance |
 | [Official D&D SRD page](https://www.dndbeyond.com/srd) | Existence and scope of separately licensed reference documents | No SRD text or stat blocks imported into AI RPG Skirmish |

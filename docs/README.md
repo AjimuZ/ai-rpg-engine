@@ -20,6 +20,7 @@ Requirements stated by the project owner are binding for this design. Technical 
 | [05 — Domain and persistence](05-domain-model.md) | Entities, identity, constraints, versioning, and storage |
 | [06 — Codex integration](06-codex-integration.md) | Process lifecycle, protocol contract, routing, security, and compatibility |
 | [33 — Claude runtime integration](33-claude-runtime-integration.md) | Selectable alternative to Codex: capability comparison, candidate launch profile, authentication and terms gates, limits, isolation evidence |
+| [34 — Inference backends and model selection](34-inference-backends-and-model-selection.md) | Free local models, API-key and custom backends, owner-assigned slots, hardware advisor, shared GPU admission, reference-host defaults |
 | [07 — Turn protocol](07-turn-protocol.md) | Commands, transactions, retries, interruptions, and narration consistency |
 | [08 — Memory and continuity](08-memory-and-continuity.md) | Long sessions, context selection, renewal, summaries, and recovery |
 | [09 — Adventure packs](09-adventure-packs.md) | File-driven customization, formats, validation, import, and migrations |
@@ -69,4 +70,4 @@ Requirements stated by the project owner are binding for this design. Technical 
 
 Core identifiers, ruleset versions, events, and state revisions have consistent meanings across documents. If a numerical example conflicts with the combat rules, the rules take precedence and the example must be corrected. If an adventure conflicts with engine security or canonical state, it is rejected or explicitly migrated; prose cannot override those boundaries.
 
-**Runtime wording.** A runtime-neutral statement that says “Codex” (for example “Codex narrates the resolved events”) describes the selected narration runtime: Codex by default, or Claude when selected under [ADR 0020](adr/0020-selectable-narration-runtime.md). Statements about app-server, thread RPC, device-code sign-in or the pinned 0.164.0 image are Codex-specific. Claude-specific statements live in [Claude runtime integration](33-claude-runtime-integration.md).
+**Runtime wording.** A runtime-neutral statement that says “Codex” (for example “Codex narrates the resolved events”) describes the selected narration runtime: Codex by default, or Claude when selected under [ADR 0020](adr/0020-selectable-narration-runtime.md). Statements about app-server, thread RPC, device-code sign-in or the pinned 0.164.0 image are Codex-specific. Claude-specific statements live in [Claude runtime integration](33-claude-runtime-integration.md), and model slots, local backends and API-key backends in [inference backends and model selection](34-inference-backends-and-model-selection.md).
