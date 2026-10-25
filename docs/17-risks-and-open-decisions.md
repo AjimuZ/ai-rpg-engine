@@ -3,8 +3,13 @@
 P06.5's persisted library GETs expose only owner-authorized public workspace
 metadata and never persist an active selection. Guarding the entire adventure
 subtree closes the admission gap before further routes are introduced. This
-checkpoint does not implement managed specification/media folders or browser
-binding; preview draft isolation is still distinct from real workspace recovery.
+checkpoint now includes opt-in derived specification/authored-media folders, but
+not browser binding; preview draft isolation is still distinct from real workspace
+recovery. Projection duplicates disk usage and verifies every sealed revision at
+startup. Post-commit projection failure preserves registered content and requires
+storage repair/retry. Roots must be private and quiescent; static-link rejection
+does not protect against a hostile local process swapping ancestors. Failed private
+staging folders require offline operator cleanup, never automatic deletion.
 QA-33 remains open for memory, artwork, stale callbacks, owner-wide job limits
 and combined restart/restore evidence. Later pages are fresh snapshots, so
 concurrent additions may require refreshing the library from its first page.

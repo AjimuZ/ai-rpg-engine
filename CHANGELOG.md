@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Recoverable workspace folders checkpoint, 25 October 2026
+
+- Add opt-in adventure/revision folders separating sealed specifications and authored
+  media, with an integrity manifest and atomic publication. Reconcile after committed
+  imports and on startup; retain PostgreSQL originals as the sole authority. Reject
+  modified/extra files, unsafe paths and links without overwriting private content.
+  Real browser switching, generated artwork and complete QA-33 remain unfinished.
+
 ## Unreleased — Persisted adventure library checkpoint, 25 October 2026
 
 - Add bounded owner-scoped adventure listing and detail GETs, preserving empty

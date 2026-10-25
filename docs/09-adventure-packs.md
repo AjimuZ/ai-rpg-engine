@@ -260,6 +260,13 @@ In combat, generated mechanics must use supported templates/effects and fit the 
 
 ## 9. Import and compilation pipeline
 
+P06.5 can project sealed originals into separate private specification/authored-media
+folders when `engine.workspaces.root` is configured. Registration commits PostgreSQL
+first, then publishes an atomic revision directory; projection failure leaves the
+sealed registration intact and an identical retry reconciles it. Startup rebuilds
+missing directories from the same canonical bytes. These files are not editable
+pack authority, player exports or public assets; see [workspace storage](25-adventure-workspaces.md#2-separate-managed-folders).
+
 P04.4 implements `PackStaging.directory(Path)` and `archive(InputStream)` followed
 by `PackRegistry.preview(adventureId, staged)` or `register(adventureId, staged)`.
 Staging buffers bytes in memory without extraction or execution; its inventory

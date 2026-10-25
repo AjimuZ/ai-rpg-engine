@@ -71,8 +71,10 @@ UI integration remains later work; P06.3 adds deterministic starting presentatio
 See [backend scope](backend/README.md#atomic-campaign-creation-p061).
 
 P06.5 now has admitted owner-scoped persisted adventure library/detail reads,
-including empty workspaces and distinct same-title identities. Browser library
-binding, managed specifications/media folders and complete QA-33 remain unfinished.
+including empty workspaces and distinct same-title identities. Optional private
+folders project sealed specifications/authored media and rebuild from PostgreSQL
+on restart. Browser library binding, generated media and complete QA-33 remain
+unfinished; see [workspace storage](docs/25-adventure-workspaces.md#2-separate-managed-folders).
 
 P06.4 adds admitted exact `status`/`stato` and `inventory`/`inventario`
 consultation reads. Responses separate transient typed passages from committed

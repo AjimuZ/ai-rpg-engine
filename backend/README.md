@@ -381,7 +381,7 @@ maximum 100), and never merges equal titles. Detail reads hide missing and
 foreign scopes behind the same 404. Reads use independent read-only snapshots;
 no global active adventure or world counters are changed. See the
 [API contract](../docs/13-api-and-ui.md#persisted-adventure-library-p065-checkpoint).
-No workspace creation or managed specification/media storage is added yet;
+Workspace creation and generated-media storage remain pending;
 the browser library still uses local preview fixtures.
 
 ## Exact consultations (P06.4)
@@ -404,3 +404,30 @@ Verified on 25 October 2026: all 300 packaged backend tests pass on pinned Java
 aliases, whole-database equality on progressed/depleted saves, admission/scope
 isolation and reconstruction across separate-JVM restart; repository checks pass.
 No separate Java style linter is configured; compilation supplies type checking.
+
+## Managed revision folders (P06.5 checkpoint)
+
+Set `ENGINE_WORKSPACES_ROOT` to an absolute, normalized private persistent path
+outside the source checkout. The default is disabled; no new mount or property is
+silently enabled in Compose. A packaged installation can use an owner-controlled
+subdirectory of the existing engine-only content volume, for example
+`/var/lib/engine/content/workspaces`, after checking its ownership and permissions.
+Never share it with the runtime or expose it as static web content.
+
+The optional component publishes sealed originals under
+`adventures/<adventure-id>/content-revisions/<revision-id>/`, separating
+`specification/` and `assets/authored/` and recording `integrity.json`. One atomic
+directory rename publishes the complete tree. Startup and post-commit import
+notifications verify or reconstruct one revision at a time; unchanged retries
+never rewrite files. PostgreSQL remains authoritative and database backups include
+all projected original bytes. A registration can commit before projection fails;
+repair the root and retry identical bytes or restart, never import a changed release
+as a workaround. Corrupt/extra files and static links fail closed without deletion.
+
+Use a single engine process and a private quiescent root. New POSIX paths use
+owner-only permissions; operators own existing-root permissions and Windows ACLs.
+Interrupted `.building-*` directories require offline inspection/cleanup. Existing
+partial published revisions require offline operator repair or an empty replacement
+projection root. No generated-art storage, file-serving route, browser switching,
+identity-remapped restore or full QA-33 acceptance is claimed. See the
+[workspace contract](../docs/25-adventure-workspaces.md#2-separate-managed-folders).

@@ -67,7 +67,12 @@ P06.5 adds `adventure.AdventureLibraryService` and its GET controller for
 persisted owner-scoped library metadata. It reuses the local admission boundary,
 which now protects all adventure routes, and independent read-only snapshots.
 No process-global active adventure is stored; campaign reads continue to require
-their explicit selected scope. Managed folders and frontend binding remain open.
+their explicit selected scope. `content.WorkspaceProjection` optionally consumes
+committed-registration notifications and reconciles startup into private revision
+folders through `RevisionFolders`. Files are derived from sealed PostgreSQL bytes,
+never another mutable authority; publication is an atomic directory rename. I/O
+failure after import cannot undo the database commit and is repaired by an identical
+retry after storage repair. Frontend binding and generated-media storage remain open.
 
 P04.1 adds a data-only manifest/parsing/hash stage in `content`, using fixed
 classpath schemas and no I/O ports. Its immutable `ParsedPack` is distinct from

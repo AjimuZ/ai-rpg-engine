@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.rpgengine.presentation.SupportedLocale;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -40,6 +41,7 @@ public class PackRegistry {
     private final TransactionTemplate transactions;
     private final TransactionTemplate reads;
     private final EngineContract contract;
+    private final ApplicationEventPublisher events;
     private final JsonMapper json = JsonMapper.builder().build();
 
     /**
@@ -48,9 +50,14 @@ public class PackRegistry {
      * @param jdbc PostgreSQL access
      * @param manager transaction manager shared with the canonical services
      */
-    @Autowired
     public PackRegistry(JdbcTemplate jdbc, PlatformTransactionManager manager) {
         this(jdbc, manager, EngineContract.current());
+    }
+
+    /** Wire committed-registration notifications in the application; listener failures propagate after commit. */
+    @Autowired
+    public PackRegistry(JdbcTemplate jdbc, PlatformTransactionManager manager, ApplicationEventPublisher events) {
+        this(jdbc, manager, EngineContract.current(), events);
     }
 
     /**
@@ -61,7 +68,14 @@ public class PackRegistry {
      * @param contract engine contract packs are compiled against and whose ruleset hash is recorded
      */
     PackRegistry(JdbcTemplate jdbc, PlatformTransactionManager manager, EngineContract contract) {
+        this(jdbc, manager, contract, event -> { });
+    }
+
+    /** Configure persistence and optional post-commit delivery; null infrastructure fails construction. */
+    private PackRegistry(JdbcTemplate jdbc, PlatformTransactionManager manager, EngineContract contract,
+            ApplicationEventPublisher events) {
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
+        this.events = Objects.requireNonNull(events, "events");
         this.contract = Objects.requireNonNull(contract, "contract");
         transactions = new TransactionTemplate(Objects.requireNonNull(manager, "manager"));
         transactions.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
@@ -106,13 +120,15 @@ public class PackRegistry {
      * @return the new or existing revision
      * @throws PackException on any blocking diagnostic; the transaction then writes nothing
      * @throws IllegalArgumentException when the adventure does not exist
+     * @throws java.io.UncheckedIOException when an enabled folder projection fails after commit;
+     *         the sealed revision remains registered and an identical retry reconciles its projection
      */
     public Registration register(UUID adventureId, PackStaging.StagedPack staged) {
         Objects.requireNonNull(adventureId, "adventureId");
         // Parsing and media checks are pure CPU work and run before any lock is taken.
         Prepared prepared = prepare(staged);
         requireNoTransaction();
-        return transactions.execute(status -> {
+        Registration result = transactions.execute(status -> {
             boundWaits();
             requireAdventure(adventureId, true);
             var parsed = prepared.parsed();
@@ -152,6 +168,10 @@ public class PackRegistry {
                     prepared.files().size(), prepared.totalBytes(), inspection.report(), inspection.exports());
             return new Registration(id, true, pack);
         });
+        // Never make private files visible for a transaction that might still roll back. Identical
+        // retries also notify: they repair a missing projection after a crash between these steps.
+        events.publishEvent(new RegisteredRevision(adventureId, result.revisionId()));
+        return result;
     }
 
     /**
@@ -525,4 +545,7 @@ public class PackRegistry {
      */
     public record Registration(UUID revisionId, boolean created, ContentRevision.PackCoordinates pack) {
     }
+
+    /** Internal committed identity notification; contains neither source bytes nor arbitrary filesystem paths. */
+    record RegisteredRevision(UUID adventureId, UUID revisionId) { }
 }

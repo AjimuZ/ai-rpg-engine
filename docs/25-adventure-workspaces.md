@@ -35,9 +35,11 @@ owned workspace. Both include empty workspaces and preserve separate identities
 for equal titles. Metadata excludes owner IDs, specifications and child records.
 Campaigns remain separately queried with an explicit adventure ID; reading or
 switching request scope never writes a process-wide active adventure. Workspace
-creation, managed folders, browser binding and complete QA-33 remain unfinished.
+creation, browser binding and complete QA-33 remain unfinished. The second
+checkpoint adds optional managed projections of sealed specifications and authored
+media, as described below; generated campaign media is still pending.
 
-The owner requires personalized adventures in parallel, each with its own specifications, content and media folders. An **adventure workspace** is not a quick-save slot. It owns an authored world/configuration and can contain multiple **campaigns** (playthroughs); each campaign can have checkpoints/backups. A reusable imported **pack** is a versioned content source, not the active adventure or a saved campaign. P03.1 delivers the storage foundation only: `adventure_workspace`, adventure-owned `content_revision`, `campaign` rows pinned to a revision of the same adventure, and `campaign_checkpoint` rows. Managed folders, the library UI, backups and workspace commands are not delivered.
+The owner requires personalized adventures in parallel, each with its own specifications, content and media folders. An **adventure workspace** is not a quick-save slot. It owns an authored world/configuration and can contain multiple **campaigns** (playthroughs); each campaign can have checkpoints/backups. A reusable imported **pack** is a versioned content source, not the active adventure or a saved campaign. P03.1 delivers the storage foundation only: `adventure_workspace`, adventure-owned `content_revision`, `campaign` rows pinned to a revision of the same adventure, and `campaign_checkpoint` rows. Subsequent checkpoints add library reads, database recovery and the optional folder projection below; workspace commands and real browser binding remain pending.
 
 The library's primary cards represent adventures. “New adventure” creates a workspace; “New playthrough” creates a campaign inside it; “Continue” resumes its selected campaign. Installed reusable packs are managed separately. Switching adventures never clones, resets or merges state.
 
@@ -84,11 +86,55 @@ P04.4 stores imported original files and sealed reports in PostgreSQL alongside
 their adventure-owned revision. Dependencies cannot resolve through another
 adventure. Re-import is idempotent for identical bytes and never replaces an
 existing release; campaigns retain their pinned revision. This bounded initial
-store is the authority included in database backups. The folder layout below
-remains planned; future managed-file storage must migrate bytes explicitly and
-preserve hashes/ownership, rather than introduce a second editable authority.
+store remains the authority included in database backups. P06.5 deliberately adds
+only a rebuildable private projection, not a migration of that authority. Moving
+canonical bytes out of PostgreSQL still requires an explicit migration preserving
+hashes, ownership and atomic visibility.
 
-Proposed layout under the owner's managed data root, outside the source checkout/container writable layer:
+Set `engine.workspaces.root` (environment `ENGINE_WORKSPACES_ROOT`) to an absolute,
+normalized private directory on persistent storage outside the checkout. Omitting
+the property disables projection and preserves database-only operation. Startup
+reconciles sealed revisions in bounded pages, one revision at a time; unsealed
+legacy metadata is ignored. Successful registration and identical retries also
+reconcile, after the database transaction commits. An I/O failure therefore leaves
+the admitted revision intact; repair the storage problem and retry the same bytes
+or restart. Neither workflow reads edits back from the projection.
+
+Implemented layout:
+
+```text
+<managed-root>/adventures/<adventure-id>/content-revisions/<revision-id>/
+  specification/<original-pack-relative-path>
+  assets/authored/<original-pack-relative-path>
+  integrity.json
+```
+
+The sealed file category selects the destination; original relative paths remain
+intact (an original `assets/map.png` becomes `assets/authored/assets/map.png`). The
+version-1 integrity manifest records adventure/revision IDs, aggregate content hash
+and each original path, destination, size and SHA-256. One atomic directory rename
+publishes the complete revision; unsupported atomic moves fail rather than degrade.
+Retries compare the exact tree and bytes without rewriting it. Missing *whole*
+revision directories rebuild; missing/extra/changed files inside a published
+revision fail closed, including an altered manifest or empty extra directory.
+
+All ancestors and entries reject static symbolic links, junctions/reparse nodes
+and special files. New POSIX directories/files use `0700`/`0600`; existing roots
+and Windows ACLs must be private and owner-controlled. Use one engine writer per
+root and keep it quiescent from external editors: portable JDK path operations
+cannot exclude an adversarial local process replacing an inspected ancestor.
+Failed unpublished `.building-*` directories remain private for offline operator
+inspection and are neither accepted nor automatically deleted. No power-loss
+fsync guarantee is claimed; PostgreSQL originals permit reconstruction.
+
+These files include private lore and are never mounted into the narration runtime,
+served as static web resources, or exposed by library GETs. They are not player
+exports. A database-only installation recovery with preserved IDs can rebuild an
+empty projection root; generated artwork, campaign directories, identity-remapped
+restores and complete QA-33 remain later work.
+
+Remaining campaign/specification-editing layout under the owner's managed data
+root, outside the source checkout/container writable layer (not yet implemented):
 
 ```text
 adventures/
@@ -159,4 +205,4 @@ the full workspace restore/remapping contract below remains P16.
 
 Full-owner backups preserve adventure configuration, admitted revisions, campaign data and artwork. Player-facing exports omit private specifications/notes. Restore previews show destination adventure/campaign identities and asset remapping; default to new identities instead of overwriting or merging by equal titles. Deliberate recovery validates existing associations/hashes. Deleting an adventure is a separate explicit owner action, never startup/retry behavior. Stopping one campaign must not kill another's unrelated work.
 
-QA-33 creates fantasy and cyberpunk adventures with equal NPC/item names but distinct secrets, inventory and art. Switch with pending replies, open tabs and late media events; verify no cross-world text, media, draft, memory, file or canonical effect. Purchase/equip in one leaves the other unchanged. Reboot/restore retains the correct directories and associations. These checks remain unimplemented.
+QA-33 creates fantasy and cyberpunk adventures with equal NPC/item names but distinct secrets, inventory and art. Switch with pending replies, open tabs and late media events; verify no cross-world text, media, draft, memory, file or canonical effect. Purchase/equip in one leaves the other unchanged. Reboot/restore retains the correct directories and associations. The complete scenario remains unverified; the optional P06.5 projection tests cover authored original-file isolation and fresh-JVM reconstruction only, not generated art or combined gameplay/browser/memory acceptance.

@@ -9,9 +9,17 @@ restart. Admission tests cover seven HTTP methods on the adventure subtree, incl
 invalid/future routes. The first two library regressions failed on missing routes
 before implementation. Repository policy tests pass all 22 cases; backup tests
 pass eight with one Windows symlink-privilege skip. No live restore rehearsal is
-claimed. This is persisted library API evidence only: managed specification/media
-folders, browser switching,
-draft/memory/artwork/job recovery and complete QA-33 remain unfinished.
+claimed by that first checkpoint. The second checkpoint adds optional private
+specification/authored-media projections; 13 focused tests pass, including same-title
+two-genre original bytes, idempotent retries/renames, post-commit storage failure,
+foreign revision scopes, exact inventory corruption, unsafe paths/static links,
+abandoned staging and fresh-JVM reconstruction into an empty root. The first new
+folder regression failed before implementation. The second full packaged build passes
+all 318 tests without failures/errors/skips. A live V10 backup/restore and fresh-JVM
+startup preserves all 32 canonical tables and reconstructs 34 byte-identical files
+and manifests for two same-title authored-content fixtures into an empty private root.
+Browser switching, generated artwork,
+draft/memory/job recovery and complete QA-33 remain unfinished.
 
 
 P06.1 delivers a creation acceptance corpus: pure allocation/minimum/budget/

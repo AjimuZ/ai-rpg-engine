@@ -929,8 +929,23 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     separate-JVM restart. Two new regressions first failed on missing routes.
     Repository policy tests pass all 22 cases; backup tests pass eight with one
     Windows symlink-privilege skip. No live restore rehearsal is claimed.
-    Managed specification/media folders, real browser switching and full QA-33
-    draft/memory/artwork/job restart/restore evidence remain unfinished.
+    This first checkpoint did not deliver managed folders or browser switching.
+  - Verified second partial checkpoint (25 October 2026): add opt-in private, atomic
+    specification/authored-media projections of sealed revisions, keyed by adventure
+    and revision UUIDs. PostgreSQL remains the sole authority; startup and identical
+    import retries rebuild missing projections. Changed/extra files, links and
+    scope mismatches fail closed. The initial two-genre folder regression failed
+    before implementation and passes afterward. All 13 focused tests pass, including
+    corruption/static links, post-commit storage failure and identical retry repair,
+    title renames and fresh-JVM reconstruction. Pinned Java 21/PostgreSQL 18.6
+    `clean verify -Ppackaged-ui` passes all 318 tests with no failures/errors/skips.
+    The shipped backup/restore tool plus fresh-JVM startup preserved all 32 canonical
+    tables and rebuilt 34 byte-identical files/manifests for two same-title genres
+    into an empty root. This rehearsal has authored originals, not gameplay memory,
+    drafts or generated media. Repository policy tests pass 22; backup tests pass
+    eight with one Windows symlink-privilege skip; repository scans have no findings.
+    Real browser switching, generated media, memory, owner-wide job limits and
+    complete QA-33 draft/artwork/job restart/restore evidence remain unfinished.
 
 **Exit:** two independent campaigns survive restart and read-only use changes no game counters. **Checks:** creation budget/loadout validation, ownership isolation, restart, and no-AI consultations. **Suggested commit:** `Add persistent campaigns and local RPG consultations`.
 

@@ -42,6 +42,15 @@ py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
 
 ## Limits
 
+P06.5 optional workspace folders contain derived copies of these sealed originals,
+not additional canonical data. Restore into a new offline database, then start
+the engine with `ENGINE_WORKSPACES_ROOT` pointing to an empty private persistent
+directory to reconstruct adventure/revision folders and integrity manifests with
+the preserved IDs. An existing complete projection is verified byte-for-byte;
+altered or partial published trees fail startup for offline operator repair.
+Generated campaign media and identity-remapped workspace restores remain outside
+this checkpoint. This does not change the database archive format or table scope.
+
 - The scope is the database only. Registered pack bytes (including declared assets
   and EN/IT resources), hashes, exports and immutable version 1/2 reports are included.
   External assets, unregistered pack directories and configuration are not included.
@@ -85,4 +94,10 @@ V10 scope also includes `campaign_known_fact` and `campaign_known_quest`, preser
 explicit actor audiences, fact confidence and known quest objectives/status.
 The exact migration/table regression check reproduced the P06.2 CI failure before
 this scope update; older schemas and unknown tables remain rejected. Offline
-checks cover the V10 manifest/catalog; a live V10 restore has not been rehearsed.
+checks cover the V10 manifest/catalog. The P06.5 rehearsal (25 October 2026)
+used the shipped backup/restore commands on PostgreSQL 18.6 with two same-title
+adventures and sealed fantasy/science-fiction imports. All 32 canonical tables
+matched the source after restore; a fresh JVM with an empty workspace root rebuilt
+34 byte-identical specification/artwork files and integrity manifests. The source
+database remained unchanged. This verifies V10 authored-content recovery, not
+populated gameplay memory, drafts, jobs or generated-media recovery under QA-33.
