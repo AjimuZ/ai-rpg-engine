@@ -24,6 +24,17 @@ is not a Maven execution, compilation or database-test result. The attempted
 Temurin metadata lookup returned HTTP 403; no JDK or database was provisioned.
 Resume only once the documented JDK and real disposable database are available.
 
+A verification entrypoint that calls `mvn` directly also requires the pinned Maven
+3.10.0 executable on its own `PATH`; a downloaded ZIP or a wrapper available only
+in another shell does not satisfy it. Packaged verification additionally requires
+`npm ci` and `npm run build:locales` in `frontend/` with the pinned Node/npm versions
+before building the backend. Preserve both locale bundles and extracted license
+notices. On the continuation environment, the direct packaged verification command
+fails with `mvn: not found`; frontend dependencies, compiled locale output and the
+three test datasource environment variables are absent too. Provision all these
+prerequisites before expecting a packaged backend verification result. Do not
+substitute an unpackaged run for the packaged gate.
+
 Provide a disposable PostgreSQL 18 database for tests and a separate database for
 manual development. Use the pinned `postgres:18.6-trixie` digest in
 [ADR 0009](../docs/adr/0009-toolchain-baseline.md). Supply Spring's environment

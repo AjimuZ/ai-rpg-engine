@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Packaged verification prerequisite audit, 26 October 2026
+
+- Clarify that direct Maven verification needs Maven 3.10.0 on its executing PATH
+  and that packaged verification needs the compiled bilingual interface and notices.
+- Confirm the existing 130-task dependency graph is valid, with all 40 completion
+  marks preserved. Toolchain, frontend-build and disposable-database prerequisites
+  remain unavailable; this audit does not repair the environment or complete P07.1.
+
 ## Unreleased — Backend prerequisite recovery diagnostics, 26 October 2026
 
 - Reproduce the missing-JDK wrapper failure and document the additional `unzip`

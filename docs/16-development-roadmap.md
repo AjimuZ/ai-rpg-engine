@@ -1014,6 +1014,13 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     HTTP 403, and no JDK or PostgreSQL service was provisioned. Recovery remains
     unresolved. Preserve all toolchain pins, prerequisites, draft files and task
     statuses; documentation/artifact checks do not replace backend verification.
+  - Follow-up prerequisite audit (26 October 2026): the installed dependency-graph
+    validator accepts all 130 tasks, preserves 40 checked items and confirms P07.1's
+    roadmap prerequisites are satisfied. No scheduling dependency needs alteration.
+    Direct packaged verification fails with `mvn: not found`; compiled EN/IT assets,
+    frontend dependencies and test datasource variables are also absent. Provision
+    the complete documented build environment before retrying; no backend compilation,
+    database verification or recovery success is claimed.
   - Resume with the documented JDK 21/Maven wrapper and disposable PostgreSQL 18.6
     test database. Complete bounded canonicalization, atomic journal/lease admission,
     owner-wide limits and scoped status reads; review all lease-grant paths and
