@@ -306,6 +306,11 @@ Show an optional recipient selector from permitted public identities, plus free 
 
 During an NPC activation or a pending operation, keep reading/drafting available and explain why Send is unavailable; never queue a draft for automatic submission on the next turn. A recipient can refuse or counteroffer. Agreement terms require an explicit player decision. Only an accepted receipt updates the battle, and a negotiated ending uses the usual settlement/return-to-story path. Rejection, clarification, stale revision, provider failure and committed-but-narration-pending states retain the draft/operation identity and a usable mechanical recap. Retry/reconnect/renewal cannot duplicate speech costs, checks, effects or settlement. Suggestions and recipient projections refresh with the encounter revision without silently replacing the player's draft.
 
+Optional [speech input](35-speech-input-and-hands-free-play.md) can prepare these
+same dialogue/action drafts, with voice-only preview, correction, confirmation and
+cancel. It cannot change turn eligibility, auto-submit next turn or force an NPC
+agreement. See section 13 for the proposed input boundary.
+
 This is a planned P11/P12 contract. The P05.1 preview shells do not implement playable combat chat.
 
 ## 8. Loading, empty, error, and recovery states
@@ -439,3 +444,47 @@ status is generic and public-safe; do not reveal a quest secret through queue
 labels or imply a future branch is guaranteed. Core play does not wait for
 advanced planning, illustrations or speech. See QA-35, QA-38, QA-40 and the
 [speech contract](30-local-speech-synthesis.md).
+
+## 13. Optional microphone input and hands-free interaction
+
+This is an unimplemented, disabled-by-default P17.8–P17.10 contract under
+[ADR 0022](adr/0022-optional-speech-input.md), distinct from TTS playback. The
+[STT specification](35-speech-input-and-hands-free-play.md) defines capture,
+recognition, EN/IT qualification, voice controls, privacy and QA-45. No concrete
+recognizer or audio transport/endpoint is selected here.
+
+The UI requires deliberate microphone enablement, selected device/input language,
+bounded push-to-talk or opt-in hands-free mode, visible/accessible listening and
+transcribing status, and independent microphone mute/stop. Typed controls remain
+complete. Speech prepares a labelled editable draft; silence, partial results and
+playback completion never submit. Consequential input requires a separate public
+action preview and explicit confirmation. Full hands-free support includes
+audible known costs/targets and voice-only repeat, correction and cancel; if
+audible output is unavailable, show the limitation and retain dictation/text.
+
+The future capture boundary uses existing admitted owner/session/origin controls
+and finite audio duration/byte/rate limits. Bind every session, utterance, chunk
+and result to adventure, campaign, capture generation and input locale; include
+sequence/finality and bounded transcript fields. Recognition results are transient
+input proposals, never `state.committed`, `speech.ready` or world operations.
+No raw paths, credentials, hidden actor vocabulary or arbitrary recognizer options
+are accepted. Raw audio is ephemeral and absent from ordinary history/exports.
+
+Confirmations reference an immutable preview identity, payload, expected revision
+and pending decision. Correction, scope/locale switch or stale state invalidates
+the old preview. The final command uses the existing command envelope and one
+durable `requestId`, with duplicate/conflict/receipt semantics unchanged. Audio
+retries and duplicate recognition results cannot generate new gameplay requests.
+Cancellation after submission uses the existing operation-cancel contract and
+reports committed effects accurately. No confirmation can override combat
+legality or queue an out-of-turn action.
+
+Stop capture on scope switch, permission/device loss, reload or disconnect;
+reconcile pending operations and require explicit resume. Reject stale results.
+Suspend recognition during TTS/readback and clear contaminated audio; mute
+soundtrack/effects during listening windows unless their isolation is qualified.
+Return to listening after bounded readback only in the same still-enabled scope;
+continuous music cannot block input indefinitely. Qualify interruption/echo
+separately before advertising it. Mic, worker or shared
+resource failure leaves the committed state and typed composer usable. All
+microphone, voice-only and audio/browser acceptance checks remain unrun.

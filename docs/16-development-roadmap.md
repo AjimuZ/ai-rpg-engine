@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 40/127 tasks verified.** The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5 and P06.1–P06.4. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 40/130 tasks verified.** The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5 and P06.1–P06.4. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -25,6 +25,17 @@ This is an ordered development roadmap, not a claim of committed delivery dates.
 Each work package must be split into small reviewable changes with one main objective. For each change record intended behavior, affected modules/files, required checks, documentation update, completion evidence, and a suggested English commit message. Source paths below describe **future** work; they are not folders scaffolded by this documentation phase.
 
 Do not commit, push, create a remote repository, or publish a release merely because a roadmap task mentions it. Those actions follow the owner's development/publication instructions when execution begins. As of 22 October 2026 the owner authorizes commits and pushes of verified implementation work to `main`, the project's single branch; releases and publication remain owner decisions. Each implementation commit names its roadmap item in a final `Roadmap: <item>` body line so progress can be traced to Git history ([contribution workflow](../CONTRIBUTING.md#git-workflow)).
+
+**Speech-input revision (26 October 2026):** the owner requests optional EN/IT
+[STT and hands-free play](35-speech-input-and-hands-free-play.md), including
+combat dialogue/commands, under [ADR 0022](adr/0022-optional-speech-input.md).
+Three unchecked tasks P17.8–P17.10 bring the queue from 127 to 130, preserving all
+40 verified boxes. Microphone enablement/status/mute, voice-only correction and
+confirmation, normal command authority/idempotency, echo suppression and scoped
+ephemeral audio are required before enabling a profile. Concrete recognition
+backend/model selection remains open. No implementation, installation, capture,
+performance or gameplay result is delivered. Full voice qualification is optional;
+QA-45's disabled/no-capture/text fallback remains required for release.
 
 ## 2. Milestones
 
@@ -1151,8 +1162,18 @@ this update. No combat runtime/browser result is claimed.
     same-name entities across switching, late job results and backup/restore.
     P06.5 covers authored artwork and presentation media at the MVP scope.
 - [ ] P17.7 Qualify optional local EN/IT speech with admitted model/voice licenses, stable voice identities, accepted-line audio caching and shared GPU limits under QA-38; ship disabled with tested text-only fallback if hardware/rights/quality gates fail. No TTS prerequisite for core v1.
+- [ ] P17.8 Research and qualify a concrete optional local EN/IT STT backend against exact code/weight/dependency rights, bounded capture/cancel interfaces, offline behavior, platform packaging and measured CPU/RAM/GPU/latency budgets; no recognizer is selected by the design alone.
+  **Requires tasks:** P21.4.
+- [ ] P17.9 Implement explicitly enabled scoped microphone capture, accessible listening/mute states, draft-only recognition, voice-only preview/correction/repeat/confirmation/cancel and normal command/receipt routing for exploration and combat; suppress playback echo and never auto-queue out-of-turn input.
+- [ ] P17.10 Run QA-45 in EN/IT with silence/noise/accent/negation, TTS/interruptions, duplicate audio/results/confirmations, reconnect/restart/cancel, same-name adventure isolation and shared-resource failures. Enable only the measured qualified profile, or record disabled capability and verified no-capture/complete typed fallback; do not claim unimplemented voice support.
 
-**Exit:** the graphical visual-novel UI, persistent identifying artwork and bounded image-job pipeline are verified; unsupported generation degrades accurately without blocking play. Optional dynamic music follows [its specification](24-dynamic-music-and-credits.md); no player or audio integration is delivered by adding that document. TTS is not required. **Checks:** QA-16, QA-19, QA-25, QA-29–32, actual visual review and asset/license inventory. **Suggested commit:** `Complete accessible presentation and optional atmosphere`.
+STT is separate from P17.7's TTS output. Dictation does not require TTS; claiming
+full hands-free play additionally requires admitted audible public previews and
+voice-only correction/confirmation. P17.8–P17.10 may conclude with a documented
+disabled disposition and tested fallback if qualification fails; this never
+counts as implementation of the disabled capability or blocks core text play.
+
+**Exit:** the graphical visual-novel UI, persistent identifying artwork and bounded image-job pipeline are verified; unsupported generation degrades accurately without blocking play. Optional dynamic music follows [its specification](24-dynamic-music-and-credits.md); no player or audio integration is delivered by adding that document. TTS and STT are optional; disabled/no-capture/text fallback is required. **Checks:** QA-16, QA-19, QA-25, QA-29–32, QA-45 at enabled or disabled scope, actual visual review and asset/license inventory. **Suggested commit:** `Complete accessible presentation and optional atmosphere`.
 
 ## 22. P18 — Full-engine hardening and balance
 
@@ -1164,6 +1185,9 @@ this update. No combat runtime/browser result is claimed.
 - [ ] P18.4 Profile queries, outbox, memory retrieval, context budgets, AI calls, and latency; optimize measured bottlenecks.
 - [ ] P18.5 Rehearse backup recovery, supported migrations, degraded provider mode, and owned-process shutdown.
 - [ ] P18.6 Record paired baseline/planner/reviewer comparisons in English and Italian at 100/500 turns, including agency, secrets, wasted work, latency/quota and recovery; publish unrun/unavailable narrative cells honestly under QA-39; benchmark optional speech/GPU under QA-38 only when enabling it.
+
+QA-45 adds mandatory disabled/no-capture/text fallback checks; full STT and
+hands-free measurements are conditional on enabling the optional profile.
 
 **Exit:** all v1 hard gates pass, balance limitations are published, and no integrity/security-critical defect remains open. **Suggested commit:** `Harden the complete engine for long campaigns`.
 
@@ -1220,6 +1244,7 @@ Scheduling: this package follows the core packages in roadmap order and gates P1
 | FR-038 | P08 (runtime-neutral port), P20; QA-42 |
 | FR-039 | P08 (slot-aware port), P21; QA-43 |
 | FR-040 | P17.6, P21; QA-44 |
+| FR-041 | Optional P17.8–P17.10, P18; QA-45; command/combat foundations P07/P11–P12 |
 | NFR-001–015 | Cross-cutting gates in P01, P03, P07–P09, P16–P19 |
 
 ## 26. Explicitly later initiatives

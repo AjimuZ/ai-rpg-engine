@@ -114,6 +114,14 @@ The player can keep talking and describing intentions inside combat through a pe
 
 The following are provisional default policies to implement and playtest, rather than demonstrated balance. Supported adventure profiles can configure their bounds while preserving the scheduler, explicit player decisions and deterministic authority.
 
+Optional [STT/hands-free input](35-speech-input-and-hands-free-play.md) prepares
+the same dialogue/action drafts. Consequential interpretations need a public
+known-cost/target preview and separate voice confirmation, with voice-only
+correction/cancel. Recognition, microphone controls and narration interruption
+cannot bypass this section's eligibility/costs or directly alter events. A
+draft recorded outside a player decision is never auto-submitted next turn.
+Voice input is disabled/unimplemented and requires QA-45 qualification.
+
 | Intent | Default resolution and cost |
 | --- | --- |
 | Brief speech without a mechanical benefit | One bounded utterance per player activation, 0 AP; persist the player's words and any admitted public reply without advancing initiative, world time or RNG. Enforce text/response bounds; this cannot repeat indefinitely or grant modifiers, reveal undiscovered facts or force cooperation. |

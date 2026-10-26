@@ -1,5 +1,10 @@
 # Optional Local Speech Synthesis
 
+This document covers TTS output. Optional microphone recognition and hands-free
+commands have a separate [STT specification](35-speech-input-and-hands-free-play.md)
+and [ADR 0022](adr/0022-optional-speech-input.md); no TTS candidate is selected as
+a recognizer, and playback must respect that specification's echo controls.
+
 ## 1. Status, scope and recommendation
 
 Research checked on 23 October 2026. This is an accepted **design for an optional feature**, under [ADR 0016](adr/0016-optional-local-speech.md), with a provisional model choice. No speech worker, model weights, voice samples, inference result, hardware benchmark or playback implementation is delivered by this documentation change. Repository/API inspection is evidence of available interfaces and published artifacts, not proof of installation, voice quality or performance on the owner's machine.

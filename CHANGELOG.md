@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — Speech input and hands-free play (documentation), 26 October 2026
+
+- Add [ADR 0022](docs/adr/0022-optional-speech-input.md) and the separate
+  [EN/IT STT specification](docs/35-speech-input-and-hands-free-play.md) for
+  optional spoken exploration and combat dialogue/commands. Existing local TTS
+  remains a distinct feature; the recognition backend/model is not selected.
+- Specify explicit microphone enablement/listening/mute, voice-only public
+  preview/correction/repeat/confirmation/cancel, normal command authority and
+  idempotency, decision boundaries, echo/interruption controls, ephemeral scoped
+  audio, shared-resource qualification and complete typed fallback.
+- Add FR-041, prospective QA-45, unchecked P17.8–P17.10 (127 to 130 tasks),
+  API/UX/security/risk and index/README crosslinks. Preserve all checked statuses.
+- No recognizer, capture transport, worker, microphone permission, gameplay
+  implementation, installation or performance/acceptance result is delivered;
+  optional voice remains disabled and unimplemented.
+
 ## Unreleased — Inference backends and model selection (documentation), 25 October 2026
 
 - Record the owner decision for free local models, API-key backends and owner-chosen model slots in [ADR 0021](docs/adr/0021-inference-backends-and-model-selection.md): a closed set of protocol adapters, an open set of models and endpoints, four slots (light, standard and deliberate text, and image), and recommended defaults that never restrict the owner.

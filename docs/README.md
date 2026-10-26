@@ -21,6 +21,7 @@ Requirements stated by the project owner are binding for this design. Technical 
 | [06 — Codex integration](06-codex-integration.md) | Process lifecycle, protocol contract, routing, security, and compatibility |
 | [33 — Claude runtime integration](33-claude-runtime-integration.md) | Selectable alternative to Codex: capability comparison, candidate launch profile, authentication and terms gates, limits, isolation evidence |
 | [34 — Inference backends and model selection](34-inference-backends-and-model-selection.md) | Free local models, API-key and custom backends, owner-assigned slots, hardware advisor, shared GPU admission, reference-host defaults |
+| [35 — Speech input and hands-free play](35-speech-input-and-hands-free-play.md) | Optional unimplemented EN/IT STT, explicit microphone controls, voice-only review/confirmation, exploration/combat commands, echo/privacy/resource gates and text fallback; backend unselected |
 | [07 — Turn protocol](07-turn-protocol.md) | Commands, transactions, retries, interruptions, and narration consistency |
 | [08 — Memory and continuity](08-memory-and-continuity.md) | Long sessions, context selection, renewal, summaries, and recovery |
 | [09 — Adventure packs](09-adventure-packs.md) | File-driven customization, formats, validation, import, and migrations |

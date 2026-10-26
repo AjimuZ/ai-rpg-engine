@@ -122,6 +122,14 @@ On the 12 GB host one heavy model is GPU-resident at a time. The coordinator of 
 
 Techniques to evaluate in P21 (none is a promised gain): prompt-cache reuse across turns with stable prefixes; constrained JSON with short `max_tokens` for light tasks; thinking only where it pays; quantized KV cache and flash attention; optional draft-model speculative decoding where spare VRAM exists; a warm-up request after reload; image step and resolution presets; idle-time pre-generation of likely portraits; skipping AI entirely for structured player actions.
 
+Optional [STT/hands-free input](35-speech-input-and-hands-free-play.md) also uses
+this shared CPU/RAM/GPU admission; it adds no selected backend or model slot here.
+P17.8 must qualify its exact recognition profile and finite audio buffers. Treat
+capture/confirmation work as bounded interactive demand alongside interactive
+text, without starving canonical work; suspend lower-priority media or disable
+recognition when measured headroom/latency cannot be met. TTS readback priority,
+echo suppression and any narration interruption require joint QA-45 evidence.
+
 ## 11. Privacy, classes and licenses
 
 | Class | Where data goes | Cost |

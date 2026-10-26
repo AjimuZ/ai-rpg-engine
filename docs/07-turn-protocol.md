@@ -17,6 +17,14 @@ Speaking to an in-world participant during a fight is a combat command, not a re
 
 ## 2. Operation lifecycle
 
+Optional [speech input](35-speech-input-and-hands-free-play.md) changes only the
+input modality: recognition and voice preview/correction are draft work, with no
+world operation. Explicit confirmation binds one current payload/decision to the
+same command acceptance and durable request identity below. Microphone silence,
+audio retries, playback, stale results and reconnect never submit. Out-of-turn
+spoken input cannot queue a later action or spend any combat resource. STT is
+unimplemented/disabled; its qualification is separate from TTS output.
+
 P06.2 HTTP state/continue and known-state/inventory/quest/ability reads use a
 consistent committed player snapshot with explicit scope/revision tokens. They
 create no operation, transcript, event, random draw or narration job. Continue

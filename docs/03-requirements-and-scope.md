@@ -54,6 +54,7 @@
 | FR-038 | Select the default narration runtime of an installation (Codex by default, Claude as an alternative) with no automatic failover; switch only through the launcher, retiring old AI sessions and rebuilding from checkpoints; slot overrides follow FR-039 | Codex only; the selection setting may exist | QA-42 proves contract parity on shared fixtures, refusal of unknown values and unsupported versions, no silent switch, switch and restart continuity, per-runtime sign-in and billing guards, and the terms-review gate |
 | FR-039 | Assign a backend and model to each logical slot (light, standard and deliberate text; image) from a closed set of protocol adapters and an open set of models and endpoints, with defaults recommended for the detected hardware, readiness probes, visible billing and privacy classes, and no hidden class change | Defaults for the reference host; local text slots | QA-43 proves slot assignment, advisor results on synthetic hardware profiles, probe gating, endpoint and secret safety, class acknowledgement and per-slot session retirement |
 | FR-040 | Provide free local text and image inference on the owner's GPU with hash-verified explicit model fetching, model servers without network egress, and bounded shared GPU and RAM admission with the speech service | Local text; image generation is v1 | QA-44 proves leases, reload and cache restore, interruption, contention handling, provenance, safe-content defaults and graceful text-only fallback, with measurements recorded on the reference host |
+| FR-041 | Optionally accept EN/IT speech input and hands-free exploration/combat dialogue and commands, with explicit microphone control and voice-only preview, correction, confirmation and cancel | Excluded | Optional v1: QA-45 before enabling; same authoritative command pipeline/idempotency/decision boundary, echo suppression, scoped ephemeral audio and complete typed fallback; recognition backend unselected |
 
 ## 3. Nonfunctional requirements
 
@@ -77,7 +78,7 @@
 
 ## 4. MVP exclusions
 
-The MVP does not include multiplayer, public hosting, arbitrary executable plugins, a visual editor, semantic embeddings, voice acting, live image generation, advanced political simulation, or compatibility with an external tabletop ruleset. It does include the data boundaries necessary for later optional modules.
+The MVP does not include multiplayer, public hosting, arbitrary executable plugins, a visual editor, semantic embeddings, voice acting, speech input/hands-free play, live image generation, advanced political simulation, or compatibility with an external tabletop ruleset. It does include the data boundaries necessary for later optional modules.
 
 The integrated editor is scheduled after core v1 in [its separate roadmap](26-adventure-editor-roadmap.md). Manual files already preserve authored facts/mandatory entities and permit completion of allowed gaps across genres. Default combat data is customizable within supported primitives/policies; a new scheduler or arbitrary code is not file/editor-only customization.
 
@@ -91,19 +92,22 @@ The default narrative UI and its graphic kit are MVP requirements. Bounded runti
 
 Two small neutral sample packs must demonstrate different genres, optional module selections, and vocabulary. They exist to prove reuse, not to establish a flagship canon. The original private campaign is neither a sample pack nor a public fixture.
 
+The owner also requests [optional STT and hands-free play](35-speech-input-and-hands-free-play.md) under [ADR 0022](adr/0022-optional-speech-input.md). It is distinct from TTS, disabled and unimplemented, with no concrete recognition backend selected. Full hands-free support requires qualified audible public previews and voice-only correction/confirmation/cancel; recognition only prepares drafts and cannot alter events or bypass normal combat rules. QA-45's disabled/no-capture/text fallback is required; full recognition qualification is conditional on enabling the feature.
+
 ## 6. Research revision priorities
 
 | Priority | Scope | Value, complexity and operating/verification cost |
 | --- | --- | --- |
 | MVP critical | EN/IT UI/receipts/narration, stable terminology, safe presentation cues and existing canonical/knowledge guarantees | High player value; medium localization/tooling cost; no mandatory extra translation/model-review call |
 | v1 critical | Durable jobs, role/audience boundaries, versioned plan/dependency admission and no-plan recovery; portable story bundles | High continuity/portability value; high transactional/security testing, bounded runtime overhead even with deep planning off |
-| v1 optional | Selective asynchronous investigation/quest plans, occasional director/reviewer, licensed local speech | Enable only on measured benefit and capability; higher inference/VRAM/voice/maintenance evaluation costs; failure never blocks play |
+| v1 optional | Selective asynchronous investigation/quest plans, occasional director/reviewer, licensed local TTS and separately qualified STT/hands-free play | Enable only on measured benefit and capability; higher inference/VRAM/voice/maintenance evaluation costs; failure never blocks play |
 | Post-v1 | Integrated editor E01–E06, broad political simulation, runtime pool, advanced realtime audio/voice design | More authoring/operational complexity; foundations do not require shipping these now |
 | Rejected as defaults | Omnipotent director, model-written canon/SQL, mandatory reviewer, continuous per-NPC inference, vector database without evidence, unrestricted voice/asset reuse | Breaks authority, agency, rights or budget constraints without demonstrated value |
 
 The [competitive/gap matrix](27-competitive-analysis-and-gaps.md) records
 per-feature dependencies, licensing and recommendations. The [planning](28-asynchronous-narrative-planning.md),
-[localization](29-localization.md), [speech](30-local-speech-synthesis.md) and
+[localization](29-localization.md), [speech synthesis](30-local-speech-synthesis.md),
+[speech input](35-speech-input-and-hands-free-play.md) and
 [evaluation](31-research-validation-and-evaluations.md) contracts refine these
 requirements. Source-inspected competitor behavior is not local implementation
 evidence. Optional capability qualification tasks may conclude disabled/deferred

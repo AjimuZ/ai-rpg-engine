@@ -269,6 +269,18 @@ compatibility and IDs, enforce existing archive limits and create fresh local
 identities. Do not transfer account credentials or private playthrough history
 with a reusable authored adventure. See [portable stories](09-adventure-packs.md#14-portable-stories-and-person-to-person-sharing).
 
+Optional [STT input](35-speech-input-and-hands-free-play.md) has a separate
+microphone boundary: explicit enablement and capture status, independent mute,
+bounded ephemeral audio, admitted owner/session/origin checks and no account or
+hidden-state access for the recognizer. Scope audio, vocabulary, drafts and late
+results by adventure/campaign/capture generation. Raw recordings stay out of
+ordinary logs, backups and exports; diagnostic retention requires separate opt-in.
+No silent browser/OS/cloud recognition fallback is allowed. Treat transcripts as
+untrusted drafts, bind explicit confirmations to one current preview, suppress
+engine playback echo and route only confirmed input through the existing command
+pipeline. Silence, reconnect or recognition failure cannot authorize a world
+change. QA-45 qualification is pending; capture remains unimplemented/disabled.
+
 Maintain supported engine, pack schema, ruleset, database, and narration runtime adapter compatibility tables (one per supported runtime). Back up before an upgrade that changes persistent formats. Unsupported inputs produce a controlled migration-required state. Do not silently downgrade content or rules.
 
 For a suspected incorrect action, preserve the operation receipt, source event references, and last good backup. Disable further mutation if invariants are violated. Use an explicit correction or restore after diagnosis. Do not edit event history to conceal the fault.

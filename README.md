@@ -127,8 +127,13 @@ the following targets without claiming implemented gameplay or benchmark
 superiority. English is the default and Italian is required from the first
 playable release. Important quests may receive [bounded background preparation](docs/28-asynchronous-narrative-planning.md)
 through safe durable jobs; ordinary narration and the no-plan baseline remain
-playable. [Local EN/IT speech](docs/30-local-speech-synthesis.md) is optional and
-requires model/voice rights, quality and hardware checks. Reusable story bundles
+playable. [Local EN/IT speech synthesis](docs/30-local-speech-synthesis.md) is optional and
+requires model/voice rights, quality and hardware checks. Separately planned
+[speech input and hands-free play](docs/35-speech-input-and-hands-free-play.md)
+cover exploration and combat dialogue/commands, explicit microphone controls and
+voice-only review/correction/confirmation through the normal command pipeline.
+Recognition remains disabled/unimplemented, its backend unselected and text play
+complete without it. Reusable story bundles
 can be imported/exported between people under the [pack contract](docs/09-adventure-packs.md#14-portable-stories-and-person-to-person-sharing);
 the integrated graphical editor remains a later initiative. No new feature,
 model installation or performance result is delivered by this documentation update.

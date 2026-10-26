@@ -188,6 +188,9 @@ Research-revision risks and defaults are tracked in the focused contracts:
 | Voice weights/recordings have separate restrictions or consent gaps | Conditional Qwen/Kokoro selection only after exact distributable/voice inventory; XTTS-v2 excluded from default commercial-compatible path | P17.7/P19.1, QA-38 |
 | RTX4070 OOM or local image/TTS contention | Hardware is unmeasured; bounded single-heavy-job admission, unload/CPU/text fallback and no mandatory speech startup | P17.7/P18.6 |
 | Shared story bundles leak private data or overwrite a recipient world | Export reusable authored content/rights only; preview, hostile-archive checks and fresh local identities | P16.2, QA-41, later E05–E06 |
+| Misrecognition, engine echo or duplicate audio submits unintended gameplay | Draft-only STT; explicit scoped microphone control; voice-only preview/correction/confirmation/cancel; playback suppression; same command receipts and decision legality, no out-of-turn queue | P17.8–P17.10, QA-45; disabled until qualified |
+| Microphone audio or vocabulary leaks across adventures or outbound services | Ephemeral bounded local capture/recognition, no silent remote fallback, scoped generations, no raw audio in ordinary logs/backups/exports and separate diagnostic opt-in | P17.8–P17.10, QA-45 |
+| Recognition latency or shared text/image/TTS load undermines hands-free play | Concrete STT backend remains open; qualify exact rights, EN/IT quality, packaging and measured resource/latency budgets; expose limitations and retain complete typed fallback | P17.8–P17.10, QA-45 |
 
 The [competitive matrix](27-competitive-analysis-and-gaps.md) distinguishes
 observed source, claims and design inferences. No upstream license or model
