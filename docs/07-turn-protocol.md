@@ -124,6 +124,14 @@ the pinned distribution hash to bypass it. Resume with the documented toolchain
 and disposable PostgreSQL 18.6 database from the [backend guide](../backend/README.md),
 then run the command tests and full verification before marking P07.1 complete.
 
+The recovery attempt on the same date reproduced the wrapper failure and found
+`unzip` and both external download helpers absent as well. A separate download of
+the exact Maven ZIP matched the committed SHA-256, ruling out a mismatch for those
+downloaded bytes. JDK acquisition did not succeed (the Temurin metadata endpoint
+returned HTTP 403), and no PostgreSQL service was provisioned. Recovery remains
+unresolved; no compilation, database race/recovery pass or task completion is
+claimed. See the [backend prerequisite diagnostics](../backend/README.md).
+
 ## 4. Planning and validation
 
 Capture a consistent state revision and assemble authorized context. Known structured actions bypass AI interpretation. Free text may need a Codex intent proposal. An ambiguous action that could spend a rare item, make a binding commitment, or affect several targets requires clarification before spending anything.

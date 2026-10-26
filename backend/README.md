@@ -7,6 +7,23 @@ wrapper's checksum-pinned ZIP. On Windows use `mvnw.cmd` instead of `./mvnw`.
 The enforcer rejects other JDK majors, Maven outside 3.10.x, snapshots, and dynamic
 versions. Library and plugin versions come from the Boot parent/BOM.
 
+Recovery prerequisite diagnostics (26 October 2026): the continuation environment
+cannot run the backend yet. Both `java` and `javac` must resolve to JDK 21 (or be
+available under `JAVA_HOME`); a JRE alone cannot satisfy the build. Provide `unzip`
+so the wrapper selects the pinned ZIP. `curl` or `wget` can download it; without
+both, the wrapper falls back to compiling and running its Java downloader. An
+installed standalone Maven is unnecessary when the wrapper prerequisites are met.
+
+If the wrapper reports missing Java followed by a distribution-checksum error,
+repair those prerequisites before diagnosing the archive. On this environment no
+downloader could execute. An independent download of the exact 3.10.0 ZIP was
+10,102,082 bytes and matched the committed SHA-256
+`1f6d9909266510f039f59aa0e13dcd2c66da85f043e56276e41f2918f8bddaff`.
+The checksum and version pins therefore remain unchanged. This artifact check
+is not a Maven execution, compilation or database-test result. The attempted
+Temurin metadata lookup returned HTTP 403; no JDK or database was provisioned.
+Resume only once the documented JDK and real disposable database are available.
+
 Provide a disposable PostgreSQL 18 database for tests and a separate database for
 manual development. Use the pinned `postgres:18.6-trixie` digest in
 [ADR 0009](../docs/adr/0009-toolchain-baseline.md). Supply Spring's environment

@@ -1008,6 +1008,12 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     before compilation because Java/javac is missing. This is a dependency blocker.
     Documentation checks pass: 22 repository policy tests, zero scan findings and
     a clean whitespace diff; these checks do not verify the Java implementation.
+  - Recovery checkpoint (26 October 2026): unchanged wrapper failure reproduced;
+    `unzip`, `curl` and `wget` are also absent. Independently downloaded Maven 3.10.0
+    ZIP bytes match the committed checksum. The Temurin metadata lookup returned
+    HTTP 403, and no JDK or PostgreSQL service was provisioned. Recovery remains
+    unresolved. Preserve all toolchain pins, prerequisites, draft files and task
+    statuses; documentation/artifact checks do not replace backend verification.
   - Resume with the documented JDK 21/Maven wrapper and disposable PostgreSQL 18.6
     test database. Complete bounded canonicalization, atomic journal/lease admission,
     owner-wide limits and scoped status reads; review all lease-grant paths and

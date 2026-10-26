@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Backend prerequisite recovery diagnostics, 26 October 2026
+
+- Reproduce the missing-JDK wrapper failure and document the additional `unzip`
+  prerequisite and Java download fallback in the backend guide.
+- Verify the downloaded Maven 3.10.0 ZIP against its unchanged committed checksum.
+  JDK acquisition and PostgreSQL provisioning remain unresolved; no compilation,
+  database verification or P07.1 completion is claimed. Preserve all task statuses
+  and the unfinished admission drafts.
+
 ## Unreleased — Command admission continuation review, 26 October 2026
 
 - Record the P07.1 draft review, candidate admission policy, integration concerns
