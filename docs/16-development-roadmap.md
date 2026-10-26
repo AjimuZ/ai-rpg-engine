@@ -999,6 +999,27 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 
 - [ ] P07.1 Implement durable idempotency with payload hashes, expected revision, lease/fencing, admission limits, and operation statuses.
   **Requires tasks:** P06.4.
+  - Continuation checkpoint (26 October 2026): the eight preserved Java drafts
+    match their migration manifest hashes and remain outside the source tree.
+    Admission, payload normalization and status lookup have been reviewed against
+    the existing commit/lease boundary; no P07.1 implementation or acceptance pass
+    is claimed. Java/JDK 21 is absent, Maven is not on PATH, and no PostgreSQL
+    tooling or Docker/Podman runtime is available. `./mvnw -B -ntp verify` stops
+    before compilation because Java/javac is missing. This is a dependency blocker.
+    Documentation checks pass: 22 repository policy tests, zero scan findings and
+    a clean whitespace diff; these checks do not verify the Java implementation.
+  - Resume with the documented JDK 21/Maven wrapper and disposable PostgreSQL 18.6
+    test database. Complete bounded canonicalization, atomic journal/lease admission,
+    owner-wide limits and scoped status reads; review all lease-grant paths and
+    direct-caller depth/size limits. Preserve existing revision/fence/recovery rules.
+    The [protocol checkpoint](07-turn-protocol.md#p071-continuation-checkpoint)
+    records the draft policy and remaining checks.
+  - Exit checks: real PostgreSQL duplicate/conflicting payload races, exact revision
+    rejection, rollback between journal insertion and lease grant, concurrent
+    cross-campaign owner limits, expired-holder commit/draw rejection, restart and
+    stored-result replay, and read-only owner-scoped status. Run focused command
+    tests and full backend verification, plus repository policy tests/scans; record
+    actual results and a neutral owner commit before checking this task.
 - [ ] P07.2 Implement typed commands and atomic semantic validation; reject generic field patches.
 - [ ] P07.3 Add resource, ownership, prerequisite, knowledge, and causal validation.
 - [ ] P07.4 Implement local action calculations, durable draws, events, receipts, and pending decisions.

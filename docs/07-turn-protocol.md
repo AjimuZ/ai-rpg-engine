@@ -78,6 +78,52 @@ P03.3 now adds the internal commit service, exact revision checks and durable ou
 Acceptance API, leases/fencing and gameplay authorization remain later tasks.
 See [domain constraints](05-domain-model.md#3-database-organization).
 
+### P07.1 continuation checkpoint
+
+On 26 October 2026, the preserved unfinished admission implementation was reviewed
+against the journal, canonical commit, mutation lease and startup recovery services.
+All eight draft files match their recorded migration hashes; none has been installed
+in the source tree. This is a review checkpoint, not an implemented API or a passing
+P07.1 result. The existing P03 transaction and recovery guarantees remain the baseline.
+
+The draft proposes a versioned SHA-256 canonical form containing command type,
+expected revision and payload; sorted object keys, exact string text, ordered arrays
+and distinct integer/decimal types define identity. It proposes replay before
+revision/busy/limit checks and one database transaction for journal insertion plus
+lease grant, with owner → campaign → journal/lease serialization. Its candidate
+limits are 32 KiB canonical data, two live campaign mutation permits per owner and
+a 180-second database-clock lease. These are unverified command-admission defaults;
+they do not change the separate single-active-inference-turn policy or grant
+background planners a campaign mutation lease. Status views omit internal permit
+tokens and unprojected receipt details.
+
+Before promoting the drafts, bound recursion and incremental allocation for direct
+Java callers as well as parsed input. The draft canonicalizer only checks length
+after appending values and relies on the HTTP parser for depth bounds; cyclic or
+deep in-memory containers therefore need explicit rejection. Check owner-wide
+accounting across every lease-grant path: the existing internal
+`MutationLeaseService.acquire` does not take the draft's owner admission lock or
+check its cap. Define and enforce which callers may acquire or reacquire permits
+before claiming that competing workers cannot exceed the limit. Retain immutable
+receipt replay before freshness checks and fail expired workers before new draws
+or canonical effects.
+
+Required verification includes concurrent matching and conflicting duplicates,
+revision changes, simultaneous admissions across an owner's campaigns, journal/lease
+rollback fault injection, expiry/takeover and old-worker commit/draw rejection,
+restart recovery, stored-result replay and owner-scoped status reads with no world
+changes. The preserved tests are a starting corpus, not evidence those gates passed.
+Typed semantic validation remains P07.2–P07.3, and stream/cancellation delivery remains
+P07.5; this checkpoint does not advance those tasks.
+
+The current continuation container has no Java/JDK 21, Maven executable, PostgreSQL
+tools or Docker/Podman runtime on PATH. The backend wrapper verification stops
+before compilation with missing Java/javac and a subsequent distribution-checksum
+validation error. That output does not establish a checksum mismatch; do not alter
+the pinned distribution hash to bypass it. Resume with the documented toolchain
+and disposable PostgreSQL 18.6 database from the [backend guide](../backend/README.md),
+then run the command tests and full verification before marking P07.1 complete.
+
 ## 4. Planning and validation
 
 Capture a consistent state revision and assemble authorized context. Known structured actions bypass AI interpretation. Free text may need a Codex intent proposal. An ambiguous action that could spend a rare item, make a binding commitment, or affect several targets requires clarification before spending anything.

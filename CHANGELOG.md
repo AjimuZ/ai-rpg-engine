@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Command admission continuation review, 26 October 2026
+
+- Record the P07.1 draft review, candidate admission policy, integration concerns
+  and explicit exit checks in the [turn protocol](docs/07-turn-protocol.md#p071-continuation-checkpoint)
+  and existing development roadmap.
+- Preserve all eight unverified drafts and the 40 checked task statuses. No command
+  implementation or controller is added. Backend verification cannot start without
+  JDK 21; a disposable PostgreSQL test service is also a required dependency.
+
 ## Unreleased — Speech input and hands-free play (documentation), 26 October 2026
 
 - Add [ADR 0022](docs/adr/0022-optional-speech-input.md) and the separate
