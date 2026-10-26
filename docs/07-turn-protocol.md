@@ -116,7 +116,7 @@ changes. The preserved tests are a starting corpus, not evidence those gates pas
 Typed semantic validation remains P07.2–P07.3, and stream/cancellation delivery remains
 P07.5; this checkpoint does not advance those tasks.
 
-The current continuation container has no Java/JDK 21, Maven executable, PostgreSQL
+The initial continuation container had no Java/JDK 21, Maven executable, PostgreSQL
 tools or Docker/Podman runtime on PATH. The backend wrapper verification stops
 before compilation with missing Java/javac and a subsequent distribution-checksum
 validation error. That output does not establish a checksum mismatch; do not alter
@@ -131,6 +131,19 @@ downloaded bytes. JDK acquisition did not succeed (the Temurin metadata endpoint
 returned HTTP 403), and no PostgreSQL service was provisioned. Recovery remains
 unresolved; no compilation, database race/recovery pass or task completion is
 claimed. See the [backend prerequisite diagnostics](../backend/README.md).
+
+A later owner-provisioned dependency recovery on 26 October 2026 passes the
+private helper's packaged backend verification with JDK 21.0.12.1, Maven 3.10.0
+and a separate disposable PostgreSQL 18.6 fixture: 318 tests, no failures, errors
+or skips. The 49 canonical commit cases exercise the existing concurrency,
+rollback, fencing, replay and recovery foundation. Frontend typechecking, 49 tests,
+four localization tests and the bilingual production build also pass. This
+supersedes the missing-toolchain blocker for the helper's scoped environment;
+the earlier failed attempts remain historical evidence. All eight admission
+drafts remain unchanged outside source, so P07.1 and its exit checks remain open.
+Use the verified helper described in the private handoff; the unscoped wrapper
+still lacks its ZIP extraction prerequisite. No version/checksum pin, test gate
+or runner configuration is changed. See the [recovery evidence](../backend/README.md).
 
 ## 4. Planning and validation
 

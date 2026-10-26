@@ -7,9 +7,9 @@ wrapper's checksum-pinned ZIP. On Windows use `mvnw.cmd` instead of `./mvnw`.
 The enforcer rejects other JDK majors, Maven outside 3.10.x, snapshots, and dynamic
 versions. Library and plugin versions come from the Boot parent/BOM.
 
-Recovery prerequisite diagnostics (26 October 2026): the continuation environment
-cannot run the backend yet. Both `java` and `javac` must resolve to JDK 21 (or be
-available under `JAVA_HOME`); a JRE alone cannot satisfy the build. Provide `unzip`
+Initial recovery prerequisite diagnostics (26 October 2026): the continuation
+environment could not run the backend at that checkpoint. Both `java` and `javac`
+must resolve to JDK 21 (or be available under `JAVA_HOME`); a JRE alone cannot satisfy the build. Provide `unzip`
 so the wrapper selects the pinned ZIP. `curl` or `wget` can download it; without
 both, the wrapper falls back to compiling and running its Java downloader. An
 installed standalone Maven is unnecessary when the wrapper prerequisites are met.
@@ -29,11 +29,35 @@ A verification entrypoint that calls `mvn` directly also requires the pinned Mav
 in another shell does not satisfy it. Packaged verification additionally requires
 `npm ci` and `npm run build:locales` in `frontend/` with the pinned Node/npm versions
 before building the backend. Preserve both locale bundles and extracted license
-notices. On the continuation environment, the direct packaged verification command
-fails with `mvn: not found`; frontend dependencies, compiled locale output and the
-three test datasource environment variables are absent too. Provision all these
-prerequisites before expecting a packaged backend verification result. Do not
+notices. At the initial continuation checkpoint, the direct packaged verification
+command failed with `mvn: not found`; frontend dependencies, compiled locale output
+and the three test datasource environment variables were absent too. Provision all
+these prerequisites before expecting a packaged backend verification result. Do not
 substitute an unpackaged run for the packaged gate.
+
+Verified dependency recovery (26 October 2026): the owner-provisioned private
+verification helper now loads JDK/javac 21.0.12.1, checksum-pinned Maven 3.10.0,
+Node 24.22.1/npm 11.19.1 and scoped datasource settings for a separate disposable
+PostgreSQL 18.6 fixture. Run its `frontend-install`, `frontend-typecheck`,
+`frontend-test`, `frontend-i18n` and `frontend-build` modes before `backend`.
+The helper executes each command in its module directory; backend uses
+`mvn -B -ntp verify -Ppackaged-ui`, retaining strict checksums and the Central-only
+mirror. Private helper paths and environment values belong in the recovery handoff,
+not source configuration. The owner stages runner environment/check activation at
+its next safe boundary; this recovery does not change that configuration.
+
+The actual helper passes typechecking, all 49 frontend tests, four localization
+checker tests, parity for 240 reviewed messages, both production locale bundles
+and all 318 backend tests with zero failures, errors or skips. The backend run
+compiles 111 production and 26 test sources and packages the executable jar.
+Its 49 canonical commit tests include duplicate races, transaction rollback,
+lease contention, expired-holder fencing, draw/receipt replay and restart recovery.
+These verify the existing foundations, not the eight uninstalled P07.1 drafts.
+The unscoped wrapper still fails distribution checksum validation; `unzip` remains
+absent, and the wrapper selects a tar archive when it is unavailable even though
+the committed checksum pins the ZIP. Keep the pins intact and use the verified
+private helper for this environment. Wrapper use still requires its documented
+ZIP extraction prerequisite; no wrapper pass or system-wide provisioning is claimed.
 
 Provide a disposable PostgreSQL 18 database for tests and a separate database for
 manual development. Use the pinned `postgres:18.6-trixie` digest in

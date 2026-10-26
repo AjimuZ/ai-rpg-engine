@@ -1021,6 +1021,18 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     frontend dependencies and test datasource variables are also absent. Provision
     the complete documented build environment before retrying; no backend compilation,
     database verification or recovery success is claimed.
+  - Verified dependency recovery (26 October 2026): the owner-provisioned private
+    helper executes with JDK/javac 21.0.12.1, Maven 3.10.0 and scoped settings for
+    a separate disposable PostgreSQL 18.6 fixture. Frontend installation,
+    typechecking, 49 tests, four localization tests, parity for 240 reviewed messages
+    and both production locales pass. Packaged backend verification compiles the
+    existing source and passes all 318 tests with zero failures/errors/skips,
+    including 49 canonical commit/lease/recovery cases. The missing-toolchain
+    blocker is repaired for that helper; the unscoped wrapper still requires
+    `unzip` for its pinned ZIP. Preserve prior recovery history and all eight
+    uninstalled drafts. This is prerequisite recovery, not P07.1 implementation or
+    acceptance. The owner controls activation of the staged runner environment
+    and checks; no runner configuration or task identity/status is changed.
   - Resume with the documented JDK 21/Maven wrapper and disposable PostgreSQL 18.6
     test database. Complete bounded canonicalization, atomic journal/lease admission,
     owner-wide limits and scoped status reads; review all lease-grant paths and

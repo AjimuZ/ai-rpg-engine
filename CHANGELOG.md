@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Verified development dependency recovery, 26 October 2026
+
+- Verify the owner-provisioned private JDK 21.0.12.1/Maven 3.10.0 environment and
+  disposable PostgreSQL 18.6 fixture through the scoped verification helper.
+- Install locked frontend dependencies, build both production locales and pass
+  typechecking, 49 frontend tests, four localization tests and all 318 packaged
+  backend tests without failures, errors or skips. Keep existing checks and pins.
+- Preserve earlier recovery failures, all eight unfinished drafts, 130 roadmap
+  tasks and 40 completion marks. P07.1 remains unimplemented and unchecked;
+  runner configuration activation stays owner-controlled. Document the remaining
+  unscoped wrapper ZIP extraction prerequisite separately from helper success.
+
 ## Unreleased — Packaged verification prerequisite audit, 26 October 2026
 
 - Clarify that direct Maven verification needs Maven 3.10.0 on its executing PATH
