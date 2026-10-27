@@ -119,6 +119,15 @@ a campaign lock. Lock/statement/transaction bounds remain 2/5/10 seconds. These 
 mutation limits, independent of runtime inference/job permits; background planners
 obtain no campaign mutation permit through this change.
 
+The owner lock serializes admission with renewal, but does not extend a lease's
+lifetime. A renewal must still satisfy the database-time expiry predicate after
+obtaining that lock, even if the request began while its permit was live. The
+PostgreSQL acceptance corpus forces expiry during actual lock contention in both
+acquisition orders: the late renewal fails and another campaign can consume the
+expired slot without exceeding the owner cap. See the
+[acceptance evidence](15-quality-and-acceptance.md) for the injected boundary and
+remaining gameplay/delivery scope.
+
 Status and identical retries return detached journal progress, base/committed
 revision, operation version and timestamps. They perform no recovery or world write,
 and reveal no payload, payload hash, internal receipt, draw, holder or fence. An

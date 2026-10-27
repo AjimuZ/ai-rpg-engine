@@ -1,5 +1,41 @@
 # Quality Strategy and Acceptance Criteria
 
+P07.1 acceptance verification (27 October 2026): the preserved implementation
+is committed in `174be3e`; fresh scoped verification passes **96 focused command
+cases and all 359 packaged backend cases in 29 suites**, with zero failures,
+errors or skips. The focused breakdown is 10 canonical-form, 26 admission,
+five HTTP, 49 canonical commit, five lifecycle and one resolved-plan case.
+All task-specific duplicate/conflict, exact-revision, rollback, owner-capacity,
+fencing, restart, stored-result replay and read-only scope gates pass.
+
+Two added PostgreSQL cases close the previously documented renewal/admission
+expiry-interleaving gap. A bounded JDBC gate pauses the first transaction after
+its real owner-row lock; `pg_blocking_pids` confirms the competing transaction
+is waiting. A separate committed fixture update expires the original permit before
+either caller proceeds. Both lock acquisition orders reject the expired renewal,
+admit the competing campaign exactly once and retain exactly two live permits,
+without adding events or draws or changing the expired operation's status/fence.
+Expiry is injected through the database rather than relying on wall-clock scheduling;
+production lock timeouts and SQL remain unchanged. The existing tests cover live
+renewal at capacity, takeover fencing and immutable old-result replay.
+
+The configured finite independent checks pass frontend installation, typechecking,
+49 frontend tests, four localization tests, parity for 240 messages, both production
+locales, packaged backend verification and zero-finding repository scans. All
+22 repository-policy tests pass. The installed dependency validator accepts all
+130 task identities with P07.1 prerequisites satisfied; only P07.1 advances beyond
+the preserved 40-task baseline. Original inputs and all eight migration hashes
+remain intact. Source/external roadmaps are synchronized and no publication occurs.
+The session executes the selected commands directly; final runner admission remains
+the runner's responsibility and its configuration/state is not modified.
+
+This completes the P07.1 admission/status boundary. Typed gameplay execution,
+public receipt projection, browser submission and streaming/cancellation remain
+P07.2–P07.5. The application-context restart evidence is not a separate new JVM-kill
+experiment, and fixture persistence across a Docker restart remains owner-reported.
+The following dated checkpoints preserve earlier failures and recovery history;
+their unchecked statuses and noted expiry coverage gap describe those earlier runs.
+
 P07.1 dependency recovery (27 October 2026): after the owner restored the isolated
 PostgreSQL fixture, the unchanged-source DNS reproduction probe succeeds rather
 than reproducing the historical failure. A separate TCP probe and fresh real

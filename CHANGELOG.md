@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Complete durable command admission, 27 October 2026
+
+- Finish P07.1 from the preserved implementation in `174be3e`, retaining versioned
+  payload hashes, exact revisions, atomic journal/lease admission, fencing,
+  owner-wide limits and scoped read-only operation statuses.
+- Add two real PostgreSQL concurrency cases for lease expiry during renewal and
+  admission in both owner-lock acquisition orders; reject expired renewal while
+  reusing capacity without exceeding the two-permit limit.
+- Pass 96 focused command tests and all 359 packaged backend tests, with zero
+  failures/errors/skips. Pass frontend installation/typechecking, 49 tests, four
+  localization checks, both locale builds and 22 repository-policy tests with
+  zero scan findings. Synchronize both roadmaps and preserve prior recovery
+  evidence and original drafts. Keep typed execution and delivery in later tasks.
+
 ## Unreleased — Restored command verification, 27 October 2026
 
 - Independently verify the owner-restored disposable PostgreSQL fixture: scoped

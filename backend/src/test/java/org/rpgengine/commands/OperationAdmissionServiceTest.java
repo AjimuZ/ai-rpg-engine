@@ -12,6 +12,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import jakarta.persistence.EntityManager;
@@ -31,6 +32,7 @@ import org.rpgengine.presentation.SupportedLocale;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -418,6 +420,109 @@ class OperationAdmissionServiceTest {
         assertThrows(IllegalStateException.class, () -> leases.renew(scope.adventure(), scope.campaign(),
                 first.operation().operationId(), first.lease().token(), Duration.ofSeconds(300)));
         assertEquals(2, livePermits());
+    }
+
+    /**
+     * Force expiry while two real transactions contend for the owner lock, in both
+     * acquisition orders. A renewal that started while live must recheck database time
+     * after waiting; even a renewal already holding the owner lock cannot revive the
+     * expired slot. The competing campaign may reuse that slot exactly once.
+     *
+     * <p>The gate pauses immediately after the first owner lock, before either caller
+     * locks a campaign. The test connection commits expiry only after PostgreSQL reports
+     * the second caller blocked, avoiding timing guesses about which transaction won.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void expiryDuringRenewalAdmissionContentionCannotExceedCapacity(boolean renewalFirst) throws Exception {
+        var old = submit(scope.campaign(), command("old", 0, Map.of()));
+        submit(addCampaign(scope, "occupied"), command("occupied", 0, Map.of()));
+        UUID third = addCampaign(scope, "contender");
+        var locked = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var contenderPid = new AtomicInteger();
+        var firstJdbc = ownerLockBoundary(() -> {}, () -> {
+            locked.countDown();
+            awaitGate(release);
+        });
+        var secondJdbc = ownerLockBoundary(() -> contenderPid.set(
+                jdbc.queryForObject("select pg_backend_pid()", Integer.class)), () -> {});
+        var renewing = new MutationLeaseService(renewalFirst ? firstJdbc : secondJdbc, manager);
+        var admitting = new OperationAdmissionService(entities, renewalFirst ? secondJdbc : firstJdbc, manager);
+        Callable<Object> renewal = () -> {
+            var failure = assertThrows(IllegalStateException.class, () -> renewing.renew(scope.adventure(),
+                    scope.campaign(), old.operation().operationId(), old.lease().token(), Duration.ofSeconds(300)));
+            assertEquals("mutation lease lost", failure.getMessage());
+            return failure;
+        };
+        Callable<Object> admission = () -> admitting.submit(scope.owner(), scope.adventure(), third,
+                command("contender", 0, Map.of()));
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var first = pool.submit(renewalFirst ? renewal : admission);
+            awaitGate(locked);
+            var second = pool.submit(renewalFirst ? admission : renewal);
+            // The normal production lock timeout remains 2s. Observe an actual wait
+            // within 1s; unexpected failures/timeouts fail this test rather than skip it.
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+            boolean blocked = false;
+            while (System.nanoTime() < deadline) {
+                if (contenderPid.get() != 0 && Boolean.TRUE.equals(jdbc.queryForObject(
+                        "select cardinality(pg_blocking_pids(?)) > 0", Boolean.class, contenderPid.get()))) {
+                    blocked = true;
+                    break;
+                }
+                Thread.sleep(10);
+            }
+            assertTrue(blocked, "second transaction must wait on the owner lock before expiry");
+            expire(scope.campaign());
+            release.countDown();
+            Object firstResult = first.get(10, TimeUnit.SECONDS);
+            Object secondResult = second.get(10, TimeUnit.SECONDS);
+            var accepted = (OperationAdmissionService.Admission) (renewalFirst ? secondResult : firstResult);
+            assertFalse(accepted.replayed());
+            assertEquals(2, livePermits());
+            assertEquals(3, count("operation_journal"));
+            assertEquals(old.lease().token().fence(), jdbc.queryForObject(
+                    "select fence from campaign_mutation_lease where campaign_id = ?", Long.class, scope.campaign()));
+            // Capacity checks do not retire another campaign's journal or renew its permit.
+            assertEquals(old.operation(), admissions.status(scope.owner(), scope.adventure(),
+                    scope.campaign(), old.operation().operationId()));
+            assertEquals(0, count("campaign_event"));
+            assertEquals(0, count("operation_random_draw"));
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    /** Execute bounded test gates around the real owner-row lock on the transaction's connection. */
+    private JdbcTemplate ownerLockBoundary(Runnable before, Runnable after) {
+        return new JdbcTemplate(java.util.Objects.requireNonNull(jdbc.getDataSource())) {
+            @Override
+            public <T> List<T> query(String sql, RowMapper<T> mapper, Object... args) {
+                boolean ownerLock = sql.startsWith("select id from identity_owner_profile");
+                if (ownerLock) {
+                    before.run();
+                }
+                List<T> result = super.query(sql, mapper, args);
+                if (ownerLock) {
+                    after.run();
+                }
+                return result;
+            }
+        };
+    }
+
+    /** Fail a stalled/interrupted test gate promptly while preserving the worker's interrupt flag. */
+    private static void awaitGate(CountDownLatch gate) {
+        try {
+            assertTrue(gate.await(5, TimeUnit.SECONDS), "owner-lock test gate timed out");
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("owner-lock test gate interrupted", failure);
+        }
     }
 
     /** Fail both at lease SQL and at deferred COMMIT: no journal, permit or cleanup write may escape. */

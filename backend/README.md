@@ -1,5 +1,18 @@
 # Backend development shell
 
+P07.1 acceptance verification (27 October 2026): continue the preserved
+implementation from owner commit `174be3e` and pass 96 focused command tests plus
+all 359 packaged backend tests in 29 suites on the isolated PostgreSQL 18.6 fixture,
+with zero failures, errors or skips. Two new cases force lease expiry during actual
+renewal/admission owner-lock contention in both acquisition orders. The expired
+renewal fails and the competing campaign takes the available slot without exceeding
+the two-live-permit cap. Production behavior and toolchain pins are unchanged.
+The configured finite independent checks also pass frontend installation,
+typechecking, 49 tests, four localization checks and both production locales.
+See the [acceptance evidence](../docs/15-quality-and-acceptance.md) for scope and
+limits. The recovery checkpoints below are historical, including their then-current
+unchecked task status; they do not describe a current dependency blocker.
+
 Restored-fixture verification (27 October 2026): the owner restored the isolated
 PostgreSQL service. A fresh scoped DNS/TCP check now succeeds; the unchanged private
 helper passes all 94 focused command tests and all 357 packaged backend tests with

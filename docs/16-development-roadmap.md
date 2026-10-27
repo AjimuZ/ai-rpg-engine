@@ -997,8 +997,21 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 
 **Depends on:** P03, P04; uses completed P06.1–P06.4 campaign foundations, not P06.5 isolation acceptance. **Areas:** commands, rules, operation API, outbox.
 
-- [ ] P07.1 Implement durable idempotency with payload hashes, expected revision, lease/fencing, admission limits, and operation statuses.
+- [x] P07.1 Implement durable idempotency with payload hashes, expected revision, lease/fencing, admission limits, and operation statuses.
   **Requires tasks:** P06.4.
+  - Acceptance verification (27 October 2026): continue the implementation already
+    committed in `174be3e`; 96 focused command tests and all 359 packaged backend
+    tests in 29 suites pass on PostgreSQL 18.6, with zero failures/errors/skips.
+    Two new cases force expiry during real renewal/admission owner-lock contention
+    in both acquisition orders, closing the earlier unforced interleaving gap.
+    Frontend installation/typecheck, 49 tests, four localization tests, both locale
+    builds, 22 repository-policy tests and zero-finding scans pass. Run the unchanged
+    selected independent commands directly; leave final runner admission to the
+    runner without altering its state/configuration. Preserve all original inputs,
+    eight migration hashes and prior recovery history. Only P07.1 may advance;
+    typed execution and presentation delivery retain the follow-on scope below.
+    Earlier unchecked checkpoints record their historical status, not a current
+    dependency blocker. See [evidence scope](15-quality-and-acceptance.md).
   - Restored-fixture recovery (27 October 2026): the owner restored the disposable
     PostgreSQL service; fresh DNS/TCP checks, 94 focused command tests and all 357
     packaged backend tests pass with zero failures/errors/skips. Frontend typecheck,
