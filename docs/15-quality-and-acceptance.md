@@ -34,9 +34,12 @@ policy tests pass with zero scan findings. This establishes the P07.2 typed/comm
 semantic boundary toward QA-04/05/17/18/20. It does not claim complete QA-05 item/
 ability/knowledge authorization, an executed gameplay action, public receipts,
 browser submission, delivery/cancellation, or live inference. Detailed rules remain
-P07.3, local calculations/execution P07.4 and stream/cancellation P07.5. Only P07.2
-is eligible for the next completion mark after its neutral implementation commit;
-P07.1's committed verified baseline and all original migration drafts are preserved.
+P07.3, local calculations/execution P07.4 and stream/cancellation P07.5. The neutral implementation owner commit is `05f5ba7`; only P07.2 now gains a
+completion mark after the passing exit checks. Preserve P07.1's verified baseline,
+all 130 imported task identities/titles and eight original migration drafts. The
+external roadmap already contained one additional pending P98 requested-changes
+entry at session start; retain it verbatim in both roadmaps (131 entries total,
+42 complete), without checking or rescheduling it.
 
 P07.1 acceptance verification (27 October 2026): the preserved implementation
 is committed in `174be3e`; fresh scoped verification passes **96 focused command

@@ -14,6 +14,9 @@
   validation boundaries. Pass configured frontend checks, both locale builds and
   all 22 repository-policy tests with zero scan findings. Keep detailed resource/
   prerequisite/knowledge/causal rules and execution in P07.3–P07.4.
+- Record implementation owner commit `05f5ba7` before marking P07.2 complete.
+  Preserve all imported task identities/statuses and the pre-existing pending
+  external P98 follow-up, synchronizing it into the source roadmap.
 
 ## Unreleased — Complete durable command admission, 27 October 2026
 

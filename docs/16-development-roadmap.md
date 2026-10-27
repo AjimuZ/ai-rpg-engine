@@ -1098,7 +1098,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     stored-result replay, and read-only owner-scoped status. Run focused command
     tests and full backend verification, plus repository policy tests/scans; record
     actual results and a neutral owner commit before checking this task.
-- [ ] P07.2 Implement typed commands and atomic semantic validation; reject generic field patches.
+- [x] P07.2 Implement typed commands and atomic semantic validation; reject generic field patches.
   - Package A — closed intention contracts: sealed exploration `MOVE`, `WAIT` and
     `SPEAK` types with exact bounded payloads, no arbitrary patches/effects/batches,
     and immutable canonical input shared by hashing and decoding. Preserve historical
@@ -1114,8 +1114,11 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     the scoped JDK 21/PostgreSQL 18.6 fixture. Configured frontend installation,
     typechecking, 49 tests, four localization tests, 240-message parity and both
     locale builds pass; all 22 repository-policy tests and zero-finding scans pass.
-    Preserve the repaired compile-attempt history in the quality evidence; record
-    the implementation commit before adding this task's completion mark.
+    Implementation owner commit: `05f5ba7`; all exit checks passed before this
+    completion mark. Preserve the repaired compile-attempt history in the quality
+    evidence. Synchronize the pre-existing pending P98 requested-changes entry from
+    the external roadmap; all 130 imported tasks and that pending follow-up retain
+    their identities/titles, and only P07.2 gains a completion mark.
   - Exit checks: pure closed-payload/coercion/bounds/patch corpus; real PostgreSQL
     no-write rejection snapshots, old-request replay, mutable-input freezing, owner/
     player/recipient scope, mode/decision drift between admission and commit, actual
