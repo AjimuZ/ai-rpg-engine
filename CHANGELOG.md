@@ -18,6 +18,8 @@
   boundaries. Pass configured frontend checks, both locale builds and all 22
   repository-policy tests with zero scan findings. Calculations and execution
   remain P07.4.
+- Record implementation owner commit `1b9b0ee` before marking P07.3 complete;
+  correct the roadmap status summary to 43 of 131 entries.
 
 ## Unreleased — Typed commands and atomic semantic validation, 27 October 2026
 

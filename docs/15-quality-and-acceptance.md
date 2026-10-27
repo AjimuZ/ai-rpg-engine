@@ -38,7 +38,9 @@ tests, 240-message parity and both locale builds pass, as do all 22 repository-p
 tests and zero-finding scans. This adds ownership/prerequisite/knowledge/resource/
 causal evidence toward QA-05 and QA-20; it does not claim item authorization (no
 item intention exists yet), executed actions, public receipts, delivery or live
-inference. Calculations and execution remain P07.4.
+inference. Calculations and execution remain P07.4. The neutral implementation
+owner commit is `1b9b0ee`; every check above passed on that exact tree, and only
+P07.3 then gains a completion mark (43 of 131 roadmap entries).
 
 P07.2 independent re-verification (27 October 2026): the first completion report
 listed two superseded compile attempts and one superseded audit run as failed
