@@ -79,3 +79,15 @@ to all internal acquisition/renewal paths. Classify retirement and busy with one
 captured database timestamp so expiry between statements cannot strand an old active
 journal. Status reads expose detached progress only, never permit capabilities or
 unprojected receipts. Typed semantics and execution workers remain later tasks.
+
+P07.2 implementation decision (27 October 2026): use a sealed intention vocabulary
+with closed payloads rather than a configurable field/effect patch registry. Start
+with exploration movement, bounded waiting and addressed speech; unsupported actions
+fail closed. Hash and decode one frozen canonical byte snapshot, then check current
+mode, decision, immutable creation player and recipient scope under the admission
+lock. At canonical commit require matching immutable typed intention evidence for
+registered player operations and recheck common semantics before effects. Keep the
+trusted internal compatibility constructors for non-player foundation operations;
+no HTTP or planning-artifact route accepts resolved plans. Preserve matching historic
+admission/receipt replay before newer policy checks. Add no migration or executor;
+detailed rule validation and local resolution remain P07.3–P07.4.

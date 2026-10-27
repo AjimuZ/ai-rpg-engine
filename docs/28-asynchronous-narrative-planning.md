@@ -207,6 +207,13 @@ Then, in a short admission transaction, lock/recheck the campaign generation and
 
 At **actual use**, the normal [command transaction](07-turn-protocol.md#5-canonical-commit) checks its exact current `expectedRevision`, campaign mutation fence, actor eligibility, relevant plan dependencies, constraints and resources again. Only that transaction can admit a proposed canonical definition/fact, adopt a pending event, reveal evidence or apply a consequence. Background dependency-sensitive validation does not weaken the existing exact-revision requirement for game actions. If state changes after validation, the command's second check wins.
 
+P07.2 implements the common typed activation gate for the currently registered
+exploration intentions. A resolver must bind its intention to the admitted request
+hash and recheck mode, pending decision and creation-player/recipient scope inside
+canonical commit. A validated artifact cannot supply generic patches or bypass that
+gate. Resource, prerequisite, knowledge and causal rules remain P07.3; typed plan
+activation and complete QA-36 remain P07.6. No new background world writer is added.
+
 ## 8. Plans, pending events, knowledge and canon
 
 | Data class | Authority and permitted use |

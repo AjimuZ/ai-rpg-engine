@@ -1,5 +1,43 @@
 # Quality Strategy and Acceptance Criteria
 
+P07.2 verification (27 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks
+pass **131 focused command cases and all 394 packaged backend cases in 31 suites**,
+with zero failures, errors or skips. The focused breakdown is 14 typed-contract,
+20 typed-validation, ten canonical-form, 26 admission, six command HTTP, 49 canonical
+commit, five lifecycle and one resolved-plan case. Full verification packages the
+executable application. Two initial compile attempts exposed a related multi-catch
+and a test-fixture factory-signature error; both were corrected before the passing
+focused/full runs. They were ordinary failed verification attempts, not intentional
+failing-baseline evidence.
+
+The closed-shape corpus rejects unknown/unsupported types, generic and nested field
+patches, extra effects/costs/actor fields, bad UUIDs, decimal/string integer coercion,
+invalid Unicode and bounds violations. PostgreSQL snapshots prove rejection writes
+no canonical state, journal, cleanup, permit, event or draw. Current mode, exact
+supported pending-decision shape, immutable creation-player binding and recipient
+campaign scope are checked in admission; missing legacy players fail closed.
+
+Typed final commit requires matching owner/request/type/revision/hash evidence,
+rejects omission through the legacy constructor and repeats current eligibility
+before effects. Two real contention cases hold the campaign row, observe a blocked
+backend with `pg_blocking_pids`, then commit a mode change before admission or final
+commit obtains the lock. Both reject under unchanged production timeouts, without
+partial writes. Separate cases cover a mutable caller map after hashing, historical
+opaque-request replay/conflicts, eligibility drift, durable reserved-draw retention,
+a valid cost followed by an invalid resource effect, and exact stored receipt replay
+after current eligibility changes. Existing canonical fault-injection, owner-cap,
+lease expiry, restart and idempotency tests remain passing.
+
+Frontend locked installation/typechecking, 49 tests, four localization tests,
+parity for 240 messages and both production locale builds pass. All 22 repository
+policy tests pass with zero scan findings. This establishes the P07.2 typed/common
+semantic boundary toward QA-04/05/17/18/20. It does not claim complete QA-05 item/
+ability/knowledge authorization, an executed gameplay action, public receipts,
+browser submission, delivery/cancellation, or live inference. Detailed rules remain
+P07.3, local calculations/execution P07.4 and stream/cancellation P07.5. Only P07.2
+is eligible for the next completion mark after its neutral implementation commit;
+P07.1's committed verified baseline and all original migration drafts are preserved.
+
 P07.1 acceptance verification (27 October 2026): the preserved implementation
 is committed in `174be3e`; fresh scoped verification passes **96 focused command
 cases and all 359 packaged backend cases in 29 suites**, with zero failures,

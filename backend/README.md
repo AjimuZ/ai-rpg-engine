@@ -536,3 +536,36 @@ partial published revisions require offline operator repair or an empty replacem
 projection root. No generated-art storage, file-serving route, browser switching,
 identity-remapped restore or full QA-33 acceptance is claimed. See the
 [workspace contract](../docs/25-adventure-workspaces.md#2-separate-managed-folders).
+
+## Typed intentions and atomic common semantics (P07.2)
+
+New command admission accepts only the closed immutable `MOVE`, `WAIT` and `SPEAK`
+intention payloads in the [turn protocol](../docs/07-turn-protocol.md#p072-typed-intentions-and-atomic-common-semantics).
+It rejects unknown types, generic/nested patches, effect/cost fields and unsupported
+mode/decision/player/recipient state before journaling or granting capacity. Decode
+and hash one bounded canonical byte snapshot so mutable Java callers cannot change
+the validated payload while waiting for a lock. Preserve historical matching replay.
+
+Trusted resolvers pass `CommandIntent` in the full `ResolvedCommit` constructor.
+Registered player operations require matching request/type/revision/hash evidence
+and repeat common semantic checks inside canonical commit. Omitting evidence fails
+before world effects. Internal non-player foundation operations retain their trusted
+compatibility constructors. No new HTTP controller, migration or worker is added.
+An admission is not an executed action: resource/prerequisite/knowledge/causal rules,
+local calculations, mechanical receipts and delivery remain P07.3–P07.5.
+
+`TypedCommandTest` covers closed shape, bounds, coercion, unknown types and immutable
+hash evidence. `TypedCommandValidationTest` uses real PostgreSQL for rejection
+no-write snapshots, scoped actors, unsupported decisions/modes, frozen direct input,
+legacy replay, commit revalidation, draw retention and multi-effect rollback. Both
+admission and commit contention cases observe a real PostgreSQL blocker before a
+concurrent mode change commits. Run these with the existing command corpus and
+full packaged backend verification; repository checks remain required.
+
+Verified on 27 October 2026 with the unchanged scoped JDK 21.0.12.1/Maven 3.10.0
+and disposable PostgreSQL 18.6 fixture: 131 focused command cases and all 394
+packaged backend cases in 31 suites pass with zero failures/errors/skips. The
+executable jar is packaged. Configured frontend checks, EN/IT builds, 22 repository
+policy tests and zero-finding scans also pass. Two earlier compile attempts failed
+on a related multi-catch and test factory signature; both were repaired before
+these passing runs. See [evidence scope](../docs/15-quality-and-acceptance.md).

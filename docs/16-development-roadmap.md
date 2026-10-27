@@ -1099,6 +1099,30 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     tests and full backend verification, plus repository policy tests/scans; record
     actual results and a neutral owner commit before checking this task.
 - [ ] P07.2 Implement typed commands and atomic semantic validation; reject generic field patches.
+  - Package A — closed intention contracts: sealed exploration `MOVE`, `WAIT` and
+    `SPEAK` types with exact bounded payloads, no arbitrary patches/effects/batches,
+    and immutable canonical input shared by hashing and decoding. Preserve historical
+    matching replay before current registration checks; unsupported actions fail closed.
+  - Package B — atomic common semantics: validate mode, supported pending decision,
+    immutable creation-player binding and campaign-scoped speech recipient under the
+    admission lock before journal/lease writes. Require hash-bound `CommandIntent`
+    evidence and repeat eligibility inside canonical commit; reject omitted/mismatched
+    evidence for registered player operations. Keep rule/resource/knowledge/causal
+    validation and execution in P07.3–P07.4; no executor or browser submission is added.
+  - Verified evidence (27 October 2026): all 131 focused command cases and all
+    394 packaged backend cases in 31 suites pass with zero failures/errors/skips on
+    the scoped JDK 21/PostgreSQL 18.6 fixture. Configured frontend installation,
+    typechecking, 49 tests, four localization tests, 240-message parity and both
+    locale builds pass; all 22 repository-policy tests and zero-finding scans pass.
+    Preserve the repaired compile-attempt history in the quality evidence; record
+    the implementation commit before adding this task's completion mark.
+  - Exit checks: pure closed-payload/coercion/bounds/patch corpus; real PostgreSQL
+    no-write rejection snapshots, old-request replay, mutable-input freezing, owner/
+    player/recipient scope, mode/decision drift between admission and commit, actual
+    campaign-lock contention at both boundaries, draw retention, multi-effect rollback
+    and immutable committed replay. Run focused commands, full packaged backend and
+    repository policy tests/scans; record actual results and a neutral owner commit
+    before checking this task.
 - [ ] P07.3 Add resource, ownership, prerequisite, knowledge, and causal validation.
 - [ ] P07.4 Implement local action calculations, durable draws, events, receipts, and pending decisions.
 - [ ] P07.5 Add resumable public stream, cancellation race handling, and post-commit presentation jobs.
@@ -1351,3 +1375,10 @@ Scheduling: this package follows the core packages in roadmap order and gates P1
 Semantic retrieval/pgvector after retrieval evidence; visual authoring editor after core v1; advanced voice design/fine-tuning or true streaming after separate rights/quality/runtime proofs; alternative combat schedulers and grid maps; public multiplayer hosting; online marketplace/hosted sharing infrastructure; generic AI providers (beyond the closed protocol set of ADR 0020 and ADR 0021); a ComfyUI workflow adapter, multi-GPU or remote GPU scheduling, model training or fine-tuning, and automatic model downloads; mobile-native or desktop packaging. Each needs its own scope, design, risks, and roadmap. None is an implicit requirement for the complete initial engine. Bounded runtime image generation is in v1 under ADR 0011; local EN/IT speech is independently optional under ADR 0016. Portable story-file exchange is a v1 P16 requirement and does not require a hosted marketplace.
 
 The owner explicitly requests the integrated text/graphical adventure editor **after core v1**. Its ordered [E01–E06 roadmap](26-adventure-editor-roadmap.md) covers world/history/requirements, mandatory characters, author-fixed versus generatable gaps, fantasy/cyberpunk content, supported combat-profile controls and validate/publish/migrate previews. It is deliberately outside P00–P19 and does not delay the initial engine release. Fixed author constraints and bounded combat customization remain file-contract requirements now; the future editor writes that same contract. QA-34 validates those semantics independently of an editor UI.
+
+## 99. P98 — Requested project changes
+
+**Depends on:** none.
+
+- [ ] P98.225128809311715153591895101169653028529 Review requested project changes.
+  **Complexity:** complex; assess requested requirements and verification impact.

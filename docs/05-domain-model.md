@@ -132,6 +132,25 @@ unfinished intent: restart does not automatically rerun a command. See the
 [admission contract](07-turn-protocol.md#p071-durable-admission) for normalization,
 bounds, expiry classification and the later semantic/worker boundary.
 
+### Typed command boundary (P07.2)
+
+The sealed exploration intention types (`MOVE`, `WAIT`, `SPEAK`) are closed data,
+not generic entity patches. The acting character derives from immutable
+`campaign_creation`, not a submitted actor ID or display name. A new command's
+canonical byte snapshot is both hashed and decoded; input mutation cannot cause
+one payload to be journaled while another is validated. Typed/common semantic
+checks and journal/lease admission share the campaign lock and transaction.
+
+Registered player commits additionally require immutable `CommandIntent` evidence
+matching the journal's owner scope, request, type, revision and payload hash. Current
+mode/decision/player/recipient eligibility is rechecked in the canonical transaction;
+a prior admission is never unconditional authorization. Historical matching retries
+and committed receipt replay remain read-only and precede newer eligibility checks.
+No schema migration, fabricated legacy player binding or background-artifact world
+write is added. Detailed resource/ownership/prerequisite/knowledge/causal checks and
+local action calculation remain P07.3–P07.4. See the [closed payloads and transaction
+contract](07-turn-protocol.md#p072-typed-intentions-and-atomic-common-semantics).
+
 ### Campaign creation (P06.1)
 
 V9 introduces `character_state`, `item_instance`, `learned_ability` and immutable

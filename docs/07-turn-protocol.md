@@ -76,7 +76,7 @@ receipt and revision; other statuses carry neither. Once recorded, neither commi
 field can change, and terminal statuses cannot reopen. These are database bounds;
 P03.3 now adds the internal commit service, exact revision checks and durable outbox.
 P03.5 supplies leases/fencing and P07.1 supplies owner-scoped admission/status;
-typed gameplay authorization and semantic resolution remain later tasks.
+typed/common gameplay authorization is supplied by P07.2 below; detailed rule validation and resolution remain P07.3–P07.4.
 See [domain constraints](05-domain-model.md#3-database-organization).
 
 ### P07.1 durable admission
@@ -139,10 +139,72 @@ defines the bounded envelope, scope and stable error codes.
 
 P07.1 installs admission/status only: there is no gameplay execution worker or
 payload persistence for resuming unfinished intent. A lost permit eventually fails
-before commit; an identical retry never recreates it. Typed command registration,
-mode/actor/semantic checks, public mechanical receipt projection, browser submission,
-streaming and cancellation remain the subsequent P07 tasks. No accepted command
-in this checkpoint claims an executed game action or a runtime request.
+before commit; an identical retry never recreates it. P07.2 adds the typed/common
+semantic boundary below. Detailed rule resolution, public mechanical receipt
+projection, browser submission, streaming and cancellation remain subsequent work.
+Admission alone never claims an executed game action or a runtime request.
+
+### P07.2 typed intentions and atomic common semantics
+
+`TypedCommand` is a sealed, immutable vocabulary. A proposal contains an intention,
+never a resource delta, field assignment, receipt, reward, dice result, executable
+callback or arbitrary effect list. The initial exploration registry is deliberately
+small; each new action must add an explicit type, closed payload and current-state
+validator. Unsupported actions, including item/ability/trade/combat actions, fail
+closed until their contracts and rule services are implemented.
+
+| Type | Exact payload | Structural bounds |
+| --- | --- | --- |
+| `MOVE` | `destinationId` | Nonblank stable content reference, at most 256 UTF-16 units |
+| `WAIT` | `seconds` | Exact JSON integer, 1..86,400 |
+| `SPEAK` | `recipientActorId`, `text` | Canonical UUID and nonblank text, at most 4,000 UTF-16 units |
+
+Text remains exact: no trimming, Unicode normalization or decimal/string coercion.
+The wait cap is an input ceiling, not permission to advance a day. Reachability,
+legal duration, recipient knowledge/range and other resource/prerequisite/causal
+rules remain P07.3 and P10.4; calculations and execution remain P07.4. No worker
+currently turns an admitted intention into effects. An `ACCEPTED` result means
+only durable admission after the checks implemented here.
+
+Admission hashes a bounded canonical byte snapshot before locking. Under the
+existing owner → campaign order it authorizes scope, replays/conflicts an existing
+request, checks the exact revision, then decodes **those same bytes** and runs
+`CommandSemantics` before cleanup, journal insertion or permit grant. A direct Java
+caller mutating its input map during lock contention cannot change the validated
+intention without changing its hash. Fresh unknown types, missing/extra fields,
+nested patches, batches and client-selected actor/effect/cost fields are rejected
+as a whole. Matching pre-registry requests still replay their stored progress,
+without executing or authorizing their old payload; changed duplicates conflict
+before current registry checks.
+
+Common semantic validation requires `EXPLORATION`, either a null decision or the
+exact supported version-1 starting marker, and the `CHARACTER` actor bound by the
+immutable campaign-creation receipt. The server selects this player; a request
+cannot nominate a different actor. Legacy campaigns without that binding and
+unknown/future pending decisions fail closed. Addressed speech additionally requires
+a recipient in the same campaign. All encounter intentions are rejected until the
+encounter scheduler can validate decision ownership and costs; speech gains no
+special bypass. Rejections roll back the whole admission transaction, including
+any cleanup, and consume no request identity or permit.
+
+Trusted resolution carries `CommandIntent` with owner, request, revision and a sealed
+typed intention into `ResolvedCommit`. For registered player operations the canonical
+transaction requires that evidence to match the journal's type/request/hash and
+rechecks owner scope and current common semantics under its campaign lock, after
+revision/operation/fence checks and before changing entities. An earlier valid
+admission is not a reusable authorization stamp. Omitting or changing the evidence
+cannot use the compatibility constructor to bypass validation. The legacy internal
+resolved-plan constructors remain for trusted non-player operations; neither those
+constructors nor resolved effects are exposed over HTTP or to narrative planners.
+Local resolution, not the intention, remains responsible for choosing all effects.
+
+All effects still share one canonical transaction. A later invalid resource effect
+rolls back an earlier valid cost, counters, events, settlements, receipt, outbox and
+lease release. Prior durable draw reservations remain independent and unchanged.
+Matching committed receipt replay precedes current eligibility checks, since replay
+cannot perform new effects. Background artifacts never enter this path as world
+facts: their activation must construct an ordinary typed command and pass the same
+current-state gate ([planning admission](28-asynchronous-narrative-planning.md#7-dependency-sensitive-staleness-and-admission)).
 
 ### P07.1 continuation checkpoint
 
@@ -284,8 +346,8 @@ by a 2-second lock timeout, a 5-second statement timeout and a 10-second transac
 timeout. Plans allow at most 128 resources, 128 events (at least one), 128 settlements
 and 32 KiB receipt details; existing stored JSONB limits remain authoritative.
 
-This internal primitive does not accept player/model proposals directly. Command
-semantic authorization, encounter checks, cancellation coordination and outbox
+This internal primitive does not accept player/model proposals directly. P07.2 supplies common typed authorization for registered player operations. Detailed
+rule/resource validation, encounter checks, cancellation coordination and outbox
 dispatch remain later roadmap tasks. P07.1 admission and P03.5 leases/fences/startup
 recovery now protect the durable operation boundary. New domain effect types must join the same explicit commit path.
 

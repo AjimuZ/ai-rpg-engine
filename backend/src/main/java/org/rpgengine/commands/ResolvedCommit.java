@@ -17,7 +17,9 @@ import org.rpgengine.progression.RewardSettlement;
  * an arbitrary patch/callback. Context identifies the admitted operation; world,
  * resource deltas, events and settlements describe its resolved effects. Receipt
  * details must already be owner-safe. Construction rejects malformed/oversized input;
- * current state and database JSON validity are rechecked during commit.
+ * current state and database JSON validity are rechecked during commit. Registered
+ * player commands also require immutable typed intent bound to the admitted hash;
+ * internal legacy operations retain their separate trusted construction contract.
  *
  * <p>No executable work can be supplied: inference and other network preparation must
  * finish before this value enters the commit service. Later rule modules extend the
@@ -27,7 +29,7 @@ import org.rpgengine.progression.RewardSettlement;
  */
 public record ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources,
         List<Event> events, List<Reward> rewards, String receiptDetails, boolean narrationRequired,
-        Preparation preparation) {
+        Preparation preparation, CommandIntent intent) {
     /** Copy bounded lists to freeze the plan; reject duplicate resource effects and missing events. */
     public ResolvedCommit {
         Objects.requireNonNull(context, "context");
@@ -48,10 +50,20 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
         CanonicalValues.requireJsonObject(receiptDetails, "receiptDetails", 32_768);
     }
 
+    /**
+     * Compatibility constructor for trusted internal operations outside the player registry.
+     * Registered player commands require the full constructor's typed evidence at commit;
+     * omitting it cannot bypass semantic validation.
+     */
+    public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
+            List<Reward> rewards, String receiptDetails, boolean narrationRequired, Preparation preparation) {
+        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, preparation, null);
+    }
+
     /** Build a commit without preparation intents (no epoch bumps, no critical jobs). */
     public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
             List<Reward> rewards, String receiptDetails, boolean narrationRequired) {
-        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, Preparation.NONE);
+        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, Preparation.NONE, null);
     }
 
     /** Return a defensive copy of at most limit non-null entries; fail before taking any locks. */

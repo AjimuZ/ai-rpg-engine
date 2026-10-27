@@ -30,8 +30,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * requests consume nothing and may be retried with a new request identity. Identical
  * retries are recognized before any stale/busy/limit check, so a lost HTTP response is
  * always answered with the original operation even after the campaign moved on. Command
- * semantics (typed registry, mode legality, pending decisions) belong to P07.2; this
- * service stores only the canonical hash, never the payload itself.
+ * semantics use a closed typed vocabulary and current mode/decision/player checks. This
+ * service stores only the canonical hash, never the payload itself; resolution is separate.
  */
 @Service
 public class OperationAdmissionService {
@@ -49,7 +49,7 @@ public class OperationAdmissionService {
      * operation fails before commit at the next admission or startup reconciliation.
      */
     public static final Duration LEASE = Duration.ofSeconds(180);
-    /** Upper-case wire identifiers; semantic registration of each type is P07.2 work. */
+    /** Upper-case envelope syntax; the closed typed registry is checked after matching replay. */
     private static final Pattern COMMAND_TYPE = Pattern.compile("[A-Z][A-Z0-9_]{0,63}");
 
     private final EntityManager entities;
@@ -80,16 +80,16 @@ public class OperationAdmissionService {
      * Admit one command or replay its earlier admission.
      *
      * <p>Order of checks (all under the campaign lock): scope, request identity
-     * (replay/conflict), expected revision, retirement of expired permits and of
-     * pre-commit operations without a live permit, campaign busy, owner admission limit,
+     * (replay/conflict), expected revision, typed/common semantic validation, retirement
+     * of expired permits and pre-commit operations without a live permit, campaign busy, owner admission limit,
      * then journal insert plus lease grant.
      *
      * @param owner locally admitted owner
      * @param adventure adventure that must own the campaign
      * @param campaign target campaign
-     * @param command validated envelope
+     * @param command structurally validated envelope; typed meaning is checked atomically for new requests
      * @return the durable operation view; a new admission also carries its lease grant
-     * @throws OperationAdmissionFailure for scope, conflict, stale, busy or limit outcomes
+     * @throws OperationAdmissionFailure for scope, conflict, stale, typed/semantic, busy or limit outcomes
      * @throws IllegalArgumentException if the command cannot be canonicalized within bounds
      * @throws IllegalStateException if called inside an ambient transaction
      * @throws org.springframework.dao.DataAccessException for lock/statement timeouts or storage failures
@@ -100,11 +100,12 @@ public class OperationAdmissionService {
         Objects.requireNonNull(campaign, "campaign");
         Objects.requireNonNull(command, "command");
         // Hash before opening the transaction so CPU work never extends lock hold time.
-        String hash = CommandCanonicalForm.sha256(CommandCanonicalForm.encode(command.commandType(),
-                command.expectedRevision(), command.payload(), MAX_CANONICAL_BYTES));
+        byte[] canonical = CommandCanonicalForm.encode(command.commandType(),
+                command.expectedRevision(), command.payload(), MAX_CANONICAL_BYTES);
+        String hash = CommandCanonicalForm.sha256(canonical);
         // The permit must be durable before the caller can act on it (same rule as MutationLeaseService).
         MutationLeaseService.requireNoTransaction();
-        return transaction.execute(status -> admit(owner, adventure, campaign, command, hash));
+        return transaction.execute(status -> admit(owner, adventure, campaign, command, hash, canonical));
     }
 
     /**
@@ -139,7 +140,7 @@ public class OperationAdmissionService {
     }
 
     /** Transaction body of {@link #submit}; any exception rolls back every write made here. */
-    private Admission admit(UUID owner, UUID adventure, UUID campaign, Command command, String hash) {
+    private Admission admit(UUID owner, UUID adventure, UUID campaign, Command command, String hash, byte[] canonical) {
         jdbc.execute("set local lock_timeout = '2s'");
         jdbc.execute("set local statement_timeout = '5s'");
         OwnerMutationAdmission.lockOwner(jdbc, owner);
@@ -165,6 +166,11 @@ public class OperationAdmissionService {
         if (revision.getFirst() != command.expectedRevision()) {
             throw new OperationAdmissionFailure(OperationAdmissionFailure.Kind.STALE_REVISION);
         }
+
+        // Decode the frozen hash input, never a mutable map that may have changed while
+        // waiting for locks. Replay above intentionally preserves historical admissions.
+        TypedCommand intention = TypedCommand.decode(canonical);
+        CommandSemantics.requireEligible(jdbc, owner, adventure, campaign, intention);
 
         Instant now = jdbc.queryForObject("select clock_timestamp()", (row, index) -> row.getTimestamp(1).toInstant());
         // One database cutoff classifies both cleanup and busy. If a lease lapses

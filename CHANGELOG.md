@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Typed commands and atomic semantic validation, 27 October 2026
+
+- Admit a closed immutable exploration vocabulary for movement, bounded waiting and
+  addressed speech. Reject unknown types, generic/nested field patches, batches,
+  effect/cost fields and coercion; hash and validate one frozen canonical snapshot.
+- Validate current mode, supported decision and creation-player/recipient scope in
+  the admission transaction. Require matching typed intention evidence and repeat
+  common semantics inside canonical commit; preserve historical admission/receipt
+  replay, durable draws and atomic multi-effect rollback.
+- Pass 131 focused command cases and all 394 packaged backend tests in 31 suites,
+  with zero failures/errors/skips, including real campaign-lock contention at both
+  validation boundaries. Pass configured frontend checks, both locale builds and
+  all 22 repository-policy tests with zero scan findings. Keep detailed resource/
+  prerequisite/knowledge/causal rules and execution in P07.3–P07.4.
+
 ## Unreleased — Complete durable command admission, 27 October 2026
 
 - Finish P07.1 from the preserved implementation in `174be3e`, retaining versioned

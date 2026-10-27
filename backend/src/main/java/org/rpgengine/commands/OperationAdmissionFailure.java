@@ -3,10 +3,10 @@ package org.rpgengine.commands;
 import java.util.Objects;
 
 /**
- * Expected outcome of command admission or operation lookup. The message
+ * Expected outcome of command admission, common semantic validation or operation lookup. The message
  * is fixed per kind and never contains caller input, SQL or row identities, so adapters
- * can map {@link #kind()} to a stable public code. Every failure rolls back the admission
- * transaction: no journal row, lease change or recovery write survives a rejection.
+ * can map {@link #kind()} to a stable public code. Every failure escapes the calling
+ * admission or canonical transaction: no journal row, lease change or recovery write survives a rejection.
  * Busy/limit outcomes can be retried once capacity is available; stale/conflicting
  * commands require explicit correction rather than automatic submission against new state.
  */
@@ -40,6 +40,14 @@ public final class OperationAdmissionFailure extends RuntimeException {
         /** Another operation holds the live campaign mutation lease; nothing is queued (HTTP 409). */
         CAMPAIGN_BUSY,
         /** The owner already runs the maximum number of concurrently leased operations (HTTP 429). */
-        ADMISSION_LIMIT
+        ADMISSION_LIMIT,
+        /** Unknown type, malformed typed payload or attempted generic effect/field patch (HTTP 422). */
+        INVALID_COMMAND,
+        /** No registered intention is eligible in the current scheduling mode (HTTP 422). */
+        MODE_ILLEGAL,
+        /** The stored pending decision has no supported input contract (HTTP 422). */
+        DECISION_UNAVAILABLE,
+        /** Missing creation player or missing/foreign action recipient (HTTP 422). */
+        ACTOR_UNAVAILABLE
     }
 }

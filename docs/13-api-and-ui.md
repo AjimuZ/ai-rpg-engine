@@ -210,8 +210,10 @@ for chunked input. The object has exactly `requestId`, `expectedRevision`,
 `commandType` and object-valued `payload`. Revisions are nonnegative exact JSON
 integers within signed 64-bit range; decimals/strings are not coerced. Type syntax
 is `[A-Z][A-Z0-9_]{0,63}`. Unknown envelope fields, duplicate keys, invalid UTF-8,
-multiple documents and malformed UUIDs fail before storage. Payload meaning and
-registered command types remain P07.2; syntax acceptance is not action legality.
+multiple documents and malformed UUIDs fail before storage. For new requests, P07.2 applies the closed `MOVE`/`WAIT`/`SPEAK` payloads and
+transactional eligibility checks in the [turn protocol](07-turn-protocol.md#p072-typed-intentions-and-atomic-common-semantics).
+Unknown types, arbitrary patches, extra/missing fields and wrong payload types are
+semantic 422 errors. These are intentions only; admission does not execute them.
 
 New admissions return 202; identical retries return 200 with the same operation ID
 and its current status. Both and GET return exactly `operationId`, `campaignId`,
@@ -230,13 +232,18 @@ stored progress, not evidence that a worker is currently alive.
 | 409 | `COMMAND_STALE_REVISION` | Expected revision is below or above current revision |
 | 409 | `COMMAND_CAMPAIGN_BUSY` | Live campaign permit or transient admission contention |
 | 413 | `COMMAND_BODY_TOO_LARGE` | Body exceeds the byte cap |
-| 422 | `COMMAND_INVALID` | Parsed input exceeds canonical value/depth/size bounds |
+| 422 | `COMMAND_INVALID` | Canonical bounds, unknown command type, invalid closed payload or generic patch |
+| 422 | `COMMAND_MODE_ILLEGAL` | Current scheduling mode has no supported command contract |
+| 422 | `COMMAND_DECISION_UNAVAILABLE` | Pending decision shape/version does not permit supported input |
+| 422 | `COMMAND_ACTOR_UNAVAILABLE` | Missing creation player or missing/foreign speech recipient |
 | 429 | `COMMAND_ADMISSION_LIMIT` | Two live mutation permits already belong to this owner |
 | 503 | `COMMAND_STORAGE_UNAVAILABLE` | Required transaction/storage unavailable |
 
 The existing filter supplies its local 403/415/429/503 codes before these handlers.
 Errors contain only `code`, with no SQL, submitted text or internal exception.
-Duplicate replay precedes stale/busy/capacity checks. New rejected requests consume
+Duplicate replay precedes revision, current typed/semantic and busy/capacity checks.
+Fresh requests check exact revision, typed/common semantics, busy, then owner capacity.
+New rejected requests consume
 no journal identity or capacity, and no action is queued. Retry an uncertain
 transport result with its original identity/payload; review a stale action against
 fresh state before explicitly submitting another command.

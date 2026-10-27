@@ -13,8 +13,8 @@ import org.rpgengine.content.PackTextParser;
  * Decode the fixed public command envelope (docs/13 §3) without coercions or polymorphic
  * binding. Input is already byte-bounded JSON; the shared parser rejects duplicate keys,
  * invalid UTF-8 and excessive depth/node counts. Structural problems throw {@link Malformed}
- * (HTTP 400); the payload object itself stays opaque here because its typed validation is
- * P07.2 work.
+ * (HTTP 400); the payload stays unbound here so matching historical requests can replay before
+ * the service applies the current closed registry and transactional semantic checks.
  */
 public final class CampaignCommandJson {
     /** Wire command identifiers; mirrors the service check so shape errors stay HTTP 400. */

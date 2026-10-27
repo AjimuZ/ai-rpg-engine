@@ -80,7 +80,7 @@ class OperationAdmissionServiceTest {
     /** A new command is journaled ACCEPTED and owns a fresh fenced permit in the same commit. */
     @Test
     void admissionJournalsOperationAndGrantsPermitAtomically() {
-        var admission = submit(scope.campaign(), command("r1", 0, Map.of("target", "door")));
+        var admission = submit(scope.campaign(), command("r1", 0, Map.of("destinationId", "door")));
         assertFalse(admission.replayed());
         var view = admission.operation();
         assertEquals(OperationStatus.ACCEPTED, view.status());
@@ -94,7 +94,7 @@ class OperationAdmissionServiceTest {
                 "select holder_id from campaign_mutation_lease where campaign_id = ?", UUID.class, scope.campaign()));
         String hash = jdbc.queryForObject("select payload_hash from operation_journal where id = ?", String.class,
                 view.operationId());
-        assertEquals(CommandCanonicalForm.sha256(CommandCanonicalForm.encode("MOVE", 0, Map.of("target", "door"),
+        assertEquals(CommandCanonicalForm.sha256(CommandCanonicalForm.encode("MOVE", 0, Map.of("destinationId", "door"),
                 OperationAdmissionService.MAX_CANONICAL_BYTES)), hash);
         // The returned permit is a real MutationLeaseService token usable by the worker.
         assertTrue(leases.release(scope.adventure(), scope.campaign(), view.operationId(), admission.lease().token()));
@@ -103,16 +103,9 @@ class OperationAdmissionServiceTest {
     /** Identical retries replay before stale/busy checks, even after the campaign revision moved on. */
     @Test
     void identicalRetryReplaysWithoutWritesAfterRevisionChange() {
-        var payload = new LinkedHashMap<String, Object>();
-        payload.put("b", new java.math.BigDecimal("1.50"));
-        payload.put("a", List.of("x", 2));
-        var first = submit(scope.campaign(), command("r1", 0, payload));
+        var first = submit(scope.campaign(), command("r1", 0, Map.of("destinationId", "door")));
         bumpRevision(scope.campaign());
-        // Reordered keys and an equivalent decimal spelling are the same canonical command.
-        var reordered = new LinkedHashMap<String, Object>();
-        reordered.put("a", List.of("x", java.math.BigInteger.TWO));
-        reordered.put("b", new java.math.BigDecimal("1.5"));
-        var replay = submit(scope.campaign(), command("r1", 0, reordered));
+        var replay = submit(scope.campaign(), command("r1", 0, Map.of("destinationId", "door")));
         assertTrue(replay.replayed());
         assertNull(replay.lease());
         assertEquals(first.operation().operationId(), replay.operation().operationId());
@@ -123,12 +116,12 @@ class OperationAdmissionServiceTest {
     /** Reusing a request identity for a different canonical command is a conflict, not a replay. */
     @Test
     void changedCommandUnderSameRequestIsConflict() {
-        submit(scope.campaign(), command("r1", 0, Map.of("count", java.math.BigInteger.TEN)));
+        submit(scope.campaign(), new OperationAdmissionService.Command("r1", 0, "WAIT", Map.of("seconds", java.math.BigInteger.TEN)));
         // Integer 10 and decimal 10.0 are different JSON values for the typed validator.
         assertFailure(OperationAdmissionFailure.Kind.REQUEST_CONFLICT,
-                () -> submit(scope.campaign(), command("r1", 0, Map.of("count", new java.math.BigDecimal("10.0")))));
+                () -> submit(scope.campaign(), new OperationAdmissionService.Command("r1", 0, "WAIT", Map.of("seconds", new java.math.BigDecimal("10.0")))));
         assertFailure(OperationAdmissionFailure.Kind.REQUEST_CONFLICT, () -> submit(scope.campaign(),
-                new OperationAdmissionService.Command("r1", 0, "WAIT", Map.of("count", java.math.BigInteger.TEN))));
+                new OperationAdmissionService.Command("r1", 0, "MOVE", Map.of("seconds", java.math.BigInteger.TEN))));
         assertEquals(1, count("operation_journal"));
     }
 
@@ -285,7 +278,7 @@ class OperationAdmissionServiceTest {
             for (int index = 0; index < callers; index++) {
                 tasks.add(() -> {
                     assertTrue(start.await(10, TimeUnit.SECONDS));
-                    return submit(scope.campaign(), command("same", 0, Map.of("k", "v")));
+                    return submit(scope.campaign(), command("same", 0, Map.of("destinationId", "v")));
                 });
             }
             var futures = tasks.stream().map(pool::submit).toList();
@@ -346,8 +339,8 @@ class OperationAdmissionServiceTest {
     @Test
     void concurrentChangedPayloadHasOneWinnerAndOneConflict() throws Exception {
         var results = race(
-                () -> submit(scope.campaign(), command("same", 0, Map.of("value", "a"))),
-                () -> submit(scope.campaign(), command("same", 0, Map.of("value", "b"))));
+                () -> submit(scope.campaign(), command("same", 0, Map.of("destinationId", "a"))),
+                () -> submit(scope.campaign(), command("same", 0, Map.of("destinationId", "b"))));
         assertEquals(1, results.stream().filter(OperationAdmissionService.Admission.class::isInstance).count());
         assertEquals(1, results.stream().filter(OperationAdmissionFailure.Kind.REQUEST_CONFLICT::equals).count());
         assertEquals(1, count("operation_journal"));
@@ -570,7 +563,7 @@ class OperationAdmissionServiceTest {
     /** Real startup preserves one committed outcome, retires expired work and never revives a retried identity. */
     @Test
     void applicationRestartReplaysStoredOutcomeAndRecoversAbandonedAdmission() {
-        var request = command("committed", 0, Map.of("target", "door"));
+        var request = command("committed", 0, Map.of("destinationId", "door"));
         var admitted = submit(scope.campaign(), request);
         var plan = resolve(admitted);
         var draw = draws.reserve(plan.context(), 0, 20);
@@ -622,7 +615,9 @@ class OperationAdmissionServiceTest {
                 new ResolvedCommit.WorldChange(true, 60, CampaignMode.EXPLORATION, null), List.of(),
                 List.of(new ResolvedCommit.Event(null, null, EventVisibility.PUBLIC,
                         new CampaignEvent.Body("explored", 1, 1, "{}"))),
-                List.of(new ResolvedCommit.Reward("door:first", "party", "{\"visited\":true}")), "{}", true);
+                List.of(new ResolvedCommit.Reward("door:first", "party", "{\"visited\":true}")), "{}", true, ResolvedCommit.Preparation.NONE,
+                new CommandIntent(scope.owner(), jdbc.queryForObject("select idempotency_key from operation_journal where id = ?",
+                        String.class, view.operationId()), 0, new TypedCommand.Move("door")));
     }
 
     /** Start two actual database transactions together; unexpected failures propagate through their futures. */
@@ -674,6 +669,7 @@ class OperationAdmissionServiceTest {
             entities.persist(content);
             var campaign = Campaign.start(adventure.getId(), content, "Campaign", "seed", NOW);
             entities.persist(campaign);
+            addPlayer(campaign);
             return new Scope(owner, adventure.getId(), campaign.getId(), content.getId());
         });
     }
@@ -685,7 +681,8 @@ class OperationAdmissionServiceTest {
 
     /** Build a MOVE command; tests vary only the request identity, revision and payload. */
     private static OperationAdmissionService.Command command(String request, long revision, Map<String, Object> payload) {
-        return new OperationAdmissionService.Command(request, revision, "MOVE", payload);
+        return new OperationAdmissionService.Command(request, revision, "MOVE",
+                payload.isEmpty() ? Map.of("destinationId", "door") : payload);
     }
 
     /** Assert one expected admission outcome. */
@@ -723,6 +720,7 @@ class OperationAdmissionServiceTest {
             entities.persist(content);
             var campaign = Campaign.start(adventure.getId(), content, "Campaign", "seed", NOW);
             entities.persist(campaign);
+            addPlayer(campaign);
             return new Scope(owner.getId(), adventure.getId(), campaign.getId(), content.getId());
         });
     }
@@ -733,8 +731,20 @@ class OperationAdmissionServiceTest {
             var campaign = Campaign.start(owner.adventure(), entities.find(ContentRevision.class, owner.content()),
                     "Campaign", seed, NOW);
             entities.persist(campaign);
+            addPlayer(campaign);
             return campaign.getId();
         });
+    }
+
+    /** Attach the immutable creation player required by typed action eligibility. */
+    private void addPlayer(Campaign campaign) {
+        var player = org.rpgengine.characters.Actor.create(campaign.getId(),
+                org.rpgengine.characters.ActorKind.CHARACTER, null, "Player", null, 0, NOW);
+        entities.persist(player);
+        entities.flush();
+        jdbc.update("insert into campaign_creation (adventure_id, request_id, payload_hash, campaign_id, actor_id, "
+                        + "profile_id, choices, created_at) values (?, ?, ?, ?, ?, 'neutral', '{}'::jsonb, now())",
+                campaign.getAdventureId(), UUID.randomUUID(), "a".repeat(64), campaign.getId(), player.getId());
     }
 
     /** Detached identities of one owned campaign scope. */

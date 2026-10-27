@@ -26,8 +26,9 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Short database-only boundary for a trusted resolved operation. Serializes commits
  * per campaign, rechecks its snapshot, writes every effect and returns a receipt only
- * after COMMIT succeeds. Preparation, authorization and later delivery belong to
- * callers/workers; this internal service has no controller, network port or callback.
+ * after COMMIT succeeds. Registered player operations recheck hash-bound typed
+ * evidence and common semantic eligibility here; detailed rule resolution and later
+ * delivery belong to callers/workers; this internal service has no controller, network port or callback.
  * Any validation, persistence, timeout or commit failure rolls back all its writes.
  */
 @Service
@@ -99,6 +100,20 @@ public class CanonicalCommitService {
             throw new IllegalStateException("stale or ineligible resolved operation");
         }
         MutationLeaseService.requireHeld(jdbc, context);
+        // A registered player action cannot use the legacy internal overload to skip
+        // semantic checks. Bind every field of the intention to the admitted identity,
+        // then re-read eligibility in this same transaction before changing any entity.
+        if (TypedCommand.registered(operation.getCommandType()) || plan.intent() != null) {
+            CommandIntent intent = plan.intent();
+            if (intent == null || !intent.command().type().equals(operation.getCommandType())
+                    || !intent.requestId().equals(operation.getIdempotencyKey())
+                    || intent.expectedRevision() != context.expectedRevision()
+                    || !intent.payloadHash().equals(context.payloadHash())) {
+                throw new IllegalStateException("missing or mismatched typed command evidence");
+            }
+            CommandSemantics.requireEligible(jdbc, intent.ownerId(), context.adventureId(),
+                    context.campaignId(), intent.command());
+        }
         ContentRevision content = entities.find(ContentRevision.class, campaign.getContentRevisionId());
         Instant now = Instant.now();
         long firstSequence = Math.addExact(campaign.getCounters().eventSequence(), 1);

@@ -14,7 +14,7 @@ public record StartingDecision(String type, String inputMode) {
     public StartingDecision { }
 
     /** Return whether stored JSON is exactly the supported marker; null/unknown shapes return false. */
-    static boolean supports(JsonNode value) {
+    public static boolean supports(JsonNode value) {
         // An equal type with extra fields or a newer version is not permission to expose that payload.
         return value != null && value.isObject() && value.size() == 2
                 && value.path("type").isString() && value.path("type").asText().equals("STARTING_SITUATION")

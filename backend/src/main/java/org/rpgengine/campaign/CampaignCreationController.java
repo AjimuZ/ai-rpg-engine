@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * HTTP adapter for campaign creation, durable command admission and status reads.
  * Owner context comes only from local admission; byte-bounded input enters the atomic
  * services, and detached public identities/status leave them. Admission does not execute
- * gameplay: semantic resolution and public receipt projection belong to later command
+ * gameplay: rule resolution and public receipt projection belong to later command
  * work. Failures expose stable codes rather than SQL, pack text or exception messages.
  */
 @RestController
@@ -159,6 +159,10 @@ public class CampaignCreationController {
             case STALE_REVISION -> error(409, "COMMAND_STALE_REVISION");
             case CAMPAIGN_BUSY -> error(409, "COMMAND_CAMPAIGN_BUSY");
             case ADMISSION_LIMIT -> error(429, "COMMAND_ADMISSION_LIMIT");
+            case INVALID_COMMAND -> error(422, "COMMAND_INVALID");
+            case MODE_ILLEGAL -> error(422, "COMMAND_MODE_ILLEGAL");
+            case DECISION_UNAVAILABLE -> error(422, "COMMAND_DECISION_UNAVAILABLE");
+            case ACTOR_UNAVAILABLE -> error(422, "COMMAND_ACTOR_UNAVAILABLE");
         };
     }
 
