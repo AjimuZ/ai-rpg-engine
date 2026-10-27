@@ -17,6 +17,10 @@
 - Record implementation owner commit `05f5ba7` before marking P07.2 complete.
   Preserve all imported task identities/statuses and the pre-existing pending
   external P98 follow-up, synchronizing it into the source roadmap.
+- Re-verify P07.2 after its first completion report was rejected for listing
+  superseded failed attempts as verification outcomes. With the implementation
+  unchanged, fresh focused/backend/frontend/repository gates pass again; record only
+  final repaired-gate outcomes as exit evidence.
 
 ## Unreleased — Complete durable command admission, 27 October 2026
 

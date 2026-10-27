@@ -1,5 +1,18 @@
 # Quality Strategy and Acceptance Criteria
 
+P07.2 independent re-verification (27 October 2026): the first completion report
+listed two superseded compile attempts and one superseded audit run as failed
+verification outcomes, so independent review correctly rejected it. The implementation
+was not changed. At completion commit `fb6e8b3` a fresh run on the unchanged scoped
+JDK 21/PostgreSQL 18.6 fixture again passes 131 focused command cases and all 394
+packaged backend cases in 31 suites (zero failures, errors or skips; executable jar
+built), locked frontend installation of 285 packages, both TypeScript checks, 49
+frontend tests, four localization tests, 240-message parity with both locale builds,
+all 22 repository-policy tests, a zero-finding scan and the whitespace check. Report
+verification as the final repaired-gate outcome of each command; repaired development
+attempts remain history in the paragraph below, never current gate results, and are
+never recast as an intentional failing baseline.
+
 P07.2 verification (27 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks
 pass **131 focused command cases and all 394 packaged backend cases in 31 suites**,
 with zero failures, errors or skips. The focused breakdown is 14 typed-contract,

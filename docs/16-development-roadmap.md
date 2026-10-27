@@ -1119,6 +1119,12 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     evidence. Synchronize the pre-existing pending P98 requested-changes entry from
     the external roadmap; all 130 imported tasks and that pending follow-up retain
     their identities/titles, and only P07.2 gains a completion mark.
+  - Independent re-verification (27 October 2026): the first completion report
+    listed superseded failed development attempts as verification outcomes and was
+    rejected. With the implementation unchanged, fresh focused (131), packaged
+    backend (394 in 31 suites), configured frontend, repository-policy and scan
+    checks pass again; only final repaired-gate outcomes count as exit evidence.
+    See the [re-verification record](15-quality-and-acceptance.md).
   - Exit checks: pure closed-payload/coercion/bounds/patch corpus; real PostgreSQL
     no-write rejection snapshots, old-request replay, mutable-input freezing, owner/
     player/recipient scope, mode/decision drift between admission and commit, actual
