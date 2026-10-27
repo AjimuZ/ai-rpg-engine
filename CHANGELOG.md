@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Command verification dependency checkpoint, 27 October 2026
+
+- Re-run the scoped packaged backend check: JDK/Maven execute, but the disposable
+  PostgreSQL fixture hostname does not resolve. The suite reports 357 tests,
+  188 passing and 169 context/connection errors, with no skipped tests. This failed
+  check does not supersede the earlier recovery history with a new acceptance pass.
+- Verify frontend typechecking, 49 tests, four localization checks and both locale
+  builds, plus all 22 repository-policy tests and zero scan findings.
+- Retain the reviewed command implementation and original migration drafts without
+  marking P07.1 complete. Restore fixture connectivity, then rerun focused and full
+  database checks before committing the implementation and checking its roadmap item.
+
 ## Unreleased — Verified development dependency recovery, 26 October 2026
 
 - Verify the owner-provisioned private JDK 21.0.12.1/Maven 3.10.0 environment and

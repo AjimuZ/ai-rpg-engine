@@ -999,6 +999,17 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 
 - [ ] P07.1 Implement durable idempotency with payload hashes, expected revision, lease/fencing, admission limits, and operation statuses.
   **Requires tasks:** P06.4.
+  - Continuation verification (27 October 2026): the scoped helper executes
+    JDK/Maven, but the disposable PostgreSQL fixture hostname cannot resolve.
+    Packaged verification reports 357 tests: 188 pass, 169 database/context errors,
+    zero assertion failures and zero skips. Frontend typecheck, 49 tests, four
+    localization checks, both locale builds and 22 repository-policy tests pass;
+    repository scans report zero findings. Read-only review finds no critical or
+    important defect; the documented exact-expiry renewal race remains unforced.
+    Preserve the earlier successful evidence and all source/migration drafts.
+    Restore fixture connectivity and rerun focused/full database verification before
+    the implementation commit and completion mark. This is a dependency blocker,
+    not a new missing-JDK failure or a passing P07.1 acceptance result.
   - Continuation checkpoint (26 October 2026): the eight preserved Java drafts
     match their migration manifest hashes and remain outside the source tree.
     Admission, payload normalization and status lookup have been reviewed against

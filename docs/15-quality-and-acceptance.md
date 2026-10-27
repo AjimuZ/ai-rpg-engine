@@ -1,5 +1,18 @@
 # Quality Strategy and Acceptance Criteria
 
+P07.1 continuation check (27 October 2026): fresh scoped packaged verification
+fails because the disposable PostgreSQL fixture hostname cannot resolve. Maven
+reports 357 tests, 188 passing and 169 database/context errors, zero assertion
+failures and zero skips. This includes errors in the 24 admission, five command
+HTTP and 49 canonical-commit cases; the ten canonical-form, five lifecycle and one
+resolved-plan case pass. No fresh concurrency, rollback or recovery pass is claimed.
+Frontend typecheck, 49 tests, four localization checks, both production locales and
+22 repository-policy tests pass, with zero repository scan findings. A read-only
+review finds no critical or important implementation defect; the previously noted
+renewal/admission exact-expiry coverage gap remains minor and unforced. All eight
+original migration hashes match. Preserve the prior evidence below, but restore
+fixture connectivity and rerun the database gates before P07.1 completion.
+
 P06.5 library checkpoint (25 October 2026): pinned Java 21/PostgreSQL 18.6
 `clean verify -Ppackaged-ui` passes all 305 tests without failures/errors/skips.
 The 19 HTTP cases cover equal-title workspace identities, empty workspaces,

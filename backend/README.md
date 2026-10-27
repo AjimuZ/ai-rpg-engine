@@ -1,5 +1,17 @@
 # Backend development shell
 
+Continuation verification checkpoint (27 October 2026): the private helper still
+executes JDK/Maven, but its disposable PostgreSQL fixture hostname is unavailable
+from the current session (`UnknownHostException`). The full packaged check reports
+357 tests: 188 pass and 169 error during database/application-context setup, with
+zero assertion failures or skips. No database acceptance pass is established by this
+run. There is no Docker/Podman client, container socket or PostgreSQL service tool
+in this session to repair that network attachment. Restore the owner-provisioned
+fixture's reachability without changing test requirements, toolchain pins or owner
+configuration; then rerun the focused corpus and full helper. Frontend checks and
+both locale builds pass. Earlier successful runs below remain historical evidence;
+P07.1 stays unchecked and its implementation remains pending verification/commit.
+
 Spring Boot 4.1.2 on Java 21, with Maven 3.10.0 through the checksum-verified
 Maven Wrapper 3.3.4. Run commands **from `backend/`** so `.mvn/maven.config`
 applies the Central-only mirror and strict checksums. Linux needs `unzip` for the
