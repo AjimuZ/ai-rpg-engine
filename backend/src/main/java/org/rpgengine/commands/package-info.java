@@ -1,9 +1,12 @@
 /**
- * Operation journal, idempotency identity, the docs/07 state machine and the internal
- * atomic commit/outbox boundary. Accepts trusted resolved data and returns durable
- * receipts; persistence failures roll back the bundle, including mutation leases,
- * random draws and preparation intents (query epochs, critical jobs, plan
- * invalidation). Command API/semantic validation and outbox dispatch remain later
- * tasks. No network work runs here.
+ * Durable owner-scoped command admission, payload identity and operation status, plus
+ * the docs/07 lifecycle and internal canonical commit/outbox boundary. Admission hashes
+ * bounded JSON and atomically journals an operation with a fenced campaign permit;
+ * all grants/renewals share owner-wide database accounting. Status/replay expose no
+ * worker capability and create no world effects. Trusted resolved data commits world
+ * changes, immutable receipt/draw references, lease release and preparation intents
+ * together; persistence failure rolls back that bundle. Previously reserved draws stay
+ * durable independently. Typed semantic validation, execution workers, public receipt
+ * projection and outbox dispatch remain later tasks. No network work runs here.
  */
 package org.rpgengine.commands;

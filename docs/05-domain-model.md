@@ -85,7 +85,7 @@ P03.2 adds `V2__campaign_bounds_and_versions.sql` without changing V1. The seven
 
 V2 freezes row identities, owner/adventure/campaign associations and creation provenance after insert; campaign content revision and seed are pinned. Resource identity, actor and content key are fixed. `actor_resource` has a composite actor/campaign foreign key, uniqueness on `(campaign_id, actor_id, resource_key)` and inclusive `minimum_value <= current_value <= maximum_value` bounds. Integer values and declared bounds use BIGINT; adjustments reject overflow or an out-of-range result without clamping, and unknown values are never inserted as zero. Resource revision cannot rewind. Rules/content determine the declared bounds and available resource keys; debt and inventory ownership are separate later entities.
 
-Canonical counters and presentation generations cannot decrease, and a campaign state revision advances by at most one per row update. Committed journal statuses require both revision and receipt; other statuses require neither. Commit outcomes are write-once, terminal statuses cannot reopen, and `(campaign_id, committed_revision)` is unique while uncommitted NULL revisions remain distinct. Checkpoints and settlements also expose composite campaign/identity unique keys for later relationships. P03.3 adds the internal atomic commit/revision/outbox boundary described below; P03.4 adds draw records above. P03.5 adds the V5 campaign mutation lease/fence and startup journal recovery ([turn protocol §8](07-turn-protocol.md#8-interrupt-and-recovery-matrix)). Acceptance APIs remain later tasks. Java owns the full lifecycle transition table. Scoped repository methods are persistence primitives; future application boundaries must authorize owner/adventure/campaign before calling them, and must not expose inherited unscoped repository methods.
+Canonical counters and presentation generations cannot decrease, and a campaign state revision advances by at most one per row update. Committed journal statuses require both revision and receipt; other statuses require neither. Commit outcomes are write-once, terminal statuses cannot reopen, and `(campaign_id, committed_revision)` is unique while uncommitted NULL revisions remain distinct. Checkpoints and settlements also expose composite campaign/identity unique keys for later relationships. P03.3 adds the internal atomic commit/revision/outbox boundary described below; P03.4 adds draw records above. P03.5 adds the V5 campaign mutation lease/fence and startup journal recovery ([turn protocol §8](07-turn-protocol.md#8-interrupt-and-recovery-matrix)). P07.1 now supplies owner-scoped admission/status APIs. Java owns the full lifecycle transition table. Scoped repository methods are persistence primitives; future application boundaries must authorize owner/adventure/campaign before calling them, and must not expose inherited unscoped repository methods.
 
 JSONB object bounds use UTF-8 bytes of PostgreSQL's normalized text rendering: pending decision and reward payload 16,384 bytes, receipt and event payload 65,536 bytes, checkpoint snapshot 8,388,608 bytes. Java rejects oversized input early; JSONB whitespace/escape normalization can change the byte count, so the database remains authoritative. Larger exports/media belong outside these payloads. The constraints, boundary values, races and populated-upgrade checks pass in the full backend verification on PostgreSQL 18.6 (24 October 2026); see the [evidence scope](15-quality-and-acceptance.md#1-evidence-policy). The other table families above remain later work, except the P03.6 preparation
 foundation verified on 24 October 2026. Its V6 rows store immutable snapshots,
@@ -113,6 +113,24 @@ P03.3 adds `V3__canonical_outbox.sql` and the internal `CanonicalCommitService`.
 Core state is relational. Immutable compiled content and event payloads may use JSONB with an explicit schema version. Store large media on disk under managed identifiers, keeping metadata and hashes in PostgreSQL. Do not store arbitrary user-supplied paths as trusted URLs.
 
 Minimum indexes include campaign/revision, campaign/event sequence, operation idempotency key, current actor and encounter, knowledge audience/entity, quest source settlement, source-summary event range, and owned item/container. Full-text indexes support lore and event retrieval. Indexes must be justified by measured query plans later.
+
+### Durable command admission (P07.1)
+
+No new migration is needed: `operation_journal` already stores the campaign/request
+unique key, payload hash, base revision and lifecycle/outcome, while V5 stores the
+campaign permit and monotonically increasing fence. Admission uses these existing
+rows in one transaction, locking owner before campaign and inserting the journal
+before its lease foreign key. A matching identity/hash replays without a new permit;
+a different hash conflicts, and a fresh command must target the exact revision.
+
+The two-live-permit owner cap spans adventures and applies equally to new admission,
+internal acquisition/reacquisition and renewal serialization. Committed release and
+startup retirement preserve the fence high-water mark. Scope never derives from
+client owner fields. Read-only status exposes a detached allowlist, excluding raw
+receipt/payload/hash and worker capabilities. The service retains the hash, not
+unfinished intent: restart does not automatically rerun a command. See the
+[admission contract](07-turn-protocol.md#p071-durable-admission) for normalization,
+bounds, expiry classification and the later semantic/worker boundary.
 
 ### Campaign creation (P06.1)
 

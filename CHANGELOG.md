@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Restored command verification, 27 October 2026
+
+- Independently verify the owner-restored disposable PostgreSQL fixture: scoped
+  DNS/TCP connectivity succeeds, all 94 focused command tests pass, and the full
+  packaged backend passes 357 tests with zero failures, errors or skips.
+- Preserve the interrupted command implementation and its tests in a verified
+  checkpoint. Retain the earlier failed recovery evidence and original migration
+  drafts; no source behavior, fixture configuration or test requirement is changed
+  during this recovery.
+- Keep all 130 roadmap identities/titles/statuses and 40 completion marks intact.
+  Return P07.1, still unchecked, for normal independent admission. The owner reports
+  restart persistence for the fixture; this session verifies connectivity and
+  authenticated database tests, without repeating the host restart experiment.
+
 ## Unreleased — Command verification dependency checkpoint, 27 October 2026
 
 - Re-run the scoped packaged backend check: JDK/Maven execute, but the disposable
@@ -11,6 +25,22 @@
 - Retain the reviewed command implementation and original migration drafts without
   marking P07.1 complete. Restore fixture connectivity, then rerun focused and full
   database checks before committing the implementation and checking its roadmap item.
+
+## Unreleased — Durable command admission, 26 October 2026
+
+- Add bounded versioned command hashes, exact revision checks and atomic durable
+  journal/lease admission, with matching retry replay and changed-payload conflicts.
+- Enforce two live mutation permits per owner across adventures and internal lease
+  acquisition/renewal; keep inference-job limits separate. Fence expired workers and
+  use one database cutoff for cleanup/busy to prevent stranded active journals.
+- Expose owner-scoped admission/status through the existing campaign adapter with
+  strict bounded JSON and sanitized responses; keep worker capabilities and raw
+  receipts private. Leave typed execution and browser submission to subsequent tasks.
+- Pass 94 focused command tests and all 357 packaged backend tests on PostgreSQL
+  18.6, without failures/errors/skips. Reproduce and repair the expiry regression;
+  pass frontend typechecking, 49 tests, four localization checks, both locale builds
+  and 22 repository-policy tests with zero scan findings. Preserve original drafts
+  and earlier recovery history.
 
 ## Unreleased — Verified development dependency recovery, 26 October 2026
 

@@ -1,5 +1,16 @@
 # Quality Strategy and Acceptance Criteria
 
+P07.1 dependency recovery (27 October 2026): after the owner restored the isolated
+PostgreSQL fixture, the unchanged-source DNS reproduction probe succeeds rather
+than reproducing the historical failure. A separate TCP probe and fresh real
+PostgreSQL verification pass: 94 focused command cases and 357 full packaged backend
+cases, with zero failures, errors or skips. Frontend typechecking, all 49 tests,
+four localization tests and both EN/IT production builds also pass. These are fresh
+results for the preserved implementation, not reuse of the owner's earlier log.
+Retain the failed runs below as historical evidence. The host restart-policy test
+is owner-reported only. Recovery checkpoints the existing work for normal admission;
+it does not mark P07.1 complete or extend the evidence scope described below.
+
 P07.1 continuation check (27 October 2026): fresh scoped packaged verification
 fails because the disposable PostgreSQL fixture hostname cannot resolve. Maven
 reports 357 tests, 188 passing and 169 database/context errors, zero assertion
@@ -12,6 +23,39 @@ review finds no critical or important implementation defect; the previously note
 renewal/admission exact-expiry coverage gap remains minor and unforced. All eight
 original migration hashes match. Preserve the prior evidence below, but restore
 fixture connectivity and rerun the database gates before P07.1 completion.
+
+P07.1 verification (26 October 2026): the scoped JDK 21.0.12.1/Maven 3.10.0
+helper passes all 357 packaged backend tests in 29 suites on real PostgreSQL 18.6,
+with zero failures/errors/skips. The focused command corpus passes 94 cases:
+10 canonical-form, 24 admission, five HTTP, 49 canonical commit, five lifecycle
+and one resolved-plan test. The inherited draft baseline passed 356 cases; review
+then exposed expiry between retirement and busy checks. The new deterministic
+SQL-boundary regression failed once as expected (93/94 passed), then all 94 passed
+after using one captured database cutoff for cleanup and busy classification.
+
+New admission checks cover six simultaneous identical submissions, changed-payload
+races, exact past/future revision rejection, busy/no-queue behavior, cross-adventure
+owner-cap races and internal reacquisition competing for the last owner slot.
+Immediate lease SQL failure and deferred COMMIT failure both restore the exact
+journal/lease/world snapshot. Admitted expired workers cannot add draws or commit
+after takeover, while stored draw replay remains immutable. A fresh application
+context against the same database preserves committed receipt/draw/settlement/outbox
+identity, retires expired work and preserves live permits. This is an application
+restart test, not a new separate-JVM kill test. Existing foundation restart tests
+remain in the full suite. Status/identical replay have no database effects, and
+HTTP rejects malformed/foreign requests with stable codes and local browser proofs.
+
+Frontend typechecking, all 49 tests, all four localization checks and the production
+EN/IT build pass; 240 reviewed messages retain parity. All 22 repository-policy tests
+pass and repository scans have zero findings. The unchanged eight original draft
+hashes and original inputs are preserved. This establishes P07.1 service/API
+boundaries toward QA-03/04/17/18/20; typed gameplay execution, public mechanical
+receipt projection, browser submission, cancellation/stream delivery and the complete
+release scenarios remain their later tasks. Review noted one minor coverage gap:
+renewal at capacity and after expiry is tested sequentially, but a renewal racing
+admission at the exact expiry boundary is not separately forced. Cross-campaign
+admission/reacquisition races and the shared owner lock are exercised.
+
 
 P06.5 library checkpoint (25 October 2026): pinned Java 21/PostgreSQL 18.6
 `clean verify -Ppackaged-ui` passes all 305 tests without failures/errors/skips.

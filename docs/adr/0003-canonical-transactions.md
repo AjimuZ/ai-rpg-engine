@@ -69,3 +69,13 @@ outside their profile. Leases/fencing remain P03.5 and gameplay
 semantic/owner authorization remains P07/the application boundary.
 
 Duplicate/crash/concurrency fault tests, resource/ownership constraints, one-time settlement, narration-only retries, and fresh-storage recovery. See [turn protocol](../07-turn-protocol.md).
+
+P07.1 implementation decision (26 October 2026): reuse the existing journal and
+lease schema for atomic command admission, with database owner-before-campaign
+serialization rather than process-local capacity counters. Hash versioned bounded
+canonical command bytes before entering the transaction; replay a matching request
+before revision/busy/limit checks. Extend the same owner lock and two-live-permit cap
+to all internal acquisition/renewal paths. Classify retirement and busy with one
+captured database timestamp so expiry between statements cannot strand an old active
+journal. Status reads expose detached progress only, never permit capabilities or
+unprojected receipts. Typed semantics and execution workers remain later tasks.

@@ -195,6 +195,57 @@ The backend returns operation ID, accepted status, base revision, and a query/st
 
 Use HTTP 202 for accepted asynchronous work, 200 for current/final queries, 201 for created resources, 400 for malformed input, 403 for denied origin/owner/capability, 404 for inaccessible identities, 409 for busy/stale/idempotency conflicts, 422 for valid-shaped but illegal content/action, 429 for local admission limits, and 503 for unavailable required runtime dependencies. Keep detailed safe error codes stable across localized messages.
 
+### P07.1 admission and status
+
+Implemented routes use the existing local session/owner admission and return
+`Cache-Control: no-store`:
+
+- `POST /api/v1/campaigns/{campaignId}/commands?adventureId={uuid}` admits an envelope.
+- `GET /api/v1/campaigns/{campaignId}/operations/{operationId}?adventureId={uuid}`
+  reads its durable status without changing any row.
+
+Path/query UUIDs and `requestId` require canonical lowercase UUID text. POST requires
+Origin, session cookie, CSRF token and UTF-8 JSON, with a 16,384-byte body cap even
+for chunked input. The object has exactly `requestId`, `expectedRevision`,
+`commandType` and object-valued `payload`. Revisions are nonnegative exact JSON
+integers within signed 64-bit range; decimals/strings are not coerced. Type syntax
+is `[A-Z][A-Z0-9_]{0,63}`. Unknown envelope fields, duplicate keys, invalid UTF-8,
+multiple documents and malformed UUIDs fail before storage. Payload meaning and
+registered command types remain P07.2; syntax acceptance is not action legality.
+
+New admissions return 202; identical retries return 200 with the same operation ID
+and its current status. Both and GET return exactly `operationId`, `campaignId`,
+`commandType`, `status`, `baseRevision`, nullable `committedRevision`,
+`operationVersion`, `replayed`, `createdAt`, `updatedAt` and relative `query` URL.
+`replayed` is false for GET. No stream reference is available yet. Receipts,
+clarifications, payloads, hashes, draws and lease/holder/fence values are excluded;
+the final player-safe receipt projection remains P07.4. An operation status is
+stored progress, not evidence that a worker is currently alive.
+
+| HTTP | Stable command code | Meaning |
+| --- | --- | --- |
+| 400 | `COMMAND_INPUT_MALFORMED` | Invalid JSON/envelope or missing/malformed scope identity |
+| 404 | `COMMAND_SCOPE_UNAVAILABLE` | Missing/foreign owner, adventure, campaign or operation |
+| 409 | `COMMAND_REQUEST_CONFLICT` | Same request identity with different normalized command |
+| 409 | `COMMAND_STALE_REVISION` | Expected revision is below or above current revision |
+| 409 | `COMMAND_CAMPAIGN_BUSY` | Live campaign permit or transient admission contention |
+| 413 | `COMMAND_BODY_TOO_LARGE` | Body exceeds the byte cap |
+| 422 | `COMMAND_INVALID` | Parsed input exceeds canonical value/depth/size bounds |
+| 429 | `COMMAND_ADMISSION_LIMIT` | Two live mutation permits already belong to this owner |
+| 503 | `COMMAND_STORAGE_UNAVAILABLE` | Required transaction/storage unavailable |
+
+The existing filter supplies its local 403/415/429/503 codes before these handlers.
+Errors contain only `code`, with no SQL, submitted text or internal exception.
+Duplicate replay precedes stale/busy/capacity checks. New rejected requests consume
+no journal identity or capacity, and no action is queued. Retry an uncertain
+transport result with its original identity/payload; review a stale action against
+fresh state before explicitly submitting another command.
+
+This checkpoint connects no gameplay executor or browser Send action. Admission
+stores a hash and fenced permit only; uncompleted work eventually fails through
+expiry/recovery. It cannot apply arbitrary payload fields to canonical state.
+Typed semantic resolution, public receipts and delivery remain subsequent work.
+
 ## 4. Stream contract
 
 Use durable public message IDs and `Last-Event-ID` resumption. Proposed message types: `operation.accepted`, `operation.progress`, `operation.clarification`, `operation.rejected`, `state.committed`, `narrative.ready`, `narrative.pending`, `encounter.updated`, `media.ready`, and `application.closing`.

@@ -1,5 +1,15 @@
 # Backend development shell
 
+Restored-fixture verification (27 October 2026): the owner restored the isolated
+PostgreSQL service. A fresh scoped DNS/TCP check now succeeds; the unchanged private
+helper passes all 94 focused command tests and all 357 packaged backend tests with
+zero failures, errors or skips. This supersedes the connectivity blocker in the
+historical checkpoint below. The owner reports an `unless-stopped` restart policy
+and a successful host restart rehearsal; this session does not have container
+controls and does not independently repeat that rehearsal. Preserve the same scoped
+helper and disposable database settings. The reviewed interrupted implementation is
+checkpointed for normal admission, with P07.1 still unchecked during recovery.
+
 Continuation verification checkpoint (27 October 2026): the private helper still
 executes JDK/Maven, but its disposable PostgreSQL fixture hostname is unavailable
 from the current session (`UnknownHostException`). The full packaged check reports
@@ -71,6 +81,23 @@ the committed checksum pins the ZIP. Keep the pins intact and use the verified
 private helper for this environment. Wrapper use still requires its documented
 ZIP extraction prerequisite; no wrapper pass or system-wide provisioning is claimed.
 
+P07.1 now installs the bounded command canonicalizer, atomic admission service,
+shared owner permit accounting and HTTP admission/status in the existing campaign
+adapter. The eight original migration drafts remain preserved externally; source
+contains reviewed implementations and tests. The previous 318-test recovery result
+above describes the prerequisite baseline, not the current command corpus.
+
+With the scoped test environment loaded, run the focused corpus from `backend/`:
+
+```sh
+mvn -B -ntp test -Ppackaged-ui -Dtest=CommandCanonicalFormTest,OperationAdmissionServiceTest,CampaignCommandHttpTest,CanonicalCommitServiceTest,CampaignOperationTest,ResolvedCommitTest
+```
+
+Then use the private helper's `backend` mode for the full packaged gate. The
+[protocol](../docs/07-turn-protocol.md#p071-durable-admission) and
+[API](../docs/13-api-and-ui.md#p071-admission-and-status) distinguish durable
+admission from the later gameplay executor; no UI Send action is enabled here.
+
 Provide a disposable PostgreSQL 18 database for tests and a separate database for
 manual development. Use the pinned `postgres:18.6-trixie` digest in
 [ADR 0009](../docs/adr/0009-toolchain-baseline.md). Supply Spring's environment
@@ -122,8 +149,9 @@ P03.3 adds an internal `CanonicalCommitService` consuming immutable `ResolvedCom
 values from trusted backend resolution. It atomically saves world/resource changes,
 events, settlements, a backend receipt and reference-only outbox intents, and returns
 only after commit succeeds. It rejects ambient transactions and has no network ports
-or executable callbacks. Operation acceptance, gameplay authorization/rules,
-outbox delivery and narration remain later tasks; no command endpoint is exposed.
+or executable callbacks. P07.1 adds owner-scoped operation acceptance/status;
+gameplay authorization/rules, execution workers, outbox delivery and narration
+remain later tasks.
 `CanonicalCommitServiceTest` uses real PostgreSQL failure triggers (including deferred
 commit failures), duplicate/stale races and scoped references; no runtime account is needed.
 See [database invariants and payload limits](../docs/05-domain-model.md#3-database-organization).

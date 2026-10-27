@@ -75,10 +75,71 @@ operation per `(campaign_id, committed_revision)`. Committed statuses carry both
 receipt and revision; other statuses carry neither. Once recorded, neither commit
 field can change, and terminal statuses cannot reopen. These are database bounds;
 P03.3 now adds the internal commit service, exact revision checks and durable outbox.
-Acceptance API, leases/fencing and gameplay authorization remain later tasks.
+P03.5 supplies leases/fencing and P07.1 supplies owner-scoped admission/status;
+typed gameplay authorization and semantic resolution remain later tasks.
 See [domain constraints](05-domain-model.md#3-database-organization).
 
+### P07.1 durable admission
+
+`OperationAdmissionService.submit` now authorizes the owner/adventure/campaign,
+canonicalizes the envelope before opening a transaction, and serializes by owner
+then campaign. It checks the stored campaign/request identity before freshness or
+capacity: equal hashes return the existing status without a new lease; changed
+hashes conflict. A new request requires the exact current revision, a free campaign
+permit and fewer than two live mutation permits across all of the owner's adventures.
+Busy, stale, conflicting or limited requests create no row and queue no future action.
+Every rejection rolls back any attempted cleanup as well as insertion/grant.
+
+The version-1 canonical UTF-8 JSON contains `commandType`, `expectedRevision`,
+`payload` and `version`, hashed with SHA-256. Keys sort in Java UTF-16 order, array
+order and exact text remain meaningful, and mandatory JSON escaping preserves
+Unicode scalar values without normalization. Integers use plain decimal; decimals
+use trailing-zero-stripped unscaled value plus exponent (`1.50` and `1.5` match,
+but integer `10` differs from decimal `10.0`). Unsupported Java values, unpaired
+surrogates, cycles, more than 64 nested containers including the envelope, decimal
+scale overflow and canonical output beyond 32,768 bytes are rejected. Incremental
+output budgets bound copying, sorting, numeric conversion and recursion for direct
+callers as well as HTTP. A normalization change requires a new format version;
+stored hashes must not be silently reinterpreted.
+
+Admission journals `ACCEPTED` and grants a fresh holder/fence with a 180-second
+PostgreSQL-clock deadline in one commit. The existing lease high-water row survives
+release/expiry. Cleanup retires expired permits and fails orphaned pre-commit work
+before granting a successor. Cleanup and the busy check use one captured database
+timestamp: a permit that lapses during these checks conservatively returns busy;
+a later request can retire it. Otherwise, differing clock reads could overwrite
+a just-expired permit while leaving its old journal incorrectly active.
+
+All internal `MutationLeaseService.acquire` paths share the same owner lock/cap,
+including reacquisition after expiry. Matching live retries and renewals reuse one
+slot. Renewals lock the owner before campaign/journal and must still be live at the
+update; an expired permit cannot be revived by renewal after capacity was reused.
+Commit/release/recovery only remove permits and never acquire the owner lock after
+a campaign lock. Lock/statement/transaction bounds remain 2/5/10 seconds. These are
+mutation limits, independent of runtime inference/job permits; background planners
+obtain no campaign mutation permit through this change.
+
+Status and identical retries return detached journal progress, base/committed
+revision, operation version and timestamps. They perform no recovery or world write,
+and reveal no payload, payload hash, internal receipt, draw, holder or fence. An
+expired journal can still report its stored pre-commit status until a new admission
+or startup reconciliation retires it; polling is not a heartbeat. Matching stored
+commit receipts and draw reservations remain replayable internally before freshness
+checks, with no repeated effects. The [HTTP contract](13-api-and-ui.md#p071-admission-and-status)
+defines the bounded envelope, scope and stable error codes.
+
+P07.1 installs admission/status only: there is no gameplay execution worker or
+payload persistence for resuming unfinished intent. A lost permit eventually fails
+before commit; an identical retry never recreates it. Typed command registration,
+mode/actor/semantic checks, public mechanical receipt projection, browser submission,
+streaming and cancellation remain the subsequent P07 tasks. No accepted command
+in this checkpoint claims an executed game action or a runtime request.
+
 ### P07.1 continuation checkpoint
+
+The following paragraphs preserve the earlier review and dependency-recovery
+history. The implementation above supersedes their then-current draft status;
+the original eight migration files remain unchanged outside source.
 
 On 26 October 2026, the preserved unfinished admission implementation was reviewed
 against the journal, canonical commit, mutation lease and startup recovery services.
@@ -215,9 +276,9 @@ timeout. Plans allow at most 128 resources, 128 events (at least one), 128 settl
 and 32 KiB receipt details; existing stored JSONB limits remain authoritative.
 
 This internal primitive does not accept player/model proposals directly. Command
-acceptance/authorization, semantic rules, encounter checks,
-leases/fences, cancellation coordination and outbox dispatch/recovery remain their
-later roadmap tasks. New domain effect types must join the same explicit commit path.
+semantic authorization, encounter checks, cancellation coordination and outbox
+dispatch remain later roadmap tasks. P07.1 admission and P03.5 leases/fences/startup
+recovery now protect the durable operation boundary. New domain effect types must join the same explicit commit path.
 
 ## 6. Narration after authority
 
@@ -249,8 +310,10 @@ pages of 100, one transaction per operation. It preserves live leases, retires
 expired ones and moves orphaned `ACCEPTED`/`PLANNING`/`VALIDATING`/`COMMITTING` work
 to `FAILED_BEFORE_COMMIT`. It moves `NARRATING`, and `COMMITTED` with a narration
 outbox intent, to `COMMITTED_NARRATION_PENDING`. Receipts, draws and world state are
-unchanged; any recovery error aborts startup. Limits: recovery assumes one local
-installation, with no other admitter between acceptance and lease grant.
+unchanged; any recovery error aborts startup. P07.1 makes acceptance and lease
+grant atomic under the shared campaign lock, so recovery cannot observe an
+intermediate journal-only admission. Legacy internal journal writers must still
+coordinate startup or accept that unleased work is abandoned.
 `COMMITTED` without a narration intent stays `COMMITTED`. P03.6 persists preparation
 attempt accounting and lease renewal; runtime cancellation transport remains P07/P08. The
 [database backup tool](../tools/database_backup/README.md) retires all saved leases

@@ -999,6 +999,16 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 
 - [ ] P07.1 Implement durable idempotency with payload hashes, expected revision, lease/fencing, admission limits, and operation statuses.
   **Requires tasks:** P06.4.
+  - Restored-fixture recovery (27 October 2026): the owner restored the disposable
+    PostgreSQL service; fresh DNS/TCP checks, 94 focused command tests and all 357
+    packaged backend tests pass with zero failures/errors/skips. Frontend typecheck,
+    49 tests, four localization checks and both production locales pass. Preserve
+    the reviewed interrupted implementation in a verified checkpoint and retain all
+    historical failures and original migration drafts. This supersedes the DNS
+    blocker below, not the normal task-admission gate. P07.1 stays unchecked and all
+    task identities/titles/statuses remain unchanged during recovery. Host restart
+    persistence is owner-reported; this session verifies database reachability and
+    authenticated checks without changing service or runner configuration.
   - Continuation verification (27 October 2026): the scoped helper executes
     JDK/Maven, but the disposable PostgreSQL fixture hostname cannot resolve.
     Packaged verification reports 357 tests: 188 pass, 169 database/context errors,
@@ -1044,12 +1054,31 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     uninstalled drafts. This is prerequisite recovery, not P07.1 implementation or
     acceptance. The owner controls activation of the staged runner environment
     and checks; no runner configuration or task identity/status is changed.
-  - Resume with the documented JDK 21/Maven wrapper and disposable PostgreSQL 18.6
-    test database. Complete bounded canonicalization, atomic journal/lease admission,
-    owner-wide limits and scoped status reads; review all lease-grant paths and
-    direct-caller depth/size limits. Preserve existing revision/fence/recovery rules.
-    The [protocol checkpoint](07-turn-protocol.md#p071-continuation-checkpoint)
-    records the draft policy and remaining checks.
+  - Implementation checkpoint (26 October 2026): install bounded version-1 SHA-256
+    canonicalization, exact-revision/idempotent atomic journal-plus-lease admission,
+    shared owner-wide permit accounting on acquire/reacquire/renew, and owner-scoped
+    HTTP status/replay through the existing campaign adapter. Preserve all eight
+    original drafts externally; add no controller file or migration. Retain 32 KiB
+    canonical/16 KiB HTTP bounds, two live permits per owner and a 180-second initial
+    lease, independent of inference concurrency. Cleanup/busy share one database
+    timestamp after a deterministic regression reproduced an expiry race.
+  - Verified exits (26 October 2026): all 94 focused command tests and all 357
+    packaged backend tests in 29 suites pass on PostgreSQL 18.6, with zero failures,
+    errors or skips. Coverage includes duplicate/conflicting races, exact revision,
+    immediate/deferred journal/lease rollback, cross-adventure owner-cap and internal
+    reacquisition races, old-worker draw/commit fencing, application-context restart,
+    immutable stored-result replay and read-only scoped status. The expiry regression
+    first failed as expected, then passed with the shared cutoff. Frontend typecheck,
+    49 tests, four localization checks and both locale builds pass. All 22 repository
+    policy tests and zero-finding scans pass. Review's minor unforced exact-expiry
+    renewal/admission interleaving is recorded in the
+    [evidence scope](15-quality-and-acceptance.md); sequential expired renewal and
+    mixed reacquisition/admission races pass. Completion remains unchecked until the
+    neutral owner implementation commit is recorded.
+  - Follow-on boundary: typed command registration/semantic execution is P07.2–P07.4;
+    stream/cancellation delivery remains P07.5. Admission itself runs no worker,
+    retains no payload for automatic restart and enables no browser Send action.
+    See the [implemented contract](07-turn-protocol.md#p071-durable-admission).
   - Exit checks: real PostgreSQL duplicate/conflicting payload races, exact revision
     rejection, rollback between journal insertion and lease grant, concurrent
     cross-campaign owner limits, expired-holder commit/draw rejection, restart and

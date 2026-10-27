@@ -228,6 +228,12 @@ Planner context may include authorized secrets; public narrator, guide and tacti
 
 The dispatcher enforces installation/account-wide limits before per-campaign limits. Separate canonical campaign mutation leases from AI-job leases and runtime admission permits; a running planner holds no campaign mutation lease. A backend instance cannot multiply concurrency by starting another worker. Persist/reconcile shared permits and accounting alongside jobs.
 
+P07.1 implements a separate database cap of two live canonical mutation permits
+per owner across adventures, including internal reacquisition and renewal. This
+bounds command work only; it neither raises the one-active-inference-turn baseline
+nor admits planners, narration or media jobs through campaign mutation leases.
+The runtime dispatcher and job budgets below remain their separate P08 scope.
+
 Order work as: interactive intent/resolved narration and immediate legal-tactic work; required bounded continuity work; accepted-quest preparation/refinement; speculative preparation/director/review. Deterministic reads require no inference permit. Public receipt fallback remains available if a narration job cannot be admitted. Use an age-aware fair rotation among campaigns within a class, with at most one candidate per campaign before another gets a turn. Background work never ages above active interaction. An inactive campaign's speculative work is paused/superseded; switching the UI does not reset budgets, kill another campaign or allow its callbacks into the selected view.
 
 Initial candidate policy: one active inference turn globally, one unresolved plan job per target, at most two pending background jobs per campaign and eight installation-wide, bounded attempts, and no review/speculation when usage is uncertain. Queue caps reject/coalesce optional work; they never silently queue a second canonical player action behind an unseen state. Use measured pressure and aging before expanding caps.

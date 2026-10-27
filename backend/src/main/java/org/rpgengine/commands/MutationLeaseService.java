@@ -16,7 +16,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Database-only campaign mutation permits for trusted internal workers. Inputs are
  * scoped journal identities and opaque worker tokens; outputs are detached grants.
  * Busy, expired, stale or out-of-scope requests fail without changing canonical data.
- * Every mutation locks campaign then journal, matching commit and draw reservation.
+ * Grants and renewals lock owner before campaign/journal for owner-wide admission;
+ * release locks campaign then journal, matching commit and draw reservation.
  * There is no scheduler, automatic renewal, network wait or public authorization API.
  */
 @Service
@@ -37,12 +38,14 @@ public class MutationLeaseService {
      * Matching live retries return the existing grant without extending its deadline;
      * expired/released permits get a strictly larger fence. Duration is 1..300 whole
      * seconds. A conflicting live owner, stale revision or terminal journal fails.
+     * New/reacquired permits also enforce the shared two-live-permits owner cap.
      */
     public Grant acquire(UUID adventure, UUID campaign, UUID operation, UUID holder, Duration duration) {
         Objects.requireNonNull(holder, "holder");
         long seconds = seconds(duration);
         requireNoTransaction();
         return transaction.execute(status -> {
+            UUID owner = OwnerMutationAdmission.lockCampaignOwner(jdbc, adventure, campaign);
             lockEligible(adventure, campaign, operation);
             jdbc.update("insert into campaign_mutation_lease (campaign_id) values (?) on conflict do nothing", campaign);
             var live = jdbc.query("select holder_id, fence, expires_at from campaign_mutation_lease "
@@ -58,6 +61,7 @@ public class MutationLeaseService {
                 }
                 return grant;
             }
+            OwnerMutationAdmission.requireCapacity(jdbc, owner);
             return jdbc.queryForObject("update campaign_mutation_lease set fence = fence + 1, operation_id = ?, "
                             + "holder_id = ?, expires_at = clock_timestamp() + (? * interval '1 second') "
                             + "where campaign_id = ? returning fence, expires_at",
@@ -72,6 +76,8 @@ public class MutationLeaseService {
         long seconds = seconds(duration);
         requireNoTransaction();
         return transaction.execute(status -> {
+            // Serialize with admissions: a renewal cannot revive a slot already counted as expired.
+            OwnerMutationAdmission.lockCampaignOwner(jdbc, adventure, campaign);
             lockEligible(adventure, campaign, operation);
             var grants = jdbc.query("update campaign_mutation_lease set expires_at = greatest(expires_at, "
                             + "clock_timestamp() + (? * interval '1 second')) where campaign_id = ? "
