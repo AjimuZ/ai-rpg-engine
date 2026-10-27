@@ -27,21 +27,29 @@ import tools.jackson.databind.json.JsonMapper;
  * Short database-only boundary for a trusted resolved operation. Serializes commits
  * per campaign, rechecks its snapshot, writes every effect and returns a receipt only
  * after COMMIT succeeds. Registered player operations recheck hash-bound typed
- * evidence and common semantic eligibility here; detailed rule resolution and later
- * delivery belong to callers/workers; this internal service has no controller, network port or callback.
+ * evidence, common semantic eligibility and the P07.3 current-state rules here, and
+ * their effects must be attributable to the intention's participants; effect calculation
+ * and later delivery belong to callers/workers; this internal service has no controller,
+ * network port or callback.
  * Any validation, persistence, timeout or commit failure rolls back all its writes.
  */
 @Service
 public class CanonicalCommitService {
     private final EntityManager entities;
     private final JdbcTemplate jdbc;
+    private final CommandRuleCatalogs catalogs;
     private final TransactionTemplate transaction;
     private final JsonMapper json = JsonMapper.builder().build();
 
-    /** Wire database dependencies only; missing infrastructure fails application startup. */
-    public CanonicalCommitService(EntityManager entities, PlatformTransactionManager manager, JdbcTemplate jdbc) {
+    /**
+     * Wire database dependencies and the pinned rule-fact loader; missing infrastructure fails
+     * application startup.
+     */
+    public CanonicalCommitService(EntityManager entities, PlatformTransactionManager manager, JdbcTemplate jdbc,
+            CommandRuleCatalogs catalogs) {
         this.entities = Objects.requireNonNull(entities, "entities");
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
+        this.catalogs = Objects.requireNonNull(catalogs, "catalogs");
         transaction = new TransactionTemplate(manager);
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         transaction.setTimeout(10);
@@ -61,14 +69,18 @@ public class CanonicalCommitService {
                 || TransactionSynchronizationManager.isSynchronizationActive()) {
             throw new IllegalStateException("canonical commit requires no ambient transaction");
         }
-        return Objects.requireNonNull(transaction.execute(status -> write(plan)));
+        // Load frozen pinned rule facts before taking locks; scope is still decided under the lock.
+        var intent = plan.intent();
+        var rules = intent == null ? CommandRuleCatalogs.Content.UNAVAILABLE : catalogs.preload(intent.ownerId(),
+                plan.context().adventureId(), plan.context().campaignId(), intent.command().type());
+        return Objects.requireNonNull(transaction.execute(status -> write(plan, rules)));
     }
 
     /**
      * Apply one plan under database locks; input is immutable and output is tentative
      * until TransactionTemplate commits. Any exception escapes to force rollback.
      */
-    private Receipt write(ResolvedCommit plan) {
+    private Receipt write(ResolvedCommit plan, CommandRuleCatalogs.Content rules) {
         // Bound database contention separately from external work, which is absent.
         entities.createNativeQuery("set local lock_timeout = '2s'").executeUpdate();
         entities.createNativeQuery("set local statement_timeout = '5s'").executeUpdate();
@@ -111,8 +123,11 @@ public class CanonicalCommitService {
                     || !intent.payloadHash().equals(context.payloadHash())) {
                 throw new IllegalStateException("missing or mismatched typed command evidence");
             }
-            CommandSemantics.requireEligible(jdbc, intent.ownerId(), context.adventureId(),
+            UUID player = CommandSemantics.requireEligible(jdbc, intent.ownerId(), context.adventureId(),
                     context.campaignId(), intent.command());
+            // Re-derive every rule premise from current state, then bind effects to participants.
+            var participants = CommandRules.require(jdbc, context.campaignId(), player, intent.command(), rules);
+            CommandRules.requireAttributed(jdbc, context.campaignId(), participants, plan);
         }
         ContentRevision content = entities.find(ContentRevision.class, campaign.getContentRevisionId());
         Instant now = Instant.now();

@@ -91,3 +91,17 @@ trusted internal compatibility constructors for non-player foundation operations
 no HTTP or planning-artifact route accepts resolved plans. Preserve matching historic
 admission/receipt replay before newer policy checks. Add no migration or executor;
 detailed rule validation and local resolution remain P07.3–P07.4.
+
+P07.3 implementation decision (27 October 2026): extend the same lock-scoped gate with
+current-state rules instead of a separate validation phase or stored validation
+stamp. Read mutable premises (position, learned abilities, skill ranks, resources)
+under the campaign lock at admission and again at commit; read authored facts from
+an immutable catalog compiled from the sealed pinned closure before the lock, so pack
+recompilation never extends lock hold time. Fail closed on secret definitions until
+typed reveal records exist, on area targeting until encounter zones exist and on
+costs from another pack's resource vocabulary. Share one category across concealment-
+sensitive failures. At commit require every resource change and event actor to belong
+to the intention's participants. Alternatives rejected: trusting admission-time
+results at commit (stale after any canonical write), validating inside the resolver
+only (would let a resolver defect write unattributable effects), and caching
+mutable state (cannot be fenced by the campaign lock). Local calculation remains P07.4.

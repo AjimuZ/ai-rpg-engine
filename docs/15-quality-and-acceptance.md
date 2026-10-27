@@ -1,5 +1,45 @@
 # Quality Strategy and Acceptance Criteria
 
+P07.3 verification (27 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks
+pass **138 focused command cases and all 401 packaged backend cases in 32 suites**,
+with zero failures, errors or skips; the executable jar is packaged. The focused
+breakdown is 14 typed-contract, 19 typed-validation, eight command-rule, ten
+canonical-form, 26 admission, six command HTTP, 49 canonical commit, five lifecycle
+and one resolved-plan case. Typed validation has one case fewer than P07.2 because
+`MOVE` now needs pinned content and moved from the content-free fixture to the new
+pack-backed `CommandRulesTest`; content-free fixtures use `WAIT` and speech.
+
+`CommandRulesTest` registers a root and a dependency pack through real staging and
+sealing and creates the campaign with the production creation service. It proves
+movement only along disclosed accessible links (current, blocked, secret, unlinked,
+unknown, dependency-namespaced and location-less cases reject alike); speech only to
+co-present perceivable actors (self, secret, foreign, unknown-origin, nonexistent,
+elsewhere and moved recipients reject alike); ability ownership, prerequisite ability and skill
+ranks, every target policy, target perception and exact, insufficient, cross-pack
+vocabulary and missing-row costs. Every rejection leaves an exact snapshot of 14
+state, journal, permit and effect tables unchanged. At commit, a target that moved
+and a cost spent after admission are re-derived and rejected; bystander resources,
+bystander event actors and unknown resources are rejected as unattributable; a valid
+participant-only plan commits and its receipt replays after the rules change. A
+matching admission replays after the player moved. Two real contention cases hold
+the campaign row, observe the blocked backend through `pg_blocking_pids`, move the
+recipient and commit; admission and final commit both reject with unchanged
+production timeouts and no writes. The rule catalog is scope-checked, retains no
+prose and is bound to its revision. An unsealed fixture revision makes content-
+dependent fresh commands fail with `COMMAND_CONTENT_UNAVAILABLE` over HTTP.
+
+Test sensitivity was checked deliberately during development: one run weakened the
+secret-destination, co-presence and resource-vocabulary rules together, and another
+disabled commit attribution. The corresponding rule cases failed in both runs, and
+the source was restored byte-identically (checksum verified) before the passing
+runs above; these were intentional sensitivity probes, not gate outcomes. Configured
+frontend installation (285 packages), both typechecks, 49 tests, four localization
+tests, 240-message parity and both locale builds pass, as do all 22 repository-policy
+tests and zero-finding scans. This adds ownership/prerequisite/knowledge/resource/
+causal evidence toward QA-05 and QA-20; it does not claim item authorization (no
+item intention exists yet), executed actions, public receipts, delivery or live
+inference. Calculations and execution remain P07.4.
+
 P07.2 independent re-verification (27 October 2026): the first completion report
 listed two superseded compile attempts and one superseded audit run as failed
 verification outcomes, so independent review correctly rejected it. The implementation

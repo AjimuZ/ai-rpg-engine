@@ -1,6 +1,8 @@
 package org.rpgengine.commands;
 
 import java.math.BigInteger;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -9,12 +11,15 @@ import org.rpgengine.content.PackTextParser;
 
 /**
  * Closed vocabulary of player intentions, never effects or generic field writes.
- * Exploration currently admits movement, waiting and addressed speech. Item, ability,
- * trade and encounter intentions must acquire explicit contracts and validators before
- * registration; unknown types fail closed. Resolution remains backend-owned (P07.4).
- * Every value is immutable and can reproduce its exact version-1 hash input.
+ * Exploration currently admits movement, waiting, addressed speech and use of a learned
+ * ability. Item, trade and encounter intentions must acquire explicit contracts and
+ * validators before registration; unknown types fail closed. Structural decoding here
+ * is followed by current-state rule validation in {@link CommandRules}; resolution
+ * remains backend-owned (P07.4). Every value is immutable and can reproduce its exact
+ * version-1 hash input.
  */
-public sealed interface TypedCommand permits TypedCommand.Move, TypedCommand.Wait, TypedCommand.Speak {
+public sealed interface TypedCommand
+        permits TypedCommand.Move, TypedCommand.Wait, TypedCommand.Speak, TypedCommand.UseAbility {
     /** @return registered, case-sensitive wire identifier */
     String type();
 
@@ -48,6 +53,15 @@ public sealed interface TypedCommand permits TypedCommand.Move, TypedCommand.Wai
                     yield new Speak(CampaignCommandJson.uuid(payload.get("recipientActorId")),
                             text(payload.get("text"), 4000));
                 }
+                case "USE_ABILITY" -> {
+                    fields(payload, "abilityId", "targetActorIds");
+                    if (!(payload.get("targetActorIds") instanceof List<?> targets)
+                            || targets.size() > UseAbility.MAX_TARGETS) {
+                        throw invalid();
+                    }
+                    yield new UseAbility(text(payload.get("abilityId"), 256),
+                            targets.stream().map(CampaignCommandJson::uuid).toList());
+                }
                 default -> throw invalid();
             };
         } catch (IllegalArgumentException | ArithmeticException failure) {
@@ -58,7 +72,7 @@ public sealed interface TypedCommand permits TypedCommand.Move, TypedCommand.Wai
 
     /** Whether the journal type requires typed evidence at canonical commit. */
     static boolean registered(String type) {
-        return Set.of("MOVE", "WAIT", "SPEAK").contains(type);
+        return Set.of("MOVE", "WAIT", "SPEAK", "USE_ABILITY").contains(type);
     }
 
     /** Require the exact payload field set; missing, extra and effect-bearing keys all fail. */
@@ -123,6 +137,39 @@ public sealed interface TypedCommand permits TypedCommand.Move, TypedCommand.Wai
         /** @return exact submitted wording and canonical recipient identity */
         public Map<String, Object> payload() {
             return Map.of("recipientActorId", recipientActorId.toString(), "text", text);
+        }
+    }
+
+    /**
+     * Request to use one learned ability on explicit targets. It names the pinned ability
+     * and the actors the player intends to affect; costs, magnitudes, draws and outcomes are
+     * never part of the intention. Ownership, prerequisites, target policy, perception and
+     * affordable costs are checked against current state by {@link CommandRules}.
+     */
+    record UseAbility(String abilityId, List<UUID> targetActorIds) implements TypedCommand {
+        /** Upper bound of explicit targets, matching the pack contract's per-action target cap. */
+        static final int MAX_TARGETS = 8;
+
+        /**
+         * Require a bounded stable content reference and at most eight distinct target identities
+         * in submitted order. Order is part of the hashed intention; duplicates fail because one
+         * action cannot address the same actor twice. An empty list means "no explicit target".
+         */
+        public UseAbility {
+            abilityId = text(abilityId, 256);
+            if (targetActorIds == null || targetActorIds.size() > MAX_TARGETS) { throw invalid(); }
+            var distinct = new HashSet<UUID>();
+            for (UUID target : targetActorIds) {
+                if (target == null || !distinct.add(target)) { throw invalid(); }
+            }
+            targetActorIds = List.copyOf(targetActorIds);
+        }
+        /** @return the fixed ability-use identifier */
+        public String type() { return "USE_ABILITY"; }
+        /** @return the ability reference and canonical target UUID texts in submitted order */
+        public Map<String, Object> payload() {
+            return Map.of("abilityId", abilityId,
+                    "targetActorIds", targetActorIds.stream().map(UUID::toString).toList());
         }
     }
 }

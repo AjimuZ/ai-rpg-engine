@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — Current-state command rules, 27 October 2026
+
+- Validate movement against disclosed, accessible authored links from the player's
+  current location, and speech recipients against co-presence and authored
+  knowledge. Hidden locations, routes and actors share one rejection category.
+- Add the closed `USE_ABILITY` intention. Require a learned pinned ability, its
+  prerequisite abilities and skill ranks, a legal target count and affordable costs
+  in the creation profile's own resource vocabulary; area targeting and item, trade
+  and encounter intentions stay unavailable.
+- Re-derive every rule premise inside canonical commit and reject resolved effects
+  on actors the intention does not involve. Compile prose-free pinned rule facts
+  before the campaign lock; content that cannot be loaded fails closed only where
+  definitions are needed. Add six stable `COMMAND_*` rejection codes.
+- Pass 138 focused command cases and all 401 packaged backend tests in 32 suites,
+  with zero failures/errors/skips, including real campaign-lock contention at both
+  boundaries. Pass configured frontend checks, both locale builds and all 22
+  repository-policy tests with zero scan findings. Calculations and execution
+  remain P07.4.
+
 ## Unreleased — Typed commands and atomic semantic validation, 27 October 2026
 
 - Admit a closed immutable exploration vocabulary for movement, bounded waiting and

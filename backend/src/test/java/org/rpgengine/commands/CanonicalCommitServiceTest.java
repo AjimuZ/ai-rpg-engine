@@ -444,8 +444,15 @@ class CanonicalCommitServiceTest {
                 assertThrows(IllegalStateException.class, () -> commits.commit(plan(fixture, fixture.operation()))));
         assertEquals(before, snapshot());
         for (var field : CanonicalCommitService.class.getDeclaredFields()) {
-            assertTrue(Set.of(EntityManager.class, JdbcTemplate.class, TransactionTemplate.class, JsonMapper.class).contains(field.getType()),
+            assertTrue(Set.of(EntityManager.class, JdbcTemplate.class, TransactionTemplate.class, JsonMapper.class,
+                            CommandRuleCatalogs.class).contains(field.getType()),
                     "Review transaction dependency: " + field);
+        }
+        // The P07.3 rule-fact loader is itself local: sealed pack rows, a read transaction and a bounded cache.
+        for (var field : CommandRuleCatalogs.class.getDeclaredFields()) {
+            assertTrue(Set.of(JdbcTemplate.class, org.rpgengine.content.PackRegistry.class, TransactionTemplate.class,
+                            java.util.Map.class, int.class, java.util.Set.class).contains(field.getType()),
+                    "Review rule-catalog dependency: " + field);
         }
     }
 

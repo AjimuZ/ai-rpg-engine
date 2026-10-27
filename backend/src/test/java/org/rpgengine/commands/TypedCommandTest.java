@@ -20,7 +20,8 @@ class TypedCommandTest {
     @Test
     void supportedIntentionsRoundTripAndPreserveExactText() {
         for (TypedCommand command : List.of(new TypedCommand.Move("harbor:door"), new TypedCommand.Wait(86_400),
-                new TypedCommand.Speak(UUID.randomUUID(), "  È qui? 😀\n"))) {
+                new TypedCommand.Speak(UUID.randomUUID(), "  È qui? 😀\n"), new TypedCommand.UseAbility("steady", List.of()),
+                new TypedCommand.UseAbility("dep#mend", List.of(UUID.randomUUID(), UUID.randomUUID())))) {
             byte[] canonical = CommandCanonicalForm.encode(command.type(), 3, command.payload(), 32_768);
             assertEquals(command, TypedCommand.decode(canonical));
             assertThrows(UnsupportedOperationException.class, () -> command.payload().put("patch", "bad"));
@@ -33,7 +34,7 @@ class TypedCommandTest {
     /** Effect, batch, administrative and not-yet-supported action types cannot masquerade as player intentions. */
     @ParameterizedTest
     @ValueSource(strings = {"PATCH", "SET_FIELD", "UPDATE", "BATCH", "ADMIN_CORRECTION", "USE_ITEM",
-            "USE_ABILITY", "TRANSFER_ITEM", "ATTACK", "FREE_TEXT", "UNKNOWN"})
+            "EQUIP_ITEM", "TRANSFER_ITEM", "ATTACK", "FREE_TEXT", "UNKNOWN"})
     void rejectsUnregisteredCommands(String type) {
         assertInvalid(type, Map.of());
     }
@@ -58,6 +59,25 @@ class TypedCommandTest {
         }
         assertInvalid("SPEAK", Map.of("recipientActorId", UUID.randomUUID().toString(), "text", " "));
         assertInvalid("SPEAK", Map.of("recipientActorId", UUID.randomUUID().toString(), "text", "x".repeat(4001)));
+        // Ability use names a pinned ability and targets only: no costs, magnitudes, rolls or actor overrides.
+        String target = UUID.randomUUID().toString();
+        for (Map<String, Object> payload : List.<Map<String, Object>>of(Map.of("abilityId", "steady"),
+                Map.of("targetActorIds", List.of()), Map.of("abilityId", " ", "targetActorIds", List.of()),
+                Map.of("abilityId", "x".repeat(257), "targetActorIds", List.of()),
+                Map.of("abilityId", 1, "targetActorIds", List.of()),
+                Map.of("abilityId", "steady", "targetActorIds", target),
+                Map.of("abilityId", "steady", "targetActorIds", List.of(target, target)),
+                Map.of("abilityId", "steady", "targetActorIds", List.of(target.toUpperCase())),
+                Map.of("abilityId", "steady", "targetActorIds", List.of(1)),
+                Map.of("abilityId", "steady", "targetActorIds", java.util.Collections.nCopies(9, target)),
+                Map.of("abilityId", "steady", "targetActorIds", java.util.stream.Stream.generate(
+                        () -> UUID.randomUUID().toString()).limit(9).toList()),
+                Map.of("abilityId", "steady", "targetActorIds", List.of(), "costs", Map.of("vigor", -1)),
+                Map.of("abilityId", "steady", "targetActorIds", List.of(), "actorId", target),
+                Map.of("abilityId", "steady", "targetActorIds", List.of(), "roll", 20),
+                Map.of("abilityId", "steady", "targetActorIds", List.of(Map.of("id", target))))) {
+            assertInvalid("USE_ABILITY", payload);
+        }
     }
 
     /** Direct record callers cannot bypass the wire validation of bounds or Unicode scalar text. */
@@ -67,6 +87,16 @@ class TypedCommandTest {
         assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.Move("\ud800"));
         assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.Speak(null, "hello"));
         assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.Speak(UUID.randomUUID(), "\udc00"));
+        UUID target = UUID.randomUUID();
+        assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.UseAbility("steady", null));
+        assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.UseAbility("steady", List.of(target, target)));
+        assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.UseAbility("\ud800", List.of()));
+        var targets = new java.util.ArrayList<UUID>(List.of(target));
+        var use = new TypedCommand.UseAbility("steady", targets);
+        targets.add(UUID.randomUUID());
+        // A caller mutating its list after construction cannot change the frozen intention.
+        assertEquals(List.of(target), use.targetActorIds());
+        assertThrows(UnsupportedOperationException.class, () -> use.targetActorIds().add(target));
     }
 
     /** Decode bounded canonical input and require only the sanitized semantic category. */

@@ -147,9 +147,27 @@ mode/decision/player/recipient eligibility is rechecked in the canonical transac
 a prior admission is never unconditional authorization. Historical matching retries
 and committed receipt replay remain read-only and precede newer eligibility checks.
 No schema migration, fabricated legacy player binding or background-artifact world
-write is added. Detailed resource/ownership/prerequisite/knowledge/causal checks and
-local action calculation remain P07.3–P07.4. See the [closed payloads and transaction
+write is added. P07.3 adds the current-state rules below; local action calculation
+remains P07.4. See the [closed payloads and transaction
 contract](07-turn-protocol.md#p072-typed-intentions-and-atomic-common-semantics).
+
+### Command rules (P07.3)
+
+Rule premises are read from committed rows under the campaign lock at admission and
+again at canonical commit: `actor.location_id` for position and co-presence,
+`learned_ability` for ownership, `character_state.skills` for skill ranks and
+`actor_resource` (current above minimum) for affordability. Authored facts come from
+the campaign's pinned sealed closure: location links with their `accessible` flag,
+`knowledge: secret` on locations and NPCs, and ability prerequisites, costs and
+target policy. Identities are canonical, exactly as creation stores them: root IDs
+unqualified, dependency IDs `pack#id`. Resource keys stay unqualified and belong to
+the creation profile's declaring pack, so a cost declared by another pack's
+vocabulary is never charged to a same-named resource. Secret definitions fail closed
+until typed reveal records exist (P09.1). At commit, every resource change and event
+actor must belong to the intention's participants (player plus recipient/targets).
+No table, trigger or migration is added; the immutable compiled rule facts are an
+in-memory cache keyed by sealed revision. See the
+[rule contract](07-turn-protocol.md#p073-current-state-rule-validation).
 
 ### Campaign creation (P06.1)
 

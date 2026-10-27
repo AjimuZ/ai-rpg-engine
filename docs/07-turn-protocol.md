@@ -76,7 +76,8 @@ receipt and revision; other statuses carry neither. Once recorded, neither commi
 field can change, and terminal statuses cannot reopen. These are database bounds;
 P03.3 now adds the internal commit service, exact revision checks and durable outbox.
 P03.5 supplies leases/fencing and P07.1 supplies owner-scoped admission/status;
-typed/common gameplay authorization is supplied by P07.2 below; detailed rule validation and resolution remain P07.3–P07.4.
+typed/common gameplay authorization is supplied by P07.2 and current-state rule validation by P07.3 below;
+local calculation and resolution remain P07.4.
 See [domain constraints](05-domain-model.md#3-database-organization).
 
 ### P07.1 durable admission
@@ -160,11 +161,11 @@ closed until their contracts and rule services are implemented.
 | `SPEAK` | `recipientActorId`, `text` | Canonical UUID and nonblank text, at most 4,000 UTF-16 units |
 
 Text remains exact: no trimming, Unicode normalization or decimal/string coercion.
-The wait cap is an input ceiling, not permission to advance a day. Reachability,
-legal duration, recipient knowledge/range and other resource/prerequisite/causal
-rules remain P07.3 and P10.4; calculations and execution remain P07.4. No worker
-currently turns an admitted intention into effects. An `ACCEPTED` result means
-only durable admission after the checks implemented here.
+The wait cap is an input ceiling, not permission to advance a day. P07.3 below adds
+`USE_ABILITY` plus reachability, recipient knowledge/range, ownership, prerequisite,
+resource and causal rules; legal wait duration remains P10.4 and calculations and
+execution remain P07.4. No worker currently turns an admitted intention into effects.
+An `ACCEPTED` result means only durable admission after the checks implemented here.
 
 Admission hashes a bounded canonical byte snapshot before locking. Under the
 existing owner → campaign order it authorizes scope, replays/conflicts an existing
@@ -205,6 +206,81 @@ Matching committed receipt replay precedes current eligibility checks, since rep
 cannot perform new effects. Background artifacts never enter this path as world
 facts: their activation must construct an ordinary typed command and pass the same
 current-state gate ([planning admission](28-asynchronous-narrative-planning.md#7-dependency-sensitive-staleness-and-admission)).
+
+### P07.3 current-state rule validation
+
+`CommandRules` runs immediately after `CommandSemantics`, in the same transaction and
+under the same campaign row lock, at admission (before cleanup, journal insertion or
+permit grant) and again at canonical commit (after replay, revision, operation and
+fence checks, before any entity changes). Every premise is read from committed rows
+at that moment; an earlier admission, a planning snapshot or a cached catalog never
+counts as permission. Rejections use sanitized categories, roll back the whole
+transaction and consume no request identity, permit, draw or world state. Matching
+admission retries and committed receipts still replay before these rules.
+
+P07.3 registers one more exploration intention. Costs, magnitudes, draws, outcomes
+and actor overrides are never part of it; the server derives them during resolution.
+
+| Type | Exact payload | Structural bounds |
+| --- | --- | --- |
+| `USE_ABILITY` | `abilityId`, `targetActorIds` | Nonblank stable content reference of at most 256 UTF-16 units; array of at most eight distinct canonical UUIDs in submitted order (order is hashed); empty means no explicit target |
+
+| Intention | Rules, in order; the first failure wins | Category |
+| --- | --- | --- |
+| `MOVE` | The player has a current location; the destination differs from it, exists in the pinned closure, is not `knowledge: secret`, and an `accessible: true` authored link leads there from the current location | `DESTINATION_UNAVAILABLE` |
+| `SPEAK` | The recipient is another actor of this campaign, shares the player's non-null current location and is perceivable (below) | `ACTOR_UNAVAILABLE` |
+| `USE_ABILITY` | Ownership: a pinned ability the player has a `learned_ability` row for | `ABILITY_UNAVAILABLE` |
+| | Prerequisites: every prerequisite ability learned and every skill at or above its rank in `character_state.skills` (missing means rank 0) | `PREREQUISITE_UNMET` |
+| | Target policy: `self` takes no explicit target, `single` exactly one, `multiple` one to `maxTargets`; `area` needs encounter zones (P11) and every unknown policy fails closed | `TARGET_ILLEGAL` |
+| | Every explicit target is perceivable and co-present; a single-target ability may name the player itself | `ACTOR_UNAVAILABLE` |
+| | Resources: each nonzero declared cost is at most the player's current value above its minimum, in the vocabulary of the ability's declaring pack | `RESOURCE_INSUFFICIENT` |
+| `WAIT` | No rule beyond P07.2; legal duration belongs to the world clock (P10.4) | — |
+
+**Knowledge.** An actor is perceivable when it has no authored origin, or its origin
+resolves in the pinned closure and is not `knowledge: secret`. A creation profile is
+the player's own origin and is never concealed. Until typed reveal records exist
+(P09.1), secret locations and actors stay undiscoverable and therefore fail closed;
+`campaign_known_fact` is free text and is not consulted as a rule source. Unknown,
+concealed, unlinked, blocked or current destinations share one category, and missing,
+foreign, self, absent and concealed recipients share another, so a rejection never
+confirms that a hidden location, route or actor exists.
+
+**Resource vocabulary.** Resource keys are unqualified. Campaign creation stores the
+resource IDs declared by the creation profile's own pack, while ability costs name
+resources of the ability's declaring pack. A nonzero cost from a different pack is
+therefore never charged to a same-named player resource; it is unaffordable. Cost-free
+dependency abilities remain usable. A player without a resolvable creation origin, or
+without the resource row, cannot pay any cost.
+
+**Causal attribution.** At canonical commit the rule result is the set of
+participants: the player plus the speech recipient or explicit ability targets.
+Every resolved resource change must belong to a participant and every event actor
+must be absent or a participant; otherwise the trusted plan is rejected as a resolver
+defect (`IllegalStateException`) before any write. Premises are re-derived after the
+lock, so an effect cannot depend on a target that left, a cost already spent or a
+link that closed after admission. Event causation references must name events of the
+same campaign (database key), and the exact-revision check makes every such event
+causally earlier than this operation. Spending the cost and applying ability effects
+remain P07.4; P07.3 checks only that the premises hold and that effects are attributable.
+
+**Pinned rule facts.** `CommandRuleCatalogs` loads a compact catalog before the lock:
+it authorizes owner/adventure/campaign scope in a short read-only transaction, then
+reparses and recompiles the campaign's sealed revision closure through `PackRegistry`.
+It keeps only location links/disclosure, actor-origin disclosure, creation-profile
+vocabularies and ability contracts under canonical IDs (root IDs unqualified,
+dependency IDs `pack#id`); no prose, secret text, effect tree or localization is
+retained. At most 16 revisions are cached (least recently used evicted); pinned
+revisions are frozen by trigger and sealed bytes are immutable, so a cached catalog
+equals the locked state, and the locked validator still compares the revision ID.
+Load failures never throw from preload: a fresh command whose rules need definitions
+then fails with `CONTENT_UNAVAILABLE`, while `WAIT` and speech to an actor without an
+authored origin need no catalog. Recompilation therefore never extends lock hold time.
+
+Item, trade and encounter intentions (`USE_ITEM`, `EQUIP_ITEM`, `TRANSFER_ITEM`,
+`ATTACK` and similar) remain unregistered and fail closed: pack items currently carry
+no use contract, and item ownership/equipment checks arrive with their commands in
+P10.1–P10.2. A forged item or ability therefore cannot reach canonical state through
+any current route.
 
 ### P07.1 continuation checkpoint
 
@@ -346,8 +422,9 @@ by a 2-second lock timeout, a 5-second statement timeout and a 10-second transac
 timeout. Plans allow at most 128 resources, 128 events (at least one), 128 settlements
 and 32 KiB receipt details; existing stored JSONB limits remain authoritative.
 
-This internal primitive does not accept player/model proposals directly. P07.2 supplies common typed authorization for registered player operations. Detailed
-rule/resource validation, encounter checks, cancellation coordination and outbox
+This internal primitive does not accept player/model proposals directly. P07.2 supplies common typed authorization for registered player operations, and P07.3
+re-derives their current-state rules and requires effects attributable to the
+intention's participants. Encounter checks, cancellation coordination and outbox
 dispatch remain later roadmap tasks. P07.1 admission and P03.5 leases/fences/startup
 recovery now protect the durable operation boundary. New domain effect types must join the same explicit commit path.
 

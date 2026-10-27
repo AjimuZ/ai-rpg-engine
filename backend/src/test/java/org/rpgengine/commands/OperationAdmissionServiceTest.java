@@ -48,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class OperationAdmissionServiceTest {
     private static final Instant NOW = Instant.parse("2026-10-25T12:00:00Z");
     @Autowired private OperationAdmissionService admissions;
+    @Autowired private CommandRuleCatalogs catalogs;
     @Autowired private MutationLeaseService leases;
     @Autowired private CanonicalCommitService commits;
     @Autowired private RandomDrawService draws;
@@ -80,12 +81,12 @@ class OperationAdmissionServiceTest {
     /** A new command is journaled ACCEPTED and owns a fresh fenced permit in the same commit. */
     @Test
     void admissionJournalsOperationAndGrantsPermitAtomically() {
-        var admission = submit(scope.campaign(), command("r1", 0, Map.of("destinationId", "door")));
+        var admission = submit(scope.campaign(), command("r1", 0, Map.of("seconds", 60)));
         assertFalse(admission.replayed());
         var view = admission.operation();
         assertEquals(OperationStatus.ACCEPTED, view.status());
         assertEquals(0L, view.baseRevision());
-        assertEquals("MOVE", view.commandType());
+        assertEquals("WAIT", view.commandType());
         assertNotNull(admission.lease());
         assertEquals(1L, admission.lease().token().fence());
         assertEquals(view.operationId(), jdbc.queryForObject(
@@ -94,7 +95,7 @@ class OperationAdmissionServiceTest {
                 "select holder_id from campaign_mutation_lease where campaign_id = ?", UUID.class, scope.campaign()));
         String hash = jdbc.queryForObject("select payload_hash from operation_journal where id = ?", String.class,
                 view.operationId());
-        assertEquals(CommandCanonicalForm.sha256(CommandCanonicalForm.encode("MOVE", 0, Map.of("destinationId", "door"),
+        assertEquals(CommandCanonicalForm.sha256(CommandCanonicalForm.encode("WAIT", 0, Map.of("seconds", 60),
                 OperationAdmissionService.MAX_CANONICAL_BYTES)), hash);
         // The returned permit is a real MutationLeaseService token usable by the worker.
         assertTrue(leases.release(scope.adventure(), scope.campaign(), view.operationId(), admission.lease().token()));
@@ -103,9 +104,9 @@ class OperationAdmissionServiceTest {
     /** Identical retries replay before stale/busy checks, even after the campaign revision moved on. */
     @Test
     void identicalRetryReplaysWithoutWritesAfterRevisionChange() {
-        var first = submit(scope.campaign(), command("r1", 0, Map.of("destinationId", "door")));
+        var first = submit(scope.campaign(), command("r1", 0, Map.of("seconds", 60)));
         bumpRevision(scope.campaign());
-        var replay = submit(scope.campaign(), command("r1", 0, Map.of("destinationId", "door")));
+        var replay = submit(scope.campaign(), command("r1", 0, Map.of("seconds", 60)));
         assertTrue(replay.replayed());
         assertNull(replay.lease());
         assertEquals(first.operation().operationId(), replay.operation().operationId());
@@ -191,7 +192,7 @@ class OperationAdmissionServiceTest {
                 return super.queryForObject(sql, type, args);
             }
         };
-        var service = new OperationAdmissionService(entities, boundary, manager);
+        var service = new OperationAdmissionService(entities, boundary, manager, catalogs);
         assertFailure(OperationAdmissionFailure.Kind.CAMPAIGN_BUSY,
                 () -> service.submit(scope.owner(), scope.adventure(), scope.campaign(),
                         command("next", 0, Map.of())));
@@ -278,7 +279,7 @@ class OperationAdmissionServiceTest {
             for (int index = 0; index < callers; index++) {
                 tasks.add(() -> {
                     assertTrue(start.await(10, TimeUnit.SECONDS));
-                    return submit(scope.campaign(), command("same", 0, Map.of("destinationId", "v")));
+                    return submit(scope.campaign(), command("same", 0, Map.of("seconds", 61)));
                 });
             }
             var futures = tasks.stream().map(pool::submit).toList();
@@ -339,8 +340,8 @@ class OperationAdmissionServiceTest {
     @Test
     void concurrentChangedPayloadHasOneWinnerAndOneConflict() throws Exception {
         var results = race(
-                () -> submit(scope.campaign(), command("same", 0, Map.of("destinationId", "a"))),
-                () -> submit(scope.campaign(), command("same", 0, Map.of("destinationId", "b"))));
+                () -> submit(scope.campaign(), command("same", 0, Map.of("seconds", 62))),
+                () -> submit(scope.campaign(), command("same", 0, Map.of("seconds", 63))));
         assertEquals(1, results.stream().filter(OperationAdmissionService.Admission.class::isInstance).count());
         assertEquals(1, results.stream().filter(OperationAdmissionFailure.Kind.REQUEST_CONFLICT::equals).count());
         assertEquals(1, count("operation_journal"));
@@ -441,7 +442,8 @@ class OperationAdmissionServiceTest {
         var secondJdbc = ownerLockBoundary(() -> contenderPid.set(
                 jdbc.queryForObject("select pg_backend_pid()", Integer.class)), () -> {});
         var renewing = new MutationLeaseService(renewalFirst ? firstJdbc : secondJdbc, manager);
-        var admitting = new OperationAdmissionService(entities, renewalFirst ? secondJdbc : firstJdbc, manager);
+        var admitting = new OperationAdmissionService(entities, renewalFirst ? secondJdbc : firstJdbc, manager,
+                catalogs);
         Callable<Object> renewal = () -> {
             var failure = assertThrows(IllegalStateException.class, () -> renewing.renew(scope.adventure(),
                     scope.campaign(), old.operation().operationId(), old.lease().token(), Duration.ofSeconds(300)));
@@ -563,7 +565,7 @@ class OperationAdmissionServiceTest {
     /** Real startup preserves one committed outcome, retires expired work and never revives a retried identity. */
     @Test
     void applicationRestartReplaysStoredOutcomeAndRecoversAbandonedAdmission() {
-        var request = command("committed", 0, Map.of("destinationId", "door"));
+        var request = command("committed", 0, Map.of("seconds", 60));
         var admitted = submit(scope.campaign(), request);
         var plan = resolve(admitted);
         var draw = draws.reserve(plan.context(), 0, 20);
@@ -617,7 +619,7 @@ class OperationAdmissionServiceTest {
                         new CampaignEvent.Body("explored", 1, 1, "{}"))),
                 List.of(new ResolvedCommit.Reward("door:first", "party", "{\"visited\":true}")), "{}", true, ResolvedCommit.Preparation.NONE,
                 new CommandIntent(scope.owner(), jdbc.queryForObject("select idempotency_key from operation_journal where id = ?",
-                        String.class, view.operationId()), 0, new TypedCommand.Move("door")));
+                        String.class, view.operationId()), 0, new TypedCommand.Wait(60)));
     }
 
     /** Start two actual database transactions together; unexpected failures propagate through their futures. */
@@ -679,10 +681,13 @@ class OperationAdmissionServiceTest {
         return admissions.submit(scope.owner(), scope.adventure(), campaign, command);
     }
 
-    /** Build a MOVE command; tests vary only the request identity, revision and payload. */
+    /**
+     * Build a WAIT command; tests vary only the request identity, revision and payload. WAIT
+     * consults no pinned definitions, so these admission mechanics need no sealed pack fixture.
+     */
     private static OperationAdmissionService.Command command(String request, long revision, Map<String, Object> payload) {
-        return new OperationAdmissionService.Command(request, revision, "MOVE",
-                payload.isEmpty() ? Map.of("destinationId", "door") : payload);
+        return new OperationAdmissionService.Command(request, revision, "WAIT",
+                payload.isEmpty() ? Map.of("seconds", 60) : payload);
     }
 
     /** Assert one expected admission outcome. */

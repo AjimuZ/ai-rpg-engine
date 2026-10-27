@@ -10,8 +10,9 @@ import tools.jackson.databind.json.JsonMapper;
  * Database-only common semantic gate shared by admission and canonical commit. The
  * caller holds the campaign lock in its bounded transaction. No validation stamp from
  * an earlier snapshot grants permission: mode, pending decision and player binding are
- * read again at use. Resource/prerequisite/knowledge rules extend this gate in P07.3;
- * encounter commands remain unavailable until their scheduler exists.
+ * read again at use. {@link CommandRules} then applies the P07.3 reachability, perception,
+ * ownership, prerequisite and resource rules in the same transaction; encounter commands
+ * remain unavailable until their scheduler exists.
  */
 final class CommandSemantics {
     private static final JsonMapper JSON = JsonMapper.builder().build();

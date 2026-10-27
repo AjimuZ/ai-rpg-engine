@@ -1133,6 +1133,46 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     repository policy tests/scans; record actual results and a neutral owner commit
     before checking this task.
 - [ ] P07.3 Add resource, ownership, prerequisite, knowledge, and causal validation.
+  - Package A — current-state rule gate: `CommandRules` runs after common semantics
+    under the same campaign lock at admission and again in canonical commit. `MOVE`
+    follows one disclosed `accessible` authored link from the player's current
+    location; speech recipients and ability targets are other co-present campaign
+    actors whose authored origin is not secret. Secret definitions fail closed until
+    typed reveal records exist (P09.1). Concealment-sensitive failures share one
+    sanitized category each. Matching retries and stored receipts replay first.
+  - Package B — ability ownership, prerequisites and resources: register the closed
+    `USE_ABILITY {abilityId, targetActorIds}` intention (at most eight distinct
+    targets, no costs/rolls/actor overrides). Require a learned pinned ability, its
+    prerequisite abilities and skill ranks, a legal `self`/`single`/`multiple` target
+    count (`area` waits for P11 zones) and affordable nonzero costs in the creation
+    profile's own resource vocabulary. Item, trade and encounter intentions stay
+    unregistered until P10.1–P10.2/P11 supply their contracts.
+  - Package C — pinned facts and causal attribution: compile an immutable prose-free
+    rule catalog from the sealed pinned closure before the lock (16-revision cache,
+    revision-bound, `CONTENT_UNAVAILABLE` only where definitions are needed). At
+    commit, every resource change and event actor must belong to the intention's
+    participants. No migration, controller, worker or browser action is added;
+    calculations, cost spending and execution remain P07.4. See the
+    [rule contract](07-turn-protocol.md#p073-current-state-rule-validation).
+  - Verified evidence (27 October 2026): all 138 focused command cases (eight new
+    command-rule cases) and all 401 packaged backend cases in 32 suites pass with zero
+    failures/errors/skips on the scoped JDK 21/PostgreSQL 18.6 fixture. Configured
+    frontend installation, typechecking, 49 tests, four localization tests,
+    240-message parity and both locale builds pass; all 22 repository-policy tests
+    and zero-finding scans pass. Deliberate rule-weakening probes failed the intended
+    cases and were reverted byte-identically. See the
+    [verification record](15-quality-and-acceptance.md).
+  - Exit checks: real sealed root/dependency packs and production campaign creation;
+    open/blocked/secret/unlinked/current/dependency destinations and missing location;
+    secret/foreign/self/absent/out-of-range recipients; ownership, ability and skill
+    prerequisites, every target policy and exact/insufficient/cross-vocabulary/missing
+    costs; exact multi-table no-write snapshots for every rejection; commit-time
+    re-derivation after target movement and spending; unattributable resource/event
+    effects; admission and receipt replay before current rules; real campaign-lock
+    contention at both boundaries; catalog scope, prose exclusion and revision binding.
+    Run focused commands, full packaged backend, configured frontend gates and
+    repository policy tests/scans; record actual results and a neutral owner commit
+    before checking this task.
 - [ ] P07.4 Implement local action calculations, durable draws, events, receipts, and pending decisions.
 - [ ] P07.5 Add resumable public stream, cancellation race handling, and post-commit presentation jobs.
 - [ ] P07.6 Implement atomic plan admission with dependency/query-epoch rechecks, scope/content/author validation, fencing and idempotency; artifacts never directly change world facts/time/rewards, and activation uses ordinary commands under QA-36.

@@ -76,7 +76,7 @@ class CampaignCommandHttpTest {
     @Test
     void admitsReplaysAndReportsStatus() throws Exception {
         String request = UUID.randomUUID().toString();
-        var accepted = post(commandsPath(), envelope(request, 0, "{\"recipientActorId\":\"" + player(campaign) + "\",\"text\":\"Hello\"}").replace("\"MOVE\"", "\"SPEAK\""));
+        var accepted = post(commandsPath(), envelope(request, 0, "{\"recipientActorId\":\"" + guide(campaign) + "\",\"text\":\"Hello\"}").replace("\"MOVE\"", "\"SPEAK\""));
         assertEquals(202, accepted.status(), accepted.body());
         JsonNode view = json.readTree(accepted.body());
         assertEquals("ACCEPTED", view.get("status").asText());
@@ -87,7 +87,7 @@ class CampaignCommandHttpTest {
         assertEquals("/api/v1/campaigns/" + campaign + "/operations/" + operation + "?adventureId=" + adventure,
                 view.get("query").asText());
         // Key order does not change the canonical identity of a closed speech payload.
-        var replay = post(commandsPath(), envelope(request, 0, "{\"text\":\"Hello\",\"recipientActorId\":\"" + player(campaign) + "\"}").replace("\"MOVE\"", "\"SPEAK\""));
+        var replay = post(commandsPath(), envelope(request, 0, "{\"text\":\"Hello\",\"recipientActorId\":\"" + guide(campaign) + "\"}").replace("\"MOVE\"", "\"SPEAK\""));
         assertEquals(200, replay.status(), replay.body());
         assertEquals(operation, json.readTree(replay.body()).get("operationId").asText());
         assertTrue(json.readTree(replay.body()).get("replayed").asBoolean());
@@ -107,7 +107,8 @@ class CampaignCommandHttpTest {
         assertEquals("{\"code\":\"COMMAND_REQUEST_CONFLICT\"}", conflict.body());
         assertEquals("{\"code\":\"COMMAND_STALE_REVISION\"}",
                 post(commandsPath(), envelope(UUID.randomUUID().toString(), 3, "{\"destinationId\":\"door\"}")).body());
-        var busy = post(commandsPath(), envelope(UUID.randomUUID().toString(), 0, "{\"destinationId\":\"door\"}"));
+        var busy = post(commandsPath(), envelope(UUID.randomUUID().toString(), 0, "{\"seconds\":20}")
+                .replace("\"MOVE\"", "\"WAIT\""));
         assertEquals(409, busy.status());
         assertEquals("{\"code\":\"COMMAND_CAMPAIGN_BUSY\"}", busy.body());
         assertEquals(1, count());
@@ -140,7 +141,7 @@ class CampaignCommandHttpTest {
         assertEquals(0, count());
     }
 
-    /** Typed shape and common-semantic failures return stable 422 categories without retaining an operation. */
+    /** Typed shape, common-semantic and rule failures return stable 422 categories without retaining an operation. */
     @Test
     void rejectsGenericPatchesAndIllegalTypedActions() throws Exception {
         for (String payload : new String[] {"{}", "{\"destinationId\":\"door\",\"patch\":{\"hp\":99}}",
@@ -153,7 +154,7 @@ class CampaignCommandHttpTest {
                 .replace("\"MOVE\"", "\"PATCH\""));
         assertEquals(422, unknown.status());
         assertEquals("{\"code\":\"COMMAND_INVALID\"}", unknown.body());
-        String valid = envelope(UUID.randomUUID().toString(), 0, "{\"destinationId\":\"door\"}");
+        String valid = envelope(UUID.randomUUID().toString(), 0, "{\"seconds\":20}").replace("\"MOVE\"", "\"WAIT\"");
         jdbc.update("update campaign set mode = 'ENCOUNTER', row_version = row_version + 1 where id = ?", campaign);
         var mode = post(commandsPath(), valid);
         assertEquals(422, mode.status());
@@ -169,6 +170,21 @@ class CampaignCommandHttpTest {
                 .replace("\"MOVE\"", "\"SPEAK\""));
         assertEquals(422, target.status());
         assertEquals("{\"code\":\"COMMAND_ACTOR_UNAVAILABLE\"}", target.body());
+        // P07.3: the player cannot address itself, and rules needing definitions fail closed
+        // when the campaign pins no sealed pack (this fixture's revision has no stored bytes).
+        var self = post(commandsPath(), envelope(UUID.randomUUID().toString(), 0,
+                "{\"recipientActorId\":\"" + player(campaign) + "\",\"text\":\"hello\"}")
+                .replace("\"MOVE\"", "\"SPEAK\""));
+        assertEquals("{\"code\":\"COMMAND_ACTOR_UNAVAILABLE\"}", self.body());
+        for (String content : new String[] {envelope(UUID.randomUUID().toString(), 0, "{\"destinationId\":\"door\"}"),
+                envelope(UUID.randomUUID().toString(), 0, "{\"abilityId\":\"steady\",\"targetActorIds\":[]}")
+                        .replace("\"MOVE\"", "\"USE_ABILITY\"")}) {
+            var unavailable = post(commandsPath(), content);
+            assertEquals(422, unavailable.status());
+            assertEquals("{\"code\":\"COMMAND_CONTENT_UNAVAILABLE\"}", unavailable.body());
+        }
+        assertEquals("{\"code\":\"COMMAND_INVALID\"}", post(commandsPath(), envelope(UUID.randomUUID().toString(), 0,
+                "{\"abilityId\":\"steady\",\"targetActorIds\":[],\"cost\":0}").replace("\"MOVE\"", "\"USE_ABILITY\"")).body());
         assertEquals(0, count());
         assertEquals(0, jdbc.queryForObject("select count(*) from campaign_mutation_lease", Integer.class));
         // Rejection consumes no request identity: the same valid envelope can be reviewed and submitted.
@@ -221,8 +237,11 @@ class CampaignCommandHttpTest {
             var started = Campaign.start(workspace.getId(), content, "Campaign", "seed", now);
             entities.persist(started);
             var player = org.rpgengine.characters.Actor.create(started.getId(),
-                    org.rpgengine.characters.ActorKind.CHARACTER, null, "Player", null, 0, now);
+                    org.rpgengine.characters.ActorKind.CHARACTER, null, "Player", "camp", 0, now);
             entities.persist(player);
+            // A co-present listener without an authored origin is perceivable without pinned content.
+            entities.persist(org.rpgengine.characters.Actor.create(started.getId(),
+                    org.rpgengine.characters.ActorKind.NPC, null, "Guide", "camp", 0, now));
             entities.flush();
             jdbc.update("insert into campaign_creation (adventure_id, request_id, payload_hash, campaign_id, actor_id, "
                             + "profile_id, choices, created_at) values (?, ?, ?, ?, ?, 'neutral', '{}'::jsonb, now())",
@@ -231,9 +250,14 @@ class CampaignCommandHttpTest {
         });
     }
 
-    /** Resolve the fixture's immutable creation player for an addressed speech intention. */
+    /** Resolve the fixture's immutable creation player, which can never address itself. */
     private UUID player(UUID id) {
         return jdbc.queryForObject("select actor_id from campaign_creation where campaign_id = ?", UUID.class, id);
+    }
+
+    /** Resolve the fixture's co-present listener for an addressed speech intention. */
+    private UUID guide(UUID id) {
+        return jdbc.queryForObject("select id from actor where campaign_id = ? and kind = 'NPC'", UUID.class, id);
     }
 
     /** Build one public envelope with a raw JSON payload so tests control exact spelling. */

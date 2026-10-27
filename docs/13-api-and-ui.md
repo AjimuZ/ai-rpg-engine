@@ -211,7 +211,9 @@ for chunked input. The object has exactly `requestId`, `expectedRevision`,
 integers within signed 64-bit range; decimals/strings are not coerced. Type syntax
 is `[A-Z][A-Z0-9_]{0,63}`. Unknown envelope fields, duplicate keys, invalid UTF-8,
 multiple documents and malformed UUIDs fail before storage. For new requests, P07.2 applies the closed `MOVE`/`WAIT`/`SPEAK` payloads and
-transactional eligibility checks in the [turn protocol](07-turn-protocol.md#p072-typed-intentions-and-atomic-common-semantics).
+transactional eligibility checks in the [turn protocol](07-turn-protocol.md#p072-typed-intentions-and-atomic-common-semantics);
+P07.3 adds `USE_ABILITY` (`abilityId`, `targetActorIds`) and the
+[current-state rules](07-turn-protocol.md#p073-current-state-rule-validation).
 Unknown types, arbitrary patches, extra/missing fields and wrong payload types are
 semantic 422 errors. These are intentions only; admission does not execute them.
 
@@ -235,14 +237,22 @@ stored progress, not evidence that a worker is currently alive.
 | 422 | `COMMAND_INVALID` | Canonical bounds, unknown command type, invalid closed payload or generic patch |
 | 422 | `COMMAND_MODE_ILLEGAL` | Current scheduling mode has no supported command contract |
 | 422 | `COMMAND_DECISION_UNAVAILABLE` | Pending decision shape/version does not permit supported input |
-| 422 | `COMMAND_ACTOR_UNAVAILABLE` | Missing creation player or missing/foreign speech recipient |
+| 422 | `COMMAND_ACTOR_UNAVAILABLE` | Missing creation player; or a recipient/target that is missing, foreign, the speaker itself, not co-present or concealed |
+| 422 | `COMMAND_DESTINATION_UNAVAILABLE` | Destination unknown, concealed, current, unlinked or blocked, or the player has no current location |
+| 422 | `COMMAND_ABILITY_UNAVAILABLE` | Ability not pinned or not learned by the acting player |
+| 422 | `COMMAND_PREREQUISITE_UNMET` | A prerequisite ability or skill rank is missing |
+| 422 | `COMMAND_TARGET_ILLEGAL` | Target count violates the ability's policy, or the policy needs encounter zones |
+| 422 | `COMMAND_RESOURCE_INSUFFICIENT` | A declared cost exceeds the player's current resource above its minimum, or belongs to another pack's vocabulary |
+| 422 | `COMMAND_CONTENT_UNAVAILABLE` | The pinned content closure cannot be loaded by this engine build for a rule that needs it |
 | 429 | `COMMAND_ADMISSION_LIMIT` | Two live mutation permits already belong to this owner |
 | 503 | `COMMAND_STORAGE_UNAVAILABLE` | Required transaction/storage unavailable |
 
 The existing filter supplies its local 403/415/429/503 codes before these handlers.
 Errors contain only `code`, with no SQL, submitted text or internal exception.
-Duplicate replay precedes revision, current typed/semantic and busy/capacity checks.
-Fresh requests check exact revision, typed/common semantics, busy, then owner capacity.
+Duplicate replay precedes revision, current typed/semantic/rule and busy/capacity checks.
+Fresh requests check exact revision, typed/common semantics, current-state rules, busy,
+then owner capacity. Concealment-sensitive rule failures share one code each, so a
+rejection never confirms that a hidden location, route or actor exists.
 New rejected requests consume
 no journal identity or capacity, and no action is queued. Retry an uncertain
 transport result with its original identity/payload; review a stale action against

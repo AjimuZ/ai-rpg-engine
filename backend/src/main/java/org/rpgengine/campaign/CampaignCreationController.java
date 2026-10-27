@@ -163,6 +163,12 @@ public class CampaignCreationController {
             case MODE_ILLEGAL -> error(422, "COMMAND_MODE_ILLEGAL");
             case DECISION_UNAVAILABLE -> error(422, "COMMAND_DECISION_UNAVAILABLE");
             case ACTOR_UNAVAILABLE -> error(422, "COMMAND_ACTOR_UNAVAILABLE");
+            case DESTINATION_UNAVAILABLE -> error(422, "COMMAND_DESTINATION_UNAVAILABLE");
+            case ABILITY_UNAVAILABLE -> error(422, "COMMAND_ABILITY_UNAVAILABLE");
+            case PREREQUISITE_UNMET -> error(422, "COMMAND_PREREQUISITE_UNMET");
+            case TARGET_ILLEGAL -> error(422, "COMMAND_TARGET_ILLEGAL");
+            case RESOURCE_INSUFFICIENT -> error(422, "COMMAND_RESOURCE_INSUFFICIENT");
+            case CONTENT_UNAVAILABLE -> error(422, "COMMAND_CONTENT_UNAVAILABLE");
         };
     }
 

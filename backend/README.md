@@ -551,8 +551,8 @@ Registered player operations require matching request/type/revision/hash evidenc
 and repeat common semantic checks inside canonical commit. Omitting evidence fails
 before world effects. Internal non-player foundation operations retain their trusted
 compatibility constructors. No new HTTP controller, migration or worker is added.
-An admission is not an executed action: resource/prerequisite/knowledge/causal rules,
-local calculations, mechanical receipts and delivery remain P07.3–P07.5.
+An admission is not an executed action: local calculations, mechanical receipts and
+delivery remain P07.4–P07.5.
 
 `TypedCommandTest` covers closed shape, bounds, coercion, unknown types and immutable
 hash evidence. `TypedCommandValidationTest` uses real PostgreSQL for rejection
@@ -569,3 +569,38 @@ executable jar is packaged. Configured frontend checks, EN/IT builds, 22 reposit
 policy tests and zero-finding scans also pass. Two earlier compile attempts failed
 on a related multi-catch and test factory signature; both were repaired before
 these passing runs. See [evidence scope](../docs/15-quality-and-acceptance.md).
+
+## Current-state command rules (P07.3)
+
+`CommandRules` applies the [rule contract](../docs/07-turn-protocol.md#p073-current-state-rule-validation)
+after common semantics at admission and again inside canonical commit, under the
+same campaign lock. `MOVE` follows one disclosed, accessible authored link from the
+player's current location; speech recipients and ability targets must be co-present,
+perceivable campaign actors; the new `USE_ABILITY` intention requires a learned
+pinned ability, its prerequisite abilities and skill ranks, a legal target count and
+affordable costs from the creation profile's own resource vocabulary. Concealment-
+sensitive failures share one category. At commit, resource changes and event actors
+must belong to the intention's participants. Matching retries and stored receipts
+replay first. No migration, controller, worker or browser action is added.
+
+`CommandRuleCatalogs` compiles an immutable prose-free rule catalog from the sealed
+pinned closure in a read-only transaction before the lock (at most 16 revisions
+cached). A campaign whose content cannot be loaded rejects content-dependent fresh
+commands with `CONTENT_UNAVAILABLE`; `WAIT` and speech to an actor without an
+authored origin need no catalog, so content-free fixtures use those intentions.
+
+`CommandRulesTest` registers a root and a dependency pack through real staging and
+sealing, creates a campaign with the production creation service and covers open,
+blocked, secret, unlinked, current and dependency destinations; secret, foreign,
+self, absent and out-of-range recipients; ability ownership, prerequisites, every
+target policy and exact/insufficient/cross-vocabulary/missing costs; commit-time
+re-derivation, unattributable effects and receipt replay; admission replay; real
+campaign-lock contention at both boundaries; and catalog scope, prose exclusion and
+revision binding. Every rejection is compared with an exact multi-table snapshot.
+
+Verified on 27 October 2026 with the unchanged scoped JDK 21.0.12.1/Maven 3.10.0
+and disposable PostgreSQL 18.6 fixture: 138 focused command cases and all 401
+packaged backend cases in 32 suites pass with zero failures/errors/skips, and the
+executable jar is packaged. Configured frontend checks, EN/IT builds, 22 repository
+policy tests and zero-finding scans also pass. See
+[evidence scope](../docs/15-quality-and-acceptance.md).

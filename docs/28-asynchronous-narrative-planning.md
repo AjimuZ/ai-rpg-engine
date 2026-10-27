@@ -211,8 +211,10 @@ P07.2 implements the common typed activation gate for the currently registered
 exploration intentions. A resolver must bind its intention to the admitted request
 hash and recheck mode, pending decision and creation-player/recipient scope inside
 canonical commit. A validated artifact cannot supply generic patches or bypass that
-gate. Resource, prerequisite, knowledge and causal rules remain P07.3; typed plan
-activation and complete QA-36 remain P07.6. No new background world writer is added.
+gate. P07.3 adds the resource, ownership, prerequisite, knowledge and causal rules to
+that same gate, re-derived from current rows at activation and commit; a validation
+receipt or cached catalog never substitutes for them. Typed plan activation and
+complete QA-36 remain P07.6. No new background world writer is added.
 
 ## 8. Plans, pending events, knowledge and canon
 

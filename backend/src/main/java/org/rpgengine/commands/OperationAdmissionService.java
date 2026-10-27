@@ -30,8 +30,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * requests consume nothing and may be retried with a new request identity. Identical
  * retries are recognized before any stale/busy/limit check, so a lost HTTP response is
  * always answered with the original operation even after the campaign moved on. Command
- * semantics use a closed typed vocabulary and current mode/decision/player checks. This
- * service stores only the canonical hash, never the payload itself; resolution is separate.
+ * semantics use a closed typed vocabulary, current mode/decision/player checks and the
+ * P07.3 reachability, perception, ownership, prerequisite and resource rules. Pinned rule
+ * facts are preloaded before the lock; current state is read under it. This service
+ * stores only the canonical hash, never the payload itself; resolution is separate.
  */
 @Service
 public class OperationAdmissionService {
@@ -54,6 +56,7 @@ public class OperationAdmissionService {
 
     private final EntityManager entities;
     private final JdbcTemplate jdbc;
+    private final CommandRuleCatalogs catalogs;
     private final TransactionTemplate transaction;
     private final TransactionTemplate reads;
 
@@ -63,10 +66,13 @@ public class OperationAdmissionService {
      * @param entities JPA context used for the journal entity and its version checks
      * @param jdbc JDBC access on the same transactional connection for locks and leases
      * @param manager shared transaction manager
+     * @param catalogs pinned rule-fact loader used before the campaign lock is taken
      */
-    public OperationAdmissionService(EntityManager entities, JdbcTemplate jdbc, PlatformTransactionManager manager) {
+    public OperationAdmissionService(EntityManager entities, JdbcTemplate jdbc, PlatformTransactionManager manager,
+            CommandRuleCatalogs catalogs) {
         this.entities = Objects.requireNonNull(entities, "entities");
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
+        this.catalogs = Objects.requireNonNull(catalogs, "catalogs");
         transaction = new TransactionTemplate(Objects.requireNonNull(manager, "manager"));
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         transaction.setTimeout(10);
@@ -80,16 +86,18 @@ public class OperationAdmissionService {
      * Admit one command or replay its earlier admission.
      *
      * <p>Order of checks (all under the campaign lock): scope, request identity
-     * (replay/conflict), expected revision, typed/common semantic validation, retirement
-     * of expired permits and pre-commit operations without a live permit, campaign busy, owner admission limit,
-     * then journal insert plus lease grant.
+     * (replay/conflict), expected revision, typed/common semantic validation, current-state
+     * rule validation, retirement of expired permits and pre-commit operations without a
+     * live permit, campaign busy, owner admission limit, then journal insert plus lease grant.
+     * Pinned content is loaded before the lock; a load failure matters only to a fresh
+     * command whose rules consult definitions, never to a matching replay.
      *
      * @param owner locally admitted owner
      * @param adventure adventure that must own the campaign
      * @param campaign target campaign
      * @param command structurally validated envelope; typed meaning is checked atomically for new requests
      * @return the durable operation view; a new admission also carries its lease grant
-     * @throws OperationAdmissionFailure for scope, conflict, stale, typed/semantic, busy or limit outcomes
+     * @throws OperationAdmissionFailure for scope, conflict, stale, typed/semantic/rule, busy or limit outcomes
      * @throws IllegalArgumentException if the command cannot be canonicalized within bounds
      * @throws IllegalStateException if called inside an ambient transaction
      * @throws org.springframework.dao.DataAccessException for lock/statement timeouts or storage failures
@@ -105,7 +113,9 @@ public class OperationAdmissionService {
         String hash = CommandCanonicalForm.sha256(canonical);
         // The permit must be durable before the caller can act on it (same rule as MutationLeaseService).
         MutationLeaseService.requireNoTransaction();
-        return transaction.execute(status -> admit(owner, adventure, campaign, command, hash, canonical));
+        // Pinned content is frozen per campaign, so recompiling it outside the lock is equivalent.
+        var content = catalogs.preload(owner, adventure, campaign, command.commandType());
+        return transaction.execute(status -> admit(owner, adventure, campaign, command, hash, canonical, content));
     }
 
     /**
@@ -140,7 +150,8 @@ public class OperationAdmissionService {
     }
 
     /** Transaction body of {@link #submit}; any exception rolls back every write made here. */
-    private Admission admit(UUID owner, UUID adventure, UUID campaign, Command command, String hash, byte[] canonical) {
+    private Admission admit(UUID owner, UUID adventure, UUID campaign, Command command, String hash, byte[] canonical,
+            CommandRuleCatalogs.Content content) {
         jdbc.execute("set local lock_timeout = '2s'");
         jdbc.execute("set local statement_timeout = '5s'");
         OwnerMutationAdmission.lockOwner(jdbc, owner);
@@ -170,7 +181,8 @@ public class OperationAdmissionService {
         // Decode the frozen hash input, never a mutable map that may have changed while
         // waiting for locks. Replay above intentionally preserves historical admissions.
         TypedCommand intention = TypedCommand.decode(canonical);
-        CommandSemantics.requireEligible(jdbc, owner, adventure, campaign, intention);
+        UUID player = CommandSemantics.requireEligible(jdbc, owner, adventure, campaign, intention);
+        CommandRules.require(jdbc, campaign, player, intention, content);
 
         Instant now = jdbc.queryForObject("select clock_timestamp()", (row, index) -> row.getTimestamp(1).toInstant());
         // One database cutoff classifies both cleanup and busy. If a lease lapses

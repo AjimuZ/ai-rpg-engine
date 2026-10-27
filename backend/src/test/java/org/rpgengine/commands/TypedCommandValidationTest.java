@@ -35,10 +35,14 @@ import static org.junit.jupiter.api.Assertions.*;
  * Real PostgreSQL proof that typed/common semantics and canonical effects share their
  * transaction boundary. Exact table snapshots include counters, resources, operation,
  * permit, draws and outbox; rejected intentions never partially apply or consume identity.
+ * This fixture pins no sealed pack, so it exercises content-free intentions (WAIT, and
+ * SPEAK to a co-present actor without an authored origin); pinned-content rules are
+ * covered with a registered pack by {@code CommandRulesTest}.
  */
 @SpringBootTest
 class TypedCommandValidationTest {
     @Autowired private OperationAdmissionService admissions;
+    @Autowired private CommandRuleCatalogs catalogs;
     @Autowired private CanonicalCommitService commits;
     @Autowired private RandomDrawService draws;
     @Autowired private EntityManager entities;
@@ -49,6 +53,7 @@ class TypedCommandValidationTest {
     private UUID campaign;
     private UUID content;
     private UUID player;
+    private UUID guide;
     private UUID resource;
 
     /** Construct the injected fixture; missing database infrastructure fails startup. */
@@ -74,9 +79,13 @@ class TypedCommandValidationTest {
             var world = Campaign.start(adventure, revision, "Campaign", "seed", now);
             entities.persist(world);
             campaign = world.getId();
-            var actor = Actor.create(campaign, ActorKind.CHARACTER, null, "Player", null, 0, now);
+            var actor = Actor.create(campaign, ActorKind.CHARACTER, null, "Player", "camp", 0, now);
             entities.persist(actor);
             player = actor.getId();
+            // Co-present actor without an authored origin: perceivable without pinned content.
+            var listener = Actor.create(campaign, ActorKind.NPC, null, "Guide", "camp", 0, now);
+            entities.persist(listener);
+            guide = listener.getId();
             var pool = ActorResource.create(actor, "hp", 0, 5, 10, 0, now);
             entities.persist(pool);
             resource = pool.getId();
@@ -95,13 +104,12 @@ class TypedCommandValidationTest {
 
     /** A registered intention is durably admitted without a world effect, event, draw or resource spend. */
     @ParameterizedTest
-    @ValueSource(strings = {"MOVE", "WAIT", "SPEAK"})
+    @ValueSource(strings = {"WAIT", "SPEAK"})
     void admitsSupportedTypedIntentionsOnly(String type) {
         var world = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
         var command = switch (type) {
-            case "MOVE" -> new TypedCommand.Move("door");
             case "WAIT" -> new TypedCommand.Wait(1);
-            default -> new TypedCommand.Speak(player, "È qui? 😀");
+            default -> new TypedCommand.Speak(guide, "È qui? 😀");
         };
         var admitted = submit(envelope(command));
         assertEquals(type, admitted.operation().commandType());
@@ -114,7 +122,7 @@ class TypedCommandValidationTest {
     /** All new unknown/patch payloads leave the full database snapshot unchanged, including an expired permit. */
     @Test
     void rejectedPayloadCannotRetireOrPartiallyApplyAnEarlierOperation() {
-        submit(envelope(new TypedCommand.Move("door")));
+        submit(envelope(new TypedCommand.Wait(60)));
         jdbc.update("update campaign_mutation_lease set expires_at = clock_timestamp() - interval '1 second'");
         var before = snapshot();
         var bad = new OperationAdmissionService.Command("bad", 0, "MOVE",
@@ -135,7 +143,7 @@ class TypedCommandValidationTest {
         decision(decision);
         var before = snapshot();
         assertFailure(OperationAdmissionFailure.Kind.DECISION_UNAVAILABLE,
-                () -> submit(envelope(new TypedCommand.Move("door"))));
+                () -> submit(envelope(new TypedCommand.Wait(60))));
         assertEquals(before, snapshot());
     }
 
@@ -144,7 +152,7 @@ class TypedCommandValidationTest {
     void startingMarkerAllowsInputWithoutChoosingAnAction() {
         decision("{\"type\":\"STARTING_SITUATION\",\"version\":1}");
         var before = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
-        submit(envelope(new TypedCommand.Move("door")));
+        submit(envelope(new TypedCommand.Wait(60)));
         assertEquals(before, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
     }
 
@@ -154,7 +162,7 @@ class TypedCommandValidationTest {
         jdbc.update("update campaign set mode = 'ENCOUNTER', row_version = row_version + 1");
         var before = snapshot();
         assertFailure(OperationAdmissionFailure.Kind.MODE_ILLEGAL,
-                () -> submit(envelope(new TypedCommand.Speak(player, "hello"))));
+                () -> submit(envelope(new TypedCommand.Speak(guide, "hello"))));
         assertEquals(before, snapshot());
     }
 
@@ -164,7 +172,7 @@ class TypedCommandValidationTest {
         jdbc.execute("truncate campaign_creation");
         var before = snapshot();
         assertFailure(OperationAdmissionFailure.Kind.ACTOR_UNAVAILABLE,
-                () -> submit(envelope(new TypedCommand.Move("door"))));
+                () -> submit(envelope(new TypedCommand.Wait(60))));
         assertEquals(before, snapshot());
     }
 
@@ -205,8 +213,8 @@ class TypedCommandValidationTest {
     /** Lock waits cannot let a caller change what gets validated after its payload hash has been calculated. */
     @Test
     void validationUsesFrozenCanonicalBytesInsteadOfMutableMap() {
-        var payload = new LinkedHashMap<String, Object>(Map.of("destinationId", "door"));
-        var input = new OperationAdmissionService.Command("frozen", 0, "MOVE", payload);
+        var payload = new LinkedHashMap<String, Object>(Map.of("seconds", 60));
+        var input = new OperationAdmissionService.Command("frozen", 0, "WAIT", payload);
         var boundary = new JdbcTemplate(java.util.Objects.requireNonNull(jdbc.getDataSource())) {
             @Override public void execute(String sql) {
                 if (sql.startsWith("set local lock_timeout")) {
@@ -216,31 +224,32 @@ class TypedCommandValidationTest {
                 super.execute(sql);
             }
         };
-        var admitted = new OperationAdmissionService(entities, boundary, manager).submit(owner, adventure, campaign, input);
-        assertEquals(CommandCanonicalForm.sha256(CommandCanonicalForm.encode("MOVE", 0,
-                        Map.of("destinationId", "door"), 32_768)),
+        var admitted = new OperationAdmissionService(entities, boundary, manager, catalogs)
+                .submit(owner, adventure, campaign, input);
+        assertEquals(CommandCanonicalForm.sha256(CommandCanonicalForm.encode("WAIT", 0,
+                        Map.of("seconds", 60), 32_768)),
                 jdbc.queryForObject("select payload_hash from operation_journal where id = ?", String.class,
                         admitted.operation().operationId()));
-        assertTrue(submit(new OperationAdmissionService.Command("frozen", 0, "MOVE", Map.of("destinationId", "door"))).replayed());
+        assertTrue(submit(new OperationAdmissionService.Command("frozen", 0, "WAIT", Map.of("seconds", 60))).replayed());
     }
 
     /** Missing evidence, changed request/type/hash and an inaccessible owner cannot use the trusted legacy overload. */
     @Test
     void commitRequiresMatchingTypedEvidence() {
-        var input = envelope(new TypedCommand.Move("door"));
+        var input = envelope(new TypedCommand.Wait(60));
         var base = plan(submit(input), input);
         for (CommandIntent intent : new CommandIntent[] {null,
-                new CommandIntent(owner, "other", 0, new TypedCommand.Move("door")),
-                new CommandIntent(owner, input.requestId(), 0, new TypedCommand.Move("elsewhere")),
-                new CommandIntent(owner, input.requestId(), 0, new TypedCommand.Wait(1)),
-                new CommandIntent(owner, input.requestId(), 1, new TypedCommand.Move("door"))}) {
+                new CommandIntent(owner, "other", 0, new TypedCommand.Wait(60)),
+                new CommandIntent(owner, input.requestId(), 0, new TypedCommand.Wait(61)),
+                new CommandIntent(owner, input.requestId(), 0, new TypedCommand.Move("door")),
+                new CommandIntent(owner, input.requestId(), 1, new TypedCommand.Wait(60))}) {
             var before = snapshot();
             assertThrows(IllegalStateException.class, () -> commits.commit(withIntent(base, intent)));
             assertEquals(before, snapshot());
         }
         var before = snapshot();
         assertFailure(OperationAdmissionFailure.Kind.SCOPE_UNAVAILABLE, () -> commits.commit(withIntent(base,
-                new CommandIntent(UUID.randomUUID(), input.requestId(), 0, new TypedCommand.Move("door")))));
+                new CommandIntent(UUID.randomUUID(), input.requestId(), 0, new TypedCommand.Wait(60)))));
         assertEquals(before, snapshot());
     }
 
@@ -248,7 +257,7 @@ class TypedCommandValidationTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void commitRechecksSemanticsAndRetainsDurableDraws(boolean encounter) {
-        var input = envelope(new TypedCommand.Move("door"));
+        var input = envelope(new TypedCommand.Wait(60));
         var resolved = plan(submit(input), input);
         var draw = draws.reserve(resolved.context(), 0, 20);
         if (encounter) {
@@ -265,7 +274,7 @@ class TypedCommandValidationTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void eligibilityIsReadAfterAcquiringCampaignLock(boolean finalCommit) throws Exception {
-        var input = envelope(new TypedCommand.Move("door"));
+        var input = envelope(new TypedCommand.Wait(60));
         var resolved = finalCommit ? plan(submit(input), input) : null;
         var pool = java.util.concurrent.Executors.newSingleThreadExecutor();
         try (var connection = java.util.Objects.requireNonNull(jdbc.getDataSource()).getConnection()) {
@@ -316,7 +325,7 @@ class TypedCommandValidationTest {
     /** A late invalid effect rolls back the earlier valid cost, all counters, journal and permit together. */
     @Test
     void multiEffectResolutionIsAtomicAndSuccessfulReplaySkipsNewEligibility() {
-        var input = envelope(new TypedCommand.Move("door"));
+        var input = envelope(new TypedCommand.Wait(60));
         var base = plan(submit(input), input);
         UUID second = new TransactionTemplate(manager).execute(status -> {
             var pool = ActorResource.create(entities.find(Actor.class, player), "mana", 0, 0, 10, 0, Instant.now());
