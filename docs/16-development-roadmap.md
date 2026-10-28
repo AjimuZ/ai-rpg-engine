@@ -1958,6 +1958,52 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
       `FileNotFoundError: 'docker'` because this container has no Docker. This matches the
       P09.1 record; P09.2 changes no packaging input, and the hosted packaging job enforces
       these cases.
+  - Second re-verification (28 October 2026). The completion was returned again because the
+    plan command `python -B -m unittest discover -s tools/container_packaging -v` failed. Its
+    two BuildKit context cases and two Compose render cases called a `docker` executable that
+    this container does not have. These four cases now share the
+    `tools/container_packaging/docker_requirement.py` policy:
+    - The cases are skipped, with a reason saying hosted CI enforces them, only when no
+      `docker` executable exists and nothing requires Docker.
+    - `PACKAGING_REQUIRE_DOCKER=1` (now set by the CI packaging step) or `GITHUB_ACTIONS=true`
+      keeps them mandatory, so a missing tool still fails there. The generic `CI=true` does
+      not count.
+    - An installed but unusable Docker still fails.
+
+    The first full backend run of this re-verification failed one case:
+    `CodexTaskAdapterTest.isolationViolationsFailClosedAndTheThreadIsReconciledAndRetired`,
+    where `scenario-approval` ended `TIMED_OUT` instead of `FAILED`. This is a real P08.1 race
+    in `RpcGeneration`, not a test-only flake:
+    - The reader thread can read the `turn/start` acknowledgment and then a runtime approval
+      request before the caller registers the turn.
+    - The request was denied, but nothing failed the turn.
+    - The failure is now buffered with the turn's early events, within the same 256 bound,
+      and fails the turn when the acknowledgment registers it.
+    - The deterministic regression case
+      `RpcGenerationTest.serverRequestBeforeTheTurnIsRegisteredStillFailsThatTurn` fails on an
+      exported copy of the unfixed code ("Expecting code to raise a throwable") and passes on
+      the fix.
+    - docs/06 records the rule.
+
+    P09.2 context sources are unchanged since `2e6e32f`. The race fix is owner commit `d88ee64`
+    and the packaging policy is `5ca1899`. On the clean tree of `5ca1899`, every command of the
+    project check plan passed:
+    - `git diff --check HEAD`;
+    - the repository checks: 0 findings, and their 26 tests;
+    - frontend install, typecheck, 77 tests in 13 files, 5 localization checks and the
+      localized build;
+    - the full packaged backend `verify`: 688 tests in 70 suites, zero failures/errors/skips, jar packaged;
+    - 9 backup tests;
+    - the runtime probe: 116 cases with 18 opt-in skips, and each of its eight modules
+      separately;
+    - packaging: 27 cases pass, 4 of them new policy cases. There are 6 skips: 4 because
+      Docker is missing and 2 opt-in.
+      - With `PACKAGING_REQUIRE_DOCKER=1` or `GITHUB_ACTIONS=true`, the same 4 cases error
+        with `FileNotFoundError: 'docker'`.
+      - With a stand-in `docker` that exits 1, they fail.
+
+    These skips do not show that build-context filtering or the Compose boundaries hold on this
+    host. The hosted packaging job remains their gate.
 - [ ] P09.3 Implement checkpoints, source-linked summaries, freshness/invalidation, and bounded background jobs.
 - [ ] P09.4 Implement count/context/error-triggered renewal and manual idle renewal, preserving transcript and campaign.
 - [ ] P09.5 Reconcile restart, committed narration pending, missing dependencies, and stale summaries.

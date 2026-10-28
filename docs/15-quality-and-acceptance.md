@@ -83,6 +83,40 @@ bytes before any check ran. Probes now mutate only an exported copy of HEAD.
   `FileNotFoundError: 'docker'` because the development container has no Docker. P09.2 changes
   no packaging input, and the hosted packaging job enforces these cases.
 
+P09.2 second re-verification (28 October 2026). The completion was returned because the
+plan's `tools/container_packaging` command failed on the four Docker cases above. Two fixes
+followed (owner commits `d88ee64` and `5ca1899`). Every command of the project check plan then
+passed on the clean tree of `5ca1899`.
+
+- **Packaging on hosts without Docker:**
+  - The BuildKit context and Compose render cases now follow
+    `tools/container_packaging/docker_requirement.py`. They are skipped, with an explicit
+    reason, only when no `docker` executable exists and nothing requires Docker.
+  - `PACKAGING_REQUIRE_DOCKER=1` (set by the CI packaging step) or `GITHUB_ACTIONS=true`
+    makes them run, and a missing tool then fails. An installed but unusable Docker always
+    fails.
+  - The suite runs 27 cases (4 new policy cases) with 6 skips: 4 because Docker is missing
+    and 2 opt-in.
+  - The required mode was checked by hand: the same 4 cases error with `FileNotFoundError`.
+    A stand-in `docker` that exits 1 makes them fail.
+  - The skips are not evidence for build-context filtering or Compose boundaries. The hosted
+    packaging job remains their gate.
+- **Early server requests (P08.1 race):**
+  - A full backend run once ended `CodexTaskAdapterTest`'s approval scenario `TIMED_OUT`
+    instead of `FAILED`. A runtime request read before the caller registered the
+    acknowledged turn was denied but did not fail the turn.
+  - `RpcGeneration` now buffers that failure with the turn's early events.
+  - `RpcGenerationTest.serverRequestBeforeTheTurnIsRegisteredStillFailsThatTurn` fails on an
+    exported copy of the unfixed code and passes on the fix.
+- **Passed:**
+  - `git diff --check HEAD`;
+  - repository checks (0 findings) and their 26 tests;
+  - frontend install, typecheck, 77 tests in 13 files, 5 localization checks and the localized
+    build;
+  - the full packaged backend `verify`: 688 tests in 70 suites with zero failures, errors or skips, and the jar packaged;
+  - 9 backup tests;
+  - the runtime probe: 116 cases with 18 opt-in skips, and each module separately.
+
 P09.1 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **8 new cases and all 674 packaged backend cases in 68 suites**, with zero failures, errors
 or skips; the executable jar is packaged. The new cases are in `KnowledgeLedgerTest`. The V15
