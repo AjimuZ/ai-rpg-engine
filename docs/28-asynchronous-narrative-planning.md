@@ -213,8 +213,12 @@ hash and recheck mode, pending decision and creation-player/recipient scope insi
 canonical commit. A validated artifact cannot supply generic patches or bypass that
 gate. P07.3 adds the resource, ownership, prerequisite, knowledge and causal rules to
 that same gate, re-derived from current rows at activation and commit; a validation
-receipt or cached catalog never substitutes for them. Typed plan activation and
-complete QA-36 remain P07.6. No new background world writer is added.
+receipt or cached catalog never substitutes for them. P07.4 local execution bumps
+the `actor:<uuid>` query epoch of every actor whose placement or resource pools a
+command changed, in the same canonical transaction, and invalidates current plans that
+read a bumped scope; plans that depend on an actor's position or pools should record
+that scope. Typed plan activation and complete QA-36 remain P07.6. No new background
+world writer is added.
 
 ## 8. Plans, pending events, knowledge and canon
 

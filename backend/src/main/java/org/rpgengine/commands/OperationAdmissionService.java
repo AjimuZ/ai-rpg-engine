@@ -33,7 +33,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * semantics use a closed typed vocabulary, current mode/decision/player checks and the
  * P07.3 reachability, perception, ownership, prerequisite and resource rules. Pinned rule
  * facts are preloaded before the lock; current state is read under it. This service
- * stores only the canonical hash, never the payload itself; resolution is separate.
+ * stores only the canonical hash, never the payload itself; local resolution of a fresh
+ * admission is {@link CommandExecutionService}'s next step.
  */
 @Service
 public class OperationAdmissionService {
@@ -276,7 +277,8 @@ public class OperationAdmissionService {
 
     /**
      * Owner-visible operation progress. The stored receipt is intentionally absent: it
-     * can contain resolver details, and its player-safe projection is P07.4 work.
+     * can contain resolver details; {@link CommandExecutionService} adds the player-safe
+     * projection ({@link CommandReceipts}) for committed operations.
      *
      * @param operationId durable operation identity
      * @param campaignId owning campaign

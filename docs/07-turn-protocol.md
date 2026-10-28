@@ -76,8 +76,8 @@ receipt and revision; other statuses carry neither. Once recorded, neither commi
 field can change, and terminal statuses cannot reopen. These are database bounds;
 P03.3 now adds the internal commit service, exact revision checks and durable outbox.
 P03.5 supplies leases/fencing and P07.1 supplies owner-scoped admission/status;
-typed/common gameplay authorization is supplied by P07.2 and current-state rule validation by P07.3 below;
-local calculation and resolution remain P07.4.
+typed/common gameplay authorization is supplied by P07.2, current-state rule validation by P07.3
+and local calculation and execution by P07.4 below.
 See [domain constraints](05-domain-model.md#3-database-organization).
 
 ### P07.1 durable admission
@@ -163,9 +163,9 @@ closed until their contracts and rule services are implemented.
 Text remains exact: no trimming, Unicode normalization or decimal/string coercion.
 The wait cap is an input ceiling, not permission to advance a day. P07.3 below adds
 `USE_ABILITY` plus reachability, recipient knowledge/range, ownership, prerequisite,
-resource and causal rules; legal wait duration remains P10.4 and calculations and
-execution remain P07.4. No worker currently turns an admitted intention into effects.
-An `ACCEPTED` result means only durable admission after the checks implemented here.
+resource and causal rules; legal wait duration remains P10.4. P07.4 below executes an
+admitted intention locally in the same request; `ACCEPTED` on its own means only durable
+admission after the checks implemented here.
 
 Admission hashes a bounded canonical byte snapshot before locking. Under the
 existing owner → campaign order it authorizes scope, replays/conflicts an existing
@@ -260,8 +260,8 @@ defect (`IllegalStateException`) before any write. Premises are re-derived after
 lock, so an effect cannot depend on a target that left, a cost already spent or a
 link that closed after admission. Event causation references must name events of the
 same campaign (database key), and the exact-revision check makes every such event
-causally earlier than this operation. Spending the cost and applying ability effects
-remain P07.4; P07.3 checks only that the premises hold and that effects are attributable.
+causally earlier than this operation. P07.3 checks only that the premises hold and that
+effects are attributable; P07.4 below spends the cost and applies the effects.
 
 **Pinned rule facts.** `CommandRuleCatalogs` loads a compact catalog before the lock:
 it authorizes owner/adventure/campaign scope in a short read-only transaction, then
@@ -281,6 +281,97 @@ Item, trade and encounter intentions (`USE_ITEM`, `EQUIP_ITEM`, `TRANSFER_ITEM`,
 no use contract, and item ownership/equipment checks arrive with their commands in
 P10.1–P10.2. A forged item or ability therefore cannot reach canonical state through
 any current route.
+
+### P07.4 local action execution
+
+`CommandExecutionService` turns one registered intention into one canonical commit in the
+caller's thread. There is no inference, network client or background worker on this path,
+and no payload is stored: a matching retry replays the stored status and receipt and never
+resumes or re-executes an earlier attempt. Every step is its own bounded transaction:
+
+1. **Admission** (P07.1–P07.3) journals `ACCEPTED` and grants the mutation lease atomically.
+2. **Prepare** locks campaign then journal, moves the operation `ACCEPTED → PLANNING →
+   VALIDATING`, re-runs `CommandSemantics` and `CommandRules` on current rows and reads a
+   detached snapshot (player location and row version, attributes, skills, every
+   participant's pools and origin vocabulary). A rule failure commits `REJECTED` and
+   releases the lease.
+3. **Calculate** with `LocalActionResolver`, a pure function of intention, snapshot, pinned
+   catalog and draws. Each die reserves one durable draw (`RandomDrawService`, one
+   committed transaction per ordinal) in evaluation order starting at ordinal 0.
+4. **Commit** through `CanonicalCommitService`, which rechecks revision, lease, typed
+   evidence, semantics, rules and attribution, then writes every effect, events, receipt,
+   outbox intents and query-epoch bumps, and releases the lease.
+
+After durable admission a failure is never reported as "nothing happened": a rule failure at
+commit records `REJECTED`, any other failure `FAILED_BEFORE_COMMIT`, and the lease is
+released; if even that bookkeeping fails, lease expiry plus admission cleanup or startup
+reconciliation fail the operation. Draws reserved before a failure remain bound to that
+operation, never reused by another one and never re-rolled for it.
+
+| Intention | Effects | World time | Events (all v1) |
+| --- | --- | --- | --- |
+| `MOVE` | Typed `Placement` of the player at the destination, guarded by its actor row version | 0 s | `ACTOR_MOVED` {actorId, from, to} |
+| `WAIT` | None | Exactly the requested seconds | `TIME_PASSED` {seconds} |
+| `SPEAK` | None | 0 s | `SPEECH_DELIVERED` {speakerActorId, recipientActorId, text} |
+| `USE_ABILITY` | Exact cost payment, then the effect program | 0 s | `ABILITY_USED`, one `RESOURCE_SPENT` per nonzero cost, one `EFFECT_RESOLVED` per executed resource node |
+
+Every action advances the game turn once and resolves to **no pending decision** (`null`),
+which also clears the creation `STARTING_SITUATION` marker: the player may then submit any
+registered exploration intention. Typed clarification, choice and encounter decisions arrive
+with P08.2, P10.3 and P11. The durations are provisional: pinned links and abilities declare
+no duration yet, and P10.4 adds movement duration, rest and a tighter legal wait. Every
+commit requires narration (`NARRATION_REQUIRED` outbox intent); narration itself is P08.
+
+**Effect programs.** The rule catalog compiles each ability's validated effect tree into
+prose-free values (`EffectProgram`). Locally executable nodes are `modifyResource` and
+`conditional`; `damage`, `heal`, `move`, condition changes, `reveal` and `createItem` need
+armor, conditions, forced movement, knowledge records or item instances from P09.1, P10 and
+P11. `CommandRules` therefore adds a last ability rule, `EFFECT_UNSUPPORTED` (HTTP 422
+`COMMAND_EFFECT_UNSUPPORTED`), refused before any journal row, permit or draw when the program
+contains such a node, could need more than 128 draws (every die of every expression in every
+branch, the per-operation draw ordinal limit) or reads `attribute`/`resource` atoms although
+the ability's pack is not the player's creation vocabulary.
+
+**Calculation rules.**
+
+- Costs are paid exactly, in sorted key order, before effects. Top-level `pre` nodes run
+  before `post` nodes, each group in authored order; nested nodes share their conditional's
+  timing, and only the chosen branch runs.
+- Expressions use exact `long` arithmetic with the compiler's semantics: truncating `div`,
+  `clamp(v, lo, hi) = min(max(v, lo), hi)`, and `all`/`any` stop at the deciding operand (dice
+  in skipped operands reserve nothing; the order is fixed, so this stays deterministic).
+  Atoms read the acting player's running state: attributes, current resource values after
+  earlier payments/effects, and skill ranks (missing rank is 0). A missing attribute or
+  resource is a resolver failure, never a silent zero.
+- A resource node's amount is evaluated **once** and applied to each affected actor:
+  `self` is the player; `target`/`targets` are the explicit targets, or the player for an
+  ability without explicit targets. The result is clamped to the pool's bounds (`APPLIED` or
+  `CLAMPED`). An actor whose origin is not from the ability's pack, or who lacks the pool, is
+  recorded as `NO_RESOURCE`; no pool is invented and no same-named key is charged.
+- Net deltas merge per pool into one `ResourceChange` read at its row version; pools whose
+  net change is zero are not written.
+- `EFFECT_RESOLVED` is `INTERNAL` whenever it records another actor's pool values; all other
+  events are `PUBLIC`. Event actor is always the player; payloads carry the effect path,
+  calculated amount, draw ordinals and before/after values (docs/05 section 6).
+- Query epochs `actor:<uuid>` are bumped for every actor whose placement or pools changed,
+  invalidating plans that read them (docs/28 section 7).
+
+**Receipts.** The stored receipt keeps `details` from the resolver (`resolver: local-v1`,
+command type, acting player, elapsed seconds, turn advancement, cleared decision, move origin
+and destination, ability, targets, calculations with draw ordinals, net per-pool changes)
+plus the backend-owned `randomDraws`. `CommandReceipts` projects only an allowlist to the
+owner: committed revision, event sequence range, command type, elapsed seconds, turn
+advancement, move destination, the player's **own** net resource changes, ability
+calculations (they read only the player's own state and draws) and committed draw
+ordinals/sides/values. Other actors' values, actor/request identities, draw IDs, seeds,
+algorithm names and unknown detail fields never leave the backend. Receipts not written by
+this resolver project only their counters and draws.
+
+**HTTP.** `POST /api/v1/campaigns/{id}/commands` now executes a fresh command and answers
+202 with its final status (`COMMITTED` with `receipt`, or `REJECTED`/`FAILED_BEFORE_COMMIT`
+with `receipt: null`); a replay answers 200 with the stored status and receipt, and the
+status query returns the same projection. Admission failures keep their earlier codes and
+journal nothing. Streaming, cancellation and post-commit presentation remain P07.5.
 
 ### P07.1 continuation checkpoint
 
@@ -383,8 +474,11 @@ resolver must reserve only draws appropriate for its committed mechanical outcom
 Exact stored old receipts replay unchanged, including receipts predating this field.
 Event-level calculation/reference schemas belong to later rules work. Seed bytes and
 uncommitted values never enter outbox envelopes or runtime contexts. The service has
-no public endpoint; future command authorization and equivalent-attempt cancellation
-policy are still required to prevent reroll fishing with new operation IDs.
+no public endpoint. P07.4 local execution reserves draws only for admitted, authorized
+operations, after prepare re-validated them, and a matching retry replays instead of
+re-rolling. The equivalent-new-attempt policy that stops reroll fishing through a
+cancelled or failed attempt followed by a new request belongs with cancellation (P07.5);
+today there is no player cancellation, and an infrastructure failure keeps its draws.
 
 ## 5. Canonical commit
 
@@ -420,12 +514,17 @@ No network client, callback or delivery listener participates in the transaction
 the caller receives detached receipt data after COMMIT. Database contention is bounded
 by a 2-second lock timeout, a 5-second statement timeout and a 10-second transaction
 timeout. Plans allow at most 128 resources, 128 events (at least one), 128 settlements
-and 32 KiB receipt details; existing stored JSONB limits remain authoritative.
+and 32 KiB receipt details; existing stored JSONB limits remain authoritative. P07.4
+adds at most 16 typed actor `Placement` effects (unique per actor) applied by a
+row-version-guarded update of `actor.location_id`; a stale version or foreign actor rolls
+back the whole commit.
 
 This internal primitive does not accept player/model proposals directly. P07.2 supplies common typed authorization for registered player operations, and P07.3
 re-derives their current-state rules and requires effects attributable to the
-intention's participants. Encounter checks, cancellation coordination and outbox
-dispatch remain later roadmap tasks. P07.1 admission and P03.5 leases/fences/startup
+intention's participants (resources, placements and event actors). P07.4's
+`CommandExecutionService` is the only production caller for player intentions and builds
+plans solely through `LocalActionResolver`. Encounter checks, cancellation coordination and
+outbox dispatch remain later roadmap tasks. P07.1 admission and P03.5 leases/fences/startup
 recovery now protect the durable operation boundary. New domain effect types must join the same explicit commit path.
 
 ## 6. Narration after authority

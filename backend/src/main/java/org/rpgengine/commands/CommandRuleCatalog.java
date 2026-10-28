@@ -14,11 +14,13 @@ import org.rpgengine.content.CompiledPack;
 import org.rpgengine.content.Definition;
 
 /**
- * Compact immutable projection of the pinned rule facts that command validation consults:
- * location links and disclosure, actor-definition disclosure and ability contracts. It is
+ * Compact immutable projection of the pinned rule facts that command validation and local
+ * resolution consult: location links and disclosure, actor-definition disclosure and
+ * declaring packs, and ability contracts including their compiled effect programs. It is
  * derived only from a sealed, recompiled {@link CampaignPackSnapshot}; no authored prose,
- * secret text, effect tree or localization is retained, so caching it costs little memory
- * and cannot leak content. Every identity is canonical: root definitions keep their local
+ * secret text, display name or localization is retained, so caching it costs little memory
+ * and cannot leak content. Effect programs hold only types, targets, resource keys and
+ * bounded expressions ({@link EffectProgram}). Every identity is canonical: root definitions keep their local
  * ID and dependency definitions use {@code pack#id}, exactly as campaign creation stores
  * actor locations, skills and learned abilities. Pinned content never changes for a
  * campaign, so a catalog stays valid for the whole life of its content revision.
@@ -33,16 +35,19 @@ import org.rpgengine.content.Definition;
  * @param locations location rules keyed by canonical location ID
  * @param actorDefinitions disclosure of actor-origin definitions keyed by canonical ID
  * @param resourceVocabularies declaring pack ID of each creation profile, keyed by canonical profile ID
+ * @param actorPacks declaring pack ID of every NPC and creation-profile origin, keyed by canonical ID;
+ *        an actor's resource keys belong to this pack's vocabulary (P07.4 effect targets)
  * @param abilities ability contracts keyed by canonical ability ID
  */
 record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
-        Map<String, String> resourceVocabularies, Map<String, Ability> abilities) {
+        Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities) {
     /** Freeze every index; null parts are construction bugs and fail immediately. */
     CommandRuleCatalog {
         Objects.requireNonNull(revisionId, "revisionId");
         locations = Map.copyOf(locations);
         actorDefinitions = Map.copyOf(actorDefinitions);
         resourceVocabularies = Map.copyOf(resourceVocabularies);
+        actorPacks = Map.copyOf(actorPacks);
         abilities = Map.copyOf(abilities);
     }
 
@@ -59,6 +64,7 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         var locations = new HashMap<String, Location>();
         var actors = new HashMap<String, Boolean>();
         var vocabularies = new HashMap<String, String>();
+        var origins = new HashMap<String, String>();
         var abilities = new HashMap<String, Ability>();
         for (CompiledPack pack : snapshot.packs().values()) {
             String packId = pack.parsed().manifest().id();
@@ -77,22 +83,26 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
                         }
                         locations.put(id, new Location(disclosed(data), reachable));
                     }
-                    case "npc" -> actors.put(id, disclosed(data));
+                    case "npc" -> {
+                        actors.put(id, disclosed(data));
+                        origins.put(id, packId);
+                    }
                     // A creation profile is the player's own origin and is never concealed; its
                     // declaring pack supplied the player's resource keys at campaign creation.
                     case "creation" -> {
                         actors.put(id, true);
                         vocabularies.put(id, packId);
+                        origins.put(id, packId);
                     }
                     case "ability" -> abilities.put(id, ability(snapshot, pack, data));
                     default -> { }
                 }
             }
         }
-        return new CommandRuleCatalog(revisionId, locations, actors, vocabularies, abilities);
+        return new CommandRuleCatalog(revisionId, locations, actors, vocabularies, origins, abilities);
     }
 
-    /** Canonicalize one ability contract's prerequisites, costs and target policy. */
+    /** Canonicalize one ability contract's prerequisites, costs, target policy and effect program. */
     private static Ability ability(CampaignPackSnapshot snapshot, CompiledPack pack, Map<String, Object> data) {
         var skills = new ArrayList<SkillNeed>();
         var required = new LinkedHashSet<String>();
@@ -113,7 +123,7 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         }
         var target = data.get("target") instanceof Map<?, ?> value ? value : Map.of();
         return new Ability(pack.parsed().manifest().id(), skills, required, costs, (String) target.get("policy"),
-                number(target.get("maxTargets"), 1));
+                number(target.get("maxTargets"), 1), EffectProgram.compile(data.get("effects"), snapshot, pack, null));
     }
 
     /** Pack default for omitted knowledge visibility is public, matching the compiler's default. */
@@ -146,7 +156,7 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
     }
 
     /**
-     * Ability contract facts needed before any calculation.
+     * Ability contract facts needed for validation and local resolution.
      *
      * @param pack declaring pack ID, which owns the vocabulary of the cost resource keys
      * @param skills minimum ranks of canonical skills
@@ -154,9 +164,10 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
      * @param costs non-negative amount per unqualified resource key of {@code pack}, charged to the acting player
      * @param targetPolicy {@code self}, {@code single}, {@code multiple} or {@code area}
      * @param maxTargets declared upper bound for multiple-target abilities
+     * @param effects compiled effect program in authored order (at least one node in valid content)
      */
     record Ability(String pack, List<SkillNeed> skills, Set<String> abilities, Map<String, Integer> costs,
-            String targetPolicy, int maxTargets) {
+            String targetPolicy, int maxTargets, List<EffectProgram.Effect> effects) {
         /** Freeze nested collections; the pack and policy are always present in compiled content. */
         Ability {
             Objects.requireNonNull(pack, "pack");
@@ -164,6 +175,7 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
             abilities = Set.copyOf(abilities);
             costs = Map.copyOf(costs);
             Objects.requireNonNull(targetPolicy, "targetPolicy");
+            effects = List.copyOf(effects);
         }
     }
 

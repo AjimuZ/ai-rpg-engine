@@ -71,6 +71,14 @@ public final class OperationAdmissionFailure extends RuntimeException {
          * The campaign's pinned content closure cannot be loaded by this engine build, so rules
          * that consult definitions fail closed instead of guessing (HTTP 422).
          */
-        CONTENT_UNAVAILABLE
+        CONTENT_UNAVAILABLE,
+        /**
+         * The ability's effect program cannot be executed by the local exploration resolver: it
+         * contains an effect type that needs later systems (damage/heal armor, conditions, forced
+         * movement, reveals, item creation), reads attribute or resource values from a vocabulary
+         * other than the acting player's, or could need more durable draws than one operation may
+         * reserve. Nothing is journaled (HTTP 422).
+         */
+        EFFECT_UNSUPPORTED
     }
 }

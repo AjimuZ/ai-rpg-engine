@@ -200,7 +200,8 @@ Use HTTP 202 for accepted asynchronous work, 200 for current/final queries, 201 
 Implemented routes use the existing local session/owner admission and return
 `Cache-Control: no-store`:
 
-- `POST /api/v1/campaigns/{campaignId}/commands?adventureId={uuid}` admits an envelope.
+- `POST /api/v1/campaigns/{campaignId}/commands?adventureId={uuid}` admits an envelope
+  and, since P07.4, resolves a fresh one locally in the same request.
 - `GET /api/v1/campaigns/{campaignId}/operations/{operationId}?adventureId={uuid}`
   reads its durable status without changing any row.
 
@@ -215,16 +216,24 @@ transactional eligibility checks in the [turn protocol](07-turn-protocol.md#p072
 P07.3 adds `USE_ABILITY` (`abilityId`, `targetActorIds`) and the
 [current-state rules](07-turn-protocol.md#p073-current-state-rule-validation).
 Unknown types, arbitrary patches, extra/missing fields and wrong payload types are
-semantic 422 errors. These are intentions only; admission does not execute them.
+semantic 422 errors. These are intentions only; the server calculates every effect
+([local execution](07-turn-protocol.md#p074-local-action-execution)).
 
-New admissions return 202; identical retries return 200 with the same operation ID
-and its current status. Both and GET return exactly `operationId`, `campaignId`,
-`commandType`, `status`, `baseRevision`, nullable `committedRevision`,
-`operationVersion`, `replayed`, `createdAt`, `updatedAt` and relative `query` URL.
-`replayed` is false for GET. No stream reference is available yet. Receipts,
-clarifications, payloads, hashes, draws and lease/holder/fence values are excluded;
-the final player-safe receipt projection remains P07.4. An operation status is
-stored progress, not evidence that a worker is currently alive.
+New requests return 202 after local execution with their final status: `COMMITTED`,
+or `REJECTED`/`FAILED_BEFORE_COMMIT` when current state or storage refused them after
+durable admission. Identical retries return 200 with the same operation ID and its
+stored status and receipt; they never re-execute. Both and GET return exactly
+`operationId`, `campaignId`, `commandType`, `status`, `baseRevision`, nullable
+`committedRevision`, `operationVersion`, `replayed`, `createdAt`, `updatedAt`, nullable
+`receipt` and relative `query` URL. `replayed` is false for GET. No stream reference is
+available yet. `receipt` is the player-safe projection of a committed operation:
+`stateRevision`, `firstEventSequence`, `lastEventSequence`, and for locally resolved
+commands `commandType`, `elapsedSeconds`, `turnAdvanced`, `destinationId` (moves only),
+`resources` (the player's own net `resourceKey`/`before`/`after` changes), `calculations`
+(`path`, `kind`, `value`, `drawOrdinals`), then `randomDraws` (`ordinal`, `sides`,
+`value`). Stored receipt details, other actors' values, speech text, clarifications,
+payloads, hashes, draw identities/seeds and lease/holder/fence values are excluded. An
+operation status is stored progress, not evidence that a worker is currently alive.
 
 | HTTP | Stable command code | Meaning |
 | --- | --- | --- |
@@ -232,7 +241,7 @@ stored progress, not evidence that a worker is currently alive.
 | 404 | `COMMAND_SCOPE_UNAVAILABLE` | Missing/foreign owner, adventure, campaign or operation |
 | 409 | `COMMAND_REQUEST_CONFLICT` | Same request identity with different normalized command |
 | 409 | `COMMAND_STALE_REVISION` | Expected revision is below or above current revision |
-| 409 | `COMMAND_CAMPAIGN_BUSY` | Live campaign permit or transient admission contention |
+| 409 | `COMMAND_CAMPAIGN_BUSY` | Live campaign permit or transient admission contention (nothing journaled) |
 | 413 | `COMMAND_BODY_TOO_LARGE` | Body exceeds the byte cap |
 | 422 | `COMMAND_INVALID` | Canonical bounds, unknown command type, invalid closed payload or generic patch |
 | 422 | `COMMAND_MODE_ILLEGAL` | Current scheduling mode has no supported command contract |
@@ -244,6 +253,7 @@ stored progress, not evidence that a worker is currently alive.
 | 422 | `COMMAND_TARGET_ILLEGAL` | Target count violates the ability's policy, or the policy needs encounter zones |
 | 422 | `COMMAND_RESOURCE_INSUFFICIENT` | A declared cost exceeds the player's current resource above its minimum, or belongs to another pack's vocabulary |
 | 422 | `COMMAND_CONTENT_UNAVAILABLE` | The pinned content closure cannot be loaded by this engine build for a rule that needs it |
+| 422 | `COMMAND_EFFECT_UNSUPPORTED` | The ability's effect program needs a later system (damage, healing, conditions, movement, reveal, items), more than 128 draws, or actor values from another pack's vocabulary |
 | 429 | `COMMAND_ADMISSION_LIMIT` | Two live mutation permits already belong to this owner |
 | 503 | `COMMAND_STORAGE_UNAVAILABLE` | Required transaction/storage unavailable |
 

@@ -23,19 +23,24 @@ import org.rpgengine.progression.RewardSettlement;
  *
  * <p>No executable work can be supplied: inference and other network preparation must
  * finish before this value enters the commit service. Later rule modules extend the
- * explicit effect types instead of adding generic entity writes. Preparation intents
+ * explicit effect types instead of adding generic entity writes; P07.4 adds actor
+ * {@link Placement placements} for movement. Preparation intents
  * (query-scope epoch bumps and critical preparation jobs) are data too; they commit or
  * roll back with the world change that caused them.
  */
 public record ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources,
         List<Event> events, List<Reward> rewards, String receiptDetails, boolean narrationRequired,
-        Preparation preparation, CommandIntent intent) {
-    /** Copy bounded lists to freeze the plan; reject duplicate resource effects and missing events. */
+        Preparation preparation, CommandIntent intent, List<Placement> placements) {
+    /**
+     * Copy bounded lists to freeze the plan; reject duplicate resource or placement effects
+     * and missing events.
+     */
     public ResolvedCommit {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(world, "world");
         Objects.requireNonNull(preparation, "preparation");
         resources = bounded(resources, 128, "resources");
+        placements = bounded(placements, 16, "placements");
         events = bounded(events, 128, "events");
         rewards = bounded(rewards, 128, "rewards");
         if (events.isEmpty()) {
@@ -47,7 +52,21 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
                 throw new IllegalArgumentException("duplicate resource effect");
             }
         }
+        var placed = new HashSet<UUID>();
+        for (Placement placement : placements) {
+            if (!placed.add(placement.actorId())) {
+                throw new IllegalArgumentException("duplicate placement effect");
+            }
+        }
         CanonicalValues.requireJsonObject(receiptDetails, "receiptDetails", 32_768);
+    }
+
+    /** Plan without actor placements, the shape used before P07.4 movement execution. */
+    public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
+            List<Reward> rewards, String receiptDetails, boolean narrationRequired, Preparation preparation,
+            CommandIntent intent) {
+        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, preparation, intent,
+                List.of());
     }
 
     /**
@@ -57,13 +76,15 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
      */
     public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
             List<Reward> rewards, String receiptDetails, boolean narrationRequired, Preparation preparation) {
-        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, preparation, null);
+        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, preparation, null,
+                List.of());
     }
 
     /** Build a commit without preparation intents (no epoch bumps, no critical jobs). */
     public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
             List<Reward> rewards, String receiptDetails, boolean narrationRequired) {
-        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, Preparation.NONE, null);
+        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, Preparation.NONE, null,
+                List.of());
     }
 
     /** Return a defensive copy of at most limit non-null entries; fail before taking any locks. */
@@ -108,6 +129,20 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
         public ResourceChange {
             Objects.requireNonNull(resourceId, "resourceId");
             CanonicalValues.requireNonNegative(expectedRowVersion, "expectedRowVersion");
+        }
+    }
+
+    /**
+     * Move one campaign actor to a stable content location read at {@code expectedRowVersion}.
+     * Reachability is a rule premise checked by {@link CommandRules} for player intentions;
+     * this value only carries the resolved destination.
+     */
+    public record Placement(UUID actorId, long expectedRowVersion, String locationId) {
+        /** Reject a missing actor, negative storage version or malformed location reference. */
+        public Placement {
+            Objects.requireNonNull(actorId, "actorId");
+            CanonicalValues.requireNonNegative(expectedRowVersion, "expectedRowVersion");
+            CanonicalValues.requireText(locationId, "locationId", 256);
         }
     }
 

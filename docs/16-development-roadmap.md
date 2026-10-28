@@ -1177,6 +1177,39 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     repository policy tests/scans; record actual results and a neutral owner commit
     before checking this task.
 - [ ] P07.4 Implement local action calculations, durable draws, events, receipts, and pending decisions.
+  - Package A — local execution pipeline: `CommandExecutionService` admits, then moves a
+    fresh operation `ACCEPTED → PLANNING → VALIDATING` under the campaign/journal locks,
+    re-runs common semantics and current-state rules, reads a detached snapshot, calculates
+    with the pure `LocalActionResolver`, reserves one durable draw per die and commits once.
+    Rule drift after admission records `REJECTED`, other failures `FAILED_BEFORE_COMMIT`;
+    both release the lease and keep reserved draws bound to the operation. Matching retries
+    replay the stored status/receipt and never re-execute. No payload, worker or inference.
+  - Package B — calculations and effects: `MOVE` commits a typed row-version-guarded
+    `Placement`, `WAIT` advances exactly the requested seconds, `SPEAK` records the exact
+    words, and `USE_ABILITY` pays costs exactly, then runs the compiled `EffectProgram`
+    (`modifyResource`/`conditional`; `pre` before `post`; exact integer expression
+    semantics; clamped, vocabulary-bound targets with explicit `NO_RESOURCE`). Effect types
+    that need P09–P11 systems, programs above 128 draws and foreign-vocabulary value reads
+    are refused before journaling as `EFFECT_UNSUPPORTED`. Durations are provisional until
+    P10.4.
+  - Package C — events, receipts and pending decisions: v1 `ACTOR_MOVED`, `TIME_PASSED`,
+    `SPEECH_DELIVERED`, `ABILITY_USED`, `RESOURCE_SPENT` and `EFFECT_RESOLVED` events with
+    calculation inputs and draw ordinals (internal when they hold other actors' values);
+    one turn per action; the pending decision resolves to none, clearing the starting
+    marker; receipts record calculations, net changes and committed draws; both outbox
+    intents and `actor:<uuid>` query-epoch bumps commit atomically. The command and status
+    HTTP routes return an allowlisted player-safe receipt projection. See the
+    [execution contract](07-turn-protocol.md#p074-local-action-execution).
+  - Exit checks: pure resolver corpus (operators, ordinals, timing, branches, costs, net
+    merge, clamping, vocabulary targets, visibility, fail-closed unknown values,
+    determinism); real PostgreSQL execution on sealed packs and production campaign
+    creation for every intention with exact counters, events, outbox, epochs and lease
+    release; draw/receipt agreement; replay before and after startup reconciliation;
+    refused effect programs with exact no-write snapshots; trigger-injected failures after
+    durable draws (event insert failure, concurrent rule-fact change) leaving no world
+    effect; forged/stale placements; HTTP receipt allowlist and replay. Run focused
+    commands, full packaged backend, configured frontend gates and repository policy
+    tests/scans; record actual results and a neutral owner commit before checking this task.
 - [ ] P07.5 Add resumable public stream, cancellation race handling, and post-commit presentation jobs.
 - [ ] P07.6 Implement atomic plan admission with dependency/query-epoch rechecks, scope/content/author validation, fencing and idempotency; artifacts never directly change world facts/time/rewards, and activation uses ordinary commands under QA-36.
 

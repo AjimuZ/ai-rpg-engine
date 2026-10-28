@@ -26,9 +26,10 @@ import tools.jackson.databind.json.JsonMapper;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Real servlet and PostgreSQL acceptance of the command admission adapter: 202/200 replay
- * semantics, the status query, strict envelope parsing, stable error codes, foreign scope
- * hiding and the browser-proof requirement inherited from local admission.
+ * Real servlet and PostgreSQL acceptance of the command adapter: local execution with a
+ * player-safe receipt, 202/200 replay semantics, the status query, strict envelope parsing,
+ * stable error codes, foreign scope hiding and the browser-proof requirement inherited from
+ * local admission.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "engine.http.owner-id=00000000-0000-0000-0000-000000000071")
@@ -38,6 +39,7 @@ class CampaignCommandHttpTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private EntityManager entities;
     @Autowired private PlatformTransactionManager manager;
+    @Autowired private OperationAdmissionService admissions;
     private final JsonMapper json = JsonMapper.builder().build();
     private UUID adventure;
     private UUID campaign;
@@ -72,17 +74,31 @@ class CampaignCommandHttpTest {
                 + "content_revision_report, content_revision_file, content_revision, adventure_workspace, identity_owner_profile");
     }
 
-    /** A new command answers 202, the same request replays 200, and the query reads the same operation. */
+    /**
+     * A new command executes and answers 202 with its committed receipt; the same request replays
+     * 200 with the identical receipt, and the query reads the same operation and receipt.
+     */
     @Test
     void admitsReplaysAndReportsStatus() throws Exception {
         String request = UUID.randomUUID().toString();
         var accepted = post(commandsPath(), envelope(request, 0, "{\"recipientActorId\":\"" + guide(campaign) + "\",\"text\":\"Hello\"}").replace("\"MOVE\"", "\"SPEAK\""));
         assertEquals(202, accepted.status(), accepted.body());
         JsonNode view = json.readTree(accepted.body());
-        assertEquals("ACCEPTED", view.get("status").asText());
+        assertEquals("COMMITTED", view.get("status").asText());
         assertEquals("SPEAK", view.get("commandType").asText());
+        assertEquals(1, view.get("committedRevision").asLong());
         assertFalse(view.get("replayed").asBoolean());
         assertFalse(accepted.body().contains("fence") || accepted.body().contains("holder"));
+        // Allowlisted body and receipt projection: no stored details, actors, words or draw identities.
+        assertEquals(java.util.List.of("operationId", "campaignId", "commandType", "status", "baseRevision",
+                "committedRevision", "operationVersion", "replayed", "createdAt", "updatedAt", "receipt", "query"),
+                java.util.List.copyOf(view.propertyNames()));
+        JsonNode receipt = view.get("receipt");
+        assertEquals(java.util.List.of("stateRevision", "firstEventSequence", "lastEventSequence", "commandType",
+                "elapsedSeconds", "turnAdvanced", "resources", "calculations", "randomDraws"),
+                java.util.List.copyOf(receipt.propertyNames()));
+        assertFalse(accepted.body().contains(guide(campaign).toString()) || accepted.body().contains("Hello")
+                || accepted.body().contains("details"));
         String operation = view.get("operationId").asText();
         assertEquals("/api/v1/campaigns/" + campaign + "/operations/" + operation + "?adventureId=" + adventure,
                 view.get("query").asText());
@@ -91,13 +107,20 @@ class CampaignCommandHttpTest {
         assertEquals(200, replay.status(), replay.body());
         assertEquals(operation, json.readTree(replay.body()).get("operationId").asText());
         assertTrue(json.readTree(replay.body()).get("replayed").asBoolean());
+        assertEquals(receipt, json.readTree(replay.body()).get("receipt"));
         var status = exchange("GET", view.get("query").asText(), "", headers());
         assertEquals(200, status.status(), status.body());
         assertEquals(operation, json.readTree(status.body()).get("operationId").asText());
+        assertEquals(receipt, json.readTree(status.body()).get("receipt"));
+        assertEquals(1, jdbc.queryForObject("select state_revision from campaign where id = ?", Long.class, campaign));
         assertEquals(1, count());
     }
 
-    /** Changed payloads, stale revisions and a busy campaign return fixed 409 codes. */
+    /**
+     * Changed payloads, stale revisions and a busy campaign return fixed 409 codes. The first
+     * command commits and frees the campaign, so a second operation admitted internally holds
+     * the permit that makes the HTTP request busy.
+     */
     @Test
     void reportsConflictsWithStableCodes() throws Exception {
         String request = UUID.randomUUID().toString();
@@ -107,11 +130,14 @@ class CampaignCommandHttpTest {
         assertEquals("{\"code\":\"COMMAND_REQUEST_CONFLICT\"}", conflict.body());
         assertEquals("{\"code\":\"COMMAND_STALE_REVISION\"}",
                 post(commandsPath(), envelope(UUID.randomUUID().toString(), 3, "{\"destinationId\":\"door\"}")).body());
-        var busy = post(commandsPath(), envelope(UUID.randomUUID().toString(), 0, "{\"seconds\":20}")
+        var holder = admissions.submit(OWNER, adventure, campaign, new OperationAdmissionService.Command(
+                UUID.randomUUID().toString(), 1, "WAIT", java.util.Map.of("seconds", 5)));
+        assertNotNull(holder.lease());
+        var busy = post(commandsPath(), envelope(UUID.randomUUID().toString(), 1, "{\"seconds\":20}")
                 .replace("\"MOVE\"", "\"WAIT\""));
         assertEquals(409, busy.status());
         assertEquals("{\"code\":\"COMMAND_CAMPAIGN_BUSY\"}", busy.body());
-        assertEquals(1, count());
+        assertEquals(2, count());
     }
 
     /** Shape, coercion, duplicate keys, bad identities and oversized bodies fail before storage. */

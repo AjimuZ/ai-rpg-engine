@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — Local command execution, 28 October 2026
+
+- Execute registered exploration intentions locally after admission: re-check rules
+  under the campaign lock, calculate effects deterministically, reserve one durable
+  draw per die and commit once. Record `REJECTED` or `FAILED_BEFORE_COMMIT` after a
+  late refusal or failure, release the permit and keep reserved draws; identical
+  retries replay and never re-execute.
+- Move the player with a typed row-version-guarded placement, advance exact waiting
+  time, record exact speech, and use abilities by paying costs exactly and running
+  `modifyResource`/`conditional` effect programs with clamping and vocabulary-bound
+  targets. Refuse effect programs that need later systems with
+  `COMMAND_EFFECT_UNSUPPORTED`.
+- Write versioned events with calculation inputs and draw ordinals, advance one turn
+  per action, clear the pending starting decision, bump actor query epochs and return
+  an allowlisted player-safe receipt from the command and status routes.
+- Pass 151 focused command cases and all 414 packaged backend tests in 34 suites,
+  with zero failures/errors/skips, including trigger-injected failures after durable
+  draws. Pass configured frontend checks, both locale builds and all 22
+  repository-policy tests with zero scan findings. Cancellation, streaming and narration remain later
+  work.
+
 ## Unreleased — Current-state command rules, 27 October 2026
 
 - Validate movement against disclosed, accessible authored links from the player's

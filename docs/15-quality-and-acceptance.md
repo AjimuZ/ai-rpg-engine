@@ -1,5 +1,46 @@
 # Quality Strategy and Acceptance Criteria
 
+P07.4 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks
+pass **151 focused command cases and all 414 packaged backend cases in 34 suites**,
+with zero failures, errors or skips; the executable jar is packaged. The focused
+breakdown is 14 typed-contract, 19 typed-validation, eight command-rule, ten
+canonical-form, 26 admission, six command HTTP, 49 canonical commit, five lifecycle,
+one resolved-plan, seven local-resolver and six command-execution cases.
+
+`LocalActionResolverTest` is pure: it proves the compiler's integer semantics
+(truncating division, clamp, min/max, comparisons, short-circuit logic), draw ordinals
+in evaluation order with recorded sides, `pre` before `post` timing, single-branch
+conditionals, exact cost payment before effects, per-pool net merging with the read
+row version, clamping, vocabulary-bound targets with explicit `NO_RESOURCE`, internal
+visibility for other actors' values, fail-closed missing attributes/resources, invalid
+draws and unpayable costs, movement/wait/speech shapes and byte-identical determinism.
+`CommandExecutionTest` registers root and dependency packs through real staging and
+sealing and uses the production creation service. It proves committed movement
+(placement, revision/turn/time/event counters, cleared starting decision, public event,
+both outbox intents, `actor:<uuid>` epoch, lease release, allowlisted receipt), exact
+wait time and speech text, ability cost payment with durable draws matching the stored
+draw rows and the receipt, internal target effects absent from the projection, and
+foreign-vocabulary effects recorded as unaffected. Identical retries replay without
+writes before and after startup reconciliation (`COMMITTED_NARRATION_PENDING`).
+Damage effects, a 160-die program and a foreign-vocabulary value read are refused as
+`EFFECT_UNSUPPORTED` with exact no-write snapshots. Two database triggers inject faults
+after durable draws: a failing event insert yields `FAILED_BEFORE_COMMIT` with no world
+change, retained draws, a released permit and an unchanged replay, after which a new
+command commits; a concurrent move of the target yields `REJECTED` with no effects and
+retained draws. Commit-level cases reject forged bystander and stale-version placements;
+HTTP cases assert the body and receipt allowlists and identical replay/status receipts.
+
+Test sensitivity was checked deliberately during development: disabling the
+effect-support rule and placement attribution together made exactly the
+unsupported-program and forged-effect cases fail, and the source was restored
+byte-identically (checksum verified) before the passing runs above; this was an
+intentional probe, not a gate outcome. Configured frontend installation (285
+packages), both typechecks, 49 tests, four localization tests, 240-message parity and
+both locale builds pass, as do all 22 repository-policy tests and zero-finding scans. This adds executed-
+action, durable-draw, receipt and fault-injection evidence toward QA-03, QA-05, QA-17,
+QA-18 and QA-20; it does not claim item intentions, cancellation, streaming,
+narration, live inference or the equivalent-new-attempt reroll policy (P07.5).
+
 P07.3 verification (27 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks
 pass **138 focused command cases and all 401 packaged backend cases in 32 suites**,
 with zero failures, errors or skips; the executable jar is packaged. The focused

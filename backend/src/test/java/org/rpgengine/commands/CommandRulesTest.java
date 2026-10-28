@@ -232,10 +232,13 @@ class CommandRulesTest {
         assertEquals(before, snapshot());
         jdbc.update("update actor_resource set current_value = 8, row_version = row_version + 1 where id = ?", vigor);
         before = snapshot();
-        // Neither a bystander's resource nor an event attributed to it can be caused by this intention.
+        // Neither a bystander's resource, placement or event can be caused by this intention, and a
+        // participant's placement must still match the actor row version it was resolved from.
         for (var forged : List.of(plan(admitted, input, List.of(change(vigor, -3), change(bystanderPool, -1)), player),
                 plan(admitted, input, List.of(change(vigor, -3)), bystander),
-                plan(admitted, input, List.of(change(UUID.randomUUID(), -1)), player))) {
+                plan(admitted, input, List.of(change(UUID.randomUUID(), -1)), player),
+                place(plan(admitted, input, List.of(change(vigor, -3)), player), bystander, version(bystander)),
+                place(plan(admitted, input, List.of(change(vigor, -3)), player), player, version(player) + 1))) {
             assertThrows(IllegalStateException.class, () -> commits.commit(forged));
             assertEquals(before, snapshot());
         }
@@ -430,6 +433,18 @@ class CommandRulesTest {
                 List.of(new ResolvedCommit.Event(eventActor, null, EventVisibility.PUBLIC,
                         new CampaignEvent.Body("test-ability-resolved", 1, 1, "{}"))),
                 List.of(), "{}", false, ResolvedCommit.Preparation.NONE, intent);
+    }
+
+    /** Copy a plan with one actor placement to the grove. */
+    private static ResolvedCommit place(ResolvedCommit plan, UUID actor, long rowVersion) {
+        return new ResolvedCommit(plan.context(), plan.world(), plan.resources(), plan.events(), plan.rewards(),
+                plan.receiptDetails(), plan.narrationRequired(), plan.preparation(), plan.intent(),
+                List.of(new ResolvedCommit.Placement(actor, rowVersion, "grove")));
+    }
+
+    /** Current storage version of an actor row. */
+    private long version(UUID actor) {
+        return jdbc.queryForObject("select row_version from actor where id = ?", Long.class, actor);
     }
 
     /** Capture exact committed rows for every state, journal, permit and effect table these rules could touch. */

@@ -147,8 +147,8 @@ mode/decision/player/recipient eligibility is rechecked in the canonical transac
 a prior admission is never unconditional authorization. Historical matching retries
 and committed receipt replay remain read-only and precede newer eligibility checks.
 No schema migration, fabricated legacy player binding or background-artifact world
-write is added. P07.3 adds the current-state rules below; local action calculation
-remains P07.4. See the [closed payloads and transaction
+write is added. P07.3 adds the current-state rules below and P07.4 the local
+execution after them. See the [closed payloads and transaction
 contract](07-turn-protocol.md#p072-typed-intentions-and-atomic-common-semantics).
 
 ### Command rules (P07.3)
@@ -168,6 +168,22 @@ actor must belong to the intention's participants (player plus recipient/targets
 No table, trigger or migration is added; the immutable compiled rule facts are an
 in-memory cache keyed by sealed revision. See the
 [rule contract](07-turn-protocol.md#p073-current-state-rule-validation).
+
+### Local command execution (P07.4)
+
+A fresh registered intention moves `ACCEPTED → PLANNING → VALIDATING` and then to
+`COMMITTED`, `REJECTED` (rules refused it after admission) or `FAILED_BEFORE_COMMIT`
+(any other failure), always releasing its lease. Calculated effects are typed: resource
+deltas read at row version, and the new actor `Placement` effect that updates
+`actor.location_id` under its row version. Each commit appends ordered v1 events
+(`ACTOR_MOVED`, `TIME_PASSED`, `SPEECH_DELIVERED`, `ABILITY_USED`, `RESOURCE_SPENT`,
+`EFFECT_RESOLVED`) attributed to the player, advances the game turn once, clears the
+pending decision (removing the starting marker), writes a receipt with calculation
+inputs and draw references, `PUBLIC_STATE` and `NARRATION_REQUIRED` outbox intents, and
+bumps the `actor:<uuid>` query epoch of every actor whose placement or pools changed.
+Resource keys are applied only to actors whose origin belongs to the ability's pack;
+others are recorded as unaffected. No table, trigger or migration is added. See the
+[execution contract](07-turn-protocol.md#p074-local-action-execution).
 
 ### Campaign creation (P06.1)
 
@@ -275,6 +291,8 @@ New facts also require a boundary: world compatibility, allowed generation categ
 Every event includes campaign ID, event ID and sequence, operation ID, event type/version, actor, targets, real creation timestamp, in-world time, ruleset hash, causation references, visibility classification, and a bounded typed payload. Mechanical events include calculation inputs and random-draw references.
 
 Examples: `ItemConsumed`, `ResourceChanged`, `ActorMoved`, `AbilityLearned`, `FactDiscovered`, `QuestObjectiveSatisfied`, `EncounterStarted`, `CombatActionResolved`, `ActorDefeated`, `RewardSettled`, and `CanonCorrectionApplied`.
+
+Implemented event types (P07.4, event and payload schema version 1): `ACTOR_MOVED`, `TIME_PASSED`, `SPEECH_DELIVERED`, `ABILITY_USED`, `RESOURCE_SPENT` and `EFFECT_RESOLVED`. All carry the acting player as event actor, the operation as correlation and no causation reference (events of one operation are ordered by sequence). Target identities live in the payload; `EFFECT_RESOLVED` records the effect path, calculated amount, draw ordinals and per-actor `APPLIED`/`CLAMPED`/`NO_RESOURCE` outcomes, and is `INTERNAL` when it contains another actor's pool values. See the [execution contract](07-turn-protocol.md#p074-local-action-execution).
 
 The event log is an audit and recovery foundation. Current state is maintained transactionally alongside it. v1 does not promise that every future database version can be rebuilt solely by replaying events. Full replay requires versioned reducers and explicit support tests; distinguish that from replaying an encounter's recorded calculations.
 

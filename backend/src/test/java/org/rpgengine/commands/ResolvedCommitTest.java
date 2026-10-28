@@ -47,5 +47,16 @@ class ResolvedCommitTest {
                 List.of(event), Collections.nCopies(129, reward), "{}", false));
         assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit(context, world, List.of(),
                 List.of(event), List.of(), "{\"text\":\"" + "x".repeat(32_768) + "\"}", false));
+        // Placements are bounded, unique per actor and carry a valid location reference.
+        var placement = new ResolvedCommit.Placement(UUID.randomUUID(), 0, "grove");
+        assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit(context, world, List.of(),
+                List.of(event), List.of(), "{}", false, ResolvedCommit.Preparation.NONE, null,
+                List.of(placement, placement)));
+        assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit(context, world, List.of(),
+                List.of(event), List.of(), "{}", false, ResolvedCommit.Preparation.NONE, null,
+                Collections.nCopies(17, placement)));
+        assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit.Placement(UUID.randomUUID(), 0, " "));
+        assertEquals(List.of(), new ResolvedCommit(context, world, List.of(), List.of(event), List.of(), "{}", false)
+                .placements());
     }
 }

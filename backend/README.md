@@ -551,8 +551,8 @@ Registered player operations require matching request/type/revision/hash evidenc
 and repeat common semantic checks inside canonical commit. Omitting evidence fails
 before world effects. Internal non-player foundation operations retain their trusted
 compatibility constructors. No new HTTP controller, migration or worker is added.
-An admission is not an executed action: local calculations, mechanical receipts and
-delivery remain P07.4–P07.5.
+An admission alone is not an executed action; local calculations and mechanical
+receipts arrived with P07.4 (below), and delivery remains P07.5.
 
 `TypedCommandTest` covers closed shape, bounds, coercion, unknown types and immutable
 hash evidence. `TypedCommandValidationTest` uses real PostgreSQL for rejection
@@ -604,3 +604,37 @@ packaged backend cases in 32 suites pass with zero failures/errors/skips, and th
 executable jar is packaged. Configured frontend checks, EN/IT builds, 22 repository
 policy tests and zero-finding scans also pass. See
 [evidence scope](../docs/15-quality-and-acceptance.md).
+
+## Local command execution (P07.4)
+
+`CommandExecutionService` executes one registered intention per request according to
+the [execution contract](../docs/07-turn-protocol.md#p074-local-action-execution):
+admission, a prepare transaction (`ACCEPTED → PLANNING → VALIDATING`, rules re-checked,
+detached snapshot), pure calculation in `LocalActionResolver` with one durable
+`RandomDrawService` reservation per die, and one `CanonicalCommitService` commit. Rule
+drift after admission records `REJECTED`, any other failure `FAILED_BEFORE_COMMIT`; the
+lease is released and reserved draws remain bound to the operation. Matching retries
+replay the stored status and receipt and never re-execute.
+
+`MOVE` commits a typed row-version-guarded `Placement`, `WAIT` advances exactly the
+requested seconds, `SPEAK` records the exact words, and `USE_ABILITY` pays costs exactly
+and runs the ability's compiled `EffectProgram` (`modifyResource` and `conditional`
+nodes; other effect types are refused as `EFFECT_UNSUPPORTED` before journaling). Every
+action advances the turn once, clears the pending decision, writes v1 events, a receipt
+with calculations and draw ordinals, both outbox intents and `actor:<uuid>` query-epoch
+bumps. `CommandReceipts` projects the player-safe receipt returned by the command and
+status HTTP routes. No migration, worker, browser action or inference is added.
+
+`LocalActionResolverTest` (pure) covers expression semantics, draw ordinal order, timing
+phases, branches, exact costs, merged net changes, clamping, vocabulary-bound targets,
+event visibility, fail-closed unknown values and determinism. `CommandExecutionTest`
+(real PostgreSQL, sealed packs, production campaign creation) covers committed movement,
+waiting, speech and abilities, draw/receipt agreement, replay before and after startup
+reconciliation, refused effect programs, and trigger-injected faults after durable draws
+(failing event insert, concurrent rule-fact change) that leave no world effect.
+
+Verified on 28 October 2026 with the unchanged scoped JDK 21 toolchain and disposable
+PostgreSQL 18.6 fixture: 151 focused command cases and all 414 packaged backend cases
+in 34 suites pass with zero failures/errors/skips, and the executable jar is packaged.
+Configured frontend checks, EN/IT builds, 22 repository policy tests and zero-finding
+scans also pass. See [evidence scope](../docs/15-quality-and-acceptance.md).

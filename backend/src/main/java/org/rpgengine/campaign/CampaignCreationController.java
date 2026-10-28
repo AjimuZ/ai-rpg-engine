@@ -7,8 +7,8 @@ import java.util.UUID;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.rpgengine.commands.CampaignCommandJson;
+import org.rpgengine.commands.CommandExecutionService;
 import org.rpgengine.commands.OperationAdmissionFailure;
-import org.rpgengine.commands.OperationAdmissionService;
 import org.rpgengine.identity.LocalHttpAdmission;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.TransientDataAccessException;
@@ -21,24 +21,25 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * HTTP adapter for campaign creation, durable command admission and status reads.
- * Owner context comes only from local admission; byte-bounded input enters the atomic
- * services, and detached public identities/status leave them. Admission does not execute
- * gameplay: rule resolution and public receipt projection belong to later command
- * work. Failures expose stable codes rather than SQL, pack text or exception messages.
+ * HTTP adapter for campaign creation, command execution and status reads. Owner context
+ * comes only from local admission; byte-bounded input enters the atomic services, and
+ * detached public identities, status and the player-safe receipt projection leave them.
+ * A fresh command is admitted and then resolved locally in the same request (P07.4); its
+ * narration stays an outbox intent for later presentation work. Failures expose stable
+ * codes rather than SQL, pack text or exception messages.
  */
 @RestController
 public class CampaignCreationController {
     private static final int MAX_BYTES = 16_384;
     private final CampaignCreationService service;
-    private final OperationAdmissionService admissions;
+    private final CommandExecutionService commands;
     private final CampaignCommandJson commandDecoder = new CampaignCommandJson();
     private final CampaignCreationJson decoder = new CampaignCreationJson();
 
     /** Require both durable services; missing infrastructure fails application construction. */
-    public CampaignCreationController(CampaignCreationService service, OperationAdmissionService admissions) {
+    public CampaignCreationController(CampaignCreationService service, CommandExecutionService commands) {
         this.service = java.util.Objects.requireNonNull(service, "service");
-        this.admissions = java.util.Objects.requireNonNull(admissions, "admissions");
+        this.commands = java.util.Objects.requireNonNull(commands, "commands");
     }
 
     /**
@@ -79,13 +80,16 @@ public class CampaignCreationController {
     }
 
     /**
-     * Admit or replay one command. Reads at most 16 KiB plus one sentinel byte, also for
-     * chunked input, so the decoder never sees an unbounded body.
+     * Admit and locally resolve one command, or replay it. Reads at most 16 KiB plus one
+     * sentinel byte, also for chunked input, so the decoder never sees an unbounded body.
+     * A fresh request answers 202 with its final status: {@code COMMITTED} with a receipt,
+     * or {@code REJECTED}/{@code FAILED_BEFORE_COMMIT} when current state or storage refused
+     * it after durable admission. A replay answers 200 with the stored status and receipt.
      *
      * @param request admitted HTTP request carrying the owner attribute and JSON body
      * @param campaignId canonical campaign UUID from the path
      * @param adventureId canonical adventure UUID that must own the campaign
-     * @return 202 new admission, 200 replay, or a fixed error code
+     * @return 202 new operation, 200 replay, or a fixed error code (nothing journaled)
      */
     @PostMapping("/api/v1/campaigns/{campaignId}/commands")
     public ResponseEntity<?> submit(HttpServletRequest request, @PathVariable String campaignId,
@@ -103,9 +107,8 @@ public class CampaignCreationController {
             if (bytes.length > MAX_BYTES) {
                 return error(413, "COMMAND_BODY_TOO_LARGE");
             }
-            var admission = admissions.submit(owner, adventure, campaign, commandDecoder.decode(bytes));
-            return ResponseEntity.status(admission.replayed() ? 200 : 202)
-                    .body(body(admission.operation(), adventure, admission.replayed()));
+            var execution = commands.execute(owner, adventure, campaign, commandDecoder.decode(bytes));
+            return ResponseEntity.status(execution.replayed() ? 200 : 202).body(body(execution, adventure));
         } catch (CampaignCommandJson.Malformed | IOException failure) {
             return error(400, "COMMAND_INPUT_MALFORMED");
         } catch (OperationAdmissionFailure failure) {
@@ -115,7 +118,8 @@ public class CampaignCreationController {
             // normalization limits. The service applies those bounds before any writes.
             return error(422, "COMMAND_INVALID");
         } catch (TransientDataAccessException failure) {
-            // Lock or statement timeout: the campaign is effectively busy; nothing was admitted.
+            // Lock or statement timeout during admission: the campaign is effectively busy and
+            // nothing was admitted. Later failures are recorded on the operation instead.
             return error(409, "COMMAND_CAMPAIGN_BUSY");
         } catch (DataAccessException | TransactionException | IllegalStateException failure) {
             return error(503, "COMMAND_STORAGE_UNAVAILABLE");
@@ -141,7 +145,7 @@ public class CampaignCreationController {
             UUID campaign = CampaignCommandJson.uuid(campaignId);
             UUID operation = CampaignCommandJson.uuid(operationId);
             UUID adventure = CampaignCommandJson.uuid(adventureId);
-            return ResponseEntity.ok(body(admissions.status(owner, adventure, campaign, operation), adventure, false));
+            return ResponseEntity.ok(body(commands.status(owner, adventure, campaign, operation), adventure));
         } catch (CampaignCommandJson.Malformed failure) {
             return error(400, "COMMAND_INPUT_MALFORMED");
         } catch (OperationAdmissionFailure failure) {
@@ -169,15 +173,17 @@ public class CampaignCreationController {
             case TARGET_ILLEGAL -> error(422, "COMMAND_TARGET_ILLEGAL");
             case RESOURCE_INSUFFICIENT -> error(422, "COMMAND_RESOURCE_INSUFFICIENT");
             case CONTENT_UNAVAILABLE -> error(422, "COMMAND_CONTENT_UNAVAILABLE");
+            case EFFECT_UNSUPPORTED -> error(422, "COMMAND_EFFECT_UNSUPPORTED");
         };
     }
 
     /**
-     * Build the owner-visible operation body with a relative status query reference.
-     * Only server-generated identities are echoed, never caller-supplied text.
+     * Allowlisted public operation body: identities, lifecycle counters, the safe query path
+     * and the player-safe receipt projection (null until committed). Stored receipts,
+     * permits, payloads and rejection internals are never included.
      */
-    private static Map<String, Object> body(OperationAdmissionService.OperationView view, UUID adventure,
-            boolean replayed) {
+    private static Map<String, Object> body(CommandExecutionService.Execution execution, UUID adventure) {
+        var view = execution.operation();
         var body = new LinkedHashMap<String, Object>();
         body.put("operationId", view.operationId().toString());
         body.put("campaignId", view.campaignId().toString());
@@ -186,9 +192,10 @@ public class CampaignCreationController {
         body.put("baseRevision", view.baseRevision());
         body.put("committedRevision", view.committedRevision());
         body.put("operationVersion", view.operationVersion());
-        body.put("replayed", replayed);
+        body.put("replayed", execution.replayed());
         body.put("createdAt", view.createdAt().toString());
         body.put("updatedAt", view.updatedAt().toString());
+        body.put("receipt", execution.receipt());
         body.put("query", "/api/v1/campaigns/" + view.campaignId() + "/operations/" + view.operationId()
                 + "?adventureId=" + adventure);
         return body;

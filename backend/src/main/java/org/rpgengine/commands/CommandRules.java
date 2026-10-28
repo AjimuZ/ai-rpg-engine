@@ -25,11 +25,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *   <li><b>Target policy and resources</b> — target count must fit the ability's policy and every
  *       declared nonzero cost must be affordable above the minimum of the acting player's own
  *       resource from the same pack vocabulary as the ability.</li>
+ *   <li><b>Executable effects</b> — the ability's effect program must be one the local resolver
+ *       executes, read actor values only in the player's own vocabulary and fit the per-operation
+ *       durable draw budget (P07.4).</li>
  *   <li><b>Causal attribution</b> — at commit, resolved effects may only touch the participants
  *       this intention lawfully involves ({@link #requireAttributed}).</li>
  * </ul>
  * {@code WAIT} has no additional rule here; its legal duration belongs to the world clock
- * (P10.4). Calculating effects, spending costs and moving actors remain P07.4 work.
+ * (P10.4). {@link LocalActionResolver} calculates the effects of an intention that passed here.
  * Every rule rejection is a sanitized {@link OperationAdmissionFailure}; an unattributable
  * resolved effect is a trusted-resolver defect and raises {@link IllegalStateException}.
  * Both escape the caller's transaction and therefore roll back everything it wrote.
@@ -71,8 +74,8 @@ final class CommandRules {
 
     /**
      * Reject resolved effects that the admitted intention cannot have caused: every adjusted
-     * resource must belong to a participant, and every event actor must be absent or a
-     * participant. A resolver bug or a forged plan therefore cannot charge or credit an
+     * resource and every placed actor must belong to a participant, and every event actor must
+     * be absent or a participant. A resolver bug or a forged plan therefore cannot charge or credit an
      * uninvolved actor. Runs under the commit's campaign lock before any entity changes.
      *
      * @throws IllegalStateException for an unattributable or out-of-scope effect
@@ -82,6 +85,11 @@ final class CommandRules {
             List<UUID> owner = jdbc.query("select actor_id from actor_resource where id = ? and campaign_id = ?",
                     (row, index) -> row.getObject(1, UUID.class), change.resourceId(), campaign);
             if (owner.isEmpty() || !participants.contains(owner.getFirst())) {
+                throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
+            }
+        }
+        for (var placement : plan.placements()) {
+            if (!participants.contains(placement.actorId())) {
                 throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
             }
         }
@@ -188,7 +196,8 @@ final class CommandRules {
 
         /**
          * Ability rules in a fixed order: ownership, prerequisites, target policy, perceived
-         * targets and finally affordable costs. The first failure wins deterministically.
+         * targets, affordable costs and finally an executable effect program. The first failure
+         * wins deterministically.
          *
          * @return explicit targets that become commit participants
          */
@@ -234,9 +243,7 @@ final class CommandRules {
                 // share a key with the player's resource while meaning something else, so the
                 // player cannot pay it. Cost-free dependency abilities remain usable. A player
                 // without a resolvable creation origin has no provable vocabulary and cannot pay.
-                String origin = origin();
-                String vocabulary = origin == null ? null : catalog().resourceVocabularies().get(origin);
-                if (!ability.pack().equals(vocabulary)) {
+                if (!ability.pack().equals(vocabulary())) {
                     throw fail(OperationAdmissionFailure.Kind.RESOURCE_INSUFFICIENT);
                 }
                 List<Long> headroom = jdbc.query("select current_value - minimum_value from actor_resource "
@@ -246,7 +253,26 @@ final class CommandRules {
                     throw fail(OperationAdmissionFailure.Kind.RESOURCE_INSUFFICIENT);
                 }
             }
+            // Effects the resolver cannot execute are refused now, before a journal row, permit or
+            // draw exists. Attribute/resource atoms and resource changes use unqualified keys, so
+            // reading them is meaningful only in the player's own vocabulary. Writing a foreign
+            // vocabulary key is allowed: the resolver records that actor as explicitly unaffected.
+            var effects = ability.effects();
+            if (!EffectProgram.supported(effects)
+                    || EffectProgram.maxDraws(effects) > org.rpgengine.rules.DeterministicDraw.MAX_DRAWS
+                    || (EffectProgram.readsActorValues(effects) && !ability.pack().equals(vocabulary()))) {
+                throw fail(OperationAdmissionFailure.Kind.EFFECT_UNSUPPORTED);
+            }
             return use.targetActorIds();
+        }
+
+        /**
+         * Declaring pack of the player's creation profile, which supplied its resource and
+         * attribute keys; null for a player without a resolvable creation origin.
+         */
+        private String vocabulary() {
+            String origin = origin();
+            return origin == null ? null : catalog().resourceVocabularies().get(origin);
         }
 
         /** Whether the acting player currently holds a learned row for the canonical ability ID. */

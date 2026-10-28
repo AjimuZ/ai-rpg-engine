@@ -105,3 +105,22 @@ to the intention's participants. Alternatives rejected: trusting admission-time
 results at commit (stale after any canonical write), validating inside the resolver
 only (would let a resolver defect write unattributable effects), and caching
 mutable state (cannot be fenced by the campaign lock). Local calculation remains P07.4.
+
+P07.4 implementation decision (28 October 2026): execute a registered intention in the
+request thread as four short transactions (admission, prepare to `VALIDATING` with a
+rule re-check and detached snapshot, one committed draw reservation per die, canonical
+commit) instead of one long transaction or a background worker. A single transaction
+could not keep durable draws when the commit fails; a worker would need the payload,
+which admission deliberately does not store. Calculation is a pure function of
+intention, snapshot, pinned catalog and draws, so the commit's own re-checks (revision,
+lease, typed evidence, semantics, rules, attribution, row versions) make a stale
+calculation fail rather than apply. After durable admission every failure is recorded
+(`REJECTED` for rule drift, otherwise `FAILED_BEFORE_COMMIT`) and the lease released;
+reserved draws stay bound to the failed operation. Movement is a new explicit typed
+`Placement` effect guarded by the actor row version, not a generic field write.
+Abilities whose effect programs need later systems are refused at the gate
+(`EFFECT_UNSUPPORTED`) rather than partially executed. Alternatives rejected: storing
+the payload for asynchronous resumption (a second copy of untrusted input and a resume
+path that P07.5 cancellation must govern first), evaluating dice without durable
+reservation (reroll on retry), and silently skipping unsupported effect nodes (a
+partial ability is not the authored ability).

@@ -28,9 +28,9 @@ import tools.jackson.databind.json.JsonMapper;
  * per campaign, rechecks its snapshot, writes every effect and returns a receipt only
  * after COMMIT succeeds. Registered player operations recheck hash-bound typed
  * evidence, common semantic eligibility and the P07.3 current-state rules here, and
- * their effects must be attributable to the intention's participants; effect calculation
- * and later delivery belong to callers/workers; this internal service has no controller,
- * network port or callback.
+ * their effects must be attributable to the intention's participants. Effect calculation
+ * belongs to {@link CommandExecutionService}/{@link LocalActionResolver} and delivery to
+ * later workers; this internal service has no controller, network port or callback.
  * Any validation, persistence, timeout or commit failure rolls back all its writes.
  */
 @Service
@@ -148,6 +148,16 @@ public class CanonicalCommitService {
             // @Version also catches a writer racing after this read, including writers
             // outside this service. A failure rolls back previously flushed effects.
             resource.adjust(change.delta(), counters.stateRevision(), now);
+        }
+        for (var placement : plan.placements()) {
+            // Movement is an explicit typed effect, never a generic field write. The storage version
+            // makes a concurrent actor writer (including one outside this service) a stale-plan
+            // failure; the row-version trigger additionally requires exactly one step.
+            if (jdbc.update("update actor set location_id = ?, row_version = row_version + 1 where id = ? "
+                    + "and campaign_id = ? and row_version = ?", placement.locationId(), placement.actorId(),
+                    campaign.getId(), placement.expectedRowVersion()) != 1) {
+                throw new IllegalStateException("stale or out-of-scope actor placement");
+            }
         }
         for (int index = 0; index < plan.events().size(); index++) {
             var event = plan.events().get(index);
