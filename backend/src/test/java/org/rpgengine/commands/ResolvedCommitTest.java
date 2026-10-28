@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.campaign.CampaignMode;
 import org.rpgengine.campaign.EventVisibility;
+import org.rpgengine.preparation.PlanActivations;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -58,5 +59,31 @@ class ResolvedCommitTest {
         assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit.Placement(UUID.randomUUID(), 0, " "));
         assertEquals(List.of(), new ResolvedCommit(context, world, List.of(), List.of(event), List.of(), "{}", false)
                 .placements());
+    }
+
+    /** Plan citations are bounded, distinct and frozen before any lock is taken. */
+    @Test
+    void boundsPlanActivationCitations() {
+        var artifact = UUID.randomUUID();
+        var branches = new ArrayList<>(List.of("interview"));
+        var activation = new PlanActivations.Request(artifact, branches);
+        branches.add("document");
+        assertEquals(List.of("interview"), activation.branchRefs());
+        assertThrows(UnsupportedOperationException.class, () -> activation.branchRefs().clear());
+        assertThrows(IllegalArgumentException.class, () -> new PlanActivations.Request(artifact, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new PlanActivations.Request(artifact,
+                List.of("a", "b", "c", "d", "e", "f", "g", "h", "i")));
+        assertThrows(IllegalArgumentException.class, () -> new PlanActivations.Request(artifact, List.of("a", "a")));
+        assertThrows(IllegalArgumentException.class, () -> new PlanActivations.Request(artifact,
+                List.of("x".repeat(129))));
+        assertEquals(List.of(), new ResolvedCommit.Preparation(List.of(), List.of()).activations());
+        assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit.Preparation(List.of(), List.of(),
+                List.of(activation, new PlanActivations.Request(artifact, List.of("document")))));
+        var citations = new ArrayList<PlanActivations.Request>();
+        for (int index = 0; index < 5; index++) {
+            citations.add(new PlanActivations.Request(UUID.randomUUID(), List.of("branch")));
+        }
+        assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit.Preparation(List.of(), List.of(), citations));
+        assertEquals(4, new ResolvedCommit.Preparation(List.of(), List.of(), citations.subList(0, 4)).activations().size());
     }
 }

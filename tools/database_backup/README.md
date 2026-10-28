@@ -1,4 +1,4 @@
-# Database backup and restore (V11 scope)
+# Database backup and restore (V12 scope)
 
 A trusted-owner disaster-recovery tool for the canonical PostgreSQL database. It
 uses only the Python standard library and the `pg_dump`/`pg_restore` clients inside
@@ -19,7 +19,7 @@ py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
 ## What it does
 
 - **Backup** checks the exact server and client version, the exact table set and
-  successful migrations V1–V11, including immutable pack bytes and sealed reports. It then creates the target directory, which must
+  successful migrations V1–V12, including immutable pack bytes and sealed reports. It then creates the target directory, which must
   not already exist, and writes `database.dump` (custom format, no owners or
   privileges). It re-reads the catalog and writes `manifest.json` last. The manifest
   holds the format, schema and PostgreSQL versions, the scope, the byte count, the
@@ -109,3 +109,10 @@ V11 scope (P07.5) adds `campaign_stream_head`, `campaign_stream_message` and
 `presentation_job`, so the stream high-water mark, the retained public messages and
 owed presentation survive a backup. Offline checks cover the V11 manifest/catalog; no
 live V11 dump/restore rehearsal has been run.
+
+V12 scope (P07.6) adds `plan_activation` (one immutable row per plan branch an
+ordinary committed command used) and two nullable gate columns on `plan_admission`.
+Restore keeps activation history as audit evidence; the existing restore step still
+retires every usable plan with a `GENERATION_RETIRED` disposition, and activation
+refuses retired generations, so a restored plan cannot be used again. Offline checks
+cover the V12 manifest/catalog; no live V12 dump/restore rehearsal has been run.

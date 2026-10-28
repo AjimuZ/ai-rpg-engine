@@ -18,6 +18,21 @@ and a populated restore/startup rehearsal establish this limited scope. Full epo
 tagging by gameplay writers, scheduler fairness/budgets, runtime cancellation,
 author/quest semantics and plan consumption remain P07.6/P08.6–P08.7.
 
+P07.6 (28 October 2026) completes the transactional half of that admission and the
+check at actual use. Under the campaign lock the V12 gate also checks scope (current
+generation, no private reads or secret definitions in public input), pinned content
+(revision, pack and ruleset hashes, cited definitions), author constraints (a digest
+recomputed from the sealed pin, cited required/fixed entities) and typed row-version
+dependencies on actors, resources, items, character state and player-knowledge records,
+and requires every cited campaign entity to be covered by a recorded dependency. Every
+canonical commit re-evaluates admitted plans against the rows it changed. Only an
+ordinary canonical command uses a plan: its commit rechecks the cited branches against
+current rows before writing any effect and records each branch once in
+`plan_activation`; the plan contributes no fact, time, reward or draw. Predicates,
+constraint rows, the quest-plan body contract, consumers that build commands from plans,
+dispatch and budgets remain P08.6–P08.7, P09.1 and P10. See the
+[P07.6 contract](07-turn-protocol.md#p076-plan-admission-and-activation).
+
 Keep the playable loop small: validated intent when needed, deterministic resolution, canonical save, then public narration. Prepare selected expensive narrative situations separately, so accepting a mystery does not require generating its whole future before acknowledging the action. A prepared situation supplies motives, causal dependencies, clues and alternatives; it never prescribes the protagonist's choices or makes an anticipated outcome inevitable.
 
 This extends the existing [architecture](04-architecture.md), [turn protocol](07-turn-protocol.md), [memory model](08-memory-and-continuity.md), [authoring contract](09-adventure-packs.md), and [task envelopes](21-ai-task-contracts-and-prompts.md). Those remain authoritative for canonical mutations, supported mechanics and public narration. A plan is preparation, not a second world-state store.
@@ -217,8 +232,13 @@ receipt or cached catalog never substitutes for them. P07.4 local execution bump
 the `actor:<uuid>` query epoch of every actor whose placement or resource pools a
 command changed, in the same canonical transaction, and invalidates current plans that
 read a bumped scope; plans that depend on an actor's position or pools should record
-that scope. Typed plan activation and complete QA-36 remain P07.6. No new background
-world writer is added.
+that scope. P07.6 implements the second check and typed activation: the admission gate
+rechecks scope, pinned content, author constraints, query epochs and typed row versions
+under the campaign lock, and a canonical commit that cites admitted branches rechecks
+them live before any effect and records each use once (see the
+[P07.6 contract](07-turn-protocol.md#p076-plan-admission-and-activation)). A reveal or
+other writer added later must bump the affected scope (for example `knowledge:<actorId>`)
+or step the row version it changes. No new background world writer is added.
 
 P07.5 post-commit presentation jobs (`presentation_job`) are deliberately separate from
 `ai_job`: one per committed operation, created by the canonical transaction, settled
@@ -316,7 +336,7 @@ The following acceptance contracts are **planned**, not passing results. They su
 | AP-11 | Fixed author facts, unexpected lawful solution, failure/abandonment | Identity/constraints preserved without prescribing player actions; valid solution/objective and failure policies remain available |
 | AP-12 | Narrator A, planner B, planner+reviewer C | Paired bilingual quality/latency/usage report with configuration, raw counts, uncertainty and failures; no superiority claim without evidence |
 
-QA-36 owns AP-01–AP-05's stale-plan/admission assertions, QA-37 owns priority, quota, cancellation/recovery and concurrency scenarios, QA-39 owns AP-12's paired bilingual narrative comparisons, and existing QA-07/16/23/33/34 plus QA-35/40 cover agency, scope, restore, authorship, locale and presentation sinks. These references are coverage mappings, not passed tests. Use deterministic scripted jobs and real PostgreSQL for race, lease, phantom, idempotency, restart and safety checks. Runtime adapter fixtures test event interleaving and fault handling without live inference in normal CI. Qualify account-backed concurrency separately and minimally; live access is not needed to review this document. Long quality evaluations use a controlled explicit inference allowance.
+QA-36 owns AP-01–AP-05's stale-plan/admission assertions (P07.6 records the first deterministic real-PostgreSQL evidence for them and for AP-08's no-canonical-change rule; see the [quality record](15-quality-and-acceptance.md)), QA-37 owns priority, quota, cancellation/recovery and concurrency scenarios, QA-39 owns AP-12's paired bilingual narrative comparisons, and existing QA-07/16/23/33/34 plus QA-35/40 cover agency, scope, restore, authorship, locale and presentation sinks. These references are coverage mappings, not passed tests. Use deterministic scripted jobs and real PostgreSQL for race, lease, phantom, idempotency, restart and safety checks. Runtime adapter fixtures test event interleaving and fault handling without live inference in normal CI. Qualify account-backed concurrency separately and minimally; live access is not needed to review this document. Long quality evaluations use a controlled explicit inference allowance.
 
 For AP-12, compare A (single narrator), B (same narrator plus bounded planning), and C (B plus optional review), keeping pack/ruleset, task/model settings, locale, seeds and evaluation prompts recorded. Include simple errands, mystery with several leads, an unavailable witness, a spent unique resource, faction conflict, rejected romance/commitment, abandonment, secret discovery, renewal and restore. Use matched scenarios with randomized/blinded presentation order, at least two human raters and the same rubric in English and Italian. Follow the [central evaluation protocol](31-research-validation-and-evaluations.md) and its proposed floor of ten paired short situations per language; expanding to 30 per locale is a candidate study after budget review. Add a 100-turn continuity exercise, then the existing 500-turn release soak. Neither sample proposal is a statistical power claim; publish disagreement, variation and confidence intervals where meaningful.
 
@@ -342,4 +362,4 @@ P14 should record one optional A/B demonstration in both languages when the plan
 
 ### Research checkpoint
 
-Completed for the 23 October design checkpoint: inspected relevant existing architecture/turn/memory/author/workspace contracts, runtime probe source and retained evidence; fetched current official app-server documentation and four primary planning papers; compared topology alternatives and recorded explicit proposal/verification boundaries. That checkpoint ran no inference, implementation or benchmark. P03.6 implementation evidence is recorded in section 1. Remaining investigations belong to P07/P08/P18: complete gameplay query-epoch tagging and semantic dependencies, exact supported-account concurrency/priority/cancellation measurements, bilingual A/B/C study and policy tuning. The design does not change P01's remaining live isolation/image gates.
+Completed for the 23 October design checkpoint: inspected relevant existing architecture/turn/memory/author/workspace contracts, runtime probe source and retained evidence; fetched current official app-server documentation and four primary planning papers; compared topology alternatives and recorded explicit proposal/verification boundaries. That checkpoint ran no inference, implementation or benchmark. P03.6 and P07.6 implementation evidence is recorded in section 1. Remaining investigations belong to P08/P09/P10/P18: query-epoch tagging by later writers (reveals, items, quests), semantic predicate/constraint dependencies, exact supported-account concurrency/priority/cancellation measurements, bilingual A/B/C study and policy tuning. The design does not change P01's remaining live isolation/image gates.

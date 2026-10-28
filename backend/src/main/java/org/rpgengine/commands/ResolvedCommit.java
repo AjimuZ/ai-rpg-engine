@@ -10,6 +10,7 @@ import org.rpgengine.campaign.CampaignMode;
 import org.rpgengine.campaign.EventVisibility;
 import org.rpgengine.persistence.CanonicalValues;
 import org.rpgengine.preparation.JobRequest;
+import org.rpgengine.preparation.PlanActivations;
 import org.rpgengine.progression.RewardSettlement;
 
 /**
@@ -25,8 +26,8 @@ import org.rpgengine.progression.RewardSettlement;
  * finish before this value enters the commit service. Later rule modules extend the
  * explicit effect types instead of adding generic entity writes; P07.4 adds actor
  * {@link Placement placements} for movement. Preparation intents
- * (query-scope epoch bumps and critical preparation jobs) are data too; they commit or
- * roll back with the world change that caused them.
+ * (query-scope epoch bumps, critical preparation jobs and cited plan branches) are data
+ * too; they commit or roll back with the world change that caused them.
  */
 public record ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources,
         List<Event> events, List<Reward> rewards, String receiptDetails, boolean narrationRequired,
@@ -167,24 +168,39 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
 
     /**
      * Preparation intents written atomically with the canonical effects (docs/28
-     * section 7). Each scope's query epoch is bumped once, current plans that read a
-     * bumped scope are invalidated, and each job is enqueued deduplicated with this
+     * section 7). Each scope's query epoch is bumped once, current plans whose recorded
+     * reads changed are invalidated, and each job is enqueued deduplicated with this
      * operation as its origin; replaying an identical intent finds the same job.
+     * Activations cite admitted plan branches the trusted resolver used: the commit
+     * rechecks them under its lock before writing any effect and records each use once,
+     * but a plan contributes no effect of its own (P07.6).
      *
      * @param queryScopes at most 64 distinct query scopes the effects can change
      * @param jobs at most 16 critical or ordinary preparation jobs to create
+     * @param activations at most four cited artifacts, each at most once
      */
-    public record Preparation(List<String> queryScopes, List<JobRequest> jobs) {
-        /** No scopes and no jobs. */
-        public static final Preparation NONE = new Preparation(List.of(), List.of());
+    public record Preparation(List<String> queryScopes, List<JobRequest> jobs,
+            List<PlanActivations.Request> activations) {
+        /** No scopes, no jobs and no plan use. */
+        public static final Preparation NONE = new Preparation(List.of(), List.of(), List.of());
 
-        /** Copy and bound both lists; reject duplicate scopes so each bump is meaningful. */
+        /** Copy and bound every list; reject duplicate scopes and artifacts so each entry is meaningful. */
         public Preparation {
             queryScopes = bounded(queryScopes, 64, "queryScopes");
             jobs = bounded(jobs, 16, "jobs");
+            activations = bounded(activations, 4, "activations");
             if (new HashSet<>(queryScopes).size() != queryScopes.size()) {
                 throw new IllegalArgumentException("duplicate query scope");
             }
+            if (activations.stream().map(PlanActivations.Request::artifactId).distinct().count()
+                    != activations.size()) {
+                throw new IllegalArgumentException("duplicate plan activation");
+            }
+        }
+
+        /** Intents without plan use, the shape used before P07.6. */
+        public Preparation(List<String> queryScopes, List<JobRequest> jobs) {
+            this(queryScopes, jobs, List.of());
         }
     }
 }

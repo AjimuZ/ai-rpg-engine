@@ -99,7 +99,7 @@ class TypedCommandValidationTest {
     /** Remove disposable test rows, preserving production constraints and triggers. */
     @AfterEach
     void clear() {
-        jdbc.execute("truncate presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, operation_journal, actor_resource, actor, presentation_campaign_settings, campaign, content_revision_report, content_revision_file, content_revision, adventure_workspace, identity_owner_profile");
+        jdbc.execute("truncate presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, operation_journal, actor_resource, actor, presentation_campaign_settings, campaign, content_revision_report, content_revision_file, content_revision, adventure_workspace, identity_owner_profile");
     }
 
     /** A registered intention is durably admitted without a world effect, event, draw or resource spend. */

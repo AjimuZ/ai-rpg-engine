@@ -1,11 +1,16 @@
 package org.rpgengine.preparation;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import tools.jackson.databind.json.JsonMapper;
 
 import org.rpgengine.persistence.CanonicalValues;
@@ -16,33 +21,61 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Transactional admission of versioned quest-plan artifacts and their dependency
- * records (docs/28 section 7, second admission check). Under the campaign lock that
- * every canonical writer also takes, admission re-checks the job lease, fence,
- * generation and cancellation, the recorded query epochs (which catch phantoms) and
- * the plan predecessor/version, then stores the immutable artifact, its dependencies,
- * one admission receipt and a VALIDATED disposition atomically. A stale proposal is
- * rejected, never copied forward, and may trigger at most one fresh regeneration.
- * Admission and invalidation are metadata writes: they never advance state revision,
- * turn, world time, random draws or the event sequence, and a validated plan is
- * preparation, never canonical truth. ENTITY_FIELD, FACT and CONSTRAINT dependencies
- * fail closed until semantic evaluators arrive at P08.7;
- * dispatch-side use of this service arrives at P07.6.
+ * records (docs/28 section 7, second admission check; QA-36). The provisional validator
+ * (P08.7) runs outside any transaction; this gate repeats every check that later world
+ * changes could falsify, under the campaign lock that every canonical writer also takes:
+ *
+ * <ol>
+ *   <li><b>Fencing and idempotency:</b> the attempt's holder, fence, live lease, current
+ *       generation and recorded result digest; a repeated call returns the same receipt or
+ *       rejection, and unique keys allow one artifact per attempt and plan version.</li>
+ *   <li><b>Scope:</b> the snapshot's generation is current, and a public snapshot carries
+ *       neither planner-private dependencies nor references to secret definitions.</li>
+ *   <li><b>Content:</b> the snapshot's pinned revision, pack hash and ruleset hash are the
+ *       campaign's own, and every cited definition exists in that sealed closure.</li>
+ *   <li><b>Author:</b> the snapshot's author-constraint digest equals the pinned root
+ *       policy's, and every cited constraint is a required or fixed authored entity.</li>
+ *   <li><b>Dependencies:</b> each recorded QUERY epoch is current (which catches phantoms)
+ *       and each typed version dependency still names its exact row version; every cited
+ *       campaign entity must be covered by a recorded dependency, so a plan cannot rely on
+ *       an unrecorded read. Predicates and CONSTRAINT rows fail closed until P08.7.</li>
+ *   <li><b>Lineage:</b> the version is new and builds on an admitted predecessor.</li>
+ * </ol>
+ *
+ * <p>Then it stores the immutable artifact, dependencies, one admission receipt carrying
+ * the gate version and checked references, and a VALIDATED disposition atomically. A stale
+ * proposal is rejected, never copied forward, and may trigger at most one regeneration.
+ * Admission and invalidation are metadata writes: they never advance state revision, turn,
+ * world time, random draws, rewards or the event sequence. A validated plan is preparation,
+ * never canonical truth; only an ordinary canonical command can use it, through
+ * {@link PlanActivations}.
  */
 @Service
 public class PlanAdmissionService {
+    /** Version of this transactional gate, recorded on every receipt it writes. */
+    public static final String GATE_VERSION = "plan-gate-v1";
     // Only quest-plan jobs produce artifacts admitted here.
     static final String QUEST_PLAN = "QUEST_PLAN";
     // Predecessor states a new version may build on; SUPERSEDED implies a version conflict.
     private static final Set<String> BUILDABLE = Set.of("VALIDATED", "PARTIALLY_INVALIDATED", "INVALIDATED");
+    private static final String UUID_TEXT = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+    // Closed typed-version grammar, mirroring plan_reference_version in V12. ENTITY_FIELD
+    // names world rows; FACT names player-knowledge records. Anything else is unsupported.
+    static final Pattern ENTITY_REFERENCE = Pattern.compile("^(actor|resource|item|character):" + UUID_TEXT + "$");
+    static final Pattern FACT_REFERENCE = Pattern.compile("^(known-fact|known-quest):" + UUID_TEXT + "$");
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final JobRecoveryService recovery;
+    private final PlanContentCatalogs catalogs;
 
-    /** Wire local persistence only. */
-    public PlanAdmissionService(JdbcTemplate jdbc, PlatformTransactionManager manager, JobRecoveryService recovery) {
+    /** Wire local persistence, the startup reconciliation gate and the pinned content loader. */
+    public PlanAdmissionService(JdbcTemplate jdbc, PlatformTransactionManager manager, JobRecoveryService recovery,
+            PlanContentCatalogs catalogs) {
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
         this.recovery = Objects.requireNonNull(recovery, "recovery");
+        this.catalogs = Objects.requireNonNull(catalogs, "catalogs");
         transaction = PreparationSupport.template(manager);
     }
 
@@ -50,12 +83,15 @@ public class PlanAdmissionService {
      * Admit the result of one attempt. Idempotent per attempt: a repeated call after an
      * acceptance returns DUPLICATE with the same receipt, after a rejection the same
      * rejection. Integrity mismatches between proposal and job throw without writing.
+     * The pinned content catalog is loaded before any lock is taken.
      *
      * @param lease the lease whose attempt recorded the result
-     * @param proposal backend-validated plan content and dependencies
+     * @param proposal backend-validated plan content, references and dependencies
      * @return ACCEPTED with the receipt, REJECTED with a reason code, or DUPLICATE
-     * @throws IllegalStateException for stale leases or a result digest other than the recorded one
-     * @throws IllegalArgumentException when the proposal does not belong to the job
+     * @throws IllegalStateException for stale leases, a retired generation, a result digest
+     *         other than the recorded one, or before startup reconciliation
+     * @throws IllegalArgumentException when the proposal does not belong to the job or omits
+     *         the snapshot's dependency manifest
      */
     public Admission admit(PreparationJobService.Lease lease, Proposal proposal) {
         Objects.requireNonNull(lease, "lease");
@@ -64,17 +100,19 @@ public class PlanAdmissionService {
         if (!recovery.isReconciled()) {
             throw new IllegalStateException("job recovery has not completed");
         }
+        var content = catalogs.preload(lease.campaignId());
         return transaction.execute(status -> {
             PreparationSupport.boundWaits(jdbc);
             // NO KEY UPDATE conflicts with canonical commits (FOR UPDATE) and with share
             // locks of enqueue/snapshot/recovery, but not with foreign-key checks.
-            var campaigns = jdbc.queryForList("select state_revision, recovery_generation from campaign "
-                    + "where id = ? for no key update", lease.campaignId());
+            var campaigns = jdbc.queryForList("select state_revision, recovery_generation, content_revision_id "
+                    + "from campaign where id = ? for no key update", lease.campaignId());
             if (campaigns.isEmpty()) {
                 throw new IllegalArgumentException("unknown campaign");
             }
             long revision = ((Number) campaigns.getFirst().get("state_revision")).longValue();
             long generation = ((Number) campaigns.getFirst().get("recovery_generation")).longValue();
+            UUID pinned = (UUID) campaigns.getFirst().get("content_revision_id");
             JobRow row = JobRow.lock(jdbc, lease.campaignId(), lease.jobId());
             var attempts = jdbc.queryForList("select fence, lease_holder, outcome, result_digest, snapshot_id, "
                     + "failure_code from ai_job_attempt where job_id = ? and attempt_number = ?", lease.jobId(),
@@ -102,24 +140,24 @@ public class PlanAdmissionService {
             if ("REJECTED".equals(attempt.get("outcome"))) {
                 return new Admission(Outcome.REJECTED, null, null, (String) attempt.get("failure_code"));
             }
-            // Any other outcome means the attempt ended without a result to admit.
+            // Any other outcome means the attempt ended without a result to admit; a
+            // cancellation request or lost lease leaves no RESULT_RECEIVED holder here.
             row.requireHeldBy(lease, Set.of("RESULT_RECEIVED"));
-            if (!proposal.resultDigest().equals(attempt.get("result_digest"))) {
-                throw new IllegalStateException("conflicting job result");
-            }
             if (!QUEST_PLAN.equals(row.kind()) || !proposal.contractVersion().equals(row.contractVersion())
                     || !proposal.questTarget().equals(row.target())) {
                 throw new IllegalArgumentException("proposal does not belong to the job");
             }
-            UUID snapshot = (UUID) attempt.get("snapshot_id");
-            String sourceHash = jdbc.queryForObject("select context_digest from planning_snapshot "
-                    + "where id = ? and campaign_id = ?", String.class, snapshot, lease.campaignId());
+            UUID snapshotId = (UUID) attempt.get("snapshot_id");
             // The result cannot remove or replace anything the engine supplied. JSONB
             // comparison normalizes object whitespace and key order, preserving array order.
-            boolean sameManifest = Boolean.TRUE.equals(jdbc.queryForObject(
-                    "select dependency_manifest = ?::jsonb from planning_snapshot where id = ?",
-                    Boolean.class, manifest(proposal.dependencies()), snapshot));
-            if (!sameManifest) {
+            SnapshotFacts snapshot = jdbc.queryForObject("select context_digest, audience, campaign_generation, "
+                    + "content_revision_id, pack_hash, ruleset_hash, author_constraint_hash, "
+                    + "dependency_manifest = ?::jsonb from planning_snapshot where id = ? and campaign_id = ?",
+                    (result, index) -> new SnapshotFacts(snapshotId, result.getString(1),
+                            Audience.valueOf(result.getString(2)), result.getLong(3), result.getObject(4, UUID.class),
+                            result.getString(5), result.getString(6), result.getString(7), result.getBoolean(8)),
+                    manifest(proposal.dependencies()), snapshotId, lease.campaignId());
+            if (!Objects.requireNonNull(snapshot).sameManifest()) {
                 throw new IllegalArgumentException("proposal must retain the snapshot dependency manifest");
             }
             updateJob("VALIDATING", "", lease);
@@ -131,19 +169,20 @@ public class PlanAdmissionService {
                     "select s.audience = 'PUBLIC' and (s.locale_revision <> coalesce(p.locale_revision, 0) "
                     + "or s.glossary_revision <> coalesce(p.glossary_revision, 0)) from planning_snapshot s "
                     + "left join presentation_campaign_settings p on p.campaign_id = s.campaign_id where s.id = ?",
-                    Boolean.class, snapshot));
-            String reason = stalePresentation ? "STALE_PRESENTATION" : staleness(lease.campaignId(), proposal);
+                    Boolean.class, snapshotId));
+            String reason = stalePresentation ? "STALE_PRESENTATION"
+                    : gate(lease.campaignId(), generation, pinned, content.matching(pinned), snapshot, proposal);
             if (reason != null) {
                 reject(lease, row, reason);
                 return new Admission(Outcome.REJECTED, null, null, reason);
             }
-            return accept(lease, proposal, snapshot, sourceHash, revision, generation);
+            return accept(lease, proposal, snapshot, revision, generation);
         });
     }
 
     /**
-     * Append invalidation dispositions for current artifacts whose recorded query epochs
-     * no longer match, in its own transaction under the campaign lock.
+     * Append invalidation dispositions for current artifacts whose recorded query epochs or
+     * typed versions no longer match, in its own transaction under the campaign lock.
      *
      * @return number of artifacts whose disposition changed
      * @throws IllegalArgumentException for an unknown campaign
@@ -164,11 +203,15 @@ public class PlanAdmissionService {
 
     /**
      * Invalidate inside the caller's transaction, which must hold the campaign lock
-     * (canonical commits call this after bumping epochs). A stale ARTIFACT-severity
-     * query makes the artifact INVALIDATED; stale BRANCH-severity queries only make a
-     * VALIDATED artifact PARTIALLY_INVALIDATED. Prior bytes are never edited; each
-     * change is one more disposition row, and an unchanged stale state adds nothing,
-     * so repeated commits cannot loop.
+     * (canonical commits call this after writing effects and bumping epochs). Every stored
+     * dependency is re-evaluated by the V12 {@code plan_dependency_fresh} function: a QUERY
+     * epoch that moved or a typed reference whose row version changed (including a removed
+     * or foreign row) is stale. A stale ARTIFACT-severity dependency makes the artifact
+     * INVALIDATED; stale BRANCH-severity ones only make a VALIDATED artifact
+     * PARTIALLY_INVALIDATED. The reason is DEPENDENCY_CHANGED when a typed version moved,
+     * otherwise QUERY_EPOCH_CHANGED. Prior bytes are never edited; each change is one more
+     * disposition row, and an unchanged stale state adds nothing, so repeated commits
+     * cannot loop.
      *
      * @param revision canonical state revision the check ran against
      * @return number of artifacts whose disposition changed
@@ -182,31 +225,85 @@ public class PlanAdmissionService {
                 + "cross join lateral (select status, sequence from plan_disposition where artifact_id = a.id "
                 + "order by sequence desc limit 1) d where a.campaign_id = ? "
                 + "and d.status in ('VALIDATED', 'PARTIALLY_INVALIDATED')), "
-                + "stale as (select l.id, l.status, l.sequence, bool_or(p.severity = 'ARTIFACT') as whole "
-                + "from latest l join plan_dependency p on p.artifact_id = l.id and p.kind = 'QUERY' "
-                + "left join query_epoch e on e.campaign_id = ? and e.scope_key = p.scope_key "
-                + "where p.query_epoch <> coalesce(e.epoch, 0) group by l.id, l.status, l.sequence) "
+                + "stale as (select l.id, l.status, l.sequence, bool_or(p.severity = 'ARTIFACT') as whole, "
+                + "bool_or(p.kind <> 'QUERY') as versioned from latest l "
+                + "join plan_dependency p on p.artifact_id = l.id where not plan_dependency_fresh(?, p) "
+                + "group by l.id, l.status, l.sequence) "
                 + "insert into plan_disposition (artifact_id, sequence, campaign_id, status, reason_code, "
                 + "checked_revision, created_at) select id, sequence + 1, ?, case when whole then 'INVALIDATED' "
-                + "else 'PARTIALLY_INVALIDATED' end, 'QUERY_EPOCH_CHANGED', ?, clock_timestamp() from stale "
+                + "else 'PARTIALLY_INVALIDATED' end, case when versioned then 'DEPENDENCY_CHANGED' "
+                + "else 'QUERY_EPOCH_CHANGED' end, ?, clock_timestamp() from stale "
                 + "where whole or status = 'VALIDATED'", campaign, campaign, campaign, revision);
     }
 
     /**
-     * Return the first staleness reason, or null when the proposal is still current:
-     * every QUERY epoch must equal the current epoch, the version must be new and a
-     * version above 1 must build on an admitted predecessor with the same target.
+     * Run the transactional gate under the caller's campaign lock and return the first
+     * rejection reason, or null when the proposal may be admitted. Reasons are checked in a
+     * fixed order (scope, content, author, dependency support and coverage, freshness,
+     * lineage) so equal inputs always yield the same code. Only reads are performed.
+     *
+     * @param catalog pinned facts matching the locked content revision, or null when unavailable
      */
-    private String staleness(UUID campaign, Proposal proposal) {
+    private String gate(UUID campaign, long generation, UUID pinned, PlanContentCatalog catalog,
+            SnapshotFacts snapshot, Proposal proposal) {
+        References references = proposal.references();
+        // Scope: a restored generation cannot admit older input even with equal revisions,
+        // and public input can never carry private reads or secret definitions.
+        if (snapshot.generation() != generation) {
+            return "STALE_GENERATION";
+        }
+        if (snapshot.audience() == Audience.PUBLIC
+                && proposal.dependencies().stream().anyMatch(value -> value.audience() == Audience.PLANNER_PRIVATE)) {
+            return "AUDIENCE_SCOPE";
+        }
+        // Content: the snapshot must describe the campaign's own sealed pinned closure.
+        if (catalog == null) {
+            return "CONTENT_UNAVAILABLE";
+        }
+        var hashes = jdbc.queryForMap("select content_hash, ruleset_hash from content_revision where id = ?", pinned);
+        if (!pinned.equals(snapshot.contentRevision()) || !snapshot.packHash().equals(hashes.get("content_hash"))
+                || !snapshot.rulesetHash().equals(hashes.get("ruleset_hash"))) {
+            return "STALE_CONTENT";
+        }
+        if (!catalog.definitions().containsAll(references.contentRefs())) {
+            return "UNKNOWN_CONTENT";
+        }
+        if (snapshot.audience() == Audience.PUBLIC
+                && references.contentRefs().stream().anyMatch(catalog.secretDefinitions()::contains)) {
+            return "AUDIENCE_SCOPE";
+        }
+        // Author: constraints are recomputed from the pinned policy, never trusted from input.
+        if (!catalog.authorConstraintHash().equals(snapshot.authorConstraintHash())) {
+            return "STALE_AUTHOR_CONSTRAINTS";
+        }
+        if (!catalog.constrainedDefinitions().containsAll(references.authorConstraintRefs())) {
+            return "UNKNOWN_AUTHOR_CONSTRAINT";
+        }
+        // Dependencies: every row must have a typed evaluator; semantic predicates wait for P08.7.
+        var recorded = new HashSet<String>();
         for (Dependency dependency : proposal.dependencies()) {
-            // Persist the full schema now, but never label unevaluated predicates as valid.
-            // Typed semantic evaluators are deliberately gated on P08.7.
-            if (dependency.kind() != Kind.QUERY) {
+            if (!supported(dependency)) {
                 return "UNSUPPORTED_DEPENDENCY";
             }
-            if (dependency.kind() == Kind.QUERY
-                    && dependency.epoch() != QueryEpochs.current(jdbc, campaign, dependency.scope())) {
-                return "STALE_QUERY_EPOCH";
+            recorded.add(dependency.kind() == Kind.QUERY ? dependency.scope() : dependency.reference());
+        }
+        // A cited entity whose read was not recorded could change without detection.
+        if (!recorded.containsAll(references.entityRefs())) {
+            return "UNRECORDED_DEPENDENCY";
+        }
+        for (Dependency dependency : proposal.dependencies()) {
+            if (dependency.kind() == Kind.QUERY) {
+                if (dependency.epoch() != QueryEpochs.current(jdbc, campaign, dependency.scope())) {
+                    return "STALE_QUERY_EPOCH";
+                }
+            } else if (!Objects.equals(dependency.expectedVersion(), referenceVersion(campaign, dependency.reference()))) {
+                return "STALE_DEPENDENCY";
+            }
+        }
+        // Covered only by a query scope: the entity itself must still exist in this campaign.
+        for (String reference : references.entityRefs()) {
+            if (referenceVersion(campaign, reference) == null) {
+                return "UNKNOWN_REFERENCE";
             }
         }
         Integer taken = jdbc.queryForObject("select count(*) from quest_plan_artifact where campaign_id = ? "
@@ -229,6 +326,27 @@ public class PlanAdmissionService {
     }
 
     /**
+     * Whether the gate can evaluate a dependency: QUERY rows by epoch; ENTITY_FIELD and FACT
+     * rows only as an exact version of a reference in the closed V12 grammar, without a
+     * predicate. CONSTRAINT rows and predicates have no evaluator until P08.7.
+     */
+    static boolean supported(Dependency dependency) {
+        return switch (dependency.kind()) {
+            case QUERY -> true;
+            case ENTITY_FIELD -> dependency.predicateJson() == null && dependency.expectedVersion() != null
+                    && ENTITY_REFERENCE.matcher(dependency.reference()).matches();
+            case FACT -> dependency.predicateJson() == null && dependency.expectedVersion() != null
+                    && FACT_REFERENCE.matcher(dependency.reference()).matches();
+            case CONSTRAINT -> false;
+        };
+    }
+
+    /** Current row version of a typed reference in this campaign; null when absent or foreign. */
+    private Long referenceVersion(UUID campaign, String reference) {
+        return jdbc.queryForObject("select plan_reference_version(?, ?)", Long.class, campaign, reference);
+    }
+
+    /**
      * Close the attempt as REJECTED and release the job: one fresh regeneration is
      * allowed while attempts and deadline remain, otherwise the job fails with reason.
      */
@@ -244,11 +362,12 @@ public class PlanAdmissionService {
     }
 
     /**
-     * Store the artifact, dependencies, receipt and dispositions, then complete the
-     * attempt and job. Unique keys on version, attempt and admission key make a racing
-     * duplicate fail the whole transaction instead of storing a second artifact.
+     * Store the artifact, dependencies, receipt (with the gate version and the references it
+     * rechecked) and dispositions, then complete the attempt and job. Unique keys on version,
+     * attempt and admission key make a racing duplicate fail the whole transaction instead of
+     * storing a second artifact.
      */
-    private Admission accept(PreparationJobService.Lease lease, Proposal proposal, UUID snapshot, String sourceHash,
+    private Admission accept(PreparationJobService.Lease lease, Proposal proposal, SnapshotFacts snapshot,
             long revision, long generation) {
         UUID campaign = lease.campaignId();
         UUID artifact = UUID.randomUUID();
@@ -259,7 +378,7 @@ public class PlanAdmissionService {
                 + "created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, clock_timestamp())", artifact,
                 campaign, proposal.planId(), proposal.planVersion(),
                 proposal.planVersion() > 1 ? proposal.planVersion() - 1 : null, proposal.questTarget(),
-                proposal.contractVersion(), snapshot, proposal.bodyJson(), fingerprint, lease.jobId(),
+                proposal.contractVersion(), snapshot.id(), proposal.bodyJson(), fingerprint, lease.jobId(),
                 lease.attempt());
         List<Object[]> dependencies = new ArrayList<>();
         for (int ordinal = 0; ordinal < proposal.dependencies().size(); ordinal++) {
@@ -275,12 +394,14 @@ public class PlanAdmissionService {
                 + "values (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?::jsonb)", dependencies);
         jdbc.update("insert into plan_admission (id, campaign_id, artifact_id, job_id, attempt_number, "
                 + "validator_version, checked_revision, campaign_generation, dependency_fingerprint, accepted_branches, "
-                + "rejected_branches, reasons, source_hash, result_hash, admission_key, created_at) "
-                + "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?, clock_timestamp())",
+                + "rejected_branches, reasons, source_hash, result_hash, admission_key, gate_version, "
+                + "checked_references, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, "
+                + "?, ?, ?, ?, ?::jsonb, clock_timestamp())",
                 admission, campaign, artifact, lease.jobId(), lease.attempt(), proposal.validatorVersion(), revision,
                 generation, fingerprint, proposal.acceptedBranchesJson(), proposal.rejectedBranchesJson(),
-                proposal.reasonsJson(), sourceHash, proposal.resultDigest(),
-                PreparationSupport.sha256(lease.jobId(), lease.attempt()));
+                proposal.reasonsJson(), snapshot.contextDigest(), proposal.resultDigest(),
+                PreparationSupport.sha256(lease.jobId(), lease.attempt()), GATE_VERSION,
+                proposal.references().json());
         jdbc.update("insert into plan_disposition (artifact_id, sequence, campaign_id, status, reason_code, "
                 + "checked_revision, created_at) values (?, 1, ?, 'VALIDATED', 'ADMITTED', ?, clock_timestamp())",
                 artifact, campaign, revision);
@@ -452,15 +573,16 @@ public class PlanAdmissionService {
      * @param contractVersion task contract; must equal the job's
      * @param bodyJson JSON object plan body, at most 65536 bytes
      * @param dependencies at most 512 recorded dependencies
-     * @param acceptedBranchesJson JSON array, at most 8192 bytes
+     * @param acceptedBranchesJson JSON array, at most 8192 bytes; activation compares its string elements
      * @param rejectedBranchesJson JSON array, at most 8192 bytes
      * @param reasonsJson JSON array of validation reasons, at most 8192 bytes
      * @param validatorVersion provisional validator version
      * @param resultDigest digest recorded by the attempt result
+     * @param references typed references the provisional validator extracted from the body
      */
     public record Proposal(UUID planId, int planVersion, String questTarget, String contractVersion, String bodyJson,
             List<Dependency> dependencies, String acceptedBranchesJson, String rejectedBranchesJson,
-            String reasonsJson, String validatorVersion, String resultDigest) {
+            String reasonsJson, String validatorVersion, String resultDigest, References references) {
         /** Reject malformed proposals before any transaction opens; copies the dependency list. */
         public Proposal {
             Objects.requireNonNull(planId, "planId");
@@ -479,6 +601,97 @@ public class PlanAdmissionService {
             PreparationSupport.requireJsonArray(reasonsJson, "reasonsJson", 8192);
             PreparationSupport.require(PreparationSupport.VERSION, validatorVersion, "validatorVersion");
             CanonicalValues.requireSha256Hex(resultDigest, "resultDigest");
+            Objects.requireNonNull(references, "references");
         }
+
+        /** Proposal that cites no campaign entity, pinned definition or author constraint. */
+        public Proposal(UUID planId, int planVersion, String questTarget, String contractVersion, String bodyJson,
+                List<Dependency> dependencies, String acceptedBranchesJson, String rejectedBranchesJson,
+                String reasonsJson, String validatorVersion, String resultDigest) {
+            this(planId, planVersion, questTarget, contractVersion, bodyJson, dependencies, acceptedBranchesJson,
+                    rejectedBranchesJson, reasonsJson, validatorVersion, resultDigest, References.NONE);
+        }
+    }
+
+    /**
+     * Typed references a plan relies on, extracted from its body by the provisional
+     * validator and rechecked by the gate. The body's own wording is never trusted to name
+     * them. Each list holds at most 256 distinct values, and the sorted receipt rendering is
+     * at most 32768 bytes (the V12 column bound).
+     *
+     * @param entityRefs campaign rows in the closed V12 grammar ({@code actor:}, {@code resource:},
+     *        {@code item:}, {@code character:}, {@code known-fact:} or {@code known-quest:}
+     *        followed by a lowercase UUID); each must exist and be covered by a recorded
+     *        dependency on the same reference or a QUERY scope of the same name
+     * @param contentRefs pinned definition identities (root IDs or {@code <packId>#<id>})
+     * @param authorConstraintRefs identities of required or fixed authored entities the plan
+     *        claims to preserve
+     */
+    public record References(List<String> entityRefs, List<String> contentRefs, List<String> authorConstraintRefs) {
+        /** No references. */
+        public static final References NONE = new References(List.of(), List.of(), List.of());
+
+        /** Copy, bound and validate each list; duplicates and malformed entity references fail. */
+        public References {
+            entityRefs = distinct(entityRefs, "entityRefs");
+            contentRefs = distinct(contentRefs, "contentRefs");
+            authorConstraintRefs = distinct(authorConstraintRefs, "authorConstraintRefs");
+            for (String reference : entityRefs) {
+                if (!ENTITY_REFERENCE.matcher(reference).matches() && !FACT_REFERENCE.matcher(reference).matches()) {
+                    throw new IllegalArgumentException("unsupported entity reference");
+                }
+            }
+            // Record fields are assigned only after this body, so render the parameters.
+            if (render(entityRefs, contentRefs, authorConstraintRefs).getBytes(StandardCharsets.UTF_8).length
+                    > 32768) {
+                throw new IllegalArgumentException("references exceed 32768 bytes");
+            }
+        }
+
+        /** Deterministic receipt rendering with sorted lists. */
+        String json() {
+            return render(entityRefs, contentRefs, authorConstraintRefs);
+        }
+
+        /** Render the three lists sorted, in a fixed key order. */
+        private static String render(List<String> entityRefs, List<String> contentRefs,
+                List<String> authorConstraintRefs) {
+            var value = new LinkedHashMap<String, Object>();
+            value.put("entityRefs", new TreeSet<>(entityRefs));
+            value.put("contentRefs", new TreeSet<>(contentRefs));
+            value.put("authorConstraintRefs", new TreeSet<>(authorConstraintRefs));
+            return JSON.writeValueAsString(value);
+        }
+
+        /** Return an immutable copy of at most 256 distinct bounded strings. */
+        private static List<String> distinct(List<String> values, String name) {
+            var copy = List.copyOf(Objects.requireNonNull(values, name));
+            if (copy.size() > 256) {
+                throw new IllegalArgumentException(name + " exceeds 256");
+            }
+            copy.forEach(value -> CanonicalValues.requireText(value, name, 256));
+            if (new HashSet<>(copy).size() != copy.size()) {
+                throw new IllegalArgumentException("duplicate " + name);
+            }
+            return copy;
+        }
+    }
+
+    /**
+     * Snapshot facts read under the admission lock.
+     *
+     * @param id snapshot identity bound by the attempt
+     * @param contextDigest database-computed digest, stored as the receipt's source hash
+     * @param audience visibility the snapshot was built for
+     * @param generation campaign recovery generation at capture
+     * @param contentRevision pinned content revision at capture
+     * @param packHash pinned pack hash at capture
+     * @param rulesetHash pinned ruleset hash at capture
+     * @param authorConstraintHash author-constraint digest checked at capture
+     * @param sameManifest whether the proposal kept the exact engine-recorded manifest
+     */
+    private record SnapshotFacts(UUID id, String contextDigest, Audience audience, long generation,
+            UUID contentRevision, String packHash, String rulesetHash, String authorConstraintHash,
+            boolean sameManifest) {
     }
 }

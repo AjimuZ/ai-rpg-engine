@@ -1,5 +1,6 @@
 package org.rpgengine.preparation;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -16,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.rpgengine.adventure.AdventureWorkspace;
 import org.rpgengine.campaign.Campaign;
 import org.rpgengine.content.ContentRevision;
+import org.rpgengine.content.PackRegistry;
+import org.rpgengine.content.PackStaging;
 import org.rpgengine.identity.OwnerProfile;
 import org.rpgengine.presentation.SupportedLocale;
 import org.rpgengine.presentation.CampaignPresentationSettings;
@@ -29,8 +32,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Exercise durable preparation against real PostgreSQL with separate committed calls.
- * Fixtures contain no runtime accounts or external work. SQL faults and independent
- * workers prove rollback and fencing; infrastructure failures fail rather than skip.
+ * Each campaign pins a sealed registered sample pack, so the P07.6 content and author
+ * checks run against real compiled content. Fixtures contain no runtime accounts or
+ * external work. SQL faults and independent workers prove rollback and fencing;
+ * infrastructure failures fail rather than skip.
  */
 @SpringBootTest
 class PreparationPersistenceTest {
@@ -44,7 +49,11 @@ class PreparationPersistenceTest {
     @Autowired private PlanningSnapshotService snapshots;
     @Autowired private PlanAdmissionService admissions;
     @Autowired private JobRecoveryService recovery;
+    @Autowired private PackRegistry registry;
+    @Autowired private PlanContentCatalogs catalogs;
     private Campaign campaign;
+    // Author-constraint digest of the pinned sample pack, recomputed by the production catalog.
+    private String authorHash;
 
     /** Construct the injected PostgreSQL fixture; missing infrastructure fails startup. */
     PreparationPersistenceTest() {
@@ -55,6 +64,7 @@ class PreparationPersistenceTest {
     void prepare() {
         clear();
         campaign = fixture();
+        authorHash = catalogs.preload(campaign.getId()).catalog().authorConstraintHash();
     }
 
     /** Remove only disposable fixture rows and this class's failure trigger. */
@@ -63,7 +73,7 @@ class PreparationPersistenceTest {
         jdbc.execute("drop trigger if exists p036_fault on plan_admission");
         jdbc.execute("drop trigger if exists p036_fault on ai_job");
         jdbc.execute("drop function if exists p036_fail()");
-        jdbc.execute("truncate presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, "
+        jdbc.execute("truncate presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, "
                 + "ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, "
                 + "operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, "
                 + "reward_settlement, campaign_event, operation_journal, actor_resource, actor, "
@@ -208,7 +218,7 @@ class PreparationPersistenceTest {
         jdbc.update("update ai_job set lease_expires_at = clock_timestamp() - interval '1 second', row_version = row_version + 1");
         var restarted = new JobRecoveryService(jdbc, manager);
         var worker = new PreparationJobService(jdbc, manager, restarted);
-        var admission = new PlanAdmissionService(jdbc, manager, restarted);
+        var admission = new PlanAdmissionService(jdbc, manager, restarted, catalogs);
         assertThrows(IllegalStateException.class, () -> worker.claim(UUID.randomUUID(), LEASE));
         assertThrows(IllegalStateException.class, () -> admission.admit(lease, proposal(UUID.randomUUID(), 1, List.of())));
         assertEquals(1, restarted.reconcile());
@@ -266,7 +276,7 @@ class PreparationPersistenceTest {
         jobs.enqueue(campaign.getAdventureId(), campaign.getId(), request("public"));
         var publicLease = jobs.claim(UUID.randomUUID(), LEASE).orElseThrow();
         var publicSnapshot = snapshots.capture(campaign.getAdventureId(), campaign.getId(),
-                new PlanningSnapshotService.SnapshotRequest(Audience.PUBLIC, "{}", "[]", List.of(), HASH, HASH, 0, 0, 0, 0));
+                new PlanningSnapshotService.SnapshotRequest(Audience.PUBLIC, "{}", "[]", List.of(), authorHash, HASH, 0, 0, 0, 0));
         jobs.bindSnapshot(publicLease, publicSnapshot.id());
         jobs.start(publicLease, LEASE, 0, "public-thread", "public-turn");
         jobs.recordResult(publicLease, HASH, 0);
@@ -375,18 +385,28 @@ class PreparationPersistenceTest {
         assertEquals(0, count("ai_job_attempt"));
     }
 
-    /** Persist one owner/adventure/content/campaign bundle; exceptions roll back the entire fixture. */
+    /**
+     * Persist one owner/adventure, register the sealed sample pack for it and start a campaign
+     * pinned to that revision; exceptions roll back each step's transaction.
+     */
     private Campaign fixture() {
-        return new TransactionTemplate(manager).execute(status -> {
+        var adventure = new TransactionTemplate(manager).execute(status -> {
             var owner = OwnerProfile.create("Owner", NOW);
             entities.persist(owner);
-            var adventure = AdventureWorkspace.create(owner.getId(), "Neutral", "neutral", SupportedLocale.EN, NOW);
-            entities.persist(adventure);
-            var content = ContentRevision.admit(adventure.getId(),
-                    new ContentRevision.PackCoordinates("neutral", "1", HASH, 1, SupportedLocale.EN),
-                    new ContentRevision.RulesetCoordinates("core", "1", HASH), NOW);
-            entities.persist(content);
-            var created = Campaign.start(adventure.getId(), content, "Campaign", "seed", NOW);
+            var created = AdventureWorkspace.create(owner.getId(), "Neutral", "neutral", SupportedLocale.EN, NOW);
+            entities.persist(created);
+            return created.getId();
+        });
+        UUID revision;
+        try {
+            revision = registry.register(adventure, new PackStaging(PackStaging.Limits.standard()).directory(
+                    Path.of(getClass().getResource("/packs/fantasy-exploration").toURI()))).revisionId();
+        } catch (java.net.URISyntaxException failure) {
+            throw new IllegalStateException(failure);
+        }
+        return new TransactionTemplate(manager).execute(status -> {
+            var created = Campaign.start(adventure, entities.find(ContentRevision.class, revision), "Campaign",
+                    "seed", NOW);
             entities.persist(created);
             return created;
         });
@@ -401,7 +421,7 @@ class PreparationPersistenceTest {
     /** Snapshot fixture input asserts initial world/presentation tokens and retains every read dependency. */
     private PlanningSnapshotService.SnapshotRequest input(List<PlanAdmissionService.Dependency> dependencies) {
         return new PlanningSnapshotService.SnapshotRequest(Audience.PLANNER_PRIVATE, "{}", "[]", dependencies,
-                HASH, HASH, 0, 0, 0, 0);
+                authorHash, HASH, 0, 0, 0, 0);
     }
 
     /** Capture a committed snapshot; stale dependency epochs deliberately propagate to the test. */

@@ -193,7 +193,9 @@ Interactive work has reserved admission and bounded waiting. No transaction or
 campaign mutation lease is held while a deep background plan runs. Planning
 artifacts are durable noncanonical preparation; completion never advances the
 world clock, awards a reward or forces the next player action. Typed command
-services revalidate dependencies and activation. Hidden planner context never
+services revalidate dependencies and activation: since P07.6 a canonical commit that
+cites admitted plan branches rechecks them against current rows under the campaign
+lock and records each use once, while the plan supplies no effect. Hidden planner context never
 enters a public narrator thread, media cue or loading diagnostic.
 
 The [bilingual contract](29-localization.md) adds locale variants/preferences and

@@ -94,8 +94,9 @@ JSONB object bounds use UTF-8 bytes of PostgreSQL's normalized text rendering: p
 foundation verified on 24 October 2026. Its V6 rows store immutable snapshots,
 plan versions/dependencies/admission receipts, fenced jobs/attempts and query epochs.
 Snapshot inputs carry assembler revision, recovery and presentation tokens; admission
-must retain their complete manifest. Non-query semantic dependencies fail closed
-until typed evaluators exist. These internal services expose no gameplay endpoint.
+must retain their complete manifest. Since P07.6 typed row-version dependencies are
+evaluated; predicates and constraint rows still fail closed until P08.7 supplies
+semantic evaluators. These internal services expose no gameplay endpoint.
 
 V6 adds `ai_job`, `ai_job_attempt`, `planning_snapshot`, `query_epoch`,
 `quest_plan_artifact`, `plan_dependency`, `plan_admission` and `plan_disposition`.
@@ -210,6 +211,29 @@ None of these rows is world state: they never advance revision, turn, time, even
 sequence or resources. Cancellation, presentation settlement and recovery change only
 journal statuses, permits, job rows and (through the trigger) stream messages. See the
 [delivery contract](07-turn-protocol.md#p075-public-stream-cancellation-and-presentation-jobs).
+
+### Plan admission gate and activation (P07.6)
+
+V12 adds, without backfilling history:
+
+- `plan_reference_version(campaign, reference)`: a read-only evaluator for the closed
+  typed-version grammar `actor:`, `resource:`, `item:`, `character:` (ENTITY_FIELD) and
+  `known-fact:`, `known-quest:` (FACT) followed by a lowercase UUID. It returns the row's
+  storage `row_version`, or null for a malformed, unsupported, absent or foreign reference.
+  `plan_dependency_fresh(campaign, dependency)` combines it with query epochs; predicates and
+  CONSTRAINT rows are never fresh.
+- `plan_admission.gate_version` and `checked_references` (sorted entity, content and
+  author-constraint references, at most 32,768 bytes); both are set together by the
+  transactional gate and stay null on receipts written before V12.
+- `plan_activation`: one immutable row per artifact branch an ordinary committed command
+  used (primary key artifact + branch), scoped to the artifact's campaign and the citing
+  operation, with a deferred check that the operation committed at the recorded revision.
+
+Admission, invalidation and activation checks are metadata: they never write world rows,
+counters, rewards, draws, events or outbox intents. The canonical commit invalidates
+artifacts whose recorded epoch or row version it changed and records the branches a
+trusted resolver cited; the plan itself supplies no effect. See the
+[admission contract](07-turn-protocol.md#p076-plan-admission-and-activation).
 
 ### Campaign creation (P06.1)
 
@@ -343,7 +367,9 @@ administrative revision and emit a safe status outbox record without incrementin
 actionable entity/fact or pending world event is created only by its validated
 ordinary canonical operation. Track branch dependency versions and predicate
 query epochs to catch inserts/removals and negative-read phantoms, not just
-existing-row updates. Enforce ownership in every unique/FK relationship.
+existing-row updates. Enforce ownership in every unique/FK relationship. P07.6
+implements typed row-version dependencies, the transactional admission gate and
+at-most-once branch activation by ordinary commands (V12 above).
 
 Owner `uiLocale`, campaign `narrativeLocale`/`localeRevision`, immutable
 `NarrativeRecord.passageLocale`, glossary revision and media configuration

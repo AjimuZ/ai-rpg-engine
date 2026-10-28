@@ -459,6 +459,75 @@ never write world rows, receipts or draws and never call the canonical commit se
 `COMMITTED_NARRATION_PENDING` remains terminal for the journal; a later narration-only
 retry (P08.5) is presentation state, never a second game action.
 
+### P07.6 plan admission and activation
+
+A plan is preparation, never a second world-state store. P07.6 completes the second,
+transactional admission check of [docs/28 section 7](28-asynchronous-narrative-planning.md#7-dependency-sensitive-staleness-and-admission)
+and the check "at actual use". Both run under the campaign lock that every canonical
+writer takes, so no world change can slip between a check and its write.
+
+**Admission gate** (`PlanAdmissionService`, gate version `plan-gate-v1`). The pinned content
+catalog (`PlanContentCatalogs`, 16 revisions cached, prose-free) is loaded before the lock.
+Under the lock, after the P03.6 fencing and idempotency checks (holder, fence, live lease,
+current generation, recorded result digest, one receipt per attempt), the gate returns the
+first failing reason in this fixed order and writes the rejection (with at most one
+regeneration within the attempt budget) or the immutable artifact:
+
+| Order | Check | Reason |
+| --- | --- | --- |
+| 1 | Public snapshot locale/glossary tokens are current | `STALE_PRESENTATION` |
+| 2 | Snapshot recovery generation is current | `STALE_GENERATION` |
+| 3 | A public snapshot records no planner-private dependency | `AUDIENCE_SCOPE` |
+| 4 | The campaign's pinned content can be reloaded from sealed bytes | `CONTENT_UNAVAILABLE` |
+| 5 | Snapshot revision, pack hash and ruleset hash are the campaign's own | `STALE_CONTENT` |
+| 6 | Every cited content reference is a pinned definition (`id` or `pack#id`) | `UNKNOWN_CONTENT` |
+| 7 | A public snapshot cites no secret definition | `AUDIENCE_SCOPE` |
+| 8 | The snapshot's author-constraint digest equals the pinned root policy's | `STALE_AUTHOR_CONSTRAINTS` |
+| 9 | Every cited author constraint is a required or fixed authored entity | `UNKNOWN_AUTHOR_CONSTRAINT` |
+| 10 | Every dependency has an evaluator (QUERY, or an exact version of a typed reference) | `UNSUPPORTED_DEPENDENCY` |
+| 11 | Every cited campaign entity is covered by a recorded dependency | `UNRECORDED_DEPENDENCY` |
+| 12 | Every QUERY epoch is current; every typed version is exact | `STALE_QUERY_EPOCH`, `STALE_DEPENDENCY` |
+| 13 | Every cited campaign entity still exists in this campaign | `UNKNOWN_REFERENCE` |
+| 14 | The version is new and builds on an admitted predecessor | `PLAN_VERSION_CONFLICT`, `STALE_PREDECESSOR` |
+
+Typed version references are `actor:`, `resource:`, `item:` or `character:` (ENTITY_FIELD)
+and `known-fact:` or `known-quest:` (FACT) followed by a lowercase UUID; they record the
+row's storage `row_version`, which every canonical writer steps. A foreign reference is
+indistinguishable from an absent one. Predicates and CONSTRAINT rows have no evaluator
+until P08.7. The cited references (`entityRefs`, `contentRefs`, `authorConstraintRefs`)
+come from the provisional validator, never from body wording, and the receipt stores
+them sorted. Snapshot capture applies checks 3 and 8 too, so an assembler cannot record
+private reads in public input or claim author constraints the pin does not have.
+
+**Invalidation.** Every canonical commit, after writing its effects, re-evaluates admitted
+artifacts with `plan_dependency_fresh`: a moved epoch or a changed, removed or foreign row
+appends `INVALIDATED` (ARTIFACT severity) or `PARTIALLY_INVALIDATED` (BRANCH severity only)
+with `DEPENDENCY_CHANGED` or `QUERY_EPOCH_CHANGED`. Unrelated revisions change nothing.
+
+**Activation.** Only an ordinary canonical command uses a plan. A trusted resolver that
+built a command from an admitted branch cites it in `ResolvedCommit.Preparation.activations`
+(at most four artifacts, one to eight branches each). The commit, after its own exact
+revision, lease, typed-evidence and rule checks and before writing any effect, requires:
+
+| Check | Reason |
+| --- | --- |
+| The artifact exists in this campaign | `PLAN_UNKNOWN` |
+| Its receipt came from this gate; its latest disposition is `VALIDATED` or `PARTIALLY_INVALIDATED` | `PLAN_NOT_USABLE` |
+| Its admission generation is current | `PLAN_GENERATION_RETIRED` |
+| Each cited branch is an accepted branch | `PLAN_BRANCH_NOT_ACCEPTED` |
+| No cited branch was already used | `PLAN_BRANCH_ALREADY_ACTIVATED` |
+| Every ARTIFACT dependency and every BRANCH dependency naming a cited branch is fresh now | `PLAN_DEPENDENCY_STALE` |
+
+A failure throws `PlanActivations.Rejected` and rolls back the whole command. On success
+the commit writes one immutable `plan_activation` row per branch in the same transaction;
+the primary key makes each branch usable once, and a deferred trigger proves the citing
+operation committed at that revision. A matching retry replays the stored receipt before
+any of these checks. The plan contributes no effect: events, time, turn, resources,
+rewards and draws are exactly those the resolver built, and receipts never cite the
+private plan. No player intention, HTTP route or job can supply a citation; P07.4's
+`CommandExecutionService` cites none. Consumers that build commands from plans
+(opportunities, pending-event adoption, reveals) arrive with P08.7, P09.1 and P10.
+
 ### P07.1 continuation checkpoint
 
 The following paragraphs preserve the earlier review and dependency-recovery
@@ -703,10 +772,12 @@ requires that complete manifest, the recorded result digest, current job fence,
 generation and query epochs. Public snapshot locale/glossary tokens must still
 match; language-neutral private structure can survive a locale change. A public
 snapshot requires an initialized presentation row so capture/admission can lock it.
-Unrelated revision changes do not alone invalidate an artifact. Non-query semantic
-dependencies currently reject with `UNSUPPORTED_DEPENDENCY`; author/rules/quest
-semantic validation remains P08.7. Rejection permits at most one regeneration within
-the durable attempt/deadline budget. Concurrent duplicate delivery stores one
+Unrelated revision changes do not alone invalidate an artifact. P07.6 adds the
+transactional scope, pinned-content, author-constraint and typed row-version checks and
+activation through ordinary commands ([P07.6](#p076-plan-admission-and-activation));
+predicates and constraint rows still reject with `UNSUPPORTED_DEPENDENCY`, and the
+semantic quest-plan contract remains P08.7. Rejection permits at most one regeneration
+within the durable attempt/deadline budget. Concurrent duplicate delivery stores one
 immutable version/admission receipt; later versions append and supersede prior ones.
 
 Quest acceptance commits its known terms and current pending decision through
@@ -725,7 +796,8 @@ preserve a plan. The canonical [plan admission contract](28-asynchronous-narrati
 defines the state machine and dependency rules.
 
 Only ordinary validated commands activate facts, consequences or scheduled
-events, with the existing receipts and source settlement keys. Accepting a
+events, with the existing receipts and source settlement keys; since P07.6 such a
+command's commit rechecks and records the plan branches it used. Accepting a
 noncanonical artifact, changing locale, reading a passage or playing audio has
 no world effect. Typed public presentation events are derived after accepted
 narration; replay/cancel/skip cannot resubmit a game command. Locale mismatch or

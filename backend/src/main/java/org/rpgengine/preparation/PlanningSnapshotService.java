@@ -18,17 +18,22 @@ import org.springframework.transaction.support.TransactionTemplate;
  * references and dependency manifest. The database computes a context digest over
  * every stored field, so two snapshots with equal inputs have equal digests. Rows
  * are never updated or deleted (V6 trigger). Choosing which state a given audience
- * may see is the caller's job until projections land at P06; this class only bounds
- * and records it.
+ * may see is the assembler's job; this class bounds and records it, rejects a public
+ * snapshot that records planner-private reads, and (since P07.6) requires the
+ * assembler's author-constraint digest to equal the one recomputed from the sealed
+ * pinned content, so a snapshot can never claim constraints the campaign does not have.
  */
 @Service
 public class PlanningSnapshotService {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
+    private final PlanContentCatalogs catalogs;
 
-    /** Wire local persistence only. */
-    public PlanningSnapshotService(JdbcTemplate jdbc, PlatformTransactionManager manager) {
+    /** Wire local persistence and the pinned content loader. */
+    public PlanningSnapshotService(JdbcTemplate jdbc, PlatformTransactionManager manager,
+            PlanContentCatalogs catalogs) {
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
+        this.catalogs = Objects.requireNonNull(catalogs, "catalogs");
         transaction = PreparationSupport.template(manager);
     }
 
@@ -38,19 +43,29 @@ public class PlanningSnapshotService {
      *
      * @return the stored snapshot header including its digest
      * @throws IllegalArgumentException for unknown or foreign campaigns
-     * @throws IllegalStateException when called inside another transaction
+     * @throws IllegalStateException when called inside another transaction, for stale
+     *         assembler tokens, unavailable pinned content or another author-constraint digest
      */
     public Snapshot capture(UUID adventure, UUID campaign, SnapshotRequest request) {
         Objects.requireNonNull(adventure, "adventure");
         Objects.requireNonNull(campaign, "campaign");
         Objects.requireNonNull(request, "request");
         PreparationSupport.requireNoTransaction();
+        // Recompile pinned facts before any lock; the frozen revision is compared under it.
+        var content = catalogs.preload(campaign);
         return transaction.execute(status -> {
             PreparationSupport.boundWaits(jdbc);
-            var owned = jdbc.queryForList("select id from campaign where id = ? and adventure_id = ? for share",
-                    UUID.class, campaign, adventure);
+            var owned = jdbc.queryForList("select content_revision_id from campaign where id = ? and adventure_id = ? "
+                    + "for share", UUID.class, campaign, adventure);
             if (owned.isEmpty()) {
                 throw new IllegalArgumentException("unknown campaign");
+            }
+            PlanContentCatalog catalog = content.matching(owned.getFirst());
+            if (catalog == null) {
+                throw new IllegalStateException("snapshot content unavailable");
+            }
+            if (!catalog.authorConstraintHash().equals(request.authorConstraintHash())) {
+                throw new IllegalStateException("stale snapshot author constraints");
             }
             // Caller-assembled bytes must describe this exact committed state; otherwise
             // a concurrent world write could label old input with a new revision.
@@ -124,7 +139,7 @@ public class PlanningSnapshotService {
      * @param expectedGeneration recovery generation from which the input was assembled
      * @param expectedLocaleRevision presentation locale revision used by the assembler
      * @param expectedGlossaryRevision glossary revision used by the assembler
-     * @param authorConstraintHash SHA-256 of the applicable author constraints
+     * @param authorConstraintHash {@link PlanContentCatalog#authorConstraintHash} of the pinned root policy
      * @param policyHash SHA-256 of the effective policy; must equal the binding job's
      */
     public record SnapshotRequest(Audience audience, String selectedStateJson, String sourceRefsJson,
@@ -138,6 +153,11 @@ public class PlanningSnapshotService {
             dependencies = List.copyOf(dependencies);
             if (dependencies.size() > 512) {
                 throw new IllegalArgumentException("at most 512 dependencies");
+            }
+            // Public input feeds player-facing text; it can never rest on a planner-private read.
+            if (audience == Audience.PUBLIC
+                    && dependencies.stream().anyMatch(value -> value.audience() == Audience.PLANNER_PRIVATE)) {
+                throw new IllegalArgumentException("public snapshots cannot record private dependencies");
             }
             PreparationSupport.requireJsonArray(PlanAdmissionService.manifest(dependencies), "dependencyManifest", 65536);
             CanonicalValues.requireNonNegative(expectedRevision, "expectedRevision");

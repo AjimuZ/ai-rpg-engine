@@ -11,6 +11,7 @@ import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.characters.ActorResource;
 import org.rpgengine.content.ContentRevision;
 import org.rpgengine.preparation.JobRequest;
+import org.rpgengine.preparation.PlanActivations;
 import org.rpgengine.preparation.PlanAdmissionService;
 import org.rpgengine.preparation.PreparationJobService;
 import org.rpgengine.preparation.QueryEpochs;
@@ -33,7 +34,9 @@ import tools.jackson.databind.json.JsonMapper;
  * belongs to {@link CommandExecutionService}/{@link LocalActionResolver}. Delivery belongs to
  * workers: the journal update emits the {@code state.committed} stream message through the V11
  * trigger, and a narration-requiring commit inserts its post-commit presentation job here, in
- * the same transaction. This internal service has no controller, network port or callback.
+ * the same transaction. Cited plan branches are rechecked before any effect and recorded once
+ * (P07.6); every commit then re-evaluates admitted plans against the rows it changed. This
+ * internal service has no controller, network port or callback.
  * Any validation, persistence, timeout or commit failure rolls back all its writes.
  */
 @Service
@@ -132,6 +135,11 @@ public class CanonicalCommitService {
             var participants = CommandRules.require(jdbc, context.campaignId(), player, intent.command(), rules);
             CommandRules.requireAttributed(jdbc, context.campaignId(), participants, plan);
         }
+        // A cited plan is rechecked against current rows before any effect is written; a
+        // plan validated earlier never substitutes for this command's own second check.
+        for (PlanActivations.Request activation : plan.preparation().activations()) {
+            PlanActivations.requireUsable(jdbc, campaign.getId(), activation);
+        }
         ContentRevision content = entities.find(ContentRevision.class, campaign.getContentRevisionId());
         Instant now = Instant.now();
         long firstSequence = Math.addExact(campaign.getCounters().eventSequence(), 1);
@@ -213,8 +221,9 @@ public class CanonicalCommitService {
         }
         // Preparation intents share this transaction and the campaign lock already held
         // (lock order campaign, then job): epochs move with the write that changed the
-        // scopes, critical jobs exist exactly when the world change does, and plans that
-        // read a changed scope are invalidated before any later admission can see them.
+        // scopes, critical jobs exist exactly when the world change does, each cited plan
+        // branch is recorded as used once, and every plan whose recorded epoch or row
+        // version this commit changed is invalidated before any later admission or use.
         var preparation = plan.preparation();
         for (String scope : preparation.queryScopes()) {
             QueryEpochs.bump(jdbc, campaign.getId(), scope);
@@ -222,9 +231,11 @@ public class CanonicalCommitService {
         for (JobRequest job : preparation.jobs()) {
             PreparationJobService.enqueueWithin(jdbc, context.adventureId(), campaign.getId(), operation.getId(), job);
         }
-        if (!preparation.queryScopes().isEmpty()) {
-            PlanAdmissionService.invalidateWithin(jdbc, campaign.getId(), counters.stateRevision());
+        for (PlanActivations.Request activation : preparation.activations()) {
+            PlanActivations.recordWithin(jdbc, campaign.getId(), operation.getId(), counters.stateRevision(),
+                    activation);
         }
+        PlanAdmissionService.invalidateWithin(jdbc, campaign.getId(), counters.stateRevision());
         // Release with the outcome, never before it: rollback retains the permit and
         // a committed duplicate can replay even though its old permit is now retired.
         MutationLeaseService.releaseHeld(jdbc, context.campaignId(), context.operationId(), context.lease());

@@ -1,5 +1,58 @@
 # Quality Strategy and Acceptance Criteria
 
+P07.6 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks
+pass **155 focused cases in 13 suites and all 444 packaged backend cases in 40 suites**,
+with zero failures, errors or skips; the executable jar is packaged. The focused set is
+the seven-case `PlanAdmissionGateTest`, 17 preparation cases (now pinned to a sealed
+sample pack), two resolved-commit cases (one new), the V12 migration upgrade, three
+application cases, 49 canonical commit, six execution, six cancellation, seven
+presentation-job, four stream, eight rule, 19 typed-validation and 26 admission cases.
+
+`PlanAdmissionGateTest` creates its campaign through production code from sealed
+registered packs and changes the world only through ordinary WAIT, MOVE and
+USE_ABILITY commands or trusted internal commits standing in for later writers. Eight
+unrelated commits leave a plan admissible at revision r+8 with its sorted checked
+references, and admission, duplicate delivery and invalidation leave every world row
+byte-identical (AP-01, AP-08). An ability that changes the witness's pool appends
+`PARTIALLY_INVALIDATED`/`DEPENDENCY_CHANGED`; using the witness branch fails
+`PLAN_DEPENDENCY_STALE` with no world change, while the independent branch is used once
+by an ordinary internal command whose counters advance only by its own revision and
+event, whose receipt never names the plan and whose replay returns the same receipt;
+a second use, a rejected branch, an unknown artifact and a retired generation are
+refused (AP-02, AP-05, AP-08). A writer that bypassed invalidation leaves the
+disposition `VALIDATED`, but the live recheck at use wins and rolls the command back,
+and an admission racing a move never leaves a usable stale artifact (AP-04). A deleted
+unique object and a knowledge-scope phantom from a reveal commit reject pending results
+(`STALE_DEPENDENCY`, `STALE_QUERY_EPOCH`) and invalidate an admitted plan, which can no
+longer be used (AP-02/AP-03). Foreign, unrecorded, absent, unknown-content,
+unconstrained-author, constraint, predicate and mismatched-kind inputs, a secret
+definition or private read in public input and an assembler author digest that differs
+from the sealed pack are refused with no artifact or receipt and unchanged world rows;
+crafted legacy snapshots are refused `STALE_AUTHOR_CONSTRAINTS`, `STALE_CONTENT`,
+`AUDIENCE_SCOPE` and, for a metadata-only campaign, `CONTENT_UNAVAILABLE`. A deferred
+failure at COMMIT of an activating command leaves no effect, receipt or activation and
+keeps the permit; the same command then commits once. Activation rows reject UPDATE,
+DELETE and insertion without their committed command. The V12 upgrade preserves
+populated canonical rows and backfills nothing.
+
+Seven deliberate sensitivity probes were run and reverted byte-identically (checksum
+verified): skipping the typed-version comparison, the coverage rule, the author digest,
+the secret-definition audience rule, the activation call in the canonical commit, the
+live dependency recheck and the second-use check each made exactly the intended cases
+fail (for the last, the activation primary key still refused the duplicate, as a
+different error). These were intentional probes, not gate outcomes. Configured frontend
+installation, both typechecks, 77 tests in 13 files, five localization tests,
+317-message parity and both locale builds pass, as do all 26 repository-policy tests,
+zero-finding scans and the nine offline database-backup tests for the V12 catalog. The
+container-packaging suite ran 23 tests: 17 pass, two opt-in skips and four errors that
+are all `FileNotFoundError: 'docker'` (no Docker CLI in this container; nothing in its
+scope changed). No live V12 dump/restore rehearsal was run. This adds stale-plan,
+phantom, fencing/idempotency, transaction fault-injection and no-canonical-change
+evidence toward QA-36 (AP-01–AP-05, AP-08) and the P07 package exit; it does not claim
+the semantic quest-plan contract, predicate or constraint evaluators, consumers that
+build commands from plans (P08.7, P09.1, P10), dispatch and budgets (QA-37, P08.6),
+narration agency (QA-07, P08) or full acceptance of those scenarios.
+
 P07.5 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks
 pass **173 focused cases in 16 suites and all 435 packaged backend cases in 38 suites**,
 with zero failures, errors or skips; the executable jar is packaged. The focused set is

@@ -142,7 +142,7 @@ From `backend/`, with those variables set:
 `verify` starts an ephemeral HTTP server and checks minimal health, hidden diagnostic
 endpoints, PostgreSQL major version, Flyway validation, and the canonical schema.
 A missing database fails tests; nothing silently skips or uses H2. Use a new
-disposable database: the test requires exactly the thirty-one domain tables created by
+disposable database: the test requires exactly the thirty-five domain tables created by
 `src/main/resources/db/migration/V1__canonical_foundations.sql` (P03.1),
 `V2__campaign_bounds_and_versions.sql` (P03.2, adding `actor_resource`) and
 `V3__canonical_outbox.sql` (P03.3), `V4__deterministic_random_draws.sql` (P03.4) and
@@ -150,8 +150,10 @@ disposable database: the test requires exactly the thirty-one domain tables crea
 `V6__durable_jobs_and_planning.sql` (P03.6), `V7__pack_registration.sql` (P04.4) and
 `V8__localized_pack_reports.sql` (P04.6, report-version constraint only) and
 `V9__campaign_creation.sql` (P06.1, character state, grants and request identities) and
-`V10__player_knowledge.sql` (P06.2, explicit player-audience facts and quests), with no
-rows, and Hibernate validates the entities against them (`ddl-auto=validate`).
+`V10__player_knowledge.sql` (P06.2, explicit player-audience facts and quests),
+`V11__operation_stream_and_presentation_jobs.sql` (P07.5) and
+`V12__plan_admission_gate_and_activation.sql` (P07.6), with no rows, and Hibernate
+validates the entities against them (`ddl-auto=validate`).
 The persistence tests truncate these tables before and after each test, so never
 point `verify` at a database whose data you want to keep.
 P03.2 adds storage row versions separate from canonical counters, frozen ownership,
@@ -683,6 +685,30 @@ suites pass with zero failures/errors/skips, and the executable jar is packaged.
 Configured frontend checks, EN/IT builds, 22 repository policy tests, zero-finding scans
 and the offline backup tests also pass. See
 [evidence scope](../docs/15-quality-and-acceptance.md).
+
+## Plan admission gate and activation (P07.6)
+
+V12 and the `preparation` package complete the transactional plan checks described in the
+[admission contract](../docs/07-turn-protocol.md#p076-plan-admission-and-activation):
+
+- `PlanContentCatalogs`/`PlanContentCatalog`: prose-free pinned definition identities,
+  secret identities, required/fixed author constraints and their digest
+  (`PlanContentCatalog.authorConstraintHash`), loaded before any campaign lock and cached
+  for 16 revisions. Legacy metadata-only revisions are unavailable and fail closed.
+- `PlanAdmissionService.admit` runs the `plan-gate-v1` gate (scope, content, author,
+  typed dependencies, coverage, lineage) after the P03.6 fencing/idempotency checks.
+  `Proposal.references` carries the entity, content and author-constraint references the
+  provisional validator extracted; the 11-argument constructor cites none.
+- `PlanActivations`: `requireUsable`/`recordWithin`, called only by
+  `CanonicalCommitService` for `ResolvedCommit.Preparation.activations`; refusals throw
+  `PlanActivations.Rejected` with a `PLAN_*` reason and roll back the command.
+- SQL: `plan_reference_version`, `plan_dependency_fresh`, `plan_admission.gate_version`/
+  `checked_references` and the immutable `plan_activation` table.
+
+`PlanAdmissionGateTest` drives the gate with ordinary commands on a campaign created from
+sealed packs; `PreparationPersistenceTest` now pins a sealed sample pack so its fixtures pass
+the content and author checks. Test fixtures that truncate tables must include
+`plan_activation`.
 
 ## Interface reload contract (P05.6)
 

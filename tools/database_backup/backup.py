@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 POSTGRES_VERSION = "18.6"
-SCHEMA_VERSION = "11"
+SCHEMA_VERSION = "12"
 # Flyway versions this tool understands; test_backup.py fails when a new backend
 # migration or table appears, so the archive scope can never silently drift.
 MIGRATIONS = [str(version) for version in range(1, int(SCHEMA_VERSION) + 1)]
@@ -27,7 +27,7 @@ TABLES = sorted([
     "content_revision", "content_revision_file", "content_revision_report", "flyway_schema_history", "identity_owner_profile", "operation_journal",
     "operation_random_draw", "presentation_campaign_settings", "reward_settlement",
     "ai_job", "ai_job_attempt", "planning_snapshot", "query_epoch", "quest_plan_artifact",
-    "plan_dependency", "plan_admission", "plan_disposition",
+    "plan_dependency", "plan_admission", "plan_disposition", "plan_activation",
     "character_state", "item_instance", "learned_ability", "campaign_creation",
     "campaign_known_fact", "campaign_known_quest",
     "campaign_stream_head", "campaign_stream_message", "presentation_job",

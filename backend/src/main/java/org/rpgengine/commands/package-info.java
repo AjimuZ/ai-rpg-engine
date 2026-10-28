@@ -13,6 +13,10 @@
  * implemented. P07.5 adds owner cancellation decided by the campaign lock, the
  * equivalent-attempt draw stream that prevents reroll fishing, and the read side of the
  * resumable public stream whose messages the V11 journal trigger appends; post-commit
- * presentation jobs live in {@code org.rpgengine.presentation}. No network work runs here.
+ * presentation jobs live in {@code org.rpgengine.presentation}. P07.6 lets a trusted
+ * resolved commit cite admitted plan branches, which the commit rechecks and records once
+ * through {@code org.rpgengine.preparation.PlanActivations}; no player intention or HTTP
+ * route can supply such a citation, and a plan never supplies an effect. No network work
+ * runs here.
  */
 package org.rpgengine.commands;

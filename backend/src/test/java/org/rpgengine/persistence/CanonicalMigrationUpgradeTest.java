@@ -13,9 +13,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V11 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V12 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -197,6 +198,33 @@ class CanonicalMigrationUpgradeTest {
                         assertEquals(0, jdbc.queryForObject("select count(*) from " + table, Integer.class));
                     }
                     assertEquals(0, v11.migrate().migrationsExecuted);
+                    // V12 adds the plan-gate evaluator, receipt columns and activations without
+                    // touching canonical rows; nothing is backfilled or marked as gate-checked.
+                    String v11Journal = jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
+                            String.class);
+                    Flyway v12 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("12").load();
+                    assertEquals(1, v12.migrate().migrationsExecuted);
+                    assertTrue(v12.validateWithResult().validationSuccessful);
+                    assertEquals(v6Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
+                    assertEquals(v11Journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
+                            String.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from plan_activation", Integer.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from plan_admission where gate_version "
+                            + "is not null or checked_references is not null", Integer.class));
+                    UUID actor = UUID.randomUUID();
+                    jdbc.update("insert into actor (id, campaign_id, kind, display_name, created_revision, created_at) "
+                            + "values (?, ?, 'NPC', 'Witness', 7, now())", actor, campaign);
+                    assertEquals(0L, jdbc.queryForObject("select plan_reference_version(?, ?)", Long.class, campaign,
+                            "actor:" + actor));
+                    for (String reference : new String[] {"actor:" + UUID.randomUUID(), "actor:" + actor.toString()
+                            .toUpperCase(), "region:" + actor, "actor:" + actor + ":location"}) {
+                        assertNull(jdbc.queryForObject("select plan_reference_version(?, ?)", Long.class, campaign,
+                                reference), reference);
+                    }
+                    assertNull(jdbc.queryForObject("select plan_reference_version(?, ?)", Long.class,
+                            UUID.randomUUID(), "actor:" + actor));
+                    assertEquals(0, v12.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

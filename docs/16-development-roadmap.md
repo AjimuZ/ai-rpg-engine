@@ -1330,6 +1330,43 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     P07.5 gains a completion mark. Narration (P08) and browser binding (P05.6/P05.7)
     remain open.
 - [ ] P07.6 Implement atomic plan admission with dependency/query-epoch rechecks, scope/content/author validation, fencing and idempotency; artifacts never directly change world facts/time/rewards, and activation uses ordinary commands under QA-36.
+  - Package A — typed dependency rechecks: V12 adds the read-only evaluator
+    `plan_reference_version` for the closed grammar `actor:`/`resource:`/`item:`/`character:`
+    (ENTITY_FIELD) and `known-fact:`/`known-quest:` (FACT) plus a lowercase UUID, returning
+    the row's storage version (null when absent or foreign), and `plan_dependency_fresh`
+    combining it with query epochs. Admission requires exact versions and current epochs;
+    predicates and CONSTRAINT rows still fail closed until P08.7. Every canonical commit
+    re-evaluates admitted plans against the rows it changed (`DEPENDENCY_CHANGED` or
+    `QUERY_EPOCH_CHANGED`); unrelated revisions change nothing.
+  - Package B — scope, content and author validation: `PlanContentCatalogs` loads prose-free
+    pinned facts before any lock. Under the campaign lock the gate (`plan-gate-v1`) checks the
+    snapshot generation, public input without private reads or secret definitions, the pinned
+    revision/pack/ruleset hashes, cited definitions, an author-constraint digest recomputed
+    from the sealed root policy and cited required/fixed entities, and that every cited
+    campaign entity is covered by a recorded dependency. Snapshot capture applies the
+    audience and author checks too. Receipts store the gate version and sorted references.
+  - Package C — fencing, idempotency and activation through ordinary commands: P03.6
+    lease/fence/generation/result-digest checks and one receipt per attempt still come
+    first. A trusted resolved commit may cite admitted branches; the canonical commit
+    rechecks them live after its own revision/lease/rule checks and before any effect,
+    rolls back on `PLAN_*` refusals and records each branch once in immutable
+    `plan_activation` (deferred committed-origin trigger). Matching retries replay first.
+    No player intention, HTTP route or job can cite a plan; the plan supplies no effect and
+    receipts never name it. See the
+    [admission contract](07-turn-protocol.md#p076-plan-admission-and-activation).
+  - Exit checks: real PostgreSQL on sealed packs and production campaign creation with
+    ordinary WAIT/MOVE/USE_ABILITY commands: eight unrelated commits keep a plan admissible;
+    a witness change invalidates only its branch while the independent branch activates
+    once; a destroyed object and a knowledge-scope phantom reject stale admission and
+    invalidate admitted plans; the live recheck at use wins over an earlier validation; an
+    admission racing a move never leaves a usable stale artifact; foreign, unrecorded,
+    absent, unknown-content, unconstrained-author, unsupported, secret-in-public and
+    legacy-snapshot inputs reject without writes; exact world-row snapshots around every
+    admission, invalidation and refused activation; activation commit fault injection at
+    COMMIT, replay, second-use and storage guards; V12 upgrade without backfill. Run
+    focused suites, full packaged backend, configured frontend gates, repository policy
+    tests/scans, offline backup tests and deliberate weakening probes; record actual
+    results and a neutral owner commit before checking this task.
 
 **Exit:** untrusted proposals cannot mutate state directly; retries and crashes have deterministic outcomes. This gate precedes real AI-driven mutations. **Checks:** QA-03–07, QA-17–20, transaction fault injection. **Suggested commit:** `Enforce transactional command validation and idempotency`.
 

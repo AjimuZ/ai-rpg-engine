@@ -126,6 +126,15 @@ The V6 backup remains database-only, with all old writers/workers stopped during
 single-installation recovery; full content/assets and identity-remapping restore
 remain P16. No completed QA-36/37 or narrative benefit is implied.
 
+P07.6 adds typed row-version dependencies, the transactional scope/content/author gate
+and plan activation only through ordinary canonical commands. Remaining risks: a later
+writer (reveals at P09.1, items and quests at P10) that neither steps the row versions it
+changes nor bumps the affected query scopes would leave plans undetectably stale, so each
+such writer needs the same epoch/version evidence in its tests; predicates and constraint
+rows still fail closed until P08.7; and activation is at most once per artifact branch,
+not per domain settlement, so a refined plan version can offer an equivalent branch again
+until pending-event settlement keys arrive (P10).
+
 P03.4 adds durable same-operation random reuse and pinned HMAC-SHA-256 v1 identity.
 Private campaign seeds are trusted database/backup material, never runtime context.
 Reservation survives failed/cancelled canonical work, but future command policy must

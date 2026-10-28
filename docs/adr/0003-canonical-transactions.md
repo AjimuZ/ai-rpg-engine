@@ -32,6 +32,18 @@ and do not replace, the short atomic transaction and lease/fencing checks of P03
 
 ## Verification
 
+P07.6 implementation decision (28 October 2026): plan use stays inside this boundary.
+A trusted resolved commit may cite admitted plan branches; the commit rechecks them
+against current rows under the campaign lock, after its own revision/lease/rule checks
+and before writing any effect, and records each branch once in an immutable
+`plan_activation` row whose deferred trigger requires the committed operation. The plan
+supplies no effect, and every commit re-evaluates admitted plans against the rows it
+changed. Plan admission keeps its own campaign-serialized transaction and now also
+rechecks scope, pinned content, author constraints and typed row versions; it writes no
+canonical counters, draws, rewards or events. Real PostgreSQL races, fault injection at
+COMMIT and deliberate weakening probes verify both boundaries
+([quality record](../15-quality-and-acceptance.md)).
+
 P03.6 implementation decision (24 October 2026): the same short canonical transaction
 also bumps explicitly affected query epochs, appends invalidation of dependent plans
 and enqueues bounded critical preparation intents. A deferred database trigger requires

@@ -19,7 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Every lease-bound call re-checks holder, fence, attempt, expiry and campaign
  * generation under the job row lock, so an expired or superseded worker can never
  * write. This class stores coordination state only: it starts no runtime, spends no
- * usage and never touches canonical world state. Dispatch arrives at P07.6.
+ * usage and never touches canonical world state. Runtime dispatch arrives at P08.6.
  */
 @Service
 public class PreparationJobService {

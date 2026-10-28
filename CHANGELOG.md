@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — Transactional plan admission and activation, 28 October 2026
+
+- Recheck prepared plans inside the campaign lock before admission: current generation,
+  no private reads or secret definitions in public input, the campaign's own pinned
+  content and cited definitions, author constraints recomputed from the sealed pack, and
+  exact row versions of the actors, resource pools, items, character state and
+  player-knowledge records a plan read, in addition to query epochs. A plan that cites a
+  campaign entity without a recorded read is refused. Snapshot capture now rejects
+  private reads in public input and author constraints the pack does not have.
+- Invalidate admitted plans in every canonical commit that changes a row or scope they
+  read; unrelated changes keep them usable.
+- Let only ordinary canonical commands use a plan: a commit that cites admitted branches
+  rechecks them against current rows before writing anything, rolls back if any is
+  stale, retired, rejected or already used, and records each branch once. A plan never
+  supplies an effect, and receipts never name it. No player request can cite a plan.
+- Add V12 and extend the database backup scope to `plan_activation`.
+
 ## Unreleased — Italian variant rendering checks (partial), 28 October 2026
 
 - Render every routed screen, the navigation shell and the recorded real-server campaign
