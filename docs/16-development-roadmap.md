@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 48/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1 and P08.2. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 49/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6 and P08.1–P08.3. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -1480,7 +1480,56 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     `3caa39b`; all exit checks passed on that exact code before this completion mark. All
     131 task identities/titles and the pending P98 follow-up are preserved; only P08.2
     gains a completion mark.
-- [ ] P08.3 Scope threads by campaign/role/audience/policy; separate privileged planning from public narration.
+- [x] P08.3 Scope threads by campaign/role/audience/policy; separate privileged planning from public narration.
+  - Package A — scope key and role matrix: `org.rpgengine.inference.session` defines
+    `SessionScope` (adventure, campaign, recovery generation, `AiRole`, `Audience`
+    `public`/`character:<ref>`/`privileged`, pack and policy hashes); tasks share a runtime
+    thread only within one scope. The player-facing `interpreter`, `narrator` and `guide`
+    roles never run privileged; `quest-planner`, `world-director`, `plan-reviewer`,
+    `content-proposer` and `encounter-proposer` run only privileged (the planning-snapshot
+    `PLANNER_PRIVATE` audience), so no scope can serve both planning and narration.
+  - Package B — scoped registry: `ScopedSessions` is the only main-code submitter of the task
+    port. It reuses equal scopes, retires the campaign's older-generation sessions and the
+    same campaign/role/audience line under other hashes, rejects a stale generation
+    (`stale-campaign-generation`) or a campaign under two adventures
+    (`session-scope-conflict`) without sending anything, issues fresh random identifiers,
+    bounds active sessions (`engine.inference.sessions.capacity`, default 256) and forwards
+    every retirement (`retire`, `retireCampaign`, `retireAll`, supersession, eviction) to
+    `NarrationTaskPort.retireSession`. It is in memory, like the adapter's bindings.
+  - Package C — contract integration: `ContractRunner.start` no longer accepts a session; it
+    derives the scope from the task kind's role and audience and the binding, which gains
+    `campaignGeneration` (rendered in the envelope with the kind's role and audience). A
+    stale generation ends `NotCompleted(REJECTED)` without repair. See
+    [docs/06 section 7](06-codex-integration.md#p083-session-scoping).
+  - Exit checks: role-matrix and scope-key tests; registry reuse, separation, supersession,
+    generation fence, adventure conflict, explicit/campaign/installation retirement, capacity
+    eviction and concurrent use; a source/reflection boundary (only the registry builds
+    requests or calls the port; the runner takes no port or session); runner-derived
+    sessions and envelope fields; privileged-to-public handoff scenarios through the real
+    Codex adapter and the scripted app-server with a secret sentinel; Spring wiring and the
+    capacity bound; deliberate weakening probes; the full packaged backend and repository
+    checks. Durable session records and renewal triggers (P09.3/P09.4), filtering of public
+    contexts (P08.5/P09.2), the durable fair queue (P08.6), paraphrase detection and a live
+    runtime smoke are not part of this task.
+  - Verified evidence (28 October 2026): 23 new cases (22 in five new suites, one in the
+    Spring selection suite; 79 focused cases with the existing contract, boundary and
+    adapter suites) and all 548 packaged backend cases in 56 suites pass with zero
+    failures/errors/skips on the scoped JDK 21/PostgreSQL 18.6 fixture, and the jar is
+    packaged. Through the real adapter, a planner, narrator, interpreter and NPC tactician of
+    one campaign get four distinct threads and a planner sentinel is sent exactly once, on
+    the planner's thread. Fifteen deliberate weakening probes (campaign-wide session,
+    privileged narrator, unchecked role matrix, no supersession, no generation fence,
+    unchecked adventure conflict, unforwarded explicit retirement, supersession or eviction,
+    over-broad campaign retirement, a diagnostic read that reorders eviction, interpreter and
+    narrator sharing a role, generation or policy outside the scope, a request built outside
+    the registry) each made the focused run fail and were reverted byte-identically. All 26
+    repository-policy tests pass with zero scan findings. Frontend sources are unchanged and
+    its gates were not rerun. Not verified: a live runtime or account, and leakage through
+    paraphrase or through what a caller places in a public context. See the
+    [verification record](15-quality-and-acceptance.md). Implementation owner commit:
+    `a55319f`; all exit checks passed on that exact code before this completion mark. All
+    131 task identities/titles and the pending P98 follow-up are preserved; only P08.3
+    gains a completion mark.
 - [ ] P08.4 Resolve logical profiles through the owner's slot assignment (backend and model per slot, ADR 0021) against the assigned backend's catalog or approved allowlist, and set effective settings on every turn.
 - [ ] P08.5 Publish only validated final narration; add deterministic receipt fallback and narration-only retry.
 - [ ] P08.6 Implement one durable fair priority queue with isolated logical role/audience threads, interactive reservations, bounded quota/backoff/cancel/restart handling and conservative single-active-turn default; higher concurrency requires P01.7 evidence and QA-37.

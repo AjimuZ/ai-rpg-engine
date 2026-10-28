@@ -21,6 +21,10 @@
   fifteen deliberate weakening probes were detected. The checks use deterministic doubles,
   including the real Codex adapter against the scripted app-server. Gameplay still calls no
   contract (P08.5), and session records stay in memory until P09.
+- Pass all 548 packaged backend tests in 56 suites with zero failures/errors/skips; fifteen
+  weakening probes were detected and all 26 repository-policy tests pass with zero scan
+  findings. Record implementation owner commit `a55319f` before marking P08.3 complete (49
+  of 131 roadmap entries).
 
 ## Unreleased — Validated intent and narration contracts, 28 October 2026
 

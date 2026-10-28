@@ -1,5 +1,90 @@
 # Quality Strategy and Acceptance Criteria
 
+P08.3 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
+**23 new cases (22 in five new suites, one in the Spring selection suite) and all 548
+packaged backend cases in 56 suites**, with zero failures, errors or skips. Rerun with the
+existing contract, boundary, Spring-selection and Codex adapter suites, the focused set has
+79 cases. The executable jar is packaged.
+
+The new cases use deterministic doubles only:
+
+- `SessionScopeTest` (4) covers the role matrix and the scope key:
+  - every player-facing role (`interpreter`, `narrator`, `guide`) refuses the privileged
+    audience;
+  - the planning and proposal roles refuse the public and character audiences;
+  - character audiences need a valid subject;
+  - each scope component (adventure, campaign, generation, role, pack hash, policy hash)
+    distinguishes scopes, and malformed values are rejected.
+- `ScopedSessionsTest` (8) covers the registry:
+  - an equal scope reuses its session, and other roles, audiences, characters and
+    campaigns each get their own without retiring anything;
+  - a pack or policy change supersedes only that line;
+  - a new generation retires every older session of its campaign, and stale-generation
+    tasks are `REJECTED` without being sent;
+  - a campaign under another adventure is refused;
+  - explicit, campaign and installation retirement each reach the port;
+  - least-recently-used eviction respects diagnostic reads;
+  - bad capacities and a repeated identity fail loudly;
+  - 1,600 concurrent submissions over four scopes use exactly four sessions.
+- `SessionBoundaryTest` (3) checks the code structure: only `ScopedSessions` builds a
+  `TaskRequest`, no other main code that names the port calls `submit` or `retireSession`,
+  and `ContractRunner` exposes no port or session-identifier parameter.
+- `ContractSessionScopeTest` (5) covers the runner:
+  - interpretation and narration get separate sessions, and the envelope names the role,
+    `public` audience and campaign generation;
+  - a scope keeps its session, and another campaign gets its own;
+  - a policy or generation change renews the session, and a stale generation ends
+    `NotCompleted(REJECTED, stale-campaign-generation)` without a request;
+  - a privileged planner session of the same campaign is never used to narrate;
+  - renewing the narrator leaves the interpreter alone.
+- `ScopedThreadIsolationTest` (2) runs the real Codex adapter against the scripted
+  app-server:
+  - a planner, narrator, interpreter and NPC tactician get four distinct threads, with
+    continuity inside each scope;
+  - a secret sentinel given to the planner reaches the runtime exactly once, on the
+    planner's thread;
+  - renewal, a policy change, campaign retirement and a restore start fresh threads only
+    for the affected scopes, and a late generation-1 task sends no frame.
+- `TaskPortSelectionTest` (+1) checks that the Spring context wires one registry around the
+  selected port and that an out-of-range capacity fails startup.
+
+Fifteen deliberate weakening probes were run. Each made the focused run fail and was
+reverted byte-identically, with the checksum verified. The weakened rules were:
+
+- a campaign-wide session;
+- a narrator allowed in the privileged audience;
+- an unchecked role matrix;
+- no supersession;
+- no generation fence;
+- an unchecked adventure conflict;
+- an unforwarded explicit retirement;
+- an unforwarded supersession;
+- an unforwarded eviction;
+- an over-broad campaign retirement;
+- a diagnostic read that reorders eviction;
+- interpretation and narration sharing a role;
+- the generation outside the scope;
+- the policy outside the scope;
+- a request built outside the registry.
+
+These were intentional probes, not gate outcomes. All 26 repository-policy tests pass with
+zero scan findings, and `git diff --check` is clean.
+
+Frontend sources are unchanged, and the frontend gates were not rerun. This is isolation
+evidence for the inference path against deterministic doubles. It is not:
+
+- a live runtime or account run;
+- a gameplay path (P08.5);
+- QA-16 secret-sentinel coverage of the player API, media and diagnostics;
+- proof that a caller's public context is free of secrets (P08.5/P09.2 filtering; the
+  P08.2 guard refuses only verbatim markers);
+- detection of paraphrased secrets.
+
+The registry is in memory, so a backend restart costs continuity, never isolation.
+
+The neutral implementation owner commit is `a55319f`. Every check above passed on its
+exact sources, and only P08.3 then gains a completion mark (49 of 131 roadmap entries).
+
 P08.2 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **35 focused cases in four new suites and all 525 packaged backend cases in 51 suites**,
 with zero failures, errors or skips. The executable jar is packaged.

@@ -830,6 +830,12 @@ Tests use deterministic doubles only and need no database:
   planner sentinel is sent only on the planner's thread.
 - `TaskPortSelectionTest` covers Spring wiring and the capacity bound.
 
+Verified on 28 October 2026 with the unchanged scoped JDK 21 toolchain and disposable
+PostgreSQL 18.6 fixture: 79 focused cases (23 new) and all 548 packaged backend cases in 56
+suites pass with zero failures/errors/skips, fifteen deliberate weakening probes were
+detected, and the executable jar is packaged. See
+[evidence scope](../docs/15-quality-and-acceptance.md).
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.
