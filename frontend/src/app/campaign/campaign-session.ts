@@ -139,6 +139,11 @@ export interface ReconcileResult {
   readonly applied: number;
   /** Events skipped as already delivered. */
   readonly duplicates: number;
+  /**
+   * Highest world revision named by an applied message or a reset, or null when neither occurred.
+   * A value above the displayed state's revision means that state is stale and must be re-read.
+   */
+  readonly stateRevision: number | null;
 }
 
 /** Own per-scope reconciliation records, durable across language reloads; see the module comment. */
@@ -194,11 +199,17 @@ export class CampaignSession {
     } catch { return empty; }
   }
 
-  /** Merge an incoming record into memory, keeping the newer cursor and higher operation versions. */
-  private merge(into: { cursor: string | null; operations: Map<string, TrackedOperation> }, from: SyncRecord): void {
+  /**
+   * Merge an incoming record into memory, keeping the newer cursor and higher operation versions.
+   *
+   * @param adoptCursor true when the in-memory cursor was just taken from a server reset: the
+   *   server has declared the stored position unknown or expired, so a larger stored value is
+   *   exactly the stale position being replaced and must not win the comparison
+   */
+  private merge(into: { cursor: string | null; operations: Map<string, TrackedOperation> }, from: SyncRecord, adoptCursor = false): void {
     const a = parseCursor(into.cursor);
     const b = parseCursor(from.cursor);
-    if (b && (!a || (compareCursor(b, a) ?? (b.generation > a.generation ? 1 : -1)) > 0)) into.cursor = from.cursor;
+    if (!adoptCursor && b && (!a || (compareCursor(b, a) ?? (b.generation > a.generation ? 1 : -1)) > 0)) into.cursor = from.cursor;
     for (const operation of from.operations) this.upsert(into.operations, operation);
   }
 
@@ -227,15 +238,18 @@ export class CampaignSession {
   /**
    * Persist the scope's record after merging whatever another tab wrote, then re-read the exact bytes.
    *
+   * @param adoptCursor true after a stream reset; the server's head replaces the stored cursor
+   *   (see {@link merge}) while operations still merge
    * @returns true only when the stored bytes equal the in-memory record; false on any storage failure
    */
-  private persist(scope: CampaignScope): boolean {
+  private persist(scope: CampaignScope, adoptCursor = false): boolean {
     const current = this.record(scope);
     const key = this.key(scope);
     try {
       if (!this.storage) throw new Error('Storage unavailable');
-      // Another tab may have advanced the cursor; never regress it by blindly overwriting.
-      this.merge(current, this.read(key));
+      // Another tab may have advanced the cursor; never regress it by blindly overwriting,
+      // except when a reset says the stored position itself is no longer valid.
+      this.merge(current, this.read(key), adoptCursor);
       const bytes = this.serialize(current);
       this.storage.setItem(key, bytes);
       if (this.storage.getItem(key) !== bytes) throw new Error('Storage verification failed');
@@ -328,18 +342,24 @@ export class CampaignSession {
    * {@link requery} so no message class is silently skipped. A message from another generation
    * is reported as `GENERATION_CHANGED` without moving the cursor (the next poll is answered
    * with a reset). `onActivity` fires after every network chunk, which proves a live connection.
+   * The result names the highest revision an applied message or reset carried, so a caller can
+   * re-read a state projection that a commit made stale; duplicates never raise it.
    */
   async poll(scope: CampaignScope, signal: AbortSignal, onActivity: () => void = () => undefined): Promise<ReconcileResult> {
     let reset: string | null = null;
     let applied = 0;
     let duplicates = 0;
+    let stateRevision: number | null = null;
     await this.transport.stream(scope, this.record(scope).cursor, signal, (events) => {
       onActivity();
       for (const event of events) {
         if (event.type === 'stream.reset') {
           reset = event.reason;
+          stateRevision = Math.max(stateRevision ?? 0, event.stateRevision);
           this.record(scope).cursor = event.id;
-          this.persist(scope);
+          // The reset declares the stored position invalid (an unknown cursor can be ahead of the head);
+          // merging that value back would make every later poll reset again.
+          this.persist(scope, true);
           this.revision.update((n) => n + 1);
           return 'stop';
         }
@@ -349,13 +369,13 @@ export class CampaignSession {
           continue;
         }
         const outcome = this.applyEvent(scope, event);
-        if (outcome === 'applied') applied++;
+        if (outcome === 'applied') { applied++; stateRevision = Math.max(stateRevision ?? 0, event.stateRevision); }
         else if (outcome === 'duplicate') duplicates++;
         else { reset = 'GENERATION_CHANGED'; return 'stop'; }
       }
       return undefined;
     });
-    return { reset, applied, duplicates };
+    return { reset, applied, duplicates, stateRevision };
   }
 
   /** Requery pending work then poll once, requerying again after a reset; the combined load/reload step. */

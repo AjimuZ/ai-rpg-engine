@@ -390,6 +390,21 @@ component and packaged-route coverage listed in the
 No browser journey was run on this build (no browser in the Linux container), the 77
 new Italian messages await independent review, and QA-35 plus the bilingual and
 screen-reader playtests stay open.
+The sixth P05.6 checkpoint (28 October 2026, Linux build container, pinned JDK 21,
+PostgreSQL test service, Node 24.22.1) adds a
+[recorded real-server contract](29-localization.md#sixth-checkpoint-recorded-real-server-contract-28-october-2026).
+`CampaignInterfaceContractTest` records 19 real HTTP exchanges across five phases and
+matches the normalized golden transcript on repeated runs; `campaign-contract.spec.ts`
+replays its byte-identical copy through the validators and an EN→IT→EN reload of the
+routed view with an operation in flight, and the `contracts` repository check keeps the
+copies equal. The replay exposed a reset loop (an unknown cursor merged back over the
+adopted head) and a stale starting decision after a commit; both regression tests failed
+before and pass after the fixes. Results: 72 frontend tests in 12 files, strict typecheck,
+four localization checker tests and the parity build (317 messages); 436 packaged backend
+tests in 39 suites with zero failures, errors or skips; 26 repository-checker tests and
+zero findings across all six checks. An author review corrected 11 Italian targets. Still
+open: Chrome journeys on the packaged origin, independent Italian and screen-reader review
+and the QA-35 sign-off.
 The 24 October prerequisite audit is retained as history in the
 [P05.6 integration prerequisites](29-localization.md#p056-integration-prerequisites-24-october-2026-audit).
 These checks preserve the preview safety boundary and do not establish real

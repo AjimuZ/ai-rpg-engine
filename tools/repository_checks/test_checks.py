@@ -346,6 +346,37 @@ class LocalizationCodeTest(unittest.TestCase):
         self.assertEqual(["%s:1: campaign controller is missing" % checks.CAMPAIGN_CONTROLLERS[0]], checks.check_localization(root))
 
 
+class ContractCopyTest(unittest.TestCase):
+    """Recorded protocol transcripts must be identical on the producer and consumer side."""
+
+    def _repository(self, golden: bytes | None, copy: bytes | None) -> Path:
+        """Build a minimal fixture repository under scratch with optional golden and copy files."""
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        root = Path(tempfile.mkdtemp(dir=SCRATCH))
+        self.addCleanup(shutil.rmtree, root, True)
+        for (golden_path, copy_path) in checks.CONTRACT_COPIES:
+            for path, content in ((golden_path, golden), (copy_path, copy)):
+                if content is not None:
+                    (root / path).parent.mkdir(parents=True, exist_ok=True)
+                    (root / path).write_bytes(content)
+        return root
+
+    def test_identical_copies_pass_and_drift_is_reported(self) -> None:
+        """One changed byte in the frontend copy is a finding that names the copy, not its content."""
+        text = b'{"schemaVersion": 1, "body": "Arrivi al riparo"}\n'
+        self.assertEqual([], checks.check_contracts(self._repository(text, text)))
+        findings = checks.check_contracts(self._repository(text, text.replace(b"riparo", b"rifugio")))
+        self.assertEqual(len(checks.CONTRACT_COPIES), len(findings))
+        self.assertIn(checks.CONTRACT_COPIES[0][1] + ":1: contract copy differs", findings[0])
+        self.assertNotIn("rifugio", findings[0])
+
+    def test_missing_files_cannot_disable_the_check(self) -> None:
+        """Deleting either side is reported instead of passing."""
+        self.assertEqual([checks.CONTRACT_COPIES[0][1] + ":1: recorded contract transcript is missing"],
+                         checks.check_contracts(self._repository(b"{}", None)))
+        self.assertEqual(2, len(checks.check_contracts(self._repository(None, None))))
+
+
 class ProjectTest(unittest.TestCase):
     """The committed project itself satisfies every check (same as the CI steps)."""
 
@@ -353,7 +384,7 @@ class ProjectTest(unittest.TestCase):
         """No secret, private path, broken link, workflow-policy or image-pin finding exists."""
         for name, check in [("secrets", checks.check_secrets), ("docs", checks.check_docs),
                             ("workflows", checks.check_workflows), ("images", checks.check_images),
-                            ("localization", checks.check_localization)]:
+                            ("localization", checks.check_localization), ("contracts", checks.check_contracts)]:
             with self.subTest(check=name):
                 self.assertEqual([], check(ROOT))
 

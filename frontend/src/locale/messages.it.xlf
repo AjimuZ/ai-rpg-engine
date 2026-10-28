@@ -2190,7 +2190,7 @@
       </notes>
       <segment>
         <source>The playthrough is busy with another action. Wait a moment and check its status before retrying.</source>
-      <target>La partita è occupata con un’altra azione. Attendi un momento e controlla il suo stato prima di riprovare.</target>
+      <target>La partita sta elaborando un’altra azione. Attendi un momento e controlla lo stato prima di riprovare.</target>
       </segment>
     </unit>
     <unit id="campaign.error.admissionLimit">
@@ -2336,7 +2336,7 @@
       </notes>
       <segment>
         <source>Received</source>
-      <target>Ricevuta</target>
+      <target>Presa in carico</target>
       </segment>
     </unit>
     <unit id="campaign.status.planning">
@@ -2453,7 +2453,7 @@
       </notes>
       <segment>
         <source>Narration was stopped. The saved result below is complete.</source>
-      <target>La narrazione è stata interrotta. Il risultato salvato qui sotto è completo.</target>
+      <target>La narrazione è stata annullata. Il risultato salvato qui sotto è completo.</target>
       </segment>
     </unit>
     <unit id="campaign.narration.failed">
@@ -2570,7 +2570,7 @@
       </notes>
       <segment>
         <source>Speak</source>
-      <target>Parlare</target>
+      <target>Dialogo</target>
       </segment>
     </unit>
     <unit id="campaign.command.useAbility">
@@ -2624,7 +2624,7 @@
       </notes>
       <segment>
         <source>Saved as world revision <ph id="0" equiv="revision" disp="revision" />.</source>
-      <target>Salvato come revisione del mondo <ph id="0" equiv="revision" disp="revision" />.</target>
+      <target>Azione salvata come revisione del mondo <ph id="0" equiv="revision" disp="revision" />.</target>
       </segment>
     </unit>
     <unit id="campaign.receipt.moved">
@@ -2633,7 +2633,7 @@
       </notes>
       <segment>
         <source>Moved to <ph id="0" equiv="destination" disp="destination" />.</source>
-      <target>Spostamento verso <ph id="0" equiv="destination" disp="destination" />.</target>
+      <target>Destinazione raggiunta: <ph id="0" equiv="destination" disp="destination" />.</target>
       </segment>
     </unit>
     <unit id="campaign.receipt.elapsed">
@@ -2642,7 +2642,7 @@
       </notes>
       <segment>
         <source>World time passed: <ph id="0" equiv="seconds" disp="seconds" /> s.</source>
-      <target>Tempo di gioco trascorso: <ph id="0" equiv="seconds" disp="seconds" /> s.</target>
+      <target>Tempo trascorso nel mondo di gioco: <ph id="0" equiv="seconds" disp="seconds" /> s.</target>
       </segment>
     </unit>
     <unit id="campaign.receipt.turnAdvanced">
@@ -2678,7 +2678,7 @@
       </notes>
       <segment>
         <source>Draw <ph id="0" equiv="ordinal" disp="ordinal" />: <ph id="1" equiv="value" disp="value" /> on a <ph id="2" equiv="sides" disp="sides" />-sided die</source>
-      <target>Estrazione <ph id="0" equiv="ordinal" disp="ordinal" />: <ph id="1" equiv="value" disp="value" /> su un dado a <ph id="2" equiv="sides" disp="sides" /> facce</target>
+      <target>Tiro <ph id="0" equiv="ordinal" disp="ordinal" />: <ph id="1" equiv="value" disp="value" /> su un dado a <ph id="2" equiv="sides" disp="sides" /> facce</target>
       </segment>
     </unit>
     <unit id="campaign.view.startingTitle">
@@ -2705,7 +2705,7 @@
       </notes>
       <segment>
         <source>No decision is waiting for you in this playthrough.</source>
-      <target>In questa partita nessuna decisione è in attesa di te.</target>
+      <target>In questa partita non ci sono decisioni in attesa.</target>
       </segment>
     </unit>
     <unit id="campaign.view.loading">
@@ -2786,7 +2786,7 @@
       </notes>
       <segment>
         <source>Connected. Waiting for pending actions to finish.</source>
-      <target>Connesso. In attesa che le azioni in sospeso finiscano.</target>
+      <target>Connesso. In attesa che le azioni in sospeso si concludano.</target>
       </segment>
     </unit>
     <unit id="campaign.view.liveIdle">
@@ -2804,7 +2804,7 @@
       </notes>
       <segment>
         <source>Connection unavailable. Your last known state and draft remain available; retrying automatically.</source>
-      <target>Connessione non disponibile. L’ultimo stato noto e la bozza restano disponibili; nuovo tentativo automatico.</target>
+      <target>Connessione non disponibile. L’ultimo stato noto e la bozza restano disponibili; nuovo tentativo automatico in corso.</target>
       </segment>
     </unit>
     <unit id="campaign.view.connecting">

@@ -152,6 +152,9 @@ operation statuses and receipts from the status query and the resumable stream, 
 the scoped persistent draft. The view never submits; the saved stream cursor and
 operation identities are what the explicit language reload preserves
 ([integration status](29-localization.md#p056-campaign-integration-status-28-october-2026)).
+When an applied stream message or a reset names a newer `stateRevision` than the
+displayed state, the view re-reads the state before polling again; a reset's head
+replaces the stored cursor even if the stored value is larger.
 Workspace creation and sending actions from the browser are still pending.
 
 ## 1. Contract status
@@ -505,9 +508,11 @@ language, verifies draft bytes across scopes and reloads with validated tab read
 preferences/positions and equivalent-control focus. Unknown saved preferences
 fall back visibly to English; storage failure and unresolved recovery block
 reload even after leaving the story. Old projection callbacks and reply references
-are invalidated. Real campaign contexts remain blocked until operation/cursor
-reconciliation exists. The unlocalized packaged build does not offer switching;
-localized Spring routing and resource checks remain P05.6.
+are invalidated. Real campaign contexts reload only after their operation/cursor
+record verifies in storage; a recorded real-server transcript replays that reload in
+the frontend suite (see the [sixth checkpoint](29-localization.md#sixth-checkpoint-recorded-real-server-contract-28-october-2026)).
+The unlocalized default build does not offer switching; the packaged jar serves the
+compiled locale variants.
 
 ## 9. Accessibility and responsive behavior
 

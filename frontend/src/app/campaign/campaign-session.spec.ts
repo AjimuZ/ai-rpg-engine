@@ -65,6 +65,23 @@ describe('Campaign session reconciliation', /** Register reload-safety checks fo
     expect(session.operations(SCOPE)[0].status).toBe('DELIVERED');
   });
 
+  it('replaces an unknown cursor that is ahead of the head instead of merging it back', /** A stale larger cursor must not cause a reset loop. */ async () => {
+    // A saved position beyond the server head (for example after restoring an older database copy).
+    store.setItem(`engine.campaign-sync.v1:${JSON.stringify([SCOPE.adventureId, SCOPE.campaignId])}`,
+      JSON.stringify({ version: 1, cursor: '0:99', operations: [] }));
+    server.streams = [[frame('0:7', 'stream.reset', { reason: 'CURSOR_UNKNOWN' })], []];
+    const session = load(store, server);
+    expect((await session.reconcile(SCOPE, signal)).reset).toBe('CURSOR_UNKNOWN');
+    expect(session.cursor(SCOPE)).toBe('0:7');
+    expect(session.verified(SCOPE)).toBe(true);
+    // The next poll resumes after the adopted head, and a reloaded page reads the same position.
+    server.calls.length = 0;
+    expect((await session.poll(SCOPE, signal)).reset).toBeNull();
+    expect(server.calls.filter((url) => url.includes('/stream?')).map((url) => decodeURIComponent(url))).toEqual([
+      `/api/v1/campaigns/${SCOPE.campaignId}/stream?adventureId=${SCOPE.adventureId}&after=0:7`]);
+    expect(load(store, server).cursor(SCOPE)).toBe('0:7');
+  });
+
   it('reports a generation change instead of applying messages from another generation', /** Restored backups need a reset first. */ async () => {
     server.streams = [[accepted('0:1', OP1)]];
     const session = load(store, server);

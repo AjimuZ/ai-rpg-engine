@@ -53,6 +53,9 @@ jobs:
         run: python -B tools/repository_checks/checks.py images
       - name: Check campaign error localization
         run: python -B tools/repository_checks/checks.py localization
+      # The backend golden transcript and the copy the frontend specs replay must not drift.
+      - name: Check recorded interface contracts
+        run: python -B tools/repository_checks/checks.py contracts
       # Offline backup-tool logic; the real PostgreSQL rehearsal stays a manual release check.
       - name: Test the database backup tool
         run: python -B -m unittest discover -s tools/database_backup -v

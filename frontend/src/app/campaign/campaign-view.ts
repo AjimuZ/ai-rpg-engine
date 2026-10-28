@@ -142,7 +142,10 @@ export class CampaignPlaythrough {
     void this.follow(scope, run.signal, this.epoch);
   }
 
-  /** Load state once, then reconcile and follow the stream with bounded exponential backoff until aborted. */
+  /**
+   * Load state, then reconcile and follow the stream with bounded exponential backoff until aborted.
+   * The state is read again whenever an applied message or reset names a newer world revision.
+   */
   private async follow(scope: CampaignScope, signal: AbortSignal, epoch: number): Promise<void> {
     let delay = BASE_BACKOFF_MS;
     let loaded = false;
@@ -163,6 +166,9 @@ export class CampaignPlaythrough {
         });
         if (signal.aborted) return;
         if (result.reset) { this.notice.set(streamResetMessage(result.reset)); requery = true; }
+        // A commit or reset makes the shown projection stale (for example a starting decision the
+        // move already answered); re-read it before the next poll instead of showing old state.
+        if (result.reset || (result.stateRevision !== null && result.stateRevision > (this.view()?.stateRevision ?? -1))) loaded = false;
         // An immediately ended poll (nothing new) must not spin; a held poll already waited server-side.
         if (result.applied === 0 && !result.reset) await pause(IDLE_PAUSE_MS, signal);
       } catch (error) {
@@ -170,7 +176,8 @@ export class CampaignPlaythrough {
         const code = error instanceof CampaignProtocolError ? error.code : null;
         this.failure.set(campaignErrorMessage(code));
         this.state.set('disconnected');
-        this.input.setStatus(loaded ? 'disconnected' : 'error', epoch);
+        // A failed re-read keeps the last shown projection, so that case is a disconnection, not an error.
+        this.input.setStatus(this.view() ? 'disconnected' : 'error', epoch);
         // Permanent answers (missing scope, denial, invalid payload) are not retried in a tight loop.
         if (error instanceof CampaignProtocolError && (error.kind === 'invalid' || error.status === 404 || error.status === 403)) {
           this.busy.set(false);

@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — Real-server reload contract for the bilingual UI (partial), 28 October 2026
+
+- Record the exact replies of the real servlet stack and PostgreSQL across a language
+  reload with an action in flight (`CampaignInterfaceContractTest`), pin them in a golden
+  transcript and replay a byte-identical copy in the frontend suite through the
+  validators and an EN→IT→EN reload of the playthrough view. A new `contracts`
+  repository check (and CI step) keeps the two copies equal.
+- Fix a reset loop: after `stream.reset`, the server's head now replaces a stored cursor
+  that is ahead of it instead of being merged back over it on the next write.
+- Re-read the playthrough state when an applied message or reset names a newer world
+  revision, so an answered starting decision no longer stays on screen after a commit.
+- Correct 11 Italian campaign messages after an author review (for example
+  `Presa in carico` instead of the ambiguous `Ricevuta`, and distinct sentences for
+  stopped and interrupted narration). Independent review is still required.
+- Not complete: no browser journey ran (no browser in the build container) and QA-35
+  needs independent bilingual and screen-reader review, so P05.6 remains open.
+
 ## Unreleased — Bilingual campaign integration (partial), 28 October 2026
 
 - Show a selected playthrough's public state in the saved-adventure view: the starting

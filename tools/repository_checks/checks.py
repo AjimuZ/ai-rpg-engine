@@ -1,6 +1,6 @@
 """Credential-free repository checks for ordinary CI and local pre-push review.
 
-Five independent checks run against the files Git considers part of the project
+Six independent checks run against the files Git considers part of the project
 (tracked files plus untracked files that are not ignored):
 
 * ``secrets``: refuse private paths that must never be published (local
@@ -17,8 +17,11 @@ Five independent checks run against the files Git considers part of the project
 * ``localization``: verify that every public campaign/stream error code a backend
   controller can answer has a localized message in the browser interface, so a new
   code cannot reach players as raw text or the generic fallback by omission.
+* ``contracts``: verify that each recorded real-server transcript the frontend specs
+  replay is byte-identical to the golden file the backend test produces and compares,
+  so the two suites cannot silently test different protocol versions.
 
-Usage: ``python tools/repository_checks/checks.py [secrets|docs|workflows|images|localization|all]``.
+Usage: ``python tools/repository_checks/checks.py [secrets|docs|workflows|images|localization|contracts|all]``.
 The exit status is 0 when every selected check passes and 1 otherwise; each
 finding is printed as ``path:line: message``. The module uses only the Python
 standard library and local Git commands. It makes no network requests, reads no
@@ -483,15 +486,43 @@ def check_localization(root: Path = ROOT) -> list[str]:
     return findings
 
 
+# Golden transcripts recorded by backend tests, paired with the frontend copies their consumer specs import.
+CONTRACT_COPIES = (
+    ("backend/src/test/resources/contracts/campaign-reload-transcript.json",
+     "frontend/src/app/campaign/contract/campaign-reload-transcript.json"),
+)
+
+
+def check_contracts(root: Path = ROOT) -> list[str]:
+    """Return findings for recorded protocol transcripts whose frontend copy drifted from the golden file.
+
+    The backend test (``CampaignInterfaceContractTest``) compares a fresh real-server recording with
+    the golden file; the frontend specs replay their own copy because the frontend build context
+    contains no backend sources. A missing file on either side is a finding, as is any byte
+    difference (the files are LF-normalized by ``.gitattributes``, so no line-ending tolerance is
+    needed). Findings name the frontend copy and never print transcript content.
+    """
+    findings: list[str] = []
+    for golden, copy in CONTRACT_COPIES:
+        missing = [path for path in (golden, copy) if not (root / path).is_file()]
+        findings.extend(f"{path}:1: recorded contract transcript is missing" for path in missing)
+        if missing:
+            continue
+        if (root / golden).read_bytes() != (root / copy).read_bytes():
+            findings.append(f"{copy}:1: contract copy differs from {golden}; rerun the backend test with "
+                            "-Dengine.contract.update=true")
+    return findings
+
+
 def main(argv: list[str]) -> int:
     """Run the selected checks, print findings and return the process exit status.
 
-    ``argv`` holds zero or one selector (``secrets``, ``docs``, ``workflows``, ``images``, ``localization``, ``all``). An unknown
-    selector returns 2; findings return 1; a clean run returns 0.
+    ``argv`` holds zero or one selector (``secrets``, ``docs``, ``workflows``, ``images``, ``localization``,
+    ``contracts``, ``all``). An unknown selector returns 2; findings return 1; a clean run returns 0.
     """
     selected = argv[0] if argv else "all"
-    if selected not in {"secrets", "docs", "workflows", "images", "localization", "all"}:
-        print("usage: checks.py [secrets|docs|workflows|images|localization|all]", file=sys.stderr)
+    if selected not in {"secrets", "docs", "workflows", "images", "localization", "contracts", "all"}:
+        print("usage: checks.py [secrets|docs|workflows|images|localization|contracts|all]", file=sys.stderr)
         return 2
     findings: list[str] = []
     if selected in {"secrets", "all"}:
@@ -504,6 +535,8 @@ def main(argv: list[str]) -> int:
         findings.extend(check_images())
     if selected in {"localization", "all"}:
         findings.extend(check_localization())
+    if selected in {"contracts", "all"}:
+        findings.extend(check_contracts())
     for finding in findings:
         print(finding)
     print(f"{selected}: {len(findings)} finding(s)")

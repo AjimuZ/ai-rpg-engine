@@ -62,8 +62,10 @@ statuses, receipt lines with named placeholders (`path`, `kind`, `resource`, `be
 fallback notice. Numbers are formatted for the compiled locale only; resource keys and
 destinations stay literal identifiers. `npm run check:i18n` now reports 317 messages.
 The Italian targets of those 77 messages (plus the
-reworded `saved.readOnly`) are first drafts: they have **not** had independent human
-review. `python tools/repository_checks/checks.py localization` fails when a backend
+reworded `saved.readOnly`) had one author review pass on 28 October 2026, which corrected
+11 targets (ambiguous `Ricevuta`, identical sentences for two narration reasons, `tempo di
+gioco` for world time, `Estrazione` for a die roll, mixed verb/noun command labels and four
+less idiomatic sentences). They have **not** had independent human review. `python tools/repository_checks/checks.py localization` fails when a backend
 campaign error code has no message. Language reload of a real campaign scope requires
 a verified `engine.campaign-sync.v1` record (cursor and operation identities, no text).
 No browser journey was run for these screens; full QA-35 and independent

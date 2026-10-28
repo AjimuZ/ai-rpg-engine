@@ -287,8 +287,8 @@ independent bilingual or screen-reader acceptance.
 
 | Requirement | Delivered | Evidence | Still open |
 | --- | --- | --- | --- |
-| Operation/cursor-safe reload | `CampaignSession` persists, per adventure+campaign scope, the stream cursor and each seen operation's identity, newest version and status (`engine.campaign-sync.v1`, device storage). `UiLanguage.change` runs `verified(scope)` for every real campaign context: the record is merged with any other tab's newer cursor, written and read back byte for byte. Storage denial, a reverted write, a required restore or an unsaved draft refuse the reload. After the reload `requery` fetches unfinished (and recently saved) operations by identity and `poll` resumes the stream after the saved cursor. Messages are applied only when strictly after the cursor in the same generation (duplicates counted, not applied); `stream.reset` adopts the server head and re-queries; a generation mismatch is reported, never merged. The draft stays in `StoryInputState`; nothing is ever submitted (`Send` is disabled and no `/commands` request exists in tests). | 7 session, 3 view and 2 language-reload tests (`campaign-session.spec.ts`, `campaign-view.spec.ts`, `ui-language.spec.ts`) on a simulated server and storages | Chrome EN→IT→EN journey against the packaged origin (no browser is installed in the Linux build container); a real submit path (P05.7/P08 composer) |
-| Localized API errors and receipts | `campaign-messages.ts` maps every public `COMMAND_*`, `CAMPAIGN_*`, `STREAM_*` and `LOCAL_*` code to a `$localize` sentence; unknown, hostile or prototype-named codes fall back to one generic sentence and are never displayed. Statuses, narration reasons, reset reasons and command types are closed enumerations. Receipts render revisions, moves, elapsed seconds, own-resource changes, calculations and draws from the validated public projection; only digit grouping follows the locale, so EN and IT show identical mechanics. `tools/repository_checks` `localization` fails when a controller code has no message. | `campaign-messages.spec.ts`, `campaign-protocol.spec.ts`, `LocalizationCodeTest`; `npm run build:locales` parity (317 messages) | Human review of the Italian wording; per-pack display names for resource keys and destinations (shown as literal IDs) |
+| Operation/cursor-safe reload | `CampaignSession` persists, per adventure+campaign scope, the stream cursor and each seen operation's identity, newest version and status (`engine.campaign-sync.v1`, device storage). `UiLanguage.change` runs `verified(scope)` for every real campaign context: the record is merged with any other tab's newer cursor, written and read back byte for byte. Storage denial, a reverted write, a required restore or an unsaved draft refuse the reload. After the reload `requery` fetches unfinished (and recently saved) operations by identity and `poll` resumes the stream after the saved cursor. Messages are applied only when strictly after the cursor in the same generation (duplicates counted, not applied); `stream.reset` adopts the server head and re-queries; a generation mismatch is reported, never merged. The draft stays in `StoryInputState`; nothing is ever submitted (`Send` is disabled and no `/commands` request exists in tests). | 8 session, 3 view and 2 language-reload tests (`campaign-session.spec.ts`, `campaign-view.spec.ts`, `ui-language.spec.ts`) on a simulated server and storages; since the sixth checkpoint also a replay of real-server bytes through the routed view across EN→IT→EN with an operation in flight at reload time (`campaign-contract.spec.ts`, recorded by `CampaignInterfaceContractTest`) | Chrome EN→IT→EN journey against the packaged origin (no browser is installed in the Linux build container); a real submit path (P05.7/P08 composer) |
+| Localized API errors and receipts | `campaign-messages.ts` maps every public `COMMAND_*`, `CAMPAIGN_*`, `STREAM_*` and `LOCAL_*` code to a `$localize` sentence; unknown, hostile or prototype-named codes fall back to one generic sentence and are never displayed. Statuses, narration reasons, reset reasons and command types are closed enumerations. Receipts render revisions, moves, elapsed seconds, own-resource changes, calculations and draws from the validated public projection; only digit grouping follows the locale, so EN and IT show identical mechanics. `tools/repository_checks` `localization` fails when a controller code has no message. | `campaign-messages.spec.ts`, `campaign-protocol.spec.ts`, `LocalizationCodeTest`; `npm run build:locales` parity (317 messages); the recorded real `CAMPAIGN_SCOPE_UNAVAILABLE` reply and real MOVE receipt in `campaign-contract.spec.ts` | Independent human review of the Italian wording (an author review pass corrected 11 targets, see below); per-pack display names for resource keys and destinations (shown as literal IDs) |
 | Visible source-pack fallback | The state projection's `startingSituation.{text,locale,fallback}` is rendered with a `lang` attribute and, when `fallback` is true, a text note naming the original language. A matching-language text shows no note. Hidden catalog keys and private text are not part of the projection. | `campaign-view.spec.ts` | Fallback for later narrated passages (P08) and quest/fact text |
 | Packaged single origin (QA-35) | `/saved/<uuid>` and `/{en,it}/saved/<uuid>` serve the fixed locale indexes (canonical lowercase UUID only; deeper, uppercase, malformed and resource-like paths stay 404); opaque query/hash survive. | `PackagedInterfaceTest` (deep-link and 404 additions) | Container recreation hash comparison for the new route; Chrome journeys on the packaged origin |
 | Full QA-35 acceptance | — | — | Independent bilingual and screen-reader review of both variants; the gate cannot close without it |
@@ -301,6 +301,56 @@ a language reload, because it is re-queried by identity; this is the only change
 earlier blanket refusal. The stream is consumed with `fetch` rather than `EventSource` so
 the saved cursor can be sent explicitly on the first request after a reload and frames can
 be validated before use.
+
+Two rules were added at the sixth checkpoint. A `stream.reset` makes the server's head the
+stored cursor even when the stored value is larger: the reset declares that value unknown or
+expired, so the usual "never regress another tab's newer cursor" merge must not bring it
+back. Without this rule a cursor ahead of the head (for example after restoring an older
+database copy in the same generation) was merged back on every write and each later poll was
+reset again. And when an applied message or a reset names a newer `stateRevision` than the
+displayed state, the view re-reads the state before polling again, so an answered starting
+decision does not stay on screen after a commit.
+
+### Sixth checkpoint: recorded real-server contract (28 October 2026)
+
+Earlier evidence for reload safety came from hand-written simulated servers. This checkpoint
+adds a consumer-driven contract that uses the real backend's bytes:
+
+- **Producer.** `CampaignInterfaceContractTest` (backend, real servlet stack, PostgreSQL and the
+  background presentation worker) creates a fantasy-fixture campaign whose narrative language
+  is Italian and records every GET the interface makes, in five phases: first English load;
+  another client's MOVE plus a second command admitted but left in flight; delivery of the six
+  stream messages and the state re-read; cancellation of the in-flight command while the page
+  reloads; and the reloaded page's operation queries, resumed stream, an unknown cursor and an
+  unknown campaign. UUIDs, instants and the CSRF token are normalized; all other bytes, key
+  order, SSE framing and Italian text are the server's own. The normalized transcript must equal
+  `backend/src/test/resources/contracts/campaign-reload-transcript.json`.
+- **Consumer.** `frontend/src/app/campaign/campaign-contract.spec.ts` replays an identical copy:
+  every recorded body passes the browser validators unchanged, then the routed playthrough view,
+  `CampaignSession` and `UiLanguage` run an EN→IT→EN reload against a replaying origin that
+  answers only requests the real server answered at or before the current phase and never
+  serves the fixture's POSTs. The draft text and selection, both operation identities and the
+  cursor (`0:6` at reload, `0:7` after the cancellation) survive; the reloaded page re-queries
+  the in-flight and the receipt-less operations by identity and resumes after the saved cursor;
+  no message is applied twice and no request writes.
+- **Lock.** The repository `contracts` check fails when the two copies differ, so the suites
+  cannot test different protocol versions. After an intended protocol change, rerun the backend
+  test with `-Dengine.contract.update=true` and review both diffs.
+
+The replay found the two defects described above; each new test failed before its fix and
+passes after it. The Italian targets of the 77 campaign messages also received an author review
+pass that corrected 11 of them: `Ricevuta` (also "receipt") became `Presa in carico`; the two
+distinct narration reasons "stopped" and "interrupted" no longer share one sentence; "world
+time" is no longer the ambiguous `tempo di gioco` (play time); dice use `Tiro`, not `Estrazione`;
+command labels are consistently nouns (`Dialogo`); the move receipt reads `Destinazione
+raggiunta` and the revision line names the action (`Azione salvata`); and four sentences were
+made more idiomatic. This is not the independent bilingual
+review that QA-35 requires.
+
+What this does not establish: it runs in jsdom, not Chrome, so layout, focus rings, screen-reader
+output and the compiled Italian bundle are not exercised; wording assertions use the English
+source catalog; the replay cannot reproduce timing races beyond the recorded phases; and the page
+still has no submit path, so the in-flight operation was admitted by the fixture.
 
 ### P05.6 integration prerequisites (24 October 2026 audit)
 

@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "producer": "backend/src/test/java/org/rpgengine/commands/CampaignInterfaceContractTest.java",
+  "phases": ["first-load","actions","before-reload","during-reload","after-reload"],
+  "identities": {
+    "adventureId": "00000000-0000-4000-8000-000000000001",
+    "campaignId": "00000000-0000-4000-8000-000000000002",
+    "moveOperationId": "00000000-0000-4000-8000-000000000007",
+    "waitOperationId": "00000000-0000-4000-8000-000000000008",
+    "foreignCampaignId": "00000000-0000-4000-8000-000000000009"
+  },
+  "exchanges": [
+    {
+      "phase": "first-load",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/session",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json;charset=ISO-8859-1",
+      "body": "{\"csrfToken\":\"contract-csrf-token\"}"
+    },
+    {
+      "phase": "first-load",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/adventures/00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"title\":\"Mosslight\",\"genre\":\"fantasy\",\"sourceLocale\":\"en\",\"metadataRevision\":0,\"createdAt\":\"2026-01-01T00:00:00Z\",\"updatedAt\":\"2026-01-01T00:00:00Z\"}"
+    },
+    {
+      "phase": "first-load",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns?adventureId=00000000-0000-4000-8000-000000000001&limit=50",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"campaigns\":[{\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"title\":\"Lantern walk\",\"mode\":\"EXPLORATION\",\"stateRevision\":0,\"gameTurn\":0,\"worldTimeSeconds\":0,\"eventSequence\":0,\"updatedAt\":\"2026-01-01T00:00:00Z\",\"pendingDecisionAvailable\":true}],\"nextAfter\":null}"
+    },
+    {
+      "phase": "first-load",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/state?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"scope\":{\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"stateRevision\":0},\"campaign\":{\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"title\":\"Lantern walk\",\"mode\":\"EXPLORATION\",\"stateRevision\":0,\"gameTurn\":0,\"worldTimeSeconds\":0,\"eventSequence\":0,\"updatedAt\":\"2026-01-01T00:00:00Z\",\"pendingDecisionAvailable\":true},\"player\":{\"actorId\":\"00000000-0000-4000-8000-000000000004\",\"displayName\":\"Mara\",\"locationId\":\"trailhead\",\"attributes\":{\"awareness\":2},\"skills\":{\"fieldwork\":1},\"background\":null,\"role\":null},\"resources\":[{\"key\":\"vigor\",\"minimum\":0,\"current\":8,\"maximum\":8}],\"inventory\":[{\"itemId\":\"00000000-0000-4000-8000-000000000005\",\"definitionId\":\"kit\",\"quantity\":1}],\"abilities\":[{\"definitionId\":\"steady\",\"rank\":1}],\"knownFacts\":[],\"quests\":[],\"startingSituation\":{\"text\":\"Arrivi al riparo lungo il sentiero. Scegli se esaminare il tuo kit o seguire il sentiero fino al boschetto.\",\"locale\":\"it\",\"fallback\":false},\"pendingDecision\":{\"type\":\"STARTING_SITUATION\",\"inputMode\":\"FREE_TEXT\"}}"
+    },
+    {
+      "phase": "first-load",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "text/event-stream;charset=UTF-8",
+      "body": "retry: 1000\n\nid: 0:0\nevent: stream.ready\ndata: {\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"stateRevision\":0}\n\n"
+    },
+    {
+      "phase": "first-load",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001&after=0%3A0",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "text/event-stream;charset=UTF-8",
+      "body": "retry: 1000\n\n"
+    },
+    {
+      "phase": "actions",
+      "client": "fixture",
+      "method": "POST",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/commands?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": "{\"requestId\":\"00000000-0000-4000-8000-000000000006\",\"expectedRevision\":0,\"commandType\":\"MOVE\",\"payload\":{\"destinationId\":\"grove\"}}",
+      "status": 202,
+      "contentType": "application/json",
+      "body": "{\"operationId\":\"00000000-0000-4000-8000-000000000007\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"commandType\":\"MOVE\",\"status\":\"COMMITTED\",\"baseRevision\":0,\"committedRevision\":1,\"operationVersion\":4,\"replayed\":false,\"createdAt\":\"2026-01-01T00:00:00Z\",\"updatedAt\":\"2026-01-01T00:00:00Z\",\"receipt\":{\"stateRevision\":1,\"firstEventSequence\":1,\"lastEventSequence\":1,\"commandType\":\"MOVE\",\"elapsedSeconds\":0,\"turnAdvanced\":true,\"destinationId\":\"grove\",\"resources\":[],\"calculations\":[],\"randomDraws\":[]},\"query\":\"/api/v1/campaigns/00000000-0000-4000-8000-000000000002/operations/00000000-0000-4000-8000-000000000007?adventureId=00000000-0000-4000-8000-000000000001\",\"stream\":\"/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001\"}"
+    },
+    {
+      "phase": "before-reload",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001&after=0%3A0",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "text/event-stream;charset=UTF-8",
+      "body": "retry: 1000\n\nid: 0:1\nevent: operation.accepted\ndata: {\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"operationId\":\"00000000-0000-4000-8000-000000000007\",\"commandType\":\"MOVE\",\"status\":\"ACCEPTED\",\"operationVersion\":0,\"stateRevision\":0}\n\nid: 0:2\nevent: operation.progress\ndata: {\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"operationId\":\"00000000-0000-4000-8000-000000000007\",\"commandType\":\"MOVE\",\"status\":\"VALIDATING\",\"operationVersion\":2,\"stateRevision\":0}\n\nid: 0:3\nevent: state.committed\ndata: {\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"operationId\":\"00000000-0000-4000-8000-000000000007\",\"commandType\":\"MOVE\",\"status\":\"COMMITTED\",\"operationVersion\":4,\"stateRevision\":1,\"receipt\":{\"stateRevision\":1,\"firstEventSequence\":1,\"lastEventSequence\":1,\"commandType\":\"MOVE\",\"elapsedSeconds\":0,\"turnAdvanced\":true,\"destinationId\":\"grove\",\"resources\":[],\"calculations\":[],\"randomDraws\":[]}}\n\nid: 0:4\nevent: operation.progress\ndata: {\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"operationId\":\"00000000-0000-4000-8000-000000000007\",\"commandType\":\"MOVE\",\"status\":\"NARRATING\",\"operationVersion\":5,\"stateRevision\":1}\n\nid: 0:5\nevent: narrative.pending\ndata: {\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"operationId\":\"00000000-0000-4000-8000-000000000007\",\"commandType\":\"MOVE\",\"status\":\"COMMITTED_NARRATION_PENDING\",\"operationVersion\":6,\"stateRevision\":1,\"reason\":\"NARRATION_UNAVAILABLE\"}\n\nid: 0:6\nevent: operation.accepted\ndata: {\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"operationId\":\"00000000-0000-4000-8000-000000000008\",\"commandType\":\"WAIT\",\"status\":\"ACCEPTED\",\"operationVersion\":0,\"stateRevision\":1}\n\n"
+    },
+    {
+      "phase": "before-reload",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/state?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"scope\":{\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"stateRevision\":1},\"campaign\":{\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"title\":\"Lantern walk\",\"mode\":\"EXPLORATION\",\"stateRevision\":1,\"gameTurn\":1,\"worldTimeSeconds\":0,\"eventSequence\":1,\"updatedAt\":\"2026-01-01T00:00:00Z\",\"pendingDecisionAvailable\":false},\"player\":{\"actorId\":\"00000000-0000-4000-8000-000000000004\",\"displayName\":\"Mara\",\"locationId\":\"grove\",\"attributes\":{\"awareness\":2},\"skills\":{\"fieldwork\":1},\"background\":null,\"role\":null},\"resources\":[{\"key\":\"vigor\",\"minimum\":0,\"current\":8,\"maximum\":8}],\"inventory\":[{\"itemId\":\"00000000-0000-4000-8000-000000000005\",\"definitionId\":\"kit\",\"quantity\":1}],\"abilities\":[{\"definitionId\":\"steady\",\"rank\":1}],\"knownFacts\":[],\"quests\":[],\"startingSituation\":null,\"pendingDecision\":null}"
+    },
+    {
+      "phase": "before-reload",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001&after=0%3A6",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "text/event-stream;charset=UTF-8",
+      "body": "retry: 1000\n\n"
+    },
+    {
+      "phase": "during-reload",
+      "client": "fixture",
+      "method": "POST",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/operations/00000000-0000-4000-8000-000000000008/cancel?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": "{}",
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"operationId\":\"00000000-0000-4000-8000-000000000008\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"commandType\":\"WAIT\",\"status\":\"CANCELLED\",\"baseRevision\":1,\"committedRevision\":null,\"operationVersion\":1,\"replayed\":false,\"createdAt\":\"2026-01-01T00:00:00Z\",\"updatedAt\":\"2026-01-01T00:00:00Z\",\"receipt\":null,\"query\":\"/api/v1/campaigns/00000000-0000-4000-8000-000000000002/operations/00000000-0000-4000-8000-000000000008?adventureId=00000000-0000-4000-8000-000000000001\",\"stream\":\"/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001\",\"cancellation\":\"CANCELLED\"}"
+    },
+    {
+      "phase": "after-reload",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns?adventureId=00000000-0000-4000-8000-000000000001&limit=50",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"campaigns\":[{\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"title\":\"Lantern walk\",\"mode\":\"EXPLORATION\",\"stateRevision\":1,\"gameTurn\":1,\"worldTimeSeconds\":0,\"eventSequence\":1,\"updatedAt\":\"2026-01-01T00:00:00Z\",\"pendingDecisionAvailable\":false}],\"nextAfter\":null}"
+    },
+    {
+      "phase": "after-reload",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/state?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"scope\":{\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"stateRevision\":1},\"campaign\":{\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"title\":\"Lantern walk\",\"mode\":\"EXPLORATION\",\"stateRevision\":1,\"gameTurn\":1,\"worldTimeSeconds\":0,\"eventSequence\":1,\"updatedAt\":\"2026-01-01T00:00:00Z\",\"pendingDecisionAvailable\":false},\"player\":{\"actorId\":\"00000000-0000-4000-8000-000000000004\",\"displayName\":\"Mara\",\"locationId\":\"grove\",\"attributes\":{\"awareness\":2},\"skills\":{\"fieldwork\":1},\"background\":null,\"role\":null},\"resources\":[{\"key\":\"vigor\",\"minimum\":0,\"current\":8,\"maximum\":8}],\"inventory\":[{\"itemId\":\"00000000-0000-4000-8000-000000000005\",\"definitionId\":\"kit\",\"quantity\":1}],\"abilities\":[{\"definitionId\":\"steady\",\"rank\":1}],\"knownFacts\":[],\"quests\":[],\"startingSituation\":null,\"pendingDecision\":null}"
+    },
+    {
+      "phase": "after-reload",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/operations/00000000-0000-4000-8000-000000000008?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"operationId\":\"00000000-0000-4000-8000-000000000008\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"commandType\":\"WAIT\",\"status\":\"CANCELLED\",\"baseRevision\":1,\"committedRevision\":null,\"operationVersion\":1,\"replayed\":false,\"createdAt\":\"2026-01-01T00:00:00Z\",\"updatedAt\":\"2026-01-01T00:00:00Z\",\"receipt\":null,\"query\":\"/api/v1/campaigns/00000000-0000-4000-8000-000000000002/operations/00000000-0000-4000-8000-000000000008?adventureId=00000000-0000-4000-8000-000000000001\",\"stream\":\"/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001\"}"
+    },
+    {
+      "phase": "after-reload",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/operations/00000000-0000-4000-8000-000000000007?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"operationId\":\"00000000-0000-4000-8000-000000000007\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"commandType\":\"MOVE\",\"status\":\"COMMITTED_NARRATION_PENDING\",\"baseRevision\":0,\"committedRevision\":1,\"operationVersion\":6,\"replayed\":false,\"createdAt\":\"2026-01-01T00:00:00Z\",\"updatedAt\":\"2026-01-01T00:00:00Z\",\"receipt\":{\"stateRevision\":1,\"firstEventSequence\":1,\"lastEventSequence\":1,\"commandType\":\"MOVE\",\"elapsedSeconds\":0,\"turnAdvanced\":true,\"destinationId\":\"grove\",\"resources\":[],\"calculations\":[],\"randomDraws\":[]},\"query\":\"/api/v1/campaigns/00000000-0000-4000-8000-000000000002/operations/00000000-0000-4000-8000-000000000007?adventureId=00000000-0000-4000-8000-000000000001\",\"stream\":\"/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001\"}"
+    },
+    {
+      "phase": "after-reload",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001&after=0%3A6",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "text/event-stream;charset=UTF-8",
+      "body": "retry: 1000\n\nid: 0:7\nevent: operation.cancelled\ndata: {\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"operationId\":\"00000000-0000-4000-8000-000000000008\",\"commandType\":\"WAIT\",\"status\":\"CANCELLED\",\"operationVersion\":1,\"stateRevision\":1}\n\n"
+    },
+    {
+      "phase": "after-reload",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001&after=0%3A7",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "text/event-stream;charset=UTF-8",
+      "body": "retry: 1000\n\n"
+    },
+    {
+      "phase": "after-reload",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001&after=0%3A99",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "text/event-stream;charset=UTF-8",
+      "body": "retry: 1000\n\nid: 0:7\nevent: stream.reset\ndata: {\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"stateRevision\":1,\"reason\":\"CURSOR_UNKNOWN\"}\n\n"
+    },
+    {
+      "phase": "after-reload",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000009/state?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 404,
+      "contentType": "application/json",
+      "body": "{\"code\":\"CAMPAIGN_SCOPE_UNAVAILABLE\"}"
+    }
+  ]
+}

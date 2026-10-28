@@ -844,6 +844,25 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     drafts; there is still no submit path, so draft-plus-pending-operation reload is
     proven only on simulated servers; independent bilingual and screen-reader
     review (QA-35) is a human gate.
+  - Sixth checkpoint (28 October 2026, recorded real-server contract): the backend test
+    `CampaignInterfaceContractTest` records 19 real HTTP exchanges (servlet stack,
+    PostgreSQL, presentation worker) across first load, another client's move plus an
+    admitted command left in flight, delivery, cancellation during the language reload
+    and the reloaded page; the normalized transcript must equal its golden file on every
+    run. `campaign-contract.spec.ts` replays a byte-identical copy through all browser
+    validators and an EN→IT→EN reload of the routed view: draft text and selection, both
+    operation identities and the cursor survive, in-flight and receipt-less operations
+    are re-queried by identity, delivery resumes after the saved cursor, nothing is
+    applied twice and no request writes. A new `contracts` repository check and CI step
+    keep both copies equal. The replay exposed a reset loop (an unknown cursor merged
+    back over the adopted head) and a stale starting decision after a commit; both
+    regression tests failed before and pass after the fixes. An author review corrected
+    11 Italian campaign targets. Verified: 72 frontend tests, strict typecheck, four
+    localization checker tests, parity build (317 messages), 436 packaged backend tests
+    with zero failures/errors/skips, 26 repository tests and zero findings in all six
+    checks. Still unchecked: the replay runs in jsdom, not Chrome, so no browser or
+    packaged-container journey ran (no browser in the Linux container); independent
+    Italian and screen-reader review and the QA-35 sign-off are human gates.
 - [ ] P05.7 Define and render bounded typed public presentation events for scene, pose/expression and optional line audio hooks; reject executable/raw-URL directives, deduplicate delivery and preserve text-only/keyboard/reduced-motion behavior under QA-40.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.

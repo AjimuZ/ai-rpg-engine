@@ -46,6 +46,12 @@ Selecting a playthrough adds `src/app/campaign/`: the authorized state (starting
 situation with an explicit source-language note), operations and receipts re-queried by
 identity, a resumable stream follower with bounded backoff, localized error codes and a
 persistent scoped draft. Nothing is submitted; the saved cursor survives language reload.
+A newer `stateRevision` on an applied message or reset makes the view re-read the state.
+`campaign-contract.spec.ts` replays real backend replies recorded by the backend test
+`CampaignInterfaceContractTest` (`contract/campaign-reload-transcript.json`, kept identical
+to the backend golden file by the repository `contracts` check) through the validators and an
+EN→IT→EN reload with an operation in flight; see the
+[sixth checkpoint](../docs/29-localization.md#sixth-checkpoint-recorded-real-server-contract-28-october-2026).
 P05.5 adds `/interface-kit`, linked from Settings, for the shared original MIT
 SVG/CSS theme: control states, 20 icons, bounded numeric meters, progress,
 dialogue/portrait/item frames, empty slots and independent sample item artwork.
@@ -73,7 +79,7 @@ reload restores the supported layout, size and known passage indexes. Storage
 failures retain the in-memory view with a Settings notice and block language reload.
 Separate review variants cover English and Italian with safe persisted language
 reload in both the review harness and packaged locale variants. These samples have no operation or
-stream cursor; real campaign contexts block reload pending transport reconciliation.
+stream cursor; real campaign contexts reload only after their operation/cursor record verifies.
 Safe presentation events remain P05.7. No submitted player dialogue is fabricated.
 
 P05.3 adds a Settings layout choice: default scene-led visual novel or a narrow

@@ -683,3 +683,21 @@ suites pass with zero failures/errors/skips, and the executable jar is packaged.
 Configured frontend checks, EN/IT builds, 22 repository policy tests, zero-finding scans
 and the offline backup tests also pass. See
 [evidence scope](../docs/15-quality-and-acceptance.md).
+
+## Interface reload contract (P05.6)
+
+`commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.
+In its own discarded context (worker enabled, 200 ms stream holds) it creates a fantasy-fixture
+campaign narrating in Italian, records the exact GET replies the bilingual interface receives
+across five phases (first load, another client's move plus one admitted command left in flight,
+delivery, cancellation during the language reload, reloaded page) and compares the normalized
+transcript with `src/test/resources/contracts/campaign-reload-transcript.json`. UUIDs become
+`00000000-0000-4000-8000-<ordinal>` in order of first appearance, instants become
+`2026-01-01T00:00:00Z` and the CSRF token a fixed placeholder; every other byte is the
+server's. Each run also writes `target/contracts/campaign-reload-transcript.json`.
+
+The frontend replays a byte-identical copy (`frontend/src/app/campaign/contract/`), and the
+repository `contracts` check keeps the two equal. After an intended protocol change run
+`mvn test -Dtest=CampaignInterfaceContractTest -Dengine.contract.update=true` (it rewrites
+both copies in a full checkout; the verification image carries only the backend copy), review
+the diffs, then run the frontend tests.
