@@ -29,7 +29,8 @@
 - Pass 52 new cases and all 666 packaged backend tests in 67 suites with zero
   failures/errors/skips; 21 deliberate weakening probes were detected. Planner output is
   scripted in these checks: no live planner ran, and the paired narrative-quality comparison
-  is deferred (it does not block the playable MVP).
+  is deferred (it does not block the playable MVP). Record implementation owner commit
+  `a984b05` before marking P08.7 complete (53 of 131 roadmap entries).
 
 ## Unreleased — Durable fair inference scheduling, 28 October 2026
 

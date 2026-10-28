@@ -78,6 +78,9 @@ Not verified:
 - secret authored definitions with text;
 - speculative preparation, world direction and plan review.
 
+The implementation owner commit is `a984b05`. Every check above passed on its exact
+sources, and only P08.7 then gains a completion mark (53 of 131 roadmap entries).
+
 P08.6 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **31 new cases (10 in `FairQueueTest`, 15 in `InferenceSchedulerTest`, 3 in
 `SchedulerBoundaryTest`, 2 in `CodexTaskAdapterTest`, one in `TaskPortSelectionTest`) and all
