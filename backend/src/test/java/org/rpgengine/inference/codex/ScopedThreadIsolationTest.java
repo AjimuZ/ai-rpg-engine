@@ -6,7 +6,6 @@ import java.time.Duration;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -44,7 +43,7 @@ class ScopedThreadIsolationTest {
     private ScopedSessions sessions;
 
     private void start() throws InterruptedException {
-        adapter = new CodexTaskAdapter(CodexTaskAdapterTest.settings(4), slot -> Optional.ofNullable(slots.get(slot)),
+        adapter = new CodexTaskAdapter(CodexTaskAdapterTest.settings(4), CodexTaskAdapterTest.resolver(slots::get),
                 server::memoryWire);
         adapter.start();
         ScriptedAppServer.await(() -> adapter.status().state() != RuntimeStatus.State.STARTING);

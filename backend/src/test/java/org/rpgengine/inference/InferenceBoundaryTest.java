@@ -88,7 +88,8 @@ class InferenceBoundaryTest {
     void neutralApiUsesOnlyJdkAndNeutralTypes() {
         List<Class<?>> api = List.of(NarrationTaskPort.class, TaskHandle.class, TaskRequest.class, TaskResult.class,
                 TaskResult.Provenance.class, RuntimeStatus.class, SlotAssignments.class, EffectiveSettings.class,
-                InferenceSlot.class);
+                InferenceSlot.class, SlotAssignment.class, ModelAllowlist.class, ProfileResolver.class,
+                ProfileResolver.Resolved.class, ProfileResolver.Refused.class);
         List<String> foreign = new ArrayList<>();
         for (Class<?> type : api) {
             List<Class<?>> used = new ArrayList<>();

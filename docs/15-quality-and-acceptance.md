@@ -1,5 +1,35 @@
 # Quality Strategy and Acceptance Criteria
 
+P08.4 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
+**26 new cases (14 in `ProfileResolverTest`, 5 in `ProfileSettingsTest`, 6 in
+`CodexProfileResolutionTest`, one in the Spring selection suite) and all 574 packaged backend
+cases in 59 suites**, with zero failures, errors or skips; with the existing adapter, wire,
+boundary and session suites the focused set has 85 cases. The executable jar is packaged.
+All use deterministic doubles, including the real Codex adapter against the scripted
+app-server:
+
+- the resolver is exercised without a runtime: per-slot resolution with no inherited setting
+  after an expensive task, an unassigned slot, a slot of another backend, the discovered
+  catalog and allowlist gates (each alone, together, and an allowlist that cannot make an
+  undiscovered pair usable), an allowlist acting as the catalog of a backend without one,
+  ordered owner-approved degradation with its provenance, `fixedQuality`, reassignment taking
+  effect on the next call, and value-free validation of notation, backends and counts;
+- settings parsing and Spring wiring: slot backend defaults, alternatives, allowlists and
+  `fixed-quality`, with malformed values failing startup without echoing them;
+- through the real adapter: an owner reassignment between two turns of one thread is sent
+  explicitly on the next `turn/start`, an approved alternative runs and is recorded in
+  provenance, and unsupported, allowlist-narrowed and other-backend slots are refused with no
+  `thread/start` or `turn/start`;
+- thirteen deliberate weakening probes (unchecked backend, ignored `fixedQuality`, ignored
+  allowlist, ignored discovered catalog, unreported degradation, skipped alternatives,
+  accepted missing catalog, reversed preference, adapter catalog bypass, dropped provenance,
+  wrong adapter backend name, ignored slot backend and ignored alternatives setting) each made
+  the focused run fail and were reverted byte-identically.
+
+Not verified: a live runtime or account catalog, the Claude and local backends (P20, P21),
+the owner settings API and panel, the `image` slot and per-slot readiness probes (P21.3).
+Profile resolution is configuration-only until then.
+
 P08.3 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **23 new cases (22 in five new suites, one in the Spring selection suite) and all 548
 packaged backend cases in 56 suites**, with zero failures, errors or skips. Rerun with the

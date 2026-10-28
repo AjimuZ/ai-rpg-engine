@@ -16,7 +16,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
@@ -185,7 +184,7 @@ class UnixSocketFrameWireTest {
                 base.runtimeCwd(), 2, base.requestTimeout(), base.handshakeTimeout(), base.interruptTimeout(),
                 base.reconnectInitial(), base.reconnectMax(), base.stdioGrace(), base.maxSessions());
         CodexTaskAdapter adapter = new CodexTaskAdapter(settings,
-                slot -> Optional.of(new EffectiveSettings("model-a", "medium")), settings.wireFactory());
+                CodexTaskAdapterTest.resolver(slot -> new EffectiveSettings("model-a", "medium")), settings.wireFactory());
         adapter.start();
         try {
             ScriptedAppServer.await(() -> adapter.status().state() == RuntimeStatus.State.READY);

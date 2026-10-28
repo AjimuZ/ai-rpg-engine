@@ -54,9 +54,17 @@ public record TaskResult(UUID taskId, Status status, String output, String error
      * @param runtimeVersion pinned runtime version
      * @param model effective model sent on the turn
      * @param effort effective reasoning effort sent on the turn
+     * @param degradedFrom the owner's preferred pair when an owner-approved alternative ran
+     *        because the preferred pair was unsupported (P08.4); null when the preferred pair ran
      */
-    public record Provenance(String runtime, String runtimeVersion, String model, String effort) {
-        /** Require every component. */
+    public record Provenance(String runtime, String runtimeVersion, String model, String effort,
+            EffectiveSettings degradedFrom) {
+        /** Provenance of a turn that ran the owner's preferred pair. */
+        public Provenance(String runtime, String runtimeVersion, String model, String effort) {
+            this(runtime, runtimeVersion, model, effort, null);
+        }
+
+        /** Require every component except {@code degradedFrom}. */
         public Provenance {
             Objects.requireNonNull(runtime, "runtime");
             Objects.requireNonNull(runtimeVersion, "runtimeVersion");

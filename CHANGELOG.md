@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — Model selection through the owner's slot assignment, 28 October 2026
+
+- Resolve each AI task's logical profile (`light`, `standard`, `deliberate`) through the
+  owner's slot assignment: a backend, a preferred model and effort and up to four approved
+  alternatives per slot. The engine sets the resolved model and effort explicitly on every
+  turn, so a costly earlier task or an owner change between two turns of one conversation
+  never leaves a later task with an inherited setting.
+- Check the assigned pair against the backend's own model list and the owner's approved list
+  (`engine.inference.allowlist.<backend>`). A backend that cannot list models is limited to
+  the approved list. An unassigned slot, a slot assigned to another backend, a missing
+  catalog or an unsupported pair ends the task with a fixed code before anything is sent, and
+  the engine never moves work to another provider or billing class.
+- Use an approved alternative only when the preferred pair is unsupported, and record the
+  preferred pair with the result. Add the owner-selected fixed-quality setting
+  (`engine.inference.fixed-quality`), which sends every task through one slot.
+- Pass 85 focused cases, 26 of them new, and all 574 packaged backend tests in 59 suites
+  with zero failures/errors/skips; thirteen deliberate weakening probes were detected. No
+  live account or runtime was contacted, and the owner settings panel remains P21.3.
+
 ## Unreleased — Separate AI sessions per campaign, role, audience and policy, 28 October 2026
 
 - Give every AI task its own session for its campaign, recovery generation, role, audience

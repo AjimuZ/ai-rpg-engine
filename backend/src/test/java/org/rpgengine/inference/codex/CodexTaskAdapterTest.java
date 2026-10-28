@@ -10,10 +10,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.rpgengine.inference.EffectiveSettings;
+import org.rpgengine.inference.ModelAllowlist;
+import org.rpgengine.inference.ProfileResolver;
+import org.rpgengine.inference.SlotAssignment;
 import org.rpgengine.inference.InferenceSlot;
 import org.rpgengine.inference.RuntimeStatus;
 import org.rpgengine.inference.TaskHandle;
@@ -39,6 +43,12 @@ class CodexTaskAdapterTest {
     private volatile boolean unreachable;
     private CodexTaskAdapter adapter;
 
+    /** Resolver over fixed per-slot pairs on the {@code codex} backend, with no allowlist. */
+    static ProfileResolver resolver(Function<InferenceSlot, EffectiveSettings> pairs) {
+        return new ProfileResolver(slot -> Optional.ofNullable(pairs.apply(slot))
+                .map(settings -> SlotAssignment.of("codex", settings)), ModelAllowlist.empty(), Optional.empty());
+    }
+
     static CodexSettings settings(int capacity) {
         return new CodexSettings(CodexSettings.Transport.UNIX, Path.of("/unused"), List.of(), null,
                 CodexSettings.DEFAULT_RUNTIME_CWD, capacity, Duration.ofSeconds(2), Duration.ofSeconds(2),
@@ -46,7 +56,7 @@ class CodexTaskAdapterTest {
     }
 
     private CodexTaskAdapter start(int capacity) throws InterruptedException {
-        adapter = new CodexTaskAdapter(settings(capacity), slot -> Optional.ofNullable(slots.get(slot)), () -> {
+        adapter = new CodexTaskAdapter(settings(capacity), resolver(slots::get), () -> {
             if (unreachable) {
                 throw new WireException("runtime-unreachable");
             }

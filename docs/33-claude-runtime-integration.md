@@ -97,7 +97,7 @@ The adapter checks that `structured_output` exists, then runs the engine's struc
 
 ## 8. Models, effort and cost
 
-Logical profiles resolve against an owner-approved allowlist of model identifiers kept in private settings. A neutral readiness task proves that each identifier and effort works. An unsupported pair fails the task clearly and never falls back to another model. Reported cost (`total_cost_usd`) is a client-side estimate: in subscription mode it is a usage indicator and not a bill. It is recorded for diagnostics and never used to infer remaining quota.
+Logical profiles resolve against an owner-approved allowlist of model identifiers kept in private settings. A neutral readiness task proves that each identifier and effort works. An unsupported pair fails the task clearly and never falls back to a model the owner has not listed in that slot's `alternatives` ([P08.4 resolution](06-codex-integration.md#p084-profile-resolution); the allowlist setting is `engine.inference.allowlist.claude`, in `model@effort` entries). Reported cost (`total_cost_usd`) is a client-side estimate: in subscription mode it is a usage indicator and not a bill. It is recorded for diagnostics and never used to infer remaining quota.
 
 ## 9. Limits and errors
 

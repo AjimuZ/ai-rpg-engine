@@ -23,4 +23,22 @@ public record EffectiveSettings(String model, String effort) {
             throw new IllegalArgumentException("invalid model or effort identifier");
         }
     }
+
+    /**
+     * Parse the private-settings notation {@code model@effort} (neither part may contain
+     * {@code @}, which is outside the model alphabet).
+     *
+     * @param entry notation to parse
+     * @return the settings it names
+     * @throws IllegalArgumentException when the notation is malformed; the message never echoes
+     *         {@code entry}, because settings are private owner data
+     */
+    public static EffectiveSettings parse(String entry) {
+        Objects.requireNonNull(entry, "entry");
+        int at = entry.indexOf('@');
+        if (at < 0 || at != entry.lastIndexOf('@')) {
+            throw new IllegalArgumentException("expected model@effort");
+        }
+        return new EffectiveSettings(entry.substring(0, at).strip(), entry.substring(at + 1).strip());
+    }
 }

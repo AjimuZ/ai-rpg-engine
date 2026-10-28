@@ -7,7 +7,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -19,7 +18,7 @@ import org.rpgengine.inference.CompletedTaskHandle;
 import org.rpgengine.inference.EffectiveSettings;
 import org.rpgengine.inference.NarrationTaskPort;
 import org.rpgengine.inference.RuntimeStatus;
-import org.rpgengine.inference.SlotAssignments;
+import org.rpgengine.inference.ProfileResolver;
 import org.rpgengine.inference.TaskHandle;
 import org.rpgengine.inference.TaskRequest;
 import org.rpgengine.inference.TaskResult;
@@ -45,7 +44,8 @@ import tools.jackson.databind.json.JsonMapper;
  * replaced with exponential backoff; logical sessions bound to threads of an earlier generation
  * are resumed ({@code thread/resume}) before their next turn.
  *
- * <p>Per task: the slot resolves to explicit settings that must exist in the discovered catalog;
+ * <p>Per task: {@link ProfileResolver} resolves the slot through the owner's assignment to explicit
+ * settings that must exist in the discovered catalog (and the owner's allowlist, when set);
  * the logical session maps to a persistent read-only thread (started on first use); the turn
  * is started with explicit model, effort, approval, sandbox and output schema; its events are
  * correlated by exact thread and turn identity; output is returned only after a confirmed
@@ -79,7 +79,7 @@ final class CodexTaskAdapter implements NarrationTaskPort, SmartLifecycle {
     }
 
     private final CodexSettings settings;
-    private final SlotAssignments slots;
+    private final ProfileResolver profiles;
     private final WireFactory wires;
     private final JsonMapper json = JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
             .build();
@@ -103,12 +103,12 @@ final class CodexTaskAdapter implements NarrationTaskPort, SmartLifecycle {
 
     /**
      * @param settings validated settings
-     * @param slots owner slot assignment
+     * @param profiles resolves each task's slot to explicit settings (P08.4)
      * @param wires wire factory for each new generation
      */
-    CodexTaskAdapter(CodexSettings settings, SlotAssignments slots, WireFactory wires) {
+    CodexTaskAdapter(CodexSettings settings, ProfileResolver profiles, WireFactory wires) {
         this.settings = Objects.requireNonNull(settings, "settings");
-        this.slots = Objects.requireNonNull(slots, "slots");
+        this.profiles = Objects.requireNonNull(profiles, "profiles");
         this.wires = Objects.requireNonNull(wires, "wires");
         this.queue = new ArrayBlockingQueue<>(settings.queueCapacity());
         int maxSessions = settings.maxSessions();
@@ -391,16 +391,13 @@ final class CodexTaskAdapter implements NarrationTaskPort, SmartLifecycle {
             finish(job, TaskResult.withoutTurn(id, Status.TIMED_OUT, "expired-in-queue"));
             return;
         }
-        Optional<EffectiveSettings> assigned = slots.resolve(request.slot());
-        if (assigned.isEmpty()) {
-            finish(job, TaskResult.withoutTurn(id, Status.FAILED, "slot-unassigned"));
+        // Resolved afresh for every task: nothing is inherited from an earlier turn or thread.
+        ProfileResolver.Resolution resolution = profiles.resolve(request.slot(), RUNTIME, catalog::supports);
+        if (!(resolution instanceof ProfileResolver.Resolved resolved)) {
+            finish(job, TaskResult.withoutTurn(id, Status.FAILED, ((ProfileResolver.Refused) resolution).code()));
             return;
         }
-        EffectiveSettings effective = assigned.get();
-        if (!catalog.supports(effective)) {
-            finish(job, TaskResult.withoutTurn(id, Status.FAILED, "slot-unsupported"));
-            return;
-        }
+        EffectiveSettings effective = resolved.settings();
         JsonNode schema;
         try {
             schema = json.readTree(request.outputSchema());
@@ -412,7 +409,7 @@ final class CodexTaskAdapter implements NarrationTaskPort, SmartLifecycle {
             return;
         }
         TaskResult.Provenance provenance = new TaskResult.Provenance(RUNTIME, CodexProtocol.SUPPORTED_VERSION,
-                effective.model(), effective.effort());
+                effective.model(), effective.effort(), resolved.degradedFrom());
         RpcGeneration current = generation;
 
         // Bind the logical session to a thread on this generation.

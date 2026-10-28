@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -48,7 +47,7 @@ class StdioFrameWireTest {
     void adapterCompletesATaskOverAnOwnedChildAndClosesItsInput() throws Exception {
         CodexSettings settings = settings(command());
         CodexTaskAdapter adapter = new CodexTaskAdapter(settings,
-                slot -> Optional.of(new EffectiveSettings("model-a", "medium")), settings.wireFactory());
+                CodexTaskAdapterTest.resolver(slot -> new EffectiveSettings("model-a", "medium")), settings.wireFactory());
         adapter.start();
         try {
             ScriptedAppServer.await(() -> adapter.status().state() != RuntimeStatus.State.STARTING);

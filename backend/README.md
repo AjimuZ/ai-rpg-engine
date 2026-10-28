@@ -743,7 +743,7 @@ in [docs/06](../docs/06-codex-integration.md#p081-production-adapter).
 | `engine.inference.codex.reconnect-initial` / `reconnect-max` | `1s` / `30s` | Reconnect backoff |
 | `engine.inference.codex.stdio-grace` | `2s` | Wait after closing child input and after each escalation step |
 | `engine.inference.codex.max-sessions` | `256` | Session bindings kept (least recently used forgotten) |
-| `engine.inference.slots.<light\|standard\|deliberate>.model` / `.effort` | none | Private slot assignment; both or neither |
+| `engine.inference.slots.<light\|standard\|deliberate>.model` / `.effort` | none | Private slot assignment; both or neither. Optional `.backend` and `.alternatives` are described under P08.4 below |
 
 Tests use deterministic doubles only: `ScriptedAppServer` (fixture-shaped responses and
 events, shared daemon state across connections; never selectable), its child-process form
@@ -853,3 +853,25 @@ repository `contracts` check keeps the two equal. After an intended protocol cha
 `mvn test -Dtest=CampaignInterfaceContractTest -Dengine.contract.update=true` (it rewrites
 both copies in a full checkout; the verification image carries only the backend copy), review
 the diffs, then run the frontend tests.
+
+## Profile resolution through the owner's slot assignment (P08.4)
+
+`ProfileResolver` (neutral `org.rpgengine.inference`) resolves each task's logical slot to the
+explicit model and effort of one turn, for every task and with no state carried between tasks.
+The order, error codes and limits are in
+[docs/06](../docs/06-codex-integration.md#p084-profile-resolution); the Codex adapter only
+passes its discovered `model/list` catalog and its backend name.
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `engine.inference.backend` | `codex` | Backend of every slot that names none (the default-runtime role of `NARRATION_RUNTIME`) |
+| `engine.inference.slots.<slot>.backend` | `engine.inference.backend` | `codex`, `claude`, `local`, `openai-compatible` or `anthropic-api`; an assigned slot served by another backend ends `slot-backend-mismatch` |
+| `engine.inference.slots.<slot>.alternatives` | none | Owner-approved, same-backend `model@effort` list (at most 4) used in order when the preferred pair is unsupported; the run is flagged by `Provenance.degradedFrom` |
+| `engine.inference.allowlist.<backend>` | none | Owner-approved `model@effort` list (at most 256): the catalog of a backend that cannot enumerate models, and a narrowing of a discovered catalog |
+| `engine.inference.fixed-quality` | none | `light`, `standard` or `deliberate`: every request resolves through that slot |
+
+Refusals (`slot-unassigned`, `slot-backend-mismatch`, `catalog-unavailable`,
+`slot-unsupported`) end the task `FAILED` before any thread or turn exists. Malformed settings
+fail startup without echoing a value. Tests: `ProfileResolverTest`, `ProfileSettingsTest`,
+`CodexProfileResolutionTest` (through the real adapter and the scripted app-server) and the
+wiring case in `TaskPortSelectionTest`.

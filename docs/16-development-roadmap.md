@@ -1396,7 +1396,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     schema, 1–180 s budget), `TaskResult` (status, untrusted output, fixed error code,
     runtime/version/model/effort provenance, fresh-session flag), `RuntimeStatus` and
     `SlotAssignments` with interim configuration-backed settings (no shipped model names;
-    P08.4 replaces them). `UnavailableTaskPort` is the default when no runtime is configured;
+    P08.4 resolves them against the backend catalog). `UnavailableTaskPort` is the default when no runtime is configured;
     the `narrationRuntime` health component is UP only for a READY runtime.
   - Package B — Codex wires and generation: package-private `org.rpgengine.inference.codex`
     with the packaged Unix-socket WebSocket client (`UnixRelay.java` rules) and the owned
@@ -1531,6 +1531,33 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     131 task identities/titles and the pending P98 follow-up are preserved; only P08.3
     gains a completion mark.
 - [ ] P08.4 Resolve logical profiles through the owner's slot assignment (backend and model per slot, ADR 0021) against the assigned backend's catalog or approved allowlist, and set effective settings on every turn.
+  - Package A — owner assignment: `SlotAssignments` returns a `SlotAssignment` per text slot
+    (backend from the closed ADR 0021 text set, preferred model and effort, at most four
+    owner-approved same-backend alternatives). Private settings
+    `engine.inference.slots.<slot>.model`/`.effort`/`.backend`/`.alternatives` (the backend
+    defaults to `engine.inference.backend`, itself `codex`); half-assigned slots, unknown
+    backends and malformed or duplicate pairs fail startup without echoing a value.
+  - Package B — resolver: `ProfileResolver` applies, for every task and with no carried state,
+    the owner's `fixedQuality` slot (`engine.inference.fixed-quality`), the assignment
+    (`slot-unassigned`), the backend match (`slot-backend-mismatch`, never rerouting across
+    providers or classes), a catalog source (`catalog-unavailable`) and then the preferred pair
+    and the approved alternatives in order against the discovered catalog and the owner's
+    allowlist `engine.inference.allowlist.<backend>` (`slot-unsupported`). A degraded run is
+    recorded as `Provenance.degradedFrom`.
+  - Package C — adapter integration: the Codex adapter passes its discovered `model/list`
+    catalog and backend name and sends the resolved model and effort in `thread/start` and in
+    every `turn/start`; refusals end `FAILED` before any thread or turn exists. See
+    [docs/06 section 9](06-codex-integration.md#p084-profile-resolution).
+  - Exit checks: resolver tests (per-slot resolution without inheritance, unassigned slot,
+    backend mismatch, discovered-catalog and allowlist gates, allowlist-only backend,
+    ordered approved degradation and its provenance, `fixedQuality`, live reassignment,
+    value-free validation errors); settings parsing and Spring wiring tests; the real Codex
+    adapter against the scripted app-server (explicit settings per turn, reassignment between
+    turns of one thread, degradation, allowlist narrowing, backend mismatch and
+    `fixedQuality`, each refusal sending no thread or turn); the neutral-API boundary test;
+    deliberate weakening probes; the full packaged backend and repository checks. The owner
+    settings API and panel, advisor and readiness probes (P21.3), the `image` slot, the Claude
+    and local adapters (P20, P21) and a live-account catalog check are not part of this task.
 - [ ] P08.5 Publish only validated final narration; add deterministic receipt fallback and narration-only retry.
 - [ ] P08.6 Implement one durable fair priority queue with isolated logical role/audience threads, interactive reservations, bounded quota/backoff/cancel/restart handling and conservative single-active-turn default; higher concurrency requires P01.7 evidence and QA-37.
 - [ ] P08.7 Add the versioned bounded quest-plan contract and selective dependency validation/replanning with a playable no-plan baseline; prove contract/admission/fallback with deterministic fixtures. A live investigation comparison may be deferred/unavailable without blocking MVP; no forced player choice or waiting for a whole arc.

@@ -1,6 +1,6 @@
 package org.rpgengine.inference.codex;
 
-import org.rpgengine.inference.SlotAssignments;
+import org.rpgengine.inference.ProfileResolver;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,12 +18,12 @@ import org.springframework.core.env.Environment;
 class CodexConfiguration {
     /**
      * @param environment source of {@code engine.inference.codex.*}
-     * @param slots owner slot assignment
+     * @param profiles resolves each task's slot against the owner's assignment and the catalog
      * @return the adapter; Spring starts and stops it as a {@code SmartLifecycle}
      */
     @Bean
-    CodexTaskAdapter codexTaskAdapter(Environment environment, SlotAssignments slots) {
+    CodexTaskAdapter codexTaskAdapter(Environment environment, ProfileResolver profiles) {
         CodexSettings settings = CodexSettings.from(environment);
-        return new CodexTaskAdapter(settings, slots, settings.wireFactory());
+        return new CodexTaskAdapter(settings, profiles, settings.wireFactory());
     }
 }

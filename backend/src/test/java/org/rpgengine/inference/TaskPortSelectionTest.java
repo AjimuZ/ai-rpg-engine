@@ -82,7 +82,7 @@ class TaskPortSelectionTest {
                     assertThat(context.getBean(GameplayHealthIndicator.class).health().getStatus())
                             .isEqualTo(Status.UNKNOWN);
                     assertThat(context.getBean(SlotAssignments.class).resolve(InferenceSlot.STANDARD))
-                            .contains(new EffectiveSettings("model-a", "medium"));
+                            .contains(SlotAssignment.of("codex", new EffectiveSettings("model-a", "medium")));
                 });
     }
 
@@ -97,5 +97,26 @@ class TaskPortSelectionTest {
         runner.withPropertyValues("engine.inference.slots.light.model=private-model-name").run(context -> assertThat(
                 context).hasFailed().getFailure().hasStackTraceContaining("slot light needs both model and effort")
                 .satisfies(failure -> assertThat(failure.toString()).doesNotContain("private-model-name")));
+    }
+
+    @Test
+    void profileResolverIsWiredFromOwnerSettingsAndRefusesAnInvalidFixedQuality() {
+        runner.withPropertyValues("engine.inference.fixed-quality=Deliberate",
+                "engine.inference.slots.deliberate.model=model-b", "engine.inference.slots.deliberate.effort=high",
+                "engine.inference.allowlist.codex=model-b@high").run(context -> {
+                    ProfileResolver resolver = context.getBean(ProfileResolver.class);
+                    // Every request resolves through the fixed-quality slot, against the codex allowlist.
+                    assertThat(resolver.resolve(InferenceSlot.LIGHT, "codex", pair -> true))
+                            .isEqualTo(new ProfileResolver.Resolved(InferenceSlot.DELIBERATE,
+                                    new EffectiveSettings("model-b", "high"), null));
+                    assertThat(resolver.resolve(InferenceSlot.LIGHT, "codex", pair -> false))
+                            .isEqualTo(new ProfileResolver.Refused("slot-unsupported"));
+                });
+        runner.withPropertyValues("engine.inference.fixed-quality=secret-profile").run(context -> assertThat(context)
+                .hasFailed().getFailure().hasStackTraceContaining("fixed-quality must be light, standard or deliberate")
+                .satisfies(failure -> assertThat(failure.toString()).doesNotContain("secret-profile")));
+        runner.withPropertyValues("engine.inference.allowlist.codex=secret-model").run(context -> assertThat(context)
+                .hasFailed().getFailure().hasStackTraceContaining("allowlist of backend codex is malformed")
+                .satisfies(failure -> assertThat(failure.toString()).doesNotContain("secret-model")));
     }
 }
