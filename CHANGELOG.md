@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — Checkpoints, source-linked summaries and bounded memory jobs (P09.3), 28 October 2026
+
+- Operational checkpoints: a deterministic snapshot of canonical state (counters, pending
+  decision, actors and real locations, resources, items, abilities, quests, open commitments,
+  operations awaiting narration, and the RNG cursor without its seed) with a hash computed in
+  PostgreSQL. A checkpoint is taken only at a safe boundary, never during a commit, is verified
+  against storage and current state, and at most eight are kept per campaign. A background
+  maintenance pass keeps them current.
+- Continuity summaries for the public and privileged audiences, written by a new `summary`
+  task contract in the campaign's language. Each summary records exactly which events it
+  covers, every knowledge record it was given with that record's version, the entities it
+  names, and the generation, locale and glossary it was written under. The contract rejects
+  invented coverage, dropped promises, unlabelled rumors, ungrounded numbers or quotations and
+  leaked secrets.
+- Freshness: a summary becomes stale after a restore, a language or glossary change, a change
+  to any record it used (a revised belief, a determined claim, a resolved promise) or an
+  explicit invalidation such as a future correction. A stale summary never enters an AI
+  context; a usable one enters only as an optional, labelled `summary` item that current state
+  overrides.
+- Bounded background jobs: one pending summary job per campaign and audience, an
+  installation-wide cap, fenced leases, limited retries with backoff, recovery of expired work,
+  cancellation after a restore, and no automatic retry of a range that already failed. Summaries
+  are off by default (`engine.memory.summaries.enabled`) until session renewal uses them; a
+  missing or failed summary never blocks play.
+- Migration V16 adds `memory_summary_job`, `memory_summary`, `memory_invalidation` and the
+  snapshot function; the database backup tool now covers the V16 scope.
+
 ## Unreleased — Early runtime approval requests fail their turn at once, 28 October 2026
 
 - The AI runtime can ask for an approval or a tool call right after it acknowledges a new

@@ -817,7 +817,9 @@ rules are in [docs/06 section 7](../docs/06-codex-integration.md#p083-session-sc
 | `engine.inference.sessions.capacity` | `256` | Active scoped sessions (1–4096); the least recently used is retired |
 
 The registry is in memory, like the adapter's thread bindings, so a backend restart starts
-every scope on a fresh thread. Durable session records and renewal triggers are P09.3/P09.4.
+every scope on a fresh thread. Durable session records and renewal triggers are P09.4; the
+operational checkpoints they will reference exist since P09.3 (see "Memory checkpoints and
+continuity summaries").
 
 Tests use deterministic doubles only and need no database:
 
@@ -1066,3 +1068,57 @@ Tests:
   and the planning pipeline with a scripted planner): audience filtering, standings, the
   overflow boundary, ID and English/Italian full-text retrieval beyond the window, glossary
   binding, staleness and withheld phrases.
+
+## Memory checkpoints and continuity summaries (P09.3)
+
+`org.rpgengine.memory` keeps operational checkpoints and audience-scoped, source-linked
+continuity summaries (migration V16). None of it writes canonical state. The design is in
+[docs/08](../docs/08-memory-and-continuity.md#p093-checkpoints-summaries-freshness-and-bounded-jobs).
+
+- **`OperationalCheckpoints`:** `capture(campaign)` stores the `jsonb` snapshot of the database
+  function `memory_operational_snapshot` in `campaign_checkpoint` with a SQL-computed SHA-256 of
+  its canonical text. It returns `CAPTURED`, `EXISTING`, `UNSAFE_BOUNDARY` (a live mutation lease
+  or a `COMMITTING` operation; nothing written) or `MISMATCH`. `verify(campaign)` returns `NONE`,
+  `CORRUPT`, `UNSUPPORTED`, `INCOMPATIBLE`, `DIVERGED`, `OUTDATED` or `VALID`; `latest` and
+  `prune` complete it. The snapshot never contains the RNG seed.
+- **`MemorySummaries`:** `request(campaign, audience, force)` applies the request policy
+  (interval of significant actions, scene boundary, one pending job per audience, no automatic
+  retry of a failed range, installation-wide cap). `recover`, `claim`, `fail` and `record`
+  manage fenced job attempts. `freshness(summary)` returns `CURRENT`, `BEHIND` or `STALE` with
+  reasons, `usableWithin` gives the assembler the newest summary that is not stale, and
+  `invalidate(campaign, reason, refs)` records an explicit invalidation.
+- **`ContinuitySummarizer.processNext(holder)`:** recovers, claims one job, assembles the
+  audience's envelope (`ContextAssembler.Request` with `summaries = false`), runs the `summary` or
+  `summary-privileged` contract (`SummaryContract`, `ai-contract/1/summary.schema.json`) as
+  `CONTINUITY` work through the fair scheduler, and records the result after a source recheck.
+- **`ContextAssembler`:** a usable summary is an optional `history` item with standing
+  `summary`; `Request` gained a trailing `summaries` flag (the 10-argument constructor keeps it
+  on).
+- **`MemoryWorker`:** one daemon thread with bounded passes (checkpoints for at most 16
+  campaigns, then, when summaries are enabled, public summary requests for at most 16 campaigns
+  and one job).
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `engine.memory.worker.enabled` | `true` | Run the maintenance thread (the test configuration sets `false`) |
+| `engine.memory.worker.poll-ms` | `5000` | Delay between passes, 100–300,000 ms |
+| `engine.memory.checkpoint-retention` | `8` | Newest checkpoints kept per campaign, 2–64 |
+| `engine.memory.summaries.enabled` | `false` | Request and run continuity summaries |
+| `engine.memory.summary-interval` | `5` | Significant actions per summary, 1–10 |
+| `engine.memory.max-pending` | `256` | Unfinished summary jobs installation-wide, 1–1,024 |
+| `engine.memory.max-attempts` | `3` | Attempts per summary job, 1–5 |
+| `engine.memory.budget-seconds` | `60` | Contract budget per attempt, including one repair |
+| `engine.memory.lease-seconds` | `120` | Job lease, 30–300 s; must exceed the budget plus 10 s |
+| `engine.memory.time-to-live-seconds` | `3600` | Claim window of a queued job, 60–86,400 s |
+| `engine.memory.slot` | `light` | Inference slot of summary tasks |
+
+Tests:
+- `SummaryContractTest` (pure): acceptance in English and Italian, precise coverage, surviving
+  obligations, labelled uncertainty, grounded numbers and quotations, public scope, locale and
+  the kind/audience/work-class mapping; `ContractSchemaTest` checks the schema.
+- `MemoryContinuityTest` (real PostgreSQL, sealed packs, production creation, commands and commit,
+  the scripted runtime behind a real scheduler): checkpoint determinism, verification and safe
+  boundaries; the request policy; precise source-linked recording; audience separation;
+  freshness after newer events, source changes, invalidations, a locale switch and a generation
+  change; the source race; bounded retries, fencing, throttling and database guards.
+- `CanonicalMigrationUpgradeTest` covers the V16 step.

@@ -8,6 +8,8 @@
 
 **Implementation note (28 October 2026):** P09.2 filters AI contexts before retrieval. A public or character context is assembled only from that actor's view, without truth, other holders' beliefs, real locations of others or planning assumptions. Only a privileged context receives truth (`fact`) and private plan assumptions (`assumption`), and the selector and the envelope both refuse those standings for a limited audience. Every item carries its epistemic standing. `withheldPhrases` supplies the disclosure guard's verbatim markers ([docs/08 section 6](../08-memory-and-continuity.md#p092-context-envelopes-budgets-and-retrieval)). Filtering of summaries, media and exports and adversarial leakage evaluation are still to be delivered.
 
+**Implementation note (28 October 2026):** P09.3 keeps continuity summaries inside their audience. A summary is produced from the envelope of exactly one audience (`public` or `privileged`) in that audience's own `summarizer` session; a public summary is validated against the player's withheld phrases, and a public context holding a privileged `fact` is refused before submission. Each stored summary keeps its audience and is assembled only into contexts of the same audience ([docs/08 section 8](../08-memory-and-continuity.md#p093-checkpoints-summaries-freshness-and-bounded-jobs)).
+
 ## Context
 
 A planner may require secret canon while the player narrator, guide, or NPC must know less. Filtering only a final response cannot remove hidden facts already present in a reused thread's memory. Media can also reveal secrets indirectly.

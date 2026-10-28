@@ -44,8 +44,8 @@ rolling usage quotas, a durable account backoff for background work, preemption 
 background work with the permit kept until its terminal result, reconciliation holds
 for unconfirmed outcomes, write-ahead runtime references and restart recovery. One active
 turn installation-wide stays the only accepted limit, enforced also by a database
-index. Only interactive task kinds exist yet; planners and other background kinds
-(P08.7, P09.3, P12, P15) will submit through the same queue. See
+index. The quest planner (P08.7, `PREPARATION`) and the continuity summarizer (P09.3,
+`CONTINUITY`) submit through the same queue; tactics and guides (P12, P15) will follow. See
 [docs/06 section 12](06-codex-integration.md#p086-durable-fair-scheduling).
 
 P08.7 (28 October 2026) adds the first semantic planner on these foundations: the versioned

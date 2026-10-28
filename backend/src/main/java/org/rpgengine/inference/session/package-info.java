@@ -16,6 +16,6 @@
  * <p>What this package does not do: it does not filter context (callers assemble audience-filtered
  * input from typed projections, P08.5 and P09.2), it does not detect paraphrased secrets in output
  * (a human-rubric evaluation), and it keeps no durable session records or renewal counters
- * (P09.3, P09.4). Nothing here names a runtime, touches the database or holds canonical authority.
+ * (P09.4; the operational checkpoint those records will reference exists since P09.3). Nothing here names a runtime, touches the database or holds canonical authority.
  */
 package org.rpgengine.inference.session;

@@ -108,6 +108,8 @@ Only claim coverage for events supplied in the input. If selected events from a 
 
 No source evidence means no new canonical fact. An old promise is not fulfilled merely because the summary writer assumes enough time passed. Conflicts are returned as source-linked issues for reconciliation.
 
+Since P09.3 this contract is implemented as `summary` (public audience) and `summary-privileged`; see [section 15a](#15a-implemented-continuity-summary-contract-p093). Source-linked conflict issues are not part of version 1: a summary whose sources change is marked stale and replaced instead ([docs/08](08-memory-and-continuity.md#p093-checkpoints-summaries-freshness-and-bounded-jobs)).
+
 ## 11. Shared runtime instruction draft
 
 The following is an English template to refine and evaluate, not a live system prompt:
@@ -388,6 +390,45 @@ includes unknown and unevaluated operators, free-text conditions, a mandatory pl
 field, cycles, oversize plans, model-written metadata, foreign identities, a wrong locale, a
 dropped author constraint, malformed secrets and markup. `ContractSchemaTest` checks the
 schema against the validator field sets. No live model output has been evaluated.
+
+## 15a. Implemented continuity-summary contract (P09.3)
+
+`SummaryContract` in `org.rpgengine.inference.contract` serves both summary kinds with one schema,
+`ai-contract/1/summary.schema.json`, one English instruction and one template hash. The trusted
+input is `SummaryContext`: 1–32 events of one audience as `event:<sequence>` in increasing order,
+up to 64 knowledge sources with their standing (`obligation`, `belief`, `common-knowledge`, and
+`fact` for the privileged kind only), up to 64 actor and location entities, the bound glossary and
+the disclosure guard. The output body is `summary` (at most 2,000 characters), `coveredEvents`,
+`obligations` and `uncertainties` (notes of at most 300 characters on supplied references),
+`entities` and `reasonCode`.
+
+| Aspect | Quest plan (P08.7) | Continuity summary (P09.3) |
+| --- | --- | --- |
+| Role, audience | `quest-planner`, `privileged` | `summarizer`; `summary` is `public`, `summary-privileged` is `privileged` (separate sessions) |
+| Work class | `PREPARATION` | `CONTINUITY` (background, below interactive work) |
+| Default budget | 60 s | 60 s, with one repair |
+| Context | Privileged slice | Built from a `ContextAssembler` envelope of the job's audience, without earlier summaries, sightings or planning assumptions |
+| Disclosure guard | None | Public: the player's `withheldPhrases`; privileged: none. A public context holding a `fact` is refused before submission |
+| Accepted result | `Planned` or `CannotPlan` | `Summarized` or `CannotSummarize` |
+| After acceptance | Plan-admission gate | Source recheck under the campaign memory lock, then storage as a derived summary |
+
+Semantic codes beyond the shared envelope, structure, scope, glossary and locale checks:
+
+- `unknown-reference`: a covered event, obligation, entity or uncertainty that was not supplied.
+- `event-not-covered`: a supplied event is missing from `coveredEvents`. Coverage is exactly the
+  supplied events, so the stored coverage is precise.
+- `obligation-dropped`: a supplied open obligation has no note. Unresolved promises survive.
+- `uncertainty-not-belief`: an uncertainty note names something other than a supplied belief.
+- `unsupported-number`: a digit run that occurs in no supplied text. Current numeric state comes
+  from the database.
+- `unsupported-quote`: a quoted span of four or more characters that does not occur verbatim in
+  supplied text, so speculation is never turned into a quotation.
+
+`SummaryContractTest` covers acceptance in English and Italian and each code above with a
+single-aspect change; `ContractSchemaTest` checks the schema against the validator field sets.
+Calling a promise fulfilled in new words, or inventing a fact by paraphrase, is not detectable
+mechanically and stays a human-rubric evaluation (section 13). No live model output has been
+evaluated.
 
 ## 16. Neutral protocol proof (P01.1)
 

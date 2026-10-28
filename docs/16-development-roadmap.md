@@ -2005,6 +2005,50 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     These skips do not show that build-context filtering or the Compose boundaries hold on this
     host. The hosted packaging job remains their gate.
 - [ ] P09.3 Implement checkpoints, source-linked summaries, freshness/invalidation, and bounded background jobs.
+  - Package A — operational checkpoints (V16, `org.rpgengine.memory.OperationalCheckpoints`):
+    the database function `memory_operational_snapshot` builds a deterministic `jsonb` snapshot
+    of canonical rows (counters, mode, pending decision, player, actors with real locations,
+    resources, items, abilities, quests, open commitments, operations awaiting narration, the RNG
+    cursor without its seed, a null encounter). `campaign_checkpoint` stores it with the SHA-256
+    of its canonical text computed in SQL. Capture runs in one repeatable-read transaction and is
+    refused while a mutation lease is live or an operation is `COMMITTING`; verification reports
+    `NONE`, `CORRUPT`, `UNSUPPORTED`, `INCOMPATIBLE`, `DIVERGED`, `OUTDATED` or `VALID`; retention
+    keeps the newest 8 per campaign.
+  - Package B — source-linked summaries (`memory_summary`, `SummaryContract`): the `summary`
+    (public) and `summary-privileged` contracts of the `summarizer` role condense 1–32 events of
+    one audience from a `ContextAssembler` envelope. Validation enforces exact coverage, a note
+    for every open obligation, uncertainty only on beliefs, supplied references only, grounded
+    numbers and quotations, the public disclosure guard, glossary and locale. A recorded summary
+    stores its exact covered events, every supplied knowledge record with its row version, its
+    entities, its generation, locale and glossary revisions, the invalidation high-water mark and
+    the context, template and body digests. See
+    [docs/08](08-memory-and-continuity.md#p093-checkpoints-summaries-freshness-and-bounded-jobs).
+  - Package C — freshness and invalidation (`MemorySummaries`): `STALE` after a generation
+    change, a locale or glossary change, a changed supplied record or an explicit
+    `memory_invalidation` naming its events, sources or entities; `BEHIND` with newer events;
+    `CURRENT` otherwise. Only the newest summary that is not stale enters a context, as an
+    optional `summary` item of its own audience that current state overrides. Recording rechecks
+    sources and invalidations under a per-campaign advisory lock that `invalidate` also takes.
+  - Package D — bounded background jobs (`memory_summary_job`, `ContinuitySummarizer`,
+    `MemoryWorker`): requests after 5 significant actions (at most 10) or a scene boundary, one
+    unfinished job per campaign and audience, an installation cap of 256, at most 32 events per
+    job, fenced leases, 3 attempts with backoff, recovery of expired and retired-generation work,
+    no automatic retry of a failed range, `CONTINUITY` work through the fair scheduler.
+    Summaries are off by default; checkpoints run in the maintenance worker. The backup tool
+    covers the V16 scope.
+  - Exit checks:
+    - Pure suite: contract acceptance in English and Italian and each rejection code, the schema
+      against the validator, the kind, audience and work-class mapping.
+    - Real PostgreSQL suite over sealed packs, production creation, real commands and commit and
+      the real fair scheduler with a scripted summarizer: checkpoint determinism, verification and
+      safe boundaries; the request policy; precise source-linked recording; audience separation;
+      freshness after newer events, source changes, invalidations, a locale switch and a
+      generation change; the recording race; bounded retries, fencing, throttling and guards.
+    - The V16 upgrade step; deliberate weakening probes on an exported copy; every command of the
+      project check plan.
+    - Not part of this task: renewal triggers, durable session records and rehydration (P09.4),
+      restart reconciliation of stale summaries and the resume card (P09.5), switching the intent,
+      narration and planner callers to envelopes, entity and chapter summaries.
 - [ ] P09.4 Implement count/context/error-triggered renewal and manual idle renewal, preserving transcript and campaign.
 - [ ] P09.5 Reconcile restart, committed narration pending, missing dependencies, and stale summaries.
 

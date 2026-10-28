@@ -58,6 +58,24 @@ class ContractSchemaTest {
     }
 
     @Test
+    void summarySchemaMatchesTheValidatorFieldSets() {
+        JsonNode root = schema(new SummaryContract(TaskKind.SUMMARY));
+        assertThat(root).isEqualTo(schema(new SummaryContract(TaskKind.SUMMARY_PRIVILEGED)));
+        assertClosedObject(root, ContractEnvelope.RESPONSE_FIELDS);
+        JsonNode body = root.path("properties").path("body");
+        assertClosedObject(body, SummaryContract.BODY_FIELDS);
+        assertClosedObject(body.path("properties").path("obligations").path("items"), SummaryContract.NOTE_FIELDS);
+        assertClosedObject(body.path("properties").path("uncertainties").path("items"), SummaryContract.NOTE_FIELDS);
+        assertThat(body.path("properties").path("summary").path("maxLength").asInt())
+                .isEqualTo(SummaryContract.MAX_SUMMARY);
+        assertThat(body.path("properties").path("coveredEvents").path("maxItems").asInt())
+                .isEqualTo(SummaryContext.MAX_EVENTS);
+        var kinds = new ArrayList<String>();
+        root.path("properties").path("taskKind").path("enum").forEach(v -> kinds.add(v.asString()));
+        assertThat(kinds).containsExactly(TaskKind.SUMMARY.wire(), TaskKind.SUMMARY_PRIVILEGED.wire());
+    }
+
+    @Test
     void questPlanSchemaMatchesTheValidatorFieldSets() {
         JsonNode root = schema(new QuestPlanContract(TaskKind.QUEST_PLAN));
         assertThat(root).isEqualTo(schema(new QuestPlanContract(TaskKind.QUEST_PLAN_REFINE)));

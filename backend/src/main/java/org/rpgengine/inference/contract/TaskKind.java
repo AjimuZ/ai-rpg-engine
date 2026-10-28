@@ -11,14 +11,17 @@ import org.rpgengine.inference.session.SessionScope;
  * Application task kinds implemented as typed contracts. Each kind fixes its wire name, its
  * logical {@link AiRole}, its {@link Audience}, its scheduling {@link WorkClass} and its default
  * local budget (docs/06 section 10); the remaining docs/21 kinds (content, encounter, tactic, guide,
- * summary, world direction, plan review) acquire contracts in later packages.
+ * world direction, plan review) acquire contracts in later packages.
  *
  * <p>Role and audience are properties of the kind, not of the caller: {@link #scope} derives the
  * whole session scope from the kind and the task binding, so a caller cannot run a contract in
  * another role's or audience's session (P08.3). A future character-audience kind will take its
  * subject from its context. Intent and narration are public interactive work; the two quest-plan
  * kinds (P08.7) are privileged preparation work of the quest planner, which the fair scheduler
- * runs only when no interactive task waits and preempts for any player turn.
+ * runs only when no interactive task waits and preempts for any player turn. The two summary kinds
+ * (P09.3) belong to the {@link AiRole#SUMMARIZER}, whose sessions take exactly the audience of their
+ * inputs; one kind per audience keeps a public and a privileged summary in separate sessions, and
+ * both are {@link WorkClass#CONTINUITY} background work.
  */
 public enum TaskKind {
     /** Free-text player declaration to one typed intention: a proposal only. */
@@ -28,7 +31,11 @@ public enum TaskKind {
     /** Privileged world slice to a first versioned conditional quest plan: an artifact, never a command. */
     QUEST_PLAN("quest-plan", AiRole.QUEST_PLANNER, 60),
     /** Bounded refinement of an admitted plan whose branches went stale: replaces only those branches. */
-    QUEST_PLAN_REFINE("quest-plan-refine", AiRole.QUEST_PLANNER, 60);
+    QUEST_PLAN_REFINE("quest-plan-refine", AiRole.QUEST_PLANNER, 60),
+    /** Public events and the player's knowledge to a source-linked continuity summary for the player audience. */
+    SUMMARY("summary", AiRole.SUMMARIZER, 60),
+    /** Public events and the privileged record to a source-linked continuity summary for privileged tasks. */
+    SUMMARY_PRIVILEGED("summary-privileged", AiRole.SUMMARIZER, 60);
 
     private final String wire;
     private final AiRole role;
@@ -59,18 +66,25 @@ public enum TaskKind {
     /**
      * @return the scheduling class (P08.6); intent interpretation and the narration of a committed
      *         player action are what the player waits for, so both are interactive; quest planning
-     *         prepares an accepted quest and is {@link WorkClass#PREPARATION} background work
+     *         prepares an accepted quest and is {@link WorkClass#PREPARATION} background work;
+     *         summaries are bounded {@link WorkClass#CONTINUITY} work that later turns may use but
+     *         never wait for
      */
     public WorkClass workClass() {
-        return role == AiRole.QUEST_PLANNER ? WorkClass.PREPARATION : WorkClass.INTERACTIVE;
+        return switch (role) {
+            case QUEST_PLANNER -> WorkClass.PREPARATION;
+            case SUMMARIZER -> WorkClass.CONTINUITY;
+            default -> WorkClass.INTERACTIVE;
+        };
     }
 
     /**
-     * @return the disclosure audience: public for the P08.2 kinds, privileged for the planner kinds,
-     *         whose context may hold hidden canon ({@link AiRole#QUEST_PLANNER} permits nothing else)
+     * @return the disclosure audience: public for the P08.2 kinds and {@link #SUMMARY}, privileged
+     *         for the planner kinds, whose context may hold hidden canon ({@link AiRole#QUEST_PLANNER}
+     *         permits nothing else), and for {@link #SUMMARY_PRIVILEGED}
      */
     public Audience audience() {
-        return role == AiRole.QUEST_PLANNER ? Audience.PRIVILEGED : Audience.PUBLIC;
+        return role == AiRole.QUEST_PLANNER || this == SUMMARY_PRIVILEGED ? Audience.PRIVILEGED : Audience.PUBLIC;
     }
 
     /**

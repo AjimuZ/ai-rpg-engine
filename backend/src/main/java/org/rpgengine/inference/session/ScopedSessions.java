@@ -61,7 +61,8 @@ import org.springframework.stereotype.Component;
  * <p>The registry is in memory, like the adapter's session-to-conversation bindings: a backend
  * restart starts every scope afresh, which also covers a runtime switch at restart (ADR 0020
  * decision 4). Durable AI-session records with counters and checkpoint hashes, and the renewal
- * triggers that call {@link #retire}, are P09.3 and P09.4.
+ * triggers that call {@link #retire}, are P09.4; the operational checkpoints they will reference
+ * exist since P09.3 ({@code org.rpgengine.memory.OperationalCheckpoints}).
  *
  * <p>Thread-safety: registry state is guarded by this object's monitor; the port is always
  * called outside it, and {@link NarrationTaskPort#submit} never blocks.

@@ -69,6 +69,12 @@ import tools.jackson.databind.json.JsonMapper;
  * history, so older dialogue is reachable beyond the recent window. Each text uses the stemming
  * configuration of its own language ({@code english} or {@code italian}).
  *
+ * <p><b>Continuity summary</b> (P09.3): for public and privileged audiences, the audience's newest
+ * summary that is not stale ({@link MemorySummaries#usableWithin}) is an optional history candidate
+ * labelled {@link Standing#SUMMARY} with its exact coverage and freshness ({@code current} or
+ * {@code behind}). It never replaces state or events; a request may exclude it, as the summarizer
+ * does.
+ *
  * <p><b>Mandatory material</b> is the audience's own state, the actors it currently sees at its
  * location, the open commitments it is party to and the focus operation's public events. It is
  * never dropped; if it does not fit the budget the result is {@link TooLarge}.
@@ -379,6 +385,9 @@ public class ContextAssembler {
         }
         if (history) {
             history(campaign, request.operationId(), locale, query, focus, drafts);
+            if (request.summaries()) {
+                summary(campaign, audience, drafts);
+            }
         }
         var items = new ArrayList<ContextItem>();
         for (Draft draft : drafts) {
@@ -709,6 +718,33 @@ public class ContextAssembler {
         }
     }
 
+    /**
+     * The audience's newest usable continuity summary (P09.3): never a stale one, labelled
+     * {@link Standing#SUMMARY} with its exact coverage and freshness, ranked above individual
+     * events and narration but optional, so current state and mandatory events always win the
+     * budget. Its entities link it for ID-tier retrieval.
+     */
+    private void summary(UUID campaign, Audience audience, List<Draft> drafts) {
+        String wire = audience.kind() == Audience.Kind.PRIVILEGED ? "privileged" : "public";
+        MemorySummaries.usableWithin(jdbc, campaign, wire).ifPresent(usable -> {
+            JsonNode body = usable.body();
+            var data = fields("coveredEvents", usable.coveredEvents().stream().map(sequence -> "event:" + sequence)
+                            .toList(), "freshness", usable.freshness().status().name().toLowerCase(java.util.Locale.ROOT),
+                    "newerEvents", usable.freshness().uncoveredEvents(), "sourceRevision", usable.sourceRevision(),
+                    "summary", body.path("summary").asString(), "obligations", notes(body.path("obligations")),
+                    "uncertainties", notes(body.path("uncertainties")));
+            drafts.add(new Draft("summary:" + usable.id(), Section.HISTORY, Standing.SUMMARY, false, usable.locale(),
+                    data, List.of(), Set.copyOf(usable.entityRefs()), usable.sourceRevision(), null, 3));
+        });
+    }
+
+    /** @return stored summary notes as ordered {@code ref}/{@code note} maps */
+    private static List<Map<String, Object>> notes(JsonNode notes) {
+        var out = new ArrayList<Map<String, Object>>();
+        notes.forEach(note -> out.add(fields("ref", note.path("ref").asString(), "note", note.path("note").asString())));
+        return out;
+    }
+
     /** One public event as a draft; an event without a supported statement keeps only its type. */
     private static Draft eventDraft(StoredEvent event, SupportedLocale locale, Map<UUID, String> names, boolean mandatory) {
         var statement = EventStatements.state(locale, event.type(), event.version(), event.payload(), names);
@@ -956,9 +992,19 @@ public class ContextAssembler {
      * @param instructionTokens estimated tokens of the task instructions rendered around the context
      * @param budget input budget
      * @param policyHash audience policy hash of the caller
+     * @param summaries whether the audience's newest usable continuity summary is a candidate; the
+     *        summarizer itself passes false so a summary is never built from an earlier summary
      */
     public record Request(UUID adventureId, UUID campaignId, AiRole role, Audience audience, UUID operationId,
-            List<String> focusRefs, String query, int instructionTokens, ContextBudget budget, String policyHash) {
+            List<String> focusRefs, String query, int instructionTokens, ContextBudget budget, String policyHash,
+            boolean summaries) {
+        /** A request that includes the audience's usable summary, as every task caller wants. */
+        public Request(UUID adventureId, UUID campaignId, AiRole role, Audience audience, UUID operationId,
+                List<String> focusRefs, String query, int instructionTokens, ContextBudget budget, String policyHash) {
+            this(adventureId, campaignId, role, audience, operationId, focusRefs, query, instructionTokens, budget,
+                    policyHash, true);
+        }
+
         /** @throws IllegalArgumentException for out-of-bound or malformed values or a role/audience mismatch */
         public Request {
             Objects.requireNonNull(adventureId, "adventureId");

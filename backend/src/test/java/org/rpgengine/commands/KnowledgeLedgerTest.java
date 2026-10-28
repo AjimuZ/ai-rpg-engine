@@ -121,7 +121,7 @@ class KnowledgeLedgerTest {
     /** Remove disposable test rows, preserving production constraints and triggers. */
     @AfterEach
     void clear() {
-        jdbc.execute("truncate actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, "
+        jdbc.execute("truncate memory_invalidation, memory_summary, memory_summary_job, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, "
                 + "narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, "
                 + "campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, "
                 + "learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, "

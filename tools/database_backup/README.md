@@ -1,4 +1,4 @@
-# Database backup and restore (V15 scope)
+# Database backup and restore (V16 scope)
 
 A trusted-owner disaster-recovery tool for the canonical PostgreSQL database. It
 uses only the Python standard library and the `pg_dump`/`pg_restore` clients inside
@@ -19,7 +19,7 @@ py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
 ## What it does
 
 - **Backup** checks the exact server and client version, the exact table set and
-  successful migrations V1–V15, including immutable pack bytes and sealed reports. It then creates the target directory, which must
+  successful migrations V1–V16, including immutable pack bytes and sealed reports. It then creates the target directory, which must
   not already exist, and writes `database.dump` (custom format, no owners or
   privileges). It re-reads the catalog and writes `manifest.json` last. The manifest
   holds the format, schema and PostgreSQL versions, the scope, the byte count, the
@@ -128,3 +128,14 @@ already ends restored `QUEUED` inference tasks `ABANDONED` and takes over `DISPA
 generation retires presentation jobs. The exact migration/table regression check
 reproduced the hosted CI failure (run 40743829288) before this scope update. Offline
 checks cover the V15 manifest/catalog; no live V13–V15 dump/restore rehearsal has been run.
+
+V16 scope (P09.3) adds `memory_summary_job`, `memory_summary` and `memory_invalidation`
+(continuity summaries, their bounded jobs and explicit invalidations) and the
+`memory_operational_snapshot` function behind operational checkpoints, which stay in
+`campaign_checkpoint`. Restore needs no new retirement step: the advanced recovery
+generation makes every restored summary stale, the next job claim scan cancels queued
+summary jobs of the old generation (`GENERATION_RETIRED`), and a restored `RUNNING` job is
+requeued or failed by lease recovery and can no longer record because its generation is
+retired. Checkpoints describe canonical state at their revision, which a restore does not
+change. Offline checks cover the V16 manifest/catalog; no live V16 dump/restore rehearsal
+has been run.

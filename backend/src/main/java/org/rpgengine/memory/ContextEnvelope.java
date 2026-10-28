@@ -227,6 +227,7 @@ public record ContextEnvelope(Stamp stamp, ContextBudget budget, Map<Section, Li
         legend.put(Standing.LAST_KNOWN, "Where this audience last knew someone to be; not their real current location.");
         legend.put(Standing.NARRATION, "Text already told to the player; not a source of truth.");
         legend.put(Standing.ASSUMPTION, "A private planning assumption; unverified, never admitted, never public.");
+        legend.put(Standing.SUMMARY, "A derived summary of the listed earlier events; current state and events win over it.");
         return Collections.unmodifiableMap(legend);
     }
 

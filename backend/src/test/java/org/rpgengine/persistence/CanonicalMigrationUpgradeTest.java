@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V15 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V16 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -278,6 +278,27 @@ class CanonicalMigrationUpgradeTest {
                                 kind + ":" + UUID.randomUUID()), kind);
                     }
                     assertEquals(0, v15.migrate().migrationsExecuted);
+                    // V16 adds the memory tables empty and the snapshot function: an old save gets no invented
+                    // summary, job, invalidation or checkpoint, canonical rows stay exact, and the operational
+                    // snapshot of the populated campaign is deterministic and reports its real counters.
+                    String v15Campaign = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
+                    Flyway v16 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("16").load();
+                    assertEquals(1, v16.migrate().migrationsExecuted);
+                    assertTrue(v16.validateWithResult().validationSuccessful);
+                    assertEquals(v15Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c",
+                            String.class));
+                    for (String table : new String[] {"memory_summary_job", "memory_summary", "memory_invalidation"}) {
+                        assertEquals(0, jdbc.queryForObject("select count(*) from " + table, Integer.class), table);
+                    }
+                    String snapshot = jdbc.queryForObject("select memory_operational_snapshot(?)::text", String.class,
+                            campaign);
+                    assertEquals(snapshot, jdbc.queryForObject("select memory_operational_snapshot(?)::text",
+                            String.class, campaign));
+                    assertEquals(jdbc.queryForObject("select state_revision from campaign", Long.class),
+                            jdbc.queryForObject("select (memory_operational_snapshot(?) #>> '{campaign,stateRevision}')"
+                                    + "::bigint", Long.class, campaign));
+                    assertEquals(0, v16.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

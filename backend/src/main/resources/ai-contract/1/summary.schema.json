@@ -1,0 +1,51 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "taskId", "taskKind", "baseRevision", "contextDigest", "outputLocale", "status", "body"],
+  "properties": {
+    "contractVersion": {"type": "integer", "enum": [1]},
+    "taskId": {"type": "string", "maxLength": 36},
+    "taskKind": {"type": "string", "enum": ["summary", "summary-privileged"]},
+    "baseRevision": {"type": "integer"},
+    "contextDigest": {"type": "string", "maxLength": 64},
+    "outputLocale": {"type": "string", "enum": ["en", "it"]},
+    "status": {"type": "string", "enum": ["proposed", "cannot-complete"]},
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "coveredEvents", "obligations", "entities", "uncertainties", "reasonCode"],
+      "properties": {
+        "summary": {"type": ["string", "null"], "maxLength": 2000},
+        "coveredEvents": {"type": "array", "maxItems": 32, "items": {"type": "string", "maxLength": 128}},
+        "obligations": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ref", "note"],
+            "properties": {
+              "ref": {"type": "string", "maxLength": 128},
+              "note": {"type": "string", "maxLength": 300}
+            }
+          }
+        },
+        "entities": {"type": "array", "maxItems": 64, "items": {"type": "string", "maxLength": 128}},
+        "uncertainties": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ref", "note"],
+            "properties": {
+              "ref": {"type": "string", "maxLength": 128},
+              "note": {"type": "string", "maxLength": 300}
+            }
+          }
+        },
+        "reasonCode": {"type": ["string", "null"], "enum": ["missing-information", "out-of-scope", null]}
+      }
+    }
+  }
+}

@@ -298,7 +298,12 @@ Human EN/IT quality review is still required. Since P08.5 accepted narration is 
 
 Store exact accepted text and `passageLocale`; summaries retain source IDs and
 their language. Retrieval filters audience/freshness before rendering into a
-language-scoped context. Include locale/glossary/policy versions in context and
+language-scoped context. Since P09.3 a continuity summary is written directly in the
+campaign output locale (no translation chain), passes the same glossary and locale-signal
+checks as narration (grounded quotations are excluded from the signal), and stores its locale
+with the locale and glossary revisions of its context. A locale switch or glossary edit makes
+it stale, so it is never assembled into a context of another language or terminology; a new
+summary is written in the new locale ([docs/08](08-memory-and-continuity.md#p093-checkpoints-summaries-freshness-and-bounded-jobs)). Include locale/glossary/policy versions in context and
 media cache keys. Optional [speech](30-local-speech-synthesis.md) uses the accepted
 passage language and approved voice capability; unavailable Italian speech
 falls back to Italian subtitles/text, never an English voice reading Italian.

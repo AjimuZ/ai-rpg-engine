@@ -14,9 +14,10 @@ import java.util.Set;
  * structural: the narrator can only obtain a public session, and a planner session is never
  * public, so no scope (and therefore no session) can serve both.
  *
- * <p>Only {@link #INTERPRETER} and {@link #NARRATOR} have implemented contracts (P08.2). The
- * other roles fix their audience rules now so that later contracts (P08.7 planning, P12 tactics,
- * P15 guides, P09 summaries, P13 encounters) inherit the separation instead of inventing it.
+ * <p>{@link #INTERPRETER} and {@link #NARRATOR} have implemented contracts since P08.2,
+ * {@link #QUEST_PLANNER} since P08.7 and {@link #SUMMARIZER} since P09.3. The other roles fix their
+ * audience rules now so that later contracts (P12 tactics, P15 guides, P13 encounters) inherit the
+ * separation instead of inventing it.
  */
 public enum AiRole {
     /** Free-text declaration to a typed intention; the clarification is shown to the player. */
@@ -27,7 +28,10 @@ public enum AiRole {
     GUIDE("guide", true, EnumSet.of(Audience.Kind.CHARACTER)),
     /** One NPC or companion choosing among legal candidates from its own observations. */
     TACTICIAN("tactician", false, EnumSet.of(Audience.Kind.CHARACTER)),
-    /** Memory summary; a summary has exactly the audience of its inputs (docs/08 section 8). */
+    /**
+     * Memory summary; a summary has exactly the audience of its inputs (docs/08 section 8). Since
+     * P09.3 the {@code summary} and {@code summary-privileged} contracts run in this role.
+     */
     SUMMARIZER("summarizer", false, EnumSet.allOf(Audience.Kind.class)),
     /** Candidate world content from canon and author constraints. */
     CONTENT_PROPOSER("content-proposer", false, EnumSet.of(Audience.Kind.PRIVILEGED)),

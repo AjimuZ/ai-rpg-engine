@@ -279,9 +279,9 @@ Decisions and limits:
   writer and is still read by the player panel and the planner's `fact-known-to` predicate. It
   is retired together with the panel move in P10.5.
 - The P08.2 intent and narration contracts and the P08.7 planner still build their own contexts.
-  Feeding them from `ContextAssembler` is the job of each caller: P09.3 checkpoints and
-  rehydration, P09.4 renewal, and P10 and later gameplay callers. This task supplies the
-  envelope, the budget, retrieval and overflow behaviour they must use.
+  Feeding them from `ContextAssembler` is the job of each caller: P09.4 renewal and rehydration,
+  and P10 and later gameplay callers. This task supplies the envelope, the budget, retrieval and
+  overflow behaviour they must use. The first caller is the P09.3 continuity summarizer.
 - The `causal` tier uses revision equality with the focus operation and the informant. Explicit
   event-to-event causal links do not exist yet.
 - A `character` context has no history and no witnessed events until NPC-side observation exists
@@ -313,7 +313,7 @@ Since P08.3 the session-scoping registry ([docs/06 section 7](06-codex-integrati
 - `retire(scope)` renews one role/audience session, for example after a failure made its context unreliable.
 - `retireCampaign` and `retireAll` cover restore and a runtime change.
 
-The triggers themselves (the turn ceiling, context pressure, owner and idle renewal), durable session records with counters and checkpoint hashes, and rehydration are P09.3/P09.4. The registry is in memory, so a backend restart already starts every scope afresh.
+The triggers themselves (the turn ceiling, context pressure, owner and idle renewal), durable session records with counters and checkpoint hashes, and rehydration are P09.4. P09.3 supplies the parts they build on: verified operational checkpoints, audience-scoped continuity summaries with freshness, and the summary fallback rule (section 8). The registry is in memory, so a backend restart already starts every scope afresh.
 
 ## 8. Summary lifecycle
 
@@ -322,6 +322,144 @@ Refresh a scene summary after each scene boundary and initially every five signi
 Summarization may use Codex, but mechanical fields are generated from state. Validate source references, entity identity, unresolved commitments, and audience scope. Reject fabricated facts. Summary jobs are idempotent by audience and source range. If new events arrive during a job, keep its coverage precise rather than falsely marking it current.
 
 Corrections mark affected summaries stale. Current structured facts always win during assembly. A failed summary job does not invalidate a committed game action or block deterministic inspections; retrieval can use a bounded recent-event window and checkpoint until repair succeeds.
+
+### P09.3 checkpoints, summaries, freshness and bounded jobs
+
+Implemented in `org.rpgengine.memory` (`OperationalCheckpoints`, `MemorySummaries`,
+`ContinuitySummarizer`, `MemoryWorker`, `MemorySettings`) with the `summary` contracts
+([docs/21 section 15a](21-ai-task-contracts-and-prompts.md#15a-implemented-continuity-summary-contract-p093))
+and migration V16. Nothing here writes canonical state: no checkpoint, summary, job or
+invalidation advances the revision, the game turn, world time or the event sequence.
+
+**Operational checkpoint.** `OperationalCheckpoints.capture` stores one row of the existing
+`campaign_checkpoint` table per revision. The snapshot is the `jsonb` value of the database
+function `memory_operational_snapshot` (V16), built only from canonical rows:
+
+- the counters, mode and pending decision of the campaign;
+- the player character and every actor with its real location;
+- resources, items, learned abilities and known quests;
+- open commitments;
+- operations whose narration is still pending (`COMMITTED`, `NARRATING`,
+  `COMMITTED_NARRATION_PENDING`);
+- the RNG cursor: algorithm, version and number of recorded draws, never the seed;
+- `encounter`, always null until P11.
+
+The hash is the SHA-256 of PostgreSQL's canonical `jsonb` text, computed in SQL, so equal state
+always gives an equal snapshot and hash. A capture runs in one repeatable-read transaction and
+returns `UNSAFE_BOUNDARY` without writing while a mutation lease is live or an operation is
+`COMMITTING` (never inside an unresolved commit race, section 7). A second capture of the same
+revision returns `EXISTING`, or `MISMATCH` when the stored row differs from canonical state.
+`verify` reports `NONE`, `CORRUPT` (snapshot no longer matches its hash), `UNSUPPORTED` (another
+layout), `INCOMPATIBLE` (pinned content or ruleset hash changed), `DIVERGED` (ahead of the campaign,
+or different at the same revision), `OUTDATED` (valid but older) or `VALID`. The snapshot is
+privileged backend data and is never rendered to a limited audience. Retention keeps the newest 8
+per campaign (`engine.memory.checkpoint-retention`, 2–64); a checkpoint is a resume aid, not a
+backup (section 9).
+
+**Summary record** (`memory_summary`, immutable). One accepted summary of one audience, `public`
+or `privileged`; character audiences have no history yet (P09.2). It stores:
+
+| Field | Meaning |
+| --- | --- |
+| `covered_events` | Exact, increasing event sequences supplied and claimed (1–32) |
+| `sources` | Every supplied knowledge record as `{ref, version}`: `belief:`, `claim:` or `commitment:` with its row version |
+| `entity_refs` | Actor and location references the summary names |
+| `source_revision`, `event_high_water` | Revision the context was assembled at; newest event at that revision |
+| `campaign_generation`, `locale`, `locale_revision`, `glossary_revision` | Presentation and recovery binding of the context |
+| `invalidation_high_water` | Newest invalidation of the campaign when the summary was recorded |
+| `context_digest`, `template_hash`, `body_digest` | Provenance of the context, prompt template and stored body |
+| `body` | `summary`, `obligations`, `entities` and `uncertainties` notes |
+
+**Freshness** (`MemorySummaries.freshness`, computed, never stored):
+
+- `STALE` when the recovery generation changed (restore), the output locale or its locale or
+  glossary revision changed, a supplied source's row version changed (a belief or claim was
+  superseded, a claim's truth was determined, a commitment was resolved), or a later
+  `memory_invalidation` names one of its events, sources or entities, or the whole campaign.
+  The reasons are `generation`, `locale`, `glossary`, `source:<ref>` and `invalidated:<reason>`.
+- `BEHIND` when it is otherwise valid but newer public events exist. Its coverage stays precise.
+- `CURRENT` otherwise.
+
+Freshness does not use the broad query-scope epochs of the stamp. The sighting epoch steps on
+almost every action, so epochs would make every summary stale without cause; the precise row
+versions of the supplied records are the relevant dependencies (ADR 0014). Generation, locale
+and glossary are compared as `ContextAssembler.staleness` compares them.
+
+**Assembly.** For public and privileged audiences the newest summary of the current generation
+that is not stale (at most 8 newest are examined) is an optional `history` candidate with
+standing `summary`. Its legend reads "A derived summary of the listed earlier events; current
+state and events win over it". It carries its covered events, freshness (`current` or `behind`),
+the count of newer events, the text and the obligation and uncertainty notes, and it ranks above
+individual events and narration. It is never mandatory, so state and focus events always win the
+budget. A stale summary is never assembled. A public summary never reaches a privileged context
+and the reverse.
+
+**Explicit invalidation.** `MemorySummaries.invalidate(campaign, reason, refs)` appends to
+`memory_invalidation` with a fixed reason code (for example `CORRECTION`) and up to 64
+references (`event:<sequence>`, `actor:`, `location:`, `claim:`, `belief:`, `commitment:`); an
+empty list invalidates every earlier summary of the campaign. No correction command exists yet;
+future correcting writers must call it inside their canonical transaction, as they bump query
+epochs today.
+
+**Jobs** (`memory_summary_job`). `MemorySummaries.request(campaign, audience, force)`:
+
+1. Returns `DISABLED` without writing when summaries are off (`engine.memory.summaries.enabled`,
+   default false).
+2. Returns `PENDING` while the audience has an unfinished job (one per campaign and audience,
+   enforced by a partial unique index).
+3. Otherwise looks at the audience's public events after the newest usable summary, at most 32:
+   `UP_TO_DATE` when there are none; `NOT_DUE` unless they come from at least
+   `engine.memory.summary-interval` (default 5, at most 10) committed operations or include a
+   scene boundary (the player character's `ACTOR_MOVED`), or `force` is set.
+4. Returns `GAVE_UP` when a job for exactly this range already failed or was cancelled. A failed
+   range is not retried automatically until new events extend it, so a failing summarizer cannot
+   loop.
+5. Returns `THROTTLED` when `engine.memory.max-pending` (default 256) jobs are unfinished
+   installation-wide (counted under an advisory lock), otherwise `REQUESTED`.
+
+`ContinuitySummarizer.processNext` first recovers (queued jobs past their window fail `EXPIRED`;
+queued jobs of a retired generation are `CANCELLED` with `GENERATION_RETIRED`; a running job whose
+lease expired is queued again with a new fence, or fails `LEASE_EXPIRED` when attempts or window
+are spent). It then claims one due job of a current generation, which increments its attempt and
+fence:
+
+1. It assembles the audience's envelope with `ContextAssembler`: the job's events are explicit
+   focus references; earlier summaries are excluded; the budget is the standard 12,000 input tokens
+   with 5,000 for history, 2,500 for knowledge, 1,500 for obligations and 500 for state.
+2. It supplies the contiguous run of selected events from the range's first event; an event the
+   budget dropped ends the run, so coverage never has a gap. Sources are open obligations first,
+   then beliefs, common knowledge and, for the privileged audience, facts with truth. Sightings
+   and planning assumptions are never summary input.
+3. It runs the contract as `CONTINUITY` work through the fair scheduler, with one repair.
+4. It records under the campaign memory lock (a per-campaign advisory lock, also taken by
+   `invalidate`). The recording rechecks lease, fence and generation, the locale and glossary
+   revisions, that no supplied record changed after the assembled revision (each changing write
+   records its revision), and that no invalidation since assembly names the summary. A failed
+   recheck stores nothing and releases the attempt as `STALE_SOURCE` for a retry.
+
+Failure mapping: invalid output after the repair (`INVALID_SUMMARY`), a runtime that did not
+complete (`RUNTIME_UNAVAILABLE`, `RUNTIME_FAILED`) and `STALE_SOURCE` are retryable within
+`engine.memory.max-attempts` (default 3) with a 30-second-per-attempt backoff. A declined
+summary, a refused scope, an oversized context and an empty range end the job. A released or
+expired worker can neither fail nor record again, because the fence moved.
+
+**Worker** (`MemoryWorker`, `engine.memory.worker.enabled`, default true, every 5 seconds). One
+bounded pass captures checkpoints for at most 16 campaigns whose newest checkpoint is older than
+their revision, prunes them to the retention bound and, when summaries are enabled, requests
+public summaries for at most 16 campaigns and runs at most one job. Privileged summaries are
+requested by privileged callers. A failing pass is logged by exception class and retried.
+
+Decisions and limits:
+
+- Summaries are off by default. Nothing consumes them until renewal and rehydration (P09.4), and
+  every context already falls back to the recent-event window and current state.
+- One summary kind exists, `CONTINUITY`. Entity and chapter summaries (section 3) are not
+  implemented. Narration passages are not summary input.
+- Freshness checks the records supplied to the summary, not every record the prose could imply.
+  A summary that paraphrases a secret or calls a promise kept is beyond mechanical validation.
+- Durable AI-session records with counters and checkpoint hashes, and switching the intent,
+  narration and planner callers to envelopes, are P09.4. Restart reconciliation of stale summaries
+  and missing dependencies, and the resume card, are P09.5.
 
 ## 9. Archiving and backups
 

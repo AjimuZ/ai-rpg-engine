@@ -18,7 +18,8 @@ import tools.jackson.databind.json.JsonMapper;
  * canonical record ({@link Standing#STATE}, {@link Standing#EVENT}, {@link Standing#FACT},
  * {@link Standing#COMMON_KNOWLEDGE}, {@link Standing#OBLIGATION}), what one character holds
  * ({@link Standing#BELIEF}, {@link Standing#LAST_KNOWN}), what was told to the player
- * ({@link Standing#NARRATION}) and what a planner privately assumed ({@link Standing#ASSUMPTION}).
+ * ({@link Standing#NARRATION}), what a planner privately assumed ({@link Standing#ASSUMPTION}) and a
+ * derived continuity summary of earlier events ({@link Standing#SUMMARY}).
  * The label is rendered into every item, so a belief, a narrated sentence or a planning hypothesis
  * is never presented as an admitted fact.
  *
@@ -56,7 +57,7 @@ public record ContextItem(String ref, Section section, Standing standing, boolea
         OBLIGATIONS,
         /** Claims, beliefs and last known locations. */
         KNOWLEDGE,
-        /** Committed public events and published narration. */
+        /** Committed public events, published narration and continuity summaries. */
         HISTORY,
         /** Private planning assumptions; privileged audiences only. */
         PLANNING
@@ -81,7 +82,12 @@ public record ContextItem(String ref, Section section, Standing standing, boolea
         /** Published narration: what the player was told, not a source of truth. */
         NARRATION(false, false),
         /** A planner's private, unverified assumption; never admitted and never public. */
-        ASSUMPTION(false, true);
+        ASSUMPTION(false, true),
+        /**
+         * A derived, lossy continuity summary of the listed events for the same audience (P09.3);
+         * never a source of truth, and current state and events win over it.
+         */
+        SUMMARY(false, false);
 
         private final boolean admitted;
         private final boolean privilegedOnly;

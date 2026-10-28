@@ -302,7 +302,7 @@ Implemented (28 October 2026) in the runtime-neutral `org.rpgengine.inference.sc
 Not part of P08.6:
 
 - Live qualification of more than one active turn, live quota behavior, service priority and cancellation latency. These need an authorized account-backed experiment (QA-37 live part); no account was used.
-- Background task kinds and their owners: since P08.7 the quest planner's `quest-plan` and `quest-plan-refine` kinds submit through this queue as `PREPARATION` work in the `quest-planner`/`privileged` session (section 13); summaries (P09.3), tactics (P12) and guides (P15) will follow with their own classes.
+- Background task kinds and their owners: since P08.7 the quest planner's `quest-plan` and `quest-plan-refine` kinds submit through this queue as `PREPARATION` work in the `quest-planner`/`privileged` session (section 13); since P09.3 the `summary` and `summary-privileged` kinds submit as `CONTINUITY` work in the `summarizer` role's public or privileged session ([docs/08](08-memory-and-continuity.md#p093-checkpoints-summaries-freshness-and-bounded-jobs)); tactics (P12) and guides (P15) will follow with their own classes.
 - Owner-facing status and settings (P21.3), observed token accounting from a runtime, and the GPU/RAM admission coordinator for local backends (P21.4), which must sit behind this permit rather than beside it.
 - Supported deployment is one backend process per database. A second process is safe because of the single-turn index and ownership fencing, but its startup reconciliation takes over the rows of a still-running first process.
 

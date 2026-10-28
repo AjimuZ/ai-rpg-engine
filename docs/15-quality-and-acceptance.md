@@ -1,5 +1,48 @@
 # Quality Strategy and Acceptance Criteria
 
+P09.3 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
+**14 new cases and all 702 packaged backend cases in 72 suites**, with zero failures, errors or
+skips, and the jar is packaged. The new cases are `SummaryContractTest` (8 pure, one parameterized
+over English and Italian), `ContractSchemaTest.summarySchemaMatchesTheValidatorFieldSets` and
+`MemoryContinuityTest` (5 real PostgreSQL); `CanonicalMigrationUpgradeTest` gains the V16 step.
+The suite uses sealed packs, production campaign creation, ordinary commands, the real canonical
+commit and the real fair scheduler with only the summarizer runtime scripted:
+
+- **Checkpoints:** a capture equals the SHA-256 of the canonical `jsonb` text, names the player
+  and every actor, has a null encounter and no seed; a repeat is `EXISTING`; a later command makes
+  it `OUTDATED`; a live mutation lease gives `UNSAFE_BOUNDARY`; retention keeps the newest; a
+  forged hash is `CORRUPT`, a forged snapshot `DIVERGED`, and capture then reports `MISMATCH`.
+- **Policy:** four waits are `NOT_DUE`, the fifth is `REQUESTED`, a second request is the same
+  `PENDING` job, a recorded range is `UP_TO_DATE`, and one player move (a scene boundary) is due.
+- **Recording:** coverage equals the five public events, every supplied source carries its row
+  version, canonical state is unchanged, the public summarizer never sees the secret, and the
+  summary enters the public context as an optional `summary` item (`current`, then `behind`
+  after one more event) and never the privileged one. A privileged summary sees the secret
+  `fact` and enters only privileged contexts; a character audience is refused.
+- **Freshness:** a promise kept during summarization is caught at recording (`STALE`, retried,
+  and the retry no longer sees it); a revised belief makes the summary `STALE` with
+  `source:belief:<id>` and removes it from contexts; an unrelated invalidation leaves a summary
+  current while one naming its first event makes it stale; a locale switch and a generation
+  change make it stale, and recovery cancels the old generation's queued job.
+- **Bounds:** a leak and an invented coverage use the single repair, then the backoff holds the
+  retry; a failed runtime spends the second attempt; the failed range is `GAVE_UP`; an expired
+  lease is requeued with a new fence and the old worker can neither fail nor record; the
+  installation cap throttles; disabled summaries write nothing; terminal jobs and a second
+  unfinished job per audience are refused by the database.
+- **Probes:** 24 deliberate weakening probes, applied only to an exported copy of the backend,
+  each made the suites fail and were reverted byte-identically (SHA-256).
+
+All 26 repository-policy tests pass with zero findings, and the nine backup tests pass with the
+V16 scope. Frontend sources are unchanged.
+
+Not verified:
+- consumers of summaries and checkpoints in renewal and rehydration (P09.4) and restart
+  reconciliation and the resume card (P09.5);
+- the intent, narration and planner callers switched to envelopes (P09.4 onward);
+- entity and chapter summaries, and narration as summary input;
+- summary quality, paraphrased secrets and prose that calls a promise kept (human rubric);
+- live model runs and a live V16 dump and restore.
+
 P09.2 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **13 new cases and all 687 packaged backend cases in 70 suites**, with zero failures, errors or
 skips; the executable jar is packaged. The new cases are `ContextSelectionTest` (7, pure) and
