@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 49/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6 and P08.1–P08.3. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 50/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6 and P08.1–P08.4. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -1530,7 +1530,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     `a55319f`; all exit checks passed on that exact code before this completion mark. All
     131 task identities/titles and the pending P98 follow-up are preserved; only P08.3
     gains a completion mark.
-- [ ] P08.4 Resolve logical profiles through the owner's slot assignment (backend and model per slot, ADR 0021) against the assigned backend's catalog or approved allowlist, and set effective settings on every turn.
+- [x] P08.4 Resolve logical profiles through the owner's slot assignment (backend and model per slot, ADR 0021) against the assigned backend's catalog or approved allowlist, and set effective settings on every turn.
   - Package A — owner assignment: `SlotAssignments` returns a `SlotAssignment` per text slot
     (backend from the closed ADR 0021 text set, preferred model and effort, at most four
     owner-approved same-backend alternatives). Private settings
@@ -1558,6 +1558,24 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     deliberate weakening probes; the full packaged backend and repository checks. The owner
     settings API and panel, advisor and readiness probes (P21.3), the `image` slot, the Claude
     and local adapters (P20, P21) and a live-account catalog check are not part of this task.
+  - Verified evidence (28 October 2026): 26 new cases (14 resolver, 5 settings, 6 through the
+    real Codex adapter, one in the Spring selection suite; 85 focused cases with the existing
+    adapter, wire, boundary and session suites) and all 574 packaged backend cases in 59
+    suites pass with zero failures/errors/skips on the scoped JDK 21/PostgreSQL 18.6 fixture,
+    and the jar is packaged. Through the real adapter an owner reassignment between two turns
+    of one thread is sent explicitly on the next turn, an approved alternative runs and is
+    recorded as `degradedFrom`, and unsupported, allowlist-narrowed and other-backend slots
+    end `FAILED` with no thread or turn started. Thirteen deliberate weakening probes
+    (unchecked backend, ignored `fixedQuality`, allowlist or discovered catalog, unreported
+    degradation, skipped or reversed alternatives, accepted missing catalog, adapter catalog
+    bypass, dropped provenance, wrong adapter backend, ignored slot backend and alternatives
+    settings) each made the focused run fail and were reverted byte-identically. All 26
+    repository-policy tests pass with zero scan findings. Frontend sources are unchanged and
+    its gates were not rerun. Not verified: a live runtime or account catalog and the Claude
+    and local backends. See the [verification record](15-quality-and-acceptance.md).
+    Implementation owner commit: `fb77cf0`; all exit checks passed on that exact code before
+    this completion mark. All 131 task identities/titles and the pending P98 follow-up are
+    preserved; only P08.4 gains a completion mark.
 - [ ] P08.5 Publish only validated final narration; add deterministic receipt fallback and narration-only retry.
 - [ ] P08.6 Implement one durable fair priority queue with isolated logical role/audience threads, interactive reservations, bounded quota/backoff/cancel/restart handling and conservative single-active-turn default; higher concurrency requires P01.7 evidence and QA-37.
 - [ ] P08.7 Add the versioned bounded quest-plan contract and selective dependency validation/replanning with a playable no-plan baseline; prove contract/admission/fallback with deterministic fixtures. A live investigation comparison may be deferred/unavailable without blocking MVP; no forced player choice or waiting for a whole arc.

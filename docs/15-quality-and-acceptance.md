@@ -30,6 +30,9 @@ Not verified: a live runtime or account catalog, the Claude and local backends (
 the owner settings API and panel, the `image` slot and per-slot readiness probes (P21.3).
 Profile resolution is configuration-only until then.
 
+The implementation owner commit is `fb77cf0`. Every check above passed on its exact
+sources, and only P08.4 then gains a completion mark (50 of 131 roadmap entries).
+
 P08.3 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **23 new cases (22 in five new suites, one in the Spring selection suite) and all 548
 packaged backend cases in 56 suites**, with zero failures, errors or skips. Rerun with the

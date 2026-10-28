@@ -17,7 +17,8 @@
   (`engine.inference.fixed-quality`), which sends every task through one slot.
 - Pass 85 focused cases, 26 of them new, and all 574 packaged backend tests in 59 suites
   with zero failures/errors/skips; thirteen deliberate weakening probes were detected. No
-  live account or runtime was contacted, and the owner settings panel remains P21.3.
+  live account or runtime was contacted, and the owner settings panel remains P21.3. Record implementation owner commit `fb77cf0` before marking P08.4
+  complete (50 of 131 roadmap entries).
 
 ## Unreleased — Separate AI sessions per campaign, role, audience and policy, 28 October 2026
 
