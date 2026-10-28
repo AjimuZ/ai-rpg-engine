@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 55/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7 and P09.1–P09.2. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 (complete since 28 October 2026), P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 56/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7 and P09.1–P09.3. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -2004,7 +2004,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 
     These skips do not show that build-context filtering or the Compose boundaries hold on this
     host. The hosted packaging job remains their gate.
-- [ ] P09.3 Implement checkpoints, source-linked summaries, freshness/invalidation, and bounded background jobs.
+- [x] P09.3 Implement checkpoints, source-linked summaries, freshness/invalidation, and bounded background jobs.
   - Package A — operational checkpoints (V16, `org.rpgengine.memory.OperationalCheckpoints`):
     the database function `memory_operational_snapshot` builds a deterministic `jsonb` snapshot
     of canonical rows (counters, mode, pending decision, player, actors with real locations,
@@ -2049,6 +2049,43 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     - Not part of this task: renewal triggers, durable session records and rehydration (P09.4),
       restart reconciliation of stale summaries and the resume card (P09.5), switching the intent,
       narration and planner callers to envelopes, entity and chapter summaries.
+  - Verified evidence (28 October 2026): 14 new cases (`SummaryContractTest` 8 pure,
+    `ContractSchemaTest` 1, `MemoryContinuityTest` 5 real PostgreSQL), the V16 step of
+    `CanonicalMigrationUpgradeTest`, and all 702 packaged backend cases in 72 suites pass with zero
+    failures/errors/skips on the scoped JDK 21/PostgreSQL 18.6 fixture; the jar is packaged. Over
+    sealed packs, production campaign creation, real commands and commit and the real fair
+    scheduler with a scripted summarizer:
+    - checkpoints hash the canonical `jsonb` text, never hold the seed, repeat as `EXISTING`,
+      become `OUTDATED` after a command, are refused under a live mutation lease, keep the newest
+      on pruning, and a forged hash or snapshot is `CORRUPT` or `DIVERGED` (capture: `MISMATCH`);
+    - four waits are not due and the fifth requests a job, a repeat is the same pending job, and a
+      single player move is a scene boundary;
+    - a recorded public summary covers exactly the five public events with versioned sources,
+      changes no canonical state, never saw the secret, and is assembled as an optional `summary`
+      item (`current`, then `behind`) only into public contexts; a privileged summary sees the
+      secret fact and stays privileged;
+    - a promise kept during summarization is caught at recording and retried; a revised belief,
+      an invalidation naming a covered event, a locale switch and a generation change make a
+      summary stale and remove it from contexts, while an unrelated invalidation does not; the
+      retired generation's queued job is cancelled;
+    - a leak and an invented coverage use the single repair and the backoff; a failed runtime
+      spends the last attempt and the range is given up; an expired lease is requeued with a new
+      fence that locks the old worker out; the installation cap throttles; database guards refuse
+      terminal changes and a second unfinished job.
+    Twenty-four deliberate weakening probes, applied only to an exported copy of the backend, each
+    made the suites fail and were reverted byte-identically. Every command of the project check
+    plan passed on the clean implementation commit: `git diff --check HEAD`, the repository checks
+    (0 findings) and their 26 tests, frontend install, typecheck, 77 tests in 13 files, 5
+    localization checks and the localized build, the full backend `verify`, packaging (27 cases;
+    4 skipped because Docker is missing and 2 opt-in), 9 backup tests with the V16 scope, and the
+    runtime probe (116 cases, 18 opt-in skips; each of its eight modules also separately). The
+    skipped packaging cases stay enforced by the hosted packaging job. Not verified: renewal and
+    rehydration consumers (P09.4), restart reconciliation and the resume card (P09.5), callers
+    switched to envelopes, entity and chapter summaries, summary quality and paraphrase (human
+    rubric), live model runs and a live V16 dump and restore. Implementation owner commit:
+    `2c7d5ed`; all exit checks passed on that exact code before this completion mark. All 131
+    task identities/titles and the pending P98 follow-up are preserved; only P09.3 gains a
+    completion mark.
 - [ ] P09.4 Implement count/context/error-triggered renewal and manual idle renewal, preserving transcript and campaign.
 - [ ] P09.5 Reconcile restart, committed narration pending, missing dependencies, and stale summaries.
 
