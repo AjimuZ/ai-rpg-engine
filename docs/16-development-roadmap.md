@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 57/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7 and P09.1–P09.4. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 58/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7 and P09.1–P09.5. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -2169,7 +2169,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     commit: `ff22ae6`; all exit checks passed on that exact code before this completion mark. All
     131 task identities/titles and the pending P98 follow-up are preserved; only P09.4 gains a
     completion mark.
-- [ ] P09.5 Reconcile restart, committed narration pending, missing dependencies, and stale summaries.
+- [x] P09.5 Reconcile restart, committed narration pending, missing dependencies, and stale summaries.
   - Package A — pinned content diagnosis and mutation pause (`PackRegistry.diagnose`,
     `ClosureDiagnosis`, `CampaignDependencies`, `CommandRuleCatalogs`, `OperationAdmissionService`):
     the campaign-loading traversal, in its own read-only transaction and without throwing for
@@ -2220,6 +2220,49 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     - Not part of this task: a UI control for narration retry or session renewal, switching the
       intent, narration and planner callers to envelopes, live-model or human evaluation of QA-08,
       and a live dump and restore.
+  - Verified evidence (28 October 2026): 11 new backend cases (`MemoryContinuityTest` 4 real
+    PostgreSQL, `PackRegistryPersistenceTest` 1, `CampaignCreationHttpTest` 1, `CampaignCommandHttpTest`
+    1, `MemoryStartupReconciliationTest` 3 pure, `MemoryStartupPassTest` 1 real context), the refreshed
+    browser reload contract and 2 new frontend specs; all 724 packaged backend cases in 74 suites pass
+    with zero failures/errors/skips on the scoped JDK 21/PostgreSQL 18.6 fixture, and 79 frontend tests
+    in 13 files pass. Over sealed packs, production creation, real commands and commit, the real
+    scheduler, journal and rehydration and scripted runtimes:
+    - restart reconciliation captures a missing or outdated checkpoint, discards and recaptures a
+      corrupt one without touching summaries, discards a checkpoint diverging at its own revision
+      (which capture alone reports as `MISMATCH`) and one ahead of the campaign, invalidates every
+      earlier summary after a divergence, leaves an unsafe boundary to a later pass and never changes
+      the campaign row or its events; a second pass does nothing;
+    - an audience whose summaries are all stale gets one replacement request (`PENDING` on the next
+      pass); after a rollback without a generation change, queued work over vanished events is
+      `CANCELLED` (`RANGE_UNAVAILABLE`), the summary is stale (`rolled-back`) and invalidated once
+      (`STATE_ROLLED_BACK`), and it stays stale and out of contexts after the campaign grows past it;
+    - a lost pinned dependency is diagnosed by its coordinates in a fresh process, which refuses fresh
+      `WAIT` and `MOVE` commands with `DEPENDENCIES_MISSING` while journaling nothing and still replays
+      an earlier request; the resume card shows the pause, the committed location, the free-input
+      decision and the warden the player saw there after the warden left unseen; the startup pass
+      counts the paused campaign;
+    - narration interrupted by a crash is requeued at restart, counted as resuming and published once
+      by the narrator, whose first session after the restart resumes at `free-input` with one pending
+      narration and without the opening; campaign row, events, resources and receipts are unchanged;
+      pending narration shows its receipt with three retries, and a delivered retry round removes it;
+    - over HTTP the card is read-only (whole-database snapshot), localized (English and Italian
+      location names), refuses bad, foreign and unadmitted requests, and a corrupt pinned pack answers
+      409 `COMMAND_DEPENDENCIES_MISSING` until its bytes are restored; a legacy unsealed campaign is
+      not paused; an upgraded ruleset, a lost dependency and changed bytes are diagnosed without
+      writing; the startup pass runs before the web server and never aborts startup.
+    Twenty-two deliberate weakening probes, applied only to an exported copy of the backend, each
+    made the suites fail and were reverted byte-identically (one was first missed because no case
+    published a retry round for an action whose journal stays pending; the test now covers it). Every
+    command of the project check plan passed on the clean implementation commit: `git diff --check
+    HEAD`, the repository checks (0 findings) and their 26 tests, frontend install, typecheck, 79 tests
+    in 13 files, 5 localization checks and the localized build, the full backend `verify`, packaging
+    (27 cases; 4 skipped because Docker is missing and 2 opt-in), 9 backup tests, and the runtime
+    probe (116 cases, 18 opt-in skips; each of its eight modules also separately). The skipped
+    packaging cases stay enforced by the hosted packaging job. Not verified: a UI control for
+    narration retry or renewal, live model behavior after a restart (QA-08 live and human rubric), a
+    live dump and restore, and a real browser run. Implementation owner commit: `3935422`; all exit
+    checks passed on that exact code before this completion mark. All 131 task identities/titles and
+    the pending P98 follow-up are preserved; only P09.5 gains a completion mark.
 
 **Exit:** a fresh AI thread resumes the correct pending decision with no invented history or replayed prologue. **Checks:** QA-08, QA-16–19, delayed promises, correction invalidation, input-budget limits. **Suggested commit:** `Add persistent memory and renewable narration sessions`.
 

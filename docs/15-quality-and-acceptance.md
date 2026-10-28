@@ -1,5 +1,39 @@
 # Quality Strategy and Acceptance Criteria
 
+P09.5 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
+**11 new backend cases and all 724 packaged backend cases in 74 suites**, with zero failures,
+errors or skips, and the jar is packaged; 79 frontend tests in 13 files pass. The new backend cases
+are `MemoryContinuityTest` (4 real PostgreSQL), `PackRegistryPersistenceTest` (1),
+`CampaignCreationHttpTest` (1), `CampaignCommandHttpTest` (1), `MemoryStartupReconciliationTest`
+(3 pure) and `MemoryStartupPassTest` (1 real context); `CampaignInterfaceContractTest` records the
+resume card in the browser reload transcript. This extends QA-08, QA-17 and QA-18 across a restart:
+
+- **Restart narration (QA-18 with QA-08):** a crash during narration leaves the action's effects;
+  recovery requeues the attempt, the narration is published exactly once without re-running the
+  action, and the narrator's first session after the restart resumes at the free-input decision
+  with the pending narration counted and no opening text.
+- **Checkpoints:** corrupt, diverged (at its own revision or ahead) and outdated checkpoints are
+  replaced from canonical state; a divergence invalidates earlier summaries; an unsafe boundary
+  waits; canonical state is unchanged.
+- **Stale summaries:** a stale history gets one replacement request; summaries and queued work of a
+  rolled-back history are retired and stay stale after the campaign grows past them.
+- **Missing dependencies:** a lost dependency, changed bytes and an upgraded ruleset are diagnosed by
+  pack coordinates without writing; fresh commands are refused with 409
+  `COMMAND_DEPENDENCIES_MISSING` while replays still work; restored content lifts the pause without a
+  restart; a legacy unsealed campaign is not paused.
+- **Resume card:** read-only over HTTP (whole-database snapshot), English and Italian location names,
+  the player's knowledge of who is present rather than real positions, receipts of actions awaiting
+  narration, and fixed error codes; the interface shows it in both languages.
+- **Probes:** 22 deliberate weakening probes, applied only to an exported copy of the backend, each
+  made the suites fail and were reverted byte-identically.
+
+Every command of the project check plan passed on the implementation commit `3935422`.
+
+Not verified:
+- live model behavior after a restart and the QA-08 human rubric;
+- a UI control for narration retry or session renewal, and a real browser run of the card;
+- a live dump and restore.
+
 P09.4 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **11 new cases and all 713 packaged backend cases in 72 suites**, with zero failures, errors or
 skips, and the jar is packaged. The new cases are `ScopedSessionsTest` (6 with doubles),
