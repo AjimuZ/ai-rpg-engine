@@ -165,7 +165,7 @@ Since P08.5 the narration contract is called by the post-commit presentation job
 is assembled from the committed operation's public events, and only accepted output whose
 binding is still current is published ([docs/07 section 6](07-turn-protocol.md#p085-publication-receipt-fallback-and-narration-only-retry)).
 The intent contract is not yet called by a gameplay path (free-text command entry), and richer
-audience-filtered contexts (facts, glossary, privileged phrase sets) are P09.2; P09.1 supplies their typed knowledge sources (`KnowledgeView.forActor` without truth and `KnowledgeView.privileged`, [docs/08 section 4](08-memory-and-continuity.md#p091-typed-knowledge)). Since P08.3 every contract task runs in the session of its own
+audience-filtered contexts (facts, glossary, privileged phrase sets) are provided since P09.2 by `ContextAssembler` (stamped envelopes, standings, budgets, glossary binding) and `withheldPhrases` (disclosure-guard markers) over the P09.1 typed knowledge views ([docs/08](08-memory-and-continuity.md#p092-context-envelopes-budgets-and-retrieval)); switching the intent, narration and planner callers to them is P09.3 onward. Since P08.3 every contract task runs in the session of its own
 campaign/generation/role/audience/policy scope ([docs/06 section 7](06-codex-integration.md#p083-session-scoping)). No live runtime has produced output for
 these contracts.
 

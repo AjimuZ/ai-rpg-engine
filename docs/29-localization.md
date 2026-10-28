@@ -270,6 +270,14 @@ private prose in the campaign's narrative locale (its `locale` field must match
 `outputLocale`); structural ids and predicate vocabulary stay language independent, and no
 plan prose is ever shown or translated into public text.
 
+Since P09.2 every context item carries its own language: claim statements, commitment terms and
+narration passages keep the language they were written in, and event statements are rendered in
+the output locale. Full-text retrieval stems each text with its own language's configuration.
+The envelope stamps the output locale with its locale and glossary revisions, and binds the
+pinned pack's reviewed glossary for the definitions its items name. Each entry carries the
+output-locale rendering, and a `term` avoids the other locale's form
+([docs/08](08-memory-and-continuity.md#p092-context-envelopes-budgets-and-retrieval)).
+
 Validate locale echo, glossary IDs, permitted quotes, output bounds and source
 references. A statistical language detector is only a warning signal on short
 or mixed-name passages. One narration-only repair may correct wrong-language

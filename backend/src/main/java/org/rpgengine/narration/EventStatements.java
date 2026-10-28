@@ -24,7 +24,7 @@ import tools.jackson.databind.JsonNode;
  * names for them. The Italian wording avoids gendered participles because character gender is not
  * modelled; it still needs the independent human review that every Italian message receives.
  */
-final class EventStatements {
+public final class EventStatements {
     /** The only event payload version these statements understand. */
     static final int VERSION = 1;
 
@@ -42,7 +42,7 @@ final class EventStatements {
      * @param names display names of the campaign actors the payload may reference
      * @return the statement, or empty when the event cannot be stated faithfully
      */
-    static Optional<String> state(SupportedLocale locale, String type, int version, JsonNode payload,
+    public static Optional<String> state(SupportedLocale locale, String type, int version, JsonNode payload,
             Map<UUID, String> names) {
         if (version != VERSION || !payload.isObject()) {
             return Optional.empty();
@@ -162,7 +162,7 @@ final class EventStatements {
     }
 
     /** @return every actor identity a supported payload may reference, for one bounded name lookup */
-    static List<UUID> referencedActors(JsonNode payload) {
+    public static List<UUID> referencedActors(JsonNode payload) {
         var actors = new ArrayList<UUID>();
         for (String field : List.of("actorId", "speakerActorId", "recipientActorId")) {
             add(payload.path(field), actors);

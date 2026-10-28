@@ -1015,3 +1015,54 @@ others), and `KnowledgeView.privileged` the full record. Writers bump `knowledge
 
 Tests: `KnowledgeLedgerTest` (real PostgreSQL, sealed pack, production creation, real admission,
 rules, resolver and commit) and the V15 step of `CanonicalMigrationUpgradeTest`.
+
+## Context envelopes, budgets and retrieval (P09.2)
+
+`org.rpgengine.memory.ContextAssembler.assemble(Request)` builds one stamped, budgeted AI task
+context from canonical storage. It reads one read-only repeatable-read snapshot and loads the
+glossary outside it, and it refuses an ambient transaction. The design is in
+[docs/08](../docs/08-memory-and-continuity.md#p092-context-envelopes-budgets-and-retrieval).
+
+- **Request:** adventure, campaign, role and audience (the role must permit the audience), an
+  optional committed focus operation, up to 64 focus references, an optional full-text query of
+  at most 1,000 characters, the caller's instruction-token estimate, a `ContextBudget` and the
+  caller's policy hash.
+- **Result:** `Assembled(ContextEnvelope)` or `TooLarge` (`CONTEXT_TOO_LARGE`, with required and
+  available tokens per section). Mandatory material is never truncated.
+- **Envelope:**
+  - a `Stamp` (generation, revision, world time, hashes, locale and glossary revisions, epochs);
+  - the budget and estimator method;
+  - a legend of the standings present;
+  - sections `state`, `obligations`, `knowledge`, `history` and `planning`, holding items with
+    `ref`, `standing` and `lang`;
+  - per-section `omitted` counts, `glossaryStatus`, `glossary` and `glossaryOmitted`.
+
+  `json()` is deterministic, `digest()` is its SHA-256, and `partial()` reports omissions.
+- **Audience filtering:**
+  - `public` and `character:actor:<uuid>` contexts come from `KnowledgeView.forActorWithin`
+    (new, caller-transaction variant);
+  - `privileged` contexts come from `privilegedWithin`, plus the assumptions of usable quest
+    plans read through the preparation-owned `PlanAssumptions.usableWithin` (current
+    generation, gate-admitted, validated or partially invalidated).
+
+  `fact` and `assumption` items are refused for limited audiences.
+- **Retrieval:** required items first, then the `id` tier (explicit references; `event:` and
+  `narration:` references also fetch records older than the recent window), the `causal` tier,
+  the `text` tier (PostgreSQL full text with the `english` or `italian` configuration of each
+  text's language) and finally the `recent` tier.
+- **Selection:** `ContextSelection` is pure and deterministic, and enforces per-section
+  allowances and headroom. `TokenEstimator` uses a conservative one token per two UTF-8 bytes.
+- **Glossary:** `PackGlossaries` binds the pinned pack's glossary for the definitions the items
+  name, in the output locale. A `term` avoids the other locale's form.
+- **Staleness and guard:** `staleness(stamp)` lists changed components.
+  `withheldPhrases(campaign, holder)` returns disclosure-guard markers.
+
+`EventStatements` is now public so the assembler can state events in the output locale.
+
+Tests:
+- `ContextSelectionTest` (pure): estimator, budgets, item and envelope invariants, ranking,
+  allowances and overflow.
+- `ContextAssemblerTest` (real PostgreSQL, sealed packs, production creation, commands, commit
+  and the planning pipeline with a scripted planner): audience filtering, standings, the
+  overflow boundary, ID and English/Italian full-text retrieval beyond the window, glossary
+  binding, staleness and withheld phrases.

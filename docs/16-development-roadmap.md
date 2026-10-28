@@ -1852,6 +1852,49 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     All 131 task identities/titles and the pending P98 follow-up are preserved; only P09.1
     gains a completion mark.
 - [ ] P09.2 Build stamped context envelopes, mandatory/optional budgets, ID/full-text retrieval and overflow behavior; distinguish private planning assumptions from admitted facts and public narration, with language/glossary binding.
+  - Package A — envelope and standings (`org.rpgengine.memory`): `ContextEnvelope` with a
+    `Stamp` (adventure, campaign, generation, revision, world time, role, audience, holder,
+    focus operation, pack/ruleset/policy hashes, output locale with locale and glossary
+    revisions, query-scope epochs), deterministic JSON, SHA-256 digest, per-section omission
+    counts and a legend; `ContextItem` labels every item `state`, `event`, `fact`,
+    `common-knowledge`, `obligation`, `belief`, `last-known`, `narration` or `assumption`;
+    `fact` and `assumption` are privileged-only, and assumptions live only in the `planning`
+    section. `staleness(stamp)` reports changed generation, revision, locale, glossary and
+    epochs.
+  - Package B — budgets and overflow: `ContextBudget` (standard 12,000 input, 2,000 output and
+    1,000 safety reserve, 500 protocol overhead, `forModel` scaling, per-section optional
+    allowances, planning room only for privileged audiences), the conservative subadditive
+    `TokenEstimator` (one token per two UTF-8 bytes, recorded in the envelope) and the pure
+    `ContextSelection`: mandatory material is never truncated and returns `CONTEXT_TOO_LARGE`
+    when it cannot fit; optional material is taken by rank within allowances, then headroom,
+    later sections losing first, and every drop is counted.
+  - Package C — audience-first retrieval: `ContextAssembler` reads one repeatable-read snapshot
+    per audience (`KnowledgeView.forActorWithin`/`privilegedWithin`, public events stated by
+    `EventStatements`, published narration, and assumptions of usable quest plans with
+    freshness through the preparation-owned `PlanAssumptions`)
+    and ranks required, `id` (explicit references; `event:`/`narration:` references fetch older
+    records), `causal`, `text` (PostgreSQL full text with the `english`/`italian` configuration
+    of each text) and `recent` tiers; `withheldPhrases` supplies disclosure-guard markers.
+  - Package D — language and glossary binding: every text item keeps its language,
+    `PackGlossaries` binds the pinned pack's reviewed terms for the definitions the items name
+    in the output locale (a `term` avoids the other locale's form), each item is charged for its
+    terms, and an unavailable glossary or terms beyond the 128 bound are rendered explicitly.
+    See [docs/08](08-memory-and-continuity.md#p092-context-envelopes-budgets-and-retrieval).
+  - Exit checks:
+    - Pure suite: estimator bound and subadditivity, budget derivation and refusal, item and
+      envelope invariants, deduplication, ranking, allowances, the overflow result and
+      deterministic rendering.
+    - Real PostgreSQL suite over sealed packs, production creation, real commands and commit
+      and the real planning pipeline: limited audiences receive labelled beliefs without truth
+      or other holders' secrets; privileged contexts keep facts, beliefs and assumptions apart;
+      the exact overflow boundary; ID and English/Italian full-text retrieval beyond the recent
+      window; locale-bound glossary terms; full charging of every rendered part; staleness,
+      withheld phrases and retired-generation plans.
+    - Deliberate weakening probes; the full packaged backend and the repository checks.
+    - Not part of this task: switching the intent, narration and planner callers to the
+      envelope (P09.3 onward), checkpoints, summaries and renewal (P09.3–P09.5), NPC-side
+      history for character contexts (P11/P15), dependency-pack glossaries and semantic
+      retrieval.
 - [ ] P09.3 Implement checkpoints, source-linked summaries, freshness/invalidation, and bounded background jobs.
 - [ ] P09.4 Implement count/context/error-triggered renewal and manual idle renewal, preserving transcript and campaign.
 - [ ] P09.5 Reconcile restart, committed narration pending, missing dependencies, and stale summaries.

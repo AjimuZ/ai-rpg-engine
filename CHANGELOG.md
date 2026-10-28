@@ -1,5 +1,41 @@
 # Changelog
 
+## Unreleased — Stamped AI contexts with budgets, retrieval and audience-safe standings, 28 October 2026
+
+- Build each AI task's context from the saved campaign, not from chat history. A context is
+  stamped with exactly what it was built from: campaign, recovery generation, state revision,
+  world time, role and audience, pack, rules and policy hashes, output language with its
+  language and glossary versions, and the knowledge versions it read. A fingerprint of the
+  exact content makes stale or changed input detectable, and the engine can list what changed
+  since a context was built.
+- Filter by audience before anything is searched or ranked. The player's narrator sees only
+  what the player character believes, common knowledge, where it last saw people, its own
+  promises and public history. A character's context holds only that character's view. Hidden
+  truth, other characters' secrets, real locations and planning hypotheses reach only
+  privileged planning roles.
+- Label every piece of context with what it is: current state, a past event, a hidden fact
+  with its truth, common knowledge, an open promise, a belief that may be wrong, a last known
+  location, text already told to the player, or a planner's private assumption. Beliefs,
+  narration and assumptions are never presented as established facts.
+- Keep every context within a bounded input budget, by default 12,000 tokens with room for the
+  answer and a safety margin, sized down for smaller models. Required material (where the
+  character is, who is present, open promises, the action being narrated) is never cut. If it
+  does not fit, the engine reports that the context is too large instead of sending a
+  truncated one. Optional history is dropped from the least relevant end and counted, so a
+  partial context says it is partial.
+- Find what matters first: records named explicitly by the task, then what the current action
+  changed or who informed the character, then English or Italian full-text matches over the
+  whole public history (older dialogue included), then recent and important records.
+- Bind language and terminology: each piece keeps its own language, and the context carries
+  the pack's reviewed names for the places it mentions in the campaign's language, with the
+  other language's form marked to avoid.
+- Keep plan storage private to the preparation layer: planning assumptions reach a privileged
+  context through a dedicated reader, and only for plans still valid in the current recovery
+  generation.
+- Pass 13 new cases and all 687 packaged backend tests in 70 suites with zero
+  failures/errors/skips; 13 deliberate weakening probes were detected. The narration, intent
+  and planning tasks adopt these contexts with checkpoints and renewal (P09.3 onward).
+
 ## Unreleased — Typed knowledge, last known locations and unresolved commitments, 28 October 2026
 
 - Record what is true separately from what each character believes. A claim about a place,

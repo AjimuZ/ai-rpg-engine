@@ -61,56 +61,72 @@ public class KnowledgeView {
         Objects.requireNonNull(campaign, "campaign");
         Objects.requireNonNull(holder, "holder");
         independent();
-        return snapshot.execute(status -> {
-            var self = jdbc.query("select a.location_id, c.state_revision, c.world_time_seconds from actor a "
-                    + "join campaign c on c.id = a.campaign_id where a.campaign_id = ? and a.id = ?",
-                    (row, index) -> new Object[] {row.getString(1), row.getLong(2), row.getLong(3)}, campaign, holder);
-            if (self.isEmpty()) {
-                throw new IllegalArgumentException("unknown audience");
-            }
-            long revision = (Long) self.getFirst()[1];
-            long worldTime = (Long) self.getFirst()[2];
-            var beliefs = bounded(jdbc.query("select b.id, b.stance, b.acquisition, b.informant_actor_id, b.source_ref, "
-                    + "b.learned_revision, b.learned_world_time, " + CLAIM_COLUMNS + " from knowledge_belief b "
-                    + "join knowledge_claim c on c.campaign_id = b.campaign_id and c.id = b.claim_id "
-                    + "where b.campaign_id = ? and b.holder_actor_id = ? and b.superseded_revision is null "
-                    + "order by b.learned_revision, b.id limit ?",
-                    (row, index) -> new HeldBelief(row.getObject("id", UUID.class), content(row),
-                            KnowledgeChange.Stance.valueOf(row.getString("stance")),
-                            KnowledgeChange.Acquisition.valueOf(row.getString("acquisition")),
-                            row.getObject("informant_actor_id", UUID.class), row.getString("source_ref"),
-                            row.getLong("learned_revision"), row.getLong("learned_world_time")),
-                    campaign, holder, MAX_ROWS + 1));
-            // A held belief is the more specific record, so a common claim the holder already has a
-            // stance on is listed once, as that belief.
-            var common = bounded(jdbc.query("select c.established_revision, " + CLAIM_COLUMNS + " from knowledge_claim c "
-                    + "where c.campaign_id = ? and c.disclosure = 'COMMON' and c.superseded_revision is null "
-                    + "and not exists (select 1 from knowledge_belief b where b.campaign_id = c.campaign_id "
-                    + "and b.claim_id = c.id and b.holder_actor_id = ? and b.superseded_revision is null) "
-                    + "order by c.established_revision, c.id limit ?",
-                    (row, index) -> new CommonClaim(content(row), row.getLong("established_revision")),
-                    campaign, holder, MAX_ROWS + 1));
-            var lastKnown = bounded(jdbc.query("select subject_actor_id, location_id, acquisition, informant_actor_id, "
-                    + "observed_revision, observed_world_time, absence_revision, absence_world_time from actor_sighting "
-                    + "where campaign_id = ? and observer_actor_id = ? order by subject_actor_id limit ?",
-                    (row, index) -> new LastKnown(row.getObject(1, UUID.class), row.getString(2),
-                            KnowledgeChange.Acquisition.valueOf(row.getString(3)), row.getObject(4, UUID.class),
-                            row.getLong(5), row.getLong(6), nullableLong(row, 7), nullableLong(row, 8)),
-                    campaign, holder, MAX_ROWS + 1));
-            var commitments = bounded(jdbc.query("select id, kind, debtor_actor_id, creditor_actor_id, subject_ref, "
-                    + "terms, terms_locale, quoted, due_world_time, made_revision from actor_commitment "
-                    + "where campaign_id = ? and status = 'OPEN' and (debtor_actor_id = ? or creditor_actor_id = ? "
-                    + "or disclosure = 'COMMON') order by made_revision, id limit ?",
-                    (row, index) -> {
-                        Long due = nullableLong(row, 9);
-                        return new OpenCommitment(row.getObject(1, UUID.class),
-                                KnowledgeChange.CommitmentKind.valueOf(row.getString(2)), row.getObject(3, UUID.class),
-                                row.getObject(4, UUID.class), row.getString(5), row.getString(6), row.getString(7),
-                                row.getBoolean(8), due, due != null && worldTime > due, row.getLong(10));
-                    }, campaign, holder, holder, MAX_ROWS + 1));
-            return new Audience(campaign, holder, revision, worldTime, (String) self.getFirst()[0], beliefs, common,
-                    lastKnown, commitments);
-        });
+        return snapshot.execute(status -> forActorWithin(campaign, holder));
+    }
+
+    /**
+     * Read what one actor may know inside the caller's transaction, so a context assembler (P09.2)
+     * can combine this view with other reads of the same snapshot. The caller must hold a read-only
+     * repeatable-read transaction; nothing here checks the isolation level.
+     *
+     * @param campaign campaign the caller authorized
+     * @param holder audience actor of that campaign
+     * @return detached audience view
+     * @throws IllegalArgumentException when the holder is not an actor of the campaign
+     * @throws IllegalStateException without an active transaction or when a list exceeds {@link #MAX_ROWS}
+     */
+    public Audience forActorWithin(UUID campaign, UUID holder) {
+        Objects.requireNonNull(campaign, "campaign");
+        Objects.requireNonNull(holder, "holder");
+        within();
+        var self = jdbc.query("select a.location_id, c.state_revision, c.world_time_seconds from actor a "
+                + "join campaign c on c.id = a.campaign_id where a.campaign_id = ? and a.id = ?",
+                (row, index) -> new Object[] {row.getString(1), row.getLong(2), row.getLong(3)}, campaign, holder);
+        if (self.isEmpty()) {
+            throw new IllegalArgumentException("unknown audience");
+        }
+        long revision = (Long) self.getFirst()[1];
+        long worldTime = (Long) self.getFirst()[2];
+        var beliefs = bounded(jdbc.query("select b.id, b.stance, b.acquisition, b.informant_actor_id, b.source_ref, "
+                + "b.learned_revision, b.learned_world_time, " + CLAIM_COLUMNS + " from knowledge_belief b "
+                + "join knowledge_claim c on c.campaign_id = b.campaign_id and c.id = b.claim_id "
+                + "where b.campaign_id = ? and b.holder_actor_id = ? and b.superseded_revision is null "
+                + "order by b.learned_revision, b.id limit ?",
+                (row, index) -> new HeldBelief(row.getObject("id", UUID.class), content(row),
+                        KnowledgeChange.Stance.valueOf(row.getString("stance")),
+                        KnowledgeChange.Acquisition.valueOf(row.getString("acquisition")),
+                        row.getObject("informant_actor_id", UUID.class), row.getString("source_ref"),
+                        row.getLong("learned_revision"), row.getLong("learned_world_time")),
+                campaign, holder, MAX_ROWS + 1));
+        // A held belief is the more specific record, so a common claim the holder already has a
+        // stance on is listed once, as that belief.
+        var common = bounded(jdbc.query("select c.established_revision, " + CLAIM_COLUMNS + " from knowledge_claim c "
+                + "where c.campaign_id = ? and c.disclosure = 'COMMON' and c.superseded_revision is null "
+                + "and not exists (select 1 from knowledge_belief b where b.campaign_id = c.campaign_id "
+                + "and b.claim_id = c.id and b.holder_actor_id = ? and b.superseded_revision is null) "
+                + "order by c.established_revision, c.id limit ?",
+                (row, index) -> new CommonClaim(content(row), row.getLong("established_revision")),
+                campaign, holder, MAX_ROWS + 1));
+        var lastKnown = bounded(jdbc.query("select subject_actor_id, location_id, acquisition, informant_actor_id, "
+                + "observed_revision, observed_world_time, absence_revision, absence_world_time from actor_sighting "
+                + "where campaign_id = ? and observer_actor_id = ? order by subject_actor_id limit ?",
+                (row, index) -> new LastKnown(row.getObject(1, UUID.class), row.getString(2),
+                        KnowledgeChange.Acquisition.valueOf(row.getString(3)), row.getObject(4, UUID.class),
+                        row.getLong(5), row.getLong(6), nullableLong(row, 7), nullableLong(row, 8)),
+                campaign, holder, MAX_ROWS + 1));
+        var commitments = bounded(jdbc.query("select id, kind, debtor_actor_id, creditor_actor_id, subject_ref, "
+                + "terms, terms_locale, quoted, due_world_time, made_revision from actor_commitment "
+                + "where campaign_id = ? and status = 'OPEN' and (debtor_actor_id = ? or creditor_actor_id = ? "
+                + "or disclosure = 'COMMON') order by made_revision, id limit ?",
+                (row, index) -> {
+                    Long due = nullableLong(row, 9);
+                    return new OpenCommitment(row.getObject(1, UUID.class),
+                            KnowledgeChange.CommitmentKind.valueOf(row.getString(2)), row.getObject(3, UUID.class),
+                            row.getObject(4, UUID.class), row.getString(5), row.getString(6), row.getString(7),
+                            row.getBoolean(8), due, due != null && worldTime > due, row.getLong(10));
+                }, campaign, holder, holder, MAX_ROWS + 1));
+        return new Audience(campaign, holder, revision, worldTime, (String) self.getFirst()[0], beliefs, common,
+                lastKnown, commitments);
     }
 
     /**
@@ -125,60 +141,73 @@ public class KnowledgeView {
     public Privileged privileged(UUID campaign) {
         Objects.requireNonNull(campaign, "campaign");
         independent();
-        return snapshot.execute(status -> {
-            var counters = jdbc.query("select state_revision, world_time_seconds from campaign where id = ?",
-                    (row, index) -> new long[] {row.getLong(1), row.getLong(2)}, campaign);
-            if (counters.isEmpty()) {
-                throw new IllegalArgumentException("unknown campaign");
-            }
-            long worldTime = counters.getFirst()[1];
-            var claims = bounded(jdbc.query("select c.disclosure, c.truth, c.established_revision, "
-                    + "c.established_event_sequence, c.truth_revision, c.truth_event_sequence, c.supersedes, "
-                    + "c.superseded_revision, " + CLAIM_COLUMNS + " from knowledge_claim c where c.campaign_id = ? "
-                    + "order by c.established_revision, c.id limit ?",
-                    (row, index) -> new TruthClaim(content(row),
-                            KnowledgeChange.Disclosure.valueOf(row.getString("disclosure")),
-                            KnowledgeChange.Truth.valueOf(row.getString("truth")), row.getLong("established_revision"),
-                            row.getLong("established_event_sequence"), row.getLong("truth_revision"),
-                            row.getLong("truth_event_sequence"), row.getObject("supersedes", UUID.class),
-                            nullableLong(row, "superseded_revision")),
-                    campaign, MAX_ROWS + 1));
-            var beliefs = bounded(jdbc.query("select id, holder_actor_id, claim_id, stance, acquisition, "
-                    + "informant_actor_id, source_ref, learned_revision, learned_event_sequence, supersedes, "
-                    + "superseded_revision from knowledge_belief where campaign_id = ? "
-                    + "order by learned_revision, id limit ?",
-                    (row, index) -> new RecordedBelief(row.getObject(1, UUID.class), row.getObject(2, UUID.class),
-                            row.getObject(3, UUID.class), KnowledgeChange.Stance.valueOf(row.getString(4)),
-                            KnowledgeChange.Acquisition.valueOf(row.getString(5)), row.getObject(6, UUID.class),
-                            row.getString(7), row.getLong(8), row.getLong(9), row.getObject(10, UUID.class),
-                            nullableLong(row, 11)),
-                    campaign, MAX_ROWS + 1));
-            var whereabouts = bounded(jdbc.query("select s.observer_actor_id, s.subject_actor_id, s.location_id, "
-                    + "s.acquisition, s.informant_actor_id, s.observed_revision, s.observed_event_sequence, "
-                    + "s.absence_revision, a.location_id from actor_sighting s join actor a "
-                    + "on a.campaign_id = s.campaign_id and a.id = s.subject_actor_id where s.campaign_id = ? "
-                    + "order by s.observer_actor_id, s.subject_actor_id limit ?",
-                    (row, index) -> new Whereabouts(row.getObject(1, UUID.class), row.getObject(2, UUID.class),
-                            row.getString(3), KnowledgeChange.Acquisition.valueOf(row.getString(4)),
-                            row.getObject(5, UUID.class), row.getLong(6), row.getLong(7), nullableLong(row, 8),
-                            row.getString(9)),
-                    campaign, MAX_ROWS + 1));
-            var commitments = bounded(jdbc.query("select id, kind, debtor_actor_id, creditor_actor_id, subject_ref, "
-                    + "terms, terms_locale, quoted, disclosure, due_world_time, status, made_revision, "
-                    + "made_event_sequence, resolved_revision, resolved_event_sequence from actor_commitment "
-                    + "where campaign_id = ? order by made_revision, id limit ?",
-                    (row, index) -> {
-                        Long due = nullableLong(row, 10);
-                        var state = KnowledgeChange.CommitmentStatus.valueOf(row.getString(11));
-                        return new CommitmentRecord(row.getObject(1, UUID.class),
-                                KnowledgeChange.CommitmentKind.valueOf(row.getString(2)), row.getObject(3, UUID.class),
-                                row.getObject(4, UUID.class), row.getString(5), row.getString(6), row.getString(7),
-                                row.getBoolean(8), KnowledgeChange.CommitmentDisclosure.valueOf(row.getString(9)), due,
-                                state, state == KnowledgeChange.CommitmentStatus.OPEN && due != null && worldTime > due,
-                                row.getLong(12), row.getLong(13), nullableLong(row, 14), nullableLong(row, 15));
-                    }, campaign, MAX_ROWS + 1));
-            return new Privileged(campaign, counters.getFirst()[0], worldTime, claims, beliefs, whereabouts, commitments);
-        });
+        return snapshot.execute(status -> privilegedWithin(campaign));
+    }
+
+    /**
+     * Read the complete privileged record inside the caller's read-only repeatable-read
+     * transaction; see {@link #forActorWithin} for why and {@link #privileged} for the content.
+     *
+     * @param campaign campaign the caller authorized
+     * @return detached privileged view
+     * @throws IllegalArgumentException for an unknown campaign
+     * @throws IllegalStateException without an active transaction or when a list exceeds {@link #MAX_ROWS}
+     */
+    public Privileged privilegedWithin(UUID campaign) {
+        Objects.requireNonNull(campaign, "campaign");
+        within();
+        var counters = jdbc.query("select state_revision, world_time_seconds from campaign where id = ?",
+                (row, index) -> new long[] {row.getLong(1), row.getLong(2)}, campaign);
+        if (counters.isEmpty()) {
+            throw new IllegalArgumentException("unknown campaign");
+        }
+        long worldTime = counters.getFirst()[1];
+        var claims = bounded(jdbc.query("select c.disclosure, c.truth, c.established_revision, "
+                + "c.established_event_sequence, c.truth_revision, c.truth_event_sequence, c.supersedes, "
+                + "c.superseded_revision, " + CLAIM_COLUMNS + " from knowledge_claim c where c.campaign_id = ? "
+                + "order by c.established_revision, c.id limit ?",
+                (row, index) -> new TruthClaim(content(row),
+                        KnowledgeChange.Disclosure.valueOf(row.getString("disclosure")),
+                        KnowledgeChange.Truth.valueOf(row.getString("truth")), row.getLong("established_revision"),
+                        row.getLong("established_event_sequence"), row.getLong("truth_revision"),
+                        row.getLong("truth_event_sequence"), row.getObject("supersedes", UUID.class),
+                        nullableLong(row, "superseded_revision")),
+                campaign, MAX_ROWS + 1));
+        var beliefs = bounded(jdbc.query("select id, holder_actor_id, claim_id, stance, acquisition, "
+                + "informant_actor_id, source_ref, learned_revision, learned_event_sequence, supersedes, "
+                + "superseded_revision from knowledge_belief where campaign_id = ? "
+                + "order by learned_revision, id limit ?",
+                (row, index) -> new RecordedBelief(row.getObject(1, UUID.class), row.getObject(2, UUID.class),
+                        row.getObject(3, UUID.class), KnowledgeChange.Stance.valueOf(row.getString(4)),
+                        KnowledgeChange.Acquisition.valueOf(row.getString(5)), row.getObject(6, UUID.class),
+                        row.getString(7), row.getLong(8), row.getLong(9), row.getObject(10, UUID.class),
+                        nullableLong(row, 11)),
+                campaign, MAX_ROWS + 1));
+        var whereabouts = bounded(jdbc.query("select s.observer_actor_id, s.subject_actor_id, s.location_id, "
+                + "s.acquisition, s.informant_actor_id, s.observed_revision, s.observed_event_sequence, "
+                + "s.absence_revision, a.location_id from actor_sighting s join actor a "
+                + "on a.campaign_id = s.campaign_id and a.id = s.subject_actor_id where s.campaign_id = ? "
+                + "order by s.observer_actor_id, s.subject_actor_id limit ?",
+                (row, index) -> new Whereabouts(row.getObject(1, UUID.class), row.getObject(2, UUID.class),
+                        row.getString(3), KnowledgeChange.Acquisition.valueOf(row.getString(4)),
+                        row.getObject(5, UUID.class), row.getLong(6), row.getLong(7), nullableLong(row, 8),
+                        row.getString(9)),
+                campaign, MAX_ROWS + 1));
+        var commitments = bounded(jdbc.query("select id, kind, debtor_actor_id, creditor_actor_id, subject_ref, "
+                + "terms, terms_locale, quoted, disclosure, due_world_time, status, made_revision, "
+                + "made_event_sequence, resolved_revision, resolved_event_sequence from actor_commitment "
+                + "where campaign_id = ? order by made_revision, id limit ?",
+                (row, index) -> {
+                    Long due = nullableLong(row, 10);
+                    var state = KnowledgeChange.CommitmentStatus.valueOf(row.getString(11));
+                    return new CommitmentRecord(row.getObject(1, UUID.class),
+                            KnowledgeChange.CommitmentKind.valueOf(row.getString(2)), row.getObject(3, UUID.class),
+                            row.getObject(4, UUID.class), row.getString(5), row.getString(6), row.getString(7),
+                            row.getBoolean(8), KnowledgeChange.CommitmentDisclosure.valueOf(row.getString(9)), due,
+                            state, state == KnowledgeChange.CommitmentStatus.OPEN && due != null && worldTime > due,
+                            row.getLong(12), row.getLong(13), nullableLong(row, 14), nullableLong(row, 15));
+                }, campaign, MAX_ROWS + 1));
+        return new Privileged(campaign, counters.getFirst()[0], worldTime, claims, beliefs, whereabouts, commitments);
     }
 
     /** Map the shared claim columns; truth and disclosure are deliberately not part of the content. */
@@ -207,6 +236,13 @@ public class KnowledgeView {
             throw new IllegalStateException("knowledge view limit exceeded");
         }
         return List.copyOf(rows);
+    }
+
+    /** Require the caller's transaction for the {@code ...Within} readers. */
+    private static void within() {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("knowledge view requires the caller's snapshot transaction");
+        }
     }
 
     /** Reject ambient transactions so the snapshot cannot be downgraded or mixed with writes. */

@@ -115,8 +115,8 @@ Decisions and limits:
 
 - The P06.2 free-text `campaign_known_fact` projection stays unchanged and has no writer. It is
   not a rule source, and the quest planner's `fact-known-to` predicate still reads it. Context
-  assembly (P09.2) and panels (P10.5) move to the typed views. Retiring the old table is decided
-  then.
+  assembly (P09.2) reads only the typed views. Panels move in P10.5, which also retires the old
+  table.
 - Only trusted resolvers write knowledge. No player command, effect node or HTTP route creates
   claims or commitments yet: the pack `reveal` effect, plan consumers (opportunities, adopted
   pending events) and item creation stay P10. NPC-side observation, witnesses of a commitment
@@ -146,6 +146,147 @@ Compute a task input budget from the supported model's effective context allowan
 An illustrative 12,000-token allocation is 2,000 for task/rules, 3,000 for current state, 2,000 for relevant objectives and commitments, 3,000 for selected memory, and 2,000 of flexible headroom. Measure with an appropriate tokenizer or conservative estimator and record estimation uncertainty.
 
 Mandatory state is never silently truncated. If it cannot fit, reduce task scope, use an approved higher-capacity profile, or return a controlled context-too-large error. Remove low-ranked optional history first. No full campaign transcript is appended by default.
+
+### P09.2 context envelopes, budgets and retrieval
+
+Implemented in `org.rpgengine.memory` (`ContextAssembler`, `ContextEnvelope`, `ContextItem`,
+`ContextSelection`, `ContextBudget`, `TokenEstimator`, `PackGlossaries`). No migration is needed.
+Contract callers have not been switched to the envelope yet (see limits).
+
+**Audience first.** Candidates are read for exactly one audience, inside one read-only
+repeatable-read snapshot, before anything is ranked. A record the audience may not see never
+reaches ranking, selection, rendering or a digest.
+
+| Audience (role must permit it) | Knowledge | History | Planning |
+| --- | --- | --- | --- |
+| `public` (player character) | `KnowledgeView.forActorWithin`: own beliefs without truth, current `COMMON` claims, last known locations, open commitments it is party to or that are common | `PUBLIC` events stated by `EventStatements` in the output locale, published narration | none |
+| `character:actor:<uuid>` | the same view for that actor | none (no record yet of what an NPC witnessed) | none |
+| `privileged` | `KnowledgeView.privilegedWithin`: current claims with truth and disclosure, every current belief, sightings with the real location beside the last known one, open commitments | as public | assumptions of the newest version of each usable quest plan: gate-admitted in the current recovery generation, latest disposition `VALIDATED` or `PARTIALLY_INVALIDATED`, at most 32 artifacts, with `fresh` (every whole-plan dependency still current) |
+
+**Standings.** Every item is rendered with a `standing` label, and the envelope carries a fixed
+English legend for the labels present. Admitted canonical records are `state`, `event`, `fact`
+(privileged: truth and interval), `common-knowledge` and `obligation`. Perspectives are
+`belief` and `last-known`, which may be wrong. `narration` is text already told to the player,
+not a source of truth. `assumption` is a planner's private, unverified hypothesis, never
+admitted and never public. `fact` and `assumption` are privileged-only. Assumptions live only
+in the `planning` section. A limited-audience envelope containing either is refused at
+selection and again at construction: an assembler defect throws, it is never filtered silently.
+
+**Stamp and digest.** The stamp records adventure, campaign, recovery generation, state
+revision, world time, role, audience, holder, focus operation, pack, ruleset and policy hashes,
+output locale with its locale and glossary revisions, and the query-scope epochs read. A public
+or character stamp records `knowledge:claims`, `knowledge:<holder>`, `sightings:<holder>`,
+`commitments:<holder>` and `actor:<holder>`; a privileged stamp records `knowledge:claims`
+(the revision covers the rest). The digest is the SHA-256 of the exact compact JSON.
+`ContextAssembler.staleness(stamp)` lists what changed since: `generation`, `revision`,
+`locale`, `glossary` and `epoch:<scope>`.
+
+**Retrieval tiers** (best first; a record found twice keeps its best copy):
+
+1. `required`: mandatory material (below).
+2. `id`: the record, or one of its subjects, objects or parties, is an explicit focus
+   reference. An `event:<sequence>` or `narration:<operation>` focus reference also fetches
+   that public record when it is older than the recent window. Actors named by the focus
+   operation's events join the focus.
+3. `causal`: written at the focus operation's revision, or told by a focus actor.
+4. `text`: PostgreSQL full-text match of the task query (`websearch_to_tsquery`). Each text is
+   searched with the stemming configuration of its own language (`english` or `italian`):
+   claim statements and commitment terms by their recorded language, published narration by its
+   passage language, and public event payload strings by the campaign output locale. Only rows
+   the audience may already read are searched: claim and commitment ids from its own view, and
+   public events and narration over the whole campaign history, at most 16 matches per source.
+5. `recent`: everything else, by importance (for example overdue commitments, firm stances and
+   fresh assumptions first), then recency.
+
+The recent window is the latest 64 public events and 16 narration publications outside the
+focus operation. Older history is reachable through `id` and `text` retrieval.
+
+**Mandatory material** is the audience's own state, the actors it currently sees at its
+location (a sighting at its location without a later absence), the open commitments it is party
+to, and the focus operation's public events (at most 64; more is a programming error). For a
+privileged audience it is the player character's state and the focus events.
+
+**Budget** (`ContextBudget`). The standard profile follows section 6: 12,000 input tokens, a
+2,000-token output reserve and a 1,000-token safety reserve kept outside the input.
+`forModel(effectiveContext)` takes the smaller of 12,000 and the context left after the
+reserves and 500 tokens of protocol overhead, and scales the allowances proportionally. Section
+allowances bound optional material only:
+
+- 3,000 for `state`;
+- 2,000 for `obligations`;
+- 1,500 for `knowledge` and 1,500 for `history` (the 3,000 of selected memory);
+- 1,000 for `planning`, privileged audiences only, taken from the headroom.
+
+The caller's instruction estimate is charged first. The rest is shared headroom.
+
+**Estimation** (`TokenEstimator`, method `utf8-bytes-div-2-v1`, recorded in every envelope):
+one token per two UTF-8 bytes, rounded up. No runtime tokenizer is available to the backend,
+and identifier-heavy JSON can approach two bytes per token, so this is an intentional upper
+bound rather than an average. It is subadditive. The envelope overhead is measured with
+worst-case omission counts and every legend entry. Each item is charged its own rendering
+plus one separator and the glossary entries it brings. After rendering, the assembler checks
+that the real envelope does not exceed the charged total, and throws on a violation. P21
+measurements may replace the method.
+
+**Selection** (`ContextSelection`, pure and deterministic):
+
+1. Charge the fixed cost and every mandatory item. If they exceed the input budget, the result
+   is `TooLarge` (`CONTEXT_TOO_LARGE`) with the required tokens and the mandatory cost of each
+   section. Nothing is truncated, and the caller must narrow the scope, choose an approved
+   larger profile or report the error.
+2. Each section's allowance is reduced by its mandatory cost. When the room cannot cover every
+   allowance, later sections (`planning`, then `history`, `knowledge`, `obligations`) lose
+   allowance first.
+3. Optional items are taken in rank order, first within the allowances, then from the shared
+   headroom. A section stops at its first item that does not fit, so a lower-ranked item is never
+   kept while a higher-ranked one is dropped.
+
+Every dropped candidate is counted per section in `omitted`, and `partial()` reports it. A
+partial context is never presented as complete. No transcript is appended.
+
+**Language and glossary binding.** Each text item carries its own language (`lang`). Statements
+and terms keep the language they were written in, and narration keeps its passage language.
+Event statements are rendered in the output locale. The envelope stamps the output locale with
+its locale and glossary revisions. `PackGlossaries` binds the pinned root pack's reviewed
+glossary entries for the `location:` and `definition:` references the candidates name:
+
+- a rendering resolved for the output locale (overlay, or source text);
+- for a `term`, the other locale's text as an avoided form;
+- for a `properName`, one spelling.
+
+Only definitions named by audience-filtered items are bound, so a glossary entry never
+authorizes knowledge. Terms are charged to the items that name them. The envelope keeps the
+selected items' terms in render order up to the contract bound of 128, and counts the rest in
+`glossaryOmitted`. A revision that cannot be loaded is rendered as
+`glossaryStatus: unavailable` with no terms. Dependency-pack glossaries are not bound yet.
+
+**Disclosure guard input.** `withheldPhrases(campaign, holder)` returns privileged phrases for
+the P08.2 `DisclosureGuard` and is never rendered:
+
+- statements of `HOLDERS` claims the holder has never held a belief about;
+- terms of `PARTIES` commitments it is not party to.
+
+Newest records come first. A phrase shorter than 12 folded characters is skipped, longer ones
+are cut to 200 characters, and at most 256 are returned. A false secret is still a secret.
+Paraphrase is not detected.
+
+Decisions and limits:
+
+- Plan storage stays owned by the preparation package (ADR 0014, `PlanningBoundaryTest`).
+  The assembler receives assumptions as detached records from
+  `org.rpgengine.preparation.PlanAssumptions.usableWithin` and never queries plan tables.
+- The assembler never reads the free-text `campaign_known_fact` projection. That table keeps no
+  writer and is still read by the player panel and the planner's `fact-known-to` predicate. It
+  is retired together with the panel move in P10.5.
+- The P08.2 intent and narration contracts and the P08.7 planner still build their own contexts.
+  Feeding them from `ContextAssembler` is the job of each caller: P09.3 checkpoints and
+  rehydration, P09.4 renewal, and P10 and later gameplay callers. This task supplies the
+  envelope, the budget, retrieval and overflow behaviour they must use.
+- The `causal` tier uses revision equality with the focus operation and the informant. Explicit
+  event-to-event causal links do not exist yet.
+- A `character` context has no history and no witnessed events until NPC-side observation exists
+  (P11/P15).
+- Semantic retrieval stays out of scope (section 11).
 
 ## 7. Renewal policy
 

@@ -394,6 +394,13 @@ The canonical pending-event registry records event identity, cause, source plan/
 
 Planner context may include authorized secrets; public narrator, guide and tactic context must be assembled independently. Never reuse a privileged planner thread for narration or carry raw planner transcripts into a public handoff. A secret-marked string is not made safe by removing its label. The backend creates a minimal public projection from actually admitted/discovered facts. Apply the same sink policy to quick replies, plan-progress labels, SSE, journal, images, music, TTS, asset names/metadata, exports and diagnostics. Final-output checks are defense in depth; they do not make arbitrary secret-containing context safe.
 
+Since P09.2, `ContextAssembler` gives a privileged context the assumptions of usable plans as
+items labelled `assumption`, separate from admitted `fact` items. Each assumption carries its
+plan, status, freshness and citations. Public and character contexts never receive them: the
+selector and the envelope refuse them for a limited audience. Plan tables are still read only by
+the preparation package, through `PlanAssumptions.usableWithin`
+([docs/08](08-memory-and-continuity.md#p092-context-envelopes-budgets-and-retrieval)).
+
 ## 9. Priority, cancellation, quotas and restart
 
 The dispatcher enforces installation/account-wide limits before per-campaign limits. Separate canonical campaign mutation leases from AI-job leases and runtime admission permits; a running planner holds no campaign mutation lease. A backend instance cannot multiply concurrency by starting another worker. Persist/reconcile shared permits and accounting alongside jobs.

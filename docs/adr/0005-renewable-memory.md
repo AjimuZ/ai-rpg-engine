@@ -2,6 +2,8 @@
 
 **Status:** Proposed. **Date:** 22 October 2026.
 
+**Implementation note (28 October 2026):** P09.2 implements the bounded assembly part of this decision. `ContextAssembler` builds a stamped, digested envelope from canonical storage in one snapshot. It retrieves by explicit IDs, causal links (the focus operation's revision and informants), language-specific full-text search and recency. The standard 12,000-token input budget keeps output and safety reserves outside the input. Mandatory material is never truncated; when it does not fit, the result is a controlled `CONTEXT_TOO_LARGE`. Optional material is dropped and counted ([docs/08 section 6](../08-memory-and-continuity.md#p092-context-envelopes-budgets-and-retrieval)). Checkpoints, summaries and renewal remain P09.3–P09.5.
+
 ## Context
 
 Long campaigns cannot fit forever in a model thread. The source design separates structured state, events, and summaries; the demo demonstrates periodic context renewal with file-based rehydration.

@@ -6,6 +6,8 @@
 
 **Implementation note (28 October 2026):** P09.1 implements the first sentence of the decision in storage. Claim truth (`knowledge_claim`) and observer knowledge (`knowledge_belief`, `actor_sighting`) are separate records, and `KnowledgeView.forActor` returns one actor's audience view without truth or other actors' real locations ([docs/08 section 4](../08-memory-and-continuity.md#p091-typed-knowledge)). Using these views to filter AI contexts is P09.2.
 
+**Implementation note (28 October 2026):** P09.2 filters AI contexts before retrieval. A public or character context is assembled only from that actor's view, without truth, other holders' beliefs, real locations of others or planning assumptions. Only a privileged context receives truth (`fact`) and private plan assumptions (`assumption`), and the selector and the envelope both refuse those standings for a limited audience. Every item carries its epistemic standing. `withheldPhrases` supplies the disclosure guard's verbatim markers ([docs/08 section 6](../08-memory-and-continuity.md#p092-context-envelopes-budgets-and-retrieval)). Filtering of summaries, media and exports and adversarial leakage evaluation are still to be delivered.
+
 ## Context
 
 A planner may require secret canon while the player narrator, guide, or NPC must know less. Filtering only a final response cannot remove hidden facts already present in a reused thread's memory. Media can also reveal secrets indirectly.
