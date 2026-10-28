@@ -710,6 +710,13 @@ sealed packs; `PreparationPersistenceTest` now pins a sealed sample pack so its 
 the content and author checks. Test fixtures that truncate tables must include
 `plan_activation`.
 
+Verified on 28 October 2026 with the unchanged scoped JDK 21 toolchain and disposable
+PostgreSQL 18.6 fixture: 155 focused cases and all 444 packaged backend cases in 40
+suites pass with zero failures/errors/skips, seven deliberate weakening probes were
+detected, and the executable jar is packaged. Configured frontend checks, EN/IT builds,
+26 repository policy tests, zero-finding scans and the offline backup tests also pass.
+See [evidence scope](../docs/15-quality-and-acceptance.md).
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

@@ -51,7 +51,9 @@ phantom, fencing/idempotency, transaction fault-injection and no-canonical-chang
 evidence toward QA-36 (AP-01–AP-05, AP-08) and the P07 package exit; it does not claim
 the semantic quest-plan contract, predicate or constraint evaluators, consumers that
 build commands from plans (P08.7, P09.1, P10), dispatch and budgets (QA-37, P08.6),
-narration agency (QA-07, P08) or full acceptance of those scenarios.
+narration agency (QA-07, P08) or full acceptance of those scenarios. The neutral
+implementation owner commit is `c598429`; every check above passed on its exact Java and
+SQL sources, and only P07.6 then gains a completion mark (46 of 131 roadmap entries).
 
 P07.5 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks
 pass **173 focused cases in 16 suites and all 435 packaged backend cases in 38 suites**,

@@ -16,6 +16,15 @@
   stale, retired, rejected or already used, and records each branch once. A plan never
   supplies an effect, and receipts never name it. No player request can cite a plan.
 - Add V12 and extend the database backup scope to `plan_activation`.
+- Pass 155 focused cases and all 444 packaged backend tests in 40 suites with zero
+  failures/errors/skips, including ordinary-command invalidation, live rechecks at use,
+  admission/command races, phantoms and fault injection at COMMIT; seven deliberate
+  weakening probes were detected. Pass configured frontend checks, both locale builds,
+  all 26 repository-policy tests with zero scan findings and the offline backup tests.
+  The quest-plan contract and the consumers that build commands from plans remain later
+  work (P08.7, P09.1, P10).
+- Record implementation owner commit `c598429` before marking P07.6 complete (46 of
+  131 roadmap entries).
 
 ## Unreleased — Italian variant rendering checks (partial), 28 October 2026
 
