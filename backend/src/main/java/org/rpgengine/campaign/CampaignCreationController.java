@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.rpgengine.commands.CampaignCommandJson;
 import org.rpgengine.commands.CommandExecutionService;
 import org.rpgengine.commands.OperationAdmissionFailure;
+import org.rpgengine.commands.OperationCancellationService;
 import org.rpgengine.identity.LocalHttpAdmission;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.TransientDataAccessException;
@@ -25,21 +26,26 @@ import org.springframework.web.bind.annotation.RestController;
  * comes only from local admission; byte-bounded input enters the atomic services, and
  * detached public identities, status and the player-safe receipt projection leave them.
  * A fresh command is admitted and then resolved locally in the same request (P07.4); its
- * narration stays an outbox intent for later presentation work. Failures expose stable
- * codes rather than SQL, pack text or exception messages.
+ * narration is a durable post-commit presentation job (P07.5). Cancellation requests race the
+ * execution under the campaign lock and report whether effects were already committed. Failures
+ * expose stable codes rather than SQL, pack text or exception messages.
  */
 @RestController
 public class CampaignCreationController {
     private static final int MAX_BYTES = 16_384;
+    private static final int MAX_CANCEL_BYTES = 64;
     private final CampaignCreationService service;
     private final CommandExecutionService commands;
+    private final OperationCancellationService cancellations;
     private final CampaignCommandJson commandDecoder = new CampaignCommandJson();
     private final CampaignCreationJson decoder = new CampaignCreationJson();
 
-    /** Require both durable services; missing infrastructure fails application construction. */
-    public CampaignCreationController(CampaignCreationService service, CommandExecutionService commands) {
+    /** Require every durable service; missing infrastructure fails application construction. */
+    public CampaignCreationController(CampaignCreationService service, CommandExecutionService commands,
+            OperationCancellationService cancellations) {
         this.service = java.util.Objects.requireNonNull(service, "service");
         this.commands = java.util.Objects.requireNonNull(commands, "commands");
+        this.cancellations = java.util.Objects.requireNonNull(cancellations, "cancellations");
     }
 
     /**
@@ -155,6 +161,47 @@ public class CampaignCreationController {
         }
     }
 
+    /**
+     * Request cancellation of one operation. The body must be the empty JSON object {@code {}}.
+     * The answer is 200 with the current operation view plus {@code cancellation}:
+     * {@code CANCELLED} (no effects; also for a repeated request), {@code ALREADY_COMMITTED}
+     * (effects saved, receipt included, optional narration stopped) or {@code ALREADY_FINISHED}
+     * (rejected, failed or awaiting clarification). Lock contention answers 409 without writes;
+     * retrying is safe.
+     *
+     * @param request admitted HTTP request carrying the owner attribute and the empty JSON body
+     * @param campaignId canonical campaign UUID
+     * @param operationId canonical operation UUID
+     * @param adventureId canonical adventure UUID that must own the campaign
+     * @return 200 with the outcome, or a fixed error code
+     */
+    @PostMapping("/api/v1/campaigns/{campaignId}/operations/{operationId}/cancel")
+    public ResponseEntity<?> cancel(HttpServletRequest request, @PathVariable String campaignId,
+            @PathVariable String operationId, @RequestParam(required = false) String adventureId) {
+        if (!(request.getAttribute(LocalHttpAdmission.OWNER_ATTRIBUTE) instanceof UUID owner)) {
+            return error(403, "LOCAL_ADMISSION_DENIED");
+        }
+        try {
+            UUID campaign = CampaignCommandJson.uuid(campaignId);
+            UUID operation = CampaignCommandJson.uuid(operationId);
+            UUID adventure = CampaignCommandJson.uuid(adventureId);
+            commandDecoder.decodeEmpty(request.getInputStream().readNBytes(MAX_CANCEL_BYTES + 1));
+            var outcome = cancellations.cancel(owner, adventure, campaign, operation);
+            var body = body(commands.status(owner, adventure, campaign, operation), adventure);
+            body.put("cancellation", outcome.name());
+            return ResponseEntity.ok(body);
+        } catch (CampaignCommandJson.Malformed | IOException failure) {
+            return error(400, "COMMAND_INPUT_MALFORMED");
+        } catch (OperationAdmissionFailure failure) {
+            return failure(failure);
+        } catch (TransientDataAccessException failure) {
+            // A commit or another writer held the campaign lock too long; nothing was written.
+            return error(409, "COMMAND_CAMPAIGN_BUSY");
+        } catch (DataAccessException | TransactionException | IllegalStateException failure) {
+            return error(503, "COMMAND_STORAGE_UNAVAILABLE");
+        }
+    }
+
     /** Map an expected admission outcome to its stable public status and code. */
     private static ResponseEntity<Map<String, String>> failure(OperationAdmissionFailure failure) {
         return switch (failure.kind()) {
@@ -178,11 +225,11 @@ public class CampaignCreationController {
     }
 
     /**
-     * Allowlisted public operation body: identities, lifecycle counters, the safe query path
-     * and the player-safe receipt projection (null until committed). Stored receipts,
-     * permits, payloads and rejection internals are never included.
+     * Allowlisted public operation body: identities, lifecycle counters, the safe query and
+     * stream paths and the player-safe receipt projection (null until committed). Stored
+     * receipts, permits, payloads and rejection internals are never included.
      */
-    private static Map<String, Object> body(CommandExecutionService.Execution execution, UUID adventure) {
+    private static LinkedHashMap<String, Object> body(CommandExecutionService.Execution execution, UUID adventure) {
         var view = execution.operation();
         var body = new LinkedHashMap<String, Object>();
         body.put("operationId", view.operationId().toString());
@@ -198,6 +245,7 @@ public class CampaignCreationController {
         body.put("receipt", execution.receipt());
         body.put("query", "/api/v1/campaigns/" + view.campaignId() + "/operations/" + view.operationId()
                 + "?adventureId=" + adventure);
+        body.put("stream", "/api/v1/campaigns/" + view.campaignId() + "/stream?adventureId=" + adventure);
         return body;
     }
 

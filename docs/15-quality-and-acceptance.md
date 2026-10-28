@@ -1,5 +1,56 @@
 # Quality Strategy and Acceptance Criteria
 
+P07.5 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks
+pass **173 focused cases in 16 suites and all 435 packaged backend cases in 38 suites**,
+with zero failures, errors or skips; the executable jar is packaged. The focused set is
+six cancellation, four public-stream, seven presentation-job, three stream/cancel HTTP
+cases and the one-case V11 migration-upgrade suite, plus the P07.4 command suites: 15
+typed-contract (one new attempt-payload case), 19 typed-validation, eight command-rule,
+ten canonical-form, 26 admission, six command HTTP, 49 canonical commit, five lifecycle,
+one resolved-plan, seven local-resolver and six command-execution cases.
+
+`CommandCancellationTest` uses sealed packs and production campaign creation and holds
+the executing request at exact boundaries: after durable admission (catalog-load seam),
+after its first durable draw (draw seam) and inside the canonical commit (an event-insert
+trigger waiting on an advisory lock while `pg_stat_activity` confirms the cancellation is
+queued on the campaign lock). Cancellation wins at the first two boundaries: `CANCELLED`,
+a fence step on the permit, retained draws, no world change, idempotent repetition and
+no recovery change. The commit wins at the third: every effect and the receipt are kept,
+the cancellation reports `ALREADY_COMMITTED` and the queued narration ends
+`NARRATION_CANCELLED`. An equivalent request after a cancelled or failed attempt reuses
+its draw stream and values; a 2^31−1-sided reservation proves exact sharing and a
+different intention's independent stream; a revision change opens a fresh stream.
+Finished, foreign, unknown and ambient-transaction cancellations write nothing.
+`PublicStreamTest` proves one message per status change for the eleven persisted
+statuses (all but transaction-internal `COMMITTING`; none for a same-status update), ordered `generation:sequence` identities, identical rendering
+on re-read, the allowlist (no speech text, recipient or receipt details), `stream.ready`,
+resets for an unknown head, a changed recovery generation and an expired cursor after
+1001 further messages (exactly 1000 retained), and read-only snapshots.
+`PresentationJobTest` proves one port call per attempt and one settlement for delivered,
+unavailable and thrice-failing narration, a late worker after lease loss writing nothing
+while the replacement attempt runs, cancellation during narration discarding its result,
+startup reconciliation (queued kept, expired requeued, live preserved, older generation
+retired) and database guards (one job per operation, committed origin at transaction end,
+fence/attempt steps, final terminal rows, no deletion), all with unchanged world rows,
+receipts and draws. `CampaignStreamHttpTest` runs the background worker in its own
+context: a submitted speech is presented automatically, SSE replays and resumes after
+`Last-Event-ID`, and the cancel route and stream reject malformed, ambiguous, foreign or
+unauthenticated requests with stable codes.
+
+Five deliberate sensitivity probes were run during development and reverted
+byte-identically (checksum verified): deriving draws from the operation identity,
+omitting the permit retirement on cancellation, dropping the settle fence/holder/expiry
+check, ignoring a cancellation request at settle and removing journal recovery's
+presentation-job deferral each made exactly the intended cases fail. These were
+intentional probes, not gate outcomes. Configured frontend installation (285 packages),
+both typechecks, 49 tests, four localization tests, 240-message parity and both locale
+builds pass, as do all 22 repository-policy tests, zero-finding scans and the nine
+offline database-backup tests for the V11 catalog. This adds cancellation-race,
+resumable-delivery and post-commit presentation evidence toward QA-03, QA-17, QA-18,
+QA-19 and QA-20 and the docs/07 interrupt matrix; it does not claim narration (P08),
+browser stream/cancel binding (P05.6/P05.7), a live V11 dump/restore rehearsal or full
+acceptance of those scenarios.
+
 P07.4 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks
 pass **151 focused command cases and all 414 packaged backend cases in 34 suites**,
 with zero failures, errors or skips; the executable jar is packaged. The focused

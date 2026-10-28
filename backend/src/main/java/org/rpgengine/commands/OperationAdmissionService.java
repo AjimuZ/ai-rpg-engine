@@ -35,6 +35,12 @@ import org.springframework.transaction.support.TransactionTemplate;
  * facts are preloaded before the lock; current state is read under it. This service
  * stores only the canonical hash, never the payload itself; local resolution of a fresh
  * admission is {@link CommandExecutionService}'s next step.
+ *
+ * <p>A fresh admission also records its equivalent-attempt key (normalized intention plus base
+ * revision, {@link TypedCommand#attemptPayload}) and inherits the draw stream of the earliest
+ * earlier attempt with that key, so a new request after a cancelled or failed attempt cannot
+ * obtain different draw values (P07.5). The journal insert itself emits the
+ * {@code operation.accepted} stream message through the V11 trigger.
  */
 @Service
 public class OperationAdmissionService {
@@ -198,8 +204,18 @@ public class OperationAdmissionService {
         }
         OwnerMutationAdmission.requireCapacity(jdbc, owner);
 
+        // Equivalent-attempt policy (P07.5): an earlier attempt with the same normalized intention
+        // at this revision can only be cancelled, failed, rejected or awaiting clarification (a
+        // committed one would have moved the revision). Sharing its draw stream makes a new
+        // attempt reproduce the already reserved values, so cancelling cannot fish for rerolls.
+        String attemptKey = CommandCanonicalForm.sha256(CommandCanonicalForm.encode(intention.type(),
+                command.expectedRevision(), intention.attemptPayload(), MAX_CANONICAL_BYTES));
+        List<UUID> stream = jdbc.query("select draw_stream_id from operation_journal where campaign_id = ? "
+                        + "and attempt_key = ? order by created_at, id limit 1",
+                (row, index) -> row.getObject(1, UUID.class), campaign, attemptKey);
         CampaignOperation operation = CampaignOperation.accept(campaign, command.requestId(), hash,
-                command.commandType(), command.expectedRevision(), now);
+                command.commandType(), command.expectedRevision(), attemptKey, stream.isEmpty() ? null : stream.getFirst(),
+                now);
         entities.persist(operation);
         // The lease row references (campaign_id, operation_id) in the journal, so flush first.
         entities.flush();

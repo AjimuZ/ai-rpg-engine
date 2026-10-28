@@ -1222,6 +1222,41 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     mark. All 131 task identities/titles and the pending P98 follow-up are preserved;
     only P07.4 gains a completion mark.
 - [ ] P07.5 Add resumable public stream, cancellation race handling, and post-commit presentation jobs.
+  - Package A — cancellation races: `OperationCancellationService` and
+    `POST …/operations/{id}/cancel` take the campaign then journal lock like every journal
+    writer. `ACCEPTED`/`PLANNING`/`VALIDATING` become `CANCELLED` and the permit is retired
+    with a fence step, so the executing request's next prepare, draw or commit fails; a
+    commit that won reports `ALREADY_COMMITTED` with its receipt and only stops optional
+    narration; finished operations report `ALREADY_FINISHED`. Lifecycle gains
+    `ACCEPTED → CANCELLED` and `COMMITTED → COMMITTED_NARRATION_PENDING`.
+  - Package B — equivalent-attempt policy: admission records an attempt key (normalized
+    intention plus base revision; ability targets sorted) and inherits the earliest
+    equivalent attempt's draw stream; draw values derive from the stream, so cancelling or
+    failing and resubmitting at the same revision reproduces the retained values.
+  - Package C — resumable public stream: a V11 journal trigger appends one
+    `campaign_stream_message` per status change in the changing transaction (head counter,
+    1000-message retention); `PublicStreamService` and `GET …/stream` serve
+    `generation:sequence` identities as bounded SSE long polls with `Last-Event-ID`,
+    allowlisted rendering from immutable journal data, `stream.ready` and `stream.reset`.
+  - Package D — post-commit presentation jobs: the commit inserts one fenced
+    `presentation_job` per narration-requiring operation; `PresentationWorker` claims it
+    with a lease, calls the runtime-neutral `NarrationPort` outside transactions (default
+    `UNAVAILABLE` until P08) and settles job and journal together; bounded retries,
+    interrupted-lease recovery, generation retirement and startup reconciliation resume
+    owed narration without repeating the action. See the
+    [delivery contract](07-turn-protocol.md#p075-public-stream-cancellation-and-presentation-jobs).
+  - Exit checks: real PostgreSQL races holding the executing request after admission, after
+    a durable draw and inside the commit transaction; fenced permits, retained draws,
+    exact no-write snapshots, idempotent cancellation and scope hiding; deterministic
+    draw-stream sharing for equivalent attempts after cancellation and failure and a fresh
+    stream after a revision change; stream status mapping, ordering, resumption, identical
+    re-rendering, generation/head/retention resets and allowlists; presentation delivery,
+    unavailability, bounded retries, a late worker after lease loss, cancellation during
+    narration, startup recovery and database guards; HTTP SSE framing, `Last-Event-ID`
+    resumption, automatic background presentation and the cancel route's codes; V11
+    upgrade without backfill. Run focused suites, full packaged backend, configured
+    frontend gates, repository policy tests/scans and deliberate weakening probes; record
+    actual results and a neutral owner commit before checking this task.
 - [ ] P07.6 Implement atomic plan admission with dependency/query-epoch rechecks, scope/content/author validation, fencing and idempotency; artifacts never directly change world facts/time/rewards, and activation uses ordinary commands under QA-36.
 
 **Exit:** untrusted proposals cannot mutate state directly; retries and crashes have deterministic outcomes. This gate precedes real AI-driven mutations. **Checks:** QA-03–07, QA-17–20, transaction fault injection. **Suggested commit:** `Enforce transactional command validation and idempotency`.

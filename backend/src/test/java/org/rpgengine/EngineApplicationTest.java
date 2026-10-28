@@ -35,10 +35,12 @@ class EngineApplicationTest {
     /** Tables created by V1–V10, sorted by name; identifiers are constants, never user input. */
     private static final List<String> CANONICAL_TABLES = List.of(
             "actor", "actor_resource", "adventure_workspace", "ai_job", "ai_job_attempt", "campaign", "campaign_checkpoint", "campaign_creation", "campaign_event",
-            "campaign_known_fact", "campaign_known_quest", "campaign_mutation_lease", "campaign_random_seed", "canonical_outbox", "character_state", "content_revision", "content_revision_file", "content_revision_report", "identity_owner_profile", "item_instance", "learned_ability", "operation_journal",
+            "campaign_known_fact", "campaign_known_quest", "campaign_mutation_lease", "campaign_random_seed",
+            "campaign_stream_head", "campaign_stream_message", "canonical_outbox", "character_state", "content_revision", "content_revision_file", "content_revision_report", "identity_owner_profile", "item_instance", "learned_ability", "operation_journal",
             "operation_random_draw",
             "plan_admission", "plan_dependency", "plan_disposition", "planning_snapshot",
-            "presentation_campaign_settings", "query_epoch", "quest_plan_artifact", "reward_settlement");
+            "presentation_campaign_settings", "presentation_job", "query_epoch", "quest_plan_artifact",
+            "reward_settlement");
 
     /** Construct the framework-managed test fixture; injection failures fail setup. */
     EngineApplicationTest() {

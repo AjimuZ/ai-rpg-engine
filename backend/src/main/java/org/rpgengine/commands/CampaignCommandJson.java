@@ -68,6 +68,26 @@ public final class CampaignCommandJson {
     }
 
     /**
+     * Require exactly one empty JSON object, the body of a cancellation request. The caller reads
+     * at most a small bound plus one sentinel byte; anything longer, any member and any other JSON
+     * value are malformed, so a future cancellation option can never be silently ignored.
+     *
+     * @param bytes bounded request body
+     * @throws Malformed for anything but {@code {}} (whitespace allowed)
+     */
+    public void decodeEmpty(byte[] bytes) {
+        Object parsed;
+        try {
+            parsed = bytes.length > 64 ? null : parser.parse("cancel-request.json", bytes).value();
+        } catch (PackException failure) {
+            throw new Malformed();
+        }
+        if (!(parsed instanceof Map<?, ?> root) || !root.isEmpty()) {
+            throw new Malformed();
+        }
+    }
+
+    /**
      * Require canonical lowercase UUID text, so one logical request cannot hide behind two
      * spellings of the same identity and bypass idempotency.
      *

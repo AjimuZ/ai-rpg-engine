@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — Resumable stream, cancellation and presentation jobs, 28 October 2026
+
+- Add owner cancellation (`POST …/operations/{id}/cancel`): the campaign lock decides the
+  race with execution. Pre-commit operations become `CANCELLED` and their permit is
+  fenced; a commit that already won is reported as `ALREADY_COMMITTED` with its receipt
+  and only its optional narration is stopped.
+- Prevent reroll fishing: an equivalent new request at the same revision after a
+  cancelled, failed or rejected attempt shares that attempt's draw stream and obtains
+  the same values.
+- Announce every operation status change on a durable per-campaign public stream and
+  serve it as Server-Sent Events (`GET …/stream`) with `Last-Event-ID` resumption,
+  allowlisted data, bounded long polls and reset instructions for expired, unknown or
+  restored cursors. Command responses include the stream path.
+- Create one durable post-commit presentation job per narration-requiring commit and
+  settle it in the background with a fenced lease, bounded retries and restart
+  recovery; owed narration now survives a restart as queued work. Without a narration
+  runtime the action stays saved with narration pending.
+- Add V11 and extend the database backup scope to the three new tables.
+- Pass 173 focused cases and all 435 packaged backend tests in 38 suites with zero
+  failures/errors/skips, including real lock-held cancellation races and late-worker
+  fencing. Pass configured frontend checks, both locale builds, all 22
+  repository-policy tests with zero scan findings and the offline backup tests.
+  Narration and browser binding remain later work.
+
 ## Unreleased — Local command execution, 28 October 2026
 
 - Execute registered exploration intentions locally after admission: re-check rules

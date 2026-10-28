@@ -133,8 +133,16 @@ public class MutationLeaseService {
         }
     }
 
-    /** Acquire the shared campaign-before-journal locks; missing/mismatched identities fail closed. */
-    static void lockScope(JdbcTemplate jdbc, UUID adventure, UUID campaign, UUID operation) {
+    /**
+     * Acquire the shared campaign-before-journal locks inside the caller's transaction, with the
+     * 2-second lock and 5-second statement bounds. Every journal writer (admission, execution,
+     * cancellation, recovery and post-commit presentation) uses this order before touching lease
+     * or job rows; missing or mismatched identities fail closed.
+     *
+     * @throws org.springframework.dao.EmptyResultDataAccessException for an out-of-scope identity
+     * @throws org.springframework.dao.DataAccessException for lock or statement timeouts
+     */
+    public static void lockScope(JdbcTemplate jdbc, UUID adventure, UUID campaign, UUID operation) {
         Objects.requireNonNull(adventure, "adventure");
         Objects.requireNonNull(campaign, "campaign");
         Objects.requireNonNull(operation, "operation");
@@ -159,6 +167,19 @@ public class MutationLeaseService {
                 context.campaignId(), context.operationId(), token.holderId(), token.fence()))) {
             throw new IllegalStateException("mutation lease lost");
         }
+    }
+
+    /**
+     * Retire whatever permit this operation holds, without its token, inside a transaction that
+     * already holds the campaign and journal locks (P07.5 cancellation). The fence advances, so a
+     * worker still holding the old token can neither draw, commit nor renew afterwards.
+     *
+     * @return true if a permit belonged to the operation and was retired
+     */
+    static boolean releaseOperation(JdbcTemplate jdbc, UUID campaign, UUID operation) {
+        return jdbc.update("update campaign_mutation_lease set fence = fence + 1, operation_id = null, "
+                + "holder_id = null, expires_at = null where campaign_id = ? and operation_id = ?",
+                campaign, operation) == 1;
     }
 
     /** Clear only the matching permit inside a locked transaction; keep/increment its high-water fence. */

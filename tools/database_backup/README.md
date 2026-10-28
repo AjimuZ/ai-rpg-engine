@@ -1,4 +1,4 @@
-# Database backup and restore (V10 scope)
+# Database backup and restore (V11 scope)
 
 A trusted-owner disaster-recovery tool for the canonical PostgreSQL database. It
 uses only the Python standard library and the `pg_dump`/`pg_restore` clients inside
@@ -19,7 +19,7 @@ py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
 ## What it does
 
 - **Backup** checks the exact server and client version, the exact table set and
-  successful migrations V1–V10, including immutable pack bytes and sealed reports. It then creates the target directory, which must
+  successful migrations V1–V11, including immutable pack bytes and sealed reports. It then creates the target directory, which must
   not already exist, and writes `database.dump` (custom format, no owners or
   privileges). It re-reads the catalog and writes `manifest.json` last. The manifest
   holds the format, schema and PostgreSQL versions, the scope, the byte count, the
@@ -33,10 +33,13 @@ py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
   appends `INVALIDATED`/`GENERATION_RETIRED` to usable plan histories, and retires
   every saved mutation lease (fence + 1, owner cleared). Canonical counters and
   immutable preparation records remain unchanged; old callbacks cannot be admitted.
-- Starting the engine on the restored database runs startup journal and job
-  reconciliation before HTTP serves requests. Interrupted operations become
-  `FAILED_BEFORE_COMMIT`, and committed operations that still need narration become
-  `COMMITTED_NARRATION_PENDING`. Unfinished jobs from retired generations become
+- Starting the engine on the restored database runs startup journal, presentation and
+  job reconciliation before HTTP serves requests. Interrupted operations become
+  `FAILED_BEFORE_COMMIT`. Committed operations that still need narration become
+  `COMMITTED_NARRATION_PENDING`: legacy commits directly, and P07.5 presentation jobs
+  because the restore advanced their campaign generation (`GENERATION_RETIRED`).
+  Public stream cursors from before the restore receive `stream.reset` for the same
+  reason. Unfinished jobs from retired generations become
   `SUPERSEDED`, retaining interrupted attempt history. Claims/admissions remain
   gated until the job scan succeeds. See [turn protocol §8](../../docs/07-turn-protocol.md#8-interrupt-and-recovery-matrix).
 
@@ -101,3 +104,8 @@ matched the source after restore; a fresh JVM with an empty workspace root rebui
 34 byte-identical specification/artwork files and integrity manifests. The source
 database remained unchanged. This verifies V10 authored-content recovery, not
 populated gameplay memory, drafts, jobs or generated-media recovery under QA-33.
+
+V11 scope (P07.5) adds `campaign_stream_head`, `campaign_stream_message` and
+`presentation_job`, so the stream high-water mark, the retained public messages and
+owed presentation survive a backup. Offline checks cover the V11 manifest/catalog; no
+live V11 dump/restore rehearsal has been run.

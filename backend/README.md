@@ -552,7 +552,7 @@ and repeat common semantic checks inside canonical commit. Omitting evidence fai
 before world effects. Internal non-player foundation operations retain their trusted
 compatibility constructors. No new HTTP controller, migration or worker is added.
 An admission alone is not an executed action; local calculations and mechanical
-receipts arrived with P07.4 (below), and delivery remains P07.5.
+receipts arrived with P07.4 and delivery with P07.5 (below).
 
 `TypedCommandTest` covers closed shape, bounds, coercion, unknown types and immutable
 hash evidence. `TypedCommandValidationTest` uses real PostgreSQL for rejection
@@ -638,3 +638,40 @@ PostgreSQL 18.6 fixture: 151 focused command cases and all 414 packaged backend 
 in 34 suites pass with zero failures/errors/skips, and the executable jar is packaged.
 Configured frontend checks, EN/IT builds, 22 repository policy tests and zero-finding
 scans also pass. See [evidence scope](../docs/15-quality-and-acceptance.md).
+
+## Stream, cancellation and presentation jobs (P07.5)
+
+V11 adds the equivalent-attempt columns, the public stream log and post-commit
+presentation jobs described in the
+[delivery contract](../docs/07-turn-protocol.md#p075-public-stream-cancellation-and-presentation-jobs):
+
+- `OperationCancellationService` (`POST …/operations/{id}/cancel`, body `{}`) decides the
+  race with execution under the campaign lock: pre-commit operations become `CANCELLED`
+  with a fenced permit; a commit that won reports `ALREADY_COMMITTED` and only stops
+  optional narration.
+- Admission records `attempt_key`/`draw_stream_id`; `RandomDrawService` derives values from
+  the draw stream, so an equivalent new attempt reproduces a cancelled or failed attempt's
+  draws.
+- The `operation_journal_stream` trigger appends `campaign_stream_message` rows;
+  `PublicStreamService` and `CampaignStreamController` (`GET …/stream`) serve them as SSE
+  long polls with `generation:sequence` identities, `Last-Event-ID` resumption and resets.
+- `org.rpgengine.presentation`: `PresentationJobService` (claim, narrate, settle, retry,
+  expiry and startup reconciliation), `PresentationWorker` (one daemon thread),
+  `NarrationPort` with the default `UnavailableNarration` until P08.
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `engine.presentation.worker.enabled` | `true` | Run the background presentation worker |
+| `engine.presentation.worker.poll-ms` | `1000` | Delay between worker passes (50–60000) |
+| `engine.stream.hold-ms` | `15000` | How long one stream response waits for new messages (0–60000) |
+| `engine.stream.poll-ms` | `250` | Storage polling interval while a stream response waits (20–5000) |
+
+`src/test/resources/config/application.properties` disables the worker for every test
+context, because a background pass would race assertions about journal status; tests
+drive `PresentationJobService` explicitly, and `CampaignStreamHttpTest` enables the worker
+in its own discarded context to prove automatic dispatch. New test suites:
+`CommandCancellationTest` (races held after admission, after a durable draw and inside the
+commit through an advisory-lock trigger; equivalent-attempt draw streams),
+`PublicStreamTest`, `PresentationJobTest` and `CampaignStreamHttpTest`. Test fixtures that
+truncate tables must include `presentation_job`, `campaign_stream_message` and
+`campaign_stream_head`.

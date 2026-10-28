@@ -221,12 +221,12 @@ semantic 422 errors. These are intentions only; the server calculates every effe
 
 New requests return 202 after local execution with their final status: `COMMITTED`,
 or `REJECTED`/`FAILED_BEFORE_COMMIT` when current state or storage refused them after
-durable admission. Identical retries return 200 with the same operation ID and its
+durable admission, or `CANCELLED` when an owner cancellation won the race (P07.5). Identical retries return 200 with the same operation ID and its
 stored status and receipt; they never re-execute. Both and GET return exactly
 `operationId`, `campaignId`, `commandType`, `status`, `baseRevision`, nullable
 `committedRevision`, `operationVersion`, `replayed`, `createdAt`, `updatedAt`, nullable
-`receipt` and relative `query` URL. `replayed` is false for GET. No stream reference is
-available yet. `receipt` is the player-safe projection of a committed operation:
+`receipt`, relative `query` URL and, since P07.5, relative `stream` URL. `replayed` is
+false for GET. `receipt` is the player-safe projection of a committed operation:
 `stateRevision`, `firstEventSequence`, `lastEventSequence`, and for locally resolved
 commands `commandType`, `elapsedSeconds`, `turnAdvanced`, `destinationId` (moves only),
 `resources` (the player's own net `resourceKey`/`before`/`after` changes), `calculations`
@@ -271,11 +271,58 @@ fresh state before explicitly submitting another command.
 This checkpoint connects no gameplay executor or browser Send action. Admission
 stores a hash and fenced permit only; uncompleted work eventually fails through
 expiry/recovery. It cannot apply arbitrary payload fields to canonical state.
-Typed semantic resolution, public receipts and delivery remain subsequent work.
+Typed semantic resolution and public receipts arrived with P07.2–P07.4, delivery and
+cancellation with P07.5 below; browser Send binding remains P05.6/P05.7.
+
+### P07.5 stream and cancellation
+
+`POST /api/v1/campaigns/{campaignId}/operations/{operationId}/cancel?adventureId={uuid}`
+requires the usual Origin, session cookie, CSRF token and JSON content type; the body
+must be exactly the empty object `{}` (at most 64 bytes, whitespace allowed). It answers
+200 with the operation body above plus `cancellation`:
+
+| `cancellation` | Meaning |
+| --- | --- |
+| `CANCELLED` | Cancelled before commit (now or by an earlier request); `status` is `CANCELLED`, `receipt` is null, nothing changed |
+| `ALREADY_COMMITTED` | The commit won; `receipt` shows the saved effects; queued or running narration is stopped and ends pending |
+| `ALREADY_FINISHED` | Already rejected, failed or awaiting clarification; nothing changed |
+
+Errors: 400 `COMMAND_INPUT_MALFORMED` (identities or body), 404 `COMMAND_SCOPE_UNAVAILABLE`,
+409 `COMMAND_CAMPAIGN_BUSY` (lock contention, nothing written, retry is safe), 503
+`COMMAND_STORAGE_UNAVAILABLE`. The UI distinguishes "cancelled before resolution" from
+"action saved; narration interrupted" by `cancellation` and `status`.
+
+`GET /api/v1/campaigns/{campaignId}/stream?adventureId={uuid}[&after={cursor}]` returns
+`text/event-stream` with `Cache-Control: no-store`. The cursor is the last delivered
+identity `<generation>:<sequence>` (canonical decimal, no leading zeros); the
+`Last-Event-ID` header that browsers send on reconnect takes precedence over `after`, and
+two such headers are malformed. The response starts with `retry: 1000`, then one frame
+per message (`id`, `event`, single-line JSON `data`), at most 100 per read. It is a
+bounded long poll: the server waits up to 15 seconds for new messages (polling storage
+every 250 ms, a comment heartbeat every 5 seconds), then ends the response and the client
+reconnects with its last identity. At most eight streams run concurrently (429
+`STREAM_CAPACITY_EXCEEDED`). Errors before the first byte use the codes above; a failure
+after streaming began only ends the response.
+
+| Event | Data (all also carry `campaignId`) |
+| --- | --- |
+| `operation.accepted`, `operation.progress`, `operation.clarification`, `operation.rejected`, `operation.cancelled`, `operation.failed`, `narrative.ready` | `operationId`, `commandType`, `status`, `operationVersion`, `stateRevision` |
+| `state.committed` | the same plus `receipt` (the player-safe projection above) |
+| `narrative.pending` | the same plus `reason`: `NARRATION_UNAVAILABLE`, `NARRATION_CANCELLED`, `NARRATION_FAILED`, `GENERATION_RETIRED` or `NARRATION_INTERRUPTED` (legacy recovery) |
+| `stream.ready` | `stateRevision`; first frame without a cursor, `id` is the current head |
+| `stream.reset` | `stateRevision`, `reason`: `CURSOR_EXPIRED`, `CURSOR_UNKNOWN` or `GENERATION_CHANGED`; `id` is the current head; reload the full projection |
+
+Payloads, speech text, recipients, other actors' values, internal events, draw
+identities, hashes and permits never appear. Delivery is at-least-once: clients
+deduplicate by `id`, ignore messages older than their projection's revision, and never
+resubmit an action on reconnect. `encounter.updated`, `media.ready` and
+`application.closing` remain proposed for P11/P17/P02 lifecycle work.
 
 ## 4. Stream contract
 
-Use durable public message IDs and `Last-Event-ID` resumption. Proposed message types: `operation.accepted`, `operation.progress`, `operation.clarification`, `operation.rejected`, `state.committed`, `narrative.ready`, `narrative.pending`, `encounter.updated`, `media.ready`, and `application.closing`.
+P07.5 implements this contract for operation lifecycle messages; see
+[P07.5 stream and cancellation](#p075-stream-and-cancellation). Use durable public
+message IDs and `Last-Event-ID` resumption. Proposed message types: `operation.accepted`, `operation.progress`, `operation.clarification`, `operation.rejected`, `state.committed`, `narrative.ready`, `narrative.pending`, `encounter.updated`, `media.ready`, and `application.closing`.
 
 Only committed state events carry mechanical consequences. Progress text is application-generated. The client deduplicates delivery IDs and ignores messages from an obsolete campaign or revision. If a cursor is outside retention, return a reset instruction and retrieve a complete current projection. Reconnect never auto-submits an action.
 

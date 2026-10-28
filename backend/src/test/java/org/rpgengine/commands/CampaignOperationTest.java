@@ -21,17 +21,21 @@ class CampaignOperationTest {
     private static final Instant NOW = Instant.parse("2026-10-24T10:00:00Z");
     private static final String HASH = "0123456789abcdef".repeat(4);
 
-    /** The lifecycle table matches the docs/07 state diagram exactly. */
+    /**
+     * The lifecycle table matches the docs/07 state diagram exactly, including the P07.5 edges for
+     * cancellation before prepare and presentation stopped before narration started.
+     */
     @Test
     void lifecycleTableMatchesTheSpecification() {
-        assertEquals(EnumSet.of(OperationStatus.PLANNING, OperationStatus.FAILED_BEFORE_COMMIT),
-                OperationStatus.ACCEPTED.successors());
+        assertEquals(EnumSet.of(OperationStatus.PLANNING, OperationStatus.CANCELLED,
+                OperationStatus.FAILED_BEFORE_COMMIT), OperationStatus.ACCEPTED.successors());
         assertEquals(EnumSet.of(OperationStatus.NEEDS_CLARIFICATION, OperationStatus.VALIDATING,
                 OperationStatus.CANCELLED, OperationStatus.FAILED_BEFORE_COMMIT), OperationStatus.PLANNING.successors());
         assertEquals(EnumSet.of(OperationStatus.REJECTED, OperationStatus.COMMITTING, OperationStatus.CANCELLED,
                 OperationStatus.FAILED_BEFORE_COMMIT), OperationStatus.VALIDATING.successors());
         assertEquals(EnumSet.of(OperationStatus.COMMITTED), OperationStatus.COMMITTING.successors());
-        assertEquals(EnumSet.of(OperationStatus.NARRATING), OperationStatus.COMMITTED.successors());
+        assertEquals(EnumSet.of(OperationStatus.NARRATING, OperationStatus.COMMITTED_NARRATION_PENDING),
+                OperationStatus.COMMITTED.successors());
         assertEquals(EnumSet.of(OperationStatus.DELIVERED, OperationStatus.COMMITTED_NARRATION_PENDING),
                 OperationStatus.NARRATING.successors());
         // Once committing has started, cancellation is no longer possible.

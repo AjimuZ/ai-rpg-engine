@@ -48,14 +48,20 @@ stateDiagram-v2
     Committed --> Narrating
     Narrating --> Delivered
     Narrating --> CommittedNarrationPending
+    Accepted --> Cancelled
     Planning --> Cancelled
     Validating --> Cancelled
+    Committed --> CommittedNarrationPending
     Accepted --> FailedBeforeCommit
     Planning --> FailedBeforeCommit
     Validating --> FailedBeforeCommit
 ```
 
 `NeedsClarification` is terminal for that proposed action and consumes nothing. The clarified response is a new command referencing the clarification. An operation is never reported as cancelled after its effects committed. `CommittedNarrationPending` is a successful game action with recoverable presentation work.
+
+P07.5 adds two edges: `Accepted → Cancelled` (cancellation can win before the prepare
+step starts) and `Committed → CommittedNarrationPending` (a presentation job can be
+stopped or retired before narration starts). Neither can undo or skip a committed effect.
 
 ## 3. Acceptance
 
@@ -371,7 +377,87 @@ this resolver project only their counters and draws.
 202 with its final status (`COMMITTED` with `receipt`, or `REJECTED`/`FAILED_BEFORE_COMMIT`
 with `receipt: null`); a replay answers 200 with the stored status and receipt, and the
 status query returns the same projection. Admission failures keep their earlier codes and
-journal nothing. Streaming, cancellation and post-commit presentation remain P07.5.
+journal nothing. Streaming, cancellation and post-commit presentation are added by P07.5
+below; a fresh request can therefore also end `CANCELLED`.
+
+### P07.5 public stream, cancellation and presentation jobs
+
+**Cancellation races.** `POST /api/v1/campaigns/{id}/operations/{operationId}/cancel`
+(`OperationCancellationService`) takes the campaign lock, then the journal lock, exactly
+like admission, prepare, draws, commit and recovery, so the race has one arbiter:
+
+| Cancellation finds | Result | Effects |
+| --- | --- | --- |
+| `ACCEPTED`, `PLANNING`, `VALIDATING` | `CANCELLED`; the mutation permit is retired with a fence step | None. The executing thread's next prepare, draw or commit fails its status, operation-version and lease checks; draws already reserved stay bound to the cancelled attempt |
+| `COMMITTED`, `NARRATING` (commit won) | `ALREADY_COMMITTED` with the receipt; a queued presentation job ends pending at once, a running one finishes pending and discards its narration | All committed effects preserved |
+| `DELIVERED`, `COMMITTED_NARRATION_PENDING` | `ALREADY_COMMITTED` | Unchanged |
+| `CANCELLED` | `CANCELLED` again (idempotent) | Unchanged |
+| `REJECTED`, `FAILED_BEFORE_COMMIT`, `NEEDS_CLARIFICATION` | `ALREADY_FINISHED` | Unchanged |
+
+`COMMITTING` exists only inside the commit transaction, which holds the campaign lock, so a
+cancellation can never observe it. Lock contention beyond the 2-second bound answers 409
+`COMMAND_CAMPAIGN_BUSY` without writing; retrying the cancellation is safe. The executing
+request reports whichever outcome won (`CANCELLED` or its commit).
+
+**Equivalent-attempt policy.** Admission records an `attempt_key`: SHA-256 of the
+version-1 canonical form of the command type, base revision and the intention's
+*attempt payload*, which is the hashed payload except that `USE_ABILITY` targets are
+sorted (target order cannot change resolution because each effect amount is evaluated
+once). A fresh admission inherits the `draw_stream_id` of the earliest operation in the
+campaign with the same key, else it is its own stream. Draw values are
+`HMAC-SHA-256(seed, stream, ordinal, sides)` instead of using the operation identity, so
+an equivalent new request after a cancelled, failed or rejected attempt reproduces the
+already reserved values: cancelling or failing cannot fish for a better roll. A committed
+attempt moves the revision, so the same intention afterwards is a new deliberate action
+with its own stream; spending a turn (for example `WAIT`) is an in-world cost, and P10/P11
+may add retry or cooldown rules. Legacy rows keep null columns and draw from their own
+identity, so stored draws and receipts are unchanged.
+
+**Resumable public stream.** The V11 trigger on `operation_journal` appends one
+`campaign_stream_message` for the insert and for every status change, inside the
+transaction that made the change, so no writer can omit, duplicate or pre-announce one.
+Types: `operation.accepted` (`ACCEPTED`), `operation.progress` (`PLANNING`, `VALIDATING`,
+`COMMITTING`, `NARRATING`), `operation.clarification`, `operation.rejected`,
+`operation.cancelled`, `operation.failed`, `state.committed` (`COMMITTED`),
+`narrative.ready` (`DELIVERED`) and `narrative.pending` (`COMMITTED_NARRATION_PENDING`).
+A per-campaign head row allocates sequences and never decreases; the newest 1000 messages
+are retained. Message identity is `<recoveryGeneration>:<sequence>`. Rows hold references
+only; the adapter renders campaign/operation identity, command type, status, operation
+version and state revision, plus the player-safe receipt for `state.committed` and a fixed
+reason for `narrative.pending`, from the immutable journal outcome, so one identity always
+renders the same content. A cursor from another generation (a restored save), beyond the
+head or older than the retained window receives `stream.reset` with the head identity and
+current revision; the client reloads its projection. A connection without a cursor starts
+with `stream.ready`. Reconnect never submits anything. See the
+[HTTP contract](13-api-and-ui.md#p075-stream-and-cancellation).
+
+**Post-commit presentation jobs.** A commit that requires narration inserts exactly one
+`presentation_job` (`NARRATION`, `QUEUED`, three attempts) in the canonical transaction; a
+deferred foreign key proves the operation committed at that revision. The single
+background worker (`PresentationWorker`, 1-second poll) claims a due job under campaign,
+journal and job locks with one more attempt, a fresh fence and a 30-second database-clock
+lease, moving the journal `COMMITTED → NARRATING`. It calls the runtime-neutral
+`NarrationPort` outside any transaction (until P08 the default reports `UNAVAILABLE`),
+then settles under the same locks only if it still holds the exact live lease:
+
+| Port outcome / state at settle | Job | Journal |
+| --- | --- | --- |
+| Cancellation requested meanwhile | `PENDING` `NARRATION_CANCELLED` (narration discarded) | `COMMITTED_NARRATION_PENDING` |
+| `DELIVERED` | `DELIVERED` | `DELIVERED` |
+| `UNAVAILABLE` | `PENDING` `NARRATION_UNAVAILABLE` | `COMMITTED_NARRATION_PENDING` |
+| `FAILED` or exception, attempts left | `QUEUED`, backoff 2/4 s, fence step | stays `NARRATING` |
+| `FAILED`, third attempt | `PENDING` `NARRATION_FAILED` | `COMMITTED_NARRATION_PENDING` |
+| Lease expired, newer fence or job settled | nothing written (late result discarded) | unchanged |
+
+An expired lease is an interrupted attempt: the next pass requeues it while attempts remain.
+A job from an older recovery generation is retired `PENDING` `GENERATION_RETIRED`. Startup
+reconciliation runs before the server and worker start; queued jobs stay queued, so owed
+narration resumes after a restart without repeating the action (QA-18), and live leases
+are preserved. Journal recovery leaves committed operations that have a job to this pass;
+legacy commits with only an outbox intent still become `COMMITTED_NARRATION_PENDING`. Jobs
+never write world rows, receipts or draws and never call the canonical commit service.
+`COMMITTED_NARRATION_PENDING` remains terminal for the journal; a later narration-only
+retry (P08.5) is presentation state, never a second game action.
 
 ### P07.1 continuation checkpoint
 
@@ -476,9 +562,10 @@ Event-level calculation/reference schemas belong to later rules work. Seed bytes
 uncommitted values never enter outbox envelopes or runtime contexts. The service has
 no public endpoint. P07.4 local execution reserves draws only for admitted, authorized
 operations, after prepare re-validated them, and a matching retry replays instead of
-re-rolling. The equivalent-new-attempt policy that stops reroll fishing through a
-cancelled or failed attempt followed by a new request belongs with cancellation (P07.5);
-today there is no player cancellation, and an infrastructure failure keeps its draws.
+re-rolling. P07.5 adds player cancellation and the equivalent-new-attempt policy: an
+equivalent request at the same revision after a cancelled, failed or rejected attempt
+shares that attempt's draw stream and so obtains the same values (see
+[P07.5](#p075-public-stream-cancellation-and-presentation-jobs)).
 
 ## 5. Canonical commit
 
@@ -523,8 +610,9 @@ This internal primitive does not accept player/model proposals directly. P07.2 s
 re-derives their current-state rules and requires effects attributable to the
 intention's participants (resources, placements and event actors). P07.4's
 `CommandExecutionService` is the only production caller for player intentions and builds
-plans solely through `LocalActionResolver`. Encounter checks, cancellation coordination and
-outbox dispatch remain later roadmap tasks. P07.1 admission and P03.5 leases/fences/startup
+plans solely through `LocalActionResolver`. P07.5 adds cancellation coordination (the
+campaign lock decides) and post-commit presentation jobs inserted by this transaction;
+encounter checks remain later roadmap tasks. P07.1 admission and P03.5 leases/fences/startup
 recovery now protect the durable operation boundary. New domain effect types must join the same explicit commit path.
 
 ## 6. Narration after authority
@@ -561,7 +649,9 @@ unchanged; any recovery error aborts startup. P07.1 makes acceptance and lease
 grant atomic under the shared campaign lock, so recovery cannot observe an
 intermediate journal-only admission. Legacy internal journal writers must still
 coordinate startup or accept that unleased work is abandoned.
-`COMMITTED` without a narration intent stays `COMMITTED`. P03.6 persists preparation
+`COMMITTED` without a narration intent stays `COMMITTED`. Since P07.5 a committed
+operation with a presentation job is left to that job's reconciliation instead, so queued
+narration resumes after restart; only legacy commits are marked pending here. P03.6 persists preparation
 attempt accounting and lease renewal; runtime cancellation transport remains P07/P08. The
 [database backup tool](../tools/database_backup/README.md) retires all saved leases
 on restore and advances the campaign recovery generation.

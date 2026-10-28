@@ -124,3 +124,23 @@ the payload for asynchronous resumption (a second copy of untrusted input and a 
 path that P07.5 cancellation must govern first), evaluating dice without durable
 reservation (reroll on retry), and silently skipping unsupported effect nodes (a
 partial ability is not the authored ability).
+
+P07.5 implementation decision (28 October 2026): decide cancellation races with the
+campaign lock that every journal writer already takes first; a winning cancellation moves
+the operation to `CANCELLED` and retires its permit with a fence step, so the executing
+request's own status, version and lease checks stop it. Prevent reroll fishing with draw
+streams: draw values derive from the earliest equivalent attempt (same normalized
+intention and base revision) instead of the operation identity. Announce operation
+progress through an append-only stream log written by a journal trigger in the changing
+transaction, rendered at delivery from immutable journal data and served as bounded SSE
+long polls with `generation:sequence` identities. Represent owed presentation as one
+durable fenced `presentation_job` per committed operation, inserted by the commit and
+settled with the journal status. Alternatives rejected: a cancel flag polled by the worker
+(a flag set after the commit lock was taken could be reported as a cancellation of saved
+effects), rejecting equivalent attempts outright (blocks a legitimate retry after an
+infrastructure failure), application-level stream writes (every present and future
+journal writer, including recovery, would have to remember them), held server-push
+connections (unbounded threads and no resumption after a server restart), and reusing
+`ai_job` for presentation (its admission contract requires planning snapshots and
+artifacts, and presentation must not depend on planning admission). Retention is bounded
+(1000 messages); older cursors reset instead of guessing.

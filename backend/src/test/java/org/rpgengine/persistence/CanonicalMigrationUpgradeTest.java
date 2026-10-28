@@ -15,7 +15,7 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V10 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V11 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -182,6 +182,21 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(0, jdbc.queryForObject("select count(*) from campaign_known_fact", Integer.class));
                     assertEquals(0, jdbc.queryForObject("select count(*) from campaign_known_quest", Integer.class));
                     assertEquals(0, v10.migrate().migrationsExecuted);
+                    // V11 adds attempt identity, the stream log and presentation jobs without backfilling
+                    // history: old journal rows keep their values, gain null attempt columns and announce nothing.
+                    Flyway v11 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("11").load();
+                    assertEquals(1, v11.migrate().migrationsExecuted);
+                    assertTrue(v11.validateWithResult().validationSuccessful);
+                    assertEquals(v6Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
+                    assertEquals(journal, jdbc.queryForObject("select (to_jsonb(o) - 'attempt_key' - 'draw_stream_id')::text "
+                            + "from operation_journal o", String.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from operation_journal where attempt_key is not null "
+                            + "or draw_stream_id is not null", Integer.class));
+                    for (String table : new String[] {"campaign_stream_head", "campaign_stream_message", "presentation_job"}) {
+                        assertEquals(0, jdbc.queryForObject("select count(*) from " + table, Integer.class));
+                    }
+                    assertEquals(0, v11.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

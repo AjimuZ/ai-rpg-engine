@@ -69,7 +69,7 @@ class CampaignCommandHttpTest {
     /** Delete disposable rows after each test; constraints remain installed. */
     @AfterEach
     void clear() {
-        jdbc.execute("truncate campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
+        jdbc.execute("truncate presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
                 + "operation_journal, actor_resource, actor, presentation_campaign_settings, campaign, "
                 + "content_revision_report, content_revision_file, content_revision, adventure_workspace, identity_owner_profile");
     }
@@ -91,7 +91,8 @@ class CampaignCommandHttpTest {
         assertFalse(accepted.body().contains("fence") || accepted.body().contains("holder"));
         // Allowlisted body and receipt projection: no stored details, actors, words or draw identities.
         assertEquals(java.util.List.of("operationId", "campaignId", "commandType", "status", "baseRevision",
-                "committedRevision", "operationVersion", "replayed", "createdAt", "updatedAt", "receipt", "query"),
+                "committedRevision", "operationVersion", "replayed", "createdAt", "updatedAt", "receipt", "query",
+                "stream"),
                 java.util.List.copyOf(view.propertyNames()));
         JsonNode receipt = view.get("receipt");
         assertEquals(java.util.List.of("stateRevision", "firstEventSequence", "lastEventSequence", "commandType",

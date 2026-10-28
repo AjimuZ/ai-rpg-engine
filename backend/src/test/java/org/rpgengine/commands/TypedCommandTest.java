@@ -31,6 +31,26 @@ class TypedCommandTest {
         }
     }
 
+    /**
+     * The equivalent-attempt payload ignores target order, which cannot change resolution, while the
+     * hashed payload keeps it; other intentions use their exact payload (P07.5 reroll policy).
+     */
+    @Test
+    void attemptPayloadNormalizesOnlyOrderInsensitiveFields() {
+        UUID first = UUID.fromString("00000000-0000-0000-0000-00000000000a");
+        UUID second = UUID.fromString("00000000-0000-0000-0000-00000000000b");
+        var forward = new TypedCommand.UseAbility("mend", List.of(first, second));
+        var reversed = new TypedCommand.UseAbility("mend", List.of(second, first));
+        assertNotEquals(forward.payload(), reversed.payload());
+        assertEquals(forward.attemptPayload(), reversed.attemptPayload());
+        assertEquals(List.of(first.toString(), second.toString()), reversed.attemptPayload().get("targetActorIds"));
+        assertNotEquals(forward.attemptPayload(), new TypedCommand.UseAbility("mend", List.of(first)).attemptPayload());
+        for (TypedCommand command : List.of(new TypedCommand.Move("door"), new TypedCommand.Wait(5),
+                new TypedCommand.Speak(first, " Exact  text "))) {
+            assertEquals(command.payload(), command.attemptPayload());
+        }
+    }
+
     /** Effect, batch, administrative and not-yet-supported action types cannot masquerade as player intentions. */
     @ParameterizedTest
     @ValueSource(strings = {"PATCH", "SET_FIELD", "UPDATE", "BATCH", "ADMIN_CORRECTION", "USE_ITEM",

@@ -38,8 +38,10 @@ public class JournalRecoveryService {
      * Scan all currently unfinished/leased operations once, with no ambient transaction.
      * Live mutation permits are preserved, including when another engine starts.
      * Expired/orphaned preparation fails before commit; stored outcomes and draws
-     * remain unchanged, while interrupted narration becomes presentation-pending.
-     * No worker, account permit, outbox delivery or external task is resumed here.
+     * remain unchanged. Committed operations with a P07.5 presentation job are left to
+     * that job's reconciliation, so queued narration resumes after a restart; legacy
+     * commits with only an outbox intent, or interrupted narration without a job,
+     * become presentation-pending. No worker, permit or external task is resumed here.
      */
     public long reconcile() {
         MutationLeaseService.requireNoTransaction();
@@ -91,6 +93,13 @@ public class JournalRecoveryService {
             return false;
         }
         CampaignOperation operation = entities.find(CampaignOperation.class, candidate.operation());
+        // Since P07.5 a committed operation's presentation belongs to its durable presentation job,
+        // which resumes or settles it; only legacy commits without a job are marked pending here.
+        if (operation.getStatus().isCommitted() && Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 "
+                        + "from presentation_job where campaign_id = ? and operation_id = ?)", Boolean.class,
+                candidate.campaign(), candidate.operation()))) {
+            return false;
+        }
         boolean narrationRequired = Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from canonical_outbox "
                         + "where campaign_id = ? and operation_id = ? and kind = 'NARRATION_REQUIRED')",
                 Boolean.class, candidate.campaign(), candidate.operation()));

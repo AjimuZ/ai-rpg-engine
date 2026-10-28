@@ -45,6 +45,8 @@ public class RandomDrawService {
      * replay even after world changes or cancellation, but never permit a changed
      * bound. New records require the exact current VALIDATING snapshot. Ambient
      * transactions fail so canonical rollback cannot undo this earlier reservation.
+     * The value is a pure function of the campaign seed, the operation's draw stream
+     * (see {@link CampaignOperation#getDrawStreamId}), the ordinal and the bound.
      */
     public Draw reserve(ResolvedCommit.Context context, int ordinal, int sides) {
         Objects.requireNonNull(context, "context");
@@ -98,8 +100,11 @@ public class RandomDrawService {
                 jdbc.update("insert into campaign_random_seed values (?, ?, ?, ?, now())", c.campaignId(), seed,
                         DeterministicDraw.ALGORITHM, DeterministicDraw.VERSION);
             }
+            // Values derive from the draw stream, not the operation identity: an equivalent new
+            // attempt after a cancelled or failed one shares the earliest attempt's stream and so
+            // reproduces its values (P07.5). Legacy and first attempts are their own stream.
             Draw draw = new Draw(UUID.randomUUID(), ordinal, sides,
-                    DeterministicDraw.value(seed, c.operationId(), ordinal, sides),
+                    DeterministicDraw.value(seed, operation.getDrawStreamId(), ordinal, sides),
                     DeterministicDraw.ALGORITHM, DeterministicDraw.VERSION);
             jdbc.update("insert into operation_random_draw values (?, ?, ?, ?, ?, ?, ?, ?, now())",
                     draw.id(), c.campaignId(), c.operationId(), ordinal, sides, draw.value(), draw.algorithm(), draw.version());

@@ -67,7 +67,10 @@ No seeds or historical draws are backfilled on upgrade. Both tables reject UPDAT
 and DELETE. Draws have a unique `(campaign_id, operation_id, ordinal)`, a scoped
 journal foreign key, bounded ordinal/value and a seed algorithm/version foreign key.
 Reservation changes neither world counters nor journal versions. No mutable RNG
-cursor is needed: the durable operation/ordinal set is the reservation ledger.
+cursor is needed: the durable operation/ordinal set is the reservation ledger. Since
+P07.5 the HMAC message uses the operation's draw stream (its own identity, or the
+earliest equivalent attempt's identity) in place of the operation UUID, so an
+equivalent new attempt reproduces retained values; legacy rows use their own identity.
 
 The protocol `HMAC-SHA-256`, version 1, maps a private 32-byte campaign seed
 and operation UUID/ordinal/bound to an unbiased integer in `1..sides`. The message
@@ -184,6 +187,29 @@ bumps the `actor:<uuid>` query epoch of every actor whose placement or pools cha
 Resource keys are applied only to actors whose origin belongs to the ability's pack;
 others are recorded as unaffected. No table, trigger or migration is added. See the
 [execution contract](07-turn-protocol.md#p074-local-action-execution).
+
+### Stream, cancellation and presentation jobs (P07.5)
+
+V11 adds, without backfilling history:
+
+- `operation_journal.attempt_key` (SHA-256 of the normalized intention and base revision)
+  and `draw_stream_id` (scoped self-reference to the earliest equivalent attempt), both
+  fixed at insert and null for legacy rows.
+- `campaign_stream_head` (per-campaign monotonic high-water sequence, never deleted) and
+  `campaign_stream_message` (sequence, recovery generation, operation, operation version,
+  message type, status, state revision). An `AFTER INSERT OR UPDATE OF status` trigger on
+  the journal appends one message per status change in the same transaction and keeps the
+  newest 1000 per campaign; messages reject UPDATE.
+- `presentation_job`: one `NARRATION` job per committed operation (unique per operation,
+  deferred foreign key to the committed journal revision), `QUEUED → RUNNING →
+  DELIVERED | PENDING` with `RUNNING → QUEUED` retries, attempts 1..5 (engine default 3),
+  a fence that steps exactly when the lease holder changes, write-once cancellation request
+  and outcome, frozen identity, no deletion and terminal `DELIVERED`/`PENDING`.
+
+None of these rows is world state: they never advance revision, turn, time, event
+sequence or resources. Cancellation, presentation settlement and recovery change only
+journal statuses, permits, job rows and (through the trigger) stream messages. See the
+[delivery contract](07-turn-protocol.md#p075-public-stream-cancellation-and-presentation-jobs).
 
 ### Campaign creation (P06.1)
 

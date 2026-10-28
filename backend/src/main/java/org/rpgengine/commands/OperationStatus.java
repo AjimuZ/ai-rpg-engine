@@ -11,6 +11,12 @@ import java.util.Set;
  * <p>Statuses at or after {@link #COMMITTED} mean canonical state has changed, so the
  * operation can no longer be cancelled or fail "before commit"; narration problems
  * end in {@link #COMMITTED_NARRATION_PENDING} instead of rolling anything back.
+ *
+ * <p>P07.5 adds two edges to the original diagram: {@code ACCEPTED -> CANCELLED}, because an
+ * admitted operation can be cancelled before its prepare step starts (docs/07 section 8,
+ * "before planning completes"), and {@code COMMITTED -> COMMITTED_NARRATION_PENDING}, because
+ * a presentation job can be stopped or retired before narration starts. Neither edge can
+ * undo or skip a committed effect.
  */
 public enum OperationStatus {
     /** Received and journaled under its idempotency key. */
@@ -44,11 +50,11 @@ public enum OperationStatus {
     public Set<OperationStatus> successors() {
         // A switch keeps the table next to the enum without forward-reference issues.
         return switch (this) {
-            case ACCEPTED -> EnumSet.of(PLANNING, FAILED_BEFORE_COMMIT);
+            case ACCEPTED -> EnumSet.of(PLANNING, CANCELLED, FAILED_BEFORE_COMMIT);
             case PLANNING -> EnumSet.of(NEEDS_CLARIFICATION, VALIDATING, CANCELLED, FAILED_BEFORE_COMMIT);
             case VALIDATING -> EnumSet.of(REJECTED, COMMITTING, CANCELLED, FAILED_BEFORE_COMMIT);
             case COMMITTING -> EnumSet.of(COMMITTED);
-            case COMMITTED -> EnumSet.of(NARRATING);
+            case COMMITTED -> EnumSet.of(NARRATING, COMMITTED_NARRATION_PENDING);
             case NARRATING -> EnumSet.of(DELIVERED, COMMITTED_NARRATION_PENDING);
             case NEEDS_CLARIFICATION, REJECTED, DELIVERED, COMMITTED_NARRATION_PENDING, CANCELLED,
                     FAILED_BEFORE_COMMIT -> EnumSet.noneOf(OperationStatus.class);

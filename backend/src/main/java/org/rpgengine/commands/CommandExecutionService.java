@@ -21,7 +21,8 @@ import tools.jackson.databind.json.JsonMapper;
  * Local execution of registered player intentions (P07.4): admission, deterministic
  * calculation, durable draws and one canonical commit, with every outcome recorded in the
  * operation journal. It runs in the caller's thread with no inference, network client or
- * background worker; narration remains an outbox intent for later presentation work.
+ * background worker; narration becomes a durable post-commit presentation job that the
+ * presentation worker settles later (P07.5).
  *
  * <p>Sequence for a fresh request, each step its own bounded transaction:
  * <ol>
@@ -45,6 +46,13 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>A matching retry only replays: it returns the stored status and receipt and never resumes
  * or re-executes an earlier attempt, because the admission journal intentionally stores the
  * payload hash and not the payload.
+ *
+ * <p>Cancellation (P07.5, {@link OperationCancellationService}) races these steps under the
+ * campaign lock. When it wins, the operation is CANCELLED and its permit fenced, so the next
+ * prepare, draw or commit here fails its status/version/lease check; the bookkeeping above then
+ * leaves the terminal status untouched and this method reports CANCELLED. When the commit wins,
+ * this method reports the commit. Every status change is announced on the public stream by the
+ * journal trigger, never by this class.
  */
 @Service
 public class CommandExecutionService {
@@ -90,8 +98,8 @@ public class CommandExecutionService {
      * @param adventure adventure that must own the campaign
      * @param campaign target campaign
      * @param command structurally validated envelope
-     * @return final operation view (COMMITTED, REJECTED or FAILED_BEFORE_COMMIT for a fresh
-     *         request; the stored progress for a replay) and the player-safe receipt when committed
+     * @return final operation view (COMMITTED, REJECTED, FAILED_BEFORE_COMMIT or CANCELLED for a
+     *         fresh request; the stored progress for a replay) and the player-safe receipt when committed
      * @throws OperationAdmissionFailure for admission outcomes; nothing was journaled
      * @throws IllegalArgumentException if the command cannot be canonicalized within bounds
      * @throws IllegalStateException if called inside an ambient transaction

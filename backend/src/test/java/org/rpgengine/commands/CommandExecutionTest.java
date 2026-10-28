@@ -49,6 +49,7 @@ class CommandExecutionTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     @Autowired private CommandExecutionService executions;
     @Autowired private JournalRecoveryService recovery;
+    @Autowired private org.rpgengine.presentation.PresentationJobService presentation;
     @Autowired private CampaignCreationService creation;
     @Autowired private PackRegistry registry;
     @Autowired private EntityManager entities;
@@ -105,7 +106,7 @@ class CommandExecutionTest {
         jdbc.execute("drop trigger if exists test_move_after_draw on operation_random_draw");
         jdbc.execute("drop function if exists test_fail_event()");
         jdbc.execute("drop function if exists test_move_after_draw()");
-        jdbc.execute("truncate campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, "
+        jdbc.execute("truncate presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, "
                 + "learned_ability, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, "
                 + "ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, "
                 + "campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
@@ -154,8 +155,10 @@ class CommandExecutionTest {
         assertTrue(replay.replayed());
         assertEquals(receipt, replay.receipt());
         assertEquals(before, snapshot());
-        // A restart owes narration but never re-runs the action; the same request still replays.
-        assertEquals(1, recovery.reconcile());
+        // A restart keeps the owed narration queued as its presentation job (P07.5) and never re-runs
+        // the action; the job settles presentation only, and the same request still replays.
+        assertEquals(0, recovery.reconcile());
+        assertEquals(1, presentation.drain(4));
         var restarted = executions.execute(owner, adventure, campaign, input);
         assertEquals(OperationStatus.COMMITTED_NARRATION_PENDING, restarted.operation().status());
         assertEquals(receipt, restarted.receipt());
@@ -357,7 +360,7 @@ class CommandExecutionTest {
     }
 
     /** Dependency pack: a cost-free foreign-vocabulary "steady" plus an ability reading foreign values. */
-    private static Map<String, byte[]> dependencyPack(Map<String, byte[]> fixture) {
+    static Map<String, byte[]> dependencyPack(Map<String, byte[]> fixture) {
         var files = new TreeMap<>(fixture);
         var abilities = definitions(files, "abilities.json");
         abilities.add(ability("sense", "self", Map.of(), List.of(Map.of("type", "modifyResource", "resource", "vigor",
@@ -371,7 +374,7 @@ class CommandExecutionTest {
      * conditional dice program, a dice-based target effect, an unsupported damage effect and a
      * program exceeding the per-operation draw budget. The profile learns all of them.
      */
-    private static Map<String, byte[]> rootPack(Map<String, byte[]> fixture) {
+    static Map<String, byte[]> rootPack(Map<String, byte[]> fixture) {
         var files = new TreeMap<>(fixture);
         put(files, "npcs.json", List.of(Map.of("id", "warden", "kind", "npc", "data", Map.of("name", "Warden",
                 "role", "Trail keeper", "location", "trailhead"))));
@@ -435,12 +438,12 @@ class CommandExecutionTest {
 
     /** Parse one fixture JSON object. */
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> document(Map<String, byte[]> files, String path) {
+    static Map<String, Object> document(Map<String, byte[]> files, String path) {
         return JSON.readValue(files.get(path), Map.class);
     }
 
     /** Exact registered coordinates of a dependency. */
-    private static Map<String, Object> pin(PackRegistry.Registration registration) {
+    static Map<String, Object> pin(PackRegistry.Registration registration) {
         var pack = registration.pack();
         return Map.of("id", pack.packId(), "version", pack.packVersion(), "hash", pack.contentHash());
     }

@@ -27,6 +27,12 @@ import org.rpgengine.persistence.VersionedEntity;
  * write-once. {@link CanonicalCommitService} sets the outcome with state, events,
  * settlements and outbox in one transaction. P03.5 checks a separate campaign lease
  * and preserves its fencing high-water mark through release and recovery.
+ *
+ * <p>P07.5 adds the equivalent-attempt identity: {@code attemptKey} hashes the normalized
+ * intention with its base revision, and {@code drawStreamId} names the earliest operation of
+ * this campaign with the same key (itself for the first attempt). Draw values derive from the
+ * stream, not from this operation's identity, so an equivalent new attempt after a cancelled
+ * or failed one reproduces the same values. Both are fixed at insert; legacy rows keep null.
  */
 @Entity
 @Table(name = "operation_journal")
@@ -71,6 +77,13 @@ public class CampaignOperation extends VersionedEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    // Equivalent-attempt identity (V11); both null for legacy and internal operations.
+    @Column(name = "attempt_key", updatable = false)
+    private String attemptKey;
+
+    @Column(name = "draw_stream_id", updatable = false)
+    private UUID drawStreamId;
+
     /** Reserved for JPA. */
     protected CampaignOperation() {
     }
@@ -103,6 +116,30 @@ public class CampaignOperation extends VersionedEntity {
         operation.status = OperationStatus.ACCEPTED;
         operation.createdAt = CanonicalValues.timestamp(now, "now");
         operation.updatedAt = operation.createdAt;
+        return operation;
+    }
+
+    /**
+     * Journal a registered player intention in {@link OperationStatus#ACCEPTED} with its
+     * equivalent-attempt identity (P07.5).
+     *
+     * @param campaignId owning campaign
+     * @param idempotencyKey 1..128 character client-chosen key, unique per campaign
+     * @param payloadHash lowercase hexadecimal SHA-256 of the canonical command payload
+     * @param commandType 1..128 character command type name
+     * @param baseRevision campaign state revision the command targets
+     * @param attemptKey lowercase hexadecimal SHA-256 of the normalized intention and revision
+     * @param predecessorStream draw stream of an earlier equivalent attempt, or null when this
+     *        is the first one (the new operation then becomes its own stream root)
+     * @param now acceptance time
+     * @return an unsaved journal entry with a fresh opaque identity
+     * @throws IllegalArgumentException if any argument is malformed
+     */
+    public static CampaignOperation accept(UUID campaignId, String idempotencyKey, String payloadHash,
+            String commandType, long baseRevision, String attemptKey, UUID predecessorStream, Instant now) {
+        CampaignOperation operation = accept(campaignId, idempotencyKey, payloadHash, commandType, baseRevision, now);
+        operation.attemptKey = CanonicalValues.requireSha256Hex(attemptKey, "attemptKey");
+        operation.drawStreamId = predecessorStream == null ? operation.getId() : predecessorStream;
         return operation;
     }
 
@@ -244,5 +281,18 @@ public class CampaignOperation extends VersionedEntity {
     /** @return last transition time */
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    /** @return equivalent-attempt key, or null for legacy and internal operations */
+    public String getAttemptKey() {
+        return attemptKey;
+    }
+
+    /**
+     * @return identity whose draw stream this operation uses: the earliest equivalent attempt,
+     *         this operation itself when it is the first, or this operation for legacy rows
+     */
+    public UUID getDrawStreamId() {
+        return drawStreamId == null ? getId() : drawStreamId;
     }
 }

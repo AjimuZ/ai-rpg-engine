@@ -27,6 +27,19 @@ public sealed interface TypedCommand
     Map<String, Object> payload();
 
     /**
+     * Normalized payload of the equivalent-attempt identity (P07.5): two intentions with equal
+     * attempt payloads at the same base revision are the same deliberate attempt, so a new
+     * request for one after the other was cancelled or failed reuses its draw stream instead of
+     * re-rolling. Fields whose order or spelling cannot change the mechanical outcome must be
+     * normalized here; by default the exact hashed payload is used.
+     *
+     * @return immutable payload used only to derive the attempt key, never for execution
+     */
+    default Map<String, Object> attemptPayload() {
+        return payload();
+    }
+
+    /**
      * Decode the already bounded canonical snapshot, not the caller's mutable map.
      * Called for fresh admissions only: historical matching retries must replay before
      * today's registry or eligibility policy is consulted. All malformed payload shapes,
@@ -170,6 +183,17 @@ public sealed interface TypedCommand
         public Map<String, Object> payload() {
             return Map.of("abilityId", abilityId,
                     "targetActorIds", targetActorIds.stream().map(UUID::toString).toList());
+        }
+        /**
+         * Target order is hashed but does not change resolution: every effect amount is
+         * evaluated once and applied to each target, so reordering targets must not open a
+         * fresh draw stream. The attempt payload therefore lists targets sorted.
+         *
+         * @return the ability reference and target UUID texts in ascending text order
+         */
+        public Map<String, Object> attemptPayload() {
+            return Map.of("abilityId", abilityId,
+                    "targetActorIds", targetActorIds.stream().map(UUID::toString).sorted().toList());
         }
     }
 }

@@ -14,6 +14,7 @@ import org.rpgengine.preparation.JobRequest;
 import org.rpgengine.preparation.PlanAdmissionService;
 import org.rpgengine.preparation.PreparationJobService;
 import org.rpgengine.preparation.QueryEpochs;
+import org.rpgengine.presentation.PresentationJobService;
 import org.rpgengine.progression.RewardSettlement;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,8 +30,10 @@ import tools.jackson.databind.json.JsonMapper;
  * after COMMIT succeeds. Registered player operations recheck hash-bound typed
  * evidence, common semantic eligibility and the P07.3 current-state rules here, and
  * their effects must be attributable to the intention's participants. Effect calculation
- * belongs to {@link CommandExecutionService}/{@link LocalActionResolver} and delivery to
- * later workers; this internal service has no controller, network port or callback.
+ * belongs to {@link CommandExecutionService}/{@link LocalActionResolver}. Delivery belongs to
+ * workers: the journal update emits the {@code state.committed} stream message through the V11
+ * trigger, and a narration-requiring commit inserts its post-commit presentation job here, in
+ * the same transaction. This internal service has no controller, network port or callback.
  * Any validation, persistence, timeout or commit failure rolls back all its writes.
  */
 @Service
@@ -202,6 +205,12 @@ public class CanonicalCommitService {
             entities.persist(new OutboxMessage(operation, OutboxMessage.Kind.NARRATION_REQUIRED, now));
         }
         entities.flush();
+        if (plan.narrationRequired()) {
+            // The owed presentation is durable exactly when the world change is (P07.5): one
+            // NARRATION job per operation, checked against this committed revision at COMMIT.
+            PresentationJobService.enqueueWithin(jdbc, context.adventureId(), campaign.getId(), operation.getId(),
+                    counters.stateRevision());
+        }
         // Preparation intents share this transaction and the campaign lock already held
         // (lock order campaign, then job): epochs move with the write that changed the
         // scopes, critical jobs exist exactly when the world change does, and plans that

@@ -220,6 +220,14 @@ read a bumped scope; plans that depend on an actor's position or pools should re
 that scope. Typed plan activation and complete QA-36 remain P07.6. No new background
 world writer is added.
 
+P07.5 post-commit presentation jobs (`presentation_job`) are deliberately separate from
+`ai_job`: one per committed operation, created by the canonical transaction, settled
+together with the journal's presentation status and never admitted as an artifact. They
+cannot change world facts, time, rewards or draws. When P08 adds narration inference, the
+job's `NarrationPort` call is the point where the P08.6 fair queue and its runtime permits
+take over; the job keeps its own fence, lease and attempt budget, and its cancellation
+request follows the interrupt/reconcile rules of section 9.
+
 ## 8. Plans, pending events, knowledge and canon
 
 | Data class | Authority and permitted use |

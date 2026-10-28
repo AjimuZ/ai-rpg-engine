@@ -8,8 +8,11 @@
  * changes, immutable receipt/draw references, lease release and preparation intents
  * together; persistence failure rolls back that bundle. Previously reserved draws stay
  * durable independently. Registered player commands require hash-bound immutable typed
- * evidence and repeat semantic checks inside canonical commit. Detailed resource,
- * prerequisite and knowledge rules, execution workers, public receipt projection and
- * outbox dispatch remain later tasks. No network work runs here.
+ * evidence and repeat semantic checks inside canonical commit. Current-state rules
+ * (P07.3) and local execution with durable draws and player-safe receipts (P07.4) are
+ * implemented. P07.5 adds owner cancellation decided by the campaign lock, the
+ * equivalent-attempt draw stream that prevents reroll fishing, and the read side of the
+ * resumable public stream whose messages the V11 journal trigger appends; post-commit
+ * presentation jobs live in {@code org.rpgengine.presentation}. No network work runs here.
  */
 package org.rpgengine.commands;
