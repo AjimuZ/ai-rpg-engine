@@ -18,8 +18,10 @@
 - Pass 151 focused command cases and all 414 packaged backend tests in 34 suites,
   with zero failures/errors/skips, including trigger-injected failures after durable
   draws. Pass configured frontend checks, both locale builds and all 22
-  repository-policy tests with zero scan findings. Cancellation, streaming and narration remain later
-  work.
+  repository-policy tests with zero scan findings. Cancellation, streaming and
+  narration remain later work.
+- Record implementation owner commit `3174e5a` before marking P07.4 complete (44 of
+  131 roadmap entries).
 
 ## Unreleased — Current-state command rules, 27 October 2026
 

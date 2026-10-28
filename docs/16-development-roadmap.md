@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 43/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4 and P07.1–P07.3. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 44/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4 and P07.1–P07.4. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -1176,7 +1176,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     Run focused commands, full packaged backend, configured frontend gates and
     repository policy tests/scans; record actual results and a neutral owner commit
     before checking this task.
-- [ ] P07.4 Implement local action calculations, durable draws, events, receipts, and pending decisions.
+- [x] P07.4 Implement local action calculations, durable draws, events, receipts, and pending decisions.
   - Package A — local execution pipeline: `CommandExecutionService` admits, then moves a
     fresh operation `ACCEPTED → PLANNING → VALIDATING` under the campaign/journal locks,
     re-runs common semantics and current-state rules, reads a detached snapshot, calculates
@@ -1210,6 +1210,17 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     effect; forged/stale placements; HTTP receipt allowlist and replay. Run focused
     commands, full packaged backend, configured frontend gates and repository policy
     tests/scans; record actual results and a neutral owner commit before checking this task.
+  - Verified evidence (28 October 2026): all 151 focused command cases (seven pure
+    resolver and six execution cases new) and all 414 packaged backend cases in 34 suites
+    pass with zero failures/errors/skips on the scoped JDK 21/PostgreSQL 18.6 fixture.
+    Configured frontend installation, typechecking, 49 tests, four localization tests,
+    240-message parity and both locale builds pass; all 22 repository-policy tests and
+    zero-finding scans pass. A deliberate weakening of the effect-support rule and
+    placement attribution failed the intended cases and was reverted byte-identically.
+    See the [verification record](15-quality-and-acceptance.md). Implementation owner
+    commit: `3174e5a`; all exit checks passed on that exact code before this completion
+    mark. All 131 task identities/titles and the pending P98 follow-up are preserved;
+    only P07.4 gains a completion mark.
 - [ ] P07.5 Add resumable public stream, cancellation race handling, and post-commit presentation jobs.
 - [ ] P07.6 Implement atomic plan admission with dependency/query-epoch rechecks, scope/content/author validation, fencing and idempotency; artifacts never directly change world facts/time/rewards, and activation uses ordinary commands under QA-36.
 

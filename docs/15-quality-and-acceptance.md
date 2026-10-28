@@ -39,7 +39,9 @@ packages), both typechecks, 49 tests, four localization tests, 240-message parit
 both locale builds pass, as do all 22 repository-policy tests and zero-finding scans. This adds executed-
 action, durable-draw, receipt and fault-injection evidence toward QA-03, QA-05, QA-17,
 QA-18 and QA-20; it does not claim item intentions, cancellation, streaming,
-narration, live inference or the equivalent-new-attempt reroll policy (P07.5).
+narration, live inference or the equivalent-new-attempt reroll policy (P07.5). The
+neutral implementation owner commit is `3174e5a`; every check above passed on its exact
+Java sources, and only P07.4 then gains a completion mark (44 of 131 roadmap entries).
 
 P07.3 verification (27 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks
 pass **138 focused command cases and all 401 packaged backend cases in 32 suites**,
