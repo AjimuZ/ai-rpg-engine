@@ -63,8 +63,10 @@ import org.springframework.stereotype.Component;
  * the permit, even one of another process. Only then is the task forwarded to the port with its
  * remaining budget.
  *
- * <p><b>Settlement</b>: the port's terminal result is written to the ledger and returned to the
- * caller unchanged, except that a preempted task reports {@value #PREEMPTED}. The reservation stays
+ * <p><b>Settlement</b>: the port's terminal result is written to the ledger, reported to
+ * {@link ScopedSessions#settled} for the renewal counters and the unreliable-context rule (P09.4,
+ * docs/08 section 7), and returned to the caller unchanged, except that a preempted task reports
+ * {@value #PREEMPTED}. The reservation stays
  * charged whenever a runtime turn may have run (the result has provenance, or is UNRESOLVED) and is
  * released otherwise. A failed ledger write never withholds the result; the permit stays in use
  * and the write is retried every tick until it succeeds.
@@ -266,7 +268,7 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
 
     /**
      * Startup reconciliation, before any admission (docs/28 section 9): attach the write-ahead
-     * journal, abandon earlier processes' queued rows, take over their dispatched and reconciling
+     * journal, retire the AI-session records an earlier process left active (P09.4), abandon earlier processes' queued rows, take over their dispatched and reconciling
      * rows with the permit held, hand their runtime references to the port and reload the account
      * backoff. Idempotent; storage failures propagate and fail startup.
      */
@@ -275,6 +277,8 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
             return;
         }
         port.attachJournal(this::recordStart);
+        // Session records left active by an earlier process can never continue (P09.4).
+        sessions.recover();
         TaskLedger.Recovery recovery = ledger.recover(instance, clock.instant());
         suspension = ledger.suspension();
         List<String> references = recovery.uncertain().stream().map(TaskLedger.Uncertain::runtimeReference)
@@ -641,6 +645,15 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
             unsettled.add(settlement);
         }
         account(result);
+        if (task.portHandle != null) {
+            // Renewal counters and the unreliable-context rule (P09.4); a registry failure must
+            // never withhold the caller's result.
+            try {
+                sessions.settled(task.task.taskId(), result);
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "session accounting failed: " + failure.getClass().getName());
+            }
+        }
         task.future.complete(result);
     }
 

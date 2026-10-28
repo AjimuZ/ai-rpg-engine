@@ -16,6 +16,7 @@ import org.rpgengine.inference.scheduling.TaskLedger;
 import org.rpgengine.inference.scheduling.WorkClass;
 import org.rpgengine.inference.session.AiRole;
 import org.rpgengine.inference.session.Audience;
+import org.rpgengine.inference.session.JdbcSessionJournal;
 import org.rpgengine.inference.session.ScopedSessions;
 import org.rpgengine.inference.session.SessionScope;
 import org.springframework.boot.health.contributor.Status;
@@ -27,8 +28,9 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
  * half-assigned slot. The scoped session registry (P08.3) wraps whichever port is selected, and the
  * fair scheduler (P08.6) sits in front of the registry with the single qualified turn permit. Uses
  * component scanning of the inference package, so the adapter is reached only through the neutral
- * interface; the scan replaces the PostgreSQL ledger with the in-memory one because this context
- * has no data source.
+ * interface; the scan replaces the PostgreSQL ledger with the in-memory one and leaves out the
+ * PostgreSQL session journal (the registry then records nothing) because this context has no data
+ * source.
  */
 class TaskPortSelectionTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
@@ -38,7 +40,7 @@ class TaskPortSelectionTest {
     @org.springframework.context.annotation.ComponentScan(value = "org.rpgengine.inference",
             excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(
                     type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE,
-                    classes = JdbcTaskLedger.class))
+                    classes = {JdbcTaskLedger.class, JdbcSessionJournal.class}))
     static class Scan {
         @org.springframework.context.annotation.Bean
         TaskLedger ledger() {

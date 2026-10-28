@@ -9,14 +9,16 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V16 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V17 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -299,6 +301,26 @@ class CanonicalMigrationUpgradeTest {
                             jdbc.queryForObject("select (memory_operational_snapshot(?) #>> '{campaign,stateRevision}')"
                                     + "::bigint", Long.class, campaign));
                     assertEquals(0, v16.migrate().migrationsExecuted);
+                    // V17 adds the AI-session records empty: an old save gets no invented session, its
+                    // canonical rows stay exact, and a retired record rejects being reopened.
+                    String v16Campaign = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
+                    Flyway v17 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("17").load();
+                    assertEquals(1, v17.migrate().migrationsExecuted);
+                    assertTrue(v17.validateWithResult().validationSuccessful);
+                    assertEquals(v16Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c",
+                            String.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from ai_session_record", Integer.class));
+                    UUID record = UUID.randomUUID();
+                    jdbc.update("insert into ai_session_record (id, adventure_id, campaign_id, campaign_generation, "
+                            + "role, audience, pack_hash, policy_hash, line_generation, opened_cause, status, "
+                            + "rehydration_basis, opened_at, retired_reason, retired_at) select ?, adventure_id, id, "
+                            + "recovery_generation, 'narrator', 'public', ?, ?, 1, 'FIRST', 'RETIRED', 'NONE', now(), "
+                            + "'OWNER', now() from campaign", record, "a".repeat(64), "b".repeat(64));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update ai_session_record set status = "
+                            + "'ACTIVE', retired_reason = null, retired_at = null, row_version = row_version + 1 "
+                            + "where id = ?", record));
+                    assertEquals(0, v17.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

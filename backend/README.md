@@ -817,9 +817,8 @@ rules are in [docs/06 section 7](../docs/06-codex-integration.md#p083-session-sc
 | `engine.inference.sessions.capacity` | `256` | Active scoped sessions (1–4096); the least recently used is retired |
 
 The registry is in memory, like the adapter's thread bindings, so a backend restart starts
-every scope on a fresh thread. Durable session records and renewal triggers are P09.4; the
-operational checkpoints they will reference exist since P09.3 (see "Memory checkpoints and
-continuity summaries").
+every scope on a fresh thread. Since P09.4 the registry also renews sessions and records them
+durably (see "Session renewal, records and rehydration").
 
 Tests use deterministic doubles only and need no database:
 
@@ -1122,3 +1121,54 @@ Tests:
   freshness after newer events, source changes, invalidations, a locale switch and a generation
   change; the source race; bounded retries, fencing, throttling and database guards.
 - `CanonicalMigrationUpgradeTest` covers the V16 step.
+
+## Session renewal, records and rehydration (P09.4)
+
+Design: [docs/08 section 7](../docs/08-memory-and-continuity.md#p094-renewal-triggers-session-records-and-rehydration).
+Migration V17 adds `ai_session_record`. Nothing here writes canonical state or the transcript.
+
+- **`ScopedSessions`** keeps counters per live session. `settled(taskId, result)` is called by
+  the scheduler for every forwarded task: a result with provenance (or `UNRESOLVED`) adds a turn
+  and its estimated size; a completed one counts toward the ceiling; one that did not complete
+  retires the session (`UNRELIABLE`). At the line's next `submit`, a session at the turn ceiling
+  (`TURN_CEILING`) or one whose conversation plus the task would cross the pressure threshold
+  (`CONTEXT_PRESSURE`) is replaced, unless the rehydrator defers because a commit may be in
+  progress. `renewCampaign(id)` retires a campaign's sessions (`OWNER`). `recover()` (called by
+  the scheduler's startup recovery) retires records left active. `status()` adds `deferred`,
+  `warned` and `rehydrated` counts; `usage(scope)` reads one session's counters.
+- **`RenewalPolicy`** validates `engine.inference.sessions.*` (table below).
+- **`SessionJournal` / `JdbcSessionJournal`** write `ai_session_record`: one row per session with
+  line generation, predecessor, opening cause, retirement reason, counters and the rehydration
+  basis, code, revision, digest, checkpoint and summary. Failures are logged and never block.
+- **`Rehydrator` / `SessionRehydration`** build the continuity block of a renewed line's first
+  task: capture and verify a checkpoint (deferral at an unsafe boundary), request a summary of
+  the uncovered tail, assemble a 4,000-token envelope for the scope's own role and audience with
+  the usable summary, and check that the resume point and the envelope share one revision. The
+  summarizer role gets no block.
+- **`SessionRenewalService` / `SessionRenewalController`**:
+  `POST /api/v1/campaigns/{id}/ai-session/renew?adventureId=…` with `{}` renews an idle campaign
+  (200 with counts; 409 `SESSION_RENEWAL_BUSY`; 404, 400, 503 fixed codes).
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `engine.inference.sessions.turn-ceiling` | `10` | Completed tasks per session before renewal, 1–100 |
+| `engine.inference.sessions.context-window` | `128000` | Estimated conversation size (4-byte units) the percentages refer to, 8,000–2,000,000 |
+| `engine.inference.sessions.context-warn-percent` | `75` | Warning threshold, below the renewal threshold |
+| `engine.inference.sessions.context-renew-percent` | `85` | Renewal threshold, 2–99 |
+
+Tests:
+- `ScopedSessionsTest` (doubles): the ceiling renews at the next task with the block on that
+  task only; pressure renews only after a turn and counts the warning once; failed or unconfirmed
+  turns retire at once while turnless results count nothing; deferral keeps the session; an
+  oversized block is omitted; owner renewal and journal history after a restart rehydrate; a
+  failing rehydrator costs continuity only; settings are validated.
+- `MemoryContinuityTest` (real PostgreSQL, real scheduler, journal and rehydration, scripted
+  runtime): the ceiling renewal resumes at the starting decision with a verified checkpoint, no
+  opening text and linked records while the campaign row, events and transcript are unchanged;
+  an unreliable turn and context pressure renew with `free-input`; a live lease defers renewal
+  and a restart rehydrates from the journal; owner renewal waits for idleness, refuses a foreign
+  owner and resumes from the public summary with the open promise and without the secret; the
+  summarizer gets no block.
+- `CampaignCommandHttpTest`: the renewal route answers counts only, refuses malformed bodies,
+  foreign scopes and missing browser proofs, and leaves the campaign unchanged.
+- `CanonicalMigrationUpgradeTest` covers the V17 step.

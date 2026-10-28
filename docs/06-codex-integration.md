@@ -181,8 +181,9 @@ P08.3 implements this scoping in `org.rpgengine.inference.session`, above the ne
   6. At most `engine.inference.sessions.capacity` sessions are active (default 256, range 1–4096); the least recently used one is retired.
 
   Every retirement is forwarded to `NarrationTaskPort.retireSession`, so the adapter forgets the thread binding too. A task already running finishes on its thread.
-- **Retirement operations.** `retire(scope)` handles renewal or a context made unreliable by a failure, `retireCampaign(id)` handles restore, deletion or archival, and `retireAll()` handles a runtime change or an owner request. The P09.4 triggers (turn ceiling, context pressure, idle renewal) will call them.
-- **State.** The registry is in memory, like the adapter's bindings. A backend restart starts every scope with a fresh thread, which also covers a runtime switch at restart (ADR 0020 decision 4). Durable `AiSession` records with counters and checkpoint hashes are P09.3/P09.4.
+- **Retirement operations.** `retire(scope)` handles renewal or a context made unreliable by a failure, `retireCampaign(id)` handles restore, deletion or archival, and `retireAll()` handles a runtime change or an owner request.
+- **Renewal (P09.4).** The registry counts turns, completed tasks and the estimated conversation size of each session (`settled`, called by the scheduler for every forwarded task). At the line's next task it renews a session that reached the turn ceiling (10) or would cross 85% of the 128,000-unit context window; a turn that ran but did not complete retires its session at once; `renewCampaign(id)` serves the owner's idle renewal. A renewed line's first task carries a continuity block before its instructions. Details: [docs/08 section 7](08-memory-and-continuity.md#p094-renewal-triggers-session-records-and-rehydration).
+- **State.** The registry is in memory, like the adapter's bindings. A backend restart starts every scope with a fresh thread, which also covers a runtime switch at restart (ADR 0020 decision 4). Since P09.4 every session is also recorded durably in `ai_session_record` (counters, rehydration basis and checkpoint hash); records are history, never a way to resume a thread.
 
 Not part of P08.3:
 

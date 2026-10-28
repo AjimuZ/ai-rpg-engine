@@ -13,9 +13,20 @@
  * content or encounter proposers run; a privileged conversation therefore can never render player
  * text, and its earlier context never reaches a public task through a reused runtime conversation.
  *
+ * <p>Renewal (P09.4, docs/08 section 7): the registry counts turns, completed tasks and the
+ * estimated conversation size of every live session and renews a line at its next task when the
+ * {@link org.rpgengine.inference.session.RenewalPolicy} turn ceiling or context-pressure threshold
+ * is reached; a turn that ran but did not complete retires its session at once; the owner can
+ * renew an idle campaign. A renewed line's first task carries the continuity block of a
+ * {@link org.rpgengine.inference.session.Rehydrator} (implemented in the memory package), and every
+ * opening, use and retirement is recorded through a
+ * {@link org.rpgengine.inference.session.SessionJournal} ({@code ai_session_record}, V17).
+ *
  * <p>What this package does not do: it does not filter context (callers assemble audience-filtered
- * input from typed projections, P08.5 and P09.2), it does not detect paraphrased secrets in output
- * (a human-rubric evaluation), and it keeps no durable session records or renewal counters
- * (P09.4; the operational checkpoint those records will reference exists since P09.3). Nothing here names a runtime, touches the database or holds canonical authority.
+ * input from typed projections, P08.5 and P09.2; the rehydrator assembles for the session's own
+ * audience), it does not detect paraphrased secrets in output (a human-rubric evaluation), and it
+ * never resumes a runtime conversation after a restart: the registry stays in memory and the
+ * durable records are history and provenance only. Nothing here names a runtime or holds
+ * canonical authority; the only storage access is the journal's own table.
  */
 package org.rpgengine.inference.session;

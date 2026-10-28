@@ -9,13 +9,17 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -34,13 +38,25 @@ import org.rpgengine.characters.ActorKind;
 import org.rpgengine.content.PackRegistry;
 import org.rpgengine.content.PackStaging;
 import org.rpgengine.identity.OwnerProfile;
+import org.rpgengine.inference.CompletedTaskHandle;
+import org.rpgengine.inference.InferenceSlot;
+import org.rpgengine.inference.NarrationTaskPort;
+import org.rpgengine.inference.RuntimeStatus;
+import org.rpgengine.inference.TaskHandle;
+import org.rpgengine.inference.TaskRequest;
+import org.rpgengine.inference.TaskResult;
 import org.rpgengine.inference.contract.ContractRunner;
 import org.rpgengine.inference.scheduling.InferenceScheduler;
+import org.rpgengine.inference.scheduling.ScheduledTask;
 import org.rpgengine.inference.scheduling.SchedulerSettings;
 import org.rpgengine.inference.scheduling.TaskLedger;
+import org.rpgengine.inference.scheduling.WorkClass;
 import org.rpgengine.inference.session.AiRole;
 import org.rpgengine.inference.session.Audience;
+import org.rpgengine.inference.session.RenewalPolicy;
 import org.rpgengine.inference.session.ScopedSessions;
+import org.rpgengine.inference.session.SessionJournal;
+import org.rpgengine.inference.session.SessionScope;
 import org.rpgengine.knowledge.KnowledgeChange;
 import org.rpgengine.knowledge.KnowledgeChange.Acquisition;
 import org.rpgengine.knowledge.KnowledgeChange.CommitmentDisclosure;
@@ -63,6 +79,8 @@ import org.rpgengine.memory.MemorySummaries.Freshness;
 import org.rpgengine.memory.OperationalCheckpoints;
 import org.rpgengine.memory.OperationalCheckpoints.Capture;
 import org.rpgengine.memory.OperationalCheckpoints.Verification;
+import org.rpgengine.memory.SessionRehydration;
+import org.rpgengine.memory.SessionRenewalService;
 import org.rpgengine.presentation.SupportedLocale;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -108,6 +126,8 @@ class MemoryContinuityTest {
     @Autowired private EntityManager entities;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager manager;
+    @Autowired private SessionJournal journal;
+    @Autowired private SessionRehydration rehydration;
     private UUID owner;
     private UUID adventure;
     private UUID revision;
@@ -150,7 +170,7 @@ class MemoryContinuityTest {
     /** Remove disposable rows, preserving production constraints and triggers. */
     @AfterEach
     void clear() {
-        jdbc.execute("truncate memory_invalidation, memory_summary, memory_summary_job, actor_commitment, actor_sighting, "
+        jdbc.execute("truncate ai_session_record, memory_invalidation, memory_summary, memory_summary_job, actor_commitment, actor_sighting, "
                 + "knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_job, "
                 + "campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, "
                 + "campaign_creation, character_state, item_instance, learned_ability, plan_activation, "
@@ -459,6 +479,298 @@ class MemoryContinuityTest {
                 .noneMatch(item -> item.standing() == Standing.SUMMARY));
         assertThrows(IllegalArgumentException.class, () -> summaries.request(campaign,
                 Audience.character("actor:" + warden), true));
+    }
+
+    // ----------------------------------------------------------------------------------------------
+    // P09.4 renewal: real scheduler, real session registry, journal and rehydration; scripted runtime
+
+    /**
+     * The turn ceiling renews a line at its next task: the fresh session's first task carries the
+     * continuity block (renewal notice, the pending starting decision, a verified checkpoint) and
+     * no opening text, the durable records link the two sessions with their counters and the
+     * checkpoint hash, and the campaign row, its events and the transcript are exactly unchanged.
+     */
+    @Test
+    void theTurnCeilingRenewsTheLineAndRehydratesAtThePendingDecisionWithoutTouchingTheCampaign() throws Exception {
+        String campaignBefore = campaignRow();
+        int eventsBefore = count("campaign_event");
+        var runtime = new RenewalPort();
+        var sessions = renewalSessions(runtime, new RenewalPolicy(2, 128_000, 75, 85));
+        var scheduler = renewalScheduler(sessions, runtime);
+
+        assertEquals(TaskResult.Status.COMPLETED, run(scheduler, narrator(), "first task").status());
+        assertEquals(TaskResult.Status.COMPLETED, run(scheduler, narrator(), "second task").status());
+        assertEquals(TaskResult.Status.COMPLETED, run(scheduler, narrator(), "third task").status());
+
+        TaskRequest first = runtime.requests.get(0);
+        TaskRequest third = runtime.requests.get(2);
+        assertEquals(first.sessionId(), runtime.requests.get(1).sessionId(), "the ceiling allows two tasks");
+        assertEquals("first task", first.instructions(), "a line's first session carries no block");
+        assertNotEquals(first.sessionId(), third.sessionId(), "the third task runs in a renewed session");
+        assertEquals(List.of(first.sessionId()), runtime.retired, "the runtime forgets the retired conversation");
+        assertTrue(third.instructions().startsWith("SESSION RENEWAL."));
+        assertTrue(third.instructions().endsWith("\n\nthird task"), "the task's own instructions follow unchanged");
+        assertFalse(third.instructions().contains("You arrive at the trail shelter"), "the opening is not replayed");
+        JsonNode continuity = continuity(third);
+        assertEquals("turn-ceiling", continuity.path("renewal").path("cause").asString());
+        assertEquals("starting-situation", continuity.path("resume").path("pendingDecision").asString());
+        assertEquals(revision(), continuity.path("resume").path("stateRevision").asLong());
+        assertEquals("checkpoint", continuity.path("basis").asString());
+        assertEquals("valid", continuity.path("checkpoint").path("status").asString());
+        assertEquals("public", continuity.path("context").path("stamp").path("audience").asString(),
+                "the context is assembled for the session's own audience");
+        assertEquals(1L, sessions.status().retired().get(ScopedSessions.Reason.TURN_CEILING));
+
+        var records = records();
+        assertEquals(2, records.size());
+        assertEquals("RETIRED", records.get(0).get("status"));
+        assertEquals("TURN_CEILING", records.get(0).get("retired_reason"));
+        assertEquals("FIRST", records.get(0).get("opened_cause"));
+        assertEquals("NONE", records.get(0).get("rehydration_basis"));
+        assertEquals(2, records.get(0).get("completed_tasks"));
+        assertEquals(first.sessionId(), records.get(0).get("id"));
+        assertEquals("ACTIVE", records.get(1).get("status"));
+        assertEquals("TURN_CEILING", records.get(1).get("opened_cause"));
+        assertEquals(first.sessionId(), records.get(1).get("predecessor_id"));
+        assertEquals(2L, records.get(1).get("line_generation"));
+        assertEquals("CHECKPOINT", records.get(1).get("rehydration_basis"));
+        assertEquals(sha256(continuityLine(third)), records.get(1).get("rehydration_digest"));
+        assertEquals(jdbc.queryForObject("select snapshot_hash from campaign_checkpoint where campaign_id = ? and "
+                + "state_revision = ?", String.class, campaign, revision()), records.get(1).get("checkpoint_hash"));
+        assertFalse(third.instructions().contains((String) records.get(1).get("checkpoint_hash")),
+                "the checkpoint hash digests privileged data and is never rendered");
+        assertEquals(1, records.get(1).get("completed_tasks"));
+
+        assertEquals(campaignBefore, campaignRow(), "renewal never changes the campaign");
+        assertEquals(eventsBefore, count("campaign_event"), "renewal writes no event");
+        assertEquals(0, count("narration_publication"), "renewal writes no transcript entry");
+        // Summary tasks are self-contained: a renewed summarizer line never receives a block.
+        var summarizerScope = new SessionScope(adventure, campaign, narrator().campaignGeneration(), AiRole.SUMMARIZER,
+                Audience.PUBLIC, HASH, POLICY);
+        assertEquals(new org.rpgengine.inference.session.Rehydrator.Unavailable(SessionRehydration.SELF_CONTAINED),
+                rehydration.prepare(summarizerScope, "turn-ceiling", true));
+    }
+
+    /**
+     * A turn that ran but did not complete retires its session at once; the replacement is
+     * rehydrated with the free-input decision. Context pressure then renews before the window fills,
+     * after counting the warning threshold.
+     */
+    @Test
+    void anUnreliableTurnRetiresTheSessionAndPressureRenewsBeforeTheWindowFills() throws Exception {
+        execute(new TypedCommand.Wait(60));
+        var runtime = new RenewalPort();
+        var sessions = renewalSessions(runtime, new RenewalPolicy(10, 8_000, 30, 60));
+        var scheduler = renewalScheduler(sessions, runtime);
+        String large = "x".repeat(8_000);
+
+        runtime.script.add(TaskResult.Status.FAILED);
+        assertEquals(TaskResult.Status.FAILED, run(scheduler, narrator(), large).status());
+        UUID failed = runtime.requests.get(0).sessionId();
+        assertEquals(List.of(failed), runtime.retired, "an uncertain conversation is retired at once");
+        assertEquals(1L, sessions.status().retired().get(ScopedSessions.Reason.UNRELIABLE));
+
+        assertEquals(TaskResult.Status.COMPLETED, run(scheduler, narrator(), large).status());
+        TaskRequest replacement = runtime.requests.get(1);
+        assertNotEquals(failed, replacement.sessionId());
+        JsonNode continuity = continuity(replacement);
+        assertEquals("unreliable", continuity.path("renewal").path("cause").asString());
+        assertEquals("free-input", continuity.path("resume").path("pendingDecision").asString());
+        assertTrue(sessions.status().warned() >= 1, "the warning threshold was crossed");
+
+        assertEquals(TaskResult.Status.COMPLETED, run(scheduler, narrator(), large).status());
+        assertNotEquals(replacement.sessionId(), runtime.requests.get(2).sessionId(), "pressure renews the line");
+        assertEquals("context-pressure", continuity(runtime.requests.get(2)).path("renewal").path("cause").asString());
+        var records = records();
+        assertEquals(List.of("UNRELIABLE", "CONTEXT_PRESSURE"), records.stream().limit(2)
+                .map(row -> (String) row.get("retired_reason")).toList());
+        assertEquals(1, records.get(0).get("turns"));
+        assertEquals(0, records.get(0).get("completed_tasks"));
+        assertEquals(true, records.get(1).get("context_warned"));
+        assertTrue((long) records.get(1).get("context_units") > 0);
+    }
+
+    /**
+     * A due renewal waits while a mutation lease is live, then happens at the next task. A restart
+     * retires the journal's active record, and the new process's first session of the line is
+     * rehydrated because the journal knows the line's history.
+     */
+    @Test
+    void anUnsafeBoundaryDefersRenewalAndARestartRehydratesFromTheJournal() throws Exception {
+        var runtime = new RenewalPort();
+        var sessions = renewalSessions(runtime, new RenewalPolicy(1, 128_000, 75, 85));
+        var scheduler = renewalScheduler(sessions, runtime);
+        run(scheduler, narrator(), "first task");
+
+        UUID operation = accepted();
+        var grant = leases.acquire(adventure, campaign, operation, operation, Duration.ofSeconds(60));
+        try {
+            run(scheduler, narrator(), "during a commit");
+        } finally {
+            leases.release(adventure, campaign, operation, grant.token());
+        }
+        assertEquals(runtime.requests.get(0).sessionId(), runtime.requests.get(1).sessionId(),
+                "never renew inside an unresolved commit race");
+        assertEquals("during a commit", runtime.requests.get(1).instructions());
+        assertEquals(1L, sessions.status().deferred());
+
+        run(scheduler, narrator(), "after the commit");
+        assertNotEquals(runtime.requests.get(0).sessionId(), runtime.requests.get(2).sessionId());
+        assertEquals("turn-ceiling", continuity(runtime.requests.get(2)).path("renewal").path("cause").asString());
+
+        // A new process: empty registry, same journal.
+        var restarted = new RenewalPort();
+        var after = renewalSessions(restarted, new RenewalPolicy(10, 128_000, 75, 85));
+        var schedulerAfter = renewalScheduler(after, restarted);
+        assertEquals("RESTART", records().get(1).get("retired_reason"));
+        run(schedulerAfter, narrator(), "after a restart");
+        assertEquals("restart", continuity(restarted.requests.getFirst()).path("renewal").path("cause").asString());
+        var records = records();
+        assertEquals(3, records.size());
+        assertEquals("RESTART", records.get(2).get("opened_cause"));
+        assertEquals(records.get(1).get("id"), records.get(2).get("predecessor_id"));
+    }
+
+    /**
+     * Manual idle renewal is refused while the campaign is busy and for a foreign owner; once idle
+     * it retires the campaign's sessions without changing the campaign, and the next session is
+     * rehydrated from the audience's usable continuity summary, which carries the open promise but
+     * never the secret.
+     */
+    @Test
+    void ownerIdleRenewalWaitsForIdlenessAndTheNextSessionResumesFromTheSummary() throws Exception {
+        seedKnowledge();
+        var summaries = summaries(MemorySettings.defaults().withSummaries(true));
+        var summarizer = summarizer(summaries);
+        for (int index = 0; index < 5; index++) {
+            execute(new TypedCommand.Wait(60));
+        }
+        assertEquals(MemorySummaries.Request.Outcome.REQUESTED, summaries.request(campaign, Audience.PUBLIC, false)
+                .outcome());
+        port.then(MemoryContinuityTest::summarized);
+        Processed processed = summarizer.processNext(UUID.randomUUID()).orElseThrow();
+        assertEquals(Processed.Outcome.RECORDED, processed.outcome(), String.valueOf(processed.code()));
+
+        var runtime = new RenewalPort();
+        var sessions = renewalSessions(runtime, RenewalPolicy.defaults());
+        var scheduler = renewalScheduler(sessions, runtime);
+        var renewal = new SessionRenewalService(jdbc, manager, sessions);
+        run(scheduler, narrator(), "before renewal");
+        String campaignBefore = campaignRow();
+
+        UUID operation = accepted();
+        assertEquals(SessionRenewalService.Outcome.BUSY, renewal.renewIdle(owner, adventure, campaign).outcome(),
+                "an operation being validated keeps the campaign busy");
+        var grant = leases.acquire(adventure, campaign, operation, operation, Duration.ofSeconds(60));
+        try {
+            new TransactionTemplate(manager).executeWithoutResult(status -> entities.find(CampaignOperation.class,
+                    operation).transitionTo(OperationStatus.CANCELLED, Instant.now()));
+            assertEquals(SessionRenewalService.Outcome.BUSY, renewal.renewIdle(owner, adventure, campaign).outcome(),
+                    "a live mutation lease alone keeps the campaign busy");
+        } finally {
+            leases.release(adventure, campaign, operation, grant.token());
+        }
+        assertTrue(sessions.activeSession(narrator()).isPresent(), "a refused renewal retires nothing");
+        assertEquals(SessionRenewalService.Outcome.SCOPE_UNAVAILABLE,
+                renewal.renewIdle(UUID.randomUUID(), adventure, campaign).outcome());
+        var renewed = renewal.renewIdle(owner, adventure, campaign);
+        assertEquals(SessionRenewalService.Outcome.RENEWED, renewed.outcome());
+        assertEquals(1, renewed.renewedSessions());
+        assertEquals(revision(), renewed.stateRevision());
+        assertEquals(campaignBefore, campaignRow(), "renewal never changes the campaign");
+
+        run(scheduler, narrator(), "after renewal");
+        TaskRequest next = runtime.requests.get(1);
+        JsonNode continuity = continuity(next);
+        assertEquals("owner", continuity.path("renewal").path("cause").asString());
+        assertEquals("summary", continuity.path("basis").asString());
+        String block = continuityLine(next);
+        assertTrue(block.contains(SUMMARY) && block.contains(PROMISE), "summary and open promise resume the story");
+        assertFalse(next.instructions().contains(SECRET), "the public block never carries the secret");
+        var records = records();
+        assertEquals("OWNER", records.get(0).get("retired_reason"));
+        assertEquals("OWNER", records.get(1).get("opened_cause"));
+        assertEquals("SUMMARY", records.get(1).get("rehydration_basis"));
+        assertEquals(processed.summaryId(), records.get(1).get("summary_id"));
+    }
+
+    /** Scripted runtime of the renewal tests: answers each task with the next scripted status. */
+    private static final class RenewalPort implements NarrationTaskPort {
+        final List<TaskRequest> requests = Collections.synchronizedList(new ArrayList<>());
+        final List<UUID> retired = Collections.synchronizedList(new ArrayList<>());
+        final Deque<TaskResult.Status> script = new ArrayDeque<>();
+
+        @Override
+        public synchronized TaskHandle submit(TaskRequest request) {
+            requests.add(request);
+            TaskResult.Status status = script.isEmpty() ? TaskResult.Status.COMPLETED : script.poll();
+            return new CompletedTaskHandle(status == TaskResult.Status.COMPLETED
+                    ? new TaskResult(request.taskId(), status, "{\"done\":true}", null, PlannerTaskPort.PROVENANCE, false)
+                    : new TaskResult(request.taskId(), status, null, "turn-failed", PlannerTaskPort.PROVENANCE, false));
+        }
+
+        @Override
+        public void retireSession(UUID sessionId) {
+            retired.add(sessionId);
+        }
+
+        @Override
+        public RuntimeStatus status() {
+            return new RuntimeStatus("scripted", RuntimeStatus.State.READY, null, 0, 0);
+        }
+    }
+
+    /** A registry with the real journal and rehydration over this campaign's storage. */
+    private ScopedSessions renewalSessions(RenewalPort runtime, RenewalPolicy policy) {
+        return new ScopedSessions(runtime, 16, policy, journal, rehydration, UUID::randomUUID, Clock.systemUTC());
+    }
+
+    /** A recovered scheduler in front of the registry; recovery also retires stale journal records. */
+    private InferenceScheduler renewalScheduler(ScopedSessions sessions, RenewalPort runtime) {
+        var scheduler = new InferenceScheduler(sessions, runtime, ledger, SchedulerSettings.defaults(), Clock.systemUTC(),
+                () -> 0.5);
+        scheduler.recover();
+        return scheduler;
+    }
+
+    /** Run one interactive task to its settled result. */
+    private static TaskResult run(InferenceScheduler scheduler, SessionScope scope, String instructions)
+            throws Exception {
+        return scheduler.submit(new ScheduledTask(UUID.randomUUID(), scope, WorkClass.INTERACTIVE, InferenceSlot.LIGHT,
+                instructions, "{\"type\":\"object\"}", Duration.ofSeconds(30))).result().toCompletableFuture()
+                .get(30, TimeUnit.SECONDS);
+    }
+
+    /** @return the public narrator scope of the campaign at its current generation */
+    private SessionScope narrator() {
+        long generation = jdbc.queryForObject("select recovery_generation from campaign where id = ?", Long.class,
+                campaign);
+        return new SessionScope(adventure, campaign, generation, AiRole.NARRATOR, Audience.PUBLIC, HASH, POLICY);
+    }
+
+    /** @return the continuity JSON line of a request's block */
+    private static String continuityLine(TaskRequest request) {
+        String text = request.instructions();
+        int start = text.indexOf(SessionRehydration.MARKER + "\n");
+        assertTrue(start >= 0, "a continuity block is present");
+        start += SessionRehydration.MARKER.length() + 1;
+        return text.substring(start, text.indexOf('\n', start));
+    }
+
+    /** @return the parsed continuity JSON of a request's block */
+    private static JsonNode continuity(TaskRequest request) {
+        return JSON.readTree(continuityLine(request));
+    }
+
+    /** @return the campaign's session records in line order */
+    private List<Map<String, Object>> records() {
+        return jdbc.queryForList("select * from ai_session_record where campaign_id = ? order by line_generation",
+                campaign);
+    }
+
+    /** @return the campaign row as canonical JSON text */
+    private String campaignRow() {
+        return jdbc.queryForObject("select to_jsonb(c)::text from campaign c where id = ?", String.class, campaign);
     }
 
     // ----------------------------------------------------------------------------------------------

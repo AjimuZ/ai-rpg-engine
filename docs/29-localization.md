@@ -303,7 +303,7 @@ campaign output locale (no translation chain), passes the same glossary and loca
 checks as narration (grounded quotations are excluded from the signal), and stores its locale
 with the locale and glossary revisions of its context. A locale switch or glossary edit makes
 it stale, so it is never assembled into a context of another language or terminology; a new
-summary is written in the new locale ([docs/08](08-memory-and-continuity.md#p093-checkpoints-summaries-freshness-and-bounded-jobs)). Include locale/glossary/policy versions in context and
+summary is written in the new locale ([docs/08](08-memory-and-continuity.md#p093-checkpoints-summaries-freshness-and-bounded-jobs)). Since P09.4 the continuity block of a renewed session has fixed English rules (like the context legend), and its envelope carries the output locale with its locale and glossary revisions; a stale summary of another locale is never part of it ([docs/08 section 7](08-memory-and-continuity.md#p094-renewal-triggers-session-records-and-rehydration)). Include locale/glossary/policy versions in context and
 media cache keys. Optional [speech](30-local-speech-synthesis.md) uses the accepted
 passage language and approved voice capability; unavailable Italian speech
 falls back to Italian subtitles/text, never an English voice reading Italian.

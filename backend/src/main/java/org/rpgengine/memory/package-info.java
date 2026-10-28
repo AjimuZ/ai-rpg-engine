@@ -19,6 +19,13 @@
  * {@link org.rpgengine.memory.ContinuitySummarizer} runs one summary job through the fair scheduler;
  * and {@link org.rpgengine.memory.MemoryWorker} drives both in bounded background passes. A usable
  * summary enters contexts as an optional, labelled {@code summary} item that current state always
- * overrides. Renewal and rehydration arrive with P09.4–P09.5; restore semantics arrived with P03.5.
+ * overrides. Restore semantics arrived with P03.5.
+ *
+ * <p>P09.4 adds renewal support: {@link org.rpgengine.memory.SessionRehydration} builds the
+ * continuity block that the first task of a renewed AI session carries (resume point, verified
+ * checkpoint, audience envelope with the usable summary), and
+ * {@link org.rpgengine.memory.SessionRenewalService} with its controller lets the owner renew an
+ * idle campaign's sessions. Neither writes canonical state. Restart reconciliation and the resume
+ * card are P09.5.
  */
 package org.rpgengine.memory;

@@ -184,7 +184,7 @@ schema versions for persisted/imported data.
 | `POST /api/v1/campaigns/{id}/operations/{operationId}/narration/retry` | Narration-only retry of a committed operation whose narration is pending (P08.5) | Never re-runs the action, rolls a draw or changes the receipt; at most three retries |
 | `GET /api/v1/campaigns/{id}/stream` | Resumable authorized event stream | Transport delivery only |
 | `GET /api/v1/campaigns/{id}/encounter` | Public current combat projection | No raw enemy secrets |
-| `POST /api/v1/campaigns/{id}/ai-session/renew` | Renew idle role contexts safely | Does not advance world |
+| `POST /api/v1/campaigns/{id}/ai-session/renew` | Renew every AI session of an idle campaign (P09.4) | Does not advance the world or change the transcript; 409 while anything of the campaign runs |
 | `GET /api/v1/runtime/status` | Selected narration runtime (Codex or Claude), version, account and model readiness | No credentials or raw RPC identifiers; read-only, the runtime is changed through the launcher (ADR 0020) |
 | `GET /api/v1/models/status` | Slots, assigned backends and models, billing and privacy classes, probe results, hardware profile and admission state | No keys or endpoint credentials; read-only |
 | `PUT /api/v1/settings/models` | Owner-only slot assignment and same-class fallback lists | Validates, probes and audits; a class change needs acknowledgement; keys are never accepted here (ADR 0021) |
@@ -357,6 +357,18 @@ recording that the action was saved without narration, and the round's result ap
 `presentation`. Clients re-read the operation after a retry; retry rounds publish no stream
 message, because the public stream types stay closed until the browser consumes a new one.
 Cancelling an operation whose narration is pending stops a queued or running retry round.
+
+`POST /api/v1/campaigns/{campaignId}/ai-session/renew?adventureId={uuid}` (P09.4) has the same
+admission and empty `{}` body. It retires every AI session of the owner's campaign when nothing
+of the campaign is running (no live mutation lease, no operation being resolved or narrated, no
+running presentation or summary job, no dispatched inference task) and answers 200
+`{"outcome":"RENEWED","renewedSessions":n,"stateRevision":r}`; queued work is not a reason to
+refuse, it simply starts in the renewed sessions. Otherwise it answers 409
+`SESSION_RENEWAL_BUSY` (nothing retired), 404 `SESSION_RENEWAL_SCOPE_UNAVAILABLE`, 400
+`SESSION_RENEWAL_INPUT_MALFORMED` or 503 `SESSION_RENEWAL_STORAGE_UNAVAILABLE`. The body never
+names a session. Each line's next task starts a fresh conversation with a continuity block
+([docs/08 section 7](08-memory-and-continuity.md#p094-renewal-triggers-session-records-and-rehydration)).
+No UI control calls it yet.
 
 ## 4. Stream contract
 

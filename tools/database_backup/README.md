@@ -1,4 +1,4 @@
-# Database backup and restore (V16 scope)
+# Database backup and restore (V17 scope)
 
 A trusted-owner disaster-recovery tool for the canonical PostgreSQL database. It
 uses only the Python standard library and the `pg_dump`/`pg_restore` clients inside
@@ -19,7 +19,7 @@ py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
 ## What it does
 
 - **Backup** checks the exact server and client version, the exact table set and
-  successful migrations V1–V16, including immutable pack bytes and sealed reports. It then creates the target directory, which must
+  successful migrations V1–V17, including immutable pack bytes and sealed reports. It then creates the target directory, which must
   not already exist, and writes `database.dump` (custom format, no owners or
   privileges). It re-reads the catalog and writes `manifest.json` last. The manifest
   holds the format, schema and PostgreSQL versions, the scope, the byte count, the
@@ -138,4 +138,13 @@ summary jobs of the old generation (`GENERATION_RETIRED`), and a restored `RUNNI
 requeued or failed by lease recovery and can no longer record because its generation is
 retired. Checkpoints describe canonical state at their revision, which a restore does not
 change. Offline checks cover the V16 manifest/catalog; no live V16 dump/restore rehearsal
+has been run.
+
+V17 scope (P09.4) adds `ai_session_record`, the durable records of logical AI sessions and
+their renewal (counters, rehydration basis and the verified checkpoint hash). They are
+diagnostics and continuity provenance, never canonical state. Restore needs no new
+retirement step: the restored backend's startup recovery marks every record left `ACTIVE`
+as retired with reason `RESTART`, no runtime conversation survives a restart, and the
+advanced recovery generation makes each line's next session rehydrate from the restored
+state. Offline checks cover the V17 manifest/catalog; no live V17 dump/restore rehearsal
 has been run.

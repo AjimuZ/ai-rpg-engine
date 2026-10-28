@@ -31,6 +31,9 @@ import org.rpgengine.inference.TaskResult;
  * generation changes, the generation fence, the adventure consistency check, explicit, campaign
  * and installation retirement, the capacity bound and concurrent use. Every retirement must reach
  * the port, because the adapter's conversation binding is what actually holds earlier context.
+ * Since P09.4 it also proves the renewal triggers (turn ceiling, context pressure, unreliable
+ * turns, owner renewal), deferral at an unsafe boundary, rehydration blocks only on a line's first
+ * task after renewal or restart, and that a failing or oversized rehydration costs continuity only.
  */
 class ScopedSessionsTest {
     static final UUID ADVENTURE = SessionScopeTest.ADVENTURE;
@@ -40,7 +43,7 @@ class ScopedSessionsTest {
     static final String POLICY = SessionScopeTest.POLICY;
 
     /** Port double: completes every task at once and records requests and retirements. */
-    static final class RecordingPort implements NarrationTaskPort {
+    static class RecordingPort implements NarrationTaskPort {
         final List<TaskRequest> requests = Collections.synchronizedList(new ArrayList<>());
         final List<UUID> retired = Collections.synchronizedList(new ArrayList<>());
 
@@ -205,7 +208,9 @@ class ScopedSessionsTest {
         assertThat(port.retired).containsExactly(narration, renewed, planning, unrelated);
         assertThat(sessions.status()).isEqualTo(new ScopedSessions.Status(0, Map.of(ScopedSessions.Reason.EXPLICIT, 1L,
                 ScopedSessions.Reason.SUPERSEDED, 0L, ScopedSessions.Reason.CAMPAIGN, 2L,
-                ScopedSessions.Reason.INSTALLATION, 1L, ScopedSessions.Reason.CAPACITY, 0L)));
+                ScopedSessions.Reason.INSTALLATION, 1L, ScopedSessions.Reason.CAPACITY, 0L,
+                ScopedSessions.Reason.TURN_CEILING, 0L, ScopedSessions.Reason.CONTEXT_PRESSURE, 0L,
+                ScopedSessions.Reason.UNRELIABLE, 0L, ScopedSessions.Reason.OWNER, 0L)));
     }
 
     @Test
@@ -278,5 +283,202 @@ class ScopedSessionsTest {
             assertThat(used).contains(shared.activeSession(scope).orElseThrow());
         }
         assertThat(port.retired).isEmpty();
+    }
+
+    // ------------------------------------------------------------------ P09.4 renewal rules
+
+    /** Journal double recording every call as text. */
+    static final class RecordingJournal implements SessionJournal {
+        final List<String> calls = Collections.synchronizedList(new ArrayList<>());
+        boolean history;
+
+        @Override
+        public boolean hasHistory(UUID campaignId, AiRole role, Audience audience) {
+            return history;
+        }
+
+        @Override
+        public void opened(Opened record) {
+            calls.add("opened " + record.cause() + " " + record.basis() + (record.code() == null ? "" : " " + record.code()));
+        }
+
+        @Override
+        public void used(UUID sessionId, Usage usage, java.time.Instant at) {
+            calls.add("used " + usage.turns() + "/" + usage.completed());
+        }
+
+        @Override
+        public void retired(UUID sessionId, ScopedSessions.Reason reason, java.time.Instant at) {
+            calls.add("retired " + reason);
+        }
+
+        @Override
+        public int recover(java.time.Instant at) {
+            calls.add("recover");
+            return 0;
+        }
+    }
+
+    /** Rehydrator double: answers every preparation with the next scripted result (default a small block). */
+    static final class ScriptedRehydrator implements Rehydrator {
+        final List<String> causes = Collections.synchronizedList(new ArrayList<>());
+        final java.util.Deque<Result> script = new java.util.ArrayDeque<>();
+
+        @Override
+        public synchronized Result prepare(SessionScope scope, String cause, boolean deferrable) {
+            causes.add(cause + (deferrable ? " deferrable" : ""));
+            return script.isEmpty() ? block("BLOCK") : script.poll();
+        }
+
+        static Ready block(String text) {
+            return new Ready(text, "STATE", 7, "e".repeat(64), null, null, "NONE");
+        }
+    }
+
+    final RecordingJournal journal = new RecordingJournal();
+    final ScriptedRehydrator rehydrator = new ScriptedRehydrator();
+
+    ScopedSessions renewing(RenewalPolicy policy) {
+        return new ScopedSessions(port, 8, policy, journal, rehydrator, sequence(), java.time.Clock.systemUTC());
+    }
+
+    /** Submit, wait for the port's result and report it as the scheduler does. */
+    static TaskResult settle(ScopedSessions registry, SessionScope scope, String instructions) throws Exception {
+        UUID taskId = UUID.randomUUID();
+        TaskResult result = registry.submit(scope, taskId, InferenceSlot.LIGHT, instructions, "{}", Duration.ofSeconds(5))
+                .result().toCompletableFuture().get(1, TimeUnit.SECONDS);
+        registry.settled(taskId, result);
+        return result;
+    }
+
+    @Test
+    void theTurnCeilingRenewsAtTheNextTaskWhichCarriesTheContinuityBlock() throws Exception {
+        var registry = renewing(new RenewalPolicy(2, 128_000, 75, 85));
+        settle(registry, narrator(1, POLICY), "a");
+        settle(registry, narrator(1, POLICY), "b");
+        UUID first = lastSession();
+        assertThat(registry.usage(narrator(1, POLICY)).orElseThrow().completed()).isEqualTo(2);
+        settle(registry, narrator(1, POLICY), "c");
+
+        assertThat(lastSession()).isNotEqualTo(first);
+        assertThat(port.requests.getLast().instructions()).isEqualTo("BLOCK" + ScopedSessions.SEPARATOR + "c");
+        assertThat(port.requests.get(1).instructions()).isEqualTo("b");
+        assertThat(port.retired).containsExactly(first);
+        assertThat(rehydrator.causes).containsExactly("turn-ceiling deferrable");
+        assertThat(journal.calls).containsExactly("opened FIRST NONE", "used 1/1", "used 2/2", "retired TURN_CEILING",
+                "opened TURN_CEILING STATE", "used 1/1");
+        assertThat(registry.status().retired()).containsEntry(ScopedSessions.Reason.TURN_CEILING, 1L);
+        assertThat(registry.status().rehydrated()).isEqualTo(1);
+        // Only the first task of the new session carries the block.
+        settle(registry, narrator(1, POLICY), "d");
+        assertThat(port.requests.getLast().instructions()).isEqualTo("d");
+    }
+
+    @Test
+    void contextPressureRenewsOnlyAfterATurnAndTheWarningIsCountedOnce() throws Exception {
+        var registry = renewing(new RenewalPolicy(10, 8_000, 20, 60));
+        String large = "x".repeat(14_000);
+        // 3,500 input units + 1,024 allowance: below 4,800, so the fresh session takes it.
+        settle(registry, narrator(1, POLICY), large);
+        UUID first = lastSession();
+        assertThat(registry.status().warned()).isEqualTo(1);
+        // A second identical task would reach about 7,000 units: the line is renewed first.
+        settle(registry, narrator(1, POLICY), large);
+        assertThat(lastSession()).isNotEqualTo(first);
+        assertThat(registry.status().retired()).containsEntry(ScopedSessions.Reason.CONTEXT_PRESSURE, 1L);
+        assertThat(rehydrator.causes).containsExactly("context-pressure deferrable");
+
+        // An oversized single task in a fresh session runs there: no renewal loop.
+        var fresh = renewing(new RenewalPolicy(10, 8_000, 20, 60));
+        settle(fresh, planner(1), "y".repeat(40_000));
+        assertThat(fresh.status().retired()).containsEntry(ScopedSessions.Reason.CONTEXT_PRESSURE, 0L);
+    }
+
+    @Test
+    void anUnconfirmedOrFailedTurnRetiresTheSessionAndTurnlessResultsCountNothing() throws Exception {
+        var failing = new RecordingPort() {
+            @Override
+            public TaskHandle submit(TaskRequest request) {
+                requests.add(request);
+                return new CompletedTaskHandle(new TaskResult(request.taskId(), TaskResult.Status.UNRESOLVED, null,
+                        "connection-lost", null, false));
+            }
+        };
+        var registry = new ScopedSessions(failing, 8, RenewalPolicy.defaults(), journal, rehydrator, sequence(),
+                java.time.Clock.systemUTC());
+        settle(registry, narrator(1, POLICY), "a");
+        UUID lost = failing.requests.getLast().sessionId();
+        assertThat(failing.retired).containsExactly(lost);
+        assertThat(registry.activeSession(narrator(1, POLICY))).isEmpty();
+        assertThat(journal.calls).containsExactly("opened FIRST NONE", "used 1/0", "retired UNRELIABLE");
+
+        var registry2 = renewing(RenewalPolicy.defaults());
+        UUID taskId = UUID.randomUUID();
+        registry2.submit(narrator(1, POLICY), taskId, InferenceSlot.LIGHT, "a", "{}", Duration.ofSeconds(5));
+        registry2.settled(taskId, TaskResult.withoutTurn(taskId, TaskResult.Status.REJECTED, "queue-full"));
+        assertThat(registry2.usage(narrator(1, POLICY)).orElseThrow().turns()).isZero();
+        registry2.settled(UUID.randomUUID(), TaskResult.withoutTurn(UUID.randomUUID(), TaskResult.Status.FAILED, "x"));
+        assertThat(registry2.status().retired()).containsEntry(ScopedSessions.Reason.UNRELIABLE, 0L);
+    }
+
+    @Test
+    void aDeferredRenewalKeepsTheSessionAndAnOversizedBlockIsOmitted() throws Exception {
+        var registry = renewing(new RenewalPolicy(1, 128_000, 75, 85));
+        settle(registry, narrator(1, POLICY), "a");
+        UUID first = lastSession();
+        rehydrator.script.add(new Rehydrator.Deferred("unsafe-boundary"));
+        settle(registry, narrator(1, POLICY), "b");
+        assertThat(lastSession()).isEqualTo(first);
+        assertThat(port.requests.getLast().instructions()).isEqualTo("b");
+        assertThat(registry.status().deferred()).isEqualTo(1);
+
+        String huge = "z".repeat(TaskRequest.MAX_INSTRUCTION_BYTES);
+        rehydrator.script.add(ScriptedRehydrator.block(huge));
+        settle(registry, narrator(1, POLICY), "c");
+        assertThat(lastSession()).isNotEqualTo(first);
+        assertThat(port.requests.getLast().instructions()).isEqualTo("c");
+        assertThat(journal.calls).contains("opened TURN_CEILING OMITTED");
+        assertThat(registry.status().rehydrated()).isZero();
+    }
+
+    @Test
+    void ownerRenewalRetiresTheCampaignAndTheJournalRemembersEarlierProcesses() throws Exception {
+        var registry = renewing(RenewalPolicy.defaults());
+        settle(registry, narrator(1, POLICY), "a");
+        settle(registry, planner(1), "b");
+        settle(registry, scope(OTHER_CAMPAIGN, 1, AiRole.NARRATOR, Audience.PUBLIC, POLICY), "c");
+        assertThat(registry.renewCampaign(CAMPAIGN)).isEqualTo(2);
+        assertThat(registry.status().retired()).containsEntry(ScopedSessions.Reason.OWNER, 2L);
+        settle(registry, narrator(1, POLICY), "d");
+        assertThat(port.requests.getLast().instructions()).startsWith("BLOCK");
+        assertThat(rehydrator.causes).containsExactly("owner");
+
+        // A new process knows nothing in memory; the journal's history still rehydrates the line.
+        journal.history = true;
+        var restarted = renewing(RenewalPolicy.defaults());
+        restarted.recover();
+        settle(restarted, narrator(1, POLICY), "e");
+        assertThat(port.requests.getLast().instructions()).startsWith("BLOCK");
+        assertThat(rehydrator.causes).containsExactly("owner", "restart");
+        assertThat(journal.calls).contains("recover", "opened RESTART STATE");
+
+        // A failing rehydrator costs continuity only.
+        var broken = new ScopedSessions(port, 8, RenewalPolicy.defaults(), journal, (scope, cause, deferrable) -> {
+            throw new IllegalStateException("boom");
+        }, sequence(), java.time.Clock.systemUTC());
+        settle(broken, narrator(1, POLICY), "f");
+        assertThat(port.requests.getLast().instructions()).isEqualTo("f");
+        assertThat(journal.calls).contains("opened RESTART UNAVAILABLE rehydration-failed");
+    }
+
+    @Test
+    void renewalSettingsAreValidated() {
+        assertThat(RenewalPolicy.defaults()).isEqualTo(new RenewalPolicy(10, 128_000, 75, 85));
+        assertThat(RenewalPolicy.defaults().renewUnits()).isEqualTo(108_800);
+        assertThatThrownBy(() -> new RenewalPolicy(0, 128_000, 75, 85)).hasMessageContaining("turn-ceiling");
+        assertThatThrownBy(() -> new RenewalPolicy(101, 128_000, 75, 85)).hasMessageContaining("turn-ceiling");
+        assertThatThrownBy(() -> new RenewalPolicy(10, 7_999, 75, 85)).hasMessageContaining("context-window");
+        assertThatThrownBy(() -> new RenewalPolicy(10, 128_000, 85, 85)).hasMessageContaining("context-warn-percent");
+        assertThatThrownBy(() -> new RenewalPolicy(10, 128_000, 75, 100)).hasMessageContaining("context-renew-percent");
     }
 }

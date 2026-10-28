@@ -83,6 +83,11 @@ attempts and no automatic retry of a failed range. Summary freshness revalidates
 a summary used (row versions) instead of broad scope epochs, following the selective-staleness
 rule above ([docs/08 section 8](../08-memory-and-continuity.md#p093-checkpoints-summaries-freshness-and-bounded-jobs)).
 
+P09.4 (28 October 2026) adds no background kind. Rehydrating a renewed session may request a
+summary of the uncovered tail; the request passes through the same job bounds (one unfinished
+job per audience, the installation cap, no retry of a failed range) and is produced later by
+the bounded worker. Renewal itself runs at the line's next dispatch, never as a job.
+
 Planned AP-01–AP-12 cover selective staleness, query phantoms, admission races, duplicate workers, fencing, cancellation/EOF/restart, play-before-plan fallback, world-time separation, secret sinks, cross-adventure fairness/restore, author constraints and bilingual A/B/C evaluation. Compare single narration, narration plus planning, and optional review with measured quality, p50/p95 latency, usage and waste. P03.6 covers only the storage/admission subset above. P07.6 adds the transactional scope/content/author/typed-dependency gate and activation through ordinary commands, with deterministic real-PostgreSQL evidence for the AP-01–AP-05 admission assertions and AP-08's no-canonical-change rule; no full AP acceptance or superiority is claimed. Evidence, proposed objectives, ownership and source links are in the [planning specification](../28-asynchronous-narrative-planning.md).
 
 P08.7 (28 October 2026) implements the minimum bounded planner contract and fallback that

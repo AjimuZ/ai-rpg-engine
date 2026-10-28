@@ -2087,6 +2087,52 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     task identities/titles and the pending P98 follow-up are preserved; only P09.3 gains a
     completion mark.
 - [ ] P09.4 Implement count/context/error-triggered renewal and manual idle renewal, preserving transcript and campaign.
+  - Package A — renewal triggers (`ScopedSessions`, `RenewalPolicy`, scheduler settlement): per
+    live session the registry counts turns, completed tasks and the estimated conversation size
+    (`settled`, called by `InferenceScheduler` for every forwarded task). At the line's next task
+    it renews a session that completed `engine.inference.sessions.turn-ceiling` tasks (10, 1–100)
+    or whose conversation plus the task would exceed `context-renew-percent` (85) of
+    `context-window` (128,000 estimated units); `context-warn-percent` (75) is counted once per
+    session. A turn that ran but did not complete (failed, timed out, cancelled, unconfirmed)
+    retires its session at once (`UNRELIABLE`). A count or pressure renewal is deferred while a
+    mutation lease is live or an operation is committing.
+  - Package B — durable session records (V17 `ai_session_record`, `SessionJournal`,
+    `JdbcSessionJournal`): one row per logical session with line generation and predecessor,
+    opening cause, retirement reason, turn/completed/context counters, rehydration basis, code,
+    revision and digest, the verified checkpoint (id, revision, hash, status) and the summary
+    used. Frozen identity, monotonic counters, terminal retirement and no deletion are enforced by
+    triggers; startup recovery retires records left active (`RESTART`). Failures never block
+    inference. The backup tool covers the V17 scope.
+  - Package C — rehydration (`Rehydrator`, `SessionRehydration`): the first task of a line that
+    had an earlier session (in memory or in the records) carries a continuity block: fixed rules
+    (no replayed opening or earlier scenes, no invented history, the task context wins), the
+    resume point (revision, turn, world time, mode, pending decision, pending narration count), the
+    verified checkpoint's status and revision, and a 4,000-token `ContextAssembler` envelope for
+    the session's own role and audience with the usable summary. Basis `SUMMARY`, `CHECKPOINT` or
+    `STATE`; the summarizer role gets no block; a failed or oversized block opens the session
+    without one. See
+    [docs/08 section 7](08-memory-and-continuity.md#p094-renewal-triggers-session-records-and-rehydration).
+  - Package D — manual idle renewal (`SessionRenewalService`, `SessionRenewalController`):
+    `POST /api/v1/campaigns/{id}/ai-session/renew` retires every session of an owned campaign
+    when nothing of it runs (no live lease, no operation being resolved or narrated, no running
+    presentation or summary job, no dispatched inference task); otherwise 409
+    `SESSION_RENEWAL_BUSY`. Renewal writes no campaign state, event, transcript entry or decision.
+  - Exit checks:
+    - Registry suite with doubles: each trigger, deferral, the block on the first task only,
+      omission of an oversized block, owner renewal, journal history after a restart, a failing
+      rehydrator and the settings bounds.
+    - Real PostgreSQL suite with the real scheduler, journal and rehydration and a scripted
+      runtime: the fresh session resumes at the correct pending decision (`starting-situation`,
+      then `free-input`) with a verified checkpoint, without the opening text, with linked records,
+      and the campaign row, events and transcript unchanged; unreliable and pressure renewals;
+      deferral under a live lease; rehydration after a restart; owner renewal refused while busy
+      or for a foreign owner, then resuming from the public summary with the open promise and
+      without the secret.
+    - The HTTP route, the V17 upgrade step, deliberate weakening probes on an exported copy and
+      every command of the project check plan.
+    - Not part of this task: restart reconciliation of stale summaries, missing dependencies and
+      the resume card (P09.5), a UI control for renewal, switching the intent, narration and
+      planner callers to envelopes, and live-model or human evaluation of QA-08.
 - [ ] P09.5 Reconcile restart, committed narration pending, missing dependencies, and stale summaries.
 
 **Exit:** a fresh AI thread resumes the correct pending decision with no invented history or replayed prologue. **Checks:** QA-08, QA-16–19, delayed promises, correction invalidation, input-budget limits. **Suggested commit:** `Add persistent memory and renewable narration sessions`.

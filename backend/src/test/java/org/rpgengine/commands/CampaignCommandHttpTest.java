@@ -70,7 +70,7 @@ class CampaignCommandHttpTest {
     /** Delete disposable rows after each test; constraints remain installed. */
     @AfterEach
     void clear() {
-        jdbc.execute("truncate memory_invalidation, memory_summary, memory_summary_job, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
+        jdbc.execute("truncate ai_session_record, memory_invalidation, memory_summary, memory_summary_job, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
                 + "operation_journal, actor_resource, actor, presentation_campaign_settings, campaign, "
                 + "content_revision_report, content_revision_file, content_revision, adventure_workspace, identity_owner_profile");
     }
@@ -287,6 +287,40 @@ class CampaignCommandHttpTest {
         assertEquals(2, after.get("presentation").get("retriesRemaining").asInt());
         assertEquals(pending.get("receipt"), after.get("receipt"));
         assertEquals(journaled, count());
+    }
+
+    /**
+     * Manual idle renewal (P09.4) answers the outcome with counts only, refuses malformed bodies,
+     * foreign scopes and requests without browser proofs, and never changes the campaign.
+     */
+    @Test
+    void renewsAiSessionsOfAnIdleCampaignWithoutChangingIt() throws Exception {
+        String campaignBefore = jdbc.queryForObject("select to_jsonb(c)::text from campaign c where id = ?", String.class,
+                campaign);
+        String path = "/api/v1/campaigns/" + campaign + "/ai-session/renew?adventureId=" + adventure;
+        var renewed = post(path, "{}");
+        assertEquals(200, renewed.status(), renewed.body());
+        JsonNode body = json.readTree(renewed.body());
+        assertEquals("RENEWED", body.get("outcome").asText());
+        assertEquals(0, body.get("renewedSessions").asInt(), "no session was active in this context");
+        assertEquals(jdbc.queryForObject("select state_revision from campaign where id = ?", Long.class, campaign),
+                body.get("stateRevision").asLong());
+        assertEquals(3, body.size(), "counts only, never session identities");
+        assertEquals("{\"code\":\"SESSION_RENEWAL_INPUT_MALFORMED\"}", post(path, "{\"all\":true}").body());
+        UUID otherOwner = new TransactionTemplate(manager).execute(status -> {
+            var other = OwnerProfile.create("Other", Instant.now());
+            entities.persist(other);
+            return other.getId();
+        });
+        UUID[] foreign = campaign(otherOwner);
+        var hidden = post("/api/v1/campaigns/" + foreign[1] + "/ai-session/renew?adventureId=" + foreign[0], "{}");
+        assertEquals(404, hidden.status());
+        assertEquals("{\"code\":\"SESSION_RENEWAL_SCOPE_UNAVAILABLE\"}", hidden.body());
+        var unproven = exchange("POST", path, "{}", "Origin: http://127.0.0.1:8080\r\nContent-Type: application/json\r\n"
+                + "Cookie: " + cookie + "\r\n");
+        assertEquals(403, unproven.status());
+        assertEquals(campaignBefore, jdbc.queryForObject("select to_jsonb(c)::text from campaign c where id = ?",
+                String.class, campaign));
     }
 
     /** Missing cookie/CSRF or a foreign Origin is refused by local admission before any write. */

@@ -10,9 +10,9 @@ import org.springframework.core.env.Environment;
  * Validated limits of checkpoints and continuity summaries (P09.3, docs/08 sections 8 and 9), read
  * from {@code engine.memory.*}. An out-of-range value fails startup with the property name only.
  *
- * <p>Summaries are <b>off by default</b>: they cost background inference, and until renewal and
- * rehydration (P09.4) consume them nothing depends on them; context assembly falls back to the
- * bounded recent-event window. Operational checkpoints are deterministic database work without
+ * <p>Summaries are <b>off by default</b>: they cost background inference. Since P09.4 session
+ * rehydration ({@link SessionRehydration}) includes a usable summary when one exists; without
+ * one it rests on the verified checkpoint and the bounded recent-event window. Operational checkpoints are deterministic database work without
  * inference and follow the worker switch alone.
  *
  * @param summariesEnabled whether summary jobs may be requested and run

@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — Renewable AI sessions that resume where play stands (P09.4), 28 October 2026
+
+- AI sessions are renewed automatically: after ten completed tasks of one role and audience, or
+  before the estimated conversation would pass 85% of its context window (a warning is counted
+  at 75%). A task that ran but did not complete (failed, timed out, interrupted or unconfirmed)
+  retires its conversation at once. Renewal happens at the line's next task and waits while a
+  game action is being committed. Limits are configurable under `engine.inference.sessions.*`.
+- The owner can renew every AI session of an idle campaign with
+  `POST /api/v1/campaigns/{id}/ai-session/renew`; a busy campaign answers 409 and nothing changes.
+- The first task of a renewed session starts with a continuity block: where play stands (state
+  revision, turn, world time, mode and the pending decision), the verified checkpoint's revision
+  and a compact context for the same audience, including the latest usable continuity summary.
+  Its rules forbid replaying the opening or earlier scenes and inventing history. The block is
+  built only from what that audience may know; summary tasks never receive one.
+- Renewal never changes the campaign, its events, the public transcript or a pending decision.
+- Every AI session is recorded in the new `ai_session_record` table (migration V17): its
+  predecessor, why it opened and ended, its turn and context counters, what it was rehydrated
+  from and the verified checkpoint hash. Records left open by a previous process are closed at
+  startup. The database backup tool now covers the V17 scope.
+- Continuity summaries stay off by default; without them, renewal rests on the verified
+  checkpoint and recent events.
+
 ## Unreleased — Checkpoints, source-linked summaries and bounded memory jobs (P09.3), 28 October 2026
 
 - Operational checkpoints: a deterministic snapshot of canonical state (counters, pending
@@ -22,8 +44,8 @@
 - Bounded background jobs: one pending summary job per campaign and audience, an
   installation-wide cap, fenced leases, limited retries with backoff, recovery of expired work,
   cancellation after a restore, and no automatic retry of a range that already failed. Summaries
-  are off by default (`engine.memory.summaries.enabled`) until session renewal uses them; a
-  missing or failed summary never blocks play.
+  are off by default (`engine.memory.summaries.enabled`); a missing or failed summary never
+  blocks play.
 - Migration V16 adds `memory_summary_job`, `memory_summary`, `memory_invalidation` and the
   snapshot function; the database backup tool now covers the V16 scope.
 
