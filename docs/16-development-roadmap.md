@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 53/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6 and P08.1–P08.7. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 (complete since 28 October 2026), P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 55/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7 and P09.1–P09.2. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 (complete since 28 October 2026), P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -1851,7 +1851,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     commit: `24dba76`; all exit checks passed on that exact code before this completion mark.
     All 131 task identities/titles and the pending P98 follow-up are preserved; only P09.1
     gains a completion mark.
-- [ ] P09.2 Build stamped context envelopes, mandatory/optional budgets, ID/full-text retrieval and overflow behavior; distinguish private planning assumptions from admitted facts and public narration, with language/glossary binding.
+- [x] P09.2 Build stamped context envelopes, mandatory/optional budgets, ID/full-text retrieval and overflow behavior; distinguish private planning assumptions from admitted facts and public narration, with language/glossary binding.
   - Package A — envelope and standings (`org.rpgengine.memory`): `ContextEnvelope` with a
     `Stamp` (adventure, campaign, generation, revision, world time, role, audience, holder,
     focus operation, pack/ruleset/policy hashes, output locale with locale and glossary
@@ -1895,6 +1895,33 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
       envelope (P09.3 onward), checkpoints, summaries and renewal (P09.3–P09.5), NPC-side
       history for character contexts (P11/P15), dependency-pack glossaries and semantic
       retrieval.
+  - Verified evidence (28 October 2026): 13 new cases (`ContextSelectionTest` 7 pure,
+    `ContextAssemblerTest` 6 real PostgreSQL) and all 687 packaged backend cases in 70 suites
+    pass with zero failures/errors/skips on the scoped JDK 21/PostgreSQL 18.6 fixture; the jar is
+    packaged. Over sealed packs, production campaign creation, real commands and commit and the
+    real planning pipeline with a scripted planner:
+    - a public context holds the player's labelled `rumored` belief (text tier), common
+      knowledge, mandatory own state, present warden and promise, and no truth, unseen secret,
+      foreign commitment, real location or assumption; the withheld phrases are exactly the
+      unseen secret and foreign terms, absent from the context; the warden's context is its own;
+    - a privileged context labels `fact` with truth, `belief` and a fresh `assumption`
+      separately, the public context of the same state has none of them, and a retired
+      recovery generation removes the plan's assumptions;
+    - mandatory material overflows as `CONTEXT_TOO_LARGE` one token below the exact required
+      size and fits at it with every optional record omitted and counted and every rendered part
+      charged;
+    - an `event:` reference and English and Italian stemmed full text reach history older than
+      the 64-event window; glossary terms bind in the output locale with the other locale's
+      form avoided; digests are stable; staleness reports the revision and sighting epoch.
+    Thirteen deliberate weakening probes each made the suites fail and were reverted
+    byte-identically. The full run caught a plan-storage boundary violation (ADR 0014), so plan
+    assumptions are now read through the preparation-owned `PlanAssumptions`. All 26
+    repository-policy tests pass with zero findings. Not verified: callers switched to the
+    envelope (P09.3 onward), renewal-level recall (QA-08, P09.3–P09.5), NPC-side history,
+    dependency-pack glossaries, paraphrase leakage and live model runs. Implementation owner
+    commit: `2e6e32f`; all exit checks passed on that exact code before this completion mark.
+    All 131 task identities/titles and the pending P98 follow-up are preserved; only P09.2
+    gains a completion mark.
 - [ ] P09.3 Implement checkpoints, source-linked summaries, freshness/invalidation, and bounded background jobs.
 - [ ] P09.4 Implement count/context/error-triggered renewal and manual idle renewal, preserving transcript and campaign.
 - [ ] P09.5 Reconcile restart, committed narration pending, missing dependencies, and stale summaries.

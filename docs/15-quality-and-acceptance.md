@@ -1,5 +1,66 @@
 # Quality Strategy and Acceptance Criteria
 
+P09.2 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
+**13 new cases and all 687 packaged backend cases in 70 suites**, with zero failures, errors or
+skips; the executable jar is packaged. The new cases are `ContextSelectionTest` (7, pure) and
+`ContextAssemblerTest` (6, real PostgreSQL). The packs are sealed and registered, campaigns are
+created by production code, history comes from real commands and commits, knowledge from
+trusted internal operations, and the plan from the real planning pipeline with only the planner
+runtime scripted.
+
+- **Audience filtering and standings:**
+  - A public context holds the player's `rumored` belief (informant, language, `text` tier for
+    the stemmed query), the common `wary` mood, its own state, the present warden (mandatory
+    `last-known`) and its promise (mandatory `obligation`).
+  - It holds no secret the player never learned, no other pair's commitment, no truth, no
+    `realLocation` and no assumption.
+  - Its stamp names the holder, revision, locale, policy hash and knowledge epochs.
+  - `withheldPhrases` returns the unseen secret and the foreign terms, never the held statement,
+    and none of them occurs in the context.
+  - The warden's own context holds its `knows` belief and its obligation, without the player's
+    belief or history.
+  - A narrator cannot request a privileged context.
+- **Privileged separation:** a planner context labels both claims as `fact` with `true` and
+  `undetermined` truth, the warden's belief as `belief`, and the plan's private assumption as a
+  fresh, validated `assumption` in `planning` with its branch. The public context of the same
+  state has no assumption, fact or secret. After a recovery-generation change the plan's
+  assumptions leave the context.
+- **Overflow:** a 1,000-token budget returns `CONTEXT_TOO_LARGE` with the exact required size.
+  At exactly that size every item is mandatory, history is omitted and counted, `partial()` is
+  true, and the overhead, items and glossary entries are all charged. One token less overflows
+  again.
+- **Retrieval and language:**
+  - After 69 commands, the old move and speech are outside the recent window.
+  - An `event:` focus reference fetches the move in the `id` tier.
+  - The English stemmer finds "keys" for "key" in the `text` tier.
+  - The trailhead binds as a proper name and the grove as a term avoiding its Italian form.
+  - The digest is stable.
+  - An Italian campaign states events in Italian, binds the Italian grove term avoiding the
+    English one, and finds "pietra" for "pietre" only with the Italian stemmer.
+- **Staleness:** a context is current until the next command, which reports `revision` and the
+  player's `sightings:` epoch. Uncommitted focus operations and malformed references are refused.
+- **Probes:** 13 deliberate weakening probes each made the suites fail and were reverted
+  byte-identically (SHA-256). In the first round, removing the glossary charge was not detected,
+  so the overflow test now asserts that every rendered part is charged. The full run then
+  caught a plan-storage boundary violation (ADR 0014), and the plan read moved to the
+  preparation-owned `PlanAssumptions`. The retired-generation probe was added with it, and all
+  13 probes were detected on the final code.
+
+All 26 repository-policy tests pass with zero findings. Frontend sources are unchanged, so the
+frontend gates were not rerun.
+
+Not verified:
+- callers switched to envelopes: the intent, narration and planner contracts still build their
+  own contexts (P09.3 onward);
+- QA-08 and delayed-promise recall over renewal (P09.3–P09.5);
+- NPC-side history for character contexts (P11/P15);
+- dependency-pack glossaries;
+- paraphrase leakage;
+- live model runs.
+
+The implementation owner commit is `2e6e32f`. Every check above passed on its exact sources,
+and only P09.2 then gains a completion mark (55 of 131 roadmap entries).
+
 P09.1 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **8 new cases and all 674 packaged backend cases in 68 suites**, with zero failures, errors
 or skips; the executable jar is packaged. The new cases are in `KnowledgeLedgerTest`. The V15

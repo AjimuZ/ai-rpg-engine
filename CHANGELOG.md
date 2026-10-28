@@ -34,7 +34,9 @@
   generation.
 - Pass 13 new cases and all 687 packaged backend tests in 70 suites with zero
   failures/errors/skips; 13 deliberate weakening probes were detected. The narration, intent
-  and planning tasks adopt these contexts with checkpoints and renewal (P09.3 onward).
+  and planning tasks adopt these contexts with checkpoints and renewal (P09.3 onward). Record
+  implementation owner commit `2e6e32f` before marking P09.2 complete (55 of 131 roadmap
+  entries).
 
 ## Unreleased — Typed knowledge, last known locations and unresolved commitments, 28 October 2026
 
