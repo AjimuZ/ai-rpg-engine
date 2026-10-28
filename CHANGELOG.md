@@ -22,6 +22,10 @@
 - Raise the narration attempt lease to 120 seconds so the 90-second narration budget fits in
   one attempt. The browser does not yet show the published passages or a Retry control
   (P05.6/P05.7); no live runtime has produced narration through this path.
+- Pass 36 focused cases, 9 of them new, and all 583 packaged backend tests in 60 suites with
+  zero failures/errors/skips; fifteen deliberate weakening probes were detected, and the
+  frontend gates pass with the re-recorded interface transcript. Record implementation owner
+  commit `32edd5e` before marking P08.5 complete (51 of 131 roadmap entries).
 
 ## Unreleased — Model selection through the owner's slot assignment, 28 October 2026
 

@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 50/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6 and P08.1–P08.4. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 51/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6 and P08.1–P08.5. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -1576,7 +1576,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     Implementation owner commit: `fb77cf0`; all exit checks passed on that exact code before
     this completion mark. All 131 task identities/titles and the pending P98 follow-up are
     preserved; only P08.4 gains a completion mark.
-- [ ] P08.5 Publish only validated final narration; add deterministic receipt fallback and narration-only retry.
+- [x] P08.5 Publish only validated final narration; add deterministic receipt fallback and narration-only retry.
   - Package A — grounded publisher: `org.rpgengine.narration` assembles the public narration
     context of one committed operation in one read-only snapshot (its `PUBLIC` events only,
     stated deterministically in English or Italian, the addressed characters as speakers, the
@@ -1611,6 +1611,27 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     for retry rounds, privileged phrase sets and richer contexts (P09.2), regeneration after a
     runtime switch (P20.2) and live narration quality (QA-07, EN/IT human review) are not part
     of this task.
+  - Verified evidence (28 October 2026): 9 new cases (8 in `GroundedNarrationTest`, one HTTP
+    retry case) plus the adapted job, stream, cancellation, interface-contract and migration
+    suites (36 focused cases in 7 suites) and all 583 packaged backend cases in 60 suites pass
+    with zero failures/errors/skips on the scoped JDK 21/PostgreSQL 18.6 fixture, and the jar is
+    packaged. Through the real job service, assembler, runner, sessions and contract with only
+    the runtime scripted: one publication per operation with trusted speaker names and
+    backend-assigned message identities, the public narrator scope, no `INTERNAL` payload in any
+    instruction, one repair then the receipt (`NARRATION_FAILED`, three retries left), a repaired
+    publication, declined, unnarratable and unavailable rounds, an Italian re-narration after a
+    locale switch during narration, and retry rounds that leave world rows, receipts, draws, the
+    journal and the stream unchanged, are idempotent, bounded to three and cancellable. Fifteen
+    deliberate weakening probes each made the focused run fail and were reverted
+    byte-identically. The recorded interface transcript gained only the `presentation` field;
+    frontend installation, typechecking, 77 tests, the localization test and both locale builds
+    (317-message parity) pass with it. All 26 repository-policy tests pass with zero findings.
+    Not verified: live runtime narration, browser rendering of passages and the Retry control,
+    and human EN/IT review of the event statements. See the
+    [verification record](15-quality-and-acceptance.md). Implementation owner commit:
+    `32edd5e`; all exit checks passed on that exact code before this completion mark. All 131
+    task identities/titles and the pending P98 follow-up are preserved; only P08.5 gains a
+    completion mark.
 - [ ] P08.6 Implement one durable fair priority queue with isolated logical role/audience threads, interactive reservations, bounded quota/backoff/cancel/restart handling and conservative single-active-turn default; higher concurrency requires P01.7 evidence and QA-37.
 - [ ] P08.7 Add the versioned bounded quest-plan contract and selective dependency validation/replanning with a playable no-plan baseline; prove contract/admission/fallback with deterministic fixtures. A live investigation comparison may be deferred/unavailable without blocking MVP; no forced player choice or waiting for a whole arc.
 

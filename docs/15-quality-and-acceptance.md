@@ -1,5 +1,53 @@
 # Quality Strategy and Acceptance Criteria
 
+P08.5 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
+**9 new cases (8 in `GroundedNarrationTest`, one in `CampaignCommandHttpTest`) and all 583
+packaged backend cases in 60 suites**, with zero failures, errors or skips; with the adapted
+`PresentationJobTest`, `PublicStreamTest`, `CommandCancellationTest`, `EngineApplicationTest`
+and the V13 step of `CanonicalMigrationUpgradeTest` the focused set has 36 cases. The executable
+jar is packaged. Only the runtime is a deterministic double (`NarratorTaskPort`); the job
+service, context assembler, contract runner, scoped sessions, narration contract and database
+are real:
+
+- validated narration of a speech is published once, with speaker names from the trusted
+  context and backend-assigned message identities, after a task in the public `narrator`
+  session whose context holds only the deterministic statement of the public event; the
+  publication row is immutable;
+- output still ungrounded after its single repair is never published: two submissions in one
+  attempt, then the receipt with `NARRATION_FAILED` and three retries remaining, an unchanged
+  receipt and world, and one `narrative.pending` message; a repaired valid output is published
+  and flagged;
+- a declined answer and an unnarratable bundle fall back at once; an unavailable runtime ends
+  the round `NARRATION_UNAVAILABLE` without any submission; a sentinel in an `INTERNAL` event
+  never appears in an instruction;
+- a locale switch while narrating discards the English narration and the next attempt is
+  published in Italian with its passage locale and revision;
+- narration-only retry queues one round, is idempotent while it is in flight, publishes
+  without changing the journal, world rows, receipts, draws or stream, then reports
+  `ALREADY_NARRATED`; rounds stop at three retries (`EXHAUSTED`, nothing written) and a queued
+  round is stopped by cancellation; the database refuses a second active round, a stray
+  publication and a rewritten round;
+- over HTTP the `presentation` view and the retry endpoint answer 202/200 with the documented
+  outcomes, refuse malformed bodies and foreign scopes, and journal no new operation;
+- fifteen deliberate weakening probes (published stale locale, rejected output retried in the
+  round, a retry reopening the journal, unbounded or non-idempotent retries, retry after
+  publication, publication not stored, view ignoring the publication, internal events in the
+  context, unavailable runtime not short-circuited, declined output retried, speaker names not
+  from the context, the stream joining every round, cancellation ignoring a retry round, a
+  wrong HTTP status) each made the focused run fail and were reverted byte-identically.
+
+The recorded interface transcript changed only by the new `presentation` field and was
+re-recorded through `-Dengine.contract.update=true`; frontend installation, typechecking, 77
+tests, the localization test and both locale builds (317-message parity) pass with it. All 26
+repository-policy tests pass with zero findings.
+
+Not verified: narration from a live runtime, browser rendering of published passages and a
+Retry control (P05.6/P05.7), a stream message for retry rounds, and independent human review
+of the Italian event statements and of EN/IT narration quality (QA-07).
+
+The implementation owner commit is `32edd5e`. Every check above passed on its exact
+sources, and only P08.5 then gains a completion mark (51 of 131 roadmap entries).
+
 P08.4 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **26 new cases (14 in `ProfileResolverTest`, 5 in `ProfileSettingsTest`, 6 in
 `CodexProfileResolutionTest`, one in the Spring selection suite) and all 574 packaged backend
