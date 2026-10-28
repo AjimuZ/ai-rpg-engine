@@ -1852,13 +1852,20 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     All 131 task identities/titles and the pending P98 follow-up are preserved; only P09.1
     gains a completion mark.
   - CI recovery (28 October 2026): exact run 40743829288 for commit `489e521` failed the
-    backup migration-scope regression because V13–V15 had added eight tables without a
+    backup migration-scope regression because V13–V15 had added seven tables without a
     reviewed backup-scope update. Extend the recovery allowlist to V15 and
     `narration_publication`, `inference_task`, `inference_scheduler_state`,
     `knowledge_claim`, `knowledge_belief`, `actor_sighting` and `actor_commitment`; strict
     version/catalog checks are retained and the scope diagnostic now names the current
     version. Local reproduction confirmed the V12/V15 mismatch; all nine backup tests pass
     after the repair. No live V15 restore is claimed and no task completion mark changes.
+    Re-verification of the repair (`d65e05c`) on 28 October 2026: an exact export of
+    `489e521` failed only the migration-scope test (V1–V15 found, V1–V12 allowed); the
+    repaired code passes all nine backup tests, 26 repository tests, 116 runtime cases (18
+    opt-in skips), the frontend gates and the full backend `verify` (687 tests). The four
+    BuildKit/Compose cases of `tools/container_packaging` error with a missing `docker`
+    executable because this development container has no Docker; they remain enforced by
+    the hosted packaging job and are not claimed here.
 - [x] P09.2 Build stamped context envelopes, mandatory/optional budgets, ID/full-text retrieval and overflow behavior; distinguish private planning assumptions from admitted facts and public narration, with language/glossary binding.
   - Package A — envelope and standings (`org.rpgengine.memory`): `ContextEnvelope` with a
     `Stamp` (adventure, campaign, generation, revision, world time, role, audience, holder,

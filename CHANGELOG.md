@@ -2,7 +2,7 @@
 
 ## Unreleased — Database backup scope for narration, scheduling and typed knowledge, 28 October 2026
 
-- Extend the strict database backup schema/catalog allowlist to migration V15 and the eight
+- Extend the strict database backup schema/catalog allowlist to migration V15 and the seven
   tables added by V13–V15: published narration, the inference scheduler ledger and backoff
   state, and typed knowledge claims, beliefs, sightings and commitments. Backups of the
   current schema are accepted again; older schemas and unknown tables remain rejected.
