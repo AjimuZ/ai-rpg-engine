@@ -1851,6 +1851,14 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     commit: `24dba76`; all exit checks passed on that exact code before this completion mark.
     All 131 task identities/titles and the pending P98 follow-up are preserved; only P09.1
     gains a completion mark.
+  - CI recovery (28 October 2026): exact run 40743829288 for commit `489e521` failed the
+    backup migration-scope regression because V13–V15 had added eight tables without a
+    reviewed backup-scope update. Extend the recovery allowlist to V15 and
+    `narration_publication`, `inference_task`, `inference_scheduler_state`,
+    `knowledge_claim`, `knowledge_belief`, `actor_sighting` and `actor_commitment`; strict
+    version/catalog checks are retained and the scope diagnostic now names the current
+    version. Local reproduction confirmed the V12/V15 mismatch; all nine backup tests pass
+    after the repair. No live V15 restore is claimed and no task completion mark changes.
 - [x] P09.2 Build stamped context envelopes, mandatory/optional budgets, ID/full-text retrieval and overflow behavior; distinguish private planning assumptions from admitted facts and public narration, with language/glossary binding.
   - Package A — envelope and standings (`org.rpgengine.memory`): `ContextEnvelope` with a
     `Stamp` (adventure, campaign, generation, revision, world time, role, audience, holder,

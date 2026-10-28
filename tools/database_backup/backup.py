@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 POSTGRES_VERSION = "18.6"
-SCHEMA_VERSION = "12"
+SCHEMA_VERSION = "15"
 # Flyway versions this tool understands; test_backup.py fails when a new backend
 # migration or table appears, so the archive scope can never silently drift.
 MIGRATIONS = [str(version) for version in range(1, int(SCHEMA_VERSION) + 1)]
@@ -31,6 +31,8 @@ TABLES = sorted([
     "character_state", "item_instance", "learned_ability", "campaign_creation",
     "campaign_known_fact", "campaign_known_quest",
     "campaign_stream_head", "campaign_stream_message", "presentation_job",
+    "narration_publication", "inference_task", "inference_scheduler_state",
+    "knowledge_claim", "knowledge_belief", "actor_sighting", "actor_commitment",
 ])
 
 
@@ -91,7 +93,7 @@ class Database:
         schemas = self.sql("select nspname from pg_namespace where nspname <> 'public' "
                            "and nspname <> 'information_schema' and nspname not like 'pg_%'")
         if tables != TABLES or schemas:
-            raise ValueError("unsupported database scope; expected only the reviewed V10 schema")
+            raise ValueError(f"unsupported database scope; expected only the reviewed V{SCHEMA_VERSION} schema")
         migrations = json.loads(self.sql(
             "select coalesce(json_agg(json_build_object('version', version, 'checksum', checksum, "
             "'success', success) order by installed_rank), '[]') from flyway_schema_history where type = 'SQL'"))

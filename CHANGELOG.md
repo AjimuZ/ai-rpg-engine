@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Database backup scope for narration, scheduling and typed knowledge, 28 October 2026
+
+- Extend the strict database backup schema/catalog allowlist to migration V15 and the eight
+  tables added by V13–V15: published narration, the inference scheduler ledger and backoff
+  state, and typed knowledge claims, beliefs, sightings and commitments. Backups of the
+  current schema are accepted again; older schemas and unknown tables remain rejected.
+- Restore needs no new retirement step: engine startup already abandons or takes over
+  restored inference tasks, and the advanced recovery generation retires presentation jobs.
+- Reproduce the hosted CI backup-scope failure locally before the repair; all nine offline
+  backup tests pass afterwards. No live V15 dump/restore rehearsal is claimed and no roadmap
+  completion mark changes.
+
 ## Unreleased — Stamped AI contexts with budgets, retrieval and audience-safe standings, 28 October 2026
 
 - Build each AI task's context from the saved campaign, not from chat history. A context is

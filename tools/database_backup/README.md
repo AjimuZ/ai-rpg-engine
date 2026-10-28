@@ -1,4 +1,4 @@
-# Database backup and restore (V12 scope)
+# Database backup and restore (V15 scope)
 
 A trusted-owner disaster-recovery tool for the canonical PostgreSQL database. It
 uses only the Python standard library and the `pg_dump`/`pg_restore` clients inside
@@ -19,7 +19,7 @@ py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
 ## What it does
 
 - **Backup** checks the exact server and client version, the exact table set and
-  successful migrations V1–V12, including immutable pack bytes and sealed reports. It then creates the target directory, which must
+  successful migrations V1–V15, including immutable pack bytes and sealed reports. It then creates the target directory, which must
   not already exist, and writes `database.dump` (custom format, no owners or
   privileges). It re-reads the catalog and writes `manifest.json` last. The manifest
   holds the format, schema and PostgreSQL versions, the scope, the byte count, the
@@ -116,3 +116,15 @@ Restore keeps activation history as audit evidence; the existing restore step st
 retires every usable plan with a `GENERATION_RETIRED` disposition, and activation
 refuses retired generations, so a restored plan cannot be used again. Offline checks
 cover the V12 manifest/catalog; no live V12 dump/restore rehearsal has been run.
+
+V13–V15 scope (P08.5, P08.6, P09.1) adds `narration_publication` (immutable accepted
+narration per operation), `inference_task` and `inference_scheduler_state` (the fair
+scheduler ledger and the installation-wide account backoff), and the typed knowledge
+records `knowledge_claim`, `knowledge_belief`, `actor_sighting` and `actor_commitment`.
+Restore needs no new retirement step: publications and knowledge are append-only
+history, the preserved backoff only delays background admissions, and engine startup
+already ends restored `QUEUED` inference tasks `ABANDONED` and takes over `DISPATCHED`/
+`RECONCILING` rows as `RECONCILING` with their charge, while the advanced recovery
+generation retires presentation jobs. The exact migration/table regression check
+reproduced the hosted CI failure (run 40743829288) before this scope update. Offline
+checks cover the V15 manifest/catalog; no live V13–V15 dump/restore rehearsal has been run.
