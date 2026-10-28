@@ -1,0 +1,197 @@
+package org.rpgengine.narration;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.rpgengine.inference.contract.PublicFact;
+import org.rpgengine.presentation.SupportedLocale;
+import tools.jackson.databind.JsonNode;
+
+/**
+ * Deterministic selected-locale statements of the public events written by the local resolver
+ * (P07.4, event version 1). A statement is the trusted, mechanical wording of what the event
+ * established; the narrator may reword it but must cite it, and every number it contains becomes a
+ * number the narration may state (docs/21 section 14, grounding rule).
+ *
+ * <p>Only the closed vocabulary below is narratable. An unknown event type or version, a payload
+ * missing a required field, an actor without a known display name, or a statement longer than
+ * {@link PublicFact#MAX_TEXT} yields an empty result, and the caller falls back to the
+ * deterministic receipt instead of guessing. Statements use the canonical location, ability and
+ * resource identifiers, exactly as the player-safe receipt does, until packs supply public display
+ * names for them. The Italian wording avoids gendered participles because character gender is not
+ * modelled; it still needs the independent human review that every Italian message receives.
+ */
+final class EventStatements {
+    /** The only event payload version these statements understand. */
+    static final int VERSION = 1;
+
+    /** Static helpers only. */
+    private EventStatements() {
+    }
+
+    /**
+     * State one public event.
+     *
+     * @param locale selected narrative locale
+     * @param type stored event type
+     * @param version stored event version
+     * @param payload stored event payload
+     * @param names display names of the campaign actors the payload may reference
+     * @return the statement, or empty when the event cannot be stated faithfully
+     */
+    static Optional<String> state(SupportedLocale locale, String type, int version, JsonNode payload,
+            Map<UUID, String> names) {
+        if (version != VERSION || !payload.isObject()) {
+            return Optional.empty();
+        }
+        boolean it = locale == SupportedLocale.IT;
+        String text = switch (type) {
+            case "ACTOR_MOVED" -> {
+                String actor = name(payload, "actorId", names);
+                String from = token(payload, "from");
+                String to = token(payload, "to");
+                yield actor == null || from == null || to == null ? null
+                        : it ? "Spostamento di " + actor + ": da " + from + " a " + to + "."
+                        : actor + " moved from " + from + " to " + to + ".";
+            }
+            case "TIME_PASSED" -> {
+                Long seconds = number(payload, "seconds");
+                yield seconds == null ? null
+                        : it ? "Attesa: trascorrono " + seconds + " secondi." : "Waiting: " + seconds + " seconds pass.";
+            }
+            case "SPEECH_DELIVERED" -> {
+                String speaker = name(payload, "speakerActorId", names);
+                String recipient = name(payload, "recipientActorId", names);
+                String words = payload.path("text").isString() ? payload.path("text").asString() : null;
+                yield speaker == null || recipient == null || words == null || words.isBlank() ? null
+                        : it ? speaker + " dice a " + recipient + ": \"" + words + "\""
+                        : speaker + " says to " + recipient + ": \"" + words + "\"";
+            }
+            case "ABILITY_USED" -> {
+                String actor = name(payload, "actorId", names);
+                String ability = token(payload, "abilityId");
+                List<String> targets = names(payload.path("targetActorIds"), names);
+                if (actor == null || ability == null || targets == null) {
+                    yield null;
+                }
+                String on = targets.isEmpty() ? "" : (it ? " su " : " on ") + String.join(", ", targets);
+                yield it ? actor + " usa l'abilità " + ability + on + "." : actor + " uses the ability " + ability + on + ".";
+            }
+            case "RESOURCE_SPENT" -> {
+                String actor = name(payload, "actorId", names);
+                String resource = token(payload, "resourceKey");
+                Long amount = number(payload, "amount");
+                Long before = number(payload, "before");
+                Long after = number(payload, "after");
+                yield actor == null || resource == null || amount == null || before == null || after == null ? null
+                        : it ? "Costo per " + actor + ": " + amount + " di " + resource + " (da " + before + " a " + after + ")."
+                        : actor + " spends " + amount + " " + resource + " (from " + before + " to " + after + ").";
+            }
+            case "EFFECT_RESOLVED" -> effect(it, payload, names);
+            default -> null;
+        };
+        return text == null || text.length() > PublicFact.MAX_TEXT ? Optional.empty() : Optional.of(text);
+    }
+
+    /**
+     * State a resolved resource effect. The resolver marks this event public only when every
+     * affected actor is the player, so each outcome here is the player's own value.
+     */
+    private static String effect(boolean it, JsonNode payload, Map<UUID, String> names) {
+        String resource = token(payload, "resourceKey");
+        if (resource == null || !payload.path("outcomes").isArray() || payload.path("outcomes").isEmpty()) {
+            return null;
+        }
+        var parts = new ArrayList<String>();
+        for (JsonNode outcome : payload.path("outcomes")) {
+            String actor = name(outcome, "actorId", names);
+            String kind = token(outcome, "outcome");
+            if (actor == null || kind == null) {
+                return null;
+            }
+            if (kind.equals("NO_RESOURCE")) {
+                parts.add(it ? "nessun effetto su " + resource + " per " + actor : actor + " is unaffected (" + resource + ")");
+                continue;
+            }
+            Long before = number(outcome, "before");
+            Long after = number(outcome, "after");
+            if (!(kind.equals("APPLIED") || kind.equals("CLAMPED")) || before == null || after == null) {
+                return null;
+            }
+            parts.add(it ? resource + " di " + actor + ": da " + before + " a " + after
+                    : actor + "'s " + resource + " goes from " + before + " to " + after);
+        }
+        String joined = String.join("; ", parts);
+        return (it ? "Effetto: " : "Effect: ") + joined + ".";
+    }
+
+    /** @return the known display name of the actor referenced by {@code field}, or null */
+    private static String name(JsonNode node, String field, Map<UUID, String> names) {
+        return known(node.path(field), names);
+    }
+
+    /** @return the display names of every referenced actor, or null when any is unknown */
+    private static List<String> names(JsonNode array, Map<UUID, String> names) {
+        if (!array.isArray()) {
+            return null;
+        }
+        var resolved = new ArrayList<String>();
+        for (JsonNode entry : array) {
+            String name = known(entry, names);
+            if (name == null) {
+                return null;
+            }
+            resolved.add(name);
+        }
+        return resolved;
+    }
+
+    /** @return the display name of the actor whose UUID text is {@code reference}, or null */
+    private static String known(JsonNode reference, Map<UUID, String> names) {
+        if (!reference.isString()) {
+            return null;
+        }
+        try {
+            return names.get(UUID.fromString(reference.asString()));
+        } catch (IllegalArgumentException malformed) {
+            return null;
+        }
+    }
+
+    /** @return every actor identity a supported payload may reference, for one bounded name lookup */
+    static List<UUID> referencedActors(JsonNode payload) {
+        var actors = new ArrayList<UUID>();
+        for (String field : List.of("actorId", "speakerActorId", "recipientActorId")) {
+            add(payload.path(field), actors);
+        }
+        payload.path("targetActorIds").forEach(entry -> add(entry, actors));
+        payload.path("outcomes").forEach(outcome -> add(outcome.path("actorId"), actors));
+        return actors;
+    }
+
+    /** Collect one well-formed UUID reference; anything else is ignored and later reads as unknown. */
+    private static void add(JsonNode reference, List<UUID> actors) {
+        if (reference.isString()) {
+            try {
+                actors.add(UUID.fromString(reference.asString()));
+            } catch (IllegalArgumentException malformed) {
+                // An unknown reference makes the statement empty, which falls back to the receipt.
+            }
+        }
+    }
+
+    /** @return a non-blank string field, or null */
+    private static String token(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isString() && !value.asString().isBlank() ? value.asString() : null;
+    }
+
+    /** @return an exact integral field, or null */
+    private static Long number(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isIntegralNumber() && value.canConvertToLong() ? value.longValue() : null;
+    }
+}

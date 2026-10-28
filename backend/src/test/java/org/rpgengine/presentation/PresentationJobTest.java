@@ -82,6 +82,8 @@ class PresentationJobTest {
             jdbc.update("insert into campaign_creation (adventure_id, request_id, payload_hash, campaign_id, actor_id, "
                     + "profile_id, choices, created_at) values (?, ?, ?, ?, ?, 'neutral', '{}'::jsonb, now())",
                     adventure, UUID.randomUUID(), "a".repeat(64), campaign, player.getId());
+            jdbc.update("insert into presentation_campaign_settings (campaign_id, narrative_locale, updated_at) "
+                    + "values (?, 'en', now())", campaign);
         });
         revision = 0;
     }
@@ -89,7 +91,7 @@ class PresentationJobTest {
     /** Remove disposable rows; constraints and triggers remain installed. */
     @AfterEach
     void clear() {
-        jdbc.execute("truncate presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, "
+        jdbc.execute("truncate narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, "
                 + "campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, "
                 + "plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, "
                 + "planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, "
@@ -109,12 +111,13 @@ class PresentationJobTest {
         var calls = new CopyOnWriteArrayList<NarrationPort.Request>();
         var jobs = service(request -> {
             calls.add(request);
-            return NarrationPort.Outcome.DELIVERED;
+            return delivered();
         });
         var world = world();
         assertEquals(1, jobs.drain(4));
         assertEquals(0, jobs.drain(4));
-        assertEquals(List.of(new NarrationPort.Request(adventure, campaign, operation, 1, 1)), calls);
+        assertEquals(List.of(new NarrationPort.Request(adventure, campaign, operation, 1, 1,
+                UUID.fromString(job(operation, "id::text")), 0)), calls);
         assertEquals("DELIVERED|NARRATION_DELIVERED|1|2", job(operation,
                 "status || '|' || outcome_code || '|' || attempt_count || '|' || fence"));
         assertEquals("DELIVERED", journal(operation));
@@ -186,12 +189,12 @@ class PresentationJobTest {
         var late = service(request -> {
             lateEntered.countDown();
             await(lateRelease);
-            return NarrationPort.Outcome.DELIVERED;
+            return delivered();
         });
         var replacement = service(request -> {
             replacementEntered.countDown();
             await(replacementRelease);
-            return NarrationPort.Outcome.DELIVERED;
+            return delivered();
         });
         try (var threads = Executors.newFixedThreadPool(2)) {
             var lateRun = threads.submit(late::runOnce);
@@ -199,7 +202,7 @@ class PresentationJobTest {
             jdbc.update("update presentation_job set lease_expires_at = clock_timestamp() - interval '1 second', "
                     + "row_version = row_version + 1 where operation_id = ?", operation);
             // The next pass interrupts the expired attempt; its retry is due after backoff.
-            assertTrue(service(request -> NarrationPort.Outcome.FAILED).runOnce());
+            assertTrue(service(request -> NarrationPort.Result.of(NarrationPort.Outcome.FAILED)).runOnce());
             assertEquals("QUEUED|1|2", job(operation, "status || '|' || attempt_count || '|' || fence"));
             makeDue(operation);
             var replacementRun = threads.submit(replacement::runOnce);
@@ -230,7 +233,7 @@ class PresentationJobTest {
         var jobs = service(request -> {
             entered.countDown();
             await(release);
-            return NarrationPort.Outcome.DELIVERED;
+            return delivered();
         });
         var world = world();
         try (var thread = Executors.newSingleThreadExecutor()) {
@@ -333,6 +336,13 @@ class PresentationJobTest {
                 + "where operation_id = ?", operation);
         jdbc.update("update operation_journal set status = 'NARRATING', operation_version = operation_version + 1, "
                 + "row_version = row_version + 1 where id = ?", operation);
+    }
+
+    /** A minimal validated English publication bound to the fixture's initial presentation generation. */
+    static NarrationPort.Result delivered() {
+        return NarrationPort.Result.delivered(new NarrationPort.Publication(SupportedLocale.EN, 0, 0, "c".repeat(64),
+                false, List.of(new NarrationPort.Passage(NarrationPort.PassageKind.NARRATION, null, null,
+                        "Time passes quietly.", List.of("event.1"))), List.of(), null, null, null));
     }
 
     /** Job service with a scripted narration port. */

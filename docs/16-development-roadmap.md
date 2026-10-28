@@ -1577,6 +1577,40 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     this completion mark. All 131 task identities/titles and the pending P98 follow-up are
     preserved; only P08.4 gains a completion mark.
 - [ ] P08.5 Publish only validated final narration; add deterministic receipt fallback and narration-only retry.
+  - Package A — grounded publisher: `org.rpgengine.narration` assembles the public narration
+    context of one committed operation in one read-only snapshot (its `PUBLIC` events only,
+    stated deterministically in English or Italian, the addressed characters as speakers, the
+    generic free-action decision, the campaign generation, revision, locale and glossary
+    revisions, content hash and public policy hash) and `GroundedNarration`, the engine's
+    `NarrationPort`, runs the P08.2 contract in the public narrator session on the `standard`
+    slot with the 90-second budget and its single repair. An unready runtime answers
+    `UNAVAILABLE` without reading or submitting anything.
+  - Package B — publication and receipt fallback: V13 `narration_publication` (immutable, one
+    per operation) is written only by the settling transaction of the delivering job, only
+    while the campaign's locale and glossary revisions still equal the binding's; stale
+    narration is discarded and the attempt counts as failed. Output still invalid after the
+    repair, a declined answer or an unnarratable bundle end the round `NARRATION_FAILED` at
+    once and the committed player-safe receipt is the presentation. The attempt lease is 120
+    seconds. See [docs/07 section 6](07-turn-protocol.md#p085-publication-receipt-fallback-and-narration-only-retry).
+  - Package C — narration-only retry and view: up to three retry rounds per operation, one in
+    flight and one delivered at most (V13 partial unique indexes); a round never changes the
+    journal, re-runs the action, rolls a draw, writes a receipt or world row or appends a
+    stream message, and cancellation stops it. Every operation body carries `presentation`
+    (`IN_PROGRESS`, `NARRATED` with backend-assigned message identities, or `RECEIPT` with its
+    reason and remaining retries); `POST .../operations/{id}/narration/retry` queues a round.
+    See [docs/13](13-api-and-ui.md#p085-narration-presentation-and-retry).
+  - Exit checks: real-PostgreSQL tests through the real job service, assembler, contract
+    runner, scoped sessions and narration contract with only the runtime scripted (single
+    publication with trusted speaker names, public narrator scope, no `INTERNAL` event in any
+    instruction, one repair then the receipt, a repaired publication, declined and
+    unnarratable bundles, unavailable runtime, locale switch during narration, retry without
+    any world/receipt/draw/stream change, bounded and cancellable rounds, database guards);
+    the HTTP retry and presentation view; the adapted P07.5 job, stream and cancellation
+    suites; the V13 upgrade step; deliberate weakening probes; the full packaged backend and
+    repository checks. Browser rendering and the Retry control (P05.6/P05.7), a stream message
+    for retry rounds, privileged phrase sets and richer contexts (P09.2), regeneration after a
+    runtime switch (P20.2) and live narration quality (QA-07, EN/IT human review) are not part
+    of this task.
 - [ ] P08.6 Implement one durable fair priority queue with isolated logical role/audience threads, interactive reservations, bounded quota/backoff/cancel/restart handling and conservative single-active-turn default; higher concurrency requires P01.7 evidence and QA-37.
 - [ ] P08.7 Add the versioned bounded quest-plan contract and selective dependency validation/replanning with a playable no-plan baseline; prove contract/admission/fallback with deterministic fixtures. A live investigation comparison may be deferred/unavailable without blocking MVP; no forced player choice or waiting for a whole arc.
 

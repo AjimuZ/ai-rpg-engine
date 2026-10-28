@@ -11,6 +11,7 @@ import org.rpgengine.commands.CommandExecutionService;
 import org.rpgengine.commands.OperationAdmissionFailure;
 import org.rpgengine.commands.OperationCancellationService;
 import org.rpgengine.identity.LocalHttpAdmission;
+import org.rpgengine.presentation.PresentationJobService;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.http.ResponseEntity;
@@ -27,8 +28,10 @@ import org.springframework.web.bind.annotation.RestController;
  * detached public identities, status and the player-safe receipt projection leave them.
  * A fresh command is admitted and then resolved locally in the same request (P07.4); its
  * narration is a durable post-commit presentation job (P07.5). Cancellation requests race the
- * execution under the campaign lock and report whether effects were already committed. Failures
- * expose stable codes rather than SQL, pack text or exception messages.
+ * execution under the campaign lock and report whether effects were already committed. Since
+ * P08.5 every committed operation view carries its {@code presentation}: published validated
+ * narration, narration in progress, or the deterministic receipt fallback with a narration-only
+ * retry. Failures expose stable codes rather than SQL, pack text or exception messages.
  */
 @RestController
 public class CampaignCreationController {
@@ -37,15 +40,17 @@ public class CampaignCreationController {
     private final CampaignCreationService service;
     private final CommandExecutionService commands;
     private final OperationCancellationService cancellations;
+    private final PresentationJobService presentations;
     private final CampaignCommandJson commandDecoder = new CampaignCommandJson();
     private final CampaignCreationJson decoder = new CampaignCreationJson();
 
     /** Require every durable service; missing infrastructure fails application construction. */
     public CampaignCreationController(CampaignCreationService service, CommandExecutionService commands,
-            OperationCancellationService cancellations) {
+            OperationCancellationService cancellations, PresentationJobService presentations) {
         this.service = java.util.Objects.requireNonNull(service, "service");
         this.commands = java.util.Objects.requireNonNull(commands, "commands");
         this.cancellations = java.util.Objects.requireNonNull(cancellations, "cancellations");
+        this.presentations = java.util.Objects.requireNonNull(presentations, "presentations");
     }
 
     /**
@@ -114,7 +119,7 @@ public class CampaignCreationController {
                 return error(413, "COMMAND_BODY_TOO_LARGE");
             }
             var execution = commands.execute(owner, adventure, campaign, commandDecoder.decode(bytes));
-            return ResponseEntity.status(execution.replayed() ? 200 : 202).body(body(execution, adventure));
+            return ResponseEntity.status(execution.replayed() ? 200 : 202).body(view(execution, adventure));
         } catch (CampaignCommandJson.Malformed | IOException failure) {
             return error(400, "COMMAND_INPUT_MALFORMED");
         } catch (OperationAdmissionFailure failure) {
@@ -151,7 +156,7 @@ public class CampaignCreationController {
             UUID campaign = CampaignCommandJson.uuid(campaignId);
             UUID operation = CampaignCommandJson.uuid(operationId);
             UUID adventure = CampaignCommandJson.uuid(adventureId);
-            return ResponseEntity.ok(body(commands.status(owner, adventure, campaign, operation), adventure));
+            return ResponseEntity.ok(view(commands.status(owner, adventure, campaign, operation), adventure));
         } catch (CampaignCommandJson.Malformed failure) {
             return error(400, "COMMAND_INPUT_MALFORMED");
         } catch (OperationAdmissionFailure failure) {
@@ -187,7 +192,7 @@ public class CampaignCreationController {
             UUID adventure = CampaignCommandJson.uuid(adventureId);
             commandDecoder.decodeEmpty(request.getInputStream().readNBytes(MAX_CANCEL_BYTES + 1));
             var outcome = cancellations.cancel(owner, adventure, campaign, operation);
-            var body = body(commands.status(owner, adventure, campaign, operation), adventure);
+            var body = view(commands.status(owner, adventure, campaign, operation), adventure);
             body.put("cancellation", outcome.name());
             return ResponseEntity.ok(body);
         } catch (CampaignCommandJson.Malformed | IOException failure) {
@@ -200,6 +205,66 @@ public class CampaignCreationController {
         } catch (DataAccessException | TransactionException | IllegalStateException failure) {
             return error(503, "COMMAND_STORAGE_UNAVAILABLE");
         }
+    }
+
+    /**
+     * Request a narration-only retry of one committed operation whose narration is pending
+     * (P08.5). The body must be the empty JSON object {@code {}}. The action is never re-run: the
+     * retry only queues one more presentation round, at most three after the original, and never
+     * writes world rows, receipts or draws. The answer is the current operation view plus
+     * {@code narrationRetry}: 202 with {@code QUEUED} when a round was queued, otherwise 200 with
+     * {@code IN_PROGRESS}, {@code ALREADY_NARRATED}, {@code EXHAUSTED} or {@code NOT_COMMITTED}.
+     * Lock contention answers 409 without writes; repeating the request is safe.
+     *
+     * @param request admitted HTTP request carrying the owner attribute and the empty JSON body
+     * @param campaignId canonical campaign UUID
+     * @param operationId canonical operation UUID
+     * @param adventureId canonical adventure UUID that must own the campaign
+     * @return 202 or 200 with the outcome, or a fixed error code
+     */
+    @PostMapping("/api/v1/campaigns/{campaignId}/operations/{operationId}/narration/retry")
+    public ResponseEntity<?> retryNarration(HttpServletRequest request, @PathVariable String campaignId,
+            @PathVariable String operationId, @RequestParam(required = false) String adventureId) {
+        if (!(request.getAttribute(LocalHttpAdmission.OWNER_ATTRIBUTE) instanceof UUID owner)) {
+            return error(403, "LOCAL_ADMISSION_DENIED");
+        }
+        try {
+            UUID campaign = CampaignCommandJson.uuid(campaignId);
+            UUID operation = CampaignCommandJson.uuid(operationId);
+            UUID adventure = CampaignCommandJson.uuid(adventureId);
+            commandDecoder.decodeEmpty(request.getInputStream().readNBytes(MAX_CANCEL_BYTES + 1));
+            // The status read authorizes the owner for this exact scope before any lock is taken.
+            commands.status(owner, adventure, campaign, operation);
+            var outcome = presentations.retry(adventure, campaign, operation);
+            var body = view(commands.status(owner, adventure, campaign, operation), adventure);
+            body.put("narrationRetry", outcome.name());
+            return ResponseEntity.status(outcome == PresentationJobService.Retry.QUEUED ? 202 : 200).body(body);
+        } catch (CampaignCommandJson.Malformed | IOException failure) {
+            return error(400, "COMMAND_INPUT_MALFORMED");
+        } catch (OperationAdmissionFailure failure) {
+            return failure(failure);
+        } catch (TransientDataAccessException failure) {
+            return error(409, "COMMAND_CAMPAIGN_BUSY");
+        } catch (DataAccessException | TransactionException | IllegalStateException failure) {
+            return error(503, "COMMAND_STORAGE_UNAVAILABLE");
+        }
+    }
+
+    /** Operation body plus the presentation state of a committed operation (null before commit). */
+    private LinkedHashMap<String, Object> view(CommandExecutionService.Execution execution, UUID adventure) {
+        var body = body(execution, adventure);
+        var operation = execution.operation();
+        Map<String, Object> presentation = null;
+        if (operation.committedRevision() != null) {
+            var state = presentations.presentation(operation.campaignId(), operation.operationId());
+            presentation = new LinkedHashMap<>();
+            presentation.put("mode", state.mode().name());
+            presentation.put("reason", state.reason());
+            presentation.put("retriesRemaining", state.retriesRemaining());
+            presentation.put("narration", state.narration());
+        }
+        body.put("presentation", presentation);
+        return body;
     }
 
     /** Map an expected admission outcome to its stable public status and code. */

@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V12 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V13 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -225,6 +225,19 @@ class CanonicalMigrationUpgradeTest {
                     assertNull(jdbc.queryForObject("select plan_reference_version(?, ?)", Long.class,
                             UUID.randomUUID(), "actor:" + actor));
                     assertEquals(0, v12.migrate().migrationsExecuted);
+                    // V13 adds narration publication and retry rounds without touching canonical rows:
+                    // the journal is unchanged and no job, round or publication is invented.
+                    String v12Journal = jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
+                            String.class);
+                    Flyway v13 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("13").load();
+                    assertEquals(1, v13.migrate().migrationsExecuted);
+                    assertTrue(v13.validateWithResult().validationSuccessful);
+                    assertEquals(v12Journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
+                            String.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from narration_publication", Integer.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from presentation_job", Integer.class));
+                    assertEquals(0, v13.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

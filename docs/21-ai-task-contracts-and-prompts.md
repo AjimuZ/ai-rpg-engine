@@ -159,9 +159,11 @@ Measure cost in provider tasks and latency, not only response length. Avoid an a
 ## 14. Implemented intent and narration contracts (P08.2)
 
 **Status (28 October 2026): implemented and tested against deterministic task-port doubles.**
-The contracts are not yet called by a gameplay path: the free-text command entry and the
-presentation job that publishes narration are P08.5, and assembling contexts from stored
-projections is P08.5/P09.2. Since P08.3 every contract task runs in the session of its own
+Since P08.5 the narration contract is called by the post-commit presentation job: its context
+is assembled from the committed operation's public events, and only accepted output whose
+binding is still current is published ([docs/07 section 6](07-turn-protocol.md#p085-publication-receipt-fallback-and-narration-only-retry)).
+The intent contract is not yet called by a gameplay path (free-text command entry), and richer
+audience-filtered contexts (facts, glossary, privileged phrase sets) are P09.2. Since P08.3 every contract task runs in the session of its own
 campaign/generation/role/audience/policy scope ([docs/06 section 7](06-codex-integration.md#p083-session-scoping)). No live runtime has produced output for
 these contracts.
 

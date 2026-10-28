@@ -181,6 +181,7 @@ schema versions for persisted/imported data.
 | `POST /api/v1/campaigns/{id}/commands` | Submit typed action or free-text intent | Returns durable operation |
 | `GET /api/v1/campaigns/{id}/operations/{operationId}` | Operation progress, receipt, or clarification | Safe retry/reconnect path |
 | `POST /api/v1/campaigns/{id}/operations/{operationId}/cancel` | Request cancellation | Receipt determines whether effects already committed |
+| `POST /api/v1/campaigns/{id}/operations/{operationId}/narration/retry` | Narration-only retry of a committed operation whose narration is pending (P08.5) | Never re-runs the action, rolls a draw or changes the receipt; at most three retries |
 | `GET /api/v1/campaigns/{id}/stream` | Resumable authorized event stream | Transport delivery only |
 | `GET /api/v1/campaigns/{id}/encounter` | Public current combat projection | No raw enemy secrets |
 | `POST /api/v1/campaigns/{id}/ai-session/renew` | Renew idle role contexts safely | Does not advance world |
@@ -328,6 +329,34 @@ identities, hashes and permits never appear. Delivery is at-least-once: clients
 deduplicate by `id`, ignore messages older than their projection's revision, and never
 resubmit an action on reconnect. `encounter.updated`, `media.ready` and
 `application.closing` remain proposed for P11/P17/P02 lifecycle work.
+
+### P08.5 narration presentation and retry
+
+Every operation body (submit, status, cancellation and retry answers) carries `presentation`:
+null until the operation commits, then an object with exactly these fields.
+
+| Field | Meaning |
+| --- | --- |
+| `mode` | `IN_PROGRESS` (narration is being produced: the first round before settlement, or a queued or running retry), `NARRATED` (validated narration is published) or `RECEIPT` (the deterministic fallback: the stored player-safe `receipt` is the presentation) |
+| `reason` | For `RECEIPT` only: `NARRATION_UNAVAILABLE`, `NARRATION_CANCELLED`, `NARRATION_FAILED` (transport failures exhausted, output still invalid after its single repair, or the narrator declined), `GENERATION_RETIRED` or `NARRATION_INTERRUPTED` (a legacy commit without any round); otherwise null |
+| `retriesRemaining` | Narration-only retries still allowed; 0 unless `mode` is `RECEIPT` and `status` is `COMMITTED_NARRATION_PENDING` |
+| `narration` | For `NARRATED` only: `locale`, `repaired` and ordered `passages` (`messageId`, `kind` `NARRATION` or `CHARACTER_SPEECH`, `speaker` null or `{actorId, name}`, `text`, `locale`) plus up to three `suggestions` (`suggestionId`, `kind` `REPLY`, `QUESTION` or `ACTION`, `label`, `draftText`, `actionId`) |
+
+Message and suggestion identities (`<operationId>:p<n>`, `<operationId>:s<n>`) are assigned by
+the backend, never by the model. Speaker names come from the trusted context, not from model
+output. A suggestion only fills the composer; it never submits. Event references, prompts,
+runtime, model, effort and raw output stay private.
+
+`POST /api/v1/campaigns/{campaignId}/operations/{operationId}/narration/retry?adventureId={uuid}`
+has the same admission, empty `{}` body and error codes as cancellation. It answers 202 with
+the operation body plus `narrationRetry: QUEUED` when one more presentation round was queued,
+otherwise 200 with `IN_PROGRESS` (a round is queued or running, or the first narration is
+still owed), `ALREADY_NARRATED`, `EXHAUSTED` (the original round and three retries were used)
+or `NOT_COMMITTED`. A retry round never changes `status`: `COMMITTED_NARRATION_PENDING` keeps
+recording that the action was saved without narration, and the round's result appears only in
+`presentation`. Clients re-read the operation after a retry; retry rounds publish no stream
+message, because the public stream types stay closed until the browser consumes a new one.
+Cancelling an operation whose narration is pending stops a queued or running retry round.
 
 ## 4. Stream contract
 

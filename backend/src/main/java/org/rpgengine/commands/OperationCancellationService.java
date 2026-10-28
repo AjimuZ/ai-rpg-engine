@@ -106,7 +106,12 @@ public class OperationCancellationService {
                 PresentationJobService.requestStopWithin(entities, jdbc, campaign, operation);
                 yield Outcome.ALREADY_COMMITTED;
             }
-            case DELIVERED, COMMITTED_NARRATION_PENDING -> Outcome.ALREADY_COMMITTED;
+            case COMMITTED_NARRATION_PENDING -> {
+                // Stops a queued or running narration-only retry round (P08.5); without one, nothing is written.
+                PresentationJobService.requestStopWithin(entities, jdbc, campaign, operation);
+                yield Outcome.ALREADY_COMMITTED;
+            }
+            case DELIVERED -> Outcome.ALREADY_COMMITTED;
             case CANCELLED -> Outcome.CANCELLED;
             case REJECTED, FAILED_BEFORE_COMMIT, NEEDS_CLARIFICATION -> Outcome.ALREADY_FINISHED;
         };

@@ -40,6 +40,7 @@ class CampaignCommandHttpTest {
     @Autowired private EntityManager entities;
     @Autowired private PlatformTransactionManager manager;
     @Autowired private OperationAdmissionService admissions;
+    @Autowired private org.rpgengine.presentation.PresentationJobService presentations;
     private final JsonMapper json = JsonMapper.builder().build();
     private UUID adventure;
     private UUID campaign;
@@ -69,7 +70,7 @@ class CampaignCommandHttpTest {
     /** Delete disposable rows after each test; constraints remain installed. */
     @AfterEach
     void clear() {
-        jdbc.execute("truncate presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
+        jdbc.execute("truncate narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
                 + "operation_journal, actor_resource, actor, presentation_campaign_settings, campaign, "
                 + "content_revision_report, content_revision_file, content_revision, adventure_workspace, identity_owner_profile");
     }
@@ -92,7 +93,7 @@ class CampaignCommandHttpTest {
         // Allowlisted body and receipt projection: no stored details, actors, words or draw identities.
         assertEquals(java.util.List.of("operationId", "campaignId", "commandType", "status", "baseRevision",
                 "committedRevision", "operationVersion", "replayed", "createdAt", "updatedAt", "receipt", "query",
-                "stream"),
+                "stream", "presentation"),
                 java.util.List.copyOf(view.propertyNames()));
         JsonNode receipt = view.get("receipt");
         assertEquals(java.util.List.of("stateRevision", "firstEventSequence", "lastEventSequence", "commandType",
@@ -236,6 +237,56 @@ class CampaignCommandHttpTest {
         assertEquals(404, exchange("GET", "/api/v1/campaigns/" + campaign + "/operations/" + UUID.randomUUID()
                 + "?adventureId=" + adventure, "", headers()).status());
         assertEquals(0, count());
+    }
+
+    /**
+     * P08.5 over HTTP: without a ready runtime the committed operation presents its receipt with
+     * the public reason and three retries; the narration-only retry queues one round (202), is
+     * idempotent while that round is in flight (200), refuses malformed bodies and foreign scopes,
+     * and never journals a new operation or changes the stored receipt.
+     */
+    @Test
+    void retriesOnlyNarrationThroughTheOperationResource() throws Exception {
+        var accepted = post(commandsPath(), envelope(UUID.randomUUID().toString(), 0,
+                "{\"recipientActorId\":\"" + guide(campaign) + "\",\"text\":\"Hello\"}").replace("\"MOVE\"", "\"SPEAK\""));
+        assertEquals(202, accepted.status(), accepted.body());
+        JsonNode view = json.readTree(accepted.body());
+        assertEquals("IN_PROGRESS", view.get("presentation").get("mode").asText());
+        String operation = view.get("operationId").asText();
+        String path = "/api/v1/campaigns/" + campaign + "/operations/" + operation;
+        assertEquals(1, presentations.drain(4));
+        var pending = json.readTree(exchange("GET", path + "?adventureId=" + adventure, "", headers()).body());
+        assertEquals("COMMITTED_NARRATION_PENDING", pending.get("status").asText());
+        assertEquals("{\"mode\":\"RECEIPT\",\"reason\":\"NARRATION_UNAVAILABLE\",\"retriesRemaining\":3,"
+                + "\"narration\":null}", pending.get("presentation").toString());
+        int journaled = count();
+        String retry = path + "/narration/retry?adventureId=" + adventure;
+        var queued = post(retry, "{}");
+        assertEquals(202, queued.status(), queued.body());
+        JsonNode retried = json.readTree(queued.body());
+        assertEquals("QUEUED", retried.get("narrationRetry").asText());
+        assertEquals("COMMITTED_NARRATION_PENDING", retried.get("status").asText());
+        assertEquals("IN_PROGRESS", retried.get("presentation").get("mode").asText());
+        assertEquals(pending.get("receipt"), retried.get("receipt"));
+        var again = post(retry, "{}");
+        assertEquals(200, again.status());
+        assertEquals("IN_PROGRESS", json.readTree(again.body()).get("narrationRetry").asText());
+        assertEquals("{\"code\":\"COMMAND_INPUT_MALFORMED\"}", post(retry, "{\"force\":true}").body());
+        UUID otherOwner = new TransactionTemplate(manager).execute(status -> {
+            var other = OwnerProfile.create("Other", Instant.now());
+            entities.persist(other);
+            return other.getId();
+        });
+        UUID[] foreign = campaign(otherOwner);
+        var hidden = post("/api/v1/campaigns/" + foreign[1] + "/operations/" + operation + "/narration/retry?adventureId="
+                + foreign[0], "{}");
+        assertEquals(404, hidden.status());
+        assertEquals("{\"code\":\"COMMAND_SCOPE_UNAVAILABLE\"}", hidden.body());
+        assertEquals(1, presentations.drain(4));
+        var after = json.readTree(exchange("GET", path + "?adventureId=" + adventure, "", headers()).body());
+        assertEquals(2, after.get("presentation").get("retriesRemaining").asInt());
+        assertEquals(pending.get("receipt"), after.get("receipt"));
+        assertEquals(journaled, count());
     }
 
     /** Missing cookie/CSRF or a foreign Origin is refused by local admission before any write. */

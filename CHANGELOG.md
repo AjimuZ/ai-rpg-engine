@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — Validated narration publication, receipt fallback and narration-only retry, 28 October 2026
+
+- Narrate each committed action from its public events only: the engine states every public
+  event in the campaign's language (English or Italian), sends that bundle to the narrator in
+  the campaign's public narrator session and publishes the answer only after the narration
+  contract accepted it. Engine-internal events, hidden content and planning material are never
+  part of the request.
+- Publish narration exactly once per action, in the transaction that settles the narration
+  job, and only while the campaign's language and glossary are unchanged; narration written
+  before a language switch is discarded and narrated again. Published text is stored
+  unchanged with its language, and character names come from the engine, not from the model.
+- Show the saved receipt instead when narration stays invalid after its single repair, the
+  narrator declines, the action cannot be narrated faithfully or no runtime is ready. The
+  operation view now reports a `presentation` (`IN_PROGRESS`, `NARRATED` or `RECEIPT` with its
+  reason and remaining retries) and the published passages and editable suggestions.
+- Add `POST /api/v1/campaigns/{id}/operations/{operationId}/narration/retry`: up to three
+  narration-only retries per action. A retry never repeats the action, rolls dice, changes the
+  receipt or the operation status, or announces anything on the stream; cancelling the action
+  stops a queued retry.
+- Raise the narration attempt lease to 120 seconds so the 90-second narration budget fits in
+  one attempt. The browser does not yet show the published passages or a Retry control
+  (P05.6/P05.7); no live runtime has produced narration through this path.
+
 ## Unreleased — Model selection through the owner's slot assignment, 28 October 2026
 
 - Resolve each AI task's logical profile (`light`, `standard`, `deliberate`) through the

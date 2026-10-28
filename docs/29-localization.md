@@ -283,7 +283,7 @@ P08.2 implements these output checks for the intent clarification and narration 
 - **Locale signal.** It counts function words: a string, or all strings together, fails only with at least 12 words, at least 4 other-language function words and more than twice as many as selected-language ones. Weaker evidence only warns (`locale-uncertain`).
 - **Repair.** A mismatch uses the single repair; there is no translation chain.
 
-Human EN/IT quality review is still required. Storage of accepted text and `passageLocale` remains P08.5.
+Human EN/IT quality review is still required. Since P08.5 accepted narration is stored immutably with its `passage_locale` and the locale and glossary revisions it was bound to; settlement re-checks both revisions under the job locks and discards narration generated before a locale switch or glossary edit, so it is never shown ([docs/07 section 6](07-turn-protocol.md#p085-publication-receipt-fallback-and-narration-only-retry)). The deterministic event statements given to the narrator exist in English and Italian; the Italian wording still needs independent human review.
 
 Store exact accepted text and `passageLocale`; summaries retain source IDs and
 their language. Retrieval filters audience/freshness before rendering into a

@@ -129,7 +129,8 @@ public class PublicStreamService {
                         + "from campaign_stream_message m join operation_journal o "
                         + "on o.campaign_id = m.campaign_id and o.id = m.operation_id "
                         + "left join presentation_job j on j.campaign_id = m.campaign_id and j.operation_id = m.operation_id "
-                        + "and j.kind = 'NARRATION' where m.campaign_id = ? and m.sequence > ? order by m.sequence limit ?",
+                        + "and j.kind = 'NARRATION' and j.round = 1 where m.campaign_id = ? and m.sequence > ? "
+                        + "order by m.sequence limit ?",
                 row -> {
                     var data = new LinkedHashMap<String, Object>();
                     data.put("campaignId", campaign.toString());

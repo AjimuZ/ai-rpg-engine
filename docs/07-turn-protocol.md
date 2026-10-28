@@ -435,16 +435,20 @@ with `stream.ready`. Reconnect never submits anything. See the
 `presentation_job` (`NARRATION`, `QUEUED`, three attempts) in the canonical transaction; a
 deferred foreign key proves the operation committed at that revision. The single
 background worker (`PresentationWorker`, 1-second poll) claims a due job under campaign,
-journal and job locks with one more attempt, a fresh fence and a 30-second database-clock
-lease, moving the journal `COMMITTED → NARRATING`. It calls the runtime-neutral
-`NarrationPort` outside any transaction (until P08 the default reports `UNAVAILABLE`),
-then settles under the same locks only if it still holds the exact live lease:
+journal and job locks with one more attempt, a fresh fence and a database-clock lease
+(30 seconds in P07.5; 120 seconds since P08.5, covering the 90-second narration budget),
+moving the journal `COMMITTED → NARRATING`. It calls the runtime-neutral `NarrationPort`
+outside any transaction (since P08.5 the grounded narration publisher, see
+[section 6](#p085-publication-receipt-fallback-and-narration-only-retry)), then settles under
+the same locks only if it still holds the exact live lease:
 
 | Port outcome / state at settle | Job | Journal |
 | --- | --- | --- |
 | Cancellation requested meanwhile | `PENDING` `NARRATION_CANCELLED` (narration discarded) | `COMMITTED_NARRATION_PENDING` |
-| `DELIVERED` | `DELIVERED` | `DELIVERED` |
+| `DELIVERED`, binding still current (P08.5) | `DELIVERED`; the validated narration is stored | `DELIVERED` |
+| `DELIVERED`, locale or glossary changed meanwhile (P08.5) | narration discarded; as `FAILED` below | as `FAILED` below |
 | `UNAVAILABLE` | `PENDING` `NARRATION_UNAVAILABLE` | `COMMITTED_NARRATION_PENDING` |
+| `REJECTED` (P08.5: invalid after the single repair, declined or unnarratable) | `PENDING` `NARRATION_FAILED` | `COMMITTED_NARRATION_PENDING` |
 | `FAILED` or exception, attempts left | `QUEUED`, backoff 2/4 s, fence step | stays `NARRATING` |
 | `FAILED`, third attempt | `PENDING` `NARRATION_FAILED` | `COMMITTED_NARRATION_PENDING` |
 | Lease expired, newer fence or job settled | nothing written (late result discarded) | unchanged |
@@ -457,7 +461,8 @@ are preserved. Journal recovery leaves committed operations that have a job to t
 legacy commits with only an outbox intent still become `COMMITTED_NARRATION_PENDING`. Jobs
 never write world rows, receipts or draws and never call the canonical commit service.
 `COMMITTED_NARRATION_PENDING` remains terminal for the journal; a later narration-only
-retry (P08.5) is presentation state, never a second game action.
+retry (P08.5) is presentation state, never a second game action: it adds a job round and,
+when delivered, a publication, but never changes the journal.
 
 ### P07.6 plan admission and activation
 
@@ -692,7 +697,63 @@ The MVP publishes final narrative after validation against the resolved bundle. 
 
 If prose is invalid, allow one narration-only repair. If repair fails or Codex is unavailable, publish a deterministic mechanical receipt and keep a narration-pending flag. Retrying narration cannot re-run the original action or roll new dice. Text generation is outside the canonical transaction.
 
-Since P08.2 the narration contract and its validator exist ([docs/21 section 14](21-ai-task-contracts-and-prompts.md#14-implemented-intent-and-narration-contracts-p082)). It checks schema shape, references to the supplied events and facts, coverage of every event, speaker attribution (never the player), permitted numbers, privileged-marker leaks, glossary terms, protected quotes, the selected locale and the pending decision. `ContractRunner` gives an invalid output exactly one repair, never repairs a transport outcome, and returns the binding so a stale locale or glossary generation is never published. Since P08.3 narration always runs in the campaign's public `narrator` session, derived from the binding and never supplied by the caller, so no privileged planner or other role's conversation can render it ([docs/06 section 7](06-codex-integration.md#p083-session-scoping)). Publication, the receipt fallback and narration-only retry jobs remain P08.5.
+Since P08.2 the narration contract and its validator exist ([docs/21 section 14](21-ai-task-contracts-and-prompts.md#14-implemented-intent-and-narration-contracts-p082)). It checks schema shape, references to the supplied events and facts, coverage of every event, speaker attribution (never the player), permitted numbers, privileged-marker leaks, glossary terms, protected quotes, the selected locale and the pending decision. `ContractRunner` gives an invalid output exactly one repair, never repairs a transport outcome, and returns the binding so a stale locale or glossary generation is never published. Since P08.3 narration always runs in the campaign's public `narrator` session, derived from the binding and never supplied by the caller, so no privileged planner or other role's conversation can render it ([docs/06 section 7](06-codex-integration.md#p083-session-scoping)).
+
+### P08.5 publication, receipt fallback and narration-only retry
+
+Implemented on 28 October 2026 in `org.rpgengine.narration` (`GroundedNarration`,
+`NarrationContextAssembler`, `EventStatements`) and `org.rpgengine.presentation`
+(`PresentationJobService`, V13 `narration_publication` and job rounds). The HTTP view is in
+[docs/13](13-api-and-ui.md#p085-narration-presentation-and-retry).
+
+- **Context.** One read-only repeatable-read snapshot of the committed operation builds the
+  public `NarrationContext`: the operation's `PUBLIC` events in sequence order, each stated
+  deterministically in the campaign's narrative locale (English or Italian) with the display
+  names of the actors it references (`event.<sequence>` is the cited identity); speakers are
+  the characters the player addressed; the decision is the generic free-action decision
+  `decision.next`, because local actions resolve to no pending decision. `INTERNAL` events,
+  raw payloads, hidden canon, planning artifacts and authoring definitions are never read.
+  The binding uses the campaign's recovery generation, committed revision, locale and glossary
+  revisions, pinned content hash and the hash of the public narration policy label
+  `rpgengine.narration.public-policy.v1`, so the task runs in the campaign's public narrator
+  session. The task identity is derived from the job round and attempt.
+- **What can be narrated.** The resolver's six event types (move, time passed, speech,
+  ability used, resource spent, a player-only resolved effect) at event version 1. An unknown
+  type or version, a missing actor name, no public event, more than 32 events or a statement
+  longer than 1,000 characters (for example very long speech) makes the operation
+  unnarratable, and the receipt is its presentation at once.
+- **Call.** If the runtime reports itself disabled, unavailable or stopping, the attempt ends
+  `UNAVAILABLE` without reading or submitting anything. Otherwise the contract runs on the
+  `standard` slot with the 90-second narration budget, which includes its single repair; the
+  worker waits at most 10 seconds longer and cancels the call after that.
+- **Publication.** Only accepted narrated output becomes a publication. The settling
+  transaction re-reads the campaign's presentation settings under the job locks and stores it
+  only when the locale and both revisions still equal the binding's; otherwise the narration is
+  discarded and the attempt counts as failed, so a later attempt narrates in the new locale.
+  The stored row is immutable and keeps the accepted text, the passage locale, the template
+  hash, the repaired flag and runtime/model/effort provenance (owner diagnostics, never
+  projected). Speaker names come from the trusted context. Cancellation requested meanwhile
+  still wins and discards the narration.
+- **Receipt fallback.** Output still invalid after its single repair, a declined
+  (`cannot-complete`) answer and an unnarratable context end the round `PENDING`
+  `NARRATION_FAILED` at once: no further attempt in that round, because asking again would be
+  the loop section 9 forbids. Unavailable runtimes, cancellations, exhausted transport failures
+  and retired generations end it as in P07.5. In every case the journal is
+  `COMMITTED_NARRATION_PENDING` and the committed player-safe receipt, which was already
+  published with `state.committed`, is the deterministic presentation.
+- **Narration-only retry.** A pending operation may get one more round at a time, up to four
+  rounds in total (the original and three retries), under the campaign's current generation.
+  A round is an ordinary job (claim, lease, fence, attempts, backoff) but never changes the
+  journal; when it is delivered, only the publication is added. At most one round is in flight
+  and at most one is delivered per operation (V13 partial unique indexes). Rounds never re-run
+  the action, roll or replay a draw, write the receipt or a world row, or append a stream
+  message; the public `narrative.pending` reason stays that of round 1. Cancellation of a
+  pending operation stops a queued or running retry round.
+- **Not part of P08.5.** Browser rendering of published passages and the Retry control
+  (P05.6/P05.7), a stream message for retry rounds, audience-filtered privileged phrase sets
+  for the disclosure guard and richer facts (P09.2), pack display names for locations,
+  abilities and resources, automatic regeneration after a runtime switch (P20.2), and live
+  runtime narration quality (QA-07, EN/IT human review).
 
 No second AI request is needed for local consultations. A structured action may need only a narration request. Free-text actions may need interpretation followed by narration. The engine must measure this cost rather than claim every turn is a single call.
 
@@ -751,7 +812,7 @@ Process cancellation is not database rollback. Killing Codex never undoes a comm
 
 ## 9. Retry limits
 
-Protocol reconnect may retry safe discovery/read requests. Proposal repair is limited to one bounded retry with the same canonical context (implemented for intent and narration contracts by `ContractRunner` in P08.2: same context digest, session and slot, remaining budget only, violation codes without the rejected text). A valid but disallowed action is a gameplay rejection, not a reason to ask AI repeatedly until it passes. State-changing transport retries always use the original operation key. AI service errors have capped backoff; no infinite automatic loop or silent provider switch.
+Protocol reconnect may retry safe discovery/read requests. Proposal repair is limited to one bounded retry with the same canonical context (implemented for intent and narration contracts by `ContractRunner` in P08.2: same context digest, session and slot, remaining budget only, violation codes without the rejected text). A valid but disallowed action is a gameplay rejection, not a reason to ask AI repeatedly until it passes. State-changing transport retries always use the original operation key. AI service errors have capped backoff; no infinite automatic loop or silent provider switch. Narration-only retry (P08.5) is an explicit request that adds one presentation round, at most three after the original, and never repeats the action.
 
 ## 10. Player agency and narrative facts
 

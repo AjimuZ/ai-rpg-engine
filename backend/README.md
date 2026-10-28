@@ -778,8 +778,8 @@ application tasks. The rules, violation codes and limits are in
 - Output schemas are bundled at `src/main/resources/ai-contract/1/`. They constrain generation
   only. `ContractSchemaTest` keeps their field sets equal to the validators'.
 
-Nothing calls these contracts from gameplay yet. P08.5 wires narration publication and the
-receipt fallback; session scoping is described below.
+Since P08.5 the post-commit presentation job calls the narration contract (below); the intent
+contract is not yet called from gameplay. Session scoping is described below.
 
 Tests use the deterministic `ScriptedTaskPort` and a manual clock; no database or runtime is
 needed. The suites are `IntentContractTest`, `NarrationContractTest`, `ContractRunnerTest` and
@@ -875,3 +875,28 @@ Refusals (`slot-unassigned`, `slot-backend-mismatch`, `catalog-unavailable`,
 fail startup without echoing a value. Tests: `ProfileResolverTest`, `ProfileSettingsTest`,
 `CodexProfileResolutionTest` (through the real adapter and the scripted app-server) and the
 wiring case in `TaskPortSelectionTest`.
+
+## Grounded narration publication, receipt fallback and retry (P08.5)
+
+`org.rpgengine.narration` connects the presentation jobs to the narration contract. The rules
+are in [docs/07 section 6](../docs/07-turn-protocol.md#p085-publication-receipt-fallback-and-narration-only-retry)
+and the HTTP view in [docs/13](../docs/13-api-and-ui.md#p085-narration-presentation-and-retry).
+
+- `NarrationContextAssembler` builds the public context of one committed operation from its
+  `PUBLIC` events only, stated by `EventStatements` in English or Italian.
+- `GroundedNarration` is the engine's `NarrationPort`. It runs the contract on the `standard`
+  slot (90-second budget including the single repair) and returns a validated
+  `NarrationPort.Publication`, or `REJECTED`, `UNAVAILABLE` or `FAILED`.
+- `PresentationJobService` stores the publication in its settling transaction only while the
+  campaign's locale and glossary revisions are unchanged (V13 `narration_publication`, immutable),
+  falls back to the stored receipt otherwise, and queues narration-only retry rounds
+  (`retry`, at most three after the original; the journal never changes). `presentation` reads
+  the player view.
+- The attempt lease is 120 seconds (`PresentationJobService.LEASE_SECONDS`). No new setting is
+  introduced; with no ready runtime every round ends `NARRATION_UNAVAILABLE` without reading or
+  submitting anything.
+
+Tests: `GroundedNarrationTest` (real PostgreSQL, real job service, assembler, runner, sessions
+and contract; only the runtime is the deterministic `NarratorTaskPort`), the retry case in
+`CampaignCommandHttpTest`, the adapted `PresentationJobTest`, and the V13 step of
+`CanonicalMigrationUpgradeTest`.
