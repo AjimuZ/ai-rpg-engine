@@ -760,6 +760,31 @@ suites pass with zero failures/errors/skips, nine deliberate weakening probes we
 detected, and the executable jar is packaged. See
 [evidence scope](../docs/15-quality-and-acceptance.md).
 
+## Intent and narration task contracts (P08.2)
+
+`org.rpgengine.inference.contract` turns the neutral task port into typed, validated
+application tasks. The rules, violation codes and limits are in
+[docs/21 section 14](../docs/21-ai-task-contracts-and-prompts.md#14-implemented-intent-and-narration-contracts-p082).
+
+- `IntentContract` maps one free-text declaration to a `TypedCommand` proposal (MOVE, WAIT,
+  SPEAK, USE_ABILITY), a bounded clarification or cannot-complete. The proposal is never
+  submitted by itself; it still passes admission, rule validation and idempotency.
+- `NarrationContract` maps a public resolved-event bundle to one to eight attributed passages
+  and up to three editable quick replies for the pending decision.
+- `ContractRunner` submits through `NarrationTaskPort`, validates the untrusted output and
+  repairs at most once. The rejected text is never echoed: only violation codes and pointers
+  go back. It returns `Accepted`, `Rejected`, `NotCompleted` or `Refused` with the
+  `TaskBinding`; check `presentationCurrent` before showing anything.
+- Output schemas are bundled at `src/main/resources/ai-contract/1/`. They constrain generation
+  only. `ContractSchemaTest` keeps their field sets equal to the validators'.
+
+Nothing calls these contracts from gameplay yet. P08.5 wires narration publication and the
+receipt fallback; P08.3 scopes sessions.
+
+Tests use the deterministic `ScriptedTaskPort` and a manual clock; no database or runtime is
+needed. The suites are `IntentContractTest`, `NarrationContractTest`, `ContractRunnerTest` and
+`ContractSchemaTest`.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

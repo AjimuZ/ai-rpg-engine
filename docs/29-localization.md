@@ -275,6 +275,16 @@ and leave narration pending. Do not charge a new game action or perform an
 unbounded translation loop. EN/IT quality requires human review, not just a
 detector score.
 
+P08.2 implements these output checks for the intent clarification and narration contracts ([docs/21 section 14](21-ai-task-contracts-and-prompts.md#14-implemented-intent-and-narration-contracts-p082)):
+
+- **Locale and generations.** Every task binds `outputLocale`, `localeRevision` and `glossaryRevision`. The output must echo the locale, and `TaskBinding.presentationCurrent` rejects output after a locale switch or glossary edit.
+- **Glossary.** Proper names keep their exact capitalization. Terms must not use an avoided form, such as `Force` in Italian.
+- **Protected quotes.** Declared quotes must appear verbatim and are excluded from the locale signal.
+- **Locale signal.** It counts function words: a string, or all strings together, fails only with at least 12 words, at least 4 other-language function words and more than twice as many as selected-language ones. Weaker evidence only warns (`locale-uncertain`).
+- **Repair.** A mismatch uses the single repair; there is no translation chain.
+
+Human EN/IT quality review is still required. Storage of accepted text and `passageLocale` remains P08.5.
+
 Store exact accepted text and `passageLocale`; summaries retain source IDs and
 their language. Retrieval filters audience/freshness before rendering into a
 language-scoped context. Include locale/glossary/policy versions in context and

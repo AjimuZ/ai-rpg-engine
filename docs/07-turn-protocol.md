@@ -692,6 +692,8 @@ The MVP publishes final narrative after validation against the resolved bundle. 
 
 If prose is invalid, allow one narration-only repair. If repair fails or Codex is unavailable, publish a deterministic mechanical receipt and keep a narration-pending flag. Retrying narration cannot re-run the original action or roll new dice. Text generation is outside the canonical transaction.
 
+Since P08.2 the narration contract and its validator exist ([docs/21 section 14](21-ai-task-contracts-and-prompts.md#14-implemented-intent-and-narration-contracts-p082)). It checks schema shape, references to the supplied events and facts, coverage of every event, speaker attribution (never the player), permitted numbers, privileged-marker leaks, glossary terms, protected quotes, the selected locale and the pending decision. `ContractRunner` gives an invalid output exactly one repair, never repairs a transport outcome, and returns the binding so a stale locale or glossary generation is never published. Publication, the receipt fallback and narration-only retry jobs remain P08.5.
+
 No second AI request is needed for local consultations. A structured action may need only a narration request. Free-text actions may need interpretation followed by narration. The engine must measure this cost rather than claim every turn is a single call.
 
 ## 7. Counters and time
@@ -749,7 +751,7 @@ Process cancellation is not database rollback. Killing Codex never undoes a comm
 
 ## 9. Retry limits
 
-Protocol reconnect may retry safe discovery/read requests. Proposal repair is limited to one bounded retry with the same canonical context. A valid but disallowed action is a gameplay rejection, not a reason to ask AI repeatedly until it passes. State-changing transport retries always use the original operation key. AI service errors have capped backoff; no infinite automatic loop or silent provider switch.
+Protocol reconnect may retry safe discovery/read requests. Proposal repair is limited to one bounded retry with the same canonical context (implemented for intent and narration contracts by `ContractRunner` in P08.2: same context digest, session and slot, remaining budget only, violation codes without the rejected text). A valid but disallowed action is a gameplay rejection, not a reason to ask AI repeatedly until it passes. State-changing transport retries always use the original operation key. AI service errors have capped backoff; no infinite automatic loop or silent provider switch.
 
 ## 10. Player agency and narrative facts
 

@@ -1,0 +1,56 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "taskId", "taskKind", "baseRevision", "contextDigest", "outputLocale", "status", "body"],
+  "properties": {
+    "contractVersion": {"type": "integer", "enum": [1]},
+    "taskId": {"type": "string", "maxLength": 36},
+    "taskKind": {"type": "string", "enum": ["intent"]},
+    "baseRevision": {"type": "integer"},
+    "contextDigest": {"type": "string", "maxLength": 64},
+    "outputLocale": {"type": "string", "enum": ["en", "it"]},
+    "status": {"type": "string", "enum": ["proposed", "needs-clarification", "cannot-complete"]},
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intentKind", "actorId", "destinationId", "recipientActorId", "speechText", "waitSeconds",
+        "abilityId", "targetActorIds", "sourceFactIds", "clarification", "reasonCode"],
+      "properties": {
+        "intentKind": {"type": ["string", "null"], "enum": ["MOVE", "WAIT", "SPEAK", "USE_ABILITY", null]},
+        "actorId": {"type": ["string", "null"], "maxLength": 36},
+        "destinationId": {"type": ["string", "null"], "maxLength": 128},
+        "recipientActorId": {"type": ["string", "null"], "maxLength": 36},
+        "speechText": {"type": ["string", "null"], "maxLength": 4000},
+        "waitSeconds": {"type": ["integer", "null"]},
+        "abilityId": {"type": ["string", "null"], "maxLength": 128},
+        "targetActorIds": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 36}},
+        "sourceFactIds": {"type": "array", "maxItems": 16, "items": {"type": "string", "maxLength": 128}},
+        "clarification": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["question", "interpretations"],
+          "properties": {
+            "question": {"type": "string", "maxLength": 300},
+            "interpretations": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["interpretationId", "label", "intentKind", "referenceIds"],
+                "properties": {
+                  "interpretationId": {"type": "string", "maxLength": 32},
+                  "label": {"type": "string", "maxLength": 120},
+                  "intentKind": {"type": "string", "enum": ["MOVE", "WAIT", "SPEAK", "USE_ABILITY"]},
+                  "referenceIds": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 128}}
+                }
+              }
+            }
+          }
+        },
+        "reasonCode": {"type": ["string", "null"], "enum": ["unsupported-intention", "missing-information", "not-permitted", null]}
+      }
+    }
+  }
+}

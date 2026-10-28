@@ -143,6 +143,8 @@ Every response has a contract version, task identity, source revision, and task-
 
 Structured output improves parsing; it does not establish legal targeting, balance, truthful narration, or permission to mutate state. Maintain independent structural and semantic validators. [AI task contracts and prompts](21-ai-task-contracts-and-prompts.md) defines the proposed envelope fields and role templates in more detail.
 
+P08.2 implements the intent and narration contracts in `org.rpgengine.inference.contract`. Each has a bundled output schema (passed as the task's output schema, constraining generation only), an independent Java validator, exactly one bounded repair with the same context and only the violation codes, and a binding to the locale and glossary generation. See [docs/21 section 14](21-ai-task-contracts-and-prompts.md#14-implemented-intent-and-narration-contracts-p082). The contracts name no runtime and pass through `NarrationTaskPort` unchanged.
+
 ## 7. Role and audience isolation
 
 A game-master planner may need secrets to plan a coherent world. A player narrator, guide, or enemy tactician may not need them. Scope AI sessions by campaign, role, audience, and policy hash. **Never reuse a privileged planner thread to render player narration**, even if the newest message omits secrets; prior context still exists.

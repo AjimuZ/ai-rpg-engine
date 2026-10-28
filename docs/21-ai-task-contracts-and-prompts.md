@@ -2,7 +2,7 @@
 
 ## 1. Purpose and status
 
-This document specifies the application-level contracts that sit above the runtime protocols and are identical for the selected runtime, Codex or Claude ([ADR 0020](adr/0020-selectable-narration-runtime.md)). It is documentation, not an implemented prompt library or executable schema. During P08, these definitions become versioned DTOs, schemas, prompt templates, and neutral evaluation fixtures.
+This document specifies the application-level contracts that sit above the runtime protocols and are identical for the selected runtime, Codex or Claude ([ADR 0020](adr/0020-selectable-narration-runtime.md)). P08.2 implements the intent (section 4) and resolved narration/quick-reply (section 8) contracts as versioned Java types, bundled schemas, English templates and independent validators; [section 14](#14-implemented-intent-and-narration-contracts-p082) records exactly what exists. The other task kinds remain specifications until their packages implement them.
 
 Prompt design must preserve the same authority boundaries as the backend. A precise prompt reduces mistakes; it never substitutes for validation, permissions, transactions, or audience isolation.
 
@@ -155,6 +155,198 @@ Each template has a semantic contract version, content hash, role/audience polic
 Maintain neutral golden fixtures for ambiguous input, resource misuse, forbidden field patches, duplicated identities, hidden facts, invented rewards, repeated prologues, unsupported abilities, current-versus-last-known location, terminal combat outcomes, and summary contradictions. Grade structure and authority mechanically; review narrative implications with a human rubric.
 
 Measure cost in provider tasks and latency, not only response length. Avoid an additional AI classifier where a structured task type and local rules already supply routing. Do not remove required validation or memory work to make a benchmark appear faster.
+
+## 14. Implemented intent and narration contracts (P08.2)
+
+**Status (28 October 2026): implemented and tested against deterministic task-port doubles.**
+The contracts are not yet called by a gameplay path: the free-text command entry and the
+presentation job that publishes narration are P08.5, thread scoping is P08.3, and assembling
+contexts from stored projections is P08.5/P09.2. No live runtime has produced output for
+these contracts.
+
+### Package and flow
+
+`org.rpgengine.inference.contract` sits above the neutral task port and names no runtime.
+
+- `IntentContract` and `NarrationContract` each own an English instruction template, a
+  bundled schema (`backend/src/main/resources/ai-contract/1/intent.schema.json`,
+  `narration.schema.json`) and an independent Java validator. `templateHash()` is the
+  SHA-256 of the shared instruction, the task instruction and the schema, for provenance.
+- `ContractRunner.start(contract, context, session, slot, budget)` renders, submits
+  through `NarrationTaskPort`, validates and allows **one** repair. The call's outcome is
+  `Accepted` (typed value, warnings, repaired flag), `Rejected` (violations after the
+  repair), `NotCompleted` (task status and fixed code) or `Refused` (nothing submitted).
+  Every outcome keeps the `TaskBinding` and per-attempt records: port task ID, status,
+  fixed violation codes, runtime/model/effort provenance, fresh-session flag. Records never
+  hold output text.
+- Contexts are immutable records built by trusted backend code: `IntentContext`,
+  `NarrationContext`, with `PublicFact`, `KnownActor`, `GlossaryTerm`, `ProtectedQuote` and
+  `DisclosureGuard`. Bad context values are programming errors and throw. Every list is
+  bounded (for example 32 events, 64 facts, 128 glossary entries, 16 quotes, 16 actions),
+  so a rendered instruction always fits the port's 256 KiB bound.
+
+### Envelope and binding
+
+The request envelope renders `contractVersion` 1, `taskId`, `taskKind`, `role`
+(`interpreter` or `narrator`), `audience` `public`, adventure and campaign IDs,
+`baseRevision`, `contextDigest`, `outputLocale`, `localeRevision`, `glossaryRevision`,
+`packHash` and `policyHash`. The context follows as JSON game data. `contextDigest` is the
+SHA-256 of that exact context JSON. Rendering is deterministic, so the repair reuses the
+same digest.
+
+The response root has exactly `contractVersion`, `taskId`, `taskKind`, `baseRevision`,
+`contextDigest`, `outputLocale`, `status` and `body`. Any mismatch is `echo-mismatch`.
+This detects stale results; it does not authenticate them.
+
+`TaskBinding.presentationCurrent(locale, localeRevision, glossaryRevision)` is the
+publication guard. Output generated before a locale switch or glossary edit is stale and
+must not be shown, even if it was valid (docs/29 section 5).
+
+### Structural checks (both contracts)
+
+- Parsing uses the engine's strict JSON reader: duplicate keys, a second document and
+  non-finite numbers are `malformed-json`; more than 64 KiB is `oversized-output`.
+  Parser diagnostics are dropped because they can quote output.
+- Every object must have its exact field set (`field-set`), so an effect field such as
+  `damage`, `hpDelta`, `statePatch` or `savedSuccessfully` always fails.
+- Strings must have the right type, be non-blank and bounded, and contain no unpaired
+  surrogates or control characters other than line feeds. Markup, code fences and
+  template or script expressions fail as `executable-content`. The exception is speech
+  copied from the player's own text, which may legitimately contain `<3`.
+- Integers are exact JSON integers and are never coerced from strings.
+- References use the stable reference syntax, with no duplicates.
+- Output-local identifiers (interpretations, passages, suggestions) match
+  `[a-z][a-z0-9-]{0,31}`. The publisher assigns the stable message IDs; the model never
+  chooses a durable identity.
+
+### Intent rules
+
+Codes: `actor-mismatch`, `intent-not-allowed`, `unknown-reference`, `wait-not-allowed`,
+`invented-speech`, `target-not-permitted`, `too-many-targets`, `missing-value`,
+`status-field-conflict`.
+
+- **`proposed`.** One intention among the four registered typed commands (MOVE, WAIT,
+  SPEAK, USE_ABILITY), allowed by the context, for the context's acting character.
+  - Only that kind's fields may be set. A second intention cannot ride along: any other
+    field set is a conflict.
+  - Every reference must be a supplied option: a destination, a recipient, a learned
+    ability and its permitted targets within its target bound, or a cited fact.
+  - A wait stays within the context bound.
+  - Speech must be a verbatim part of the player's submitted text, so the model cannot
+    author the player's words.
+  - The result is a `TypedCommand`, which still has to pass ordinary admission, rule
+    validation and idempotency. Nothing is submitted automatically.
+- **`needs-clarification`.** A question of at most 300 characters and two to four
+  interpretations. Each interpretation has an allowed kind and known references, and all
+  proposal fields stay empty.
+- **`cannot-complete`.** One of `unsupported-intention`, `missing-information` or
+  `not-permitted`.
+
+### Narration rules
+
+Codes: `speaker-not-allowed`, `player-voice`, `unknown-reference`, `event-not-narrated`,
+`unsupported-number`, `pending-decision-mismatch`, `quote-altered`, `scope-leak`,
+`glossary-mismatch`, `locale-mismatch`, `status-field-conflict`.
+
+- **Bounds.** One to eight passages of at most 1,200 characters each and 6,000 in total.
+- **Attribution.**
+  - A `narration` passage has no speaker.
+  - `characterSpeech` names a supplied non-player speaker.
+  - The player's character is never a speaker: player passages come from the player's
+    submission, and the context constructor rejects the player as a speaker.
+- **Grounding.**
+  - Each passage cites at least one supplied event or fact, and every supplied event is
+    cited by some passage.
+  - Every digit run in passages, labels and drafts must be a receipt display number or
+    occur in supplied public text. Separators are ignored, so `1.200` and `1,200` are both
+    1200.
+- **Agency.**
+  - The echoed `pendingDecisionId` must be the supplied decision.
+  - At most three suggestions.
+  - An `action` suggestion names an available action of that decision; `reply` and
+    `question` suggestions name none.
+  - Suggestions are editable drafts; selecting one never submits.
+- **`cannot-complete`.** Carries only `missing-information` or `out-of-scope`. The
+  publisher then shows the deterministic receipt.
+
+### Public scope, glossary, quotes and locale
+
+These checks apply to every human-facing string: narration passages, suggestion labels and
+drafts, and the clarification question and labels.
+
+- **Disclosure guard.** The `DisclosureGuard` holds privileged phrases (4–200 characters,
+  at most 256) and is validator input only; it is never rendered.
+  - Any occurrence in output, ignoring case and whitespace runs, is `scope-leak`.
+  - A marker already present in the rendered context means the caller assembled input
+    outside the public scope. The runner then returns `Refused(context-scope)` without
+    submitting.
+  - Paraphrase is not detected.
+- **Glossary.**
+  - A proper name must keep its exact capitalization wherever it occurs as a whole word.
+  - A term must not use an avoided form, usually the other locale's name (for example
+    `Force` in Italian narration, where the reviewed name is `Forza`).
+  - Whole-word matching means `Forceps` is not `Force`.
+- **Protected quotes.** A passage lists the protected quotes it uses, and each must occur
+  verbatim.
+- **Locale signal.** Locale is checked by counting function words that belong to one of
+  the two languages (for example "the", "is", "with" against "il", "che", "della").
+  Declared quotes and glossary renderings are removed first.
+  - A string, or all strings together, is a `locale-mismatch` when it has at least 12
+    words, at least 4 other-language function words, and more than twice as many of
+    them as selected-language ones.
+  - Weaker evidence only adds the warning `locale-uncertain`.
+  - This is a coarse signal, not a language detector or a quality judgment.
+- **Instructions.** The templates stay technical English. They direct the model to write
+  every human-facing string directly in the selected language, to keep IDs, enums,
+  references and protected quotes unchanged, and to use each glossary rendering exactly.
+
+### Repair policy
+
+- **What triggers it.** A completed output with any violation gets exactly one repair.
+- **How it is sent.**
+  - Same canonical context and envelope, same logical session and slot.
+  - A derived task identity (`ContractRunner.repairTaskId`).
+  - Only the remaining budget.
+  - An appended `REPAIR` section listing at most 16 violation codes with their JSON
+    pointers. The rejected text is never echoed back.
+- **When there is no repair.**
+  - Transport outcomes (unavailable, rejected, failed, timed out, unresolved, cancelled)
+    are not output defects and are never repaired.
+  - A budget below the port's one-second minimum ends `Rejected` without a repair.
+  - Cancelling the call cancels the running attempt and prevents the repair. An attempt
+    that completed first with invalid output ends `NotCompleted(CANCELLED)`.
+- **No loop.** A valid but disallowed proposal is a gameplay rejection for the caller, not
+  a reason to ask again. The runner never loops.
+
+### Defaults and assumptions
+
+- **Budgets.** Defaults are 60 s for interpretation and 90 s for narration (docs/06
+  section 10), shared by both attempts. The caller chooses the slot; ordinary narration
+  uses `standard` (docs/06 section 9).
+- **Audience.** Both contracts run for the public player audience. Privileged planning
+  roles and per-role thread scoping are P08.3.
+- **Session and task identity.** The caller supplies a logical session already scoped by
+  campaign, role, audience and policy. The binding's task ID is used as the port identity
+  of the first attempt, so it must be unique per live call.
+- **Not proven by these checks.** Semantic adequacy of prose (an invented attacker
+  described in new words, a paraphrased secret, an implied acceptance) is beyond the
+  mechanical checks. It stays a human-rubric evaluation, together with EN/IT quality.
+
+### Evidence
+
+Four focused suites with 35 cases: `IntentContractTest` (10), `NarrationContractTest` (13,
+two of them EN/IT parameterized), `ContractRunnerTest` (9) and `ContractSchemaTest` (3).
+They use the deterministic `ScriptedTaskPort` and a manual clock. Together they form the
+invalid-output corpus for these two contracts:
+
+- one valid output per locale, and one single-aspect mutation per rule;
+- schema/validator field-set drift;
+- repair content and budget;
+- no repair for transport outcomes;
+- cancellation, refusal of an out-of-scope context, and stale-binding detection.
+
+Deliberate weakening probes are recorded in the
+[verification record](15-quality-and-acceptance.md).
 
 ## 16. Neutral protocol proof (P01.1)
 

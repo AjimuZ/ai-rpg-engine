@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased — Validated intent and narration contracts, 28 October 2026
+
+- Add typed intent interpretation. One free-text declaration becomes exactly one proposed
+  move, wait, speech or ability use over known options, a short clarification with two to
+  four readings, or a cannot-complete reason. Speech must be the player's own words. Effect
+  fields such as damage or state patches are rejected. A proposal is never submitted by
+  itself.
+- Add attributed narration with quick replies, generated directly in the campaign's English
+  or Italian. Passages must:
+  - cite the committed public events and narrate every one;
+  - give speech only to known non-player characters;
+  - use only numbers the receipt allows;
+  - stop at the pending decision.
+
+  Up to three editable suggestions refer only to that decision's available actions.
+- Reject output that leaks privileged phrases, alters a proper name, uses the other
+  language's term, changes a protected quote or is clearly written in the other language.
+  Refuse to send a context that already contains a privileged phrase.
+- Allow exactly one repair with the same context and only the violation codes. Never repair
+  unavailable, failed, timed-out or cancelled tasks. Bind every result to the locale and
+  glossary generation so stale text is not shown.
+- Pass 35 focused cases in four new suites; deliberate weakening probes were detected.
+  Nothing in gameplay calls the contracts yet (publication is P08.5), and no live runtime
+  produced output for them.
+
 ## Unreleased — Narration task port and Codex transport, 28 October 2026
 
 - Add the runtime-neutral narration task port: tasks name a logical `light`, `standard` or
