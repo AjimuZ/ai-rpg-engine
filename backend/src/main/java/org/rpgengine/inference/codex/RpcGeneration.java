@@ -36,7 +36,11 @@ import tools.jackson.databind.node.ObjectNode;
  *       work may still execute and a late response must never be attributed to another call.</li>
  *   <li>Server-initiated requests (approvals, tool calls, elicitation) are always denied with
  *       JSON-RPC {@code -32601}; one that names a registered turn also fails that turn with
- *       {@code unexpected-server-request} (ADR 0013).</li>
+ *       {@code unexpected-server-request} (ADR 0013). One that names a not-yet-registered turn
+ *       while a {@code turn/start} is in flight on its thread is buffered with the early events
+ *       and fails that turn when its acknowledgment registers it: the runtime may emit the
+ *       request before the caller has registered the acknowledged turn, and the turn must still
+ *       fail closed rather than wait for its deadline.</li>
  *   <li>Notifications are routed by thread <em>and</em> turn identity. While a
  *       {@code turn/start} is in flight on a thread, events of not-yet-registered turns on that
  *       thread are buffered in arrival order (at most {@link #MAX_EARLY_EVENTS}; overflow closes
@@ -70,7 +74,11 @@ final class RpcGeneration {
     private volatile String failure;
     private Thread reader;
 
-    private record Early(TurnKey key, RpcEvent event) {
+    /**
+     * One buffered item of a not-yet-registered turn: either a notification ({@code event}) or
+     * the failure code of a denied server request ({@code failure}); exactly one is non-null.
+     */
+    private record Early(TurnKey key, RpcEvent event, String failure) {
     }
 
     /** Mutable diagnostics, guarded by the generation lock; contain counts only. */
@@ -237,6 +245,8 @@ final class RpcGeneration {
 
     /**
      * Register an acknowledged turn and hand it every buffered early event, in arrival order.
+     * A buffered server-request failure fails the new inbox at its position, so the events
+     * before it are discarded exactly as for a registered turn that receives the request.
      *
      * @return the turn's inbox
      * @throws ProtocolException the generation's failure, or {@code duplicate-turn}
@@ -253,7 +263,11 @@ final class RpcGeneration {
             for (Iterator<Early> it = early.iterator(); it.hasNext();) {
                 Early item = it.next();
                 if (item.key().equals(key)) {
-                    inbox.offer(item.event());
+                    if (item.failure() != null) {
+                        inbox.fail(item.failure());
+                    } else {
+                        inbox.offer(item.event());
+                    }
                     it.remove();
                 }
             }
@@ -393,7 +407,18 @@ final class RpcGeneration {
         TurnInbox inbox;
         synchronized (lock) {
             counters.deniedServerRequests++;
-            inbox = inboxes.get(new TurnKey(params.path("threadId").asString(""), params.path("turnId").asString("")));
+            TurnKey key = new TurnKey(params.path("threadId").asString(""), params.path("turnId").asString(""));
+            inbox = inboxes.get(key);
+            if (inbox == null && !key.threadId().isEmpty() && !key.turnId().isEmpty()
+                    && !retired.contains(key) && startsInFlight.containsKey(key.threadId())) {
+                // The acknowledgment may already be read while the caller has not yet called
+                // openTurn: keep the failure for that turn, bounded like any early event.
+                if (early.size() >= MAX_EARLY_EVENTS) {
+                    throw new ProtocolException("notification-overflow");
+                }
+                early.addLast(new Early(key, null, "unexpected-server-request"));
+                counters.early++;
+            }
         }
         send(denial);
         if (inbox != null) {
@@ -426,7 +451,7 @@ final class RpcGeneration {
                 if (early.size() >= MAX_EARLY_EVENTS) {
                     throw new ProtocolException("notification-overflow");
                 }
-                early.addLast(new Early(key, event));
+                early.addLast(new Early(key, event, null));
                 counters.early++;
             } else {
                 counters.ignored++;

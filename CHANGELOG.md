@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Early runtime approval requests fail their turn at once, 28 October 2026
+
+- The AI runtime can ask for an approval or a tool call right after it acknowledges a new
+  turn, before the engine has registered that turn. The request was always denied. Until
+  now, though, the turn was not failed: the task waited for its whole deadline and ended
+  `TIMED_OUT` instead of `FAILED` with `unexpected-server-request`.
+- The failure is now held with the turn's other early events, within the same 256-event
+  bound. It fails the turn as soon as the acknowledgment registers it, so the isolation
+  violation is reported and reconciled immediately.
+- A deterministic regression case covers the ordering. It fails on the previous code.
+  The race had shown up once as an intermittent `CodexTaskAdapterTest` failure in a full
+  backend run.
+
 ## Unreleased — Database backup scope for narration, scheduling and typed knowledge, 28 October 2026
 
 - Extend the strict database backup schema/catalog allowlist to migration V15 and the seven

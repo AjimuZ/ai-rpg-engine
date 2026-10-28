@@ -137,6 +137,40 @@ class RpcGenerationTest {
     }
 
     @Test
+    void serverRequestBeforeTheTurnIsRegisteredStillFailsThatTurn() throws Exception {
+        // The reader can read the turn/start acknowledgment and the runtime's approval request
+        // before the caller registers the turn; the request must still fail it (ADR 0013).
+        generation.start();
+        generation.beginTurnStart("t1");
+        wire.push("{\"method\":\"turn/started\",\"params\":{\"threadId\":\"t1\",\"turn\":{\"id\":\"u1\"}}}");
+        wire.push("{\"id\":\"srv-1\",\"method\":\"item/commandExecution/requestApproval\","
+                + "\"params\":{\"threadId\":\"t1\",\"turnId\":\"u1\"}}");
+        wire.push(event("item/started", "t1", "u2"));
+        wire.push("{\"id\":\"srv-2\",\"method\":\"item/tool/call\",\"params\":{\"threadId\":\"t1\",\"turnId\":\"u3\"}}");
+        // The second denial is written after the reader handled all four frames.
+        awaitWritten(2);
+        assertThat(wire.written).extracting(reply -> reply.path("error").path("code").asInt())
+                .containsExactly(-32601, -32601);
+
+        TurnInbox failed = generation.openTurn(new TurnKey("t1", "u1"));
+        TurnInbox healthy = generation.openTurn(new TurnKey("t1", "u2"));
+        generation.endTurnStart("t1");
+        assertThatThrownBy(() -> failed.poll(WAIT)).hasMessage("unexpected-server-request");
+        assertThat(failed.discarded()).as("events before the request are dropped").isEqualTo(1);
+        assertThat(healthy.poll(WAIT).method()).isEqualTo("item/started");
+        assertThat(healthy.poll(0)).isNull();
+        assertThat(generation.counters().early).isEqualTo(4);
+        assertThat(generation.counters().ignored).as("u3 was never acknowledged").isEqualTo(1);
+        assertThat(generation.failure()).isNull();
+
+        // Without a start in flight a request for an unknown turn is only denied and counted.
+        wire.push("{\"id\":\"srv-3\",\"method\":\"item/tool/call\",\"params\":{\"threadId\":\"t1\",\"turnId\":\"u4\"}}");
+        awaitWritten(3);
+        assertThat(generation.openTurn(new TurnKey("t1", "u4")).poll(0)).isNull();
+        assertThat(generation.counters().deniedServerRequests).isEqualTo(3);
+    }
+
+    @Test
     void earlyEventsAreKeptOnlyWhileAStartIsInFlightAndHandedOverInOrder() throws Exception {
         generation.start();
         wire.push(event("item/started", "t1", "u0"));
