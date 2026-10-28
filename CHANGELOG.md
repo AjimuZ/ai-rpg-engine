@@ -21,7 +21,8 @@
 - Pass 92 focused cases, 31 of them new, and all 614 packaged backend tests in 63 suites with
   zero failures/errors/skips; twenty-four deliberate weakening probes were detected. No live
   runtime or account was used, so multi-turn concurrency and live quota behavior remain
-  unqualified.
+  unqualified. Record implementation owner commit `e2d0ffc` before marking P08.6 complete (52
+  of 131 roadmap entries).
 
 ## Unreleased — Validated narration publication, receipt fallback and narration-only retry, 28 October 2026
 

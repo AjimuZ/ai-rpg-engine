@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 51/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6 and P08.1–P08.5. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 52/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6 and P08.1–P08.6. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 (complete since 28 October 2026), P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -1632,7 +1632,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     `32edd5e`; all exit checks passed on that exact code before this completion mark. All 131
     task identities/titles and the pending P98 follow-up are preserved; only P08.5 gains a
     completion mark.
-- [ ] P08.6 Implement one durable fair priority queue with isolated logical role/audience threads, interactive reservations, bounded quota/backoff/cancel/restart handling and conservative single-active-turn default; higher concurrency requires P01.7 evidence and QA-37.
+- [x] P08.6 Implement one durable fair priority queue with isolated logical role/audience threads, interactive reservations, bounded quota/backoff/cancel/restart handling and conservative single-active-turn default; higher concurrency requires P01.7 evidence and QA-37.
   - Package A — ledger and permit: V14 `inference_task` records every admitted task
     (identities, campaign, generation, role, audience, work class, slot, outcome code,
     owning process, estimated and charged usage, an internal write-ahead runtime reference,
@@ -1672,6 +1672,30 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     qualification of more than one turn, live quota and priority behavior, background task
     kinds (P08.7, P09.3, P12, P15), owner-facing status and settings (P21.3) and observed token
     accounting are not part of this task.
+  - Verified evidence (28 October 2026): 31 new cases (10 pure policy, 15 real-PostgreSQL
+    scheduler, 3 boundary, 2 through the real Codex adapter, one Spring wiring case; 92 focused
+    cases with the adapted contract, narration, session, presentation, schema and V14 migration
+    suites) and all 614 packaged backend cases in 63 suites pass with zero failures/errors/skips
+    on the scoped JDK 21/PostgreSQL 18.6 fixture, and the jar is packaged. Through the real
+    ledger, V14 guards, sessions and scheduler with only the runtime scripted: one turn at a
+    time also across two processes, interactive preemption with the permit kept until the
+    interrupted turn's terminal result, campaigns taking turns, separate bounded queue places,
+    quotas that charge only started turns and survive a restart, a durable 30/60-second backoff
+    of background work that a completed task clears, cancellation, queue deadlines,
+    reconciliation holds, restart recovery that abandons queued rows and confirms the recorded
+    thread before new work while fencing the old process, scope, generation and identity
+    refusals, shutdown and the database guards; the real adapter records the thread before
+    `turn/start`, starts no turn without the record and reconciles an earlier process's
+    running turn before its first new turn. Twenty-four deliberate weakening probes each made
+    their targeted suites fail and were reverted byte-identically (one probe definition was
+    first ineffective and was corrected). Frontend sources and the interface transcript are
+    unchanged. All 26 repository-policy tests pass with zero findings. Not verified: more than
+    one active turn, live quota, rate-limit, priority and cancellation behavior (no runtime or
+    account was used), observed token usage and the not yet existing background task kinds.
+    See the [verification record](15-quality-and-acceptance.md). Implementation owner commit:
+    `e2d0ffc`; all exit checks passed on that exact code before this completion mark. All 131
+    task identities/titles and the pending P98 follow-up are preserved; only P08.6 gains a
+    completion mark.
 - [ ] P08.7 Add the versioned bounded quest-plan contract and selective dependency validation/replanning with a playable no-plan baseline; prove contract/admission/fallback with deterministic fixtures. A live investigation comparison may be deferred/unavailable without blocking MVP; no forced player choice or waiting for a whole arc.
 
 **Exit:** an action runs through Codex interpretation when needed, deterministic resolution, save, and grounded narration without raw tool logs. **Checks:** protocol fixtures, invalid output corpus, no-secret projection tests, opt-in neutral real smoke. **Suggested commit:** `Integrate validated narrative orchestration`.

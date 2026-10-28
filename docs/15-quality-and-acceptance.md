@@ -65,6 +65,9 @@ runtime was used; the QA-37 live part stays open), observed token usage (the est
 labelled as such), background task kinds that do not exist yet (P08.7, P09.3, P12, P15), and an
 owner-facing scheduler status (P21.3).
 
+The implementation owner commit is `e2d0ffc`. Every check above passed on its exact
+sources, and only P08.6 then gains a completion mark (52 of 131 roadmap entries).
+
 P08.5 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **9 new cases (8 in `GroundedNarrationTest`, one in `CampaignCommandHttpTest`) and all 583
 packaged backend cases in 60 suites**, with zero failures, errors or skips; with the adapted
