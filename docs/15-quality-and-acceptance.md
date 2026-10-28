@@ -1,5 +1,83 @@
 # Quality Strategy and Acceptance Criteria
 
+P08.7 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
+**52 new cases and all 666 packaged backend cases in 67 suites**, with zero failures, errors
+or skips; the executable jar is packaged. The new cases are 38 in `QuestPlanContractTest`, one
+schema case in `ContractSchemaTest`, 7 in `QuestPlanningTest`, one in `PlanAdmissionGateTest`,
+3 in `PlanningBoundaryTest` and 2 in `PlanningSettingsTest`; those six suites have 62 cases in
+total. This is deterministic evidence for QA-36 and for docs/28 AP-01, AP-02, AP-04, AP-07,
+AP-08 and the constraint and agency part of AP-11. Only the planner runtime is a double
+(`PlannerTaskPort`). The packs are sealed and registered, the campaign is created by
+production code, and the assembler, snapshot service, preparation jobs, scheduler ledger and
+scheduler, contract runner, admission gate, canonical commands and database are real.
+
+- **Contract:** the plan is accepted in English and Italian, with backend-written validation
+  metadata. Its citation map gives the quest root reliance, gives the witness rows only the
+  interview branch (the witness is also a participant) and the kit only the document branch,
+  and leaves the player's own rows uncited. A participant that no predicate reads is root.
+  Declared assumptions only add reliance.
+- **Selective validation:** a witness elsewhere rejects only the interview (`guard-false`).
+  An exhausted witness drops the supporting node and its descendant (`missing-support`).
+  No feasible branch is `no-viable-branch`, and a false root is `root-assumption-false`.
+- **Invalid-output corpus:** 28 single-aspect corruptions each fail with their own code.
+  They cover unknown and unevaluated operators, deep and oversized predicates, a wrong
+  reference kind, an unknown entity, a free-text condition and a mandatory player-action
+  field. They also cover too many nodes or branches, a causal cycle, too deep a chain,
+  model-written metadata, a foreign plan id or version, a wrong locale, a dropped or unknown
+  author constraint, malformed secrets, unknown participant, content or dependency
+  references, an event outside the horizon, too long a horizon, markup in prose, a missing
+  fallback and a reason on a plan. Malformed and foreign envelopes and cannot-plan rules are
+  checked as well.
+- **Real planner path:**
+  - The default is disabled and writes nothing while commands commit. Play continues while a
+    plan is pending.
+  - The planner task runs as `quest-planner`/`privileged`/`PREPARATION` through the ledger,
+    with a `PLANNER_PRIVATE` snapshot.
+  - Stored severities match the citation map, with the player's rows observed only.
+    Admission changes no canonical row, and the secret proposal reaches no event, outbox,
+    journal, stream, publication or presentation row.
+  - Eight unrelated commands keep the plan `VALIDATED` with nothing to replan, and a
+    generation change returns play to the baseline.
+  - A `soothe` on the witness makes the plan `PARTIALLY_INVALIDATED`, with only the document
+    branch usable. Exactly one refinement is requested (none for repeats or unrelated
+    revisions). It runs as `quest-plan-refine` with stale `[interview]` and usable
+    `[document]` branches and supersedes version 1, and a spent allowance requests nothing
+    more.
+  - A quest change invalidates the whole plan and requests one regeneration.
+  - An unavailable planner, then output still invalid after its repair, end the job `FAILED`
+    within two attempts. A declined plan ends `PLANNER_DECLINED`. No artifact exists after
+    either.
+  - A world change during generation is rejected by the gate (`STALE_QUERY_EPOCH`), and the
+    regeneration is admitted. An unknown quest fails `UNSUPPORTED_TARGET` before reaching
+    the planner. A cancellation requested during generation discards the result.
+  - One worker pass sweeps the stale campaign, requests the refinement and runs it.
+- **Gate narrowing:** a dropped observation, an altered observation, a cited entity narrowed
+  to observed only and a weakened captured branch guard are refused without writing. Valid
+  narrowing is stored, and an observed-only change alters no disposition.
+- **Boundaries:** no package depends on planning; only the preparation and planning packages
+  read plan storage; narration and presentation never read preparation.
+- **Probes:** 21 deliberate weakening probes each made their targeted suites fail and were
+  reverted byte-identically (SHA-256): trusted unevaluated vocabulary, unbounded predicate
+  depth, an accepted false guard, kept dropped-node descendants, an accepted false root,
+  mentions not treated as root, a droppable author constraint, trusted model metadata, an
+  accepted causal cycle, a reused stale branch id, planner work run as interactive, no
+  selective narrowing, uncited reads guarding every branch, an ignored replan allowance, an
+  ignored cancellation, a disabled service reporting plans, planning enabled by default,
+  unchecked manifest narrowing, observed-only rows flipping dispositions, unchecked
+  observation changes and a worker sweep that skips partly invalidated plans.
+
+Frontend sources and the recorded interface transcript are unchanged, so the frontend gates
+were not rerun. All 26 repository-policy tests pass with zero findings.
+
+Not verified:
+- a live planner run or any model-quality, latency or usage result;
+- the paired AP-12 investigation comparison, deferred to the optional P14 demonstration and
+  P18.6;
+- consumers that build commands from plans (P09.1, P10);
+- location-membership phantoms (no writer tags that scope yet);
+- secret authored definitions with text;
+- speculative preparation, world direction and plan review.
+
 P08.6 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **31 new cases (10 in `FairQueueTest`, 15 in `InferenceSchedulerTest`, 3 in
 `SchedulerBoundaryTest`, 2 in `CodexTaskAdapterTest`, one in `TaskPortSelectionTest`) and all

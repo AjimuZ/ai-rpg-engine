@@ -95,8 +95,11 @@ foundation verified on 24 October 2026. Its V6 rows store immutable snapshots,
 plan versions/dependencies/admission receipts, fenced jobs/attempts and query epochs.
 Snapshot inputs carry assembler revision, recovery and presentation tokens; admission
 must retain their complete manifest. Since P07.6 typed row-version dependencies are
-evaluated; predicates and constraint rows still fail closed until P08.7 supplies
-semantic evaluators. These internal services expose no gameplay endpoint.
+evaluated; raw predicate and constraint rows still fail closed. Since P08.7 the quest-plan
+validator evaluates typed plan predicates and compiles them onto the reads they cite. A
+retained manifest entry may then be narrowed from whole-artifact to the citing branches,
+or to observed only (`BRANCH` severity with an empty `branch_refs`, guarding nothing), with
+no schema change. These internal services expose no gameplay endpoint.
 
 V6 adds `ai_job`, `ai_job_attempt`, `planning_snapshot`, `query_epoch`,
 `quest_plan_artifact`, `plan_dependency`, `plan_admission` and `plan_disposition`.

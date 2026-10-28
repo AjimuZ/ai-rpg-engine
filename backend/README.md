@@ -188,8 +188,8 @@ immutable snapshots with assembler freshness tokens, versioned plan/dependency a
 admission records, query epochs, cancellation/recovery state and durable usage counts.
 Critical jobs, epoch bumps and plan invalidation commit with the canonical outbox.
 Admission preserves the complete snapshot manifest and checks query epochs, generation,
-lease and public locale/glossary tokens under database locks. Unsupported non-query
-semantic dependencies fail closed until P08.7. `JobStartupReconciliation` gates claims
+lease and public locale/glossary tokens under database locks. Unsupported raw predicate
+and constraint rows fail closed; P08.7 plan predicates are compiled onto typed reads. `JobStartupReconciliation` gates claims
 and admissions until recovery completes; expired attempts require confirmed external
 stop before requeue. Restore advances generations and invalidates usable artifacts.
 No dispatcher, runtime cancellation transport, global quota enforcement, plan-consumption
@@ -941,3 +941,46 @@ scheduler wiring case of `TaskPortSelectionTest`, the V14 step of
 `CanonicalMigrationUpgradeTest`, and `GroundedNarrationTest`, which now runs through the real
 scheduler and ledger. Suites without a database use `MemoryTaskLedger` through
 `SchedulerFixtures`.
+
+### Optional quest planning (P08.7)
+
+`org.rpgengine.planning` holds the optional quest planner. It is off by default, and no
+other package depends on it:
+
+- `QuestPlanAssembler` reads the privileged slice of one `known-quest:<uuid>` target in one
+  repeatable-read transaction, records each read as a row-version or actor query-epoch
+  dependency, captures the `PLANNER_PRIVATE` snapshot and builds the `QuestPlanContext`.
+- `QuestPlanning` handles the plan lifecycle. `request` (deduplicated, never waits) and
+  `processNext` claim, snapshot, run the `quest-plan`/`quest-plan-refine` contract through
+  the fair scheduler and admit through `PlanAdmissionService`, narrowing each read to the
+  branches whose predicates cite it. `replan` requests one bounded refinement per stale
+  latest version, and `standing` reports `PREPARED` or `BASELINE` with a reason, without
+  writing.
+- `QuestPlanWorker` is a single daemon thread. It runs only when planning and the worker are
+  enabled.
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `engine.planning.enabled` | `false` | Economy default: no planning job is requested, run or used |
+| `engine.planning.slot` | `standard` | Logical inference slot of planner tasks |
+| `engine.planning.budget-seconds` | `60` | Contract budget of one attempt including its repair; plus 10 s must stay below the lease |
+| `engine.planning.lease-seconds` | `120` | Preparation-job lease, 30..300 |
+| `engine.planning.max-attempts` | `2` | Attempts per job (one retry or regeneration), 1..5 |
+| `engine.planning.time-to-live-seconds` | `3600` | Claim window of a queued job |
+| `engine.planning.replan-allowance` | `3` | Most refinement jobs per plan, 0..5 |
+| `engine.planning.max-horizon-seconds` | `604800` | Longest planning horizon a plan may declare (1 hour..30 days) |
+| `engine.planning.priority` | `100` | Preparation-job priority, 0..1000 |
+| `engine.planning.worker.enabled` / `worker.poll-ms` | `true` / `2000` | Worker thread (only with planning enabled) and its poll delay |
+
+Tests:
+
+- `QuestPlanContractTest`: pure; EN/IT acceptance, citation map, selective rejection and a
+  28-case invalid-output corpus. `ContractSchemaTest` checks the schema against the
+  validator.
+- `QuestPlanningTest`: real PostgreSQL, sealed packs, production campaign creation, the real
+  assembler, jobs, ledger, scheduler and gate; only the planner runtime is the
+  `PlannerTaskPort` double.
+- `PlanAdmissionGateTest`: manifest narrowing.
+- `PlanningBoundaryTest`: no package depends on planning, and narration and presentation
+  never read preparation.
+- `PlanningSettingsTest`.

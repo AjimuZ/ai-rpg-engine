@@ -1,0 +1,617 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "taskId",
+    "taskKind",
+    "baseRevision",
+    "contextDigest",
+    "outputLocale",
+    "status",
+    "body"
+  ],
+  "properties": {
+    "contractVersion": {
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "taskId": {
+      "type": "string",
+      "maxLength": 36
+    },
+    "taskKind": {
+      "type": "string",
+      "enum": [
+        "quest-plan",
+        "quest-plan-refine"
+      ]
+    },
+    "baseRevision": {
+      "type": "integer"
+    },
+    "contextDigest": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "outputLocale": {
+      "type": "string",
+      "enum": [
+        "en",
+        "it"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "planned",
+        "cannot-plan"
+      ]
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planId",
+        "planVersion",
+        "questId",
+        "predecessorPlanId",
+        "premise",
+        "tensions",
+        "planningHorizonSeconds",
+        "establishedLoreRefs",
+        "requiredWorldFacts",
+        "participants",
+        "secrets",
+        "nodes",
+        "branches",
+        "failureAndAbandonment",
+        "pendingEventProposals",
+        "authorConstraintRefs",
+        "readDependencies",
+        "assumptions",
+        "locale",
+        "terminologyRefs",
+        "validationMetadata",
+        "reasonCode"
+      ],
+      "properties": {
+        "planId": {
+          "type": "string",
+          "maxLength": 36
+        },
+        "planVersion": {
+          "type": "integer"
+        },
+        "questId": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "predecessorPlanId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 36
+        },
+        "premise": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 600
+        },
+        "tensions": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "planningHorizonSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "establishedLoreRefs": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "requiredWorldFacts": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/predicate"
+          }
+        },
+        "participants": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "participantRef",
+              "motive",
+              "goal",
+              "sourceRefs",
+              "knownSecretRefs"
+            ],
+            "properties": {
+              "participantRef": {
+                "type": "string",
+                "maxLength": 128
+              },
+              "motive": {
+                "type": "string",
+                "maxLength": 300
+              },
+              "goal": {
+                "type": "string",
+                "maxLength": 300
+              },
+              "sourceRefs": {
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "type": "string",
+                  "maxLength": 128
+                }
+              },
+              "knownSecretRefs": {
+                "type": "array",
+                "maxItems": 8,
+                "items": {
+                  "type": "string",
+                  "maxLength": 32
+                }
+              }
+            }
+          }
+        },
+        "secrets": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "secretId",
+              "establishedFactRef",
+              "proposal",
+              "knowerRefs",
+              "disclosurePrerequisite"
+            ],
+            "properties": {
+              "secretId": {
+                "type": "string",
+                "maxLength": 32
+              },
+              "establishedFactRef": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 128
+              },
+              "proposal": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 300
+              },
+              "knowerRefs": {
+                "type": "array",
+                "maxItems": 8,
+                "items": {
+                  "type": "string",
+                  "maxLength": 128
+                }
+              },
+              "disclosurePrerequisite": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/predicate"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "nodes": {
+          "type": "array",
+          "maxItems": 24,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "nodeId",
+              "kind",
+              "summary",
+              "supportRefs",
+              "visibility",
+              "eligibility",
+              "expiresAfterSeconds",
+              "contentRefs"
+            ],
+            "properties": {
+              "nodeId": {
+                "type": "string",
+                "maxLength": 32
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "opportunity",
+                  "clue",
+                  "development",
+                  "subgoal"
+                ]
+              },
+              "summary": {
+                "type": "string",
+                "maxLength": 300
+              },
+              "supportRefs": {
+                "type": "array",
+                "maxItems": 6,
+                "items": {
+                  "type": "string",
+                  "maxLength": 128
+                }
+              },
+              "visibility": {
+                "type": "string",
+                "enum": [
+                  "hidden",
+                  "discoverable"
+                ]
+              },
+              "eligibility": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/predicate"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "expiresAfterSeconds": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "contentRefs": {
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "type": "string",
+                  "maxLength": 256
+                }
+              }
+            }
+          }
+        },
+        "branches": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "branchId",
+              "guard",
+              "nodeRefs",
+              "objective",
+              "outcomeCandidates"
+            ],
+            "properties": {
+              "branchId": {
+                "type": "string",
+                "maxLength": 32
+              },
+              "guard": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/predicate"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "nodeRefs": {
+                "type": "array",
+                "maxItems": 8,
+                "items": {
+                  "type": "string",
+                  "maxLength": 32
+                }
+              },
+              "objective": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/predicate"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "outcomeCandidates": {
+                "type": "array",
+                "maxItems": 3,
+                "items": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              }
+            }
+          }
+        },
+        "failureAndAbandonment": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "expiry",
+            "failure",
+            "noProgressFallback",
+            "consequenceProposals"
+          ],
+          "properties": {
+            "expiry": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/predicate"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "failure": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/predicate"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "noProgressFallback": {
+              "type": "string",
+              "enum": [
+                "baseline-objective",
+                "receipt-only"
+              ]
+            },
+            "consequenceProposals": {
+              "type": "array",
+              "maxItems": 3,
+              "items": {
+                "type": "string",
+                "maxLength": 200
+              }
+            }
+          }
+        },
+        "pendingEventProposals": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "proposalId",
+              "trigger",
+              "windowFromSeconds",
+              "windowToSeconds",
+              "causeRefs",
+              "summary"
+            ],
+            "properties": {
+              "proposalId": {
+                "type": "string",
+                "maxLength": 32
+              },
+              "trigger": {
+                "$ref": "#/$defs/predicate"
+              },
+              "windowFromSeconds": {
+                "type": "integer"
+              },
+              "windowToSeconds": {
+                "type": "integer"
+              },
+              "causeRefs": {
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "type": "string",
+                  "maxLength": 128
+                }
+              },
+              "summary": {
+                "type": "string",
+                "maxLength": 300
+              }
+            }
+          }
+        },
+        "authorConstraintRefs": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "readDependencies": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "maxLength": 16
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "assumptionId",
+              "branchRefs",
+              "dependencyRefs",
+              "note"
+            ],
+            "properties": {
+              "assumptionId": {
+                "type": "string",
+                "maxLength": 32
+              },
+              "branchRefs": {
+                "type": "array",
+                "maxItems": 8,
+                "items": {
+                  "type": "string",
+                  "maxLength": 32
+                }
+              },
+              "dependencyRefs": {
+                "type": "array",
+                "maxItems": 8,
+                "items": {
+                  "type": "string",
+                  "maxLength": 16
+                }
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 300
+              }
+            }
+          }
+        },
+        "locale": {
+          "type": "string",
+          "enum": [
+            "en",
+            "it"
+          ]
+        },
+        "terminologyRefs": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "validationMetadata": {
+          "type": "null"
+        },
+        "reasonCode": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "insufficient-context",
+            "constraint-conflict",
+            null
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "operands",
+        "ref",
+        "value",
+        "amount",
+        "fromSeconds",
+        "toSeconds"
+      ],
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": [
+            "all",
+            "any",
+            "not",
+            "actor-at",
+            "resource-at-least",
+            "item-available",
+            "fact-known-to",
+            "quest-status",
+            "world-time-window"
+          ]
+        },
+        "operands": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/predicate"
+          }
+        },
+        "ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "amount": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "fromSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "toSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

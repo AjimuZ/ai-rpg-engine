@@ -42,6 +42,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li><b>Lineage:</b> the version is new and builds on an admitted predecessor.</li>
  * </ol>
  *
+ * <p>The proposal must keep the snapshot's dependency manifest: the same observations in the same
+ * order. Since P08.7 the provisional validator may narrow a captured whole-artifact entry to the
+ * branches whose typed predicates read it, so a later change invalidates only those branches;
+ * it can never drop an entry, alter an observation or weaken an entry to fewer branches.
+ *
  * <p>Then it stores the immutable artifact, dependencies, one admission receipt carrying
  * the gate version and checked references, and a VALIDATED disposition atomically. A stale
  * proposal is rejected, never copied forward, and may trigger at most one regeneration.
@@ -148,16 +153,25 @@ public class PlanAdmissionService {
                 throw new IllegalArgumentException("proposal does not belong to the job");
             }
             UUID snapshotId = (UUID) attempt.get("snapshot_id");
-            // The result cannot remove or replace anything the engine supplied. JSONB
-            // comparison normalizes object whitespace and key order, preserving array order.
+            // The result cannot remove or replace anything the engine supplied: every recorded
+            // observation stays in order with identical fields. JSONB comparison normalizes
+            // object whitespace and key order and compares numbers by value; only the two
+            // reliance fields (severity, branch references) are excluded, and retained() below
+            // decides whether their change keeps the captured protection.
             SnapshotFacts snapshot = jdbc.queryForObject("select context_digest, audience, campaign_generation, "
                     + "content_revision_id, pack_hash, ruleset_hash, author_constraint_hash, "
-                    + "dependency_manifest = ?::jsonb from planning_snapshot where id = ? and campaign_id = ?",
+                    + "jsonb_array_length(dependency_manifest) = jsonb_array_length(?::jsonb) and not exists ("
+                    + "select 1 from jsonb_array_elements(dependency_manifest) with ordinality m(entry, position) "
+                    + "where (m.entry - 'severity' - 'branchRefsJson') is distinct from "
+                    + "((?::jsonb -> (m.position::int - 1)) - 'severity' - 'branchRefsJson')) "
+                    + "from planning_snapshot where id = ? and campaign_id = ?",
                     (result, index) -> new SnapshotFacts(snapshotId, result.getString(1),
                             Audience.valueOf(result.getString(2)), result.getLong(3), result.getObject(4, UUID.class),
                             result.getString(5), result.getString(6), result.getString(7), result.getBoolean(8)),
-                    manifest(proposal.dependencies()), snapshotId, lease.campaignId());
-            if (!Objects.requireNonNull(snapshot).sameManifest()) {
+                    manifest(proposal.dependencies()), manifest(proposal.dependencies()), snapshotId,
+                    lease.campaignId());
+            if (!Objects.requireNonNull(snapshot).sameManifest()
+                    || !retained(snapshotId, proposal.dependencies(), proposal.references())) {
                 throw new IllegalArgumentException("proposal must retain the snapshot dependency manifest");
             }
             updateJob("VALIDATING", "", lease);
@@ -208,7 +222,8 @@ public class PlanAdmissionService {
      * epoch that moved or a typed reference whose row version changed (including a removed
      * or foreign row) is stale. A stale ARTIFACT-severity dependency makes the artifact
      * INVALIDATED; stale BRANCH-severity ones only make a VALIDATED artifact
-     * PARTIALLY_INVALIDATED. The reason is DEPENDENCY_CHANGED when a typed version moved,
+     * PARTIALLY_INVALIDATED, and a BRANCH row without branch references (observed only, P08.7)
+     * changes no disposition. The reason is DEPENDENCY_CHANGED when a typed version moved,
      * otherwise QUERY_EPOCH_CHANGED. Prior bytes are never edited; each change is one more
      * disposition row, and an unchanged stale state adds nothing, so repeated commits
      * cannot loop.
@@ -228,6 +243,7 @@ public class PlanAdmissionService {
                 + "stale as (select l.id, l.status, l.sequence, bool_or(p.severity = 'ARTIFACT') as whole, "
                 + "bool_or(p.kind <> 'QUERY') as versioned from latest l "
                 + "join plan_dependency p on p.artifact_id = l.id where not plan_dependency_fresh(?, p) "
+                + "and (p.severity = 'ARTIFACT' or jsonb_array_length(p.branch_refs) > 0) "
                 + "group by l.id, l.status, l.sequence) "
                 + "insert into plan_disposition (artifact_id, sequence, campaign_id, status, reason_code, "
                 + "checked_revision, created_at) select id, sequence + 1, ?, case when whole then 'INVALIDATED' "
@@ -279,7 +295,8 @@ public class PlanAdmissionService {
         if (!catalog.constrainedDefinitions().containsAll(references.authorConstraintRefs())) {
             return "UNKNOWN_AUTHOR_CONSTRAINT";
         }
-        // Dependencies: every row must have a typed evaluator; semantic predicates wait for P08.7.
+        // Dependencies: every row must have a typed evaluator. P08.7 plan predicates are compiled
+        // onto the version/query reads they cite, so raw predicate rows still have none.
         var recorded = new HashSet<String>();
         for (Dependency dependency : proposal.dependencies()) {
             if (!supported(dependency)) {
@@ -326,9 +343,58 @@ public class PlanAdmissionService {
     }
 
     /**
+     * Whether the proposal keeps the protection each captured manifest entry had (P08.7). The
+     * assembler records reads before any plan exists, conservatively; the provisional validator
+     * may then narrow an entry it can attribute to specific branches. Accepted per position:
+     * <ul>
+     *   <li>the proposal entry guards the whole artifact (always at least as strict);</li>
+     *   <li>or the captured entry guarded the whole artifact and the proposal entry guards a
+     *       list of branch references (selective validation narrowed it). An empty list means
+     *       observed only: the read stays recorded and rechecked but guards no branch, which is
+     *       refused for any campaign entity the proposal cites;</li>
+     *   <li>or both guard branches and the proposal lists every captured branch reference.</li>
+     * </ul>
+     * Observation fields are compared separately in SQL; the caller holds the campaign lock.
+     */
+    private boolean retained(UUID snapshotId, List<Dependency> dependencies, References references) {
+        var captured = jdbc.query("select m.entry ->> 'severity', m.entry ->> 'branchRefsJson' from planning_snapshot s "
+                + "cross join lateral jsonb_array_elements(s.dependency_manifest) with ordinality m(entry, position) "
+                + "where s.id = ? order by m.position", (row, index) -> new String[] {row.getString(1), row.getString(2)},
+                snapshotId);
+        for (int index = 0; index < dependencies.size(); index++) {
+            Dependency proposed = dependencies.get(index);
+            if (proposed.severity() == Severity.ARTIFACT) {
+                continue;
+            }
+            List<String> branches = branchRefs(proposed.branchRefsJson());
+            String guarded = proposed.kind() == Kind.QUERY ? proposed.scope() : proposed.reference();
+            if (branches.isEmpty() && references.entityRefs().contains(guarded)) {
+                return false;
+            }
+            if (Severity.BRANCH.name().equals(captured.get(index)[0])
+                    && !branches.containsAll(branchRefs(captured.get(index)[1]))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** @return the string elements of a branch-reference array; other elements are ignored */
+    private static List<String> branchRefs(String json) {
+        var refs = new ArrayList<String>();
+        JSON.readTree(json).forEach(node -> {
+            if (node.isString()) {
+                refs.add(node.asString());
+            }
+        });
+        return refs;
+    }
+
+    /**
      * Whether the gate can evaluate a dependency: QUERY rows by epoch; ENTITY_FIELD and FACT
      * rows only as an exact version of a reference in the closed V12 grammar, without a
-     * predicate. CONSTRAINT rows and predicates have no evaluator until P08.7.
+     * predicate. CONSTRAINT rows and raw predicates have no evaluator: P08.7 plan predicates are
+     * evaluated by the provisional validator and compiled onto the typed reads they cite.
      */
     static boolean supported(Dependency dependency) {
         return switch (dependency.kind()) {

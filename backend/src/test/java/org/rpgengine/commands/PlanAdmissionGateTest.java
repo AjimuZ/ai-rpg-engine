@@ -424,6 +424,48 @@ class PlanAdmissionGateTest {
         assertEquals(1, count("plan_activation"));
     }
 
+    /**
+     * P08.7 manifest retention: the provisional validator may narrow captured whole-artifact
+     * reads to the branches citing them, or to observed only for reads the plan never
+     * references, but can never drop or alter an observation, weaken a captured branch guard
+     * or leave a cited entity unguarded. Refusals write nothing; the narrowed rows are stored.
+     */
+    @Test
+    void selectiveNarrowingKeepsEveryObservationAndNeverUnguardsACitedEntity() {
+        long wardenVersion = version("actor", "id", warden);
+        long kitVersion = version("item_instance", "id", kit);
+        long playerVersion = version("actor", "id", player);
+        var captured = List.of(versioned(Kind.ENTITY_FIELD, "actor:" + warden, wardenVersion, Severity.ARTIFACT),
+                versioned(Kind.ENTITY_FIELD, "item:" + kit, kitVersion, Severity.BRANCH, "document"),
+                versioned(Kind.ENTITY_FIELD, "actor:" + player, playerVersion, Severity.ARTIFACT));
+        var cited = new References(List.of("actor:" + warden, "item:" + kit), List.of(), List.of());
+        var lease = result(captured);
+        var refusals = List.of(captured.subList(0, 2),
+                List.of(captured.get(0), captured.get(1), versioned(Kind.ENTITY_FIELD, "actor:" + player,
+                        playerVersion + 1, Severity.ARTIFACT)),
+                List.of(versioned(Kind.ENTITY_FIELD, "actor:" + warden, wardenVersion, Severity.BRANCH),
+                        captured.get(1), captured.get(2)),
+                List.of(captured.get(0), versioned(Kind.ENTITY_FIELD, "item:" + kit, kitVersion, Severity.BRANCH,
+                        "harbor"), captured.get(2)));
+        for (var dependencies : refusals) {
+            assertThrows(IllegalArgumentException.class, () -> admissions.admit(lease, proposal(dependencies, cited)));
+        }
+        assertEquals(0, count("quest_plan_artifact"));
+        var narrowed = List.of(versioned(Kind.ENTITY_FIELD, "actor:" + warden, wardenVersion, Severity.BRANCH,
+                        "interview"), versioned(Kind.ENTITY_FIELD, "item:" + kit, kitVersion, Severity.BRANCH,
+                        "document", "harbor"), versioned(Kind.ENTITY_FIELD, "actor:" + player, playerVersion,
+                        Severity.BRANCH));
+        var admission = admissions.admit(lease, proposal(narrowed, cited));
+        assertEquals(Outcome.ACCEPTED, admission.outcome());
+        assertEquals(List.of("BRANCH|[\"interview\"]", "BRANCH|[\"document\", \"harbor\"]", "BRANCH|[]"),
+                jdbc.queryForList("select severity || '|' || branch_refs::text from plan_dependency order by ordinal",
+                        String.class));
+        // An observed-only read changes no disposition and guards no branch.
+        jdbc.update("update actor set location_id = 'grove', row_version = row_version + 1 where id = ?", player);
+        assertEquals(0, admissions.invalidateStale(campaign));
+        assertEquals("VALIDATED", status(admission.artifactId()));
+    }
+
     /** Witness branch reads the warden row, its pool and its epoch scope; document branch reads the kit. */
     private List<Dependency> witnessAndDocument() {
         return List.of(versioned(Kind.ENTITY_FIELD, "actor:" + warden, version("actor", "id", warden), Severity.BRANCH,

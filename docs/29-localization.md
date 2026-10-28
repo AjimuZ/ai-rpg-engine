@@ -265,7 +265,10 @@ language policy. Human-facing suggestions, character dialogue and narrator
 passages share that locale, unless an explicitly tagged in-world quote requires
 another language. Planner roles may use a fixed internal language with stable
 IDs; only audience-filtered permitted facts reach the public narrator. Language
-is not a way around knowledge authorization.
+is not a way around knowledge authorization. The P08.7 quest-plan contract writes its
+private prose in the campaign's narrative locale (its `locale` field must match
+`outputLocale`); structural ids and predicate vocabulary stay language independent, and no
+plan prose is ever shown or translated into public text.
 
 Validate locale echo, glossary IDs, permitted quotes, output bounds and source
 references. A statistical language detector is only a warning signal on short

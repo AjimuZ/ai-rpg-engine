@@ -1697,6 +1697,57 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     task identities/titles and the pending P98 follow-up are preserved; only P08.6 gains a
     completion mark.
 - [ ] P08.7 Add the versioned bounded quest-plan contract and selective dependency validation/replanning with a playable no-plan baseline; prove contract/admission/fallback with deterministic fixtures. A live investigation comparison may be deferred/unavailable without blocking MVP; no forced player choice or waiting for a whole arc.
+  - Package A — versioned contract: `quest-plan` and `quest-plan-refine` task kinds of the
+    privileged `quest-planner` role (`PREPARATION` work class, 60-second budget), one
+    `QuestPlanContract` with the bundled `ai-contract/1/quest-plan.schema.json` (statuses
+    `planned`/`cannot-plan`), validator `quest-plan-validator-v1`, backend-owned plan bindings,
+    backend-written `validationMetadata`, the closed typed `PlanPredicate` vocabulary
+    (`all`/`any`/`not`, `actor-at`, `resource-at-least`, `item-available`, `fact-known-to`,
+    `quest-status`, `world-time-window`; unevaluated `actor-status`, `relationship-band` and
+    `location-reachable` rejected) and the caps of docs/28 section 6 (24 nodes, 8 branches,
+    causal depth 6, predicate depth 4 and 16 leaves). No field can express a player action, and
+    every plan states a no-progress fallback.
+  - Package B — selective dependency validation: the validator evaluates predicates against
+    the snapshot (a false root rejects the output; a false branch guard or a dropped node with
+    its causal descendants rejects only the affected branch) and builds a citation map. The
+    planner narrows each recorded read to the branches whose predicates cite it, keeps root or
+    prose-only reliance whole-artifact and stores never-referenced reads as observed only. The
+    P07.6 gate accepts only such narrowing (no observation dropped or altered, no captured
+    branch guard weakened, no cited entity left unguarded), and invalidation ignores
+    observed-only rows. `QuestPlanAssembler` reads one known quest's privileged slice in one
+    repeatable-read transaction, records row versions and actor query epochs and refuses an
+    oversized slice instead of truncating it.
+  - Package C — replanning and baseline: `QuestPlanning` requests (deduplicated, never waits),
+    runs jobs through the fair scheduler and the transactional gate with bounded attempts,
+    discards results after a cancellation request and requests one `refine-v<version>` job per
+    stale latest version within `engine.planning.replan-allowance`. Unrelated revisions request
+    nothing. `standing` reports `PREPARED` usable branches or `BASELINE` with a reason, and
+    `QuestPlanWorker` runs only when enabled. Planning is off by default (Economy). No command,
+    commit, narration or presentation code depends on planning, and narration and presentation
+    never read preparation records. See
+    [docs/28 sections 6–7](28-asynchronous-narrative-planning.md#selective-narrowing-and-replanning-p087).
+  - Exit checks:
+    - Pure contract fixtures: bilingual acceptance, citation map, selective rejection and an
+      invalid-output corpus with one fixed code per corruption; the schema drift test.
+    - Real PostgreSQL suites over sealed packs, production campaign creation and the real
+      assembler, jobs, ledger, scheduler, gate and commands, with only the planner runtime
+      scripted:
+      - the disabled default, and play continuing while a plan is pending, failed, declined
+        or invalidated;
+      - privileged `PREPARATION` dispatch;
+      - selective severities, no canonical change and no secret in any public sink;
+      - unrelated revisions keeping the plan;
+      - a witness change invalidating only its branch, with one refinement superseding the
+        predecessor and the allowance bounding later changes;
+      - a root change invalidating the whole plan;
+      - a change during generation rejected by the gate and then regenerated;
+      - cancellation, an unknown quest and a worker pass.
+    - Gate narrowing refusals; the planning boundary and settings tests; deliberate weakening
+      probes; the full packaged backend and repository checks.
+    - Not part of this task: a live planner run and the paired AP-12 investigation comparison
+      (deferred to P14, optional there, and P18.6; it does not block the MVP), consumers that
+      build commands from plans (P09.1, P10), speculative preparation, world direction, plan
+      review and location-membership query epochs.
 
 **Exit:** an action runs through Codex interpretation when needed, deterministic resolution, save, and grounded narration without raw tool logs. **Checks:** protocol fixtures, invalid output corpus, no-secret projection tests, opt-in neutral real smoke. **Suggested commit:** `Integrate validated narrative orchestration`.
 

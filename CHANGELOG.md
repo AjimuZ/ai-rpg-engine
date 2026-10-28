@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased — Bounded quest-plan contract with selective replanning and a playable no-plan baseline, 28 October 2026
+
+- Add optional quest planning, off by default. With planning off, nothing is planned or
+  spent, and every quest plays exactly as before from its authored or procedural baseline.
+  When an owner enables it (`engine.planning.enabled`), a known quest can receive a small
+  private plan. The plan is prepared in the background in its own privileged planner
+  conversation and always gives way to the player's turn.
+- Define the versioned quest-plan contract: optional opportunities and clues, guarded
+  alternative branches, participants, secrets, failure and abandonment rules and candidate
+  later events, written only with a small fixed set of typed conditions over real campaign
+  rows. A plan cannot order the player to do anything. It must keep every protected author
+  constraint, must state what happens if the player ignores it, and stays within fixed
+  limits (24 nodes, 8 branches, causal depth 6). Invalid output gets one repair, then the job
+  fails within its bounded attempts.
+- Check each plan against the world it was prepared from. A branch that no longer fits, for
+  example an absent witness, is dropped alone; the other routes stay. Each recorded read
+  guards only the branches whose conditions use it. Later changes therefore invalidate only
+  the affected branches, and changes to rows the plan never uses invalidate nothing. Every
+  plan still passes the existing transactional admission check.
+- Replan selectively. When branches go stale, one refinement is requested for that plan
+  version, with a per-plan limit (three by default). Unrelated world changes request nothing,
+  and the surviving branches stay usable meanwhile.
+- Keep play independent of planning. No action, save or narration waits for, requires or
+  reads a plan, and plan text never reaches events, the journal, the stream or published
+  narration. A pending, failed, declined, rejected or invalidated plan leaves the quest on
+  its baseline.
+- Pass 52 new cases and all 666 packaged backend tests in 67 suites with zero
+  failures/errors/skips; 21 deliberate weakening probes were detected. Planner output is
+  scripted in these checks: no live planner ran, and the paired narrative-quality comparison
+  is deferred (it does not block the playable MVP).
+
 ## Unreleased — Durable fair inference scheduling, 28 October 2026
 
 - Put every AI task behind one durable fair priority queue. Interactive work (interpreting the

@@ -58,6 +58,34 @@ class ContractSchemaTest {
     }
 
     @Test
+    void questPlanSchemaMatchesTheValidatorFieldSets() {
+        JsonNode root = schema(new QuestPlanContract(TaskKind.QUEST_PLAN));
+        assertThat(root).isEqualTo(schema(new QuestPlanContract(TaskKind.QUEST_PLAN_REFINE)));
+        assertClosedObject(root, ContractEnvelope.RESPONSE_FIELDS);
+        JsonNode body = root.path("properties").path("body");
+        assertClosedObject(body, QuestPlanContract.BODY_FIELDS);
+        JsonNode fields = body.path("properties");
+        assertClosedObject(fields.path("participants").path("items"), QuestPlanContract.PARTICIPANT_FIELDS);
+        assertClosedObject(fields.path("secrets").path("items"), QuestPlanContract.SECRET_FIELDS);
+        assertClosedObject(fields.path("nodes").path("items"), QuestPlanContract.NODE_FIELDS);
+        assertClosedObject(fields.path("branches").path("items"), QuestPlanContract.BRANCH_FIELDS);
+        assertClosedObject(fields.path("failureAndAbandonment"), QuestPlanContract.FAILURE_FIELDS);
+        assertClosedObject(fields.path("pendingEventProposals").path("items"), QuestPlanContract.EVENT_FIELDS);
+        assertClosedObject(fields.path("assumptions").path("items"), QuestPlanContract.ASSUMPTION_FIELDS);
+        JsonNode predicate = root.path("$defs").path("predicate");
+        assertClosedObject(predicate, PlanPredicate.FIELDS);
+        var operators = new ArrayList<String>();
+        predicate.path("properties").path("op").path("enum").forEach(v -> operators.add(v.asString()));
+        assertThat(operators).containsExactlyElementsOf(PlanPredicate.OPERATORS);
+        assertThat(fields.path("nodes").path("maxItems").asInt()).isEqualTo(QuestPlanContract.MAX_NODES);
+        assertThat(fields.path("branches").path("maxItems").asInt()).isEqualTo(QuestPlanContract.MAX_BRANCHES);
+        assertThat(fields.path("validationMetadata").path("type").asString()).isEqualTo("null");
+        var statuses = new ArrayList<String>();
+        root.path("properties").path("status").path("enum").forEach(v -> statuses.add(v.asString()));
+        assertThat(statuses).containsExactlyInAnyOrderElementsOf(QuestPlanContract.STATUSES);
+    }
+
+    @Test
     void templatesAreVersionedEnglishAndHashed() {
         var intent = new IntentContract();
         var narration = new NarrationContract();
@@ -66,7 +94,8 @@ class ContractSchemaTest {
         assertThat(TaskContract.CONTRACT_VERSION).isEqualTo(1);
         // Technical templates stay English whatever the output locale; only output strings switch.
         for (String text : List.of(ContractEnvelope.SHARED_INSTRUCTION, IntentContract.TASK_INSTRUCTION,
-                NarrationContract.TASK_INSTRUCTION)) {
+                NarrationContract.TASK_INSTRUCTION, QuestPlanContract.PLAN_INSTRUCTION,
+                QuestPlanContract.REFINE_INSTRUCTION)) {
             assertThat(Pattern.compile("[^\\x20-\\x7E\\n]").matcher(text).find()).isFalse();
         }
     }

@@ -135,6 +135,21 @@ rows still fail closed until P08.7; and activation is at most once per artifact 
 not per domain settlement, so a refined plan version can offer an equivalent branch again
 until pending-event settlement keys arrive (P10).
 
+P08.7 adds the quest-plan contract, selective narrowing and bounded replanning with
+deterministic evidence only. Open risks:
+
+- Narrative value, false-invalidation rates and preparation waste are unmeasured. The
+  AP-12 live comparison is deferred to P14 (optional) and P18.6, so planning stays off by
+  default.
+- An observed-only read (one the plan never references) guards nothing. Plan prose that
+  names such an entity without a predicate can go stale silently. This is accepted because
+  plan prose is private, never canon and never narrated; actual use rechecks current state.
+- Location membership has no query epoch yet, so an actor arriving after capture is not
+  detected as a phantom.
+- Branch predicates that read the holder's own row invalidate their branches whenever the
+  player moves.
+- No consumer builds commands from plans yet (P09.1, P10).
+
 P03.4 adds durable same-operation random reuse and pinned HMAC-SHA-256 v1 identity.
 Private campaign seeds are trusted database/backup material, never runtime context.
 Reservation survives failed/cancelled canonical work, but future command policy must

@@ -77,3 +77,12 @@ app-server); live concurrency, quota and priority behavior remain unqualified
 ([docs/06 section 12](../06-codex-integration.md#p086-durable-fair-scheduling)).
 
 Planned AP-01–AP-12 cover selective staleness, query phantoms, admission races, duplicate workers, fencing, cancellation/EOF/restart, play-before-plan fallback, world-time separation, secret sinks, cross-adventure fairness/restore, author constraints and bilingual A/B/C evaluation. Compare single narration, narration plus planning, and optional review with measured quality, p50/p95 latency, usage and waste. P03.6 covers only the storage/admission subset above. P07.6 adds the transactional scope/content/author/typed-dependency gate and activation through ordinary commands, with deterministic real-PostgreSQL evidence for the AP-01–AP-05 admission assertions and AP-08's no-canonical-change rule; no full AP acceptance or superiority is claimed. Evidence, proposed objectives, ownership and source links are in the [planning specification](../28-asynchronous-narrative-planning.md).
+
+P08.7 (28 October 2026) implements the minimum bounded planner contract and fallback that
+this decision requires for v1 without enabling it: the versioned `quest-plan`/`quest-plan-refine`
+contract with a closed predicate vocabulary, selective dependency validation (reads narrowed to
+the branches whose predicates cite them, never dropped), bounded replanning (one refinement per
+stale version, a per-plan allowance) and the playable no-plan baseline (planning off by default;
+no gameplay path depends on it). Evidence is deterministic (pure contract corpus, real PostgreSQL
+with a scripted planner); the AP-12 comparison and any default change remain evidence gated
+([docs/28 section 7](../28-asynchronous-narrative-planning.md#selective-narrowing-and-replanning-p087)).

@@ -110,8 +110,28 @@ final class StrictJson {
      * @return the exact text, or null after recording a violation
      */
     String verbatim(Map<String, Object> object, String key, String path, int max, boolean nullable) {
-        Object value = object.get(key);
-        String at = path + "/" + key;
+        return verbatimValue(object.get(key), path + "/" + key, max, nullable);
+    }
+
+    /**
+     * Read one array element as human-readable text, with the same checks as {@link #text}.
+     *
+     * @param value candidate element
+     * @param at pointer of the element itself
+     * @param max maximum UTF-16 length
+     * @return the exact text, or null after recording a violation
+     */
+    String element(Object value, String at, int max) {
+        String text = verbatimValue(value, at, max, false);
+        if (text != null && TextChecks.executable(text)) {
+            violations.add(ContractViolation.structural("executable-content", at));
+            return null;
+        }
+        return text;
+    }
+
+    /** Shared checks of {@link #verbatim} and {@link #element} at an explicit pointer. */
+    private String verbatimValue(Object value, String at, int max, boolean nullable) {
         if (value == null) {
             if (!nullable) {
                 violations.add(ContractViolation.structural("unexpected-type", at));

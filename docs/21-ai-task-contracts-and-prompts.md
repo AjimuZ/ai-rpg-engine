@@ -141,7 +141,9 @@ allowlisted/versioned and bounded. Task kinds `quest-plan`, `quest-plan-refine`,
 not commands to execute, guaranteed future events or saved world facts. A review
 result contains bounded issue/source references, never chain-of-thought, and
 does not replace deterministic admission. Use ordinary tool-free turns, not the
-runtime's code-review or delegated-agent features.
+runtime's code-review or delegated-agent features. P08.7 implements `quest-plan` and
+`quest-plan-refine` ([section 15](#15-implemented-quest-plan-contract-p087)); world
+development and plan review remain unimplemented.
 
 Generate public narration/quick replies directly in the selected EN/IT language
 under [localization](29-localization.md). A locale mismatch can trigger the
@@ -356,6 +358,36 @@ invalid-output corpus for these two contracts:
 
 Deliberate weakening probes are recorded in the
 [verification record](15-quality-and-acceptance.md).
+
+## 15. Implemented quest-plan contract (P08.7)
+
+`QuestPlanContract` in `org.rpgengine.inference.contract` serves both planner kinds. The
+schema is `ai-contract/1/quest-plan.schema.json`, shared by both kinds. Each kind has its
+own English instruction and template hash; the validator is `quest-plan-validator-v1`. The
+docs/28 [implemented contract](28-asynchronous-narrative-planning.md#implemented-contract-p087)
+lists its fields, predicate vocabulary, caps and codes. Envelope and runner rules follow
+the P08.2 contracts, with these differences:
+
+| Aspect | Intent and narration (P08.2) | Quest plan (P08.7) |
+| --- | --- | --- |
+| Role, audience | `interpreter`/`narrator`, `public` | `quest-planner`, `privileged` |
+| Work class | `INTERACTIVE` | `PREPARATION` (background, preemptible) |
+| Default budget | 60 s / 90 s | 60 s: two 30-second attempts, so the single repair fits |
+| Context | Public projection only | Privileged slice: entities with snapshot values, lore, manifest ids, pinned refs, author constraints |
+| Disclosure guard | Privileged markers must not appear | None: the audience is privileged by design; the output is never shown |
+| Accepted result | Typed proposal for a command or publication | `Planned` with backend metadata and citation map, or `CannotPlan` |
+| After acceptance | Command admission or publication | Transactional plan-admission gate, then storage as preparation |
+
+The validator never trusts the schema. It checks the exact field sets, bounds, backend
+bindings and references, and it evaluates the typed predicates against the snapshot values
+of the context. A false root rejects the output. A false branch guard, or a dropped node with
+its causal descendants, rejects only the affected branch. The deterministic fixtures
+(`QuestPlanContractTest`) cover acceptance in English and Italian, the citation map,
+selective rejection and an invalid-output corpus of 28 single-aspect corruptions. The corpus
+includes unknown and unevaluated operators, free-text conditions, a mandatory player-action
+field, cycles, oversize plans, model-written metadata, foreign identities, a wrong locale, a
+dropped author constraint, malformed secrets and markup. `ContractSchemaTest` checks the
+schema against the validator field sets. No live model output has been evaluated.
 
 ## 16. Neutral protocol proof (P01.1)
 

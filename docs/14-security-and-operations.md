@@ -260,6 +260,13 @@ a reviewer approval nor a model echo authenticates an output. Privileged plans,
 budgets, job names and errors are never public narrative/media input. Reserve
 interactive capacity, cap retries/speculation and preserve usage accounting
 through restart/renewal; multiple runtime processes do not multiply entitlement.
+P08.7 keeps planner work inside this model. Planning is off by default. Planner tasks run
+only in the `quest-planner`/`privileged` session as preemptible background work, and their
+prompts and outputs are never logged or stored in the scheduler ledger. Plan bodies live
+only in private preparation tables, which only the preparation and planning packages read
+(`PlanningBoundaryTest`). The preparation standing is internal and exposed by no endpoint.
+The real-PostgreSQL suite checks that a secret plan proposal never reaches events, outbox,
+journal, stream, publication or presentation rows.
 
 The optional [speech worker](30-local-speech-synthesis.md) has no canonical-store,
 runtime-account, host-home or Docker socket mount. Admit fixed public model

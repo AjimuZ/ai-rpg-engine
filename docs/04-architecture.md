@@ -125,7 +125,7 @@ These are logical packages initially, not separate Maven artifacts or services. 
 
 ## 5. Ports
 
-The narration task port (drafted earlier as `CodexGameMasterPort`; runtime-neutral, with one adapter per runtime) exposes task-oriented generation: interpret intent, propose content, choose a legal tactic, narrate resolved events, and summarize an event range. Domain services never send raw arbitrary protocol methods. Since P08.1 its transport layer exists as `org.rpgengine.inference.NarrationTaskPort`: bounded tasks with a logical slot, logical session, instructions and output schema, returning untrusted results with fixed error codes and provenance. Since P08.2 the intent and narration contracts above it exist in `org.rpgengine.inference.contract`: versioned schemas, English templates, independent validators and `ContractRunner` with one bounded repair. Since P08.3 `org.rpgengine.inference.session` sits between them: `ScopedSessions` is the port's only submitter and gives each campaign/generation/role/audience/content/policy scope its own logical session, and player-facing roles can never be scoped to the privileged audience ([docs/06 section 7](06-codex-integration.md#p083-session-scoping)). Tactics, summaries and planning contracts are later work. No Codex type may appear outside the adapter package; `InferenceBoundaryTest` enforces this.
+The narration task port (drafted earlier as `CodexGameMasterPort`; runtime-neutral, with one adapter per runtime) exposes task-oriented generation: interpret intent, propose content, choose a legal tactic, narrate resolved events, and summarize an event range. Domain services never send raw arbitrary protocol methods. Since P08.1 its transport layer exists as `org.rpgengine.inference.NarrationTaskPort`: bounded tasks with a logical slot, logical session, instructions and output schema, returning untrusted results with fixed error codes and provenance. Since P08.2 the intent and narration contracts above it exist in `org.rpgengine.inference.contract`: versioned schemas, English templates, independent validators and `ContractRunner` with one bounded repair. P08.7 adds the privileged quest-plan contract there. Since P08.3 `org.rpgengine.inference.session` sits between them: `ScopedSessions` is the port's only submitter and gives each campaign/generation/role/audience/content/policy scope its own logical session, and player-facing roles can never be scoped to the privileged audience ([docs/06 section 7](06-codex-integration.md#p083-session-scoping)). Tactics and summary contracts are later work. No Codex type may appear outside the adapter package; `InferenceBoundaryTest` enforces this.
 
 `RulesetPort` resolves legal actions and effects from a pinned ruleset. `CampaignRepository` loads canonical state and commits revisions. `KnowledgeQueryPort` provides permitted facts for an audience. `PresentationPublisher` emits committed output through an outbox. `RandomSource` produces and records server-owned draws. Tests can replace these boundaries independently.
 
@@ -190,7 +190,11 @@ ADR 0014 preserves ADR 0013's verified tool-free runtime isolation. No broker,
 autonomous-agent framework, runtime pool or vector database is required. P08.6
 implements that queue as `InferenceScheduler` over V14 `inference_task` in front of the
 session registry, with one active turn installation-wide
-([docs/06 section 12](06-codex-integration.md#p086-durable-fair-scheduling)).
+([docs/06 section 12](06-codex-integration.md#p086-durable-fair-scheduling)). P08.7 adds the
+optional `org.rpgengine.planning` package (snapshot assembler, planning service, worker; off
+by default). No command, commit, narration or presentation code depends on it, so the
+playable loop is identical with planning disabled
+([docs/28 section 4](28-asynchronous-narrative-planning.md#4-player-experience-and-work-selection)).
 
 Interactive work has reserved admission and bounded waiting. No transaction or
 campaign mutation lease is held while a deep background plan runs. Planning

@@ -10,7 +10,8 @@ campaign recovery generations. Critical enqueue/epoch invalidation shares the
 canonical transaction. Capture rejects stale assembler tokens; admission keeps the
 entire engine-recorded manifest and rechecks query epochs, generation, lease and
 public presentation tokens under locks. Non-query semantic dependencies fail closed
-until P08.7 supplies typed evaluators. Unrelated world revisions alone do not reject
+(since P08.7 plan predicates are evaluated by the provisional validator and compiled onto
+the typed reads they cite, so raw predicate and constraint rows still never pass). Unrelated world revisions alone do not reject
 a plan. Claims/admissions wait for startup reconciliation; expired leases require
 explicit external-stop confirmation before retry. Restore retires old generations
 and usable plans. Seventeen real PostgreSQL preparation tests plus canonical tests
@@ -28,9 +29,9 @@ and requires every cited campaign entity to be covered by a recorded dependency.
 canonical commit re-evaluates admitted plans against the rows it changed. Only an
 ordinary canonical command uses a plan: its commit rechecks the cited branches against
 current rows before writing any effect and records each branch once in
-`plan_activation`; the plan contributes no fact, time, reward or draw. Predicates,
-constraint rows, the quest-plan body contract, consumers that build commands from plans,
-dispatch and budgets remain P08.6–P08.7, P09.1 and P10. See the
+`plan_activation`; the plan contributes no fact, time, reward or draw. Dispatch and budgets
+arrived with P08.6 and the quest-plan body contract with typed predicates with P08.7;
+consumers that build commands from plans remain P09.1 and P10. See the
 [P07.6 contract](07-turn-protocol.md#p076-plan-admission-and-activation).
 
 P08.6 (28 October 2026) implements the dispatch half of section 9: one durable fair
@@ -44,6 +45,17 @@ turn installation-wide stays the only accepted limit, enforced also by a databas
 index. Only interactive task kinds exist yet; planners and other background kinds
 (P08.7, P09.3, P12, P15) will submit through the same queue. See
 [docs/06 section 12](06-codex-integration.md#p086-durable-fair-scheduling).
+
+P08.7 (28 October 2026) adds the first semantic planner on these foundations: the versioned
+bounded `quest-plan`/`quest-plan-refine` contract (section 6), selective dependency
+validation and bounded replanning (section 7) and a playable no-plan baseline (section 4),
+all proven with deterministic fixtures. Planning is **off by default** (`engine.planning.enabled=false`,
+the Economy profile of section 9). When enabled, a planner job snapshots a privileged slice
+of one known quest, runs as `PREPARATION` background work of the P08.6 scheduler in the
+`quest-planner`/`privileged` session, and passes the provisional validator and then the
+transactional P07.6 gate; nothing on the path of a player action calls, waits for or reads
+it. No live planner run, quality comparison (AP-12) or consumer that builds commands from
+plans exists yet; the live comparison is deferred to P14/P18.6 and does not block the MVP.
 
 Keep the playable loop small: validated intent when needed, deterministic resolution, canonical save, then public narration. Prepare selected expensive narrative situations separately, so accepting a mystery does not require generating its whole future before acknowledging the action. A prepared situation supplies motives, causal dependencies, clues and alternatives; it never prescribes the protagonist's choices or makes an anticipated outcome inevitable.
 
@@ -140,6 +152,16 @@ Choose preparation locally using task type, importance, novelty, imminent use an
 
 Do not precompute every quest, all NPC lives or full dialogue trees. Prefer a small causal skeleton plus one useful next situation over a complete upfront story. Preserve committed discoveries and author-fixed truths when refining; an undisclosed proposal is not an established culprit or past event merely because a model wrote it.
 
+P08.7 implements this baseline structurally: optional planning lives in its own package that
+no command, commit, narration or presentation code depends on, and the public narration and
+presentation packages never read preparation records (`PlanningBoundaryTest`). Ordinary
+commands commit while a plan is queued, running, failed, declined, rejected or
+invalidated, and while planning is disabled. `QuestPlanning.standing` answers, without
+waiting or writing, either `PREPARED` (the usable branches of the latest admitted version)
+or `BASELINE` with a reason (`PLANNING_DISABLED`, `NOT_REQUESTED`, `PLAN_PENDING`,
+`PLAN_FAILED`, `PLAN_INVALIDATED`, `PLAN_UNAVAILABLE`). It is internal diagnostics with
+identities only. No endpoint exposes it, and no player-facing message names a plan.
+
 If the player reaches a lead before its plan is ready, resolve against the authored/procedural baseline and current state. Offer valid visible approaches or a deterministic receipt, preserve the next decision, and later revalidate the plan against that new evidence. Do not stall behind “the story is generating,” manufacture a locked route, or pretend the clue has appeared. The final narrator cannot invent pending-plan facts. A quest must remain playable when all advanced planning is disabled or unavailable.
 
 Ordinary play needs only clear existing operation/save status. Background-plan titles, secret progress, provider thread IDs and detailed budgets belong in protected diagnostics. The composer remains usable while preparation is queued. Language follows the [localization contract](29-localization.md): `en` is the default and `it` is equally supported; generate directly in the selected narrative language with stable entity/term IDs. Bind public output to `outputLocale`, `localeRevision` and glossary/policy versions. Locale changes invalidate stale public prose, not language-neutral mechanical identities; re-rendering/translation cannot introduce facts or rerun actions. Internal planner text can use a fixed language while its audience-filtered public rendition follows the campaign preference.
@@ -192,6 +214,54 @@ An illustrative branch is: when an established witness is alive, reachable and w
 
 Encode causal ordering only where required: discovering evidence can support an accusation, but two independent leads need not be visited in a fixed order. Reject impossible mandatory cycles; bound optional revisits separately. Critical root assumptions invalidate the whole dependent plan; an optional branch can be dropped only if remaining branches still satisfy protected constraints and do not cite its missing support.
 
+### Implemented contract (P08.7)
+
+`QuestPlanContract` (one class for both kinds, bundled schema
+`ai-contract/1/quest-plan.schema.json`, validator `quest-plan-validator-v1`, job contract
+`quest-plan-v1`) implements schema version 1 with these concrete decisions:
+
+- **Statuses:** `planned`, or `cannot-plan` with one `reasonCode` (`insufficient-context`,
+  `constraint-conflict`) and every plan field empty. A declined plan ends the job; play
+  continues on the baseline.
+- **Bindings:** `planId`, `planVersion`, `questId` and `predecessorPlanId` must equal the
+  backend values (`binding-mismatch`). The plan identity is derived from campaign and quest
+  target, never from text. `validationMetadata` must be `null` in model output
+  (`backend-field`). The validator writes it: contract and validator versions, context
+  digest, accepted and rejected branches with reasons.
+- **Implemented predicate vocabulary:** `all`, `any` (1–8 operands), `not`, `actor-at`
+  (actor at a location), `resource-at-least`, `item-available`, `fact-known-to`
+  (`player`), `quest-status` and `world-time-window`. Every predicate object has the
+  same seven fields. The bounds are depth 4 and 16 leaves. `actor-status`,
+  `relationship-band` and `location-reachable` are recognized but have no evaluator yet
+  (life states P11, relationships P15, travel P10). They are rejected as
+  `unsupported-predicate`, and any other operator as `unsupported-operator`.
+- **Caps:** 24 nodes, 8 branches, causal depth 6 with no cycle (`causal-cycle`,
+  `plan-too-deep`), 8 participants, secrets, assumptions and pending-event proposals,
+  bounded text, a horizon within `engine.planning.max-horizon-seconds` (7 days by default)
+  and a stored body of at most 64 KiB.
+- **References:** participants must be context actors. Lore and sources must be context
+  lore, content refs pinned definitions, dependency refs manifest ids (`dep-<n>`) and
+  terminology refs glossary ids. A secret is either an established private fact or a new
+  proposal (`secret-shape`, `secret-not-private`), and its knowers are participants.
+  Every protected author constraint of the pinned root policy must be cited
+  (`author-constraint-omitted`).
+- **Agency:** no field can express a player action, and every plan carries a
+  `noProgressFallback` (`baseline-objective` or `receipt-only`). Branches are guarded
+  alternatives, and nothing is mandatory.
+- **Snapshot feasibility (selective validation):** a root `requiredWorldFacts` predicate that
+  is false in the snapshot rejects the output (`root-assumption-false`). A node whose
+  eligibility is false is dropped together with its causal descendants. A branch whose guard
+  is false (`guard-false`) or that lists a dropped node (`missing-support`) is rejected
+  alone; the other branches stay. No remaining branch is `no-viable-branch`. A future time
+  window counts as satisfiable. A refinement may not reuse a stale branch id
+  (`stale-branch-reused`).
+- **Locale:** the plan's `locale` must equal the campaign's narrative locale. Plan prose is
+  private and never shown; any public rendition is a separate, later public task.
+
+An invalid output gets the ordinary single repair (codes and pointers only). If it is still
+invalid, the attempt fails and the job's bounded attempts (two by default) decide whether
+one more attempt runs.
+
 An author requirement to introduce a specific NPC preserves that identity and its stated conditions. It does not imply immortality, instant travel, compulsory romance or player agreement. Conflicting fixed requirements yield diagnostics. The future [E-series editor](26-adventure-editor-roadmap.md) will edit the same contract; no editor UI is required for this design.
 
 Candidate initial caps are 24 nodes, eight alternatives, depth six for the plan graph, and the existing context/output application budgets; reduce scope if these cannot fit. These are tuning proposals, not benchmarks or replacements for tighter rules/content limits. No complete story or every possible branch is required before admitting a small valid artifact.
@@ -225,6 +295,50 @@ Model-declared assumptions may add dependencies but cannot remove engine-recorde
 | Pack/ruleset/policy/author constraint or campaign generation changes | Reject the incompatible artifact; require an explicit new snapshot/version or supported migration |
 
 Prefer pruning optional stale branches and bounded targeted refinement to regenerating everything. Preserve the prior artifact with a disposition record; do not edit its bytes to conceal the assumption change. If no viable supported branch remains, retain baseline play and request at most the configured regeneration allowance. A new unrelated revision cannot cause a perpetual replan loop.
+
+### Selective narrowing and replanning (P08.7)
+
+The assembler (`QuestPlanAssembler`) reads one `known-quest:<uuid>` slice in a single
+repeatable-read transaction. The slice holds the quest, its holder and the actors at the
+holder's location, their pools, the holder's items and the 32 most recent knowledge records;
+the counts are recorded in the selected state, so the selection is explicit. It also lists
+the pinned definitions those rows name and every protected author constraint. A slice above a
+context bound is refused (`CONTEXT_TOO_LARGE`), never truncated. Every entity gets an exact
+row-version dependency, and every actor also gets its `actor:<uuid>` query epoch. All
+entries start at whole-artifact severity.
+
+The validator then builds a citation map, and the planner converts it into the admission
+proposal:
+
+| Plan reliance on a recorded read | Stored severity |
+| --- | --- |
+| A root part reads it: required facts, failure or expiry rules, secret prerequisites, pending-event triggers, `readDependencies`, whole-plan assumptions | `ARTIFACT` (captured) |
+| Only prose-bearing fields mention it (participant, lore source, established secret), and no branch predicate reads it | `ARTIFACT` (captured) |
+| Only branch guards or objectives, the eligibility of a branch's nodes (with their causal support) or branch-scoped assumptions read it | `BRANCH` with exactly those branches |
+| The plan never references it | `BRANCH` with no branches: *observed only* |
+
+An observed-only read stays recorded and is compared at admission, but it guards no branch
+and changes no disposition. A change to the holder's own unrelated pools or position
+therefore does not invalidate a plan that never conditions on them. The transactional gate
+accepts this only as narrowing. Every observation stays in order with identical fields. A
+captured whole-artifact entry may become branch-scoped. A captured branch entry keeps all
+its branches. An entity the proposal cites can never be observed only. Admission itself
+stays strict: any stale manifest entry, including an observed-only one, rejects the
+proposal, and the job's single regeneration starts from a fresh snapshot.
+
+Replanning is selective and bounded. When canonical commits make branches of a plan's
+latest version stale, `QuestPlanning.replan` requests one `refine-v<version>` job.
+Deduplication allows at most one such job per artifact version, and
+`engine.planning.replan-allowance` (three by default) caps the refinements of one plan.
+Unrelated revisions change no disposition and therefore request nothing. The refinement
+runs as `quest-plan-refine` with the stale and still-usable predecessor branches. If
+admitted, it supersedes the predecessor; until then the surviving branches stay usable.
+
+Known limits: location membership has no query epoch yet (no writer tags it), so a new
+actor arriving at the holder's location after capture is not detected as a phantom. Secret
+authored definitions are offered as content references only, without text. The holder's
+entity row, if a predicate reads it, is volatile and invalidates the branches that rely on
+it whenever the player moves. False-invalidation rates are unmeasured.
 
 ### Two admission checks
 
@@ -317,6 +431,14 @@ above stays closed (`max-active` above 1 fails startup). Live simultaneity/headr
 service priority, quota behavior and cancellation latency remain unverified.
 Scripted overlap gives no live throughput result.
 
+P08.7 ships the Economy profile as the default: `engine.planning.enabled=false` writes, runs
+and spends nothing for planning. An owner who enables it gets bounded Balanced-style
+behavior. Selected accepted quests are planned only on an explicit request, one plan job
+runs at a time on the single planning worker, a 60-second budget covers two 30-second
+attempts, two attempts per job, a 120-second lease, one-hour claim window and at most three
+refinements per plan. There is no speculative planning, director or reviewer. Balanced
+becomes a default only after the AP-12 gate below.
+
 Assess these first as internal policy presets behind one optional planning setting, not three mandatory player-facing screens:
 
 | Candidate profile | Preparation policy | Added cost and trade-off |
@@ -354,7 +476,7 @@ The following acceptance contracts are **planned**, not passing results. They su
 | AP-11 | Fixed author facts, unexpected lawful solution, failure/abandonment | Identity/constraints preserved without prescribing player actions; valid solution/objective and failure policies remain available |
 | AP-12 | Narrator A, planner B, planner+reviewer C | Paired bilingual quality/latency/usage report with configuration, raw counts, uncertainty and failures; no superiority claim without evidence |
 
-QA-36 owns AP-01–AP-05's stale-plan/admission assertions (P07.6 records the first deterministic real-PostgreSQL evidence for them and for AP-08's no-canonical-change rule; see the [quality record](15-quality-and-acceptance.md)), QA-37 owns priority, quota, cancellation/recovery and concurrency scenarios, QA-39 owns AP-12's paired bilingual narrative comparisons, and existing QA-07/16/23/33/34 plus QA-35/40 cover agency, scope, restore, authorship, locale and presentation sinks. These references are coverage mappings, not passed tests. Use deterministic scripted jobs and real PostgreSQL for race, lease, phantom, idempotency, restart and safety checks. Runtime adapter fixtures test event interleaving and fault handling without live inference in normal CI. Qualify account-backed concurrency separately and minimally; live access is not needed to review this document. Long quality evaluations use a controlled explicit inference allowance.
+QA-36 owns AP-01–AP-05's stale-plan/admission assertions (P07.6 records the first deterministic real-PostgreSQL evidence for them and for AP-08's no-canonical-change rule, and P08.7 adds deterministic evidence through the real planner path for AP-01, AP-02, AP-04, AP-07, AP-08 and the constraint/no-forced-action part of AP-11; see the [quality record](15-quality-and-acceptance.md)), QA-37 owns priority, quota, cancellation/recovery and concurrency scenarios, QA-39 owns AP-12's paired bilingual narrative comparisons, and existing QA-07/16/23/33/34 plus QA-35/40 cover agency, scope, restore, authorship, locale and presentation sinks. These references are coverage mappings, not passed tests. Use deterministic scripted jobs and real PostgreSQL for race, lease, phantom, idempotency, restart and safety checks. Runtime adapter fixtures test event interleaving and fault handling without live inference in normal CI. Qualify account-backed concurrency separately and minimally; live access is not needed to review this document. Long quality evaluations use a controlled explicit inference allowance.
 
 For AP-12, compare A (single narrator), B (same narrator plus bounded planning), and C (B plus optional review), keeping pack/ruleset, task/model settings, locale, seeds and evaluation prompts recorded. Include simple errands, mystery with several leads, an unavailable witness, a spent unique resource, faction conflict, rejected romance/commitment, abandonment, secret discovery, renewal and restore. Use matched scenarios with randomized/blinded presentation order, at least two human raters and the same rubric in English and Italian. Follow the [central evaluation protocol](31-research-validation-and-evaluations.md) and its proposed floor of ten paired short situations per language; expanding to 30 per locale is a candidate study after budget review. Add a 100-turn continuity exercise, then the existing 500-turn release soak. Neither sample proposal is a statistical power claim; publish disagreement, variation and confidence intervals where meaningful.
 

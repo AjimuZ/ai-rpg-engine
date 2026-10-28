@@ -9,20 +9,26 @@ import org.rpgengine.inference.session.SessionScope;
 
 /**
  * Application task kinds implemented as typed contracts. Each kind fixes its wire name, its
- * logical {@link AiRole}, its {@link Audience} and its default local budget (docs/06 section 10);
- * the remaining docs/21 kinds (content, encounter, tactic, guide, summary, planning) acquire
- * contracts in later packages.
+ * logical {@link AiRole}, its {@link Audience}, its scheduling {@link WorkClass} and its default
+ * local budget (docs/06 section 10); the remaining docs/21 kinds (content, encounter, tactic, guide,
+ * summary, world direction, plan review) acquire contracts in later packages.
  *
  * <p>Role and audience are properties of the kind, not of the caller: {@link #scope} derives the
  * whole session scope from the kind and the task binding, so a caller cannot run a contract in
  * another role's or audience's session (P08.3). A future character-audience kind will take its
- * subject from its context; both kinds here are public.
+ * subject from its context. Intent and narration are public interactive work; the two quest-plan
+ * kinds (P08.7) are privileged preparation work of the quest planner, which the fair scheduler
+ * runs only when no interactive task waits and preempts for any player turn.
  */
 public enum TaskKind {
     /** Free-text player declaration to one typed intention: a proposal only. */
     INTENT("intent", AiRole.INTERPRETER, 60),
     /** Public resolved-event bundle to attributed passages and quick replies. */
-    NARRATION("narration", AiRole.NARRATOR, 90);
+    NARRATION("narration", AiRole.NARRATOR, 90),
+    /** Privileged world slice to a first versioned conditional quest plan: an artifact, never a command. */
+    QUEST_PLAN("quest-plan", AiRole.QUEST_PLANNER, 60),
+    /** Bounded refinement of an admitted plan whose branches went stale: replaces only those branches. */
+    QUEST_PLAN_REFINE("quest-plan-refine", AiRole.QUEST_PLANNER, 60);
 
     private final String wire;
     private final AiRole role;
@@ -31,7 +37,8 @@ public enum TaskKind {
     /**
      * @param wire envelope {@code taskKind} value
      * @param role logical role; its envelope name is {@link AiRole#wire()}
-     * @param budgetSeconds proposed default budget
+     * @param budgetSeconds proposed default budget; for the planner kinds two 30-second background
+     *        attempts (docs/28 section 9), so the single repair fits
      */
     TaskKind(String wire, AiRole role, int budgetSeconds) {
         this.wire = wire;
@@ -51,15 +58,19 @@ public enum TaskKind {
 
     /**
      * @return the scheduling class (P08.6); intent interpretation and the narration of a committed
-     *         player action are what the player waits for, so both are interactive
+     *         player action are what the player waits for, so both are interactive; quest planning
+     *         prepares an accepted quest and is {@link WorkClass#PREPARATION} background work
      */
     public WorkClass workClass() {
-        return WorkClass.INTERACTIVE;
+        return role == AiRole.QUEST_PLANNER ? WorkClass.PREPARATION : WorkClass.INTERACTIVE;
     }
 
-    /** @return the disclosure audience; every P08.2 kind runs for the public player audience */
+    /**
+     * @return the disclosure audience: public for the P08.2 kinds, privileged for the planner kinds,
+     *         whose context may hold hidden canon ({@link AiRole#QUEST_PLANNER} permits nothing else)
+     */
     public Audience audience() {
-        return Audience.PUBLIC;
+        return role == AiRole.QUEST_PLANNER ? Audience.PRIVILEGED : Audience.PUBLIC;
     }
 
     /**

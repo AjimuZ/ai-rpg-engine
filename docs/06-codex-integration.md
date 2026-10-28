@@ -302,8 +302,36 @@ Implemented (28 October 2026) in the runtime-neutral `org.rpgengine.inference.sc
 Not part of P08.6:
 
 - Live qualification of more than one active turn, live quota behavior, service priority and cancellation latency. These need an authorized account-backed experiment (QA-37 live part); no account was used.
-- Background task kinds and their owners: planners (P08.7), summaries (P09.3), tactics (P12) and guides (P15) will submit through this queue with their own classes.
+- Background task kinds and their owners: since P08.7 the quest planner's `quest-plan` and `quest-plan-refine` kinds submit through this queue as `PREPARATION` work in the `quest-planner`/`privileged` session (section 13); summaries (P09.3), tactics (P12) and guides (P15) will follow with their own classes.
 - Owner-facing status and settings (P21.3), observed token accounting from a runtime, and the GPU/RAM admission coordinator for local backends (P21.4), which must sit behind this permit rather than beside it.
 - Supported deployment is one backend process per database. A second process is safe because of the single-turn index and ownership fencing, but its startup reconciliation takes over the rows of a still-running first process.
 
 Evidence uses deterministic doubles only: real PostgreSQL with only the runtime scripted, the real Codex adapter against the scripted app-server, and weakening probes. See the [verification record](15-quality-and-acceptance.md).
+
+## 13. Quest-planner tasks
+
+### P08.7 planner tasks
+
+Optional quest planning (off by default, `engine.planning.enabled`) is the first
+background task kind. `QuestPlanning` runs one preparation job at a time on its own worker
+thread. Each attempt renders the `quest-plan` contract, or `quest-plan-refine` for a later
+version, through `ContractRunner`. The contract kind fixes the role `quest-planner`, the
+audience `privileged` and the class `PREPARATION`, so the scheduler gives the task its own
+session line, never runs it while an interactive task waits, and preempts it for any
+player turn. The task identity is derived from the job and attempt, so it is unique for the
+ledger's lifetime. The repair identity is derived from that.
+
+The default budget is 60 seconds: two 30-second attempts, so the single repair fits. The
+planning worker waits for the budget plus ten seconds inside a 120-second job lease. The
+runtime outcome maps onto the preparation job:
+
+- **Completed and valid:** admission through the gate.
+- **Unavailable, failed, timed out, unresolved or preempted:** a retryable job failure,
+  limited by the job's two attempts.
+- **Invalid after the repair:** a retryable `INVALID_PLAN`.
+- **Declined:** a final `PLANNER_DECLINED`.
+- **Cancellation requested meanwhile:** the result is discarded and the job is
+  `CANCELLED`.
+
+Planner prompts carry privileged canon, so they are never logged, and the ledger stores no
+task text. No speculative work class is used yet, and no live planner run was made.

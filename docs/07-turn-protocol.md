@@ -498,8 +498,11 @@ regeneration within the attempt budget) or the immutable artifact:
 Typed version references are `actor:`, `resource:`, `item:` or `character:` (ENTITY_FIELD)
 and `known-fact:` or `known-quest:` (FACT) followed by a lowercase UUID; they record the
 row's storage `row_version`, which every canonical writer steps. A foreign reference is
-indistinguishable from an absent one. Predicates and CONSTRAINT rows have no evaluator
-until P08.7. The cited references (`entityRefs`, `contentRefs`, `authorConstraintRefs`)
+indistinguishable from an absent one. Raw predicates and CONSTRAINT rows have no evaluator;
+since P08.7 plan predicates are evaluated by the provisional validator and compiled onto the
+typed reads they cite. The gate also refuses a proposal whose dependencies drop or alter a
+recorded observation, weaken a captured branch guard or leave a cited entity observed only
+(P08.7 narrowing). The cited references (`entityRefs`, `contentRefs`, `authorConstraintRefs`)
 come from the provisional validator, never from body wording, and the receipt stores
 them sorted. Snapshot capture applies checks 3 and 8 too, so an assembler cannot record
 private reads in public input or claim author constraints the pin does not have.
@@ -507,7 +510,8 @@ private reads in public input or claim author constraints the pin does not have.
 **Invalidation.** Every canonical commit, after writing its effects, re-evaluates admitted
 artifacts with `plan_dependency_fresh`: a moved epoch or a changed, removed or foreign row
 appends `INVALIDATED` (ARTIFACT severity) or `PARTIALLY_INVALIDATED` (BRANCH severity only)
-with `DEPENDENCY_CHANGED` or `QUERY_EPOCH_CHANGED`. Unrelated revisions change nothing.
+with `DEPENDENCY_CHANGED` or `QUERY_EPOCH_CHANGED`. Unrelated revisions change nothing, and
+an observed-only row (BRANCH severity without branches, P08.7) changes no disposition.
 
 **Activation.** Only an ordinary canonical command uses a plan. A trusted resolver that
 built a command from an admitted branch cites it in `ResolvedCommit.Preparation.activations`
@@ -531,7 +535,8 @@ any of these checks. The plan contributes no effect: events, time, turn, resourc
 rewards and draws are exactly those the resolver built, and receipts never cite the
 private plan. No player intention, HTTP route or job can supply a citation; P07.4's
 `CommandExecutionService` cites none. Consumers that build commands from plans
-(opportunities, pending-event adoption, reveals) arrive with P08.7, P09.1 and P10.
+(opportunities, pending-event adoption, reveals) arrive with P09.1 and P10; P08.7 supplies
+the admitted plans and their usable branches but no consumer.
 
 ### P07.1 continuation checkpoint
 
@@ -839,8 +844,12 @@ snapshot requires an initialized presentation row so capture/admission can lock 
 Unrelated revision changes do not alone invalidate an artifact. P07.6 adds the
 transactional scope, pinned-content, author-constraint and typed row-version checks and
 activation through ordinary commands ([P07.6](#p076-plan-admission-and-activation));
-predicates and constraint rows still reject with `UNSUPPORTED_DEPENDENCY`, and the
-semantic quest-plan contract remains P08.7. Rejection permits at most one regeneration
+raw predicate and constraint rows still reject with `UNSUPPORTED_DEPENDENCY`. Since P08.7
+the semantic quest-plan contract evaluates typed plan predicates in its provisional
+validator and compiles them onto the version and query reads they cite. The gate then lets
+a captured whole-artifact read be narrowed to the branches citing it, or to observed only
+when the plan never references it, but never dropped or altered
+([docs/28 section 7](28-asynchronous-narrative-planning.md#selective-narrowing-and-replanning-p087)). Rejection permits at most one regeneration
 within the durable attempt/deadline budget. Concurrent duplicate delivery stores one
 immutable version/admission receipt; later versions append and supersede prior ones.
 
