@@ -717,6 +717,43 @@ detected, and the executable jar is packaged. Configured frontend checks, EN/IT 
 26 repository policy tests, zero-finding scans and the offline backup tests also pass.
 See [evidence scope](../docs/15-quality-and-acceptance.md).
 
+## Narration task port and Codex transport (P08.1)
+
+`org.rpgengine.inference` is the runtime-neutral port every later AI task uses; the Codex
+adapter behind it is the package-private `org.rpgengine.inference.codex`, which no other
+package may name (`InferenceBoundaryTest`). Behaviour, bounds and failure codes are specified
+in [docs/06](../docs/06-codex-integration.md#p081-production-adapter).
+
+- `NarrationTaskPort.submit(TaskRequest)` never blocks and never throws for runtime
+  conditions; the handle's stage always completes with a `TaskResult`
+  (`COMPLETED`, `CANCELLED`, `FAILED`, `TIMED_OUT`, `UNRESOLVED`, `UNAVAILABLE`, `REJECTED`).
+- `UnavailableTaskPort` is wired by default; `CodexConfiguration` replaces it when
+  `engine.inference.codex.transport` is `stdio` or `unix`.
+- `GameplayHealthIndicator` (`narrationRuntime`) is UP only when the port is `READY`.
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `engine.inference.codex.transport` | `disabled` | `disabled`, `stdio` or `unix`; anything else fails startup |
+| `engine.inference.codex.socket-path` | none (packaged: the hashed real socket) | Runtime socket for `unix` |
+| `engine.inference.codex.command` | none | `stdio`: absolute executable, then arguments, comma separated |
+| `engine.inference.codex.working-directory` | none | `stdio`: child working directory |
+| `engine.inference.codex.runtime-cwd` | `/var/lib/runtime/workspace` (`stdio`: working directory) | Thread working directory as seen by the runtime |
+| `engine.inference.codex.queue-capacity` | `16` | Bounded admission queue (1–256) |
+| `engine.inference.codex.request-timeout` / `handshake-timeout` / `interrupt-timeout` | `30s` / `30s` / `10s` | Response, discovery and interrupt-confirmation deadlines |
+| `engine.inference.codex.reconnect-initial` / `reconnect-max` | `1s` / `30s` | Reconnect backoff |
+| `engine.inference.codex.stdio-grace` | `2s` | Wait after closing child input and after each escalation step |
+| `engine.inference.codex.max-sessions` | `256` | Session bindings kept (least recently used forgotten) |
+| `engine.inference.slots.<light\|standard\|deliberate>.model` / `.effort` | none | Private slot assignment; both or neither |
+
+Tests use deterministic doubles only: `ScriptedAppServer` (fixture-shaped responses and
+events, shared daemon state across connections; never selectable), its child-process form
+`ScriptedAppServerMain`, and an in-test Unix-socket WebSocket server. Suites:
+`CodexTaskAdapterTest`, `RpcGenerationTest`, `CodexFixtureReplayTest` (replays
+`src/test/resources/contracts/codex/0.164.0/neutral-session.json`, a byte-identical copy of
+the probe fixture; the drift check is skipped only where `../tools` is absent, i.e. in the
+backend-only verification image), `StdioFrameWireTest`, `UnixSocketFrameWireTest`,
+`InferenceBoundaryTest` and `TaskPortSelectionTest`. No database is needed by these suites.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

@@ -42,7 +42,9 @@ Official [app-server documentation](https://learn.chatgpt.com/docs/app-server) d
 - **Framing:** `--listen unix://PATH` serves WebSocket (RFC 6455) over the socket: an HTTP/1.1 upgrade, then one JSON-RPC message per text message. `java.net.http` has no Unix-socket transport, so the adapter needs its own bounded WebSocket client on `UnixDomainSocketAddress`. The probe's `UnixRelay.java` is the reference for the handshake and framing checks.
 - **Socket location:** the runtime binds the real socket, with mode `0600`, at `/tmp/codex-daemon-<uid>/<sha256(PATH)>`. That file sits in a `0700` directory next to a lock file, and `PATH` itself holds only a symlink to it.
   - The IPC volume is therefore mounted at that daemon directory in `codex`, with `PATH`'s directory on a private tmpfs.
-  - The engine connects to the hashed file name.
+  - The engine connects to the hashed file name. P08.1 implements this client as
+    `UnixSocketFrameWire` in the backend, behind the runtime-neutral task port
+    ([docs/06](06-codex-integration.md#p081-production-adapter)).
 - **UID boundary:** the runtime and the engine must share one UID, 10001 in the probe. Relays running as UID 10002 and as root without capabilities were refused.
 - **Volume:** a tmpfs-backed IPC volume owned by UID 10001 keeps nothing at rest. `compose down` without `-v` leaves the named volume in place, and the launcher must not delete volumes.
 - **Not yet proven:** sign-in, account readiness, and authenticated runtime restart. P02.3 separately verifies account-free infrastructure recreation and neutral volume preservation below.
@@ -192,8 +194,13 @@ database connection and Flyway schema validity with no pending migration) and `g
 (narration runtime/account). The root `/actuator/health` aggregates storage health and lists
 the group names; it exposes no components or details. `gameplay` currently reports `UNKNOWN`
 mapped to 503 because no runtime adapter exists; `UNKNOWN` ranks lowest so it never lowers
-the root or readiness status. A later task replaces it with a no-inference account/capability
-check. Startup failures (unreachable database, rejected credentials, schema/migration mismatch)
+the root or readiness status. Since P08.1 the component reads the runtime-neutral task
+port's cached status without inference: it is `UP` only when the selected adapter is
+connected, on the pinned version and signed in (`READY`), and `UNKNOWN` otherwise. The
+packaged profile names the real socket (`engine.inference.codex.socket-path`) but keeps
+`engine.inference.codex.transport` at its `disabled` default, so packaged gameplay stays
+`UNKNOWN` until the narration consumer (P08.5) enables `unix` and a Docker-capable packaged
+check verifies it. Neither has run yet. Startup failures (unreachable database, rejected credentials, schema/migration mismatch)
 abort with a fixed message and action that never echo driver text or credentials; a missing
 secret tree is reported by Boot's configuration-data analyzer. The container health check
 still proves root availability only. Verified live: an unreachable database prints the

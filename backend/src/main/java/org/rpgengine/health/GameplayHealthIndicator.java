@@ -1,28 +1,33 @@
 package org.rpgengine.health;
 
+import org.rpgengine.inference.NarrationTaskPort;
+import org.rpgengine.inference.RuntimeStatus;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.stereotype.Component;
 
 /**
  * Gameplay-readiness component "narrationRuntime", deliberately separate from storage readiness.
- * No narration runtime adapter exists in this shell, so gameplay is reported
- * UNKNOWN rather than claimed. UNKNOWN is the lowest-ranked status, so the root
- * aggregate stays UP (storage health only), while the "gameplay" group maps UNKNOWN
- * to HTTP 503 (application.properties) so launchers never mistake it for ready. A later task replaces
- * this with a check of the runtime connection and account state that performs no
- * inference and consumes no turn (docs/22 section 5). Saved-data inspection and the
- * storage readiness group are unaffected by this state.
+ * It reads the runtime-neutral task port's cached status, so it performs no inference, consumes
+ * no turn and never blocks on the runtime (docs/22 section 5). UP only when the selected runtime
+ * is connected, compatible and signed in; every other state (no runtime configured, connecting,
+ * sign-in required, reconciling, stopping) is UNKNOWN. UNKNOWN is the lowest-ranked status, so
+ * the root aggregate stays UP (storage health only), while the "gameplay" group maps UNKNOWN to
+ * HTTP 503 (application.properties) so launchers never mistake it for ready. No reason code or
+ * other detail is exposed. Saved-data inspection and the storage readiness group are unaffected.
  */
 @Component("narrationRuntime")
 public class GameplayHealthIndicator implements HealthIndicator {
-    /** Construct the stateless indicator. */
-    public GameplayHealthIndicator() {
+    private final NarrationTaskPort tasks;
+
+    /** @param tasks the installation's task port */
+    public GameplayHealthIndicator(NarrationTaskPort tasks) {
+        this.tasks = tasks;
     }
 
-    /** Report UNKNOWN: gameplay readiness is not yet established; never fails. */
+    /** @return UP when the runtime is READY, otherwise UNKNOWN; never fails */
     @Override
     public Health health() {
-        return Health.unknown().build();
+        return tasks.status().state() == RuntimeStatus.State.READY ? Health.up().build() : Health.unknown().build();
     }
 }

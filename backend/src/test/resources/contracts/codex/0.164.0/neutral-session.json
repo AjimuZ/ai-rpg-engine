@@ -1,0 +1,1417 @@
+{
+  "fixtureVersion": 1,
+  "runtimeVersion": "0.164.0",
+  "source": "account-free-packaged-session",
+  "inferenceVerified": false,
+  "requests": [
+    {
+      "method": "initialize",
+      "params": {
+        "clientInfo": {
+          "name": "engine_protocol_probe",
+          "title": "Engine protocol probe",
+          "version": "1.0.0"
+        },
+        "capabilities": {
+          "experimentalApi": false
+        }
+      },
+      "result": {
+        "userAgent": "neutral-runtime/0.164.0"
+      }
+    },
+    {
+      "method": "account/read",
+      "params": {
+        "refreshToken": false
+      },
+      "result": {
+        "account": null,
+        "requiresOpenaiAuth": false
+      }
+    },
+    {
+      "method": "model/list",
+      "params": {
+        "limit": 2,
+        "includeHidden": false
+      },
+      "result": {
+        "data": [
+          {
+            "id": "gpt-6.1-sol",
+            "model": "gpt-6.1-sol",
+            "defaultReasoningEffort": "low",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              },
+              {
+                "reasoningEffort": "ultra"
+              }
+            ]
+          },
+          {
+            "id": "gpt-6-astra",
+            "model": "gpt-6-astra",
+            "defaultReasoningEffort": "low",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              },
+              {
+                "reasoningEffort": "ultra"
+              }
+            ]
+          }
+        ],
+        "nextCursor": "neutral-id-1"
+      }
+    },
+    {
+      "method": "model/list",
+      "params": {
+        "limit": 2,
+        "includeHidden": false,
+        "cursor": "neutral-id-1"
+      },
+      "result": {
+        "data": [
+          {
+            "id": "gpt-6-sol",
+            "model": "gpt-6-sol",
+            "defaultReasoningEffort": "medium",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              },
+              {
+                "reasoningEffort": "ultra"
+              }
+            ]
+          },
+          {
+            "id": "gpt-6-luna",
+            "model": "gpt-6-luna",
+            "defaultReasoningEffort": "medium",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              }
+            ]
+          }
+        ],
+        "nextCursor": "neutral-id-2"
+      }
+    },
+    {
+      "method": "model/list",
+      "params": {
+        "limit": 2,
+        "includeHidden": false,
+        "cursor": "neutral-id-2"
+      },
+      "result": {
+        "data": [
+          {
+            "id": "gpt-5.6-sol",
+            "model": "gpt-5.6-sol",
+            "defaultReasoningEffort": "low",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              },
+              {
+                "reasoningEffort": "ultra"
+              }
+            ]
+          },
+          {
+            "id": "gpt-5.6-terra",
+            "model": "gpt-5.6-terra",
+            "defaultReasoningEffort": "medium",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              },
+              {
+                "reasoningEffort": "ultra"
+              }
+            ]
+          }
+        ],
+        "nextCursor": "neutral-id-3"
+      }
+    },
+    {
+      "method": "model/list",
+      "params": {
+        "limit": 2,
+        "includeHidden": false,
+        "cursor": "neutral-id-3"
+      },
+      "result": {
+        "data": [
+          {
+            "id": "gpt-5.6-luna",
+            "model": "gpt-5.6-luna",
+            "defaultReasoningEffort": "medium",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              }
+            ]
+          },
+          {
+            "id": "gpt-5.5",
+            "model": "gpt-5.5",
+            "defaultReasoningEffort": "medium",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              }
+            ]
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "thread/start",
+      "params": {
+        "model": "gpt-6.1-sol",
+        "cwd": "/var/lib/runtime/workspace",
+        "approvalPolicy": "never",
+        "sandbox": "read-only",
+        "ephemeral": false
+      },
+      "result": {
+        "model": "gpt-6.1-sol",
+        "modelProvider": "fixture",
+        "cwd": "/var/lib/runtime/workspace",
+        "approvalPolicy": "never",
+        "sandbox": {
+          "type": "readOnly",
+          "networkAccess": false
+        },
+        "thread": {
+          "id": "neutral-id-4",
+          "status": {
+            "type": "idle"
+          }
+        }
+      }
+    },
+    {
+      "method": "turn/start",
+      "params": {
+        "threadId": "neutral-id-4",
+        "input": [
+          {
+            "type": "text",
+            "text": "Protocol compatibility check. Respond only with the JSON object required by the output schema; its body text is: The marker is blue. scenario-complete"
+          }
+        ],
+        "model": "gpt-6.1-sol",
+        "effort": "low",
+        "approvalPolicy": "never",
+        "sandboxPolicy": {
+          "type": "readOnly",
+          "networkAccess": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contractVersion",
+            "taskId",
+            "baseRevision",
+            "contextDigest",
+            "status",
+            "body"
+          ],
+          "properties": {
+            "contractVersion": {
+              "type": "integer",
+              "const": 1
+            },
+            "taskId": {
+              "type": "string",
+              "const": "neutral-protocol-check"
+            },
+            "baseRevision": {
+              "type": "integer",
+              "const": 0
+            },
+            "contextDigest": {
+              "type": "string",
+              "const": "1ddb7a9dfedfe9904c7d01f62ec30bc911cca6c47ff3bb5f557536a7163904ab"
+            },
+            "status": {
+              "type": "string",
+              "const": "answered"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "const": "The marker is blue.",
+                  "maxLength": 64
+                }
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "turn": {
+          "id": "neutral-id-5",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "method": "turn/start",
+      "params": {
+        "threadId": "neutral-id-4",
+        "input": [
+          {
+            "type": "text",
+            "text": "Protocol compatibility check. Respond only with the JSON object required by the output schema; its body text is: The marker is blue. scenario-complete"
+          }
+        ],
+        "model": "gpt-6-astra",
+        "effort": "medium",
+        "approvalPolicy": "never",
+        "sandboxPolicy": {
+          "type": "readOnly",
+          "networkAccess": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contractVersion",
+            "taskId",
+            "baseRevision",
+            "contextDigest",
+            "status",
+            "body"
+          ],
+          "properties": {
+            "contractVersion": {
+              "type": "integer",
+              "const": 1
+            },
+            "taskId": {
+              "type": "string",
+              "const": "neutral-protocol-check"
+            },
+            "baseRevision": {
+              "type": "integer",
+              "const": 0
+            },
+            "contextDigest": {
+              "type": "string",
+              "const": "1ddb7a9dfedfe9904c7d01f62ec30bc911cca6c47ff3bb5f557536a7163904ab"
+            },
+            "status": {
+              "type": "string",
+              "const": "answered"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "const": "The marker is blue.",
+                  "maxLength": 64
+                }
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "turn": {
+          "id": "neutral-id-7",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "method": "thread/start",
+      "params": {
+        "model": "gpt-6.1-sol",
+        "cwd": "/var/lib/runtime/workspace",
+        "approvalPolicy": "never",
+        "sandbox": "read-only",
+        "ephemeral": false
+      },
+      "result": {
+        "model": "gpt-6.1-sol",
+        "modelProvider": "fixture",
+        "cwd": "/var/lib/runtime/workspace",
+        "approvalPolicy": "never",
+        "sandbox": {
+          "type": "readOnly",
+          "networkAccess": false
+        },
+        "thread": {
+          "id": "neutral-id-8",
+          "status": {
+            "type": "idle"
+          }
+        }
+      }
+    },
+    {
+      "method": "turn/start",
+      "params": {
+        "threadId": "neutral-id-8",
+        "input": [
+          {
+            "type": "text",
+            "text": "Protocol compatibility check. Respond only with the JSON object required by the output schema; its body text is: The marker is blue. scenario-hold"
+          }
+        ],
+        "model": "gpt-6-astra",
+        "effort": "medium",
+        "approvalPolicy": "never",
+        "sandboxPolicy": {
+          "type": "readOnly",
+          "networkAccess": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contractVersion",
+            "taskId",
+            "baseRevision",
+            "contextDigest",
+            "status",
+            "body"
+          ],
+          "properties": {
+            "contractVersion": {
+              "type": "integer",
+              "const": 1
+            },
+            "taskId": {
+              "type": "string",
+              "const": "neutral-protocol-check"
+            },
+            "baseRevision": {
+              "type": "integer",
+              "const": 0
+            },
+            "contextDigest": {
+              "type": "string",
+              "const": "1ddb7a9dfedfe9904c7d01f62ec30bc911cca6c47ff3bb5f557536a7163904ab"
+            },
+            "status": {
+              "type": "string",
+              "const": "answered"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "const": "The marker is blue.",
+                  "maxLength": 64
+                }
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "turn": {
+          "id": "neutral-id-9",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "method": "turn/start",
+      "params": {
+        "threadId": "neutral-id-4",
+        "input": [
+          {
+            "type": "text",
+            "text": "Protocol compatibility check. Respond only with the JSON object required by the output schema; its body text is: The marker is blue. scenario-complete"
+          }
+        ],
+        "model": "gpt-6.1-sol",
+        "effort": "low",
+        "approvalPolicy": "never",
+        "sandboxPolicy": {
+          "type": "readOnly",
+          "networkAccess": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contractVersion",
+            "taskId",
+            "baseRevision",
+            "contextDigest",
+            "status",
+            "body"
+          ],
+          "properties": {
+            "contractVersion": {
+              "type": "integer",
+              "const": 1
+            },
+            "taskId": {
+              "type": "string",
+              "const": "neutral-protocol-check"
+            },
+            "baseRevision": {
+              "type": "integer",
+              "const": 0
+            },
+            "contextDigest": {
+              "type": "string",
+              "const": "1ddb7a9dfedfe9904c7d01f62ec30bc911cca6c47ff3bb5f557536a7163904ab"
+            },
+            "status": {
+              "type": "string",
+              "const": "answered"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "const": "The marker is blue.",
+                  "maxLength": 64
+                }
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "turn": {
+          "id": "neutral-id-10",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "method": "turn/interrupt",
+      "params": {
+        "threadId": "neutral-id-8",
+        "turnId": "neutral-id-9"
+      },
+      "result": {}
+    },
+    {
+      "method": "turn/start",
+      "params": {
+        "threadId": "neutral-id-4",
+        "input": [
+          {
+            "type": "text",
+            "text": "Protocol compatibility check. Respond only with the JSON object required by the output schema; its body text is: The marker is blue. scenario-hold"
+          }
+        ],
+        "model": "gpt-6-astra",
+        "effort": "medium",
+        "approvalPolicy": "never",
+        "sandboxPolicy": {
+          "type": "readOnly",
+          "networkAccess": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contractVersion",
+            "taskId",
+            "baseRevision",
+            "contextDigest",
+            "status",
+            "body"
+          ],
+          "properties": {
+            "contractVersion": {
+              "type": "integer",
+              "const": 1
+            },
+            "taskId": {
+              "type": "string",
+              "const": "neutral-protocol-check"
+            },
+            "baseRevision": {
+              "type": "integer",
+              "const": 0
+            },
+            "contextDigest": {
+              "type": "string",
+              "const": "1ddb7a9dfedfe9904c7d01f62ec30bc911cca6c47ff3bb5f557536a7163904ab"
+            },
+            "status": {
+              "type": "string",
+              "const": "answered"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "const": "The marker is blue.",
+                  "maxLength": 64
+                }
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "turn": {
+          "id": "neutral-id-11",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "method": "turn/interrupt",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turnId": "neutral-id-11"
+      },
+      "result": {}
+    },
+    {
+      "method": "turn/start",
+      "params": {
+        "threadId": "neutral-id-4",
+        "input": [
+          {
+            "type": "text",
+            "text": "Protocol compatibility check. Respond only with the JSON object required by the output schema; its body text is: The marker is blue. scenario-fail"
+          }
+        ],
+        "model": "gpt-6.1-sol",
+        "effort": "low",
+        "approvalPolicy": "never",
+        "sandboxPolicy": {
+          "type": "readOnly",
+          "networkAccess": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contractVersion",
+            "taskId",
+            "baseRevision",
+            "contextDigest",
+            "status",
+            "body"
+          ],
+          "properties": {
+            "contractVersion": {
+              "type": "integer",
+              "const": 1
+            },
+            "taskId": {
+              "type": "string",
+              "const": "neutral-protocol-check"
+            },
+            "baseRevision": {
+              "type": "integer",
+              "const": 0
+            },
+            "contextDigest": {
+              "type": "string",
+              "const": "1ddb7a9dfedfe9904c7d01f62ec30bc911cca6c47ff3bb5f557536a7163904ab"
+            },
+            "status": {
+              "type": "string",
+              "const": "answered"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "const": "The marker is blue.",
+                  "maxLength": 64
+                }
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "turn": {
+          "id": "neutral-id-12",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "method": "initialize",
+      "params": {
+        "clientInfo": {
+          "name": "engine_protocol_probe",
+          "title": "Engine protocol probe",
+          "version": "1.0.0"
+        },
+        "capabilities": {
+          "experimentalApi": false
+        }
+      },
+      "result": {
+        "userAgent": "neutral-runtime/0.164.0"
+      }
+    },
+    {
+      "method": "account/read",
+      "params": {
+        "refreshToken": false
+      },
+      "result": {
+        "account": null,
+        "requiresOpenaiAuth": false
+      }
+    },
+    {
+      "method": "model/list",
+      "params": {
+        "limit": 2,
+        "includeHidden": false
+      },
+      "result": {
+        "data": [
+          {
+            "id": "gpt-6.1-sol",
+            "model": "gpt-6.1-sol",
+            "defaultReasoningEffort": "low",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              },
+              {
+                "reasoningEffort": "ultra"
+              }
+            ]
+          },
+          {
+            "id": "gpt-6-astra",
+            "model": "gpt-6-astra",
+            "defaultReasoningEffort": "low",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              },
+              {
+                "reasoningEffort": "ultra"
+              }
+            ]
+          }
+        ],
+        "nextCursor": "neutral-id-1"
+      }
+    },
+    {
+      "method": "model/list",
+      "params": {
+        "limit": 2,
+        "includeHidden": false,
+        "cursor": "neutral-id-1"
+      },
+      "result": {
+        "data": [
+          {
+            "id": "gpt-6-sol",
+            "model": "gpt-6-sol",
+            "defaultReasoningEffort": "medium",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              },
+              {
+                "reasoningEffort": "ultra"
+              }
+            ]
+          },
+          {
+            "id": "gpt-6-luna",
+            "model": "gpt-6-luna",
+            "defaultReasoningEffort": "medium",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              }
+            ]
+          }
+        ],
+        "nextCursor": "neutral-id-2"
+      }
+    },
+    {
+      "method": "model/list",
+      "params": {
+        "limit": 2,
+        "includeHidden": false,
+        "cursor": "neutral-id-2"
+      },
+      "result": {
+        "data": [
+          {
+            "id": "gpt-5.6-sol",
+            "model": "gpt-5.6-sol",
+            "defaultReasoningEffort": "low",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              },
+              {
+                "reasoningEffort": "ultra"
+              }
+            ]
+          },
+          {
+            "id": "gpt-5.6-terra",
+            "model": "gpt-5.6-terra",
+            "defaultReasoningEffort": "medium",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              },
+              {
+                "reasoningEffort": "ultra"
+              }
+            ]
+          }
+        ],
+        "nextCursor": "neutral-id-3"
+      }
+    },
+    {
+      "method": "model/list",
+      "params": {
+        "limit": 2,
+        "includeHidden": false,
+        "cursor": "neutral-id-3"
+      },
+      "result": {
+        "data": [
+          {
+            "id": "gpt-5.6-luna",
+            "model": "gpt-5.6-luna",
+            "defaultReasoningEffort": "medium",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              },
+              {
+                "reasoningEffort": "max"
+              }
+            ]
+          },
+          {
+            "id": "gpt-5.5",
+            "model": "gpt-5.5",
+            "defaultReasoningEffort": "medium",
+            "supportedReasoningEfforts": [
+              {
+                "reasoningEffort": "low"
+              },
+              {
+                "reasoningEffort": "medium"
+              },
+              {
+                "reasoningEffort": "high"
+              },
+              {
+                "reasoningEffort": "xhigh"
+              }
+            ]
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "thread/resume",
+      "params": {
+        "threadId": "neutral-id-4",
+        "excludeTurns": true
+      },
+      "result": {
+        "model": "gpt-6.1-sol",
+        "modelProvider": "fixture",
+        "cwd": "/var/lib/runtime/workspace",
+        "approvalPolicy": "never",
+        "sandbox": {
+          "type": "readOnly",
+          "networkAccess": false
+        },
+        "thread": {
+          "id": "neutral-id-4",
+          "status": {
+            "type": "systemError"
+          }
+        },
+        "reasoningEffort": "low"
+      }
+    },
+    {
+      "method": "thread/turns/list",
+      "params": {
+        "threadId": "neutral-id-4",
+        "limit": 32,
+        "sortDirection": "asc"
+      },
+      "result": {
+        "data": [
+          {
+            "id": "neutral-id-5",
+            "status": "completed"
+          },
+          {
+            "id": "neutral-id-7",
+            "status": "completed"
+          },
+          {
+            "id": "neutral-id-10",
+            "status": "completed"
+          },
+          {
+            "id": "neutral-id-11",
+            "status": "interrupted"
+          },
+          {
+            "id": "neutral-id-12",
+            "status": "failed"
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "thread/resume",
+      "params": {
+        "threadId": "neutral-id-8",
+        "excludeTurns": true
+      },
+      "result": {
+        "model": "gpt-6-astra",
+        "modelProvider": "fixture",
+        "cwd": "/var/lib/runtime/workspace",
+        "approvalPolicy": "never",
+        "sandbox": {
+          "type": "readOnly",
+          "networkAccess": false
+        },
+        "thread": {
+          "id": "neutral-id-8",
+          "status": {
+            "type": "idle"
+          }
+        },
+        "reasoningEffort": "medium"
+      }
+    },
+    {
+      "method": "thread/turns/list",
+      "params": {
+        "threadId": "neutral-id-8",
+        "limit": 32,
+        "sortDirection": "asc"
+      },
+      "result": {
+        "data": [
+          {
+            "id": "neutral-id-9",
+            "status": "interrupted"
+          }
+        ],
+        "nextCursor": null
+      }
+    },
+    {
+      "method": "turn/start",
+      "params": {
+        "threadId": "neutral-id-4",
+        "input": [
+          {
+            "type": "text",
+            "text": "Protocol compatibility check. Respond only with the JSON object required by the output schema; its body text is: The marker is blue. scenario-complete"
+          }
+        ],
+        "model": "gpt-6-astra",
+        "effort": "medium",
+        "approvalPolicy": "never",
+        "sandboxPolicy": {
+          "type": "readOnly",
+          "networkAccess": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contractVersion",
+            "taskId",
+            "baseRevision",
+            "contextDigest",
+            "status",
+            "body"
+          ],
+          "properties": {
+            "contractVersion": {
+              "type": "integer",
+              "const": 1
+            },
+            "taskId": {
+              "type": "string",
+              "const": "neutral-protocol-check"
+            },
+            "baseRevision": {
+              "type": "integer",
+              "const": 0
+            },
+            "contextDigest": {
+              "type": "string",
+              "const": "1ddb7a9dfedfe9904c7d01f62ec30bc911cca6c47ff3bb5f557536a7163904ab"
+            },
+            "status": {
+              "type": "string",
+              "const": "answered"
+            },
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "const": "The marker is blue.",
+                  "maxLength": 64
+                }
+              }
+            }
+          }
+        }
+      },
+      "result": {
+        "turn": {
+          "id": "neutral-id-13",
+          "status": "inProgress"
+        }
+      }
+    }
+  ],
+  "notifications": [
+    {
+      "method": "turn/started",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turn": {
+          "id": "neutral-id-5",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turnId": "neutral-id-5",
+        "item": {
+          "id": "neutral-id-6",
+          "type": "agentMessage",
+          "text": "{\"contractVersion\":1,\"taskId\":\"neutral-protocol-check\",\"baseRevision\":0,\"contextDigest\":\"1ddb7a9dfedfe9904c7d01f62ec30bc911cca6c47ff3bb5f557536a7163904ab\",\"status\":\"answered\",\"body\":{\"text\":\"The marker is blue.\"}}"
+        }
+      }
+    },
+    {
+      "method": "turn/completed",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turn": {
+          "id": "neutral-id-5",
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "method": "turn/started",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turn": {
+          "id": "neutral-id-7",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turnId": "neutral-id-7",
+        "item": {
+          "id": "neutral-id-6",
+          "type": "agentMessage",
+          "text": "{\"contractVersion\":1,\"taskId\":\"neutral-protocol-check\",\"baseRevision\":0,\"contextDigest\":\"1ddb7a9dfedfe9904c7d01f62ec30bc911cca6c47ff3bb5f557536a7163904ab\",\"status\":\"answered\",\"body\":{\"text\":\"The marker is blue.\"}}"
+        }
+      }
+    },
+    {
+      "method": "turn/completed",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turn": {
+          "id": "neutral-id-7",
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "method": "turn/started",
+      "params": {
+        "threadId": "neutral-id-8",
+        "turn": {
+          "id": "neutral-id-9",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "method": "turn/started",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turn": {
+          "id": "neutral-id-10",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turnId": "neutral-id-10",
+        "item": {
+          "id": "neutral-id-6",
+          "type": "agentMessage",
+          "text": "{\"contractVersion\":1,\"taskId\":\"neutral-protocol-check\",\"baseRevision\":0,\"contextDigest\":\"1ddb7a9dfedfe9904c7d01f62ec30bc911cca6c47ff3bb5f557536a7163904ab\",\"status\":\"answered\",\"body\":{\"text\":\"The marker is blue.\"}}"
+        }
+      }
+    },
+    {
+      "method": "turn/completed",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turn": {
+          "id": "neutral-id-10",
+          "status": "completed"
+        }
+      }
+    },
+    {
+      "method": "turn/completed",
+      "params": {
+        "threadId": "neutral-id-8",
+        "turn": {
+          "id": "neutral-id-9",
+          "status": "interrupted"
+        }
+      }
+    },
+    {
+      "method": "turn/started",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turn": {
+          "id": "neutral-id-11",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "method": "turn/completed",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turn": {
+          "id": "neutral-id-11",
+          "status": "interrupted"
+        }
+      }
+    },
+    {
+      "method": "turn/started",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turn": {
+          "id": "neutral-id-12",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "method": "error",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turnId": "neutral-id-12",
+        "willRetry": false,
+        "error": {
+          "message": "Neutral error text omitted",
+          "codexErrorInfo": "other"
+        }
+      }
+    },
+    {
+      "method": "turn/completed",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turn": {
+          "id": "neutral-id-12",
+          "status": "failed"
+        }
+      }
+    },
+    {
+      "method": "turn/started",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turn": {
+          "id": "neutral-id-13",
+          "status": "inProgress"
+        }
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turnId": "neutral-id-13",
+        "item": {
+          "id": "neutral-id-6",
+          "type": "agentMessage",
+          "text": "{\"contractVersion\":1,\"taskId\":\"neutral-protocol-check\",\"baseRevision\":0,\"contextDigest\":\"1ddb7a9dfedfe9904c7d01f62ec30bc911cca6c47ff3bb5f557536a7163904ab\",\"status\":\"answered\",\"body\":{\"text\":\"The marker is blue.\"}}"
+        }
+      }
+    },
+    {
+      "method": "turn/completed",
+      "params": {
+        "threadId": "neutral-id-4",
+        "turn": {
+          "id": "neutral-id-13",
+          "status": "completed"
+        }
+      }
+    }
+  ]
+}

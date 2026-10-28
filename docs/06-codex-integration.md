@@ -86,6 +86,47 @@ P01.4 implements these lifecycle rules in the sequential developer probe (the pr
 
 See [process lifecycle checks](../tools/runtime_probe/README.md#process-lifecycle-p014) for measured shutdown and recovery behavior. A closed process or connection alone is never evidence that a canonical operation was rolled back.
 
+### P08.1 production adapter
+
+P08.1 implements the Java transport behind the runtime-neutral task port. Application code sees only `org.rpgengine.inference`:
+
+- `NarrationTaskPort`: `submit`, `retireSession` and `status`.
+- Neutral records: `TaskRequest` (task and logical session identity, `InferenceSlot`, instructions, a JSON output schema and a 1–180-second budget), `TaskResult` (status, untrusted output, fixed error code and runtime/version/model/effort provenance) and `RuntimeStatus`.
+- Slot assignment through `SlotAssignments`.
+
+The adapter lives in the package-private `org.rpgengine.inference.codex`. A source and reflection test (`InferenceBoundaryTest`) fails the build if any other package names it or if the neutral API exposes a non-neutral type. No other engine package uses the port yet. Validated narration (P08.2/P08.5) consumes it later, and until then `UnavailableNarration` stays wired.
+
+| Concern | Behaviour |
+| --- | --- |
+| Selection | `engine.inference.codex.transport` = `disabled` (default) / `stdio` / `unix`; any other value fails startup. Disabled wires `UnavailableTaskPort` (every task `UNAVAILABLE`, `runtime-not-configured`). |
+| Wires | `unix`: RFC 6455 client over the real socket file (`socket-path`), with the `UnixRelay.java` handshake and frame rules: strict 101/accept, no extensions, masked client frames, reassembly, pong, close = EOF, a 1 MiB message limit and a handshake watchdog. `stdio`: an absolute executable launched without a shell. The child inherits only `PATH`, `HOME`, `CODEX_HOME`, `LANG`, `LC_ALL`, `TMPDIR`, `USER` and `TZ`, so engine secrets never reach it. Stdio uses line framing, P01.4 stderr redaction and the close-input/terminate/kill shutdown with a `ShutdownRecord`. |
+| Generation | One reader thread per connection, monotonic request IDs, serialized writes and at most 8 outstanding requests. A correlated error resolves its request. Any request without a correlated response (timeout, interruption, write failure), terminal wire error or protocol violation closes the generation, fails its pending requests and inboxes, and discards buffered events. |
+| Correlation | Events route to exact (thread, turn) inboxes of 1,024 events each; overflow fails only that turn. While a `turn/start` is in flight on a thread, events of unregistered turns on that thread are buffered in order, up to 256 per generation; overflow closes the generation. The acknowledgment hands them over. Retired-turn events are counted as late, other unknown turns as ignored, and identity-less events as unscoped. A `turn/*` or `item/*` event without identity is a violation. |
+| Server requests | Always denied with `-32601`. One that names a registered turn fails it (`unexpected-server-request`). |
+| Admission | One bounded FIFO queue (`queue-capacity`, default 16). A full queue rejects at once (`queue-full`) and duplicate live task IDs are rejected. The queue wait counts against the task budget, and a task that expires while queued never starts a turn. |
+| Permit | One dispatcher thread runs one turn at a time: the P01.7 serialized policy. Priorities, fairness, durable queue records and any higher limit are P08.6. |
+| Readiness | `initialize`/`initialized` (a `/x.y.z` user-agent token other than 0.164.0 is refused), `account/read` (only a present ChatGPT or API-key account is `READY`) and the full `model/list` catalog (32 per page, at most 32 pages and 256 models). Otherwise the state is `UNAVAILABLE` with a fixed reason (`sign-in-required`, `unsupported-auth`, `runtime-unreachable`, `unsupported-runtime-version`, …). Queued and new tasks end `UNAVAILABLE`, and reconnection backs off from 1 to 30 seconds. The `narrationRuntime` health component is UP only when `READY`. |
+| Per task | The slot resolves to an explicit model and effort, which must be in the discovered catalog (`slot-unassigned`, `slot-unsupported`), and the schema must be a JSON object. The logical session maps to a persistent read-only thread: `thread/start` on first use, `thread/resume` when bound in an earlier generation. The effective policy is checked on every start/resume. `turn/start` always carries the model, effort, `approvalPolicy: never`, the read-only `sandboxPolicy` and the schema. Output is returned only after a matching `completed`. |
+| Cancellation and deadlines | `cancel()` removes a queued task, or interrupts the exact turn and awaits its terminal status (default 10 seconds). Expiry and shutdown do the same. Results are `CANCELLED`, `TIMED_OUT`, or `COMPLETED` when the turn finished first. |
+| Uncertainty | Several cases leave the outcome unknown: a lost generation, a malformed `turn/start` acknowledgment, an unconfirmed interrupt, and an isolation or protocol violation (`unexpected-turn-item`, `model-rerouted`, …). The task ends `UNRESOLVED`, or `FAILED` for violations on a healthy connection. The thread is marked ambiguous, its session bindings are retired (the next task reports `freshSession`), and the dispatcher keeps the permit until reconciliation succeeds: `thread/resume`, `thread/turns/list` (newest first, 8 turns), then an interrupt and confirmation of any `inProgress` turn. |
+| Shutdown | Admissions stop, queued tasks end `CANCELLED`/`shutdown`, the active turn is interrupted and confirmed, and the owned connection closes. Stop is bounded by the interrupt and request timeouts plus the wire shutdown. |
+
+Deliberate differences from the sequential probe:
+
+- Reconciliation lists turns newest first (`sortDirection: desc`, the runtime's documented default order), so a long thread's in-progress turn is never beyond the first page.
+- Catalog pages are larger.
+- The packaged version check uses the user agent, because the engine cannot run `codex --version` inside the runtime container; the image pin remains authoritative.
+
+Ambiguity is held in memory only. A backend restart during an unconfirmed turn forgets it, and durable permit/receipt records are P08.6/P09.5 work.
+
+Verification uses deterministic doubles only:
+
+- the retained 0.164.0 neutral fixture, replayed against the Java builders, validators and router;
+- a scripted app-server over in-memory, real child-process stdio and real Unix-socket WebSocket transports;
+- weakening probes.
+
+No live runtime, account or Docker was available in the P08.1 environment, so the opt-in neutral real smoke (QA-42/§11) remains a P08 package check.
+
 ## 6. Task contracts
 
 | Task | Input | Allowed output | Authority |

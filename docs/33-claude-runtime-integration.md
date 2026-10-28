@@ -134,7 +134,7 @@ Authorized campaign context goes only to Anthropic's service while `claude` is s
 | --- | --- | --- |
 | P20.1 | Pin and qualify the unmodified client without a live account | Fixtures, isolation evidence, capability matrix, limit and error signals |
 | P20.2 | Package the optional runtime service, startup guards and launcher sign-in | Extended QA-28 |
-| P20.3 | Adapter, selection, switching and diagnostics behind the neutral task port | Contract tests |
+| P20.3 | Adapter, selection, switching and diagnostics behind the neutral task port (`org.rpgengine.inference.NarrationTaskPort`, implemented for Codex in P08.1; a Claude adapter is a sibling package that must pass the same boundary test and neutral fixtures) | Contract tests |
 | P20.4 | Parity on shared fixtures, switching, limits, sentinels, owner-run live smoke, terms review recorded | QA-42 |
 
 ## 13. References

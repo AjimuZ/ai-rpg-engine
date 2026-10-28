@@ -1390,6 +1390,39 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 **Depends on:** P01 and P07. **Areas:** runtime-neutral AI task port, Codex adapter, versioned runtime prompts, UI status.
 
 - [ ] P08.1 Implement the supported Java Codex transport behind a runtime-neutral narration task port with logical `light`, `standard` and `deliberate` slots ([ADR 0020](adr/0020-selectable-narration-runtime.md), [ADR 0021](adr/0021-inference-backends-and-model-selection.md)), with bounded queues, request/turn correlation, and lifecycle management; no Codex-specific type may leak into domain or application services.
+  - Package A — neutral port: `org.rpgengine.inference` defines `NarrationTaskPort`
+    (`submit`, `retireSession`, `status`), `TaskRequest` (task/logical-session identity,
+    `InferenceSlot` `light`/`standard`/`deliberate`, bounded instructions and JSON output
+    schema, 1–180 s budget), `TaskResult` (status, untrusted output, fixed error code,
+    runtime/version/model/effort provenance, fresh-session flag), `RuntimeStatus` and
+    `SlotAssignments` with interim configuration-backed settings (no shipped model names;
+    P08.4 replaces them). `UnavailableTaskPort` is the default when no runtime is configured;
+    the `narrationRuntime` health component is UP only for a READY runtime.
+  - Package B — Codex wires and generation: package-private `org.rpgengine.inference.codex`
+    with the packaged Unix-socket WebSocket client (`UnixRelay.java` rules) and the owned
+    stdio child (absolute executable, environment allowlist, redacted stderr, bounded
+    close/terminate/kill shutdown); one RPC generation per connection with a single reader,
+    monotonic IDs, at most 8 pending requests, server-request denial, early-event buffering
+    while a start is in flight and exact (thread, turn) inboxes; unresolved requests, wire
+    errors and protocol violations close the generation.
+  - Package C — admission and lifecycle: bounded FIFO queue (`queue-full`, duplicate
+    rejection, queue time inside the budget), one dispatcher holding the serialized P01.7
+    permit, handshake/account/catalog readiness with backoff, slot-to-catalog check and
+    explicit model/effort/policy/schema on every turn, session-to-thread binding with resume
+    across generations, cancellation/deadline/shutdown interruption awaiting the terminal
+    status, ambiguity retirement and resume/list/interrupt reconciliation before further
+    work. See [docs/06](06-codex-integration.md#p081-production-adapter).
+  - Exit checks: replay the retained 0.164.0 neutral fixture against the Java builders,
+    validators and router; adapter scenarios against a scripted app-server over in-memory,
+    real child-process stdio and real Unix-socket WebSocket transports (explicit sticky
+    settings, early/foreign/late events, queue bounds, cancellation, deadlines, failures,
+    tool/reroute/approval violations, lost connection and unconfirmed interrupt with
+    reconciliation, sign-in/version/reachability gating, shutdown); RPC generation bounds
+    and fail-closed rules; Spring selection and startup refusals; a source/reflection
+    boundary test proving no package outside the adapter names it and the neutral API
+    exposes only neutral types; deliberate weakening probes; the full packaged backend and
+    repository checks. A live runtime/account smoke is not part of this task (no runtime,
+    account or Docker in this environment); it stays the opt-in P08 package check.
 - [ ] P08.2 Implement typed intent and attributed narration/quick-reply contracts with structural/semantic validation and one bounded repair; generate directly in selected English/Italian, preserve glossary/locale generations, player agency and public knowledge scope.
 - [ ] P08.3 Scope threads by campaign/role/audience/policy; separate privileged planning from public narration.
 - [ ] P08.4 Resolve logical profiles through the owner's slot assignment (backend and model per slot, ADR 0021) against the assigned backend's catalog or approved allowlist, and set effective settings on every turn.

@@ -105,8 +105,8 @@ media-serving route is exposed. See [ADR 0018](adr/0018-protected-pack-registrat
 | `knowledge` | Fact scopes, provenance, public projections, disclosure | Campaign and events |
 | `memory` | Checkpoints, summaries, retrieval, context budgets | Knowledge, events |
 | `ai` | Task profiles, prompt contracts, proposal parsing, model routing | Context and the runtime adapters |
-| `codex`, `claude` | One adapter per runtime: transport/lifecycle, protocol framing, events, cancellation; `claude` is planned (P20) | Private IPC or local process API according to deployment profile; no domain repositories |
-| `inference` | Slot assignment, backend catalog and hardware advisor, readiness probes, class and budget rules, GPU and RAM admission coordinator ([ADR 0021](adr/0021-inference-backends-and-model-selection.md)); planned | Settings, `ai` and the adapters; no domain repositories |
+| `codex`, `claude` | One adapter per runtime: transport/lifecycle, protocol framing, events, cancellation. The Codex adapter is implemented as the package-private `org.rpgengine.inference.codex` (P08.1, [docs/06](06-codex-integration.md#p081-production-adapter)); `claude` is planned (P20) | Private IPC or local process API according to deployment profile; only the neutral `org.rpgengine.inference` types; no domain repositories |
+| `inference` | Runtime-neutral narration task port, logical `light`/`standard`/`deliberate` slots and configuration-backed slot assignment (P08.1, implemented). Planned: backend catalog and hardware advisor, readiness probes, class and budget rules, GPU and RAM admission coordinator ([ADR 0021](adr/0021-inference-backends-and-model-selection.md)) | Settings, `ai` and the adapters; no domain repositories |
 | `presentation` | Narrative records, scene references, safe media cues; post-commit presentation jobs and the narration port (P07.5) | Committed events and projections |
 | `operations` | Backups, imports/exports, diagnostics, recovery | All modules through administrative services |
 | `persistence` | Shared entity base, engine-assigned identifiers and canonical value checks | JPA only; no domain rules |
@@ -125,7 +125,7 @@ These are logical packages initially, not separate Maven artifacts or services. 
 
 ## 5. Ports
 
-The proposed narration task port (drafted earlier as `CodexGameMasterPort`; runtime-neutral, with one adapter per runtime) exposes task-oriented generation: interpret intent, propose content, choose a legal tactic, narrate resolved events, and summarize an event range. Domain services never send raw arbitrary protocol methods.
+The narration task port (drafted earlier as `CodexGameMasterPort`; runtime-neutral, with one adapter per runtime) exposes task-oriented generation: interpret intent, propose content, choose a legal tactic, narrate resolved events, and summarize an event range. Domain services never send raw arbitrary protocol methods. Since P08.1 its transport layer exists as `org.rpgengine.inference.NarrationTaskPort`: bounded tasks with a logical slot, logical session, instructions and output schema, returning untrusted results with fixed error codes and provenance. The typed task contracts above it (intent, narration, tactics, summaries) are P08.2 and later work. No Codex type may appear outside the adapter package; `InferenceBoundaryTest` enforces this.
 
 `RulesetPort` resolves legal actions and effects from a pinned ruleset. `CampaignRepository` loads canonical state and commits revisions. `KnowledgeQueryPort` provides permitted facts for an audience. `PresentationPublisher` emits committed output through an outbox. `RandomSource` produces and records server-owned draws. Tests can replace these boundaries independently.
 

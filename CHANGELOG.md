@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — Narration task port and Codex transport, 28 October 2026
+
+- Add the runtime-neutral narration task port: tasks name a logical `light`, `standard` or
+  `deliberate` slot and a logical session, carry bounded instructions and a JSON output
+  schema, and always end with a result that has a fixed status and error code and records
+  the runtime, version, model and effort. Without a configured runtime every task ends
+  "unavailable" and the game keeps working.
+- Add the Codex transport behind it: the packaged Unix-socket WebSocket client and an owned
+  stdio child with an environment allowlist and redacted diagnostics. Requests and turn
+  events are correlated by exact thread and turn identity. The queue is bounded, one turn
+  runs at a time, and model and effort are explicit on every turn. Cancellation, deadlines
+  and shutdown interrupt the exact turn and wait for its confirmation. Lost or unconfirmed
+  turns are reconciled before further work. Server approval requests and tool items fail
+  closed.
+- Report gameplay readiness as up only when the selected runtime is connected, on the
+  pinned version and signed in. The packaged profile keeps the transport disabled until
+  narration uses it.
+- A boundary test keeps every Codex type inside its adapter package.
+
 ## Unreleased — Transactional plan admission and activation, 28 October 2026
 
 - Recheck prepared plans inside the campaign lock before admission: current generation,

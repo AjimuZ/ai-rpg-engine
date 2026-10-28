@@ -143,6 +143,7 @@ The Settings panel shows the class of every slot. Changing a slot's class needs 
 ## 12. Configuration surfaces
 
 - **`.env`:** `NARRATION_RUNTIME` (`codex`, `claude` or `local`) is the default backend of the text slots. Slot assignments live in private application settings. Keys live in `.local/secrets/`.
+- **Interim slot settings (P08.1, implemented):** until P08.4 adds owner settings, catalog/allowlist resolution and a degradation policy, `engine.inference.slots.<light|standard|deliberate>.model` and `.effort` (for example `ENGINE_INFERENCE_SLOTS_STANDARD_MODEL`) assign each text slot. No model name is shipped as a default. A half-assigned slot fails startup without echoing the value. The adapter refuses a task whose slot is unassigned (`slot-unassigned`) or not in the runtime's discovered catalog (`slot-unsupported`), and it sends the effective model and effort on every turn. The `image` slot and `fixedQuality` are not part of this port yet.
 - **Launcher (planned):** `./start.sh --models advise|list|fetch|verify|remove` and a secret-setting command. Fetch is the only download path, and it verifies SHA-256.
 - **Compose (planned):** services `models`, `images` and `gateway`, started only when a slot needs them, on internal networks. Only the gateway and the one-off fetch container have egress.
 - **API and UI:** `GET /api/v1/models/status`, the owner-only `PUT /api/v1/settings/models`, and the Settings → Models panel with advisor presets, per-slot assignment, probe results, class badges and budgets ([API and UI](13-api-and-ui.md)).
