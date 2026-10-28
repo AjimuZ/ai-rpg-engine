@@ -60,6 +60,7 @@ class BuildContextTest(unittest.TestCase):
             "frontend/tsconfig.spec.json", "frontend/src/main.ts",
             "frontend/src/app/app.ts", "frontend/public/icon.svg",
             "frontend/tools/check-localization.mjs", "frontend/tools/check-localization.test.mjs",
+            "frontend/tools/localize-index.mjs",
             "backend/pom.xml", "backend/mvnw", "backend/mvnw.cmd",
             "backend/.mvn/maven.config", "backend/.mvn/settings.xml",
             "backend/.mvn/wrapper/maven-wrapper.properties",

@@ -863,6 +863,22 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     checks. Still unchecked: the replay runs in jsdom, not Chrome, so no browser or
     packaged-container journey ran (no browser in the Linux container); independent
     Italian and screen-reader review and the QA-35 sign-off are human gates.
+  - Seventh checkpoint (28 October 2026, Italian variant rendering): `italian-variant.spec.ts`
+    loads the reviewed Italian catalog into `$localize` before importing the application and
+    renders every routed preview screen, the navigation shell and the recorded real-server
+    playthrough in Italian. It fails on English-only catalog text (including ICU branches),
+    uncatalogued English phrases, unnamed controls/links/images, broken ARIA references and
+    unsupported `lang` values, and checks the real replies' statuses, receipts, notices and
+    404 code in Italian with identical receipt digit sequences; its detectors are self-tested
+    and failed on deliberate defects. An exploratory pass found only data (titles, meter values,
+    icon IDs, the `Italiano` endonym) outside the catalog. Saved-adventure titles and genres now
+    carry their source `lang`, and `build:locales` writes each variant's reviewed brand into its
+    pre-bootstrap `<title>` (the `it` index opened with an English title; `PackagedInterfaceTest`
+    now asserts each locale's title and `lang` and failed before the fix). Verified: 77 frontend
+    tests in 13 files, strict typecheck, five localization tool tests, parity build (317
+    messages) and 436 packaged backend tests with zero failures/errors/skips. Still unchecked
+    for the same reasons: no browser or screen-reader journey can run in the Linux container,
+    and independent Italian and screen-reader review (QA-35) is a human gate.
 - [ ] P05.7 Define and render bounded typed public presentation events for scene, pose/expression and optional line audio hooks; reject executable/raw-URL directives, deduplicate delivery and preserve text-only/keyboard/reduced-motion behavior under QA-40.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.

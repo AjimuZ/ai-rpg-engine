@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { Xliff2TranslationParser } from '@angular/localize/tools';
 
 /** Parse targets with Angular's pinned parser; malformed XML, duplicate IDs and warnings throw diagnostics. */
-function parse(contents) {
+export function parse(contents) {
   const parser = new Xliff2TranslationParser();
   const analysis = parser.analyze('messages.xlf', contents);
   assert.ok(analysis.canParse, 'Invalid XLIFF 2 catalog');
@@ -17,7 +17,7 @@ function parse(contents) {
 }
 
 /** Read source messages through the same parser; returns normalized messages and throws on invalid source XML. */
-function sources(contents) {
+export function sources(contents) {
   // Angular's parser consumes target nodes. This deliberately narrow rewrite supports
   // the CLI's canonical XLIFF 2 output, preserving its inline placeholder structure.
   return parse(contents.replace(/<target\b[^>]*>[\s\S]*?<\/target>/g, '')

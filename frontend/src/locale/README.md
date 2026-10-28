@@ -70,3 +70,14 @@ campaign error code has no message. Language reload of a real campaign scope req
 a verified `engine.campaign-sync.v1` record (cursor and operation identities, no text).
 No browser journey was run for these screens; full QA-35 and independent
 bilingual/screen-reader acceptance remain open.
+
+`npm test` includes `src/app/italian-variant.spec.ts`, which imports this catalog as text,
+loads its targets with `loadTranslations` before any application module is evaluated and
+renders the routed screens and recorded real campaign replies in Italian. It fails when an
+English-only catalog string, an uncatalogued English phrase, an unnamed control or a broken
+ARIA reference appears in the Italian render, so a new template string without `i18n` or a
+target that silently falls back to English is caught without a browser. Its serializer
+mirrors Angular's parser for `ph`, `pc` and ICU text; adding another inline element to the
+catalog makes it throw until the serializer is extended. After compiling, `build:locales`
+runs `tools/localize-index.mjs`, which writes the reviewed `shell.brand` message into each
+variant's `<title>` (Angular does not translate `index.html`); `npm run test:i18n` covers it.

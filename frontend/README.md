@@ -52,6 +52,12 @@ A newer `stateRevision` on an applied message or reset makes the view re-read th
 to the backend golden file by the repository `contracts` check) through the validators and an
 EN→IT→EN reload with an operation in flight; see the
 [sixth checkpoint](../docs/29-localization.md#sixth-checkpoint-recorded-real-server-contract-28-october-2026).
+`src/app/italian-variant.spec.ts` loads the reviewed `src/locale/messages.it.xlf` into
+`$localize` before importing the application and renders every routed screen and the same
+recorded replies in Italian, failing on English-only catalog text, uncatalogued English
+phrases, unnamed controls or broken ARIA references
+([seventh checkpoint](../docs/29-localization.md#seventh-checkpoint-the-italian-variant-rendered-with-the-reviewed-catalog-28-october-2026)).
+The replay server shared by both specs is `src/app/campaign/contract/transcript-server.ts`.
 P05.5 adds `/interface-kit`, linked from Settings, for the shared original MIT
 SVG/CSS theme: control states, 20 icons, bounded numeric meters, progress,
 dialogue/portrait/item frames, empty slots and independent sample item artwork.

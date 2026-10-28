@@ -510,7 +510,11 @@ fall back visibly to English; storage failure and unresolved recovery block
 reload even after leaving the story. Old projection callbacks and reply references
 are invalidated. Real campaign contexts reload only after their operation/cursor
 record verifies in storage; a recorded real-server transcript replays that reload in
-the frontend suite (see the [sixth checkpoint](29-localization.md#sixth-checkpoint-recorded-real-server-contract-28-october-2026)).
+the frontend suite (see the [sixth checkpoint](29-localization.md#sixth-checkpoint-recorded-real-server-contract-28-october-2026)),
+and the Italian variant renders the same replies and every routed screen with the reviewed
+catalog, checked for English leftovers and accessible names (the
+[seventh checkpoint](29-localization.md#seventh-checkpoint-the-italian-variant-rendered-with-the-reviewed-catalog-28-october-2026)).
+Free-form adventure titles and genres are shown literally with their source `lang`.
 The unlocalized default build does not offer switching; the packaged jar serves the
 compiled locale variants.
 

@@ -43,3 +43,21 @@ test('rejects malformed XML and the wrong target language', /** Invalid catalogs
   assert.throws(/** Malformed XML must propagate diagnostics instead of an empty resource set. */ () => checkCatalog(source, '<xliff>'));
   assert.throws(/** A complete catalog for another locale cannot satisfy Italian parity. */ () => checkCatalog(source, catalog(unit('shell.title', 'Library', 'Biblioteca'), 'fr')));
 });
+
+test('titles each compiled index with its reviewed brand and refuses ambiguous documents', /** The Italian page must not open with an English title. */ async () => {
+  const { brandTitles, retitle } = await import('./localize-index.mjs');
+  const reviewed = catalog(unit('shell.brand', 'Adventure engine', 'Motore di avventure'));
+  assert.deepEqual(brandTitles(reviewed), { en: 'Adventure engine', it: 'Motore di avventure' });
+  const index = '<!doctype html>\n<html lang="it" dir="ltr">\n<head><title>Adventure engine</title></head><body></body></html>';
+  const titled = retitle(index, 'it', 'Motore di avventure');
+  assert.equal(titled, index.replace('Adventure engine', 'Motore di avventure'));
+  assert.equal(retitle(titled, 'it', 'Motore di avventure'), titled);
+  assert.match(retitle(index, 'it', 'A & <B> $&'), /<title>A &amp; &lt;B&gt; \$&amp;<\/title>/);
+  assert.throws(/** The wrong document language is a packaging error, not something to retitle. */ () => retitle(index, 'en', 'Adventure engine'));
+  assert.throws(/** Zero or several titles are ambiguous. */ () => retitle(index.replace(/<title>.*<\/title>/, ''), 'it', 'X'));
+  assert.throws(/** Zero or several titles are ambiguous. */ () => retitle(index.replace('</head>', '<title>Two</title></head>'), 'it', 'X'));
+  for (const broken of [catalog(unit('shell.other', 'Adventure engine', 'Motore')), catalog(unit('shell.brand', 'Adventure engine', ' ')),
+    catalog(unit('shell.brand', 'Engine <ph id="0" equiv="NAME"/>', 'Motore <ph id="0" equiv="NAME"/>'))]) {
+    assert.throws(/** A missing, blank or parameterized brand cannot become a static title. */ () => brandTitles(broken));
+  }
+});

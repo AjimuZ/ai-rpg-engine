@@ -39,6 +39,9 @@ class PackagedInterfaceTest {
      */
     @Test
     void servesCompiledInterfaceAndBundles() throws Exception {
+        // The pre-bootstrap title is the reviewed brand message of each variant (frontend
+        // tools/localize-index.mjs), so the Italian page never opens with an English title.
+        java.util.Map<String, String> titles = java.util.Map.of("en", "Adventure engine", "it", "Motore di avventure");
         for (String locale : new String[]{"en", "it"}) {
             URI origin = URI.create("http://127.0.0.1:" + port + "/" + locale + "/");
             try (HttpClient client = HttpClient.newHttpClient()) {
@@ -46,9 +49,9 @@ class PackagedInterfaceTest {
                         HttpResponse.BodyHandlers.ofString());
                 assertEquals(200, index.statusCode());
                 assertTrue(index.headers().firstValue("content-type").orElse("").contains("text/html"));
-                assertTrue(index.body().contains("<title>Adventure engine</title>"));
+                assertTrue(index.body().contains("<title>" + titles.get(locale) + "</title>"), locale);
                 assertTrue(index.body().contains("<base href=\"/" + locale + "/\">"));
-                assertTrue(index.body().contains("lang=\"" + locale + "\""));
+                assertTrue(index.body().contains("<html lang=\"" + locale + "\""), locale);
                 assertTrue(index.body().contains("<app-root>"));
                 assertEquals("no-store", index.headers().firstValue("cache-control").orElse(""));
                 // Deep links return exactly the same compiled index, never a rebuilt

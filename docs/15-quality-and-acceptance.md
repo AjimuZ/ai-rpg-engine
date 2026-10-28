@@ -405,6 +405,20 @@ tests in 39 suites with zero failures, errors or skips; 26 repository-checker te
 zero findings across all six checks. An author review corrected 11 Italian targets. Still
 open: Chrome journeys on the packaged origin, independent Italian and screen-reader review
 and the QA-35 sign-off.
+The seventh P05.6 checkpoint (same container and pins) renders the Italian variant with the
+reviewed catalog loaded at run time
+([details](29-localization.md#seventh-checkpoint-the-italian-variant-rendered-with-the-reviewed-catalog-28-october-2026)).
+`italian-variant.spec.ts` sweeps every routed preview screen, the shell and the saved
+playthrough for English-only catalog text, uncatalogued English phrases, unnamed controls,
+links and images, broken ARIA references and unsupported `lang` values, and checks the
+recorded real replies, the real 404 code and receipts in Italian with identical digit
+sequences. Its detectors are self-tested and failed on deliberate defects. Adventure
+titles and genres now carry their source `lang`, and each compiled locale index carries
+its reviewed pre-bootstrap title, asserted through the real server by
+`PackagedInterfaceTest` (which failed with the old English `it` title). Results: 77
+frontend tests in 13 files, strict typecheck, five localization tool tests, parity build
+(317 messages), 436 packaged backend tests with zero failures, errors or skips. The same
+human and browser gates remain open; this is jsdom evidence, not a screen-reader review.
 The 24 October prerequisite audit is retained as history in the
 [P05.6 integration prerequisites](29-localization.md#p056-integration-prerequisites-24-october-2026-audit).
 These checks preserve the preview safety boundary and do not establish real

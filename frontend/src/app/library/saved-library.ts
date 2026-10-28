@@ -5,6 +5,10 @@
  * Identity is always the server UUID. Equal titles stay separate cards, the selected adventure and
  * playthrough come only from the route, and switching cancels the previous reads so a late reply
  * for one adventure can never populate another adventure's header or list.
+ *
+ * Adventure titles and genres are free-form author metadata, never translated: they are shown
+ * literally and carry the adventure's validated `sourceLocale` as their `lang`, so a screen reader
+ * pronounces an English title correctly inside the Italian interface and vice versa (docs/29).
  */
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, resource, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -44,8 +48,8 @@ export function identityTag(id: string): string {
           <ul class="saved-list">
             @for (adventure of adventures(); track adventure.adventureId) {
               <li class="saved-card" [attr.data-adventure-id]="adventure.adventureId">
-                <h3>{{ adventure.title }}</h3>
-                <p><span class="badge">{{ adventure.genre }}</span> <span class="muted" i18n="@@saved.reference">Reference {{ tag(adventure.adventureId) }}</span></p>
+                <h3 [attr.lang]="adventure.sourceLocale">{{ adventure.title }}</h3>
+                <p><span class="badge" [attr.lang]="adventure.sourceLocale">{{ adventure.genre }}</span> <span class="muted" i18n="@@saved.reference">Reference {{ tag(adventure.adventureId) }}</span></p>
                 <a [routerLink]="['/saved', adventure.adventureId]" i18n="@@saved.open">Open saved adventure</a>
               </li>
             }
@@ -124,7 +128,8 @@ interface SavedScope {
   template: `
     @if (scope(); as current) {
       <header class="workspace-heading saved-heading" [attr.data-adventure-id]="current.adventure.adventureId">
-        <p><strong>{{ current.adventure.title }}</strong> <span class="badge">{{ current.adventure.genre }}</span>
+        <p><strong [attr.lang]="current.adventure.sourceLocale">{{ current.adventure.title }}</strong>
+          <span class="badge" [attr.lang]="current.adventure.sourceLocale">{{ current.adventure.genre }}</span>
           <span class="muted" i18n="@@saved.reference">Reference {{ tag(current.adventure.adventureId) }}</span></p>
         @if (selected(); as playthrough) {
           <p class="selected-playthrough" [attr.data-campaign-id]="playthrough.campaignId" i18n="@@saved.selected">Playthrough: {{ playthrough.title }}</p>

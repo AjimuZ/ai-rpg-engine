@@ -90,6 +90,12 @@ the same selector; direct locale links override the saved preference for that vi
 Spring serves only the finite preview route grammar and leaves missing assets,
 unsupported locale prefixes and API routes as 404s; POST requests never select a locale.
 Locale indexes are sent with `no-store`; content-hashed bundles remain static.
+Angular copies `src/index.html` into each variant changing only `lang` and the base href, so
+`npm run build:locales` finishes with `tools/localize-index.mjs`, which writes each variant's
+reviewed `shell.brand` message into its `<title>` (`Motore di avventure` for `it`). The Italian
+page therefore never opens with an English tab title or first screen-reader announcement,
+before the router sets a route title or when scripting is off. The step validates both indexes
+(`lang`, exactly one plain title) before writing either and is idempotent.
 Shared artwork and project notices retain stable root URLs and are also available
 under both locale prefixes. Extracted dependency notices ship at all three roots.
 
@@ -288,9 +294,10 @@ independent bilingual or screen-reader acceptance.
 | Requirement | Delivered | Evidence | Still open |
 | --- | --- | --- | --- |
 | Operation/cursor-safe reload | `CampaignSession` persists, per adventure+campaign scope, the stream cursor and each seen operation's identity, newest version and status (`engine.campaign-sync.v1`, device storage). `UiLanguage.change` runs `verified(scope)` for every real campaign context: the record is merged with any other tab's newer cursor, written and read back byte for byte. Storage denial, a reverted write, a required restore or an unsaved draft refuse the reload. After the reload `requery` fetches unfinished (and recently saved) operations by identity and `poll` resumes the stream after the saved cursor. Messages are applied only when strictly after the cursor in the same generation (duplicates counted, not applied); `stream.reset` adopts the server head and re-queries; a generation mismatch is reported, never merged. The draft stays in `StoryInputState`; nothing is ever submitted (`Send` is disabled and no `/commands` request exists in tests). | 8 session, 3 view and 2 language-reload tests (`campaign-session.spec.ts`, `campaign-view.spec.ts`, `ui-language.spec.ts`) on a simulated server and storages; since the sixth checkpoint also a replay of real-server bytes through the routed view across EN→IT→EN with an operation in flight at reload time (`campaign-contract.spec.ts`, recorded by `CampaignInterfaceContractTest`) | Chrome EN→IT→EN journey against the packaged origin (no browser is installed in the Linux build container); a real submit path (P05.7/P08 composer) |
-| Localized API errors and receipts | `campaign-messages.ts` maps every public `COMMAND_*`, `CAMPAIGN_*`, `STREAM_*` and `LOCAL_*` code to a `$localize` sentence; unknown, hostile or prototype-named codes fall back to one generic sentence and are never displayed. Statuses, narration reasons, reset reasons and command types are closed enumerations. Receipts render revisions, moves, elapsed seconds, own-resource changes, calculations and draws from the validated public projection; only digit grouping follows the locale, so EN and IT show identical mechanics. `tools/repository_checks` `localization` fails when a controller code has no message. | `campaign-messages.spec.ts`, `campaign-protocol.spec.ts`, `LocalizationCodeTest`; `npm run build:locales` parity (317 messages); the recorded real `CAMPAIGN_SCOPE_UNAVAILABLE` reply and real MOVE receipt in `campaign-contract.spec.ts` | Independent human review of the Italian wording (an author review pass corrected 11 targets, see below); per-pack display names for resource keys and destinations (shown as literal IDs) |
+| Localized API errors and receipts | `campaign-messages.ts` maps every public `COMMAND_*`, `CAMPAIGN_*`, `STREAM_*` and `LOCAL_*` code to a `$localize` sentence; unknown, hostile or prototype-named codes fall back to one generic sentence and are never displayed. Statuses, narration reasons, reset reasons and command types are closed enumerations. Receipts render revisions, moves, elapsed seconds, own-resource changes, calculations and draws from the validated public projection; only digit grouping follows the locale, so EN and IT show identical mechanics. `tools/repository_checks` `localization` fails when a controller code has no message. | `campaign-messages.spec.ts`, `campaign-protocol.spec.ts`, `LocalizationCodeTest`; `npm run build:locales` parity (317 messages); the recorded real `CAMPAIGN_SCOPE_UNAVAILABLE` reply and real MOVE receipt in `campaign-contract.spec.ts`; since the seventh checkpoint the same reply and receipt rendered with the reviewed Italian catalog, and Italian receipts with identical digit sequences (`italian-variant.spec.ts`) | Independent human review of the Italian wording (an author review pass corrected 11 targets, see below); per-pack display names for resource keys and destinations (shown as literal IDs) |
 | Visible source-pack fallback | The state projection's `startingSituation.{text,locale,fallback}` is rendered with a `lang` attribute and, when `fallback` is true, a text note naming the original language. A matching-language text shows no note. Hidden catalog keys and private text are not part of the projection. | `campaign-view.spec.ts` | Fallback for later narrated passages (P08) and quest/fact text |
-| Packaged single origin (QA-35) | `/saved/<uuid>` and `/{en,it}/saved/<uuid>` serve the fixed locale indexes (canonical lowercase UUID only; deeper, uppercase, malformed and resource-like paths stay 404); opaque query/hash survive. | `PackagedInterfaceTest` (deep-link and 404 additions) | Container recreation hash comparison for the new route; Chrome journeys on the packaged origin |
+| Packaged single origin (QA-35) | `/saved/<uuid>` and `/{en,it}/saved/<uuid>` serve the fixed locale indexes (canonical lowercase UUID only; deeper, uppercase, malformed and resource-like paths stay 404); opaque query/hash survive. | `PackagedInterfaceTest` (deep-link and 404 additions; since the seventh checkpoint each locale index's `lang` and reviewed pre-bootstrap title) | Container recreation hash comparison for the new route; Chrome journeys on the packaged origin |
+| Italian variant rendering and accessible names | The routed preview screens, shell and saved playthrough rendered with the reviewed Italian catalog show no English-only catalog text and no uncatalogued English phrase; every control, link and image has a name; ARIA ID references resolve; author titles and genres carry the adventure's `sourceLocale` as `lang` | `italian-variant.spec.ts` (jsdom, reviewed catalog loaded at run time; detectors self-tested and mutation-checked) | Layout, focus rings, contrast and real screen-reader output in a browser; independent review of the Italian wording |
 | Full QA-35 acceptance | — | — | Independent bilingual and screen-reader review of both variants; the gate cannot close without it |
 
 Design decisions: reconciliation state is a small allowlisted record (no receipts, text or
@@ -351,6 +358,59 @@ What this does not establish: it runs in jsdom, not Chrome, so layout, focus rin
 output and the compiled Italian bundle are not exercised; wording assertions use the English
 source catalog; the replay cannot reproduce timing races beyond the recorded phases; and the page
 still has no submit path, so the in-flight operation was admitted by the fixture.
+
+### Seventh checkpoint: the Italian variant rendered with the reviewed catalog (28 October 2026)
+
+The sixth checkpoint's replay asserted English wording only, and the compiled Italian bundle is an
+ES-module build that jsdom cannot load. `frontend/src/app/italian-variant.spec.ts` closes the
+automatable part of that gap without a browser:
+
+- **Same catalog, run time.** The spec imports `src/locale/messages.it.xlf` as text, serializes each
+  unit the way Angular's `Xliff2TranslationParser` does for the inline elements the catalog uses
+  (`ph` → `{$NAME}`, `pc` → start/close placeholders, `{NAME}` inside ICU expressions) and calls
+  `loadTranslations` before importing any application module, so template `i18n` attributes,
+  module-level route titles and `$localize` calls all resolve to the reviewed targets with
+  `LOCALE_ID` `it`. A wrong placeholder name makes `$localize` throw rather than fall back silently;
+  the first run found exactly that for the chronicle plural (ICU placeholders), and the serializer
+  was corrected before any assertion was relaxed.
+- **Every routed screen.** The library (with the recorded adventure as a card), Settings, the
+  interface kit, all scoped preview panels of both sample adventures, an unknown adventure and the
+  saved playthrough are rendered inside the real navigation shell. Each must show no English-only
+  catalog text (whole messages or literal runs of two or more words, including ICU branches), no
+  string containing an English function word outside `code` identifiers or elements whose `lang`
+  declares another language, an Italian document title, a name for every control, link and image,
+  resolvable `aria-labelledby`/`aria-describedby` references, non-empty `aria-label`s and alerts,
+  and only `en`/`it` `lang` values. An exploratory pass listing every rendered string not taken from
+  an Italian target found only data: sample adventure titles, the recorded adventure title and
+  genre, meter values such as `18 / 24`, icon identifiers in `code` and the `Italiano` endonym.
+- **Real replies in Italian.** The recorded real-server transcript renders with the reviewed
+  statuses (`Presa in carico`, the narration-pending status), narration reason, receipt lines and
+  their list label, connection notices, composer label, placeholder and help, `Invia` (still
+  disabled) and the playthrough title line. The recorded `CAMPAIGN_SCOPE_UNAVAILABLE` 404 shows the
+  Italian sentence and never the code; unknown and prototype-named codes use the Italian generic
+  sentence; a foreign playthrough ID shows the Italian refusal. Italian receipts for the richer
+  simulated receipt (resource, check and die roll) contain exactly the committed numbers, and their
+  digit sequences equal those of the English source sentences; only grouping differs (`12.000`).
+- **Author metadata language.** Adventure titles and genres are free-form author text, never
+  translated. They now carry the adventure's validated `sourceLocale` as `lang` on the library card
+  and the saved-adventure heading, so a screen reader pronounces an English title correctly inside
+  the Italian interface (WCAG 3.1.2). The playthrough title is player text of unknown language and
+  stays untagged.
+- **Pre-bootstrap title.** The compiled `it` index carried `<title>Adventure engine</title>`; it now
+  carries the reviewed brand (see section 3). `PackagedInterfaceTest` asserts each locale's `lang`
+  and title through the real server; with the English title restored in the `it` output, that test
+  failed at the Italian assertion before the fix.
+
+The detectors were checked against deliberate defects: removing `i18n` from the Send button, the
+library title's `lang` binding or the textarea's label association, or serializing without the ICU
+placeholder rule, each made the suite fail, and the accessibility rules report each defect class on a synthetic page. A missing
+`aria-label` on the single navigation landmark is deliberately not reported, because one unlabeled
+landmark is valid.
+
+What this does not establish: it is still jsdom, so layout, focus visibility, contrast, speech
+output and the compiled bundle's own execution are not exercised; the English-word detector is a
+heuristic for uncatalogued English, not a translation-quality measure; and nothing here is the
+independent Italian or screen-reader review that QA-35 requires.
 
 ### P05.6 integration prerequisites (24 October 2026 audit)
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Italian variant rendering checks (partial), 28 October 2026
+
+- Render every routed screen, the navigation shell and the recorded real-server campaign
+  replies with the reviewed Italian catalog in the frontend suite, and fail on English-only
+  catalog text, uncatalogued English phrases, unnamed controls, links or images, broken ARIA
+  references and unsupported `lang` values. Italian receipts are checked to carry exactly the
+  committed numbers.
+- Give the Italian build its reviewed page title (`Motore di avventure`) before the interface
+  starts and without scripting; the packaged server test now checks each locale's title and
+  `lang`.
+- Mark saved-adventure titles and genres with the adventure's source language so screen
+  readers pronounce them correctly in either interface language.
+- Not complete: no browser or screen-reader journey ran (no browser in the build container),
+  and QA-35 still needs independent bilingual and screen-reader review, so P05.6 remains open.
+
 ## Unreleased — Real-server reload contract for the bilingual UI (partial), 28 October 2026
 
 - Record the exact replies of the real servlet stack and PostgreSQL across a language

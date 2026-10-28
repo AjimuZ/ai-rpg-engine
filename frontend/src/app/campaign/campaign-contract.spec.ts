@@ -8,8 +8,10 @@
  * view, `CampaignSession` and `UiLanguage` across an explicit EN→IT→EN reload. The replaying
  * server answers only requests the real server was asked in the current or an earlier phase and
  * never serves a fixture-side POST to the interface, so an extra, renamed or submitting request
- * fails the spec. Wording assertions use the English source catalog; the Italian variant's
- * wording is guaranteed by the build's translation parity check, not by these specs.
+ * fails the spec. Wording assertions here use the English source catalog; the same replies are
+ * rendered with the reviewed Italian catalog by `../italian-variant.spec.ts`, and the build's
+ * parity check guarantees that the compiled `it` bundle carries those targets. The replay server
+ * itself lives in `contract/transcript-server.ts`.
  */
 import { registerLocaleData } from '@angular/common';
 import italian from '@angular/common/locales/it';
@@ -26,78 +28,10 @@ import { LANGUAGE_BROWSER, LanguageBrowser, UiLanguage } from '../preview/ui-lan
 import { campaignErrorMessage, receiptLines } from './campaign-messages';
 import { FrameDecoder, parseCampaignView, parseOperation, PublicReceipt } from './campaign-protocol';
 import { CampaignSession } from './campaign-session';
-import transcript from './contract/campaign-reload-transcript.json';
+import {
+  ADVENTURE, CAMPAIGN, DRAFT_KEY, Exchange, EXCHANGES, MOVE, ROUTE, SCOPE, SYNC_KEY, TRANSCRIPT as transcript, TranscriptServer, WAIT,
+} from './contract/transcript-server';
 import { MemoryStore, syncProvider } from './fixtures';
-
-/** One recorded HTTP exchange; bodies are the server's exact (normalized) text. */
-interface Exchange {
-  readonly phase: string;
-  readonly client: string;
-  readonly method: string;
-  readonly path: string;
-  readonly requestBody: string | null;
-  readonly status: number;
-  readonly contentType: string | null;
-  readonly body: string;
-}
-
-const EXCHANGES: readonly Exchange[] = transcript.exchanges;
-const PHASES: readonly string[] = transcript.phases;
-const { adventureId: ADVENTURE, campaignId: CAMPAIGN, moveOperationId: MOVE, waitOperationId: WAIT } = transcript.identities;
-const SCOPE = { adventureId: ADVENTURE, campaignId: CAMPAIGN };
-const ROUTE = `/saved/${ADVENTURE}?playthrough=${CAMPAIGN}`;
-const SYNC_KEY = `engine.campaign-sync.v1:${JSON.stringify([ADVENTURE, CAMPAIGN])}`;
-const DRAFT_KEY = `engine.story-draft.v1:${JSON.stringify([ADVENTURE, CAMPAIGN])}`;
-
-/**
- * Replay the transcript as the single origin. A request is answered with the latest page
- * exchange recorded for the same method and path at or before the current phase. A stream reply
- * without messages stays open, like the real held long poll, until the phase advances or the
- * request is aborted; everything else ends immediately.
- */
-class TranscriptServer {
-  readonly calls: string[] = [];
-  readonly unrecorded: string[] = [];
-  private phase = 0;
-  private readonly held = new Set<() => void>();
-
-  /** Move to a later recorded phase; held polls end so the page reconnects and sees the new answers. */
-  advance(phase: string): void {
-    const next = PHASES.indexOf(phase);
-    expect(next).toBeGreaterThan(this.phase);
-    this.phase = next;
-    for (const end of [...this.held]) end();
-  }
-
-  readonly fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const path = String(input);
-    const method = init?.method ?? 'GET';
-    this.calls.push(`${method} ${path}`);
-    const answer = EXCHANGES.filter(/** Fixture writes are never served to the interface. */ (entry) => entry.client === 'page' &&
-      entry.method === method && entry.path === path && PHASES.indexOf(entry.phase) <= this.phase).at(-1);
-    if (!answer) {
-      this.unrecorded.push(`${method} ${path}`);
-      return Promise.reject(new TypeError('Request was not recorded from the real server'));
-    }
-    const headers = answer.contentType === null ? undefined : { 'Content-Type': answer.contentType };
-    if (!path.includes('/stream?')) return Promise.resolve(new Response(answer.body, { status: answer.status, headers }));
-    const bytes = new TextEncoder().encode(answer.body);
-    const holds = !/(^|\n)id: /.test(answer.body);
-    const body = new ReadableStream<Uint8Array>({
-      start: (controller) => {
-        controller.enqueue(bytes);
-        if (!holds) { controller.close(); return; }
-        const end = (): void => { this.held.delete(end); try { controller.close(); } catch { /* Already aborted. */ } };
-        this.held.add(end);
-        init?.signal?.addEventListener('abort', /** Leaving the page aborts the held poll. */ () => {
-          this.held.delete(end);
-          try { controller.error(new DOMException('Aborted', 'AbortError')); } catch { /* Already closed. */ }
-        }, { once: true });
-      },
-    });
-    return Promise.resolve(new Response(body, { status: answer.status, headers }));
-  };
-}
 
 /** Find the single recorded exchange for a phase and path fragment. */
 function recorded(phase: string, fragment: string): Exchange {

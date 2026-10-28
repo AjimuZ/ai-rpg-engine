@@ -16,6 +16,7 @@ frontend/**
 frontend/tools/**
 !frontend/tools/check-localization.mjs
 !frontend/tools/check-localization.test.mjs
+!frontend/tools/localize-index.mjs
 !frontend/public/
 !frontend/public/**
 !backend/

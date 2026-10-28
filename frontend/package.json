@@ -7,7 +7,7 @@
     "build": "ng build",
     "extract:i18n": "ng extract-i18n --output-path .angular/i18n --out-file messages.en.xlf",
     "check:i18n": "npm run extract:i18n && node tools/check-localization.mjs .angular/i18n/messages.en.xlf src/locale/messages.it.xlf",
-    "build:locales": "npm run check:i18n && ng build --configuration production,localized",
+    "build:locales": "npm run check:i18n && ng build --configuration production,localized && node tools/localize-index.mjs src/locale/messages.it.xlf dist/engine-ui-localized/browser",
     "test:i18n": "node --test tools/check-localization.test.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false",
