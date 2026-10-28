@@ -10,8 +10,10 @@
  * performs the structural and semantic checks; the schema is never trusted as validation.
  *
  * <p>{@link org.rpgengine.inference.contract.ContractRunner} submits one contract task through
- * {@link org.rpgengine.inference.NarrationTaskPort}, validates the untrusted output and allows
- * exactly one bounded repair with the same canonical context. Every result keeps the presentation
+ * {@link org.rpgengine.inference.session.ScopedSessions} in the session scope derived from the
+ * task kind's role and audience and the binding's campaign, generation and hashes (P08.3), so no
+ * caller chooses a session, validates the untrusted output and allows exactly one bounded repair
+ * with the same canonical context. Every result keeps the presentation
  * binding (locale, locale revision, glossary revision) it was generated for, so a caller can
  * discard output that became stale. Nothing in this package mutates state, touches the database,
  * publishes text or names a runtime: an accepted intent still goes through ordinary command

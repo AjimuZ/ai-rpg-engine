@@ -12,10 +12,11 @@ import java.util.UUID;
  *
  * @param taskId caller-chosen identity, used for correlation and idempotent bookkeeping; a
  *        port never runs two tasks with the same live identity
- * @param sessionId logical AI session (ADR 0005). The caller guarantees that one session never
- *        mixes campaigns, roles, audiences or policies (docs/06 section 7, P08.3); an adapter
- *        maps it to at most one runtime conversation and may replace that conversation, which
- *        it reports through {@link TaskResult#freshSession()}
+ * @param sessionId logical AI session (ADR 0005). Engine code never chooses it: only
+ *        {@code org.rpgengine.inference.session.ScopedSessions} builds requests, and it gives every
+ *        campaign, generation, role, audience, content and policy scope its own session (docs/06
+ *        section 7, P08.3). An adapter maps it to at most one runtime conversation and may replace
+ *        that conversation, which it reports through {@link TaskResult#freshSession()}
  * @param slot logical weight class; resolved through {@link SlotAssignments}
  * @param instructions task text, at most {@link #MAX_INSTRUCTION_BYTES} UTF-8 bytes
  * @param outputSchema JSON Schema object text constraining the final output, at most

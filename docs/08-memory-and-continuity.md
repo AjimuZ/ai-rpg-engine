@@ -90,6 +90,14 @@ Renewal steps:
 
 Renewal is not a new campaign, a replay of the prologue, a rest, a round boundary, or an action by any character.
 
+Since P08.3 the session-scoping registry ([docs/06 section 7](06-codex-integration.md#p083-session-scoping)) provides the retirement half of these steps, and every retirement reaches the runtime adapter:
+
+- A content or policy hash change, or a new campaign generation, renews the affected line automatically.
+- `retire(scope)` renews one role/audience session, for example after a failure made its context unreliable.
+- `retireCampaign` and `retireAll` cover restore and a runtime change.
+
+The triggers themselves (the turn ceiling, context pressure, owner and idle renewal), durable session records with counters and checkpoint hashes, and rehydration are P09.3/P09.4. The registry is in memory, so a backend restart already starts every scope afresh.
+
 ## 8. Summary lifecycle
 
 Refresh a scene summary after each scene boundary and initially every five significant canonical actions, with a hard ceiling of ten. Keep a compact operational checkpoint current independently of AI-generated summaries. A background summary stores the source interval and revision, visibility, covered entities, and referenced event IDs.

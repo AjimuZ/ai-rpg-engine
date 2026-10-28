@@ -33,8 +33,10 @@ final class ContractFixtures {
     private ContractFixtures() {
     }
 
+    static final long GENERATION = 1;
+
     static TaskBinding binding(SupportedLocale locale) {
-        return new TaskBinding(TASK, ADVENTURE, CAMPAIGN, 7, locale, 2, 3, "a".repeat(64), "b".repeat(64));
+        return new TaskBinding(TASK, ADVENTURE, CAMPAIGN, GENERATION, 7, locale, 2, 3, "a".repeat(64), "b".repeat(64));
     }
 
     static DisclosureGuard guard() {
@@ -53,8 +55,14 @@ final class ContractFixtures {
     }
 
     static IntentContext intent(SupportedLocale locale, String playerText, Set<IntentKind> kinds) {
+        return intent(binding(locale), playerText, kinds);
+    }
+
+    /** An intent context under an explicit binding, for session-scope tests. */
+    static IntentContext intent(TaskBinding binding, String playerText, Set<IntentKind> kinds) {
+        SupportedLocale locale = binding.outputLocale();
         boolean it = locale == SupportedLocale.IT;
-        return new IntentContext(binding(locale), PLAYER, playerText, kinds,
+        return new IntentContext(binding, PLAYER, playerText, kinds,
                 List.of(new IntentContext.Destination("loc.mill", it ? "Il vecchio mulino" : "The old mill"),
                         new IntentContext.Destination("loc.square", it ? "La piazza" : "The square")),
                 List.of(new KnownActor(MARA, "Mara"), new KnownActor(TULLO, "Tullo")),
@@ -86,8 +94,14 @@ final class ContractFixtures {
     }
 
     static NarrationContext narration(SupportedLocale locale, DisclosureGuard guard) {
+        return narration(binding(locale), guard);
+    }
+
+    /** A narration context under an explicit binding, for session-scope tests. */
+    static NarrationContext narration(TaskBinding binding, DisclosureGuard guard) {
+        SupportedLocale locale = binding.outputLocale();
         boolean it = locale == SupportedLocale.IT;
-        return new NarrationContext(binding(locale), OPERATION, PLAYER,
+        return new NarrationContext(binding, OPERATION, PLAYER,
                 List.of(new PublicFact("evt.1", it ? "Il personaggio chiede a Mara dove si trova il vecchio mulino."
                                 : "The character asks Mara where the old mill is."),
                         new PublicFact("evt.2", it ? "Mara risponde che il mulino è a 2 ore di cammino verso nord."

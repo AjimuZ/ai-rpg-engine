@@ -94,7 +94,7 @@ P08.1 implements the Java transport behind the runtime-neutral task port. Applic
 - Neutral records: `TaskRequest` (task and logical session identity, `InferenceSlot`, instructions, a JSON output schema and a 1–180-second budget), `TaskResult` (status, untrusted output, fixed error code and runtime/version/model/effort provenance) and `RuntimeStatus`.
 - Slot assignment through `SlotAssignments`.
 
-The adapter lives in the package-private `org.rpgengine.inference.codex`. A source and reflection test (`InferenceBoundaryTest`) fails the build if any other package names it or if the neutral API exposes a non-neutral type. No other engine package uses the port yet. Validated narration (P08.2/P08.5) consumes it later, and until then `UnavailableNarration` stays wired.
+The adapter lives in the package-private `org.rpgengine.inference.codex`. A source and reflection test (`InferenceBoundaryTest`) fails the build if any other package names it or if the neutral API exposes a non-neutral type. Since P08.3 the only caller of `submit` and `retireSession` is the session-scoping registry ([section 7](#p083-session-scoping)), and no gameplay path calls it yet. Validated narration (P08.2/P08.5) consumes it later, and until then `UnavailableNarration` stays wired.
 
 | Concern | Behaviour |
 | --- | --- |
@@ -150,6 +150,47 @@ P08.2 implements the intent and narration contracts in `org.rpgengine.inference.
 A game-master planner may need secrets to plan a coherent world. A player narrator, guide, or enemy tactician may not need them. Scope AI sessions by campaign, role, audience, and policy hash. **Never reuse a privileged planner thread to render player narration**, even if the newest message omits secrets; prior context still exists.
 
 Player narration receives a public event bundle. NPC tactics receive that actor's observations and plausible beliefs. A guide receives its defined senses and discoveries. Summaries have the same visibility scope as their inputs. Cross-role handoffs use typed filtered records, not raw conversation transcripts.
+
+### P08.3 session scoping
+
+P08.3 implements this scoping in `org.rpgengine.inference.session`, above the neutral port and below every task contract. It names no runtime, so the Claude adapter (P20) inherits it unchanged.
+
+- **Scope key.** A `SessionScope` holds the adventure, campaign, campaign recovery generation, `AiRole`, `Audience`, pack hash and policy hash. Two tasks share a logical session, and therefore a runtime thread, only when every component is equal. The generation is in the key because a restore increments it (docs/28 section 10). The hashes are in the key because a content or policy change renews the session (docs/08 section 7).
+- **Audiences.**
+  - `public`: the player's view.
+  - `character:<ref>`: one NPC's or guide persona's own knowledge.
+  - `privileged`: hidden canon and planning material, equal to the planning snapshot audience `PLANNER_PRIVATE`.
+- **Role matrix.**
+
+  | Role (`AiRole` wire name) | Player-facing | Permitted audiences |
+  | --- | --- | --- |
+  | `interpreter`, `narrator` | yes | `public` |
+  | `guide` | yes | `character` |
+  | `tactician` | no | `character` |
+  | `summarizer` | no | any (the audience of its inputs) |
+  | `content-proposer`, `encounter-proposer`, `quest-planner`, `world-director`, `plan-reviewer` | no | `privileged` |
+
+  A player-facing role can never be privileged, and a planning role can never be public. A test checks this for every role. So no scope can serve both planning and narration, which turns "never reuse a privileged planner thread to render player narration" into a construction rule rather than a convention.
+- **Single submitter.** `ScopedSessions` is the only main code that builds a `TaskRequest` or calls the port's `submit` or `retireSession`; `SessionBoundaryTest` enforces this. Callers name a scope, never a session identifier. `ContractRunner.start(contract, context, slot, budget)` no longer accepts a session: it derives the scope from the contract kind's role and audience and the binding's campaign, generation and hashes. Intent interpretation and narration are separate roles, so they have separate threads.
+- **Registry rules** (`submit`, in order):
+  1. A campaign already scoped under another adventure is `REJECTED` with `session-scope-conflict`.
+  2. A scope with a lower generation than an active session of its campaign (a callback from before a restore) is `REJECTED` with `stale-campaign-generation`. Nothing is sent, and the current sessions are untouched.
+  3. An equal scope reuses its session.
+  4. A new scope first retires the campaign's lower-generation sessions (every role and audience) and the same campaign/role/audience line under other hashes.
+  5. New sessions get fresh random identifiers, so a retired identifier is never reissued.
+  6. At most `engine.inference.sessions.capacity` sessions are active (default 256, range 1–4096); the least recently used one is retired.
+
+  Every retirement is forwarded to `NarrationTaskPort.retireSession`, so the adapter forgets the thread binding too. A task already running finishes on its thread.
+- **Retirement operations.** `retire(scope)` handles renewal or a context made unreliable by a failure, `retireCampaign(id)` handles restore, deletion or archival, and `retireAll()` handles a runtime change or an owner request. The P09.4 triggers (turn ceiling, context pressure, idle renewal) will call them.
+- **State.** The registry is in memory, like the adapter's bindings. A backend restart starts every scope with a fresh thread, which also covers a runtime switch at restart (ADR 0020 decision 4). Durable `AiSession` records with counters and checkpoint hashes are P09.3/P09.4.
+
+Not part of P08.3:
+
+- Context filtering itself. Callers assemble public contexts from typed projections (P08.5, P09.2), and the P08.2 disclosure guard refuses a context that contains a privileged marker.
+- Detecting paraphrased secrets in output, which remains a human-rubric evaluation.
+- The durable fair queue that dispatches these scopes (P08.6).
+
+Evidence uses deterministic doubles only. The real Codex adapter runs against the scripted app-server: a planner, a narrator, an interpreter and an NPC tactician of one campaign get four distinct threads. A sentinel given to the planner is sent exactly once, on the planner's thread. Renewal, a policy change, campaign retirement and a newer generation start fresh threads only where they apply. See the [verification record](15-quality-and-acceptance.md).
 
 ## 8. Capability and tool policy
 

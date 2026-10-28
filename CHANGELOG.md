@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — Separate AI sessions per campaign, role, audience and policy, 28 October 2026
+
+- Give every AI task its own session for its campaign, recovery generation, role, audience
+  and content and policy hashes. A quest planner, the narrator, the intent interpreter and
+  each NPC's tactician of one campaign never share a runtime conversation, and a planner's
+  earlier context cannot reach public narration through a reused thread.
+- Fix which audiences each role may use. The interpreter, narrator and guide, whose output
+  the player sees, can never be scoped to the privileged audience where planners, directors,
+  reviewers and content or encounter proposers run.
+- Remove the session parameter from the contract runner. It now derives the session from the
+  task kind and the task binding, which also records the campaign generation, so callers can
+  no longer pass a planner session to narration. Only the new scoped registry may submit to
+  the runtime port, and a source-level test enforces this.
+- Renew a session automatically when its campaign generation, content hash or policy hash
+  changes. A late task from before a restore is refused without sending anything.
+  Retirement of one scope, one campaign or the whole installation reaches the runtime
+  adapter. Active sessions are bounded by `engine.inference.sessions.capacity` (default 256).
+- Pass 79 focused cases, 23 of them new in five new suites plus the Spring selection suite;
+  fifteen deliberate weakening probes were detected. The checks use deterministic doubles,
+  including the real Codex adapter against the scripted app-server. Gameplay still calls no
+  contract (P08.5), and session records stay in memory until P09.
+
 ## Unreleased — Validated intent and narration contracts, 28 October 2026
 
 - Add typed intent interpretation. One free-text declaration becomes exactly one proposed

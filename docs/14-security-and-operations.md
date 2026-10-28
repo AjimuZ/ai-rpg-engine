@@ -134,6 +134,8 @@ The tracked root [`.env.example`](../.env.example) contains only the consumed lo
 
 Player DTOs must omit unrevealed lore, private NPC knowledge, relationship internals, hidden encounter participants/statistics, and planner reasoning. Use separate role/audience threads so secret context cannot persist invisibly into a public narration task. Prevent media/audio choices from leaking a hidden threat before it is observed.
 
+P08.3 enforces the thread separation for inference ([docs/06 section 7](06-codex-integration.md#p083-session-scoping)). Every task runs in the session of its campaign, generation, role, audience, pack hash and policy hash. Player-facing roles can never be scoped to the privileged audience. Only the scoping registry may submit to the runtime port, and tests enforce this at the source level. This prevents context carry-over through a shared conversation. It does not filter what a caller puts into a public context, and it does not detect a paraphrased secret in output.
+
 The root Compose shell gives only PostgreSQL and engine the database file
 secret. Runtime account/workspace volumes are separate from canonical storage;
 the runtime joins inference egress only, never the internal data network. Only

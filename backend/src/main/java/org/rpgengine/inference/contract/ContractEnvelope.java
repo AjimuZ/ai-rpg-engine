@@ -113,10 +113,11 @@ final class ContractEnvelope {
         envelope.put("contractVersion", TaskContract.CONTRACT_VERSION);
         envelope.put("taskId", binding.taskId().toString());
         envelope.put("taskKind", kind.wire());
-        envelope.put("role", kind.role());
-        envelope.put("audience", "public");
+        envelope.put("role", kind.role().wire());
+        envelope.put("audience", kind.audience().wire());
         envelope.put("adventureId", binding.adventureId().toString());
         envelope.put("campaignId", binding.campaignId().toString());
+        envelope.put("campaignGeneration", binding.campaignGeneration());
         envelope.put("baseRevision", binding.baseRevision());
         envelope.put("contextDigest", digest);
         envelope.put("outputLocale", binding.outputLocale().tag());

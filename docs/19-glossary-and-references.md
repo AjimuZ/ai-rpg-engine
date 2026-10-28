@@ -22,6 +22,7 @@
 | State revision | Monotonic canonical mutation version |
 | Event sequence | Campaign-scoped append-only ordering of domain events |
 | AI session | Renewable role/audience working context backed by a private runtime conversation (a Codex thread, or a Claude session when selected) |
+| Session scope | Isolation key of an AI session: campaign, recovery generation, role, audience (`public`, `character:<ref>`, `privileged`), pack hash and policy hash; tasks share a runtime conversation only within one scope (P08.3) |
 | Codex turn | One submitted task and the agent work that follows; not necessarily a game turn |
 | Narration runtime | The single selected AI backend of an installation, Codex (default) or Claude, behind the runtime-neutral task port ([ADR 0020](adr/0020-selectable-narration-runtime.md)) |
 | Slot | A logical use of a model: `text.light`, `text.standard`, `text.deliberate` or `image`. The owner assigns a backend and model to each ([ADR 0021](adr/0021-inference-backends-and-model-selection.md)) |

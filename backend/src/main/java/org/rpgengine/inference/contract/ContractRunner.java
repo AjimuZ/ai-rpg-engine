@@ -12,14 +12,22 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 import org.rpgengine.inference.InferenceSlot;
-import org.rpgengine.inference.NarrationTaskPort;
 import org.rpgengine.inference.TaskHandle;
 import org.rpgengine.inference.TaskRequest;
 import org.rpgengine.inference.TaskResult;
+import org.rpgengine.inference.session.ScopedSessions;
+import org.rpgengine.inference.session.SessionScope;
 
 /**
  * Runs one contract task through the runtime-neutral port with validation and exactly one bounded
- * repair (docs/07 section 9, docs/21 section 8).
+ * repair (docs/07 section 9, docs/21 section 8), in the session of the task's own scope (P08.3).
+ *
+ * <p>Session scoping: the caller never names a session. The runner derives the
+ * {@link SessionScope} from the contract's kind (role and audience) and the context's binding
+ * (adventure, campaign, generation, pack and policy hashes) and submits through
+ * {@link ScopedSessions}, so an interpreter and a narrator, two campaigns, or a public and a
+ * privileged task can never share a runtime conversation, and a privileged planner session can
+ * never be passed in to render narration. Both attempts of a call use the same scope.
  *
  * <p>Algorithm:
  * <ol>
@@ -27,9 +35,10 @@ import org.rpgengine.inference.TaskResult;
  *       without submitting anything.</li>
  *   <li>Submit attempt 1 with the binding's task identity and the whole budget.</li>
  *   <li>A non-completed task status ends the call {@link ContractOutcome.NotCompleted}: transport
- *       failures, unavailability and timeouts are not output defects and are never repaired.</li>
+ *       failures, unavailability, timeouts and scope refusals of {@link ScopedSessions} (a stale
+ *       campaign generation) are not output defects and are never repaired.</li>
  *   <li>A completed output is validated. Acceptance ends the call. Violations start the single
- *       repair: the same canonical context, the same logical session, a derived task identity and
+ *       repair: the same canonical context, the same session scope, a derived task identity and
  *       only the remaining budget, with the violation codes and pointers (never the rejected text)
  *       appended. A remaining budget below the port minimum ends the call
  *       {@link ContractOutcome.Rejected} instead.</li>
@@ -42,15 +51,15 @@ import org.rpgengine.inference.TaskResult;
  * completes the port's result stage; they only validate in memory and submit, which never blocks.
  */
 public final class ContractRunner {
-    private final NarrationTaskPort port;
+    private final ScopedSessions sessions;
     private final Clock clock;
 
     /**
-     * @param port the installation's task port
+     * @param sessions the installation's scoped submitter of the task port
      * @param clock clock for the shared attempt budget
      */
-    public ContractRunner(NarrationTaskPort port, Clock clock) {
-        this.port = Objects.requireNonNull(port, "port");
+    public ContractRunner(ScopedSessions sessions, Clock clock) {
+        this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -58,23 +67,22 @@ public final class ContractRunner {
      * Start one contract call.
      *
      * @param contract task contract
-     * @param context trusted context
-     * @param sessionId logical AI session; the caller scopes it by campaign, role, audience and policy
+     * @param context trusted context; its binding and the contract's kind determine the session scope
      * @param slot logical inference slot
      * @param budget total budget for both attempts, {@link TaskRequest#MIN_TIMEOUT}..{@link TaskRequest#MAX_TIMEOUT}
      * @return running call
      * @throws IllegalArgumentException for an out-of-range budget or oversized instructions
      */
-    public <C extends ContractContext, T> ContractCall<T> start(TaskContract<C, T> contract, C context, UUID sessionId,
+    public <C extends ContractContext, T> ContractCall<T> start(TaskContract<C, T> contract, C context,
             InferenceSlot slot, Duration budget) {
         Objects.requireNonNull(contract, "contract");
         Objects.requireNonNull(context, "context");
-        Objects.requireNonNull(sessionId, "sessionId");
         Objects.requireNonNull(slot, "slot");
         if (budget.compareTo(TaskRequest.MIN_TIMEOUT) < 0 || budget.compareTo(TaskRequest.MAX_TIMEOUT) > 0) {
             throw new IllegalArgumentException("budget outside the supported range");
         }
-        var call = new Call<>(contract, context, sessionId, slot, clock.instant().plus(budget));
+        SessionScope scope = contract.kind().scope(context.binding());
+        var call = new Call<>(contract, context, scope, slot, clock.instant().plus(budget));
         TaskContract.RenderedTask first;
         try {
             first = contract.render(context, List.of());
@@ -95,7 +103,7 @@ public final class ContractRunner {
     private final class Call<C extends ContractContext, T> implements ContractCall<T> {
         private final TaskContract<C, T> contract;
         private final C context;
-        private final UUID sessionId;
+        private final SessionScope scope;
         private final InferenceSlot slot;
         private final Instant deadline;
         private final CompletableFuture<ContractOutcome<T>> promise = new CompletableFuture<>();
@@ -103,10 +111,10 @@ public final class ContractRunner {
         private TaskHandle current;
         private boolean cancelled;
 
-        Call(TaskContract<C, T> contract, C context, UUID sessionId, InferenceSlot slot, Instant deadline) {
+        Call(TaskContract<C, T> contract, C context, SessionScope scope, InferenceSlot slot, Instant deadline) {
             this.contract = contract;
             this.context = context;
-            this.sessionId = sessionId;
+            this.scope = scope;
             this.slot = slot;
             this.deadline = deadline;
         }
@@ -134,9 +142,8 @@ public final class ContractRunner {
 
         /** Submit one attempt and continue when its result arrives. */
         void submit(UUID portTaskId, TaskContract.RenderedTask rendered, Duration timeout, boolean repair) {
-            var request = new TaskRequest(portTaskId, sessionId, slot, rendered.instructions(), contract.outputSchema(),
-                    timeout);
-            TaskHandle handle = port.submit(request);
+            TaskHandle handle = sessions.submit(scope, portTaskId, slot, rendered.instructions(),
+                    contract.outputSchema(), timeout);
             boolean cancelNow;
             synchronized (this) {
                 current = handle;

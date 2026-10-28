@@ -7,6 +7,10 @@
  * protocol, process, socket, thread or turn: those belong to one adapter per runtime (today only the
  * Codex adapter in the {@code codex} subpackage), which no other package may reference.
  *
+ * <p>Engine code does not call the port directly: the {@code session} subpackage maps each
+ * campaign, generation, role, audience, content and policy scope to its own logical session and
+ * is the port's only submitter (P08.3), so privileged and public work never share a conversation.
+ *
  * <p>Authority is unchanged by this package: a result is a proposal or prose candidate that
  * later validators must admit (P08.2). Slot assignments are private owner settings resolved by
  * {@link org.rpgengine.inference.SlotAssignments}; when no runtime is configured the engine

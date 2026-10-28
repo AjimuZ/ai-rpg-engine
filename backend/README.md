@@ -771,15 +771,15 @@ application tasks. The rules, violation codes and limits are in
   submitted by itself; it still passes admission, rule validation and idempotency.
 - `NarrationContract` maps a public resolved-event bundle to one to eight attributed passages
   and up to three editable quick replies for the pending decision.
-- `ContractRunner` submits through `NarrationTaskPort`, validates the untrusted output and
-  repairs at most once. The rejected text is never echoed: only violation codes and pointers
+- `ContractRunner` submits through `ScopedSessions` (P08.3), validates the untrusted output
+  and repairs at most once. The rejected text is never echoed: only violation codes and pointers
   go back. It returns `Accepted`, `Rejected`, `NotCompleted` or `Refused` with the
   `TaskBinding`; check `presentationCurrent` before showing anything.
 - Output schemas are bundled at `src/main/resources/ai-contract/1/`. They constrain generation
   only. `ContractSchemaTest` keeps their field sets equal to the validators'.
 
 Nothing calls these contracts from gameplay yet. P08.5 wires narration publication and the
-receipt fallback; P08.3 scopes sessions.
+receipt fallback; session scoping is described below.
 
 Tests use the deterministic `ScriptedTaskPort` and a manual clock; no database or runtime is
 needed. The suites are `IntentContractTest`, `NarrationContractTest`, `ContractRunnerTest` and
@@ -789,6 +789,46 @@ Verified on 28 October 2026 with the unchanged scoped JDK 21 toolchain and dispo
 PostgreSQL 18.6 fixture: 35 focused cases and all 525 packaged backend cases in 51 suites
 pass with zero failures/errors/skips, fifteen deliberate weakening probes were detected, and
 the executable jar is packaged. See [evidence scope](../docs/15-quality-and-acceptance.md).
+
+## Session scoping by campaign, role, audience and policy (P08.3)
+
+`org.rpgengine.inference.session` keeps privileged planning apart from public narration. The
+rules are in [docs/06 section 7](../docs/06-codex-integration.md#p083-session-scoping).
+
+- `SessionScope` is the isolation key: adventure, campaign, recovery generation, `AiRole`,
+  `Audience` (`public`, `character:<ref>`, `privileged`), pack hash and policy hash. Tasks
+  share a runtime thread only within one scope.
+- `AiRole` fixes the permitted audiences per role. `interpreter` and `narrator` are public
+  only, `guide` and `tactician` use a character audience, and the planning and proposal roles
+  are privileged only. No player-facing role permits `privileged`.
+- `ScopedSessions` (a Spring component) is the port's only submitter. It reuses the session
+  of an equal scope, and it retires superseded lines (new generation, pack or policy hash).
+  It also rejects a stale generation (`stale-campaign-generation`) or a campaign under two
+  adventures (`session-scope-conflict`) without sending anything, and bounds active sessions.
+  Every retirement is forwarded to `NarrationTaskPort.retireSession`. `retire`,
+  `retireCampaign` and `retireAll` serve renewal, restore and a runtime change.
+- `ContractRunner.start(contract, context, slot, budget)` derives the scope from the task kind
+  and the binding; callers cannot pass a session. `TaskBinding` gained `campaignGeneration`,
+  which the envelope renders.
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `engine.inference.sessions.capacity` | `256` | Active scoped sessions (1–4096); the least recently used is retired |
+
+The registry is in memory, like the adapter's thread bindings, so a backend restart starts
+every scope on a fresh thread. Durable session records and renewal triggers are P09.3/P09.4.
+
+Tests use deterministic doubles only and need no database:
+
+- `SessionScopeTest` covers the role matrix and the scope key.
+- `ScopedSessionsTest` covers reuse, supersession, the generation fence, the adventure
+  conflict, retirement, the capacity bound and concurrent use.
+- `SessionBoundaryTest` checks that only the registry builds `TaskRequest` or calls the port,
+  and that the runner accepts no port and no session identifier.
+- `ContractSessionScopeTest` covers runner-derived sessions and envelope fields.
+- `ScopedThreadIsolationTest` runs the real Codex adapter against the scripted app-server: a
+  planner sentinel is sent only on the planner's thread.
+- `TaskPortSelectionTest` covers Spring wiring and the capacity bound.
 
 ## Interface reload contract (P05.6)
 

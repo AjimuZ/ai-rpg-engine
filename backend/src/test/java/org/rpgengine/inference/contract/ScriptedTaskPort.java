@@ -18,7 +18,8 @@ import org.rpgengine.inference.TaskResult;
 /**
  * Deterministic task-port double. Each submission consumes the next scripted step, which either
  * completes immediately from the request or leaves the result pending for the test to complete.
- * Every request and cancellation is recorded; there is no thread, runtime or timing involved.
+ * Every request, cancellation and session retirement is recorded; there is no thread, runtime or
+ * timing involved.
  */
 final class ScriptedTaskPort implements NarrationTaskPort {
     static final TaskResult.Provenance PROVENANCE = new TaskResult.Provenance("scripted", "1.0.0", "fixture-model", "low");
@@ -26,6 +27,7 @@ final class ScriptedTaskPort implements NarrationTaskPort {
     final List<TaskRequest> requests = new ArrayList<>();
     final List<UUID> cancelled = new ArrayList<>();
     final List<CompletableFuture<TaskResult>> pending = new ArrayList<>();
+    final List<UUID> retired = new ArrayList<>();
     private final Deque<Function<TaskRequest, TaskResult>> script = new ArrayDeque<>();
 
     /** Complete the next submission with a completed turn returning {@code output}. */
@@ -83,7 +85,8 @@ final class ScriptedTaskPort implements NarrationTaskPort {
     }
 
     @Override
-    public void retireSession(UUID sessionId) {
+    public synchronized void retireSession(UUID sessionId) {
+        retired.add(sessionId);
     }
 
     @Override

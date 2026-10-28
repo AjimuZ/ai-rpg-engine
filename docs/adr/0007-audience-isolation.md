@@ -2,6 +2,8 @@
 
 **Status:** Proposed. **Date:** 22 October 2026.
 
+**Implementation note (28 October 2026):** P08.3 implements the session-scoping part of this decision: a session scope of campaign, recovery generation, role, audience, pack hash and policy hash; a role matrix that never puts a player-facing role in the privileged audience; and a single scoped submitter of the runtime port ([docs/06 section 7](../06-codex-integration.md#p083-session-scoping)). Knowledge filtering of contexts, summaries, media and exports, and adversarial leakage evaluation, are still to be delivered.
+
 ## Context
 
 A planner may require secret canon while the player narrator, guide, or NPC must know less. Filtering only a final response cannot remove hidden facts already present in a reused thread's memory. Media can also reveal secrets indirectly.

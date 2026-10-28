@@ -35,7 +35,9 @@ public interface NarrationTaskPort {
     /**
      * Forget the runtime conversation bound to a logical session, so the next task of that
      * session starts a fresh one (renewal and retirement, ADR 0005). Idempotent; a task already
-     * running keeps its conversation until it ends.
+     * running keeps its conversation until it ends. Engine code reaches this only through
+     * {@code org.rpgengine.inference.session.ScopedSessions}, which retires sessions it renews,
+     * supersedes or evicts.
      *
      * @param sessionId logical session to retire
      */

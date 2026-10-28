@@ -160,8 +160,9 @@ Measure cost in provider tasks and latency, not only response length. Avoid an a
 
 **Status (28 October 2026): implemented and tested against deterministic task-port doubles.**
 The contracts are not yet called by a gameplay path: the free-text command entry and the
-presentation job that publishes narration are P08.5, thread scoping is P08.3, and assembling
-contexts from stored projections is P08.5/P09.2. No live runtime has produced output for
+presentation job that publishes narration are P08.5, and assembling contexts from stored
+projections is P08.5/P09.2. Since P08.3 every contract task runs in the session of its own
+campaign/generation/role/audience/policy scope ([docs/06 section 7](06-codex-integration.md#p083-session-scoping)). No live runtime has produced output for
 these contracts.
 
 ### Package and flow
@@ -172,8 +173,10 @@ these contracts.
   bundled schema (`backend/src/main/resources/ai-contract/1/intent.schema.json`,
   `narration.schema.json`) and an independent Java validator. `templateHash()` is the
   SHA-256 of the shared instruction, the task instruction and the schema, for provenance.
-- `ContractRunner.start(contract, context, session, slot, budget)` renders, submits
-  through `NarrationTaskPort`, validates and allows **one** repair. The call's outcome is
+- `ContractRunner.start(contract, context, slot, budget)` renders, submits through
+  `ScopedSessions` (P08.3), validates and allows **one** repair. The caller never names a
+  session: the runner derives the `SessionScope` from the contract kind's role and audience
+  and the binding's adventure, campaign, generation, pack hash and policy hash. The call's outcome is
   `Accepted` (typed value, warnings, repaired flag), `Rejected` (violations after the
   repair), `NotCompleted` (task status and fixed code) or `Refused` (nothing submitted).
   Every outcome keeps the `TaskBinding` and per-attempt records: port task ID, status,
@@ -188,9 +191,9 @@ these contracts.
 ### Envelope and binding
 
 The request envelope renders `contractVersion` 1, `taskId`, `taskKind`, `role`
-(`interpreter` or `narrator`), `audience` `public`, adventure and campaign IDs,
-`baseRevision`, `contextDigest`, `outputLocale`, `localeRevision`, `glossaryRevision`,
-`packHash` and `policyHash`. The context follows as JSON game data. `contextDigest` is the
+(`interpreter` or `narrator`, the kind's `AiRole`), `audience` (`public` for both kinds),
+adventure and campaign IDs, `campaignGeneration` (P08.3), `baseRevision`, `contextDigest`,
+`outputLocale`, `localeRevision`, `glossaryRevision`, `packHash` and `policyHash`. The context follows as JSON game data. `contextDigest` is the
 SHA-256 of that exact context JSON. Rendering is deterministic, so the repair reuses the
 same digest.
 
@@ -323,11 +326,15 @@ drafts, and the clarification question and labels.
 - **Budgets.** Defaults are 60 s for interpretation and 90 s for narration (docs/06
   section 10), shared by both attempts. The caller chooses the slot; ordinary narration
   uses `standard` (docs/06 section 9).
-- **Audience.** Both contracts run for the public player audience. Privileged planning
-  roles and per-role thread scoping are P08.3.
-- **Session and task identity.** The caller supplies a logical session already scoped by
-  campaign, role, audience and policy. The binding's task ID is used as the port identity
-  of the first attempt, so it must be unique per live call.
+- **Audience.** Both contracts run for the public player audience in their own roles
+  (`interpreter`, `narrator`). The role matrix of P08.3 never lets a player-facing role run
+  in the privileged audience.
+- **Session and task identity.** The session is derived, never supplied. Interpretation and
+  narration of one campaign have separate sessions. A new campaign generation, pack hash or
+  policy hash renews the line. A task bound to an older generation than its campaign's active
+  sessions ends `NotCompleted(REJECTED, stale-campaign-generation)` without submission or
+  repair. The binding's task ID is used as the port identity of the first attempt, so it must
+  be unique per live call.
 - **Not proven by these checks.** Semantic adequacy of prose (an invented attacker
   described in new words, a paraphrased secret, an implied acceptance) is beyond the
   mechanical checks. It stays a human-rubric evaluation, together with EN/IT quality.

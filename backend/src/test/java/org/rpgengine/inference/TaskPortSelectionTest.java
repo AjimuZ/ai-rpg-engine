@@ -7,13 +7,17 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.rpgengine.health.GameplayHealthIndicator;
+import org.rpgengine.inference.session.AiRole;
+import org.rpgengine.inference.session.Audience;
+import org.rpgengine.inference.session.ScopedSessions;
+import org.rpgengine.inference.session.SessionScope;
 import org.springframework.boot.health.contributor.Status;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 /**
  * Spring selection of exactly one task port: the unavailable port by default, the Codex adapter
  * for {@code stdio}/{@code unix}, and a startup failure for any other transport or for a
- * half-assigned slot. Uses component scanning of the inference package, so the adapter is
+ * half-assigned slot. The scoped session registry (P08.3) wraps whichever port is selected. Uses component scanning of the inference package, so the adapter is
  * reached only through the neutral interface.
  */
 class TaskPortSelectionTest {
@@ -41,6 +45,22 @@ class TaskPortSelectionTest {
             assertThat(result.errorCode()).isEqualTo("runtime-not-configured");
             assertThat(context.getBean(GameplayHealthIndicator.class).health().getStatus()).isEqualTo(Status.UNKNOWN);
         });
+    }
+
+    @Test
+    void scopedSessionsWrapTheSelectedPortAndRefuseAnInvalidCapacity() {
+        runner.run(context -> {
+            assertThat(context).hasSingleBean(ScopedSessions.class);
+            ScopedSessions sessions = context.getBean(ScopedSessions.class);
+            var scope = new SessionScope(UUID.randomUUID(), UUID.randomUUID(), 0, AiRole.NARRATOR, Audience.PUBLIC,
+                    "a".repeat(64), "b".repeat(64));
+            TaskResult result = sessions.submit(scope, UUID.randomUUID(), InferenceSlot.STANDARD, "x", "{}",
+                    Duration.ofSeconds(5)).result().toCompletableFuture().get(1, TimeUnit.SECONDS);
+            assertThat(result.status()).isEqualTo(TaskResult.Status.UNAVAILABLE);
+            assertThat(sessions.activeSession(scope)).isPresent();
+        });
+        runner.withPropertyValues("engine.inference.sessions.capacity=0").run(context -> assertThat(context)
+                .hasFailed().getFailure().hasStackTraceContaining("engine.inference.sessions.capacity must be 1..4096"));
     }
 
     @Test
