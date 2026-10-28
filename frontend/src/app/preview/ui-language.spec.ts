@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { PreviewState } from './preview-state';
 import { DraftStorage, StoryInputState } from './story-input-state';
+import { CAMPAIGN_SYNC_STORAGE } from '../campaign/campaign-session';
 import { LANGUAGE_BROWSER, LanguageBrowser, UiLanguage, uiLocale } from './ui-language';
 
 /** In-memory storage port with configurable policy denial; get/set mirror browser failure behavior. */
@@ -20,6 +21,7 @@ function setup(options: { base?: string; href?: string; saved?: string } = {}) {
   const device = new MemoryStorage();
   const tab = new MemoryStorage();
   const drafts = new MemoryStorage();
+  const sync = new MemoryStorage();
   if (options.saved !== undefined) device.setItem('engine.ui-locale.v1', options.saved);
   const input = new StoryInputState(drafts);
   const reading = new PreviewState(tab);
@@ -27,8 +29,9 @@ function setup(options: { base?: string; href?: string; saved?: string } = {}) {
   const browser: LanguageBrowser = { base: options.base ?? 'https://example.test/en/',
     href: options.href ?? 'https://example.test/en/settings?from=story#language', device, tab, navigate };
   TestBed.configureTestingModule({ providers: [{ provide: LANGUAGE_BROWSER, useValue: browser },
-    { provide: StoryInputState, useValue: input }, { provide: PreviewState, useValue: reading }] });
-  return { device, tab, drafts, input, reading, navigate, language: TestBed.inject(UiLanguage) };
+    { provide: StoryInputState, useValue: input }, { provide: PreviewState, useValue: reading },
+    { provide: CAMPAIGN_SYNC_STORAGE, useValue: sync }] });
+  return { device, tab, drafts, sync, input, reading, navigate, language: TestBed.inject(UiLanguage) };
 }
 
 describe('Safe UI language reload', /** Register persisted-state and callback boundary checks. */ () => {
@@ -73,8 +76,8 @@ describe('Safe UI language reload', /** Register persisted-state and callback bo
     expect(restored.draft()).toEqual({ text: 'Separate draft', start: 2, end: 4 });
   });
 
-  it('blocks unresolved recovery even after detachment and rejects campaign contexts', /** Settings navigation cannot erase a reconciliation obligation. */ () => {
-    const { input, language, navigate } = setup();
+  it('blocks unresolved recovery even after detachment and refuses unverified campaign contexts', /** Settings navigation cannot erase a reconciliation obligation. */ () => {
+    const { input, language, navigate, sync } = setup();
     let epoch = input.activate({ adventureId: 'mosslight', campaignId: 'local-preview' });
     input.setStatus('narration-pending', epoch);
     input.deactivate(epoch);
@@ -86,6 +89,27 @@ describe('Safe UI language reload', /** Register persisted-state and callback bo
     epoch = input.activate({ adventureId: 'mosslight', campaignId: 'real-campaign' });
     input.setStatus('ready', epoch);
     input.deactivate(epoch);
+    // Without a verifiable operation/cursor record the real campaign still blocks, even after detachment.
+    sync.denied = true;
+    expect(language.change('it')).toBe(false);
+    expect(language.notice()).toBe('unsafe');
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('reloads a real campaign context only after its operation and cursor record verifies', /** Reconciliation replaces the blanket refusal. */ () => {
+    const { input, language, navigate, sync, drafts } = setup();
+    const scope = { adventureId: 'mosslight', campaignId: 'real-campaign' };
+    const epoch = input.activate(scope);
+    input.setStatus('narration-pending', epoch);
+    input.edit('Open the shutters', 5, 8);
+    expect(language.change('it')).toBe(true);
+    expect(navigate).toHaveBeenCalledWith('/it/settings?from=story#language');
+    // The draft bytes and the record survive; no operation or draft was submitted anywhere.
+    expect(drafts.values.get('engine.story-draft.v1:["mosslight","real-campaign"]')).toContain('Open the shutters');
+    expect([...sync.values.keys()]).toEqual(['engine.campaign-sync.v1:["mosslight","real-campaign"]']);
+    // A required campaign restore blocks regardless of the record; reload invalidated the old callback epoch.
+    input.setStatus('restore-required', input.activate(scope));
+    navigate.mockClear();
     expect(language.change('it')).toBe(false);
     expect(navigate).not.toHaveBeenCalled();
   });

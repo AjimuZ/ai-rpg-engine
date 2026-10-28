@@ -56,8 +56,10 @@ class PackagedInterfaceTest {
                 for (String route : new String[]{"library", "settings", "interface-kit",
                         "adventures/mosslight/story", "adventures/relay/create",
                         "adventures/mosslight/sheet", "adventures/relay/inventory",
-                        "adventures/relay/journal", "adventures/relay/guide", "adventures/relay/creative"}) {
-                    var deep = client.send(HttpRequest.newBuilder(origin.resolve(route + "?opaque=it")).GET().build(),
+                        "adventures/relay/journal", "adventures/relay/guide", "adventures/relay/creative",
+                        "saved/00000000-0000-4000-8000-00000000000a"}) {
+                    // The saved playthrough query is opaque too: the SPA, not the server, interprets it on reload.
+                    var deep = client.send(HttpRequest.newBuilder(origin.resolve(route + "?opaque=it&playthrough=x#frag")).GET().build(),
                             HttpResponse.BodyHandlers.ofString());
                     assertEquals(200, deep.statusCode(), route);
                     assertEquals(index.body(), deep.body(), route);
@@ -152,7 +154,10 @@ class PackagedInterfaceTest {
             for (String path : new String[]{"/api/does-not-exist", "/missing-bundle.js",
                     "/src/app/app.ts", "/.env", "/actuator/env", "/api/v1/missing", "/fr/settings",
                     "/en/missing-bundle.js", "/it/missing.css", "/it/api/v1/missing", "/en/.env",
-                    "/it/unknown", "/it/adventures/missing.js", "/it/adventures/relay/unknown"}) {
+                    "/it/unknown", "/it/adventures/missing.js", "/it/adventures/relay/unknown",
+                    // Only canonical lowercase UUIDs address saved scopes; nothing deeper exists.
+                    "/saved/not-a-uuid", "/it/saved/00000000-0000-4000-8000-00000000000A",
+                    "/saved/00000000-0000-4000-8000-00000000000a/extra", "/en/saved/", "/saved/00000000-0000-4000-8000-00000000000a.js"}) {
                 var response = client.send(HttpRequest.newBuilder(
                         URI.create("http://127.0.0.1:" + port + path)).GET().build(),
                         HttpResponse.BodyHandlers.discarding());

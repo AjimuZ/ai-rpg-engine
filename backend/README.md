@@ -360,8 +360,9 @@ from compiled English output to stable root URLs. No source tree is served.
 Spring serves the root language selector, locale indexes, hashed bundles and notices at the same
 origin as `/actuator/health`; it needs no separate frontend server or CORS
 exception. Unknown API, source/configuration and asset URLs remain 404. No broad
-SPA fallback is installed. Only known preview GET routes under `/en/` and `/it/`
-receive the corresponding compiled index (`no-store`). Known unprefixed preview
+SPA fallback is installed. Only known preview GET routes and `/saved/<canonical
+lowercase UUID>` under `/en/` and `/it/` receive the corresponding compiled index
+(`no-store`); the identity never selects a resource. Known unprefixed preview
 GET routes use the root selector, preserving route/query/hash; unsupported paths
 and locale prefixes remain 404. Root chooses the saved allowlisted device locale
 or English, never browser headers; native locale links work without scripting.

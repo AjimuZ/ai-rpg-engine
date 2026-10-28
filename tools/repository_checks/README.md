@@ -8,7 +8,7 @@ rule name for each finding, never the matching text.
 
 ```sh
 py -B tools/repository_checks/checks.py all        # Windows launcher; use python3 -B elsewhere
-py -B tools/repository_checks/checks.py secrets    # or: docs | workflows | images
+py -B tools/repository_checks/checks.py secrets    # or: docs | workflows | images | localization
 py -B -m unittest discover -s tools/repository_checks -v
 ```
 
@@ -22,6 +22,7 @@ raises an error instead of passing.
 | `secrets` | No private path is publishable (`.env*` except `.env.example`, `.local/`, assistant configuration and instruction files, account state, runtime data, backups, keys, logs). No credential-shaped content (private key blocks, cloud/repository/chat tokens, signed tokens, token fields, literal `password`/`token` assignments) and no developer-specific home path. `.gitignore` must still cover every private location. |
 | `docs` | Balanced Markdown fences; every relative link and `#anchor` resolves, using GitHub's heading-slug rules; links may not escape the repository. |
 | `workflows` | Top-level `permissions: contents: read` only; no `secrets` expression or `secrets: inherit`; no `pull_request_target`/`workflow_run`; no write scopes; no runtime-account names; every action pinned to a full commit SHA; checkout sets `persist-credentials: false`; every workflow `image:` has a digest; at least one workflow exists. |
+| `localization` | Every `COMMAND_*`, `CAMPAIGN_*`, `STREAM_*` and `LOCAL_*` error code in the campaign controllers is a key of the browser's localized error table (`frontend/src/app/campaign/campaign-messages.ts`); a missing controller or message module is a finding. Findings name file and line, never the code. |
 | `images` | Every external Dockerfile `FROM`, `# syntax=` line and Compose `image:` carries an exact tag and an index digest ([ADR 0009](../../docs/adr/0009-toolchain-baseline.md)). Earlier build stages and locally built Compose images are exempt. |
 
 ## Limits

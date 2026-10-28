@@ -143,8 +143,16 @@ lists saved cards by UUID and `/saved/<adventureId>?playthrough=<campaignId>`
 shows one scope and selects only playthroughs listed under that adventure.
 Malformed, foreign or duplicate rows are rejected rather than rendered, and a 403
 triggers one session re-bootstrap. Switching adventures aborts the previous reads.
-The packaged jar does not yet serve `/saved/...` on reload or as a direct link.
-Workspace creation and browser play of saved campaigns are still pending.
+The packaged jar serves `/saved/<uuid>` and `/{en,it}/saved/<uuid>` (canonical
+lowercase UUID only; the opaque query and hash are interpreted by the browser) so a
+reload or language switch lands on the same scope. Selecting a playthrough shows its
+public state and a read-only view of its operations: the state projection's starting
+situation with an explicit note when it is shown in the pack's source language,
+operation statuses and receipts from the status query and the resumable stream, and
+the scoped persistent draft. The view never submits; the saved stream cursor and
+operation identities are what the explicit language reload preserves
+([integration status](29-localization.md#p056-campaign-integration-status-28-october-2026)).
+Workspace creation and sending actions from the browser are still pending.
 
 ## 1. Contract status
 
@@ -466,8 +474,9 @@ fallback; denied/quota storage keeps the new draft in memory with an explicit
 warning. Device storage is local convenience, not a campaign backup or cross-tab
 merge protocol (the latest device write wins). Shared-device users can explicitly
 clear each draft. P05.6 review variants preserve these drafts/selections on explicit
-language reload and refuse unsaved/conflicting storage. Full operation/cursor-safe
-reload acceptance remains dependent on campaign transport.
+language reload and refuse unsaved/conflicting storage. Real campaign scopes
+additionally persist their stream cursor and operation identities (`engine.campaign-sync.v1`,
+validated and byte-verified before reload); independent browser acceptance remains open.
 
 Suggestions are at most three unique typed speech/question/action plain-text replies (240 code units each),
 supplied by revealed public fixture context. Choosing requires an empty composer

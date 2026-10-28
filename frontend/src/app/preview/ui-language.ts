@@ -1,8 +1,9 @@
-/** Validate device language preferences and coordinate explicit compiled-variant reloads; no campaign transport is invoked. */
+/** Validate device language preferences and coordinate explicit compiled-variant reloads; campaign operation/cursor records are verified, never submitted. */
 import { DOCUMENT } from '@angular/common';
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { DraftStorage, StoryInputState } from './story-input-state';
 import { PreviewState } from './preview-state';
+import { CampaignSession } from '../campaign/campaign-session';
 
 /** Supported UI variants; protocol identities and user text never pass through translation. */
 export type UiLocale = 'en' | 'it';
@@ -43,6 +44,7 @@ export class UiLanguage {
   private readonly browser = inject(LANGUAGE_BROWSER);
   private readonly reading = inject(PreviewState);
   private readonly input = inject(StoryInputState);
+  private readonly campaigns = inject(CampaignSession);
   readonly current: UiLocale;
   readonly available: boolean;
   readonly notice = signal<'none' | 'unsupported' | 'storage' | 'unsafe'>('none');
@@ -79,7 +81,7 @@ export class UiLanguage {
   change(raw: string): boolean {
     const locale = uiLocale(raw);
     if (!locale || !this.available) return false;
-    if (!this.input.prepareReload()) { this.notice.set('unsafe'); return false; }
+    if (!this.input.prepareReload(/** Real campaigns reload only with a verified operation/cursor record. */ (scope) => this.campaigns.verified(scope))) { this.notice.set('unsafe'); return false; }
     if (!this.reading.prepareReload()) { this.notice.set('storage'); return false; }
     try {
       if (!this.browser.device || !this.browser.tab) throw new Error('Storage unavailable');

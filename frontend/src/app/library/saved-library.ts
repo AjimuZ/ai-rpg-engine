@@ -9,6 +9,7 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, resource, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { CampaignPlaythrough } from '../campaign/campaign-view';
 import {
   isUuid, SavedAdventure, SavedLibraryClient, SavedLibraryError, SavedLibraryFailure, SavedPlaythrough,
 } from './saved-library-client';
@@ -119,7 +120,7 @@ interface SavedScope {
  * optional `playthrough` query parameter. Neither is written to the server.
  */
 @Component({
-  selector: 'app-saved-adventure', imports: [RouterLink], changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-saved-adventure', imports: [RouterLink, CampaignPlaythrough], changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (scope(); as current) {
       <header class="workspace-heading saved-heading" [attr.data-adventure-id]="current.adventure.adventureId">
@@ -133,7 +134,7 @@ interface SavedScope {
       </header>
       @if (unknownPlaythrough()) { <p class="notice" role="alert" i18n="@@saved.unknownPlaythrough">That playthrough does not belong to this adventure.</p> }
       <section class="panel"><h1 i18n="@@saved.playthroughs">Playthroughs</h1>
-        <p class="notice" i18n="@@saved.readOnly">Saved metadata only. Playing a saved adventure in the browser is not connected yet.</p>
+        <p class="notice" i18n="@@saved.readOnly">Select a playthrough to read its current state and action results. Sending actions in the browser is not connected yet.</p>
         @if (current.playthroughs.length === 0) { <p i18n="@@saved.noPlaythroughs">This adventure has no playthroughs yet.</p> }
         <ul class="saved-list">
           @for (playthrough of current.playthroughs; track playthrough.campaignId) {
@@ -146,6 +147,9 @@ interface SavedScope {
         </ul>
         <a routerLink="/library" i18n="@@workspace.return">Return to library</a>
       </section>
+      @if (selected(); as playthrough) {
+        <app-campaign-playthrough [adventureId]="current.adventure.adventureId" [campaignId]="playthrough.campaignId" />
+      }
     } @else if (loaded.isLoading()) {
       <section class="panel"><p role="status" i18n="@@saved.loadingOne">Loading saved adventure…</p></section>
     } @else {

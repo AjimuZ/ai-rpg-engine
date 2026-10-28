@@ -1,8 +1,9 @@
 # Browser interface previews
 
 P05.6 currently provides separate [English/Italian review builds](src/locale/README.md)
-for all local preview screens (218 unique messages), public sample text, forms,
-preview receipts, recovery and accessibility. Chronicle ICU plurals and localized
+for all local preview screens, public sample text, forms, preview receipts, recovery
+and accessibility, plus the campaign view's errors, statuses, receipts and fallback
+notices (317 unique messages; the 77 newest Italian targets await independent review). Chronicle ICU plurals and localized
 numeric meter formatting retain stable IDs and numeric protocol values. Run `npm run test:i18n` and
 `npm run build:locales`, then `node tools/browser-smoke.mjs --locales` after
 `npm run build`. The jar/container consumes both localized production variants;
@@ -10,8 +11,10 @@ the default unlocalized build remains available for development review.
 Review Settings persists device language and safely reloads EN/IT with scoped
 drafts/selections, tab reading preferences/positions and equivalent-control focus.
 Reload blocks on unsaved/conflicting drafts or unresolved recovery, including
-after leaving the story. Real API errors/receipts, operation/cursor reconciliation
-and independent bilingual/accessibility acceptance remain open. Spring serves
+after leaving the story. Real campaign scopes reload only after their persisted
+operation identities and stream cursor verify byte for byte (`src/app/campaign/`);
+independent bilingual/accessibility acceptance and a browser journey on the packaged
+origin remain open. Spring serves
 explicit locale preview routes and selects the device preference at root; see
 the [jar assembly instructions](../backend/README.md#single-origin-jar-assembly-p023).
 
@@ -38,7 +41,11 @@ sends no credentials of its own. Cards are keyed by adventure UUID, so equal tit
 stay separate. `/saved/<adventureId>?playthrough=<campaignId>` shows one adventure
 and selects only playthroughs listed under it. Switching aborts earlier reads.
 Malformed or foreign payloads show an explained failure instead of data. The view
-is read-only, and the packaged jar does not yet serve `/saved/...` on reload.
+is read-only, and the packaged jar serves `/saved/<uuid>` (also under `/en/` and `/it/`).
+Selecting a playthrough adds `src/app/campaign/`: the authorized state (starting
+situation with an explicit source-language note), operations and receipts re-queried by
+identity, a resumable stream follower with bounded backoff, localized error codes and a
+persistent scoped draft. Nothing is submitted; the saved cursor survives language reload.
 P05.5 adds `/interface-kit`, linked from Settings, for the shared original MIT
 SVG/CSS theme: control states, 20 icons, bounded numeric meters, progress,
 dialogue/portrait/item frames, empty slots and independent sample item artwork.

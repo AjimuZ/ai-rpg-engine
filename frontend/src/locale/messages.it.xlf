@@ -2076,11 +2076,11 @@
     </unit>
     <unit id="saved.readOnly">
       <notes>
-        <note category="location">src/app/library/saved-library.ts:136,137</note>
+        <note category="location">src/app/library/saved-library.ts:137,138</note>
       </notes>
       <segment>
-        <source>Saved metadata only. Playing a saved adventure in the browser is not connected yet.</source>
-      <target>Solo metadati salvati. Giocare un’avventura salvata nel browser non è ancora collegato.</target>
+        <source>Select a playthrough to read its current state and action results. Sending actions in the browser is not connected yet.</source>
+      <target>Seleziona una partita per leggerne lo stato attuale e i risultati delle azioni. L’invio delle azioni nel browser non è ancora collegato.</target>
       </segment>
     </unit>
     <unit id="saved.noPlaythroughs">
@@ -2117,6 +2117,703 @@
       <segment>
         <source>Loading saved adventure…</source>
       <target>Caricamento dell’avventura salvata…</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.admissionDenied">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:16</note>
+      </notes>
+      <segment>
+        <source>This browser session was not admitted. Reload the page to try again.</source>
+      <target>Questa sessione del browser non è stata ammessa. Ricarica la pagina e riprova.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.ownerUnconfigured">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:17</note>
+      </notes>
+      <segment>
+        <source>The local owner is not configured, so this playthrough cannot be read.</source>
+      <target>Il proprietario locale non è configurato, quindi questa partita non può essere letta.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.inputMalformed">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:18</note>
+        <note category="location">src/app/campaign/campaign-messages.ts:22</note>
+      </notes>
+      <segment>
+        <source>The request was not understood. Nothing was changed.</source>
+      <target>La richiesta non è stata compresa. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.bodyTooLarge">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:19</note>
+      </notes>
+      <segment>
+        <source>The request was too large. Nothing was changed.</source>
+      <target>La richiesta era troppo grande. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.scopeUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:20</note>
+        <note category="location">src/app/campaign/campaign-messages.ts:21</note>
+      </notes>
+      <segment>
+        <source>This playthrough is unavailable.</source>
+      <target>Questa partita non è disponibile.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.requestConflict">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:23</note>
+      </notes>
+      <segment>
+        <source>This request identity was already used for a different action. Nothing was changed.</source>
+      <target>Questa identità di richiesta è già stata usata per un’azione diversa. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.staleRevision">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:24</note>
+      </notes>
+      <segment>
+        <source>The world has changed since this action was prepared. Refresh the current context before trying again.</source>
+      <target>Il mondo è cambiato da quando questa azione è stata preparata. Aggiorna il contesto attuale prima di riprovare.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.busy">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:25</note>
+      </notes>
+      <segment>
+        <source>The playthrough is busy with another action. Wait a moment and check its status before retrying.</source>
+      <target>La partita è occupata con un’altra azione. Attendi un momento e controlla il suo stato prima di riprovare.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.admissionLimit">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:26</note>
+      </notes>
+      <segment>
+        <source>Too many actions are waiting. Wait for one to finish before sending another.</source>
+      <target>Ci sono troppe azioni in attesa. Attendi che una finisca prima di inviarne un’altra.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.invalid">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:27</note>
+      </notes>
+      <segment>
+        <source>This action is not valid. Nothing was changed.</source>
+      <target>Questa azione non è valida. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.modeIllegal">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:28</note>
+      </notes>
+      <segment>
+        <source>This action is not available in the current situation.</source>
+      <target>Questa azione non è disponibile nella situazione attuale.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.decisionUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:29</note>
+      </notes>
+      <segment>
+        <source>There is no matching decision to answer right now.</source>
+      <target>In questo momento non c’è nessuna decisione corrispondente a cui rispondere.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.actorUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:30</note>
+      </notes>
+      <segment>
+        <source>The acting character is unavailable.</source>
+      <target>Il personaggio che agisce non è disponibile.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.destinationUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:31</note>
+      </notes>
+      <segment>
+        <source>That destination cannot be reached from here.</source>
+      <target>Da qui non si può raggiungere quella destinazione.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.abilityUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:32</note>
+      </notes>
+      <segment>
+        <source>That ability is unavailable.</source>
+      <target>Quell’abilità non è disponibile.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.prerequisiteUnmet">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:33</note>
+      </notes>
+      <segment>
+        <source>A requirement for this action is not met.</source>
+      <target>Un requisito per questa azione non è soddisfatto.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.targetIllegal">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:34</note>
+      </notes>
+      <segment>
+        <source>That target is not allowed for this action.</source>
+      <target>Quel bersaglio non è consentito per questa azione.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.resourceInsufficient">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:35</note>
+      </notes>
+      <segment>
+        <source>There are not enough resources for this action.</source>
+      <target>Non ci sono risorse sufficienti per questa azione.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.contentUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:36</note>
+        <note category="location">src/app/campaign/campaign-messages.ts:40</note>
+      </notes>
+      <segment>
+        <source>The adventure content needed for this action is unavailable.</source>
+      <target>Il contenuto dell’avventura necessario per questa azione non è disponibile.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.effectUnsupported">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:37</note>
+      </notes>
+      <segment>
+        <source>This kind of effect is not supported yet. Nothing was changed.</source>
+      <target>Questo tipo di effetto non è ancora supportato. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.storageUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:38</note>
+        <note category="location">src/app/campaign/campaign-messages.ts:39</note>
+      </notes>
+      <segment>
+        <source>Storage is unavailable right now. Check the action status before retrying.</source>
+      <target>L’archiviazione non è disponibile in questo momento. Controlla lo stato dell’azione prima di riprovare.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.streamCapacity">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:41</note>
+      </notes>
+      <segment>
+        <source>Too many live updates are open. Close another tab and try again.</source>
+      <target>Sono aperti troppi aggiornamenti in diretta. Chiudi un’altra scheda e riprova.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.generic">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:52</note>
+      </notes>
+      <segment>
+        <source>Something went wrong. Nothing was lost; check the playthrough status and try again.</source>
+      <target>Qualcosa è andato storto. Non è stato perso nulla; controlla lo stato della partita e riprova.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.status.accepted">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:58</note>
+      </notes>
+      <segment>
+        <source>Received</source>
+      <target>Ricevuta</target>
+      </segment>
+    </unit>
+    <unit id="campaign.status.planning">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:59</note>
+      </notes>
+      <segment>
+        <source>Being prepared</source>
+      <target>In preparazione</target>
+      </segment>
+    </unit>
+    <unit id="campaign.status.clarification">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:60</note>
+      </notes>
+      <segment>
+        <source>Waiting for your clarification</source>
+      <target>In attesa di un tuo chiarimento</target>
+      </segment>
+    </unit>
+    <unit id="campaign.status.validating">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:61</note>
+      </notes>
+      <segment>
+        <source>Being checked</source>
+      <target>In verifica</target>
+      </segment>
+    </unit>
+    <unit id="campaign.status.rejected">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:62</note>
+      </notes>
+      <segment>
+        <source>Not allowed; nothing changed</source>
+      <target>Non consentita; nulla è cambiato</target>
+      </segment>
+    </unit>
+    <unit id="campaign.status.committing">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:63</note>
+      </notes>
+      <segment>
+        <source>Being saved</source>
+      <target>In salvataggio</target>
+      </segment>
+    </unit>
+    <unit id="campaign.status.committed">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:64</note>
+      </notes>
+      <segment>
+        <source>Saved</source>
+      <target>Salvata</target>
+      </segment>
+    </unit>
+    <unit id="campaign.status.narrating">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:65</note>
+      </notes>
+      <segment>
+        <source>Saved; narration in progress</source>
+      <target>Salvata; narrazione in corso</target>
+      </segment>
+    </unit>
+    <unit id="campaign.status.delivered">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:66</note>
+      </notes>
+      <segment>
+        <source>Saved and narrated</source>
+      <target>Salvata e narrata</target>
+      </segment>
+    </unit>
+    <unit id="campaign.status.narrationPending">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:67</note>
+      </notes>
+      <segment>
+        <source>Saved; narration is pending</source>
+      <target>Salvata; la narrazione è in sospeso</target>
+      </segment>
+    </unit>
+    <unit id="campaign.status.cancelled">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:68</note>
+      </notes>
+      <segment>
+        <source>Cancelled before saving; nothing changed</source>
+      <target>Annullata prima del salvataggio; nulla è cambiato</target>
+      </segment>
+    </unit>
+    <unit id="campaign.status.failed">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:69</note>
+      </notes>
+      <segment>
+        <source>Failed before saving; nothing changed</source>
+      <target>Non riuscita prima del salvataggio; nulla è cambiato</target>
+      </segment>
+    </unit>
+    <unit id="campaign.narration.unavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:76</note>
+      </notes>
+      <segment>
+        <source>Narration is not available yet. The saved result below is complete.</source>
+      <target>La narrazione non è ancora disponibile. Il risultato salvato qui sotto è completo.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.narration.cancelled">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:77</note>
+      </notes>
+      <segment>
+        <source>Narration was stopped. The saved result below is complete.</source>
+      <target>La narrazione è stata interrotta. Il risultato salvato qui sotto è completo.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.narration.failed">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:78</note>
+      </notes>
+      <segment>
+        <source>Narration could not be produced. The saved result below is complete.</source>
+      <target>Non è stato possibile produrre la narrazione. Il risultato salvato qui sotto è completo.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.narration.retired">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:79</note>
+      </notes>
+      <segment>
+        <source>Narration was discarded because the language or settings changed. The saved result below is complete.</source>
+      <target>La narrazione è stata scartata perché la lingua o le impostazioni sono cambiate. Il risultato salvato qui sotto è completo.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.narration.interrupted">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:80</note>
+      </notes>
+      <segment>
+        <source>Narration was interrupted. The saved result below is complete.</source>
+      <target>La narrazione è stata interrotta. Il risultato salvato qui sotto è completo.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.reset.expired">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:87</note>
+      </notes>
+      <segment>
+        <source>Some live updates were missed while this page was closed. Operation status was checked again.</source>
+      <target>Alcuni aggiornamenti in diretta sono andati persi mentre questa pagina era chiusa. Lo stato delle azioni è stato ricontrollato.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.reset.generation">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:88</note>
+      </notes>
+      <segment>
+        <source>The playthrough was restored from a backup. Operation status was checked again.</source>
+      <target>La partita è stata ripristinata da un backup. Lo stato delle azioni è stato ricontrollato.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.reset.unknown">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:89</note>
+      </notes>
+      <segment>
+        <source>The saved update position was not recognised. Operation status was checked again.</source>
+      <target>La posizione di aggiornamento salvata non è stata riconosciuta. Lo stato delle azioni è stato ricontrollato.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.fallback.italian">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:96</note>
+      </notes>
+      <segment>
+        <source>This text is shown in the adventure&apos;s original Italian because no reviewed translation exists for your language.</source>
+      <target>Questo testo è mostrato nell’italiano originale dell’avventura perché per la tua lingua non esiste una traduzione rivista.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.fallback.english">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:97</note>
+      </notes>
+      <segment>
+        <source>This text is shown in the adventure&apos;s original English because no reviewed translation exists for your language.</source>
+      <target>Questo testo è mostrato nell’inglese originale dell’avventura perché per la tua lingua non esiste una traduzione rivista.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.language.italian">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:102</note>
+      </notes>
+      <segment>
+        <source>Italian</source>
+      <target>italiano</target>
+      </segment>
+    </unit>
+    <unit id="campaign.language.english">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:102</note>
+      </notes>
+      <segment>
+        <source>English</source>
+      <target>inglese</target>
+      </segment>
+    </unit>
+    <unit id="campaign.command.move">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:108</note>
+      </notes>
+      <segment>
+        <source>Move</source>
+      <target>Spostamento</target>
+      </segment>
+    </unit>
+    <unit id="campaign.command.wait">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:109</note>
+      </notes>
+      <segment>
+        <source>Wait</source>
+      <target>Attesa</target>
+      </segment>
+    </unit>
+    <unit id="campaign.command.speak">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:110</note>
+      </notes>
+      <segment>
+        <source>Speak</source>
+      <target>Parlare</target>
+      </segment>
+    </unit>
+    <unit id="campaign.command.useAbility">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:111</note>
+      </notes>
+      <segment>
+        <source>Use an ability</source>
+      <target>Uso di un’abilità</target>
+      </segment>
+    </unit>
+    <unit id="campaign.receipt.succeeded">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:121</note>
+      </notes>
+      <segment>
+        <source>succeeded</source>
+      <target>riuscita</target>
+      </segment>
+    </unit>
+    <unit id="campaign.receipt.failed">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:121</note>
+      </notes>
+      <segment>
+        <source>failed</source>
+      <target>fallita</target>
+      </segment>
+    </unit>
+    <unit id="campaign.receipt.check">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:122</note>
+      </notes>
+      <segment>
+        <source>Check <ph id="0" equiv="path" disp="path" /> (<ph id="1" equiv="kind" disp="kind" />): <ph id="2" equiv="outcome" disp="outcome" /></source>
+      <target>Prova <ph id="0" equiv="path" disp="path" /> (<ph id="1" equiv="kind" disp="kind" />): <ph id="2" equiv="outcome" disp="outcome" /></target>
+      </segment>
+    </unit>
+    <unit id="campaign.receipt.total">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:125</note>
+      </notes>
+      <segment>
+        <source>Calculation <ph id="0" equiv="path" disp="path" /> (<ph id="1" equiv="kind" disp="kind" />): <ph id="2" equiv="total" disp="total" /></source>
+      <target>Calcolo <ph id="0" equiv="path" disp="path" /> (<ph id="1" equiv="kind" disp="kind" />): <ph id="2" equiv="total" disp="total" /></target>
+      </segment>
+    </unit>
+    <unit id="campaign.receipt.revision">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:143</note>
+      </notes>
+      <segment>
+        <source>Saved as world revision <ph id="0" equiv="revision" disp="revision" />.</source>
+      <target>Salvato come revisione del mondo <ph id="0" equiv="revision" disp="revision" />.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.receipt.moved">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:146</note>
+      </notes>
+      <segment>
+        <source>Moved to <ph id="0" equiv="destination" disp="destination" />.</source>
+      <target>Spostamento verso <ph id="0" equiv="destination" disp="destination" />.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.receipt.elapsed">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:150</note>
+      </notes>
+      <segment>
+        <source>World time passed: <ph id="0" equiv="seconds" disp="seconds" /> s.</source>
+      <target>Tempo di gioco trascorso: <ph id="0" equiv="seconds" disp="seconds" /> s.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.receipt.turnAdvanced">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:153</note>
+      </notes>
+      <segment>
+        <source>The game turn advanced.</source>
+      <target>Il turno di gioco è avanzato.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.receipt.turnHeld">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:153</note>
+      </notes>
+      <segment>
+        <source>The game turn did not advance.</source>
+      <target>Il turno di gioco non è avanzato.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.receipt.resource">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:159</note>
+      </notes>
+      <segment>
+        <source><ph id="0" equiv="resource" disp="key" />: <ph id="1" equiv="before" disp="before" /> → <ph id="2" equiv="after" disp="after" /></source>
+      <target><ph id="0" equiv="resource" disp="key" />: <ph id="1" equiv="before" disp="before" /> → <ph id="2" equiv="after" disp="after" /></target>
+      </segment>
+    </unit>
+    <unit id="campaign.receipt.draw">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:166</note>
+      </notes>
+      <segment>
+        <source>Draw <ph id="0" equiv="ordinal" disp="ordinal" />: <ph id="1" equiv="value" disp="value" /> on a <ph id="2" equiv="sides" disp="sides" />-sided die</source>
+      <target>Estrazione <ph id="0" equiv="ordinal" disp="ordinal" />: <ph id="1" equiv="value" disp="value" /> su un dado a <ph id="2" equiv="sides" disp="sides" /> facce</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.startingTitle">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:45,46</note>
+      </notes>
+      <segment>
+        <source>Starting situation</source>
+      <target>Situazione iniziale</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.fallbackLanguage">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:49,50</note>
+      </notes>
+      <segment>
+        <source>Text language: <ph id="0" equiv="INTERPOLATION" disp="{{ languageText(situation.locale) }}" /></source>
+      <target>Lingua del testo: <ph id="0" equiv="INTERPOLATION" disp="{{ languageText(situation.locale) }}" /></target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.noSituation">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:52,53</note>
+      </notes>
+      <segment>
+        <source>No decision is waiting for you in this playthrough.</source>
+      <target>In questa partita nessuna decisione è in attesa di te.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.loading">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:54,56</note>
+      </notes>
+      <segment>
+        <source>Loading the playthrough…</source>
+      <target>Caricamento della partita…</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.operations">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:56,57</note>
+      </notes>
+      <segment>
+        <source>Actions</source>
+      <target>Azioni</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.noOperations">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:60,62</note>
+      </notes>
+      <segment>
+        <source>No actions have been recorded for this playthrough in this browser.</source>
+      <target>In questo browser non sono state registrate azioni per questa partita.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.refresh">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:76,78</note>
+      </notes>
+      <segment>
+        <source>Check for updates</source>
+      <target>Cerca aggiornamenti</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.inputLabel">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:79,80</note>
+      </notes>
+      <segment>
+        <source>What do you say or do?</source>
+      <target>Che cosa dici o fai?</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.send">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:83,84</note>
+      </notes>
+      <segment>
+        <source>Send</source>
+      <target>Invia</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.composerHelp">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:86,91</note>
+      </notes>
+      <segment>
+        <source>Your draft stays on this device and is never sent automatically, including after changing language. Sending actions is not connected yet.</source>
+      <target>La tua bozza resta su questo dispositivo e non viene mai inviata automaticamente, nemmeno dopo aver cambiato lingua. L’invio delle azioni non è ancora collegato.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.receiptLabel">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:98</note>
+      </notes>
+      <segment>
+        <source>Result of the action</source>
+      <target>Risultato dell’azione</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.live">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:109</note>
+      </notes>
+      <segment>
+        <source>Connected. Waiting for pending actions to finish.</source>
+      <target>Connesso. In attesa che le azioni in sospeso finiscano.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.liveIdle">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:110</note>
+      </notes>
+      <segment>
+        <source>Connected. All known actions are finished.</source>
+      <target>Connesso. Tutte le azioni note sono concluse.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.disconnected">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:111</note>
+      </notes>
+      <segment>
+        <source>Connection unavailable. Your last known state and draft remain available; retrying automatically.</source>
+      <target>Connessione non disponibile. L’ultimo stato noto e la bozza restano disponibili; nuovo tentativo automatico.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.view.connecting">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:112</note>
+      </notes>
+      <segment>
+        <source>Checking the playthrough…</source>
+      <target>Controllo della partita…</target>
       </segment>
     </unit>
   </file>

@@ -55,7 +55,16 @@ Browser checks perform native keyboard EN→IT→EN reloads with two independent
 draft scopes, selection, reading layout/size/positions, focus, unsupported locale
 and storage denial. Unit tests additionally reject corrupt snapshots, pending
 recovery, real campaign contexts, conflicting writes and obsolete callbacks.
-Real API errors/receipts, explicit source-pack fallback,
-operation/stream-cursor reconciliation and independent release acceptance
-remain open. These samples create no operation/cursor; they do not establish
-full QA-35 or independent human bilingual/screen-reader acceptance.
+The campaign view (`src/app/campaign/`) adds 77 messages with `campaign.*` IDs:
+error codes (a closed table; unknown codes use one generic sentence), operation
+statuses, receipt lines with named placeholders (`path`, `kind`, `resource`, `before`,
+`after`, ...), narration and stream-reset reasons, command labels and the source-language
+fallback notice. Numbers are formatted for the compiled locale only; resource keys and
+destinations stay literal identifiers. `npm run check:i18n` now reports 317 messages.
+The Italian targets of those 77 messages (plus the
+reworded `saved.readOnly`) are first drafts: they have **not** had independent human
+review. `python tools/repository_checks/checks.py localization` fails when a backend
+campaign error code has no message. Language reload of a real campaign scope requires
+a verified `engine.campaign-sync.v1` record (cursor and operation identities, no text).
+No browser journey was run for these screens; full QA-35 and independent
+bilingual/screen-reader acceptance remain open.

@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 45/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4 and P07.1–P07.5. P05.6 has verified bilingual preview/packaging checkpoints but remains unchecked for real campaign/operation/stream integration and required human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 45/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4 and P07.1–P07.5. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -820,6 +820,30 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     loopback review harness. All 22 repository tests and docs/secrets/workflows/images
     scans pass again for this checkpoint. Full QA-35, real API error/receipt and
     pack-source fallback integration, and bilingual release acceptance remain open.
+  - Fifth checkpoint (28 October 2026, campaign integration): with P06.1–P06.4 and
+    P07.1–P07.5 complete, the interface binds the real endpoints read-only. A
+    validated campaign protocol layer (cursors, operation bodies, receipts, SSE frames,
+    state subset) and a `CampaignSession` persist each scope's stream cursor and
+    operation identities/versions/statuses; language reload now proceeds for a real
+    campaign only when that record merges with other tabs, is written and reads back
+    exactly, and drafts are stored (replacing the blanket refusal). After reload,
+    pending and recently saved operations are re-queried by identity and the stream
+    resumes after the saved cursor; duplicates are skipped, resets adopt the head and
+    re-query, generation changes are reported. 77 `campaign.*` messages (317 total)
+    localize 26 error codes (unknown codes use one generic sentence), operation
+    statuses, receipts (locale digits only; identical mechanics), narration/reset
+    reasons and an explicit source-language fallback note shown from
+    `startingSituation.fallback`. The packaged jar serves `/saved/<uuid>` and
+    `/{en,it}/saved/<uuid>`; a new `localization` repository check fails when a
+    backend campaign error code lacks a message. Verified: 68 frontend tests, strict
+    typecheck, parity build, 435 backend tests with PostgreSQL (four packaged
+    interface tests including the new route), 24 repository tests and zero scan
+    findings. Not done, so this task stays unchecked: no browser exists in the
+    Linux build container, so no Chrome EN→IT→EN journey or packaged-container
+    hash recreation ran for the new screens; the 77 Italian targets are unreviewed
+    drafts; there is still no submit path, so draft-plus-pending-operation reload is
+    proven only on simulated servers; independent bilingual and screen-reader
+    review (QA-35) is a human gate.
 - [ ] P05.7 Define and render bounded typed public presentation events for scene, pose/expression and optional line audio hooks; reject executable/raw-URL directives, deduplicate delivery and preserve text-only/keyboard/reduced-motion behavior under QA-40.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.

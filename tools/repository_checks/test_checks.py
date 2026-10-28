@@ -308,13 +308,52 @@ class ImagePinTest(unittest.TestCase):
         self.assertEqual(1, len(checks.scan_compose("compose.yaml", other)))
 
 
+class LocalizationCodeTest(unittest.TestCase):
+    """Campaign error codes must stay explained in the browser interface."""
+
+    MESSAGES = "  COMMAND_INVALID: () => $localize`x`,\n  STREAM_CAPACITY_EXCEEDED: () => $localize`y`,\n"
+
+    def _repository(self, controller: str, messages: str | None) -> Path:
+        """Build a minimal fixture repository under scratch with one controller and optional messages."""
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        root = Path(tempfile.mkdtemp(dir=SCRATCH))
+        self.addCleanup(shutil.rmtree, root, True)
+        for name in checks.CAMPAIGN_CONTROLLERS:
+            target = root / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(controller, encoding="utf-8")
+        if messages is not None:
+            target = root / checks.CAMPAIGN_MESSAGES
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(messages, encoding="utf-8")
+        return root
+
+    def test_mapped_codes_pass_and_unmapped_codes_are_reported(self) -> None:
+        """A new controller code without a message is a finding naming file and line, never the code."""
+        good = 'return error(422, "COMMAND_INVALID");\nreturn error(429, "STREAM_CAPACITY_EXCEEDED");\n'
+        self.assertEqual([], checks.check_localization(self._repository(good, self.MESSAGES)))
+        bad = good + 'return error(409, "COMMAND_NEW_FAILURE");\n'
+        findings = checks.check_localization(self._repository(bad, self.MESSAGES))
+        self.assertEqual(len(checks.CAMPAIGN_CONTROLLERS), len(findings))
+        self.assertTrue(all(":3: error code has no localized browser message" in item for item in findings))
+        self.assertFalse(any("COMMAND_NEW_FAILURE" in item for item in findings))
+
+    def test_missing_files_cannot_disable_the_check(self) -> None:
+        """A moved message module or controller is itself reported."""
+        self.assertEqual(1, len(checks.check_localization(self._repository("", None))))
+        root = self._repository("", self.MESSAGES)
+        (root / checks.CAMPAIGN_CONTROLLERS[0]).unlink()
+        self.assertEqual(["%s:1: campaign controller is missing" % checks.CAMPAIGN_CONTROLLERS[0]], checks.check_localization(root))
+
+
 class ProjectTest(unittest.TestCase):
     """The committed project itself satisfies every check (same as the CI steps)."""
 
     def test_project_is_clean(self) -> None:
         """No secret, private path, broken link, workflow-policy or image-pin finding exists."""
         for name, check in [("secrets", checks.check_secrets), ("docs", checks.check_docs),
-                            ("workflows", checks.check_workflows), ("images", checks.check_images)]:
+                            ("workflows", checks.check_workflows), ("images", checks.check_images),
+                            ("localization", checks.check_localization)]:
             with self.subTest(check=name):
                 self.assertEqual([], check(ROOT))
 

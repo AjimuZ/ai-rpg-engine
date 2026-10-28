@@ -70,8 +70,10 @@ ARIA/protocol values. `npm run build:locales` checks fresh extracted IDs, exact 
 nonempty Italian targets and placeholder occurrence parity before compiling review
 variants into `dist/engine-ui-localized/browser/{en,it}/`. Missing/duplicate
 translations are build errors. [Resource instructions](../frontend/src/locale/README.md)
-describe the review scope and tests. Real backend error/receipt and source-pack
-fallback bindings await campaign transport. The `packaged-ui` Maven profile and
+describe the review scope and tests. Campaign error codes, operation statuses,
+receipts, stream notices and the source-pack fallback disclosure are bound to the
+real campaign endpoints (see [the integration status](#p056-campaign-integration-status-28-october-2026)).
+The `packaged-ui` Maven profile and
 engine image now consume this localized production output. The optional default
 `npm run build` remains an unlocalized development preview; full QA-35 stays open.
 
@@ -116,14 +118,17 @@ The trusted same-origin `/en/` or `/it/` prefix changes while route/query/hash s
 intact. Direct locale links remain explicit; packaged root entry selects the saved locale.
 Old callbacks and suggestion objects are invalidated before navigation; drafts
 are never translated or submitted. Reload refuses unsaved/conflicting drafts,
-unresolved recovery even after detachment, and every real campaign context until
-durable operation/cursor reconciliation is implemented in P06/P07. The unlocalized
-default build explains that switching requires the compiled review variants.
+unresolved local recovery even after detachment, a required campaign restore, and any
+real campaign context whose operation/cursor record cannot be written and read back
+exactly (P05.6 integration status below). The unlocalized default build explains that
+switching requires the compiled review variants.
 Nine reload/storage tests and native Chrome EN→IT→EN journeys verify these local
 guarantees, including unsupported saved values, storage denial, two scoped drafts,
 selection, restored native text-size selection, layout, reading position and focus.
-The catalog now contains 218 reviewed messages (224 extracted occurrences).
-These checks do not establish full operation/stream-cursor preservation.
+The catalog now contains 317 messages: the earlier 218 plus 77 campaign messages
+whose Italian targets are first drafts awaiting independent human review (the
+integration status below). The second, packaged-origin checkpoint
+is described there as well.
 
 The fourth checkpoint runs the same bilingual journeys against the real Spring
 container, including root missing/Italian-region/unsupported/denied preferences,
@@ -273,9 +278,33 @@ falls back to Italian subtitles/text, never an English voice reading Italian.
 
 ## 6. Acceptance and ownership
 
+### P05.6 campaign integration status (28 October 2026)
+
+The 24 October audit below named four prerequisites. P06.1–P06.4 and P07.1–P07.5 are now
+complete, so the integration was built against the real endpoints. This section records
+what is delivered, what was actually run and what is still open. Nothing here claims
+independent bilingual or screen-reader acceptance.
+
+| Requirement | Delivered | Evidence | Still open |
+| --- | --- | --- | --- |
+| Operation/cursor-safe reload | `CampaignSession` persists, per adventure+campaign scope, the stream cursor and each seen operation's identity, newest version and status (`engine.campaign-sync.v1`, device storage). `UiLanguage.change` runs `verified(scope)` for every real campaign context: the record is merged with any other tab's newer cursor, written and read back byte for byte. Storage denial, a reverted write, a required restore or an unsaved draft refuse the reload. After the reload `requery` fetches unfinished (and recently saved) operations by identity and `poll` resumes the stream after the saved cursor. Messages are applied only when strictly after the cursor in the same generation (duplicates counted, not applied); `stream.reset` adopts the server head and re-queries; a generation mismatch is reported, never merged. The draft stays in `StoryInputState`; nothing is ever submitted (`Send` is disabled and no `/commands` request exists in tests). | 7 session, 3 view and 2 language-reload tests (`campaign-session.spec.ts`, `campaign-view.spec.ts`, `ui-language.spec.ts`) on a simulated server and storages | Chrome EN→IT→EN journey against the packaged origin (no browser is installed in the Linux build container); a real submit path (P05.7/P08 composer) |
+| Localized API errors and receipts | `campaign-messages.ts` maps every public `COMMAND_*`, `CAMPAIGN_*`, `STREAM_*` and `LOCAL_*` code to a `$localize` sentence; unknown, hostile or prototype-named codes fall back to one generic sentence and are never displayed. Statuses, narration reasons, reset reasons and command types are closed enumerations. Receipts render revisions, moves, elapsed seconds, own-resource changes, calculations and draws from the validated public projection; only digit grouping follows the locale, so EN and IT show identical mechanics. `tools/repository_checks` `localization` fails when a controller code has no message. | `campaign-messages.spec.ts`, `campaign-protocol.spec.ts`, `LocalizationCodeTest`; `npm run build:locales` parity (317 messages) | Human review of the Italian wording; per-pack display names for resource keys and destinations (shown as literal IDs) |
+| Visible source-pack fallback | The state projection's `startingSituation.{text,locale,fallback}` is rendered with a `lang` attribute and, when `fallback` is true, a text note naming the original language. A matching-language text shows no note. Hidden catalog keys and private text are not part of the projection. | `campaign-view.spec.ts` | Fallback for later narrated passages (P08) and quest/fact text |
+| Packaged single origin (QA-35) | `/saved/<uuid>` and `/{en,it}/saved/<uuid>` serve the fixed locale indexes (canonical lowercase UUID only; deeper, uppercase, malformed and resource-like paths stay 404); opaque query/hash survive. | `PackagedInterfaceTest` (deep-link and 404 additions) | Container recreation hash comparison for the new route; Chrome journeys on the packaged origin |
+| Full QA-35 acceptance | — | — | Independent bilingual and screen-reader review of both variants; the gate cannot close without it |
+
+Design decisions: reconciliation state is a small allowlisted record (no receipts, text or
+drafts), bounded to 50 operations per campaign with finished work evicted first; the
+receipts of recently finished operations are re-read after a reload instead of being
+stored. A pending, cancelled or narration-pending operation does not by itself block
+a language reload, because it is re-queried by identity; this is the only change to the
+earlier blanket refusal. The stream is consumed with `fetch` rather than `EventSource` so
+the saved cursor can be sent explicitly on the first request after a reload and frames can
+be validated before use.
+
 ### P05.6 integration prerequisites (24 October 2026 audit)
 
-The remaining transport work cannot be verified against the current application.
+This audit is retained as history; the matrix above supersedes it. The remaining transport work could not be verified against the application of that date.
 `InterfaceRoutes` is the only application MVC controller and serves preview GETs;
 the campaign, operation and stream endpoints in [the API contract](13-api-and-ui.md)
 remain proposed. Internal operation journals and compiled localization catalogs

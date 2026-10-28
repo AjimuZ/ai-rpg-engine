@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — Bilingual campaign integration (partial), 28 October 2026
+
+- Show a selected playthrough's public state in the saved-adventure view: the starting
+  situation with an explicit note when it is displayed in the pack's source language,
+  operations and receipts re-queried by identity, a resumable stream follower with
+  bounded backoff and the scoped persistent draft. The view never submits anything.
+- Persist each campaign scope's stream cursor and operation identities
+  (`engine.campaign-sync.v1`). Language reload of a real campaign is now allowed only
+  after that record merges with other tabs and reads back exactly; after reload,
+  delivery resumes after the saved cursor without applying a message twice.
+- Localize 26 backend error codes, operation statuses, receipts, narration and
+  stream-reset reasons in English and Italian (77 new messages, 317 in total). Unknown
+  codes show one generic sentence. The Italian wording is a first draft awaiting
+  independent review.
+- Serve `/saved/<uuid>` and `/{en,it}/saved/<uuid>` from the packaged jar for reloads and
+  direct links; deeper, uppercase or resource-like paths stay 404.
+- Add a `localization` repository check that fails when a campaign controller error
+  code has no browser message.
+- Not complete: no browser journey ran on this build and QA-35 acceptance needs human
+  bilingual and screen-reader review, so P05.6 remains open.
+
 ## Unreleased — Resumable stream, cancellation and presentation jobs, 28 October 2026
 
 - Add owner cancellation (`POST …/operations/{id}/cancel`): the campaign lock decides the

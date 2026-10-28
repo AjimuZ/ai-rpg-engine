@@ -1,4 +1,4 @@
-/** Own bounded public projection/draft state; this module performs no transport or canonical mutations. */
+/** Own bounded public projection/draft state; this module performs no transport or canonical mutations (durable operation/cursor records live in the campaign session). */
 import { computed, Inject, Injectable, InjectionToken, signal } from '@angular/core';
 
 /** Minimal persistence boundary; browser denial/quota errors are caught by the service. */
@@ -40,7 +40,8 @@ export class StoryInputState {
   private epoch = 0;
   private readonly memory = new Map<string, { draft: InputDraft; persistence: 'saved' | 'unavailable' | 'invalid' }>();
   private readonly snapshots = new Map<string, StoryProjection>();
-  private readonly unresolved = new Set<string>();
+  /** Scopes with recovery obligations; `blocking` obligations (local recovery, required restore) forbid reload outright. */
+  private readonly unresolved = new Map<string, { scope: StoryScope; blocking: boolean }>();
   private readonly currentProjection = signal<StoryProjection | null>(null);
   readonly projection = this.currentProjection.asReadonly();
   private readonly currentDraft = signal<InputDraft>(emptyDraft);
@@ -56,10 +57,25 @@ export class StoryInputState {
   /** Receive an injectable storage port; null keeps edits in memory and reports persistence unavailable. */
   constructor(@Inject(STORY_DRAFT_STORAGE) private readonly storage: DraftStorage | null) {}
 
-  /** Verify every edited preview draft before reload; unresolved operations or storage loss block navigation. */
-  prepareReload(): boolean {
-    if (this.unresolved.size > 0 || !['loading', 'preview', 'ready', 'disconnected', 'error', 'stale-revision'].includes(this.status()) ||
-      (this.scope && this.scope.campaignId !== 'local-preview')) return false;
+  /**
+   * Verify every edited draft and recovery obligation before a language reload.
+   *
+   * Local preview recovery obligations and a required campaign restore always block. A real
+   * campaign's pending, cancelled or narration-pending work does not block by itself: the
+   * `reconciled` callback must prove that its operation identities and stream cursor are
+   * durably persisted so the reloaded page can re-query and resume. Without that proof (the
+   * default) every real campaign context blocks, exactly as before reconciliation existed.
+   *
+   * @param reconciled returns true when the scope's operation/cursor record was verified in storage
+   * @returns true only when every draft's exact bytes are stored and all obligations are covered
+   */
+  prepareReload(reconciled: (scope: StoryScope) => boolean = () => false): boolean {
+    const safe: readonly StoryStatus[] = ['loading', 'preview', 'ready', 'disconnected', 'error', 'stale-revision'];
+    const real = this.scope !== undefined && this.scope.campaignId !== 'local-preview';
+    const reconcilable: readonly StoryStatus[] = [...safe, 'reconnecting', 'clarification', 'cancelled', 'narration-pending'];
+    if ([...this.unresolved.values()].some(/** Blocking obligations and unverified real scopes refuse reload. */ (entry) =>
+      entry.blocking || (entry.scope.campaignId !== 'local-preview' && !reconciled(entry.scope))) ||
+      !(real ? reconcilable : safe).includes(this.status()) || (real && !reconciled(this.scope!))) return false;
     try {
       // Re-read exact bytes: a later quota/policy failure or another tab's edit must not silently lose this tab's draft.
       for (const [key, value] of this.memory) {
@@ -82,8 +98,8 @@ export class StoryInputState {
   activate(scope: StoryScope): number {
     if (this.scope?.adventureId === scope.adventureId && this.scope.campaignId === scope.campaignId) return this.epoch;
     this.scope = { ...scope };
-    // Real campaign identity requires future durable operation/cursor reconciliation, even after route detachment.
-    if (scope.campaignId !== 'local-preview') this.unresolved.add(this.key());
+    // A real campaign needs verified operation/cursor persistence at reload time, even after route detachment.
+    if (scope.campaignId !== 'local-preview') this.unresolved.set(this.key(), { scope: { ...scope }, blocking: false });
     this.epoch++;
     const cachedProjection = this.snapshots.get(this.key());
     // Fresh reply references prevent detached UI closures from selecting a previously displayed chip.
@@ -166,8 +182,9 @@ export class StoryInputState {
     if (this.scope && epoch === this.epoch) {
       this.currentStatus.set(status);
       // Keep recovery obligations across Settings navigation; detachment must not turn a pending operation into idle.
-      if (this.scope.campaignId !== 'local-preview' || !['loading', 'preview', 'ready', 'disconnected', 'error', 'stale-revision'].includes(status)) {
-        this.unresolved.add(this.key());
+      const local = this.scope.campaignId === 'local-preview';
+      if (!local || !['loading', 'preview', 'ready', 'disconnected', 'error', 'stale-revision'].includes(status)) {
+        this.unresolved.set(this.key(), { scope: { ...this.scope }, blocking: local || status === 'restore-required' });
       } else this.unresolved.delete(this.key());
     }
   }

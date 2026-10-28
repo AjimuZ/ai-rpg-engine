@@ -1,6 +1,6 @@
 """Credential-free repository checks for ordinary CI and local pre-push review.
 
-Four independent checks run against the files Git considers part of the project
+Five independent checks run against the files Git considers part of the project
 (tracked files plus untracked files that are not ignored):
 
 * ``secrets``: refuse private paths that must never be published (local
@@ -14,7 +14,11 @@ Four independent checks run against the files Git considers part of the project
 * ``images``: verify that every external Dockerfile ``FROM``, ``# syntax=`` line and
   Compose ``image:`` carries an exact tag and an index digest (ADR 0009).
 
-Usage: ``python tools/repository_checks/checks.py [secrets|docs|workflows|images|all]``.
+* ``localization``: verify that every public campaign/stream error code a backend
+  controller can answer has a localized message in the browser interface, so a new
+  code cannot reach players as raw text or the generic fallback by omission.
+
+Usage: ``python tools/repository_checks/checks.py [secrets|docs|workflows|images|localization|all]``.
 The exit status is 0 when every selected check passes and 1 otherwise; each
 finding is printed as ``path:line: message``. The module uses only the Python
 standard library and local Git commands. It makes no network requests, reads no
@@ -443,15 +447,51 @@ def check_images(root: Path = ROOT) -> list[str]:
     return findings
 
 
+# Controllers whose stable error codes the campaign screen must explain, and the module that maps them.
+CAMPAIGN_CONTROLLERS = (
+    "backend/src/main/java/org/rpgengine/campaign/CampaignProjectionController.java",
+    "backend/src/main/java/org/rpgengine/campaign/CampaignStreamController.java",
+    "backend/src/main/java/org/rpgengine/campaign/CampaignCreationController.java",
+)
+CAMPAIGN_MESSAGES = "frontend/src/app/campaign/campaign-messages.ts"
+# Creation codes belong to the future creation screen and have their own contract (P06.1).
+CAMPAIGN_CODE = re.compile(r'"((?:COMMAND|CAMPAIGN|STREAM|LOCAL)_[A-Z0-9_]+)"')
+
+
+def check_localization(root: Path = ROOT) -> list[str]:
+    """Return findings for campaign error codes lacking a localized browser message.
+
+    Every ``COMMAND_*``, ``CAMPAIGN_*``, ``STREAM_*`` and ``LOCAL_*`` string literal in the
+    campaign controllers is a public code. Each must appear as a key of the ``ERRORS`` table in
+    ``campaign-messages.ts``; the i18n tooling then guarantees an Italian target. A missing
+    controller or message module is itself a finding, so moving a file cannot disable the check.
+    """
+    findings: list[str] = []
+    messages_path = root / CAMPAIGN_MESSAGES
+    if not messages_path.is_file():
+        return [f"{CAMPAIGN_MESSAGES}:1: campaign message module is missing"]
+    mapped = set(re.findall(r"^\s{2}([A-Z][A-Z0-9_]+):\s*\(\)\s*=>", messages_path.read_text(encoding="utf-8"), re.M))
+    for controller in CAMPAIGN_CONTROLLERS:
+        path = root / controller
+        if not path.is_file():
+            findings.append(f"{controller}:1: campaign controller is missing")
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            for code in CAMPAIGN_CODE.findall(line):
+                if code not in mapped:
+                    findings.append(f"{controller}:{number}: error code has no localized browser message")
+    return findings
+
+
 def main(argv: list[str]) -> int:
     """Run the selected checks, print findings and return the process exit status.
 
-    ``argv`` holds zero or one selector (``secrets``, ``docs``, ``workflows``, ``images``, ``all``). An unknown
+    ``argv`` holds zero or one selector (``secrets``, ``docs``, ``workflows``, ``images``, ``localization``, ``all``). An unknown
     selector returns 2; findings return 1; a clean run returns 0.
     """
     selected = argv[0] if argv else "all"
-    if selected not in {"secrets", "docs", "workflows", "images", "all"}:
-        print("usage: checks.py [secrets|docs|workflows|images|all]", file=sys.stderr)
+    if selected not in {"secrets", "docs", "workflows", "images", "localization", "all"}:
+        print("usage: checks.py [secrets|docs|workflows|images|localization|all]", file=sys.stderr)
         return 2
     findings: list[str] = []
     if selected in {"secrets", "all"}:
@@ -462,6 +502,8 @@ def main(argv: list[str]) -> int:
         findings.extend(check_workflows())
     if selected in {"images", "all"}:
         findings.extend(check_images())
+    if selected in {"localization", "all"}:
+        findings.extend(check_localization())
     for finding in findings:
         print(finding)
     print(f"{selected}: {len(findings)} finding(s)")

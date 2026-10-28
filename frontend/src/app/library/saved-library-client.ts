@@ -226,7 +226,7 @@ export class SavedLibraryClient {
    * The shared bootstrap is not tied to any caller's abort signal: one screen switching away
    * must not cancel the session another screen is still waiting for.
    */
-  private ensureSession(renew: boolean): Promise<void> {
+  ensureSession(renew: boolean): Promise<void> {
     if (renew || !this.session) {
       const attempt = this.get('/api/v1/session', new AbortController().signal).then(/** Only a 200 JSON reply proves the session. */ async (response) => {
         await this.decode(response);

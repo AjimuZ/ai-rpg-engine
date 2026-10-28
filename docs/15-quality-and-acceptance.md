@@ -382,13 +382,16 @@ equivalent-control focus, plus unsupported saved locale and storage-denial notic
 Nine unit tests cover reload/storage boundaries, corrupt snapshots, recovery across
 detachment, conflicting draft writes and old callback/reply invalidation. A browser
 failure exposed restored text-size options selecting the first value; option-level
-selection and a routed regression assertion correct that behavior. Operation/cursor
-reconciliation, API errors/receipts and pack-source
-fallback integration remain unimplemented;
-QA-35 and independent bilingual playtests stay open.
-The 24 October prerequisite audit reran 42 frontend tests, strict type checks
-and four resource checker tests. It confirms that campaign/operation/stream HTTP
-contracts remain proposed; see the [P05.6 integration prerequisites](29-localization.md#p056-integration-prerequisites-24-october-2026-audit).
+selection and a routed regression assertion correct that behavior. The 28 October
+integration binds operation/cursor reconciliation, localized API errors/receipts and
+the visible pack-source fallback to the real campaign endpoints, with automated unit,
+component and packaged-route coverage listed in the
+[integration status](29-localization.md#p056-campaign-integration-status-28-october-2026).
+No browser journey was run on this build (no browser in the Linux container), the 77
+new Italian messages await independent review, and QA-35 plus the bilingual and
+screen-reader playtests stay open.
+The 24 October prerequisite audit is retained as history in the
+[P05.6 integration prerequisites](29-localization.md#p056-integration-prerequisites-24-october-2026-audit).
 These checks preserve the preview safety boundary and do not establish real
 operation/cursor reconciliation or independent screen-reader acceptance.
 All 22 repository-checker tests pass; docs/secrets/workflows/images scans have
