@@ -126,7 +126,7 @@ class CampaignInterfaceContractTest {
     /** Delete disposable rows after each test; constraints remain installed. */
     @AfterEach
     void clear() {
-        jdbc.execute("truncate inference_task, narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, "
+        jdbc.execute("truncate actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, "
                 + "campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, "
                 + "plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, "
                 + "planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, "

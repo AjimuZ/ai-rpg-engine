@@ -1,6 +1,7 @@
 package org.rpgengine.commands;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -10,6 +11,7 @@ import org.rpgengine.campaign.Campaign;
 import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.characters.ActorResource;
 import org.rpgengine.content.ContentRevision;
+import org.rpgengine.knowledge.KnowledgeLedger;
 import org.rpgengine.preparation.JobRequest;
 import org.rpgengine.preparation.PlanActivations;
 import org.rpgengine.preparation.PlanAdmissionService;
@@ -35,8 +37,11 @@ import tools.jackson.databind.json.JsonMapper;
  * workers: the journal update emits the {@code state.committed} stream message through the V11
  * trigger, and a narration-requiring commit inserts its post-commit presentation job here, in
  * the same transaction. Cited plan branches are rechecked before any effect and recorded once
- * (P07.6); every commit then re-evaluates admitted plans against the rows it changed. This
- * internal service has no controller, network port or callback.
+ * (P07.6); every commit then re-evaluates admitted plans against the rows it changed. Typed
+ * knowledge changes are written beside the events they cite, and after a registered player
+ * intention the player's perception at its resulting location updates its last known locations
+ * of other actors (P09.1); the query scopes both touch are bumped with the preparation scopes.
+ * This internal service has no controller, network port or callback.
  * Any validation, persistence, timeout or commit failure rolls back all its writes.
  */
 @Service
@@ -76,9 +81,11 @@ public class CanonicalCommitService {
             throw new IllegalStateException("canonical commit requires no ambient transaction");
         }
         // Load frozen pinned rule facts before taking locks; scope is still decided under the lock.
+        // Every registered intention needs them now, WAIT included: the observation after its
+        // effects decides concealment from the same catalog as the rules.
         var intent = plan.intent();
-        var rules = intent == null ? CommandRuleCatalogs.Content.UNAVAILABLE : catalogs.preload(intent.ownerId(),
-                plan.context().adventureId(), plan.context().campaignId(), intent.command().type());
+        var rules = intent == null ? CommandRuleCatalogs.Content.UNAVAILABLE : catalogs.pinned(intent.ownerId(),
+                plan.context().adventureId(), plan.context().campaignId());
         return Objects.requireNonNull(transaction.execute(status -> write(plan, rules)));
     }
 
@@ -118,6 +125,7 @@ public class CanonicalCommitService {
             throw new IllegalStateException("stale or ineligible resolved operation");
         }
         MutationLeaseService.requireHeld(jdbc, context);
+        UUID player = null;
         // A registered player action cannot use the legacy internal overload to skip
         // semantic checks. Bind every field of the intention to the admitted identity,
         // then re-read eligibility in this same transaction before changing any entity.
@@ -129,7 +137,7 @@ public class CanonicalCommitService {
                     || !intent.payloadHash().equals(context.payloadHash())) {
                 throw new IllegalStateException("missing or mismatched typed command evidence");
             }
-            UUID player = CommandSemantics.requireEligible(jdbc, intent.ownerId(), context.adventureId(),
+            player = CommandSemantics.requireEligible(jdbc, intent.ownerId(), context.adventureId(),
                     context.campaignId(), intent.command());
             // Re-derive every rule premise from current state, then bind effects to participants.
             var participants = CommandRules.require(jdbc, context.campaignId(), player, intent.command(), rules);
@@ -225,7 +233,21 @@ public class CanonicalCommitService {
         // branch is recorded as used once, and every plan whose recorded epoch or row
         // version this commit changed is invalidated before any later admission or use.
         var preparation = plan.preparation();
-        for (String scope : preparation.queryScopes()) {
+        // Knowledge cites this operation's events, which the flush above made visible to SQL. The
+        // observation runs after placements and knowledge changes, so this operation's own movement
+        // and reveals decide what the player perceives; a null perception records nothing.
+        var at = new KnowledgeLedger.Provenance(counters.stateRevision(), counters.worldTimeSeconds(), firstSequence,
+                plan.events().size());
+        var scopes = new LinkedHashSet<>(preparation.queryScopes());
+        scopes.addAll(KnowledgeLedger.applyWithin(jdbc, campaign.getId(), at, plan.knowledge()));
+        if (player != null) {
+            var perception = CommandRules.perceived(jdbc, campaign.getId(), player, rules);
+            if (perception != null) {
+                scopes.addAll(KnowledgeLedger.observeWithin(jdbc, campaign.getId(), player, perception.location(),
+                        perception.actors(), at));
+            }
+        }
+        for (String scope : scopes) {
             QueryEpochs.bump(jdbc, campaign.getId(), scope);
         }
         for (JobRequest job : preparation.jobs()) {

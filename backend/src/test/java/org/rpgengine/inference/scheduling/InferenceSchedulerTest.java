@@ -116,7 +116,7 @@ class InferenceSchedulerTest {
     }
 
     void clear() {
-        jdbc.execute("truncate inference_task, narration_publication, presentation_job, campaign_stream_message, "
+        jdbc.execute("truncate actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_job, campaign_stream_message, "
                 + "campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, "
                 + "item_instance, learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, "
                 + "quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, "
@@ -532,6 +532,9 @@ class InferenceSchedulerTest {
         ScheduledTask a = narration(campaignA);
         ScheduledTask b = narration(campaignB);
         one.submit(a);
+        // Wait until the port holds the running turn (it records a request before its journal write
+        // and registers the turn after it), so completing it never races the dispatch itself.
+        await(() -> first.running.containsKey(a.taskId()));
         TaskHandle waiting = two.submit(b);
         settle();
         assertThat(second.requests).isEmpty();
@@ -540,7 +543,8 @@ class InferenceSchedulerTest {
                 + "'RECONCILING')", Integer.class)).isEqualTo(1);
 
         first.complete(a.taskId(), TaskResult.Status.COMPLETED, null);
-        await(() -> second.requests.size() == 1);
+        await(() -> second.running.containsKey(b.taskId()));
+        assertThat(second.requests).hasSize(1);
         second.complete(b.taskId(), TaskResult.Status.COMPLETED, null);
         assertThat(result(waiting).status()).isEqualTo(TaskResult.Status.COMPLETED);
     }

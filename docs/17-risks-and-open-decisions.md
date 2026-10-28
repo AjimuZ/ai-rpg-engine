@@ -128,7 +128,7 @@ remain P16. No completed QA-36/37 or narrative benefit is implied.
 
 P07.6 adds typed row-version dependencies, the transactional scope/content/author gate
 and plan activation only through ordinary canonical commands. Remaining risks: a later
-writer (reveals at P09.1, items and quests at P10) that neither steps the row versions it
+writer (items and quests at P10; P09.1 knowledge writers comply) that neither steps the row versions it
 changes nor bumps the affected query scopes would leave plans undetectably stale, so each
 such writer needs the same epoch/version evidence in its tests; predicates and constraint
 rows still fail closed until P08.7; and activation is at most once per artifact branch,
@@ -148,7 +148,22 @@ deterministic evidence only. Open risks:
   detected as a phantom.
 - Branch predicates that read the holder's own row invalidate their branches whenever the
   player moves.
-- No consumer builds commands from plans yet (P09.1, P10).
+- No consumer builds commands from plans yet (P10).
+
+P09.1 adds typed claims, beliefs, last known locations and commitments. Open risks:
+
+- Two knowledge stores exist until P09.2/P10.5: the free-text `campaign_known_fact`
+  projection (no writer, still read by the player projection and the planner's
+  `fact-known-to` predicate) and the typed records. Neither may be merged into the other
+  without a migration decision.
+- Observation is player-only and refreshes every co-present sighting on every action. That
+  bumps `sightings:<player>` often, so a future reader that records this scope will see
+  frequent staleness. More than 64 co-present actors records no observation at all.
+- Nothing yet writes claims, beliefs or commitments from play: the `reveal` effect, plan
+  consumers and dialogue-made promises are P10/P12/P15. Until then reveals and commitments
+  exist only through trusted internal operations and tests.
+- Content references (`location:`, `definition:`) are checked for form, not against the pinned
+  closure. A trusted resolver that writes a dangling id creates a claim that reveals nothing.
 
 P03.4 adds durable same-operation random reuse and pinned HMAC-SHA-256 v1 identity.
 Private campaign seeds are trusted database/backup material, never runtime context.

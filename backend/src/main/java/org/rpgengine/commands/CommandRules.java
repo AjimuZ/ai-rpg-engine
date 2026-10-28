@@ -6,6 +6,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import org.rpgengine.knowledge.KnowledgeLedger;
+import org.rpgengine.knowledge.KnowledgeRefs;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -17,9 +19,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * <p>Checked rules, each against committed state rather than a copied validation flag:
  * <ul>
  *   <li><b>Reachability and knowledge</b> — {@code MOVE} needs a current location, a different
- *       disclosed pinned destination and an accessible authored link from here.</li>
+ *       pinned destination that is disclosed or revealed to the player (P09.1) and an accessible
+ *       authored link from here.</li>
  *   <li><b>Recipient knowledge and range</b> — {@code SPEAK} and ability targets must be other
- *       campaign actors that share the player's current location and are not concealed.</li>
+ *       campaign actors that share the player's current location and are not concealed, or whose
+ *       concealed origin has been revealed to the player (P09.1).</li>
  *   <li><b>Ownership and prerequisites</b> — {@code USE_ABILITY} needs a pinned ability the player
  *       has learned, its prerequisite abilities and skill ranks.</li>
  *   <li><b>Target policy and resources</b> — target count must fit the ability's policy and every
@@ -33,6 +37,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * </ul>
  * {@code WAIT} has no additional rule here; its legal duration belongs to the world clock
  * (P10.4). {@link LocalActionResolver} calculates the effects of an intention that passed here.
+ * A reveal is a typed knowledge record ({@link KnowledgeLedger#revealedTo}): a current TRUE
+ * {@code EXISTS} claim about the location or actor that is common knowledge or that the player
+ * KNOWS or BELIEVES. Free-text {@code campaign_known_fact} rows, rumors and suspicions never reveal.
+ * {@link #perceived} reuses the same perception rule for the observation that follows a commit.
  * Every rule rejection is a sanitized {@link OperationAdmissionFailure}; an unattributable
  * resolved effect is a trusted-resolver defect and raises {@link IllegalStateException}.
  * Both escape the caller's transaction and therefore roll back everything it wrote.
@@ -98,7 +106,68 @@ final class CommandRules {
                 throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
             }
         }
+        // Knowledge records of uninvolved actors (their beliefs, sightings, commitments or testimony)
+        // cannot be written by this intention; a mere subject of a claim or sighting is not touched.
+        for (var change : plan.knowledge()) {
+            if (!participants.containsAll(change.actors())) {
+                throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
+            }
+        }
     }
+
+    /**
+     * What the acting player perceives after the commit's effects: its current location and every
+     * other campaign actor there that passes the same perception rule as {@code SPEAK} recipients,
+     * ordered by identity. Runs under the commit's campaign lock after placements and knowledge
+     * changes were written, so movement and reveals of this very operation count.
+     *
+     * @param jdbc JDBC access joined to the caller's locked transaction
+     * @param campaign campaign whose row the caller has locked
+     * @param player acting player
+     * @param content pinned catalog, possibly unavailable
+     * @return the perception, or null when nothing can be observed safely: no current location, no
+     *         pinned catalog (concealment could not be decided) or more co-present actors than
+     *         {@link KnowledgeLedger#MAX_OBSERVED}; null never records a sighting or an absence
+     */
+    static Perception perceived(JdbcTemplate jdbc, UUID campaign, UUID player, CommandRuleCatalogs.Content content) {
+        if (content.catalog() == null) {
+            return null;
+        }
+        var check = new Check(jdbc, campaign, player, content);
+        try {
+            check.catalog();
+        } catch (OperationAdmissionFailure unavailable) {
+            // A catalog of another revision cannot decide concealment for this campaign.
+            return null;
+        }
+        String here = check.here();
+        if (here == null) {
+            return null;
+        }
+        List<UUID> present = jdbc.queryForList("select id from actor where campaign_id = ? and location_id = ? "
+                + "and id <> ? order by id limit ?", UUID.class, campaign, here, player, KnowledgeLedger.MAX_OBSERVED + 1);
+        if (present.size() > KnowledgeLedger.MAX_OBSERVED) {
+            return null;
+        }
+        var seen = new java.util.ArrayList<UUID>();
+        for (UUID actor : present) {
+            try {
+                check.perceivable(actor);
+                seen.add(actor);
+            } catch (OperationAdmissionFailure concealed) {
+                // Concealed, unresolvable or revealed-to-nobody actors are simply not perceived.
+            }
+        }
+        return new Perception(here, List.copyOf(seen));
+    }
+
+    /**
+     * Result of {@link #perceived}.
+     *
+     * @param location the player's current location
+     * @param actors perceived co-present actors, ordered by identity
+     */
+    record Perception(String location, List<UUID> actors) { }
 
     /** Build a sanitized category for {@code throw}; the caller's transaction rolls back every write. */
     private static OperationAdmissionFailure fail(OperationAdmissionFailure.Kind kind) {
@@ -129,7 +198,7 @@ final class CommandRules {
         }
 
         /** Return the catalog for the campaign's frozen revision, or fail closed. */
-        private CommandRuleCatalog catalog() {
+        CommandRuleCatalog catalog() {
             if (catalog == null) {
                 catalog = content.require(jdbc.queryForObject("select content_revision_id from campaign where id = ?",
                         UUID.class, campaign));
@@ -138,7 +207,7 @@ final class CommandRules {
         }
 
         /** Current committed location of the player; null when the save records none. */
-        private String here() {
+        String here() {
             if (!located) {
                 // Location is mutable world state; the creation-profile origin is frozen by a trigger.
                 var row = jdbc.queryForObject("select location_id, definition_id from actor "
@@ -158,8 +227,8 @@ final class CommandRules {
         }
 
         /**
-         * Movement uses one authored link. Unknown, concealed, current, unlinked and blocked
-         * destinations share one category so a secret location or route is never confirmed.
+         * Movement uses one authored link. Unknown, concealed (and not revealed), current, unlinked
+         * and blocked destinations share one category so a secret location or route is never confirmed.
          */
         void reachable(String destination) {
             String current = here();
@@ -169,17 +238,19 @@ final class CommandRules {
             var rules = catalog();
             var origin = rules.locations().get(current);
             var target = rules.locations().get(destination);
-            if (origin == null || target == null || !target.disclosed()
-                    || !origin.accessibleLinks().contains(destination)) {
+            if (origin == null || target == null || !origin.accessibleLinks().contains(destination)
+                    || (!target.disclosed() && !KnowledgeLedger.revealedTo(jdbc, campaign, player,
+                            KnowledgeRefs.location(destination)))) {
                 throw fail(OperationAdmissionFailure.Kind.DESTINATION_UNAVAILABLE);
             }
         }
 
         /**
          * Perception basis for addressing an actor: same campaign, a shared non-null current
-         * location and no concealed authored origin. An origin that does not resolve in the
-         * pinned content is treated as concealed, because disclosure cannot be established.
-         * Actors without an authored origin are perceived through co-presence alone.
+         * location and an authored origin that is disclosed, or concealed but revealed to the player
+         * as this actor. An origin that does not resolve in the pinned content is treated as
+         * concealed and cannot be revealed, because disclosure cannot be established. Actors without
+         * an authored origin are perceived through co-presence alone.
          */
         void perceivable(UUID actor) {
             String current = here();
@@ -189,7 +260,12 @@ final class CommandRules {
                 throw fail(OperationAdmissionFailure.Kind.ACTOR_UNAVAILABLE);
             }
             String origin = rows.getFirst()[1];
-            if (origin != null && !Boolean.TRUE.equals(catalog().actorDefinitions().get(origin))) {
+            if (origin == null) {
+                return;
+            }
+            Boolean disclosed = catalog().actorDefinitions().get(origin);
+            if (disclosed == null || (!disclosed && !KnowledgeLedger.revealedTo(jdbc, campaign, player,
+                    KnowledgeRefs.actor(actor)))) {
                 throw fail(OperationAdmissionFailure.Kind.ACTOR_UNAVAILABLE);
             }
         }

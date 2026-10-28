@@ -244,9 +244,13 @@ and actor overrides are never part of it; the server derives them during resolut
 
 **Knowledge.** An actor is perceivable when it has no authored origin, or its origin
 resolves in the pinned closure and is not `knowledge: secret`. A creation profile is
-the player's own origin and is never concealed. Until typed reveal records exist
-(P09.1), secret locations and actors stay undiscoverable and therefore fail closed;
-`campaign_known_fact` is free text and is not consulted as a rule source. Unknown,
+the player's own origin and is never concealed. Secret locations and actors stay
+undiscoverable and fail closed until a typed reveal discloses them to the player. Since P09.1
+that means a current `TRUE` `EXISTS` claim about the location or actor that is `COMMON`, or
+that the player currently `KNOWS` or `BELIEVES`
+([docs/08 section 4](08-memory-and-continuity.md#p091-typed-knowledge)). Rumors, doubts,
+false or undetermined claims, other actors' knowledge and the free-text `campaign_known_fact`
+are not rule sources. Unknown,
 concealed, unlinked, blocked or current destinations share one category, and missing,
 foreign, self, absent and concealed recipients share another, so a rejection never
 confirms that a hidden location, route or actor exists.
@@ -331,7 +335,7 @@ commit requires narration (`NARRATION_REQUIRED` outbox intent); narration itself
 **Effect programs.** The rule catalog compiles each ability's validated effect tree into
 prose-free values (`EffectProgram`). Locally executable nodes are `modifyResource` and
 `conditional`; `damage`, `heal`, `move`, condition changes, `reveal` and `createItem` need
-armor, conditions, forced movement, knowledge records or item instances from P09.1, P10 and
+armor, conditions, forced movement, a resolver for `reveal` over the P09.1 knowledge records, or item instances from P10 and
 P11. `CommandRules` therefore adds a last ability rule, `EFFECT_UNSUPPORTED` (HTTP 422
 `COMMAND_EFFECT_UNSUPPORTED`), refused before any journal row, permit or draw when the program
 contains such a node, could need more than 128 draws (every die of every expression in every
@@ -535,7 +539,7 @@ any of these checks. The plan contributes no effect: events, time, turn, resourc
 rewards and draws are exactly those the resolver built, and receipts never cite the
 private plan. No player intention, HTTP route or job can supply a citation; P07.4's
 `CommandExecutionService` cites none. Consumers that build commands from plans
-(opportunities, pending-event adoption, reveals) arrive with P09.1 and P10; P08.7 supplies
+(opportunities, pending-event adoption, reveals) arrive with P10, over the typed reveal records of P09.1; P08.7 supplies
 the admitted plans and their usable branches but no consumer.
 
 ### P07.1 continuation checkpoint

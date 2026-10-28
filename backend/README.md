@@ -984,3 +984,34 @@ Tests:
 - `PlanningBoundaryTest`: no package depends on planning, and narration and presentation
   never read preparation.
 - `PlanningSettingsTest`.
+
+## Typed knowledge, last known locations and commitments (P09.1)
+
+`org.rpgengine.knowledge` keeps canonical truth apart from what actors believe. V15 adds four
+tables, all written only by the canonical commit beside the events they cite. The model and its
+rules are in [docs/08 section 4](../docs/08-memory-and-continuity.md#p091-typed-knowledge).
+
+- `knowledge_claim`: a typed proposition (`EXISTS`, `PROPERTY`, `RELATION`, `STATEMENT`) about an
+  `actor:`/`item:` row or a `location:`/`definition:` content id, with a privileged truth
+  (`TRUE`, `FALSE`, `UNDETERMINED`, resolved at most once), a disclosure scope (`COMMON` or
+  `HOLDERS`), provenance and a validity interval through supersession.
+- `knowledge_belief`: one holder's current stance (`KNOWS`, `BELIEVES`, `RUMORED`, `SUSPECTS`,
+  `DOUBTS`) on a claim, with acquisition (`OBSERVED`, `TOLD` with informant, `READ` with
+  document, `INFERRED`); `KNOWS` needs a current `TRUE` claim.
+- `actor_sighting`: an observer's last known location of another actor and a later observed
+  absence. The real current location stays in `actor.location_id`.
+- `actor_commitment`: an `OPEN` promise, obligation or agreement with exact terms and their
+  language, an optional deadline and one terminal resolution.
+
+`KnowledgeChange` values ride on `ResolvedCommit.knowledge()` and cite one of the operation's
+own events by index. `KnowledgeLedger.applyWithin` writes them under the commit's campaign
+lock, `observeWithin` records what the player perceives after each registered intention, and
+`revealedTo` lets `CommandRules` disclose a secret location or actor only through a current
+`TRUE` `EXISTS` claim that is common knowledge or that the player `KNOWS` or `BELIEVES`.
+`KnowledgeView.forActor` reads one actor's audience view (no truth, no real locations of
+others), and `KnowledgeView.privileged` the full record. Writers bump `knowledge:claims`,
+`knowledge:<actor>`, `sightings:<actor>` and `commitments:<actor>` and step row versions;
+`plan_reference_version` now also evaluates `claim:`, `belief:` and `commitment:` references.
+
+Tests: `KnowledgeLedgerTest` (real PostgreSQL, sealed pack, production creation, real admission,
+rules, resolver and commit) and the V15 step of `CanonicalMigrationUpgradeTest`.

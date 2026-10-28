@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — Typed knowledge, last known locations and unresolved commitments, 28 October 2026
+
+- Record what is true separately from what each character believes. A claim about a place,
+  character, item or authored definition has a hidden truth (true, false or not yet decided,
+  decided at most once) and a scope: common knowledge, or only those who hold it. A
+  character's belief records how sure it is (knows, believes, heard a rumor, suspects,
+  doubts) and how it learned it (saw it, was told by someone, read it, worked it out). A
+  belief can be wrong, and a character's own view never shows whether its beliefs are true.
+- Tie every record to the action that produced it: each claim, belief, sighting and promise
+  cites an event of the operation that wrote it, and the database refuses any other source.
+  Changing the world supersedes a claim instead of editing it, so history stays readable.
+- Keep a character's last known location of others apart from where they really are. After
+  each player action the character notes the visible people around it; when someone leaves,
+  the old sighting stays until the player looks again and finds them gone. Hidden characters
+  are not noticed, and a report from someone else is kept as hearsay even when it is wrong.
+- Track promises, obligations and agreements between two characters, with their exact words
+  and language and an optional in-world deadline. They stay open until fulfilled, broken or
+  released, once; a missed deadline shows as overdue without changing anything. Each
+  character sees only the commitments it is part of or that everyone knows.
+- Let typed knowledge open secrets: a hidden place or character becomes reachable once the
+  player knows or believes a true record that it exists, or it is common knowledge. Rumors,
+  false records, other characters' knowledge and free-text notes never reveal anything.
+- Mark knowledge changes for planning: claims, beliefs, sightings and commitments step their
+  versions and query scopes, so prepared quest plans that read them become stale correctly.
+- Make the two-process scheduler test wait for the real dispatch instead of a fixed delay, which
+  failed intermittently (about one run in three) when the dispatch journal write was slow.
+
 ## Unreleased — Bounded quest-plan contract with selective replanning and a playable no-plan baseline, 28 October 2026
 
 - Add optional quest planning, off by default. With planning off, nothing is planned or

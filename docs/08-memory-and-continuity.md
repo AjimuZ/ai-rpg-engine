@@ -47,6 +47,82 @@ The player may know a location through a map without visiting it. An NPC may hav
 
 Secret information must be filtered before retrieval and prompt assembly for a limited audience. Filtering only the final response is insufficient. Asset selection, music, loading messages, tooltips, filenames, tactical suggestions, and search snippets are also disclosure channels.
 
+### P09.1 typed knowledge
+
+Implemented in `org.rpgengine.knowledge` with migration V15. Four records keep truth, belief,
+position and obligation apart:
+
+| Record | Holds | Never holds |
+| --- | --- | --- |
+| `knowledge_claim` | Typed proposition: subject (`actor:`/`item:` row or `location:`/`definition:` content id), predicate (`EXISTS`, `PROPERTY` with key and scalar value, `RELATION` with key and object, `STATEMENT`), optional statement text with its language, disclosure (`COMMON` or `HOLDERS`), privileged truth, provenance, validity interval | An actor's location; an opinion; a plan assumption |
+| `knowledge_belief` | One holder's stance (`KNOWS`, `BELIEVES`, `RUMORED`, `SUSPECTS`, `DOUBTS`) on one claim, acquisition (`OBSERVED`, `TOLD` + informant, `READ` + item or definition, `INFERRED`), learned revision/time/event, supersession | Truth |
+| `actor_sighting` | Observer's last known location of another actor (`OBSERVED` or `TOLD` + informant), when and from which event, and a later observed absence | The subject's real location (that is `actor.location_id`) |
+| `actor_commitment` | `PROMISE`, `OBLIGATION` or `AGREEMENT` from debtor to creditor; exact terms and their language, `quoted` flag, optional subject and deadline; `OPEN` until one terminal resolution | A derived "expired" status |
+
+Rules (each enforced in the ledger and repeated by V15 triggers or constraints):
+
+- **Truth versus belief.** Truth is set when the claim is registered and an `UNDETERMINED` claim
+  may be resolved to `TRUE` or `FALSE` once, at a later revision. A determined truth never
+  changes. A world change registers a superseding claim about the same subject, and the old
+  claim keeps its truth for its interval `[established, superseded)`. `KNOWS` needs a current
+  `TRUE` claim when written. Every other stance may concern a false or undetermined claim,
+  because a character can be wrong.
+- **Scopes.** Disclosure decides who sees a proposition without holding a belief. `COMMON` is
+  common knowledge of every actor. `HOLDERS` reaches an audience only through its own belief.
+  A secret no one holds is a `HOLDERS` claim without beliefs: privacy says nothing about truth.
+  Commitments are `PARTIES` (debtor and creditor) or `COMMON`.
+- **Provenance.** Each record cites an event of the operation that wrote it, by index into that
+  operation's events. The database checks that the cited event belongs to the recorded revision.
+  Beliefs and claims are replaced, never edited: the predecessor is closed at the committing
+  revision and the successor names it. A belief successor keeps the holder but may concern
+  another claim, and a claim successor keeps the subject.
+- **Current versus last known location.** After every committed registered intention, the
+  player observes the other actors at its resulting location who pass the `SPEAK` perception
+  rule. An `OBSERVED` sighting is written for each, and an absence for each earlier sighting at
+  that place whose subject is no longer perceived. No observation is recorded without a pinned
+  catalog, without a current location, or with more than 64 actors present, so an absence is
+  never inferred without a perception basis. An explicit `OBSERVED` sighting must match the
+  subject's real location at commit. A `TOLD` sighting records what the observer was told,
+  even if it is wrong.
+- **Commitments.** Lateness is derived at read time (`overdue` when world time is past the
+  deadline). Reading never resolves, expires or advances anything.
+- **Reveals.** Rules disclose a `knowledge: secret` location or NPC origin to the player only
+  through a current `TRUE` `EXISTS` claim about that location or actor. The claim must be
+  `COMMON`, or the player must currently `KNOWS` or `BELIEVES` it. Rumors, suspicions, doubts,
+  superseded beliefs, false or undetermined claims, another actor's knowledge and free-text
+  `campaign_known_fact` rows never reveal anything. Refusals keep the P07.3 categories, so they
+  still do not confirm that a hidden location or actor exists.
+- **Attribution.** A registered player intention may only write knowledge records of its
+  participants (holder, observer, informant, debtor, creditor). Being the subject of a claim or
+  sighting is not an effect.
+- **Invalidation.** Writers bump `knowledge:claims`, `knowledge:<holder>`, `sightings:<observer>`
+  and `commitments:<party>`, and step row versions. `plan_reference_version` evaluates `claim:`,
+  `belief:` and `commitment:` references, so a plan that read such a row becomes stale.
+
+`KnowledgeView.forActor` is the audience reader. It returns, in one repeatable-read snapshot:
+
+- the actor's current beliefs, with claim content but without truth or disclosure;
+- current `COMMON` claims it holds no belief about;
+- its own current location;
+- its last known locations of others;
+- the open commitments it is party to or that are common knowledge.
+
+`KnowledgeView.privileged` adds truth, intervals, every holder's beliefs, event sequences, real
+current locations and resolved commitments, for privileged roles only. Each list is bounded at
+1,000 rows; exceeding the bound fails instead of truncating.
+
+Decisions and limits:
+
+- The P06.2 free-text `campaign_known_fact` projection stays unchanged and has no writer. It is
+  not a rule source, and the quest planner's `fact-known-to` predicate still reads it. Context
+  assembly (P09.2) and panels (P10.5) move to the typed views. Retiring the old table is decided
+  then.
+- Only trusted resolvers write knowledge. No player command, effect node or HTTP route creates
+  claims or commitments yet: the pack `reveal` effect, plan consumers (opportunities, adopted
+  pending events) and item creation stay P10. NPC-side observation, witnesses of a commitment
+  and relationship episodes are P11/P15. Statements and terms keep the language they were
+  written in. They are not translated.
+
 ## 5. Context assembly
 
 Each task receives a stamped context envelope:

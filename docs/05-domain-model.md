@@ -37,7 +37,7 @@ One game action can emit many events but advances the game turn once. An NPC com
 | `LocationState` | Definition, spatial adjacency, discovered properties, dynamic conditions, last observed time |
 | `FactionState` | Goals, relationships, reputation, clocks, known/public state |
 | `Relationship` | Directed actor pair, dimensions, commitments, private/public disclosures, sources |
-| `KnowledgeFact` | Typed claim, truth category, audience, source, valid time, supersession, confidence where meaningful |
+| `KnowledgeFact` | Typed claim, truth category, audience, source, valid time, supersession, confidence where meaningful. Since P09.1 split into `knowledge_claim` (proposition, privileged truth, disclosure, provenance, interval) and `knowledge_belief` (holder stance and acquisition), with `actor_sighting` for last known locations and `actor_commitment` for promises ([docs/08 section 4](08-memory-and-continuity.md#p091-typed-knowledge)) |
 | `Encounter` | Frozen roster/profile, spatial state, initiative, round, current actor, lifecycle, objectives |
 | `EffectInstance` | Source operation, rule definition, target, magnitude, timing, duration, stacking key |
 | `RewardSettlement` | Unique source key, recipients, XP/items/currency, applied revision |
@@ -173,7 +173,8 @@ target policy. Identities are canonical, exactly as creation stores them: root I
 unqualified, dependency IDs `pack#id`. Resource keys stay unqualified and belong to
 the creation profile's declaring pack, so a cost declared by another pack's
 vocabulary is never charged to a same-named resource. Secret definitions fail closed
-until typed reveal records exist (P09.1). At commit, every resource change and event
+unless a typed reveal discloses them to the player (P09.1: a current `TRUE` `EXISTS` claim
+that is common knowledge or that the player knows or believes). At commit, every resource change and event
 actor must belong to the intention's participants (player plus recipient/targets).
 No table, trigger or migration is added; the immutable compiled rule facts are an
 in-memory cache keyed by sealed revision. See the
@@ -329,7 +330,8 @@ canonical commit to increment revision, turn, time or event sequence.
 ### Knowledge and progression
 
 - A rumor is not a confirmed world fact; a believed fact can differ from truth.
-- Current real location and an observer's last known location are separate records.
+- Current real location and an observer's last known location are separate records
+  (`actor.location_id` and `actor_sighting` since P09.1).
 - A reward source has one settlement per defined recipient policy.
 - Level/skill/stat changes require a supported advancement operation; narration cannot award them directly.
 - A correction appends evidence of what changed; it does not edit the historical event that originally occurred.

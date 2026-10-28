@@ -31,7 +31,9 @@ ordinary canonical command uses a plan: its commit rechecks the cited branches a
 current rows before writing any effect and records each branch once in
 `plan_activation`; the plan contributes no fact, time, reward or draw. Dispatch and budgets
 arrived with P08.6 and the quest-plan body contract with typed predicates with P08.7;
-consumers that build commands from plans remain P09.1 and P10. See the
+consumers that build commands from plans remain P10 (P09.1 adds the typed reveal and
+knowledge records they will write, and `claim:`, `belief:` and `commitment:` row-version
+dependencies). See the
 [P07.6 contract](07-turn-protocol.md#p076-plan-admission-and-activation).
 
 P08.6 (28 October 2026) implements the dispatch half of section 9: one durable fair

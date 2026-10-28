@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V14 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V15 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -255,6 +255,29 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(1, jdbc.queryForObject("select count(*) from pg_indexes where schemaname = ? "
                             + "and indexname = 'inference_task_one_turn_uk'", Integer.class, schema));
                     assertEquals(0, v14.migrate().migrationsExecuted);
+                    // V15 adds the typed knowledge tables empty: no claim, belief, sighting or commitment is
+                    // invented for an old save, canonical rows stay exact, the P07.6 reference kinds keep
+                    // their values and the new kinds evaluate to null (stale) when nothing exists.
+                    String v14Campaign = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
+                    Flyway v15 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("15").load();
+                    assertEquals(1, v15.migrate().migrationsExecuted);
+                    assertTrue(v15.validateWithResult().validationSuccessful);
+                    assertEquals(v14Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c",
+                            String.class));
+                    assertEquals(v12Journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
+                            String.class));
+                    for (String table : new String[] {"knowledge_claim", "knowledge_belief", "actor_sighting",
+                            "actor_commitment"}) {
+                        assertEquals(0, jdbc.queryForObject("select count(*) from " + table, Integer.class), table);
+                    }
+                    assertEquals(0L, jdbc.queryForObject("select plan_reference_version(?, ?)", Long.class, campaign,
+                            "actor:" + actor));
+                    for (String kind : new String[] {"claim", "belief", "commitment"}) {
+                        assertNull(jdbc.queryForObject("select plan_reference_version(?, ?)", Long.class, campaign,
+                                kind + ":" + UUID.randomUUID()), kind);
+                    }
+                    assertEquals(0, v15.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

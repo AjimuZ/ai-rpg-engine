@@ -1785,6 +1785,45 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 **Depends on:** P08. **Areas:** knowledge, memory, retrieval, AI sessions, resume UI.
 
 - [ ] P09.1 Implement typed facts, beliefs, provenance, scopes, current/last-known location, and unresolved commitments.
+  - Package A — typed records (V15, `org.rpgengine.knowledge`): `knowledge_claim` (typed
+    `EXISTS`/`PROPERTY`/`RELATION`/`STATEMENT` proposition about an `actor:`/`item:` row or a
+    `location:`/`definition:` content id, statement language, `COMMON`/`HOLDERS` disclosure,
+    privileged `TRUE`/`FALSE`/`UNDETERMINED` truth resolved at most once, supersession interval),
+    `knowledge_belief` (holder stance `KNOWS`/`BELIEVES`/`RUMORED`/`SUSPECTS`/`DOUBTS`,
+    acquisition `OBSERVED`/`TOLD`+informant/`READ`+document/`INFERRED`, one current belief per
+    holder and claim, `KNOWS` only on a current `TRUE` claim), `actor_sighting` (last known
+    location and observed absence, separate from `actor.location_id`) and `actor_commitment`
+    (`OPEN` promise/obligation/agreement with exact terms and language, optional deadline, one
+    terminal resolution). Every record cites an event of its own operation at its own revision
+    (database-checked); frozen propositions, write-once closures, monotonic sightings and no
+    deletes are enforced by triggers.
+  - Package B — commit integration: `ResolvedCommit.knowledge()` carries typed
+    `KnowledgeChange` values; `KnowledgeLedger.applyWithin` writes them under the campaign lock
+    and rechecks row versions, open status, campaign references and real locations of observed
+    sightings; registered intentions may only touch their participants' knowledge; after every
+    committed registered intention the player observes perceivable co-present actors and
+    records absences (none without a pinned catalog, a location or with more than 64 present).
+    Writers bump `knowledge:claims`, `knowledge:<actor>`, `sightings:<actor>` and
+    `commitments:<actor>` and step row versions; `plan_reference_version` evaluates `claim:`,
+    `belief:` and `commitment:` references.
+  - Package C — reveals and audience views: `CommandRules` discloses a secret location or NPC
+    origin only through a current `TRUE` `EXISTS` claim that is `COMMON` or that the player
+    `KNOWS`/`BELIEVES`; `KnowledgeView.forActor` returns one actor's beliefs without truth,
+    common claims, own location, last known locations (never real ones) and visible open
+    commitments with derived lateness; `KnowledgeView.privileged` returns truth, intervals,
+    all beliefs, real locations and resolved commitments. See
+    [docs/08 section 4](08-memory-and-continuity.md#p091-typed-knowledge).
+  - Exit checks:
+    - Real PostgreSQL suite over a sealed pack, production campaign creation and the real
+      admission, rules, resolver and commit: truth/belief separation and provenance, rollback
+      of every refused premise, typed-only reveals, perception versus real location, scoped
+      commitments with derived lateness, participant attribution, database guards and view
+      scoping.
+    - The V15 upgrade step; deliberate weakening probes; the full packaged backend and the
+      repository checks.
+    - Not part of this task: context envelopes and retrieval (P09.2), the `reveal` effect and
+      plan consumers (P10), NPC-side observation and commitment witnesses (P11/P15), player
+      panels (P10.5) and retiring the free-text `campaign_known_fact` projection.
 - [ ] P09.2 Build stamped context envelopes, mandatory/optional budgets, ID/full-text retrieval and overflow behavior; distinguish private planning assumptions from admitted facts and public narration, with language/glossary binding.
 - [ ] P09.3 Implement checkpoints, source-linked summaries, freshness/invalidation, and bounded background jobs.
 - [ ] P09.4 Implement count/context/error-triggered renewal and manual idle renewal, preserving transcript and campaign.

@@ -73,7 +73,7 @@ Not verified:
 - a live planner run or any model-quality, latency or usage result;
 - the paired AP-12 investigation comparison, deferred to the optional P14 demonstration and
   P18.6;
-- consumers that build commands from plans (P09.1, P10);
+- consumers that build commands from plans (P10);
 - location-membership phantoms (no writer tags that scope yet);
 - secret authored definitions with text;
 - speculative preparation, world direction and plan review.

@@ -84,6 +84,22 @@ public class CommandRuleCatalogs {
         if (!CONTENT_RULES.contains(commandType)) {
             return Content.UNAVAILABLE;
         }
+        return pinned(owner, adventure, campaign);
+    }
+
+    /**
+     * Return the pinned catalog whatever the command type, without taking campaign locks. The
+     * canonical commit uses it for every registered intention because the perception that follows
+     * the effects (P09.1) needs concealment facts even for {@code WAIT}. Scope and failure handling
+     * are those of {@link #preload}.
+     *
+     * @return available catalog or the unavailable marker
+     * @throws IllegalStateException if called inside an ambient transaction
+     */
+    public Content pinned(UUID owner, UUID adventure, UUID campaign) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(adventure, "adventure");
+        Objects.requireNonNull(campaign, "campaign");
         MutationLeaseService.requireNoTransaction();
         return Objects.requireNonNull(reads.execute(status -> {
             jdbc.execute("set local statement_timeout = '30s'");

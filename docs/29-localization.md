@@ -461,7 +461,8 @@ acceptance evidence is claimed.
 P03.1 persists preferences and generations (`identity_owner_profile.ui_locale`,
 `presentation_campaign_settings`); P04.6 validates overlays; P05.6 owns
 UI resources, locale serving/reload and bilingual forms; P08.2/P08.4 enforce
-per-task language/routing; P09 preserves multilingual provenance. P14 runs both
+per-task language/routing; P09 preserves multilingual provenance (since P09.1 claim
+statements and commitment terms store their `en`/`it` language and are never translated). P14 runs both
 genres in both languages. P17 speech is optional. The editor remains later
 E01–E06 and writes the same localization contract.
 
