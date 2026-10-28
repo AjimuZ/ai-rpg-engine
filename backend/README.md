@@ -754,6 +754,12 @@ the probe fixture; the drift check is skipped only where `../tools` is absent, i
 backend-only verification image), `StdioFrameWireTest`, `UnixSocketFrameWireTest`,
 `InferenceBoundaryTest` and `TaskPortSelectionTest`. No database is needed by these suites.
 
+Verified on 28 October 2026 with the unchanged scoped JDK 21 toolchain and disposable
+PostgreSQL 18.6 fixture: 46 focused cases and all 490 packaged backend cases in 47
+suites pass with zero failures/errors/skips, nine deliberate weakening probes were
+detected, and the executable jar is packaged. See
+[evidence scope](../docs/15-quality-and-acceptance.md).
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

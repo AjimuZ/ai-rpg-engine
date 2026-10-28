@@ -18,6 +18,13 @@
   pinned version and signed in. The packaged profile keeps the transport disabled until
   narration uses it.
 - A boundary test keeps every Codex type inside its adapter package.
+- Pass 46 focused cases and all 490 packaged backend tests in 47 suites with zero
+  failures/errors/skips, including a replay of the retained runtime fixture and real
+  child-process and Unix-socket transports. Nine deliberate weakening probes were detected.
+  All 26 repository-policy tests pass with zero scan findings. No live runtime or account
+  was used; the opt-in real smoke remains a later check.
+- Record implementation owner commit `4c46d9f` before marking P08.1 complete (47 of 131
+  roadmap entries).
 
 ## Unreleased — Transactional plan admission and activation, 28 October 2026
 

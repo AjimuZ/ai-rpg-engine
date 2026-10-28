@@ -1,5 +1,89 @@
 # Quality Strategy and Acceptance Criteria
 
+P08.1 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
+**46 focused cases in seven new suites and all 490 packaged backend cases in 47 suites**,
+with zero failures, errors or skips. Rerun with the application, packaged-secret and
+packaged-interface suites, the focused set has 57 cases. The executable jar is packaged.
+
+The new suites:
+
+- `CodexTaskAdapterTest` (14 cases) drives the adapter against a scripted app-server whose
+  shapes follow the 0.164.0 neutral fixture and whose thread/turn state survives across
+  connections. It covers:
+  - explicit model, effort, `never` approval, read-only sandbox and schema on every turn,
+    with a light turn after a deliberate one inheriting nothing;
+  - session-to-thread reuse;
+  - early and interleaved foreign, late, unscoped and delta events;
+  - a full queue, duplicate identities, queued and active cancellation with exact-turn
+    interruption, deadline interruption and queue expiry;
+  - fixed failure codes with no runtime text;
+  - tool-item, reroute and approval violations, each reconciled and retired before the
+    next turn, with the server request denied `-32601`;
+  - a lost connection reported `UNRESOLVED`, then resume/list/interrupt reconciliation
+    on the next generation, and resume of a session bound in an earlier generation;
+  - an unconfirmed interrupt keeping the permit until a second interrupt succeeds;
+  - unassigned and uncataloged slots, a non-object schema and an unsafe effective policy;
+  - sign-in, version and reachability gating, including recovery after sign-in;
+  - shutdown.
+- `RpcGenerationTest` (10) checks:
+  - monotonic IDs with out-of-order responses;
+  - correlated errors that keep the generation usable;
+  - unresolved requests that close it;
+  - server-request denial scoped to the named turn;
+  - early buffering and handover;
+  - early and inbox overflow;
+  - seven protocol violations, wire end and the pending-request bound.
+- `CodexFixtureReplayTest` (4) checks the retained fixture:
+  - byte identity of the backend copy with the probe fixture;
+  - byte-equal rebuilt thread/turn/interrupt/resume/account requests;
+  - validation of the recorded results (eight-model catalog; the account-free fixture is
+    valid but not ready);
+  - the recorded terminal statuses from the full notification stream routed through a
+    real generation.
+- `StdioFrameWireTest` (6) runs a real child process. It checks a completed task with an
+  `input-closed` exit, an allowlisted environment, stderr reduced to fixed labels with no
+  private marker, `terminated` escalation, sticky partial-frame failure and the
+  absolute-executable rule.
+- `UnixSocketFrameWireTest` (5) uses a real Unix-socket WebSocket server. It checks a
+  completed task through fragmented messages with a ping answered, close-frame shutdown,
+  the strict handshake (accept, extension, status), handshake timeout, an unreachable
+  socket and binary or masked server frames.
+- `InferenceBoundaryTest` (4) and `TaskPortSelectionTest` (3) prove:
+  - no package outside the adapter names it;
+  - the adapter imports only the neutral package;
+  - every adapter type is package-private;
+  - the neutral API exposes only JDK and neutral types;
+  - the unavailable default with `UNKNOWN` gameplay health;
+  - Codex selection for `unix`;
+  - startup refusal, without echoing values, for an unknown transport, a relative command
+    or a half-assigned slot.
+
+Nine deliberate sensitivity probes were run and each was reverted byte-identically,
+with the checksum verified. Each made exactly the intended cases fail. The weakened rules
+were:
+
+- dropping the effort from `turn/start`;
+- correlating by thread only;
+- allowing any item type;
+- ignoring server requests;
+- an unbounded queue;
+- trusting the interrupt acknowledgment;
+- skipping reconciliation;
+- inheriting the environment;
+- skipping the effective-policy check.
+
+These were intentional probes, not gate outcomes. All 26 repository-policy tests pass
+with zero scan findings.
+
+Frontend sources are unchanged, and the frontend gates were not rerun. No live runtime,
+account, Docker CLI or packaged socket was available, so this is protocol and transport
+evidence against deterministic doubles. It is not live inference, packaged gameplay
+readiness or the opt-in real smoke (QA-42, P08 package exit). The packaged profile keeps
+the transport disabled until P08.5.
+
+The neutral implementation owner commit is `4c46d9f`. Every check above passed on its
+exact sources, and only P08.1 then gains a completion mark (47 of 131 roadmap entries).
+
 P07.6 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks
 pass **155 focused cases in 13 suites and all 444 packaged backend cases in 40 suites**,
 with zero failures, errors or skips; the executable jar is packaged. The focused set is

@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 46/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4 and P07.1–P07.6. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 47/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6 and P08.1. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6, P09.3 and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -1389,7 +1389,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 
 **Depends on:** P01 and P07. **Areas:** runtime-neutral AI task port, Codex adapter, versioned runtime prompts, UI status.
 
-- [ ] P08.1 Implement the supported Java Codex transport behind a runtime-neutral narration task port with logical `light`, `standard` and `deliberate` slots ([ADR 0020](adr/0020-selectable-narration-runtime.md), [ADR 0021](adr/0021-inference-backends-and-model-selection.md)), with bounded queues, request/turn correlation, and lifecycle management; no Codex-specific type may leak into domain or application services.
+- [x] P08.1 Implement the supported Java Codex transport behind a runtime-neutral narration task port with logical `light`, `standard` and `deliberate` slots ([ADR 0020](adr/0020-selectable-narration-runtime.md), [ADR 0021](adr/0021-inference-backends-and-model-selection.md)), with bounded queues, request/turn correlation, and lifecycle management; no Codex-specific type may leak into domain or application services.
   - Package A — neutral port: `org.rpgengine.inference` defines `NarrationTaskPort`
     (`submit`, `retireSession`, `status`), `TaskRequest` (task/logical-session identity,
     `InferenceSlot` `light`/`standard`/`deliberate`, bounded instructions and JSON output
@@ -1423,6 +1423,22 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     exposes only neutral types; deliberate weakening probes; the full packaged backend and
     repository checks. A live runtime/account smoke is not part of this task (no runtime,
     account or Docker in this environment); it stays the opt-in P08 package check.
+  - Verified evidence (28 October 2026): 46 focused cases in seven new suites (57 with the
+    application, packaged-secret and packaged-interface suites) and all 490 packaged backend
+    cases in 47 suites pass with zero failures/errors/skips on the scoped JDK 21/PostgreSQL
+    18.6 fixture, and the jar is packaged. The fixture replay rebuilds every recorded
+    thread/turn/interrupt/resume request byte-for-byte and yields the recorded terminal
+    statuses. Nine deliberate weakening probes failed exactly their intended cases and
+    were reverted byte-identically: omitted effort, thread-only correlation, any item
+    allowed, server requests ignored, unbounded queue, interrupt acknowledgment trusted,
+    reconciliation skipped, inherited environment and unchecked effective policy. All 26
+    repository-policy tests pass with zero scan findings. Frontend sources are unchanged
+    and its gates were not rerun. Not verified: a live runtime, an account or the packaged
+    Docker socket (none available here); packaged gameplay keeps the transport disabled
+    until P08.5. See the [verification record](15-quality-and-acceptance.md).
+    Implementation owner commit: `4c46d9f`; all exit checks passed on that exact code
+    before this completion mark. All 131 task identities/titles and the pending P98
+    follow-up are preserved; only P08.1 gains a completion mark.
 - [ ] P08.2 Implement typed intent and attributed narration/quick-reply contracts with structural/semantic validation and one bounded repair; generate directly in selected English/Italian, preserve glossary/locale generations, player agency and public knowledge scope.
 - [ ] P08.3 Scope threads by campaign/role/audience/policy; separate privileged planning from public narration.
 - [ ] P08.4 Resolve logical profiles through the owner's slot assignment (backend and model per slot, ADR 0021) against the assigned backend's catalog or approved allowlist, and set effective settings on every turn.
