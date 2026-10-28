@@ -1,5 +1,37 @@
 # Quality Strategy and Acceptance Criteria
 
+P09.4 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
+**11 new cases and all 713 packaged backend cases in 72 suites**, with zero failures, errors or
+skips, and the jar is packaged. The new cases are `ScopedSessionsTest` (6 with doubles),
+`MemoryContinuityTest` (4 real PostgreSQL with the real scheduler, session journal and
+rehydration and a scripted runtime) and `CampaignCommandHttpTest` (1);
+`CanonicalMigrationUpgradeTest` gains the V17 step. This is the deterministic part of QA-08:
+
+- **Fresh thread resume:** after the turn ceiling, the new session's first task carries a block
+  that names the pending decision (`starting-situation`, then `free-input` after a command) at the
+  current revision with a verified checkpoint, contains no opening text, and keeps the task's
+  own instructions after it.
+- **Preservation:** renewal leaves the campaign row, its events and the transcript unchanged;
+  owner renewal leaves the revision unchanged.
+- **Triggers:** an unreliable turn retires its session at once; context pressure renews before
+  the window fills; a live lease defers a due renewal; a restart rehydrates the line from the
+  session records.
+- **Isolation:** the public block carries the public summary and the open promise but never the
+  privileged secret; the checkpoint hash is never rendered; the summarizer gets no block.
+- **Owner renewal:** refused while busy (an operation being validated, or a live lease alone) and
+  for a foreign owner; the HTTP route answers counts only.
+- **Probes:** 21 deliberate weakening probes, applied only to an exported copy of the backend,
+  each made the suites fail and were reverted byte-identically.
+
+Every command of the project check plan passed on the implementation commit `ff22ae6`.
+
+Not verified:
+- whether a live model follows the continuity rules (no replayed opening, no invented history)
+  and the QA-08 human rubric;
+- a UI control for renewal; restart reconciliation, missing dependencies and the resume card
+  (P09.5);
+- live model runs and a live V17 dump and restore.
+
 P09.3 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **14 new cases and all 702 packaged backend cases in 72 suites**, with zero failures, errors or
 skips, and the jar is packaged. The new cases are `SummaryContractTest` (8 pure, one parameterized
@@ -36,8 +68,8 @@ All 26 repository-policy tests pass with zero findings, and the nine backup test
 V16 scope. Frontend sources are unchanged.
 
 Not verified:
-- consumers of summaries and checkpoints in renewal and rehydration (P09.4) and restart
-  reconciliation and the resume card (P09.5);
+- consumers of summaries and checkpoints in renewal and rehydration (delivered by P09.4 above)
+  and restart reconciliation and the resume card (P09.5);
 - the intent, narration and planner callers switched to envelopes (P09.4 onward);
 - entity and chapter summaries, and narration as summary input;
 - summary quality, paraphrased secrets and prose that calls a promise kept (human rubric);
