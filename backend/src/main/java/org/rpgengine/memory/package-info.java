@@ -1,6 +1,6 @@
 /**
- * Campaign memory: checkpoints (P03, P09.3), stamped, budgeted AI task contexts (P09.2) and continuity
- * summaries (P09.3).
+ * Campaign memory: checkpoints (P03, P09.3), stamped, budgeted AI task contexts (P09.2), continuity
+ * summaries (P09.3), session rehydration (P09.4), restart reconciliation and the resume card (P09.5).
  *
  * <p>{@link org.rpgengine.memory.ContextAssembler} reads one audience's authorized records in a
  * single snapshot, ranks them by explicit IDs, causal links, per-language full text and recency,
@@ -25,7 +25,14 @@
  * continuity block that the first task of a renewed AI session carries (resume point, verified
  * checkpoint, audience envelope with the usable summary), and
  * {@link org.rpgengine.memory.SessionRenewalService} with its controller lets the owner renew an
- * idle campaign's sessions. Neither writes canonical state. Restart reconciliation and the resume
- * card are P09.5.
+ * idle campaign's sessions. Neither writes canonical state.
+ *
+ * <p>P09.5 adds the resume protocol of docs/08 section 10: {@link org.rpgengine.memory.MemoryReconciliation}
+ * reconciles derived memory after a restart (summary jobs, pinned content diagnosis, unusable
+ * checkpoints replaced from canonical state, summaries of a diverged or rolled-back history
+ * invalidated, stale summaries replaced, narration still owed counted), started once by
+ * {@link org.rpgengine.memory.MemoryStartupReconciliation} before HTTP; and
+ * {@link org.rpgengine.memory.ResumeCards} with its controller serves the short factual resume
+ * card, read from committed state without advancing time. Neither writes canonical state.
  */
 package org.rpgengine.memory;

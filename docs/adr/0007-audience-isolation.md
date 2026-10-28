@@ -12,6 +12,8 @@
 
 **Implementation note (28 October 2026):** P09.3 keeps continuity summaries inside their audience. A summary is produced from the envelope of exactly one audience (`public` or `privileged`) in that audience's own `summarizer` session; a public summary is validated against the player's withheld phrases, and a public context holding a privileged `fact` is refused before submission. Each stored summary keeps its audience and is assembled only into contexts of the same audience ([docs/08 section 8](../08-memory-and-continuity.md#p093-checkpoints-summaries-freshness-and-bounded-jobs)).
 
+**Implementation note (28 October 2026):** P09.5 keeps the resume card inside the player's audience. It lists only actors the player last saw at the player's location and has not since found absent (the player's knowledge, never real positions), the player's own resources and receipts, the pending decision as a kind without its stored payload, a location name only when its pack text is public, and fixed dependency codes with pack coordinates; it never returns hashes, private definitions, plans or another audience's summaries.
+
 ## Context
 
 A planner may require secret canon while the player narrator, guide, or NPC must know less. Filtering only a final response cannot remove hidden facts already present in a reused thread's memory. Media can also reveal secrets indirectly.

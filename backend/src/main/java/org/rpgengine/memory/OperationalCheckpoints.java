@@ -37,7 +37,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * a safe boundary and are recorded as pending narration.
  *
  * <p>A checkpoint in the same database is a resume aid, not a backup (docs/08 section 9); older
- * checkpoints beyond the retention bound are deleted by {@link #prune}.
+ * checkpoints beyond the retention bound are deleted by {@link #prune}, and checkpoints that
+ * restart reconciliation finds unusable by {@link #discard} (P09.5).
  */
 @Service
 public class OperationalCheckpoints {
@@ -201,6 +202,22 @@ public class OperationalCheckpoints {
         return jdbc.update("delete from campaign_checkpoint where campaign_id = ? and id not in (select id from "
                 + "campaign_checkpoint where campaign_id = ? order by state_revision desc limit ?)", campaign, campaign,
                 keep);
+    }
+
+    /**
+     * Delete one checkpoint that verification found unusable (P09.5 restart reconciliation). A
+     * checkpoint is a derived resume aid, so discarding one never loses canonical state; the caller
+     * recaptures from canonical rows ("recover from canonical state", docs/08 section 10) and
+     * records whatever the failure implies, for example a summary invalidation.
+     *
+     * @param campaign campaign identity
+     * @param checkpointId checkpoint of that campaign
+     * @return true when the row existed and was deleted
+     */
+    public boolean discard(UUID campaign, UUID checkpointId) {
+        Objects.requireNonNull(campaign, "campaign");
+        Objects.requireNonNull(checkpointId, "checkpointId");
+        return jdbc.update("delete from campaign_checkpoint where campaign_id = ? and id = ?", campaign, checkpointId) == 1;
     }
 
     /** Captures read their own snapshot; joining a caller's transaction would mix its writes in. */

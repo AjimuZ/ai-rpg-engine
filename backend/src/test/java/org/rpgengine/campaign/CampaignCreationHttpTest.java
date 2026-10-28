@@ -549,6 +549,112 @@ class CampaignCreationHttpTest {
         assertEquals(before, databaseSnapshot());
     }
 
+    /**
+     * P09.5 resume card and mutation pause over HTTP. With the pinned pack's stored bytes changed, the
+     * card still shows committed state, reports the corrupt pack by its coordinates and the pause, and
+     * a fresh command is refused with 409 {@code COMMAND_DEPENDENCIES_MISSING} without journaling
+     * anything. Once the bytes are restored the pause lifts without a restart. Reading the card never
+     * writes; it shows the localized location name, the starting or free-input decision and a committed
+     * action awaiting narration with its receipt, and it refuses bad, foreign and unadmitted requests.
+     */
+    @Test
+    void resumeCardShowsCommittedStateAndAPauseForCorruptPinnedContent() throws Exception {
+        String campaign = json.readTree(post(payload(UUID.randomUUID())).body()).get("campaignId").asText();
+        String card = "/api/v1/campaigns/" + campaign + "/resume?adventureId=" + adventure;
+        String commands = "/api/v1/campaigns/" + campaign + "/commands?adventureId=" + adventure;
+        corrupt("locations.json", true);
+        try {
+            var before = databaseSnapshot();
+            var paused = exchange("GET", card, "", headers());
+            assertEquals(200, paused.status(), paused.body());
+            JsonNode view = json.readTree(paused.body());
+            assertEquals("MISSING", view.get("dependencies").get("status").asText());
+            assertTrue(view.get("dependencies").get("mutationPaused").asBoolean());
+            assertEquals(json.readTree("[{\"code\":\"CONTENT_CORRUPT\",\"packId\":\"sample:fantasy-exploration\","
+                    + "\"packVersion\":\"1.0.0\"}]"), view.get("dependencies").get("issues"));
+            assertEquals("trailhead", view.get("location").get("id").asText(), "committed state stays visible");
+            assertEquals("STARTING_SITUATION", view.get("pendingDecision").asText());
+            var refused = exchange("POST", commands, waitCommand(0), headers());
+            assertEquals(409, refused.status(), refused.body());
+            assertEquals("{\"code\":\"COMMAND_DEPENDENCIES_MISSING\"}", refused.body());
+            assertEquals(before, databaseSnapshot(), "the card and the refused command write nothing");
+        } finally {
+            corrupt("locations.json", false);
+        }
+
+        var before = databaseSnapshot();
+        var available = exchange("GET", card, "", headers());
+        assertEquals(200, available.status(), available.body());
+        assertTrue(available.headers().toLowerCase().contains("cache-control: no-store"));
+        assertEquals(before, databaseSnapshot(), "reading the card writes nothing");
+        JsonNode view = json.readTree(available.body());
+        assertEquals(java.util.List.of("scope", "title", "mode", "gameTurn", "worldTimeSeconds", "location",
+                "presentActors", "resources", "encounter", "pendingDecision", "awaitingNarrationTotal",
+                "awaitingNarration", "dependencies", "continuity"), java.util.List.copyOf(view.propertyNames()));
+        assertEquals(json.readTree("{\"status\":\"AVAILABLE\",\"mutationPaused\":false,\"issues\":[]}"),
+                view.get("dependencies"));
+        assertEquals(json.readTree("{\"id\":\"trailhead\",\"name\":\"Mosslight Trailhead\",\"nameLocale\":\"en\","
+                + "\"nameFallback\":false}"), view.get("location"));
+        assertEquals("vigor", view.get("resources").get(0).get("key").asText());
+        assertTrue(view.get("presentActors").isEmpty());
+        assertTrue(view.get("encounter").isNull());
+        assertEquals(0, view.get("awaitingNarrationTotal").asInt());
+        assertEquals(json.readTree("{\"checkpoint\":\"NONE\",\"publicSummary\":\"NONE\"}"), view.get("continuity"));
+        assertFalse(available.body().contains("seed") || available.body().contains("lore"));
+
+        var accepted = exchange("POST", commands, waitCommand(0), headers());
+        assertEquals(202, accepted.status(), accepted.body());
+        String operation = json.readTree(accepted.body()).get("operationId").asText();
+        JsonNode after = json.readTree(exchange("GET", card, "", headers()).body());
+        assertEquals("FREE_INPUT", after.get("pendingDecision").asText());
+        assertEquals(1, after.get("scope").get("stateRevision").asLong());
+        assertEquals(1, after.get("awaitingNarrationTotal").asInt());
+        JsonNode owed = after.get("awaitingNarration").get(0);
+        assertEquals(operation, owed.get("operationId").asText());
+        assertEquals("IN_PROGRESS", owed.get("narration").get("mode").asText(), "queued narration resumes by itself");
+        assertEquals(1, owed.get("receipt").get("stateRevision").asLong());
+
+        var italian = json.readTree(post(payload(UUID.randomUUID()).replace("\"narrativeLocale\":\"en\"",
+                "\"narrativeLocale\":\"it\"")).body()).get("campaignId").asText();
+        JsonNode localized = json.readTree(exchange("GET", "/api/v1/campaigns/" + italian + "/resume?adventureId="
+                + adventure, "", headers()).body());
+        assertEquals("Inizio del sentiero di Mosslight", localized.get("location").get("name").asText());
+        assertEquals("it", localized.get("location").get("nameLocale").asText());
+
+        assertEquals("{\"code\":\"CAMPAIGN_READ_INPUT_INVALID\"}", exchange("GET", "/api/v1/campaigns/" + campaign
+                + "/resume", "", headers()).body());
+        assertEquals(400, exchange("GET", "/api/v1/campaigns/not-a-uuid/resume?adventureId=" + adventure, "", headers())
+                .status());
+        var foreign = exchange("GET", "/api/v1/campaigns/" + campaign + "/resume?adventureId=" + UUID.randomUUID(), "",
+                headers());
+        assertEquals(404, foreign.status());
+        assertEquals("{\"code\":\"CAMPAIGN_SCOPE_UNAVAILABLE\"}", foreign.body());
+        assertEquals(403, exchange("GET", card, "", "").status());
+    }
+
+    /** One WAIT command envelope at the expected revision. */
+    private static String waitCommand(long revision) {
+        return "{\"requestId\":\"" + UUID.randomUUID() + "\",\"expectedRevision\":" + revision
+                + ",\"commandType\":\"WAIT\",\"payload\":{\"seconds\":10}}";
+    }
+
+    /**
+     * Append one space to (or remove it from) a stored file of the pinned revision, outside every
+     * production path: the immutability trigger is bypassed for one statement, while the size and
+     * digest checks still hold, so only the pack's content hash stops matching.
+     */
+    private void corrupt(String path, boolean change) {
+        jdbc.execute("alter table content_revision_file disable trigger content_revision_file_immutable");
+        try {
+            String bytes = change ? "content || convert_to(' ', 'UTF8')" : "substring(content from 1 for octet_length(content) - 1)";
+            jdbc.update("update content_revision_file set content = " + bytes + ", byte_size = octet_length(" + bytes
+                    + "), sha256 = encode(sha256(" + bytes + "), 'hex') where content_revision_id = ? and path = ?",
+                    revision, path);
+        } finally {
+            jdbc.execute("alter table content_revision_file enable trigger content_revision_file_immutable");
+        }
+    }
+
     /** Snapshot every public-schema row deterministically; any consultation side effect fails comparison. */
     private Map<String, String> databaseSnapshot() {
         var snapshot = new java.util.TreeMap<String, String>();

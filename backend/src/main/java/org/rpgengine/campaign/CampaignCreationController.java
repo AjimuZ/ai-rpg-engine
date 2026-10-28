@@ -285,6 +285,7 @@ public class CampaignCreationController {
             case TARGET_ILLEGAL -> error(422, "COMMAND_TARGET_ILLEGAL");
             case RESOURCE_INSUFFICIENT -> error(422, "COMMAND_RESOURCE_INSUFFICIENT");
             case CONTENT_UNAVAILABLE -> error(422, "COMMAND_CONTENT_UNAVAILABLE");
+            case DEPENDENCIES_MISSING -> error(409, "COMMAND_DEPENDENCIES_MISSING");
             case EFFECT_UNSUPPORTED -> error(422, "COMMAND_EFFECT_UNSUPPORTED");
         };
     }

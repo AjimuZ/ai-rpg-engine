@@ -1172,3 +1172,54 @@ Tests:
 - `CampaignCommandHttpTest`: the renewal route answers counts only, refuses malformed bodies,
   foreign scopes and missing browser proofs, and leaves the campaign unchanged.
 - `CanonicalMigrationUpgradeTest` covers the V17 step.
+
+## Restart reconciliation, missing dependencies and the resume card (P09.5)
+
+Design: [docs/08 section 10](../docs/08-memory-and-continuity.md#p095-restart-reconciliation-missing-dependencies-and-the-resume-card).
+No migration. Nothing here writes canonical state, the transcript or a counter.
+
+- **`PackRegistry.diagnose` / `ClosureDiagnosis` / `CampaignDependencies`** (content): whether this
+  build can load a campaign's pinned closure. `AVAILABLE`, `UNSEALED` (a legacy root admitted before
+  sealing; unchanged behavior) or `MISSING` with issues `REVISION_MISSING`, `RULESET_UNAVAILABLE`,
+  `CONTENT_CORRUPT`, `DEPENDENCY_MISSING` (every missing dependency is listed) or `CLOSURE_INVALID`,
+  each with the pack ID and version only. `AVAILABLE` is cached per revision for the process;
+  failures are never cached, so a restored or re-imported pack lifts the pause without a restart.
+- **Mutation pause** (`CommandRuleCatalogs`, `OperationAdmissionService`): a fresh command of a
+  campaign whose closure is `MISSING` fails with `DEPENDENCIES_MISSING` (HTTP 409
+  `COMMAND_DEPENDENCIES_MISSING`) right after the replay check; nothing is journaled, and identical
+  retries of earlier requests still replay.
+- **`MemoryReconciliation`** (one pass, pages of 100 campaigns, per-campaign failures counted and
+  logged): `MemorySummaries.recover()` once (also cancelling queued jobs whose range is beyond the
+  campaign's newest event, `RANGE_UNAVAILABLE`); per campaign the closure diagnosis; checkpoint
+  repair (unusable checkpoints discarded newest first, `CHECKPOINT_DIVERGED` invalidation after a
+  divergence, recapture at a safe boundary); a one-time `STATE_ROLLED_BACK` invalidation for
+  summaries built from a revision the campaign no longer has; a forced replacement request for an
+  audience whose summaries are all stale (summaries enabled only); and counts of narration still
+  owed. **`MemoryStartupReconciliation`** runs it once per start in lifecycle phase
+  `Integer.MAX_VALUE - 4096`: after every startup recovery, before HTTP and the workers.
+- **`ResumeCards` / `ResumeCardController`**: `GET /api/v1/campaigns/{id}/resume?adventureId=…`
+  returns the resume card (location with its public localized name, actors the player last saw
+  there, resources, a null encounter, the pending decision kind, up to 16 actions awaiting
+  narration with receipts and presentation state, the dependency diagnosis and continuity codes).
+- Freshness gains the `rolled-back` reason (summary source revision or event high-water above the
+  campaign's counters).
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `engine.memory.reconciliation.enabled` | `true` | Run the restart reconciliation pass at startup (tests set false and drive it directly) |
+
+Tests:
+- `PackRegistryPersistenceTest.diagnosesPinnedClosuresWithoutThrowing`: available, unsealed,
+  missing revision, an upgraded ruleset, a lost dependency and changed bytes, without writing.
+- `MemoryContinuityTest` (real PostgreSQL): checkpoint repair for corrupt, diverged, ahead,
+  outdated and unsafe cases with canonical state unchanged; stale and rolled-back summary work;
+  a lost dependency pauses admission in a fresh process while replays still work and the card
+  explains it; interrupted narration resumes exactly once after a restart behind a rehydrated
+  narrator that does not replay the opening, pending narration keeps its receipt and retries, and a
+  delivered narration-only retry removes the action from the card and the count.
+- `CampaignCreationHttpTest`: the card over HTTP (read-only, localized EN/IT location name, 400,
+  404, 403), corrupt pinned content answers 409 `COMMAND_DEPENDENCIES_MISSING` and the restored
+  content lifts the pause. `CampaignCommandHttpTest`: a legacy unsealed campaign is not paused.
+- `MemoryStartupReconciliationTest` (pure) and `MemoryStartupPassTest` (real context): the pass
+  runs once per start before the web server and never aborts startup.
+- `CampaignInterfaceContractTest` records the card in the browser reload transcript.

@@ -2816,5 +2816,189 @@
       <target>Controllo della partita…</target>
       </segment>
     </unit>
+    <unit id="campaign.error.dependenciesMissing">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:39</note>
+      </notes>
+      <segment>
+        <source>This playthrough is paused because adventure content it depends on is missing or damaged. Nothing was changed.</source>
+      <target>Questa partita è in pausa perché un contenuto dell’avventura da cui dipende manca o è danneggiato. Non è stato modificato nulla.</target></segment>
+    </unit>
+    <unit id="campaign.resume.decisionStart">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:176</note>
+      </notes>
+      <segment>
+        <source>Decide how to begin, as described in the starting situation.</source>
+      <target>Decidi come iniziare, come descritto nella situazione iniziale.</target></segment>
+    </unit>
+    <unit id="campaign.resume.decisionFree">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:177</note>
+      </notes>
+      <segment>
+        <source>Say or do what you want next.</source>
+      <target>Di’ o fai ciò che vuoi adesso.</target></segment>
+    </unit>
+    <unit id="campaign.resume.decisionOther">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:178</note>
+      </notes>
+      <segment>
+        <source>A decision is waiting for you.</source>
+      <target>Una decisione ti aspetta.</target></segment>
+    </unit>
+    <unit id="campaign.resume.narrationResumes">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:185</note>
+      </notes>
+      <segment>
+        <source>Saved; its narration resumes by itself.</source>
+      <target>Salvata; la sua narrazione riprende da sola.</target></segment>
+    </unit>
+    <unit id="campaign.resume.issueRuleset">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:194</note>
+      </notes>
+      <segment>
+        <source><ph id="0" equiv="pack" disp="pack"/> <ph id="1" equiv="version" disp="version"/> was made for rules that this engine version does not provide.</source>
+      <target><ph id="0" equiv="pack" disp="pack"/> <ph id="1" equiv="version" disp="version"/> è stato creato per regole che questa versione del motore non fornisce.</target></segment>
+    </unit>
+    <unit id="campaign.resume.issueCorrupt">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:195</note>
+      </notes>
+      <segment>
+        <source>The stored files of <ph id="0" equiv="pack" disp="pack"/> <ph id="1" equiv="version" disp="version"/> are damaged.</source>
+      <target>I file salvati di <ph id="0" equiv="pack" disp="pack"/> <ph id="1" equiv="version" disp="version"/> sono danneggiati.</target></segment>
+    </unit>
+    <unit id="campaign.resume.issueMissing">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:196</note>
+      </notes>
+      <segment>
+        <source><ph id="0" equiv="pack" disp="pack"/> <ph id="1" equiv="version" disp="version"/> is not installed in this adventure.</source>
+      <target><ph id="0" equiv="pack" disp="pack"/> <ph id="1" equiv="version" disp="version"/> non è installato in questa avventura.</target></segment>
+    </unit>
+    <unit id="campaign.resume.issueInvalid">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:197</note>
+      </notes>
+      <segment>
+        <source><ph id="0" equiv="pack" disp="pack"/> <ph id="1" equiv="version" disp="version"/> cannot be loaded by this engine version.</source>
+      <target><ph id="0" equiv="pack" disp="pack"/> <ph id="1" equiv="version" disp="version"/> non può essere caricato da questa versione del motore.</target></segment>
+    </unit>
+    <unit id="campaign.resume.issueRevision">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:198</note>
+      </notes>
+      <segment>
+        <source>The adventure content of this playthrough is missing.</source>
+      <target>Manca il contenuto dell’avventura di questa partita.</target></segment>
+    </unit>
+    <unit id="campaign.resume.noLocation">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:204</note>
+      </notes>
+      <segment>
+        <source>Unknown</source>
+      <target>Sconosciuto</target></segment>
+    </unit>
+    <unit id="campaign.resume.nobody">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:211</note>
+      </notes>
+      <segment>
+        <source>Nobody you have seen here.</source>
+      <target>Nessuno che tu abbia visto qui.</target></segment>
+    </unit>
+    <unit id="campaign.resume.resource">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:222</note>
+      </notes>
+      <segment>
+        <source><ph id="0" equiv="resource" disp="key"/> <ph id="1" equiv="current" disp="current"/> of <ph id="2" equiv="maximum" disp="maximum"/></source>
+      <target><ph id="0" equiv="resource" disp="key"/> <ph id="1" equiv="current" disp="current"/> su <ph id="2" equiv="maximum" disp="maximum"/></target></segment>
+    </unit>
+    <unit id="campaign.resume.title">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:58,59</note>
+      </notes>
+      <segment>
+        <source>Where you are</source>
+      <target>Dove ti trovi</target></segment>
+    </unit>
+    <unit id="campaign.resume.paused">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:61,63</note>
+      </notes>
+      <segment>
+        <source>This playthrough is paused: adventure content it depends on is missing or damaged. Nothing can change until the same content is restored from a backup or imported again.</source>
+      <target>Questa partita è in pausa: un contenuto dell’avventura da cui dipende manca o è danneggiato. Nulla può cambiare finché lo stesso contenuto non viene ripristinato da un backup o importato di nuovo.</target></segment>
+    </unit>
+    <unit id="campaign.resume.location">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:68,69</note>
+      </notes>
+      <segment>
+        <source>Location</source>
+      <target>Luogo</target></segment>
+    </unit>
+    <unit id="campaign.resume.present">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:70,71</note>
+      </notes>
+      <segment>
+        <source>Known to be here</source>
+      <target>Presenti, per quanto ne sai</target></segment>
+    </unit>
+    <unit id="campaign.resume.resources">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:72,73</note>
+      </notes>
+      <segment>
+        <source>Resources</source>
+      <target>Risorse</target></segment>
+    </unit>
+    <unit id="campaign.resume.encounter">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:74,75</note>
+      </notes>
+      <segment>
+        <source>Encounter</source>
+      <target>Scontro</target></segment>
+    </unit>
+    <unit id="campaign.resume.noEncounter">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:75,76</note>
+      </notes>
+      <segment>
+        <source>None</source>
+      <target>Nessuno</target></segment>
+    </unit>
+    <unit id="campaign.resume.decision">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:76,77</note>
+      </notes>
+      <segment>
+        <source>Next decision</source>
+      <target>Prossima decisione</target></segment>
+    </unit>
+    <unit id="campaign.resume.awaiting">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:80,81</note>
+      </notes>
+      <segment>
+        <source>Saved actions awaiting narration</source>
+      <target>Azioni salvate in attesa di narrazione</target></segment>
+    </unit>
+    <unit id="campaign.resume.readOnly">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:94,97</note>
+      </notes>
+      <segment>
+        <source>This summary is read from the last saved state; reading it does not advance time.</source>
+      <target>Questo riepilogo è letto dall’ultimo stato salvato; leggerlo non fa avanzare il tempo.</target></segment>
+    </unit>
   </file>
 </xliff>

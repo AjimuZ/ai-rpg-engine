@@ -93,18 +93,20 @@ public class OperationAdmissionService {
      * Admit one command or replay its earlier admission.
      *
      * <p>Order of checks (all under the campaign lock): scope, request identity
-     * (replay/conflict), expected revision, typed/common semantic validation, current-state
-     * rule validation, retirement of expired permits and pre-commit operations without a
-     * live permit, campaign busy, owner admission limit, then journal insert plus lease grant.
+     * (replay/conflict), paused campaign (missing pinned content, P09.5), expected revision,
+     * typed/common semantic validation, current-state rule validation, retirement of expired
+     * permits and pre-commit operations without a live permit, campaign busy, owner admission
+     * limit, then journal insert plus lease grant.
      * Pinned content is loaded before the lock; a load failure matters only to a fresh
-     * command whose rules consult definitions, never to a matching replay.
+     * command, never to a matching replay: a sealed closure that cannot be loaded pauses every
+     * fresh command, while a legacy unsealed revision fails only rules that consult definitions.
      *
      * @param owner locally admitted owner
      * @param adventure adventure that must own the campaign
      * @param campaign target campaign
      * @param command structurally validated envelope; typed meaning is checked atomically for new requests
      * @return the durable operation view; a new admission also carries its lease grant
-     * @throws OperationAdmissionFailure for scope, conflict, stale, typed/semantic/rule, busy or limit outcomes
+     * @throws OperationAdmissionFailure for scope, conflict, paused, stale, typed/semantic/rule, busy or limit outcomes
      * @throws IllegalArgumentException if the command cannot be canonicalized within bounds
      * @throws IllegalStateException if called inside an ambient transaction
      * @throws org.springframework.dao.DataAccessException for lock/statement timeouts or storage failures
@@ -179,6 +181,12 @@ public class OperationAdmissionService {
                 throw new OperationAdmissionFailure(OperationAdmissionFailure.Kind.REQUEST_CONFLICT);
             }
             return new Admission(OperationView.of(stored), true, null);
+        }
+
+        // P09.5: missing or unusable pinned content pauses every fresh command, before any other
+        // check, because nothing can be validated against it and nothing may substitute for it.
+        if (content.paused()) {
+            throw new OperationAdmissionFailure(OperationAdmissionFailure.Kind.DEPENDENCIES_MISSING);
         }
 
         if (revision.getFirst() != command.expectedRevision()) {

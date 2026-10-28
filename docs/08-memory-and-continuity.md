@@ -409,8 +409,9 @@ Decisions and limits:
 - The session registry is still in memory; records explain history, they do not resume a
   runtime conversation. A restart starts every line afresh and the next session is rehydrated.
 - No frontend control exists yet; the owner command is an API. Restart reconciliation of stale
-  summaries and missing dependencies, and the resume card, are P09.5. The intent, narration and
-  planner callers still assemble their own contexts rather than `ContextAssembler` envelopes.
+  summaries and missing dependencies, and the resume card, arrived with P09.5 (section 10). The
+  intent, narration and planner callers still assemble their own contexts rather than
+  `ContextAssembler` envelopes.
 - Whether a model actually follows the rules (no replayed opening, no invented history) is a
   live-model and human-rubric question (QA-08); the tests prove what the fresh thread receives.
 
@@ -472,10 +473,12 @@ or `privileged`; character audiences have no history yet (P09.2). It stores:
 **Freshness** (`MemorySummaries.freshness`, computed, never stored):
 
 - `STALE` when the recovery generation changed (restore), the output locale or its locale or
-  glossary revision changed, a supplied source's row version changed (a belief or claim was
+  glossary revision changed, the campaign is behind the summary's source revision or event
+  high-water mark (`rolled-back`, P09.5), a supplied source's row version changed (a belief or claim was
   superseded, a claim's truth was determined, a commitment was resolved), or a later
   `memory_invalidation` names one of its events, sources or entities, or the whole campaign.
-  The reasons are `generation`, `locale`, `glossary`, `source:<ref>` and `invalidated:<reason>`.
+  The reasons are `generation`, `locale`, `glossary`, `rolled-back`, `source:<ref>` and
+  `invalidated:<reason>`.
 - `BEHIND` when it is otherwise valid but newer public events exist. Its coverage stays precise.
 - `CURRENT` otherwise.
 
@@ -559,7 +562,7 @@ Decisions and limits:
 - Durable AI-session records with counters and checkpoint hashes arrived with P09.4 (section 7).
   Switching the intent, narration and planner callers to envelopes is later gameplay work (P10
   onward). Restart reconciliation of stale summaries and missing dependencies, and the resume
-  card, are P09.5.
+  card, arrived with P09.5 (section 10).
 
 ## 9. Archiving and backups
 
@@ -574,6 +577,111 @@ Archive indexes preserve event ranges, checksums, schema versions, and discovera
 On startup, reconcile unfinished operations and leases. Load the last committed campaign state, not the last chat message. Reconstruct the current location, visible actors, resources, active encounter, pending decision, and any committed action awaiting narration. Show a short factual resume card without advancing time.
 
 If content or ruleset dependencies are missing, pause mutation and offer restore/import diagnostics. Do not substitute another pack. If the checkpoint hash is invalid, recover from canonical state or a verified backup; never fabricate a clean state.
+
+### P09.5 restart reconciliation, missing dependencies and the resume card
+
+Implemented in `org.rpgengine.content` (`PackRegistry.diagnose`, `ClosureDiagnosis`,
+`CampaignDependencies`), `org.rpgengine.commands` (the admission pause) and
+`org.rpgengine.memory` (`MemoryReconciliation`, `MemoryStartupReconciliation`, `ResumeCards`,
+`ResumeCardController`). No migration. Nothing here writes canonical state: no reconciliation
+step or card read changes the revision, the turn, world time, an event, a journal row, a receipt or
+the transcript.
+
+**Startup order.** Unfinished operations and leases (P07), presentation jobs (P07.5), preparation
+jobs (P03.6) and inference tasks with their AI-session records (P08.6, P09.4) are reconciled by
+initialization callbacks. Memory reconciliation runs after all of them, as a lifecycle step whose
+phase precedes the embedded web server and the background workers, so it finishes before the first
+HTTP request (`engine.memory.reconciliation.enabled`, default true). A failure is logged by
+exception class and never aborts startup: everything the pass repairs is derived data, and every
+safety decision below is re-derived where it is used.
+
+**Pass** (one per process, campaigns in pages of 100, each campaign independent):
+
+1. *Summary jobs.* `MemorySummaries.recover` runs once, whether or not summaries are enabled:
+   expired queued jobs fail `EXPIRED`, queued jobs of a retired generation are `CANCELLED`
+   (`GENERATION_RETIRED`), queued jobs whose range ends beyond the campaign's newest event are
+   `CANCELLED` (`RANGE_UNAVAILABLE`; such a range never counts as given up), and expired leases
+   are released.
+2. *Pinned content.* The campaign's pinned closure is diagnosed (below). A `MISSING` closure is
+   logged with its codes and public coordinates and pauses mutation.
+3. *Checkpoint.* The newest operational checkpoint is verified. `CORRUPT`, `UNSUPPORTED`,
+   `INCOMPATIBLE` and `DIVERGED` checkpoints are discarded newest first until a usable one or none
+   remains (at most 64); a checkpoint is a derived resume aid, so discarding one loses no canonical
+   state. A divergence (a checkpoint ahead of the campaign, or one that differs from canonical
+   state at its own revision) means canonical state was rolled back or changed outside the
+   command path; canonical state wins (section 2), and every earlier summary of the campaign is
+   invalidated with reason `CHECKPOINT_DIVERGED`. When no checkpoint remains or the newest is
+   outdated, a new one is captured from canonical state at a safe boundary; an unsafe boundary is
+   left to the maintenance worker. Capture alone could never repair a divergent checkpoint at the
+   current revision (it reports `MISMATCH`), which is why the pass discards it first.
+4. *Summaries.* A current-generation summary whose source revision or event high-water mark is
+   above the campaign's counters describes a history the campaign no longer has; freshness now
+   reports it `STALE` with reason `rolled-back`, and the pass appends one whole-campaign
+   invalidation `STATE_ROLLED_BACK`, so the summary stays stale after the campaign grows past it
+   again (it is never repeated while one already covers it). For the public and privileged
+   audiences, when summaries exist but none is usable and summaries are enabled, one replacement is
+   requested (`force`); a pending job is not duplicated.
+5. *Narration.* Committed actions still awaiting narration are counted: resuming (a queued or
+   running presentation job) or pending (the receipt is the presentation; narration-only retries
+   remain). Presentation recovery already requeued interrupted attempts; nothing re-runs an action
+   or a draw (QA-18). The first narrator task after a restart is rehydrated (P09.4) with the
+   pending narration counted and without the opening.
+
+**Missing dependencies.** `PackRegistry.diagnose` traverses the pinned closure exactly like
+campaign loading, in its own read-only transaction, without throwing for content problems. Each
+revision is verified (ruleset, stored bytes against the pinned hash), then its dependencies are
+resolved and loaded, then it is compiled. Results: `AVAILABLE`; `UNSEALED`, a legacy root admitted
+before sealed storage (its bytes were never stored, so no restore can supply them; rules that need
+definitions keep failing with `COMMAND_CONTENT_UNAVAILABLE` and other commands keep working); or
+`MISSING` with issues `REVISION_MISSING`, `RULESET_UNAVAILABLE` (sealed for another rules version
+than this engine provides, for example after an engine upgrade), `CONTENT_CORRUPT` (stored bytes no
+longer reproduce the pinned hash), `DEPENDENCY_MISSING` (every missing pinned dependency is listed)
+or `CLOSURE_INVALID` (bounds, cycle, conflicting versions or a compile error under this build).
+Issues name only the pack ID and version, never paths, hashes, parser messages or definition text.
+`CampaignDependencies` caches `AVAILABLE` per revision for the process (sealed revisions and the
+build are immutable); failures are never cached, so restoring or re-importing the exact pack lifts
+the pause at the next command without a restart, and the startup pass re-verifies every closure
+once per process.
+
+**Mutation pause.** Command admission refuses every fresh command of a `MISSING` campaign with
+`DEPENDENCIES_MISSING` (HTTP 409 `COMMAND_DEPENDENCIES_MISSING`) immediately after the
+idempotency check, before revision and rule checks; nothing is journaled and no permit is taken.
+Identical retries of earlier requests still replay their stored result. Reads, the resume card,
+narration of already committed actions and manual session renewal are not mutation and stay
+available; a narration that needs the missing content ends pending with its receipt. Nothing ever
+substitutes another pack or version.
+
+**Resume card.** `GET /api/v1/campaigns/{id}/resume?adventureId=…` ([docs/13](13-api-and-ui.md))
+reads, in one snapshot after authorizing the exact owner, adventure and campaign:
+
+| Field | Content |
+| --- | --- |
+| `scope`, `title`, `mode`, `gameTurn`, `worldTimeSeconds` | Identity and counters of the committed revision |
+| `location` | The player's current location id with its public display name in the narrative language (`nameLocale`, `nameFallback`); null name when the pinned root has none or cannot be loaded, or the name is not public |
+| `presentActors` | Actors the player last saw at that location and has not since found absent (the player's knowledge, as in the context envelope), never real positions |
+| `resources` | The player's resources with exact bounds |
+| `encounter` | Always null until P11 |
+| `pendingDecision` | `STARTING_SITUATION`, `FREE_INPUT` or `OTHER`, never the stored payload |
+| `awaitingNarrationTotal`, `awaitingNarration` | Committed actions without published narration (newest 16): command type, journal status, committed revision, the player-safe receipt as the mechanical recap, and the presentation state (`IN_PROGRESS` resumes by itself, or `RECEIPT` with its reason and remaining narration-only retries) |
+| `dependencies` | `status`, `mutationPaused` and the issues above |
+| `continuity` | Checkpoint verification status and public summary state (`NONE`, `CURRENT`, `BEHIND`, `STALE`), codes only |
+
+Reading the card captures no checkpoint, requests no summary and starts no job. The interface shows
+it above the action list in English and Italian, including a pause notice (an alert) that names
+each missing pack and asks for a restore or a re-import of the same content.
+
+Decisions and limits:
+
+- A failing startup pass does not block startup: the pause, freshness and verification are
+  computed where they are used, so a skipped pass costs only repairs of derived data.
+- The resume card is a display; it does not resume anything by itself. Narration-only retry and
+  renewal remain separate owner actions (P08.5, P09.4); the interface still has no control for them.
+- A missing dependency is detected only from the database: packs are stored in PostgreSQL (P04.4),
+  so the realistic causes are an engine upgrade with another ruleset, storage corruption and a
+  partial manual restore. Restoring a full backup brings its packs with it.
+- Rolled-back state without a generation change is not a supported operation (restores bump the
+  generation, P03.5); the `rolled-back` reason and the invalidations make its summaries harmless
+  rather than making such a restore supported.
 
 ## 11. Long-session quality measures
 

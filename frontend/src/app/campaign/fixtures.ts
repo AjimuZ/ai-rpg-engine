@@ -53,12 +53,30 @@ export function state(options: { fallback?: boolean; locale?: string; situation?
     pendingDecision: null };
 }
 
+/** Resume card body (P09.5); `paused` adds a missing-content diagnosis, `awaiting` one owed narration. */
+export function resumeCard(options: { paused?: boolean; awaiting?: boolean; decision?: string } = {}) {
+  return { scope: { adventureId: ADVENTURE, campaignId: CAMPAIGN, contentRevisionId: OP2, stateRevision: 2 },
+    title: 'Mara', mode: 'EXPLORATION', gameTurn: 3, worldTimeSeconds: 0,
+    location: { id: 'trailhead', name: 'Lantern Shelter', nameLocale: 'en', nameFallback: false },
+    presentActors: [{ actorId: OP1, name: 'Warden' }],
+    resources: [{ key: 'vigor', minimum: 0, current: 11000, maximum: 12000 }],
+    encounter: null, pendingDecision: options.decision ?? 'FREE_INPUT',
+    awaitingNarrationTotal: options.awaiting ? 1 : 0,
+    awaitingNarration: options.awaiting ? [{ operationId: OP1, commandType: 'USE_ABILITY', status: 'COMMITTED_NARRATION_PENDING',
+      committedRevision: 2, receipt: receipt(), narration: { mode: 'RECEIPT', reason: 'NARRATION_UNAVAILABLE', retriesRemaining: 3 } }] : [],
+    dependencies: options.paused
+      ? { status: 'MISSING', mutationPaused: true, issues: [{ code: 'DEPENDENCY_MISSING', packId: 'sample:lanterns', packVersion: '1.0.0' }] }
+      : { status: 'AVAILABLE', mutationPaused: false, issues: [] },
+    continuity: { checkpoint: 'VALID', publicSummary: 'NONE' } };
+}
+
 /** Scriptable fake server for the campaign endpoints. */
 export class CampaignServer {
   readonly calls: string[] = [];
   streams: string[][] = [];
   operations = new Map<string, ReturnType<typeof operation>>();
   stateBody: unknown = state();
+  resumeBody: unknown = resumeCard();
   failStream = 0;
   statusCode = 200;
   errorCode = '';
@@ -75,6 +93,7 @@ export class CampaignServer {
     if (url.startsWith('/api/v1/campaigns?')) return Promise.resolve(json({ campaigns: [(state() as { campaign: unknown }).campaign], nextAfter: null }));
     if (this.errorCode) return Promise.resolve(json({ code: this.errorCode }, this.statusCode));
     if (url.includes('/state?')) return Promise.resolve(json(this.stateBody));
+    if (url.includes('/resume?')) return Promise.resolve(json(this.resumeBody));
     const op = /\/operations\/([0-9a-f-]{36})\?/.exec(url);
     if (op) {
       const view = this.operations.get(op[1]);

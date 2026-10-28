@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -35,6 +36,8 @@ import org.rpgengine.campaign.CharacterChoices;
 import org.rpgengine.campaign.EventVisibility;
 import org.rpgengine.characters.Actor;
 import org.rpgengine.characters.ActorKind;
+import org.rpgengine.content.CampaignDependencies;
+import org.rpgengine.content.ClosureDiagnosis;
 import org.rpgengine.content.PackRegistry;
 import org.rpgengine.content.PackStaging;
 import org.rpgengine.identity.OwnerProfile;
@@ -73,14 +76,19 @@ import org.rpgengine.memory.ContextItem;
 import org.rpgengine.memory.ContextItem.Standing;
 import org.rpgengine.memory.ContinuitySummarizer;
 import org.rpgengine.memory.ContinuitySummarizer.Processed;
+import org.rpgengine.memory.MemoryReconciliation;
 import org.rpgengine.memory.MemorySettings;
 import org.rpgengine.memory.MemorySummaries;
 import org.rpgengine.memory.MemorySummaries.Freshness;
 import org.rpgengine.memory.OperationalCheckpoints;
 import org.rpgengine.memory.OperationalCheckpoints.Capture;
 import org.rpgengine.memory.OperationalCheckpoints.Verification;
+import org.rpgengine.memory.PackGlossaries;
+import org.rpgengine.memory.ResumeCards;
 import org.rpgengine.memory.SessionRehydration;
 import org.rpgengine.memory.SessionRenewalService;
+import org.rpgengine.presentation.NarrationPort;
+import org.rpgengine.presentation.PresentationJobService;
 import org.rpgengine.presentation.SupportedLocale;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -105,6 +113,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * summary has exact coverage and versioned sources, stays inside its audience and is assembled as a
  * labelled, optional {@code summary} item; and that freshness detects newer events, source changes,
  * explicit invalidations, locale changes and a restore-style generation change.
+ *
+ * <p>P09.4 cases prove renewal triggers, session records and rehydration. P09.5 cases prove restart
+ * reconciliation (docs/08 section 10): unusable checkpoints are replaced from canonical state,
+ * summary work of a diverged or rolled-back history is retired and stays stale, a lost pinned
+ * dependency pauses mutation and is explained by the resume card, and committed narration that a
+ * crash interrupted resumes exactly once after a restart, behind a rehydrated narrator that does not
+ * replay the opening.
  */
 @SpringBootTest
 class MemoryContinuityTest {
@@ -128,6 +143,12 @@ class MemoryContinuityTest {
     @Autowired private PlatformTransactionManager manager;
     @Autowired private SessionJournal journal;
     @Autowired private SessionRehydration rehydration;
+    @Autowired private MemoryReconciliation reconciliation;
+    @Autowired private ResumeCards cards;
+    @Autowired private CampaignDependencies dependencies;
+    @Autowired private PackGlossaries glossaries;
+    @Autowired private PresentationJobService presentations;
+    @Autowired private JournalRecoveryService journalRecovery;
     private UUID owner;
     private UUID adventure;
     private UUID revision;
@@ -694,6 +715,307 @@ class MemoryContinuityTest {
         assertEquals(processed.summaryId(), records.get(1).get("summary_id"));
     }
 
+    /**
+     * P09.5 checkpoints: restart reconciliation captures a missing or outdated checkpoint; discards a
+     * corrupt one and recaptures it without touching summaries; discards one that diverges from
+     * canonical state at the same revision (which capture alone cannot repair), recaptures it from
+     * canonical state and invalidates every earlier summary; discards one ahead of the campaign; leaves
+     * an unsafe boundary to a later pass; never changes canonical state; and a second pass does nothing.
+     */
+    @Test
+    void restartReconciliationReplacesUnusableCheckpointsFromCanonicalState() {
+        execute(new TypedCommand.Wait(60));
+        String campaignBefore = campaignRow();
+        int eventsBefore = count("campaign_event");
+        var first = reconciliation.reconcile(campaign);
+        assertEquals(campaignBefore, campaignRow(), "reconciliation never changes the campaign");
+        assertEquals(eventsBefore, count("campaign_event"), "reconciliation writes no event");
+        assertEquals(ClosureDiagnosis.AVAILABLE, first.content());
+        assertEquals(Verification.Status.NONE, first.checkpoint().found());
+        assertEquals(Capture.Outcome.CAPTURED, first.checkpoint().captured());
+        assertEquals(Verification.Status.VALID, first.checkpoint().now());
+        var again = reconciliation.reconcile(campaign);
+        assertEquals(new MemoryReconciliation.CheckpointResult(Verification.Status.VALID, List.of(), false, null,
+                Verification.Status.VALID), again.checkpoint(), "a second pass finds nothing to repair");
+
+        jdbc.update("delete from campaign_checkpoint where campaign_id = ?", campaign);
+        forge("{\"kind\":\"operational\"}", "0".repeat(64));
+        var corrupt = reconciliation.reconcile(campaign).checkpoint();
+        assertEquals(List.of(Verification.Status.CORRUPT), corrupt.discarded());
+        assertFalse(corrupt.diverged());
+        assertEquals(Capture.Outcome.CAPTURED, corrupt.captured());
+        assertEquals(Verification.Status.VALID, corrupt.now());
+        assertEquals(0, count("memory_invalidation"), "a tampered checkpoint says nothing about summaries");
+
+        jdbc.update("delete from campaign_checkpoint where campaign_id = ?", campaign);
+        forge("{\"kind\":\"operational\"}", null);
+        assertEquals(Capture.Outcome.MISMATCH, checkpoints.capture(campaign).outcome(), "capture alone cannot repair it");
+        var diverged = reconciliation.reconcile(campaign).checkpoint();
+        assertEquals(List.of(Verification.Status.DIVERGED), diverged.discarded());
+        assertTrue(diverged.diverged());
+        assertEquals(Verification.Status.VALID, diverged.now());
+        assertEquals(List.of(MemoryReconciliation.DIVERGED + ":0"), jdbc.queryForList("select reason || ':' || "
+                + "cardinality(refs) from memory_invalidation where campaign_id = ?", String.class, campaign));
+
+        // A checkpoint ahead of the campaign (state rolled back) is discarded; the valid one remains.
+        jdbc.update("insert into campaign_checkpoint (id, campaign_id, state_revision, event_high_water, game_turn, "
+                + "world_time_seconds, content_hash, ruleset_hash, snapshot_schema_version, snapshot_hash, snapshot, "
+                + "created_at) select ?, campaign_id, state_revision + 5, event_high_water, game_turn, world_time_seconds, "
+                + "content_hash, ruleset_hash, snapshot_schema_version, snapshot_hash, snapshot, now() from "
+                + "campaign_checkpoint where campaign_id = ? and state_revision = ?", UUID.randomUUID(), campaign, revision());
+        var ahead = reconciliation.reconcile(campaign).checkpoint();
+        assertEquals(List.of(Verification.Status.DIVERGED), ahead.discarded());
+        assertNull(ahead.captured());
+        assertEquals(Verification.Status.VALID, ahead.now());
+
+        // A live mutation lease is an unsafe boundary: nothing is captured until a later pass.
+        execute(new TypedCommand.Wait(30));
+        UUID operation = accepted();
+        var grant = leases.acquire(adventure, campaign, operation, operation, Duration.ofSeconds(60));
+        try {
+            var unsafe = reconciliation.reconcile(campaign).checkpoint();
+            assertEquals(Verification.Status.OUTDATED, unsafe.found());
+            assertEquals(Capture.Outcome.UNSAFE_BOUNDARY, unsafe.captured());
+            assertEquals(Verification.Status.OUTDATED, unsafe.now());
+        } finally {
+            leases.release(adventure, campaign, operation, grant.token());
+        }
+        String settled = campaignRow();
+        int events = count("campaign_event");
+        assertEquals(Capture.Outcome.CAPTURED, reconciliation.reconcile(campaign).checkpoint().captured());
+        assertEquals(settled, campaignRow(), "reconciliation never changes the campaign");
+        assertEquals(events, count("campaign_event"), "reconciliation writes no event");
+    }
+
+    /**
+     * P09.5 summaries: when every summary of an audience is stale, reconciliation requests one
+     * replacement (deduplicated while pending); after the campaign is rolled back outside the restore
+     * path (no generation change), queued work over vanished events is cancelled, a summary built from
+     * the vanished revision is stale and invalidated once, and it stays stale after the campaign grows
+     * past it again.
+     */
+    @Test
+    void restartReconciliationRetiresStaleAndRolledBackSummaryWork() {
+        seedKnowledge();
+        var summaries = summaries(MemorySettings.defaults().withSummaries(true));
+        var summarizer = summarizer(summaries);
+        var pass = new MemoryReconciliation(jdbc, manager, dependencies, checkpoints, summaries);
+        for (int index = 0; index < 5; index++) {
+            execute(new TypedCommand.Wait(60));
+        }
+        assertEquals(MemorySummaries.Request.Outcome.REQUESTED, summaries.request(campaign, Audience.PUBLIC, false)
+                .outcome());
+        port.then(MemoryContinuityTest::summarized);
+        assertEquals(Processed.Outcome.RECORDED, summarizer.processNext(UUID.randomUUID()).orElseThrow().outcome());
+        var clean = pass.reconcile(campaign);
+        assertEquals(List.of(new MemoryReconciliation.SummaryResult("public",
+                MemoryReconciliation.SummaryResult.State.CURRENT, null), new MemoryReconciliation.SummaryResult(
+                        "privileged", MemoryReconciliation.SummaryResult.State.NONE, null)), clean.summaries());
+        assertFalse(clean.rolledBack());
+
+        // A supplied belief is revised: every public summary is stale, so one replacement is requested.
+        UUID heldBelief = jdbc.queryForObject("select id from knowledge_belief where holder_actor_id = ?", UUID.class,
+                player);
+        UUID heldClaim = jdbc.queryForObject("select claim_id from knowledge_belief where id = ?", UUID.class, heldBelief);
+        internal(1, List.of(new KnowledgeChange.Belief(UUID.randomUUID(), player, heldClaim, Stance.DOUBTS,
+                Acquisition.INFERRED, null, null, new KnowledgeChange.Supersession(heldBelief, 0), 0)));
+        var stale = pass.reconcile(campaign).summaries().getFirst();
+        assertEquals(MemoryReconciliation.SummaryResult.State.STALE, stale.state());
+        assertEquals(MemorySummaries.Request.Outcome.REQUESTED, stale.requested());
+        assertEquals(MemorySummaries.Request.Outcome.PENDING, pass.reconcile(campaign).summaries().getFirst().requested(),
+                "a second pass does not duplicate the pending job");
+        port.then(MemoryContinuityTest::summarized);
+        Processed replaced = summarizer.processNext(UUID.randomUUID()).orElseThrow();
+        assertEquals(Processed.Outcome.RECORDED, replaced.outcome(), String.valueOf(replaced.code()));
+        UUID summary = replaced.summaryId();
+        assertEquals(Freshness.Status.CURRENT, summaries.freshness(summary).status());
+
+        // New work is queued, then the campaign is rolled back below the summary and the job's range.
+        execute(new TypedCommand.Wait(60));
+        var queued = summaries.request(campaign, Audience.PUBLIC, true);
+        assertEquals(MemorySummaries.Request.Outcome.REQUESTED, queued.outcome());
+        long revision = revision();
+        long events = jdbc.queryForObject("select event_sequence from campaign where id = ?", Long.class, campaign);
+        long sourceRevision = jdbc.queryForObject("select source_revision from memory_summary where id = ?", Long.class,
+                summary);
+        jdbc.update("delete from campaign_checkpoint where campaign_id = ?", campaign);
+        counters(sourceRevision - 1, queued.rangeFrom() - 1);
+        assertTrue(summaries.freshness(summary).reasons().contains("rolled-back"));
+        var rolled = pass.reconcile();
+        assertEquals(1, rolled.campaigns());
+        assertEquals(0, rolled.failures());
+        assertEquals(1, rolled.summaryJobsRetired());
+        assertEquals("CANCELLED|RANGE_UNAVAILABLE", jdbc.queryForObject("select status || '|' || failure_code from "
+                + "memory_summary_job where id = ?", String.class, queued.jobId()));
+        assertEquals(1, rolled.invalidations());
+        assertEquals(List.of(MemoryReconciliation.ROLLED_BACK + ":0"), jdbc.queryForList("select reason || ':' || "
+                + "cardinality(refs) from memory_invalidation where campaign_id = ?", String.class, campaign));
+        assertEquals(1, rolled.checkpointsCaptured(), "the checkpoint is recaptured from the rolled-back state");
+
+        // The campaign grows past the summary again: it stays stale, and nothing is invalidated twice.
+        counters(revision, events);
+        assertEquals(List.of("invalidated:" + MemoryReconciliation.ROLLED_BACK), summaries.freshness(summary).reasons());
+        var grown = pass.reconcile(campaign);
+        assertFalse(grown.rolledBack());
+        assertEquals(1, count("memory_invalidation"));
+        assertTrue(assembled(AiRole.NARRATOR, Audience.PUBLIC).all().stream()
+                .noneMatch(item -> item.standing() == Standing.SUMMARY), "a summary of a vanished history is never used");
+    }
+
+    /**
+     * P09.5 missing dependencies: after the pinned dependency pack is lost, a fresh process (new
+     * dependency cache, catalogs and admission) diagnoses the campaign by the missing pack's pinned
+     * coordinates and pauses mutation: a fresh command is refused with nothing journaled or changed,
+     * while an identical retry of an earlier command still replays. The resume card shows the pause
+     * and the issue beside the unchanged committed state, and the startup pass counts the campaign.
+     */
+    @Test
+    void aLostDependencyPausesMutationAndTheResumeCardExplainsIt() {
+        var earlier = new OperationAdmissionService.Command(UUID.randomUUID().toString(), revision(), "WAIT",
+                new TypedCommand.Wait(30).payload());
+        assertEquals(OperationStatus.COMMITTED, executions.execute(owner, adventure, campaign, earlier).operation().status());
+        UUID dependency = jdbc.queryForObject("select id from content_revision where adventure_id = ? and pack_id = "
+                + "'test:dep'", UUID.class, adventure);
+        jdbc.execute("alter table content_revision_report disable trigger content_revision_report_immutable");
+        try {
+            jdbc.update("delete from content_revision_report where content_revision_id = ?", dependency);
+        } finally {
+            jdbc.execute("alter table content_revision_report enable trigger content_revision_report_immutable");
+        }
+
+        var restarted = new CampaignDependencies(registry, jdbc);
+        var diagnosis = restarted.forCampaign(campaign).orElseThrow();
+        assertTrue(diagnosis.pausesMutation());
+        assertEquals(List.of(new ClosureDiagnosis.Issue(ClosureDiagnosis.Code.DEPENDENCY_MISSING, "test:dep", "1.0.0")),
+                diagnosis.issues());
+        var admissions = new OperationAdmissionService(entities, jdbc, manager,
+                new CommandRuleCatalogs(jdbc, registry, manager, restarted));
+        int journaled = jdbc.queryForObject("select count(*) from operation_journal where campaign_id = ?", Integer.class,
+                campaign);
+        String before = campaignRow();
+        for (String type : List.of("WAIT", "MOVE")) {
+            Map<String, Object> payload = type.equals("WAIT") ? new TypedCommand.Wait(30).payload()
+                    : new TypedCommand.Move("grove").payload();
+            var refused = assertThrows(OperationAdmissionFailure.class, () -> admissions.submit(owner, adventure, campaign,
+                    new OperationAdmissionService.Command(UUID.randomUUID().toString(), revision(), type, payload)));
+            assertEquals(OperationAdmissionFailure.Kind.DEPENDENCIES_MISSING, refused.kind());
+        }
+        assertEquals(journaled, jdbc.queryForObject("select count(*) from operation_journal where campaign_id = ?",
+                Integer.class, campaign), "a paused campaign journals nothing");
+        assertEquals(before, campaignRow());
+        assertTrue(admissions.submit(owner, adventure, campaign, earlier).replayed(), "earlier requests still replay");
+
+        // The warden, seen here by the earlier wait, leaves unseen: the card shows what the player
+        // knows, never real positions, and the hermit, never seen here, is not listed.
+        jdbc.update("update actor set location_id = 'grove', row_version = row_version + 1 where id = ?", warden);
+        before = campaignRow();
+        var card = new ResumeCards(jdbc, manager, restarted, glossaries, checkpoints).read(owner, adventure, campaign);
+        assertEquals(new ResumeCards.Dependencies("MISSING", true, List.of(new ResumeCards.DependencyIssue(
+                "DEPENDENCY_MISSING", "test:dep", "1.0.0"))), card.dependencies());
+        assertEquals(List.of("Warden"), card.presentActors().stream().map(ResumeCards.PresentActor::name).toList());
+        assertEquals("trailhead", card.location().id(), "committed state is still shown");
+        assertEquals("FREE_INPUT", card.pendingDecision());
+        assertEquals(revision(), card.scope().stateRevision());
+        assertFalse(card.resources().isEmpty());
+        assertNull(card.encounter());
+        assertEquals(before, campaignRow(), "reading the card writes nothing");
+        var report = new MemoryReconciliation(jdbc, manager, restarted, checkpoints,
+                summaries(MemorySettings.defaults())).reconcile();
+        assertEquals(1, report.paused());
+        assertEquals(0, report.failures());
+    }
+
+    /**
+     * P09.5 committed narration pending across a restart (QA-18 with QA-08): an action committed
+     * before a crash during its narration keeps its effects; restart recovery requeues the interrupted
+     * narration and reconciliation counts it; the resume card shows the receipt meanwhile; the
+     * narrator's first session after the restart is rehydrated at the free-input decision with the
+     * pending narration counted and without the opening; and the narration is published exactly once
+     * without re-running the action. A narration that ends pending keeps its receipt and its retries.
+     */
+    @Test
+    void aRestartResumesCommittedNarrationOnceWithoutReplayingTheAction() throws Exception {
+        var runtime = new RenewalPort();
+        var scheduler = renewalScheduler(renewalSessions(runtime, RenewalPolicy.defaults()), runtime);
+        run(scheduler, narrator(), "before the crash");
+        var executed = executions.execute(owner, adventure, campaign, new OperationAdmissionService.Command(
+                UUID.randomUUID().toString(), revision(), "WAIT", new TypedCommand.Wait(60).payload()));
+        UUID operation = executed.operation().operationId();
+        String world = world();
+        // The process stops while an attempt narrates: the job is running with a lease that expires.
+        jdbc.update("update presentation_job set status = 'RUNNING', attempt_count = 1, fence = 1, lease_holder = "
+                + "gen_random_uuid(), lease_expires_at = clock_timestamp() - interval '1 second', row_version = "
+                + "row_version + 1 where operation_id = ?", operation);
+        jdbc.update("update operation_journal set status = 'NARRATING', operation_version = operation_version + 1, "
+                + "row_version = row_version + 1 where id = ?", operation);
+        var interrupted = cards.read(owner, adventure, campaign);
+        assertEquals(1, interrupted.awaitingNarrationTotal());
+        var owed = interrupted.awaitingNarration().getFirst();
+        assertEquals(operation, owed.operationId());
+        assertEquals("NARRATING", owed.status());
+        assertEquals("IN_PROGRESS", owed.narration().mode());
+        assertEquals(revision(), ((Number) owed.receipt().get("stateRevision")).longValue(), "the receipt is the recap");
+
+        // Restart: journal, presentation and scheduler recovery, then memory reconciliation.
+        assertEquals(0, journalRecovery.reconcile());
+        assertEquals(1L, presentations.reconcile());
+        var restarted = new RenewalPort();
+        var after = renewalScheduler(renewalSessions(restarted, RenewalPolicy.defaults()), restarted);
+        var reconciled = reconciliation.reconcile(campaign);
+        assertEquals(1, reconciled.narrationResuming());
+        assertEquals(0, reconciled.narrationPending());
+        assertEquals(world, world(), "recovery never re-runs the action");
+
+        run(after, narrator(), "narrate the committed action");
+        TaskRequest first = restarted.requests.getFirst();
+        JsonNode continuity = continuity(first);
+        assertEquals("restart", continuity.path("renewal").path("cause").asString());
+        assertEquals("free-input", continuity.path("resume").path("pendingDecision").asString());
+        assertEquals(1, continuity.path("resume").path("narrationPending").asInt());
+        assertFalse(first.instructions().contains("You arrive at the trail shelter"), "the opening is not replayed");
+
+        var calls = new AtomicInteger();
+        var jobs = new PresentationJobService(entities, jdbc, manager, request -> {
+            calls.incrementAndGet();
+            return NarrationPort.Result.delivered(new NarrationPort.Publication(SupportedLocale.EN, 0, 0, "c".repeat(64),
+                    false, List.of(new NarrationPort.Passage(NarrationPort.PassageKind.NARRATION, null, null,
+                            "Time passes quietly.", List.of("event.1"))), List.of(), null, null, null));
+        });
+        // The requeued attempt's backoff elapses.
+        jdbc.update("update presentation_job set due_at = clock_timestamp(), row_version = row_version + 1 where "
+                + "operation_id = ?", operation);
+        assertEquals(1, jobs.drain(4));
+        assertEquals(0, jobs.drain(4));
+        assertEquals(1, calls.get(), "the owed narration is produced once");
+        assertEquals("DELIVERED", jdbc.queryForObject("select status from operation_journal where id = ?", String.class,
+                operation));
+        assertEquals(1, count("narration_publication"));
+        assertEquals(world, world(), "narration never re-runs the action");
+        assertEquals(0, cards.read(owner, adventure, campaign).awaitingNarrationTotal());
+
+        // Narration that ends pending keeps the receipt as the presentation and its retries.
+        execute(new TypedCommand.Wait(30));
+        assertEquals(1, new PresentationJobService(entities, jdbc, manager,
+                request -> NarrationPort.Result.of(NarrationPort.Outcome.UNAVAILABLE)).drain(4));
+        var pending = cards.read(owner, adventure, campaign).awaitingNarration().getFirst();
+        assertEquals("COMMITTED_NARRATION_PENDING", pending.status());
+        assertEquals(new ResumeCards.Narration("RECEIPT", "NARRATION_UNAVAILABLE", 3), pending.narration());
+        var counted = reconciliation.reconcile(campaign);
+        assertEquals(0, counted.narrationResuming());
+        assertEquals(1, counted.narrationPending());
+
+        // A delivered narration-only retry publishes the narration while the journal keeps recording
+        // that the action was saved without it: the action no longer awaits narration.
+        assertEquals(PresentationJobService.Retry.QUEUED, presentations.retry(adventure, campaign,
+                pending.operationId()));
+        assertEquals(1, jobs.drain(4));
+        assertEquals("COMMITTED_NARRATION_PENDING", jdbc.queryForObject("select status from operation_journal where "
+                + "id = ?", String.class, pending.operationId()));
+        assertEquals(2, count("narration_publication"));
+        assertEquals(0, cards.read(owner, adventure, campaign).awaitingNarrationTotal());
+        assertEquals(0, reconciliation.reconcile(campaign).narrationPending());
+    }
+
     /** Scripted runtime of the renewal tests: answers each task with the next scripted status. */
     private static final class RenewalPort implements NarrationTaskPort {
         final List<TaskRequest> requests = Collections.synchronizedList(new ArrayList<>());
@@ -766,6 +1088,31 @@ class MemoryContinuityTest {
     private List<Map<String, Object>> records() {
         return jdbc.queryForList("select * from ai_session_record where campaign_id = ? order by line_generation",
                 campaign);
+    }
+
+    /**
+     * Move the campaign's counters outside every production path, as a hand-made database restore
+     * without a recovery-generation change would; the campaign's guard triggers are re-enabled even
+     * when the update fails.
+     */
+    private void counters(long stateRevision, long eventSequence) {
+        jdbc.execute("alter table campaign disable trigger user");
+        try {
+            jdbc.update("update campaign set state_revision = ?, event_sequence = ? where id = ?", stateRevision,
+                    eventSequence, campaign);
+        } finally {
+            jdbc.execute("alter table campaign enable trigger user");
+        }
+    }
+
+    /** @return the campaign row, its events, its resources and its receipts as canonical JSON text */
+    private String world() {
+        return jdbc.queryForObject("select (select to_jsonb(c)::text from campaign c where id = ?) || (select "
+                + "coalesce(jsonb_agg(to_jsonb(e) order by e.sequence), '[]')::text from campaign_event e where "
+                + "e.campaign_id = ?) || (select coalesce(jsonb_agg(to_jsonb(r) order by r.actor_id, r.resource_key), "
+                + "'[]')::text from actor_resource r where r.campaign_id = ?) || (select coalesce(jsonb_agg(o.receipt "
+                + "order by o.id), '[]')::text from operation_journal o where o.campaign_id = ?)", String.class, campaign,
+                campaign, campaign, campaign);
     }
 
     /** @return the campaign row as canonical JSON text */

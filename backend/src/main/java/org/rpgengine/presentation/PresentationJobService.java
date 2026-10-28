@@ -676,8 +676,14 @@ public class PresentationJobService {
          * Publication wins over every job state; an active round means in progress; otherwise a
          * committed operation without narration falls back to its receipt, naming the reason of
          * its latest round ({@code NARRATION_INTERRUPTED} for legacy commits without any round).
+         * Public since P09.5 so the resume card derives the same view inside its own snapshot.
+         *
+         * @param journal the operation's journal status
+         * @param rounds NARRATION rounds in order, each {@code {status, outcome_code}}
+         * @param narration the published player view, or null when nothing is published
+         * @return the presentation view
          */
-        static Presentation of(OperationStatus journal, List<String[]> rounds, Map<String, Object> narration) {
+        public static Presentation of(OperationStatus journal, List<String[]> rounds, Map<String, Object> narration) {
             if (!journal.isCommitted()) {
                 return new Presentation(null, null, 0, null);
             }

@@ -9,7 +9,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -80,6 +82,7 @@ class PackRegistryPersistenceTest {
     @AfterEach
     void clear() {
         jdbc.execute("alter table content_revision_file enable trigger content_revision_file_immutable");
+        jdbc.execute("alter table content_revision_report enable trigger content_revision_report_immutable");
         jdbc.execute("drop trigger if exists p044_fail on content_revision_report");
         jdbc.execute("drop function if exists p044_fail()");
         jdbc.execute("truncate ai_session_record, memory_invalidation, memory_summary, memory_summary_job, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, "
@@ -215,6 +218,65 @@ class PackRegistryPersistenceTest {
                 + "sha256 = encode(sha256(convert_to('{}', 'UTF8')), 'hex') where path = 'world.json'");
         jdbc.execute("alter table content_revision_file enable trigger content_revision_file_immutable");
         assertThrows(IllegalStateException.class, () -> registry.files(registration.revisionId()));
+    }
+
+    /**
+     * P09.5: a pinned closure is diagnosed without throwing and without writing. A loadable closure is
+     * available; a legacy row without a sealed inventory is unsealed; an engine build with another
+     * ruleset reports the revision whose ruleset is unavailable; a lost dependency is listed by its
+     * pinned coordinates while loading keeps its argument error; changed bytes are corrupt and keep
+     * their state error; and a revision of another adventure is missing.
+     */
+    @Test
+    void diagnosesPinnedClosuresWithoutThrowing() {
+        var harbor = registry.register(adventure, staged(harbor()));
+        var quay = registry.register(adventure, staged(quay(harbor.pack().contentHash())));
+        assertEquals(ClosureDiagnosis.AVAILABLE, registry.diagnose(adventure, quay.revisionId()));
+        assertEquals(new ClosureDiagnosis(ClosureDiagnosis.Status.MISSING, List.of(new ClosureDiagnosis.Issue(
+                ClosureDiagnosis.Code.REVISION_MISSING, null, null))), registry.diagnose(UUID.randomUUID(), quay.revisionId()));
+
+        UUID legacy = UUID.randomUUID();
+        jdbc.update("insert into content_revision (id, adventure_id, pack_id, pack_version, content_hash, schema_version, "
+                + "ruleset_id, ruleset_version, ruleset_hash, source_locale, admitted_at) select ?, adventure_id, pack_id, "
+                + "'9.9.9', content_hash, schema_version, ruleset_id, ruleset_version, ruleset_hash, source_locale, "
+                + "admitted_at from content_revision where id = ?", legacy, harbor.revisionId());
+        assertEquals(ClosureDiagnosis.UNSEALED, registry.diagnose(adventure, legacy));
+        assertFalse(ClosureDiagnosis.UNSEALED.pausesMutation(), "a legacy revision keeps its earlier behavior");
+
+        // An upgraded engine with another ruleset version cannot run the sealed root.
+        var upgraded = new PackRegistry(jdbc, manager, new EngineContract("0.1.0", "skirmish", "1.1.0",
+                Set.of("standard"), Set.of()));
+        assertEquals(List.of(new ClosureDiagnosis.Issue(ClosureDiagnosis.Code.RULESET_UNAVAILABLE, "example:quay",
+                "1.0.0")), upgraded.diagnose(adventure, quay.revisionId()).issues());
+
+        jdbc.execute("alter table content_revision_report disable trigger content_revision_report_immutable");
+        jdbc.update("delete from content_revision_report where content_revision_id = ?", harbor.revisionId());
+        jdbc.execute("alter table content_revision_report enable trigger content_revision_report_immutable");
+        var lost = registry.diagnose(adventure, quay.revisionId());
+        assertTrue(lost.pausesMutation());
+        assertEquals(List.of(new ClosureDiagnosis.Issue(ClosureDiagnosis.Code.DEPENDENCY_MISSING, "example:harbor",
+                "1.0.0")), lost.issues());
+        assertEquals("pinned sealed dependency is unavailable in this adventure", assertThrows(
+                IllegalArgumentException.class, () -> new TransactionTemplate(manager).execute(status ->
+                        registry.loadForCampaign(adventure, quay.revisionId()))).getMessage());
+
+        jdbc.execute("alter table content_revision_file disable trigger content_revision_file_immutable");
+        jdbc.update("update content_revision_file set content = content || convert_to(' ', 'UTF8'), byte_size = "
+                + "byte_size + 1, sha256 = encode(sha256(content || convert_to(' ', 'UTF8')), 'hex') where "
+                + "content_revision_id = ? and path = 'world.json'", quay.revisionId());
+        jdbc.execute("alter table content_revision_file enable trigger content_revision_file_immutable");
+        String stored = snapshot();
+        assertEquals(List.of(new ClosureDiagnosis.Issue(ClosureDiagnosis.Code.CONTENT_CORRUPT, "example:quay", "1.0.0")),
+                registry.diagnose(adventure, quay.revisionId()).issues());
+        assertEquals(stored, snapshot(), "diagnosis never writes");
+        assertThrows(IllegalStateException.class, () -> new TransactionTemplate(manager).execute(status ->
+                registry.loadForCampaign(adventure, quay.revisionId())));
+    }
+
+    /** @return every content row as text, to show which writes happened */
+    private String snapshot() {
+        return jdbc.queryForObject("select (select count(*) from content_revision_report) || '|' || (select "
+                + "string_agg(sha256, ',' order by content_revision_id, path) from content_revision_file)", String.class);
     }
 
     /** Direct SQL cannot change, delete, extend or misdescribe a sealed revision. */

@@ -117,6 +117,55 @@ public class PackGlossaries {
         return Optional.of(java.util.Collections.unmodifiableMap(frozen));
     }
 
+    /**
+     * Resolve the display name of one root-pack definition for a player-facing projection (P09.5
+     * resume card). Only text whose source visibility is {@code public} is returned, so a secret
+     * definition's name never leaves the backend through this path.
+     *
+     * @param adventure adventure owning the revision
+     * @param revision the campaign's frozen pinned content revision
+     * @param locale output locale
+     * @param definition root-pack definition id; qualified dependency references are not resolved
+     * @return the name in the output locale, or in the source language with {@code fallback} set;
+     *         empty when the revision cannot be loaded, the definition has no public name text or
+     *         the reference is qualified
+     * @throws IllegalStateException inside an ambient transaction
+     */
+    public Optional<LocalizedName> name(UUID adventure, UUID revision, SupportedLocale locale, String definition) {
+        Objects.requireNonNull(locale, "locale");
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("glossary loading must not extend a caller transaction");
+        }
+        if (definition == null || definition.contains("#")) {
+            return Optional.empty();
+        }
+        PackLocalization localization = load(adventure, revision);
+        if (localization == null) {
+            return Optional.empty();
+        }
+        try {
+            var resolved = localization.resolve(definition, "/name", locale.tag());
+            String text = resolved.text().strip();
+            if (!"public".equals(resolved.visibility()) || text.isEmpty() || text.length() > GlossaryTerm.MAX_TEXT) {
+                return Optional.empty();
+            }
+            return Optional.of(new LocalizedName(text, resolved.locale(), resolved.fallback()));
+        } catch (IllegalArgumentException missing) {
+            // A definition without name text (MISSING_TEXT) simply has no display name.
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * A resolved public display name.
+     *
+     * @param text the name
+     * @param locale language of the text
+     * @param fallback true when the output locale had no overlay and the source language is shown
+     */
+    public record LocalizedName(String text, String locale, boolean fallback) {
+    }
+
     /** @return the bounded term, or null when it cannot be expressed within the contract bounds */
     private static GlossaryTerm term(PackLocalization localization, PackLocalization.Key key, String termId,
             SupportedLocale locale, SupportedLocale other) {

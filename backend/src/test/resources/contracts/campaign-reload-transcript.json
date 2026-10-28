@@ -54,6 +54,16 @@
       "phase": "first-load",
       "client": "page",
       "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/resume?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"scope\":{\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"stateRevision\":0},\"title\":\"Lantern walk\",\"mode\":\"EXPLORATION\",\"gameTurn\":0,\"worldTimeSeconds\":0,\"location\":{\"id\":\"trailhead\",\"name\":\"Inizio del sentiero di Mosslight\",\"nameLocale\":\"it\",\"nameFallback\":false},\"presentActors\":[],\"resources\":[{\"key\":\"vigor\",\"minimum\":0,\"current\":8,\"maximum\":8}],\"encounter\":null,\"pendingDecision\":\"STARTING_SITUATION\",\"awaitingNarrationTotal\":0,\"awaitingNarration\":[],\"dependencies\":{\"status\":\"AVAILABLE\",\"mutationPaused\":false,\"issues\":[]},\"continuity\":{\"checkpoint\":\"NONE\",\"publicSummary\":\"NONE\"}}"
+    },
+    {
+      "phase": "first-load",
+      "client": "page",
+      "method": "GET",
       "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001",
       "requestBody": null,
       "status": 200,
@@ -104,6 +114,16 @@
       "phase": "before-reload",
       "client": "page",
       "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/resume?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"scope\":{\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"stateRevision\":1},\"title\":\"Lantern walk\",\"mode\":\"EXPLORATION\",\"gameTurn\":1,\"worldTimeSeconds\":0,\"location\":{\"id\":\"grove\",\"name\":\"Boschetto delle lanterne\",\"nameLocale\":\"it\",\"nameFallback\":false},\"presentActors\":[],\"resources\":[{\"key\":\"vigor\",\"minimum\":0,\"current\":8,\"maximum\":8}],\"encounter\":null,\"pendingDecision\":\"FREE_INPUT\",\"awaitingNarrationTotal\":1,\"awaitingNarration\":[{\"operationId\":\"00000000-0000-4000-8000-000000000007\",\"commandType\":\"MOVE\",\"status\":\"COMMITTED_NARRATION_PENDING\",\"committedRevision\":1,\"receipt\":{\"stateRevision\":1,\"firstEventSequence\":1,\"lastEventSequence\":1,\"commandType\":\"MOVE\",\"elapsedSeconds\":0,\"turnAdvanced\":true,\"destinationId\":\"grove\",\"resources\":[],\"calculations\":[],\"randomDraws\":[]},\"narration\":{\"mode\":\"RECEIPT\",\"reason\":\"NARRATION_UNAVAILABLE\",\"retriesRemaining\":3}}],\"dependencies\":{\"status\":\"AVAILABLE\",\"mutationPaused\":false,\"issues\":[]},\"continuity\":{\"checkpoint\":\"NONE\",\"publicSummary\":\"NONE\"}}"
+    },
+    {
+      "phase": "before-reload",
+      "client": "page",
+      "method": "GET",
       "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001&after=0%3A6",
       "requestBody": null,
       "status": 200,
@@ -139,6 +159,16 @@
       "status": 200,
       "contentType": "application/json",
       "body": "{\"scope\":{\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"stateRevision\":1},\"campaign\":{\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"title\":\"Lantern walk\",\"mode\":\"EXPLORATION\",\"stateRevision\":1,\"gameTurn\":1,\"worldTimeSeconds\":0,\"eventSequence\":1,\"updatedAt\":\"2026-01-01T00:00:00Z\",\"pendingDecisionAvailable\":false},\"player\":{\"actorId\":\"00000000-0000-4000-8000-000000000004\",\"displayName\":\"Mara\",\"locationId\":\"grove\",\"attributes\":{\"awareness\":2},\"skills\":{\"fieldwork\":1},\"background\":null,\"role\":null},\"resources\":[{\"key\":\"vigor\",\"minimum\":0,\"current\":8,\"maximum\":8}],\"inventory\":[{\"itemId\":\"00000000-0000-4000-8000-000000000005\",\"definitionId\":\"kit\",\"quantity\":1}],\"abilities\":[{\"definitionId\":\"steady\",\"rank\":1}],\"knownFacts\":[],\"quests\":[],\"startingSituation\":null,\"pendingDecision\":null}"
+    },
+    {
+      "phase": "after-reload",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/resume?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"scope\":{\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"stateRevision\":1},\"title\":\"Lantern walk\",\"mode\":\"EXPLORATION\",\"gameTurn\":1,\"worldTimeSeconds\":0,\"location\":{\"id\":\"grove\",\"name\":\"Boschetto delle lanterne\",\"nameLocale\":\"it\",\"nameFallback\":false},\"presentActors\":[],\"resources\":[{\"key\":\"vigor\",\"minimum\":0,\"current\":8,\"maximum\":8}],\"encounter\":null,\"pendingDecision\":\"FREE_INPUT\",\"awaitingNarrationTotal\":1,\"awaitingNarration\":[{\"operationId\":\"00000000-0000-4000-8000-000000000007\",\"commandType\":\"MOVE\",\"status\":\"COMMITTED_NARRATION_PENDING\",\"committedRevision\":1,\"receipt\":{\"stateRevision\":1,\"firstEventSequence\":1,\"lastEventSequence\":1,\"commandType\":\"MOVE\",\"elapsedSeconds\":0,\"turnAdvanced\":true,\"destinationId\":\"grove\",\"resources\":[],\"calculations\":[],\"randomDraws\":[]},\"narration\":{\"mode\":\"RECEIPT\",\"reason\":\"NARRATION_UNAVAILABLE\",\"retriesRemaining\":3}}],\"dependencies\":{\"status\":\"AVAILABLE\",\"mutationPaused\":false,\"issues\":[]},\"continuity\":{\"checkpoint\":\"NONE\",\"publicSummary\":\"NONE\"}}"
     },
     {
       "phase": "after-reload",

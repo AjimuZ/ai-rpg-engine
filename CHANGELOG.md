@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased — Restart reconciliation, missing content and the resume card (P09.5), 28 October 2026
+
+- A playthrough whose adventure content is missing or damaged is paused instead of half-working:
+  when a pinned pack or one of its pinned dependencies is no longer installed in the adventure, its
+  stored files no longer match their pinned hash, or it was built for rules this engine version does
+  not provide, every new action is refused with 409 `COMMAND_DEPENDENCIES_MISSING` and nothing is
+  recorded. Retrying an earlier request still returns its saved result. No other pack or version is
+  ever used instead; restoring or re-importing the same content lifts the pause without a restart.
+  Legacy saves whose content was never stored in sealed form keep working as before.
+- New `GET /api/v1/campaigns/{id}/resume`: a short factual resume card read from the last saved
+  state without advancing time: the player's location with its name in the playthrough's
+  language, who the player knows to be there, resources, the next decision, saved actions still
+  awaiting narration with their receipts, the content diagnosis and whether the playthrough is
+  paused. The playthrough page shows it in English and Italian, with an alert naming each missing
+  pack.
+- At startup, after the existing recovery of actions, narration jobs and AI sessions and before
+  the web server accepts requests, a memory reconciliation pass checks every playthrough's content,
+  replaces damaged or diverging memory checkpoints with fresh ones taken from saved state, retires
+  summary work and summaries that describe a history the save no longer has, requests a
+  replacement for stale summaries when summaries are enabled, and counts narration still owed.
+  It never changes saved game state and never blocks startup (`engine.memory.reconciliation.enabled`,
+  default on).
+- A continuity summary built from a revision the save no longer has is now stale (`rolled-back`)
+  and stays stale after play continues past it.
+- Narration interrupted by a restart resumes exactly once without repeating the action, and the
+  first narrator conversation after the restart resumes at the pending decision without replaying
+  the opening.
+
 ## Unreleased — Renewable AI sessions that resume where play stands (P09.4), 28 October 2026
 
 - AI sessions are renewed automatically: after ten completed tasks of one role and audience, or

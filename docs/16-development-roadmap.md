@@ -2170,6 +2170,56 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     131 task identities/titles and the pending P98 follow-up are preserved; only P09.4 gains a
     completion mark.
 - [ ] P09.5 Reconcile restart, committed narration pending, missing dependencies, and stale summaries.
+  - Package A — pinned content diagnosis and mutation pause (`PackRegistry.diagnose`,
+    `ClosureDiagnosis`, `CampaignDependencies`, `CommandRuleCatalogs`, `OperationAdmissionService`):
+    the campaign-loading traversal, in its own read-only transaction and without throwing for
+    content problems, reports `AVAILABLE`, `UNSEALED` (a legacy root admitted before sealed storage;
+    earlier behavior kept) or `MISSING` with `REVISION_MISSING`, `RULESET_UNAVAILABLE`,
+    `CONTENT_CORRUPT`, `DEPENDENCY_MISSING` (every missing dependency listed) or `CLOSURE_INVALID`,
+    each with pack ID and version only. A revision is now verified, then its dependencies are
+    loaded, then it is compiled. `AVAILABLE` is cached per revision; failures are never cached. A
+    fresh command of a `MISSING` campaign is refused right after the replay check with
+    `DEPENDENCIES_MISSING` (HTTP 409 `COMMAND_DEPENDENCIES_MISSING`), nothing journaled; identical
+    retries still replay; nothing substitutes another pack.
+  - Package B — restart reconciliation (`MemoryReconciliation`, `MemoryStartupReconciliation`,
+    `engine.memory.reconciliation.enabled`): one pass per process, after every startup recovery
+    and before HTTP, in pages of 100 campaigns with per-campaign failure isolation; summary-job
+    recovery (also cancelling queued jobs over vanished events, `RANGE_UNAVAILABLE`); the content
+    diagnosis; unusable checkpoints (`CORRUPT`, `UNSUPPORTED`, `INCOMPATIBLE`, `DIVERGED`)
+    discarded newest first and recaptured from canonical state at a safe boundary, a divergence
+    invalidating every earlier summary (`CHECKPOINT_DIVERGED`); summaries built from a revision the
+    campaign no longer has stale (`rolled-back`) and invalidated once (`STATE_ROLLED_BACK`); one
+    replacement request for an audience with only stale summaries when summaries are enabled;
+    counts of narration still owed. Never writes canonical state; never blocks startup.
+  - Package C — committed narration pending across a restart: presentation recovery requeues the
+    interrupted attempt, reconciliation counts it, the narrator's first session after the restart
+    is rehydrated at the pending decision with the pending narration counted and without the
+    opening, and the narration is published exactly once without re-running the action.
+  - Package D — resume card (`ResumeCards`, `ResumeCardController`, playthrough view):
+    `GET /api/v1/campaigns/{id}/resume?adventureId=…` reads, without advancing time or writing, the
+    player's location with its public localized name, actors the player knows to be there,
+    resources, a null encounter, the pending decision kind, up to 16 actions awaiting narration with
+    their receipts and presentation state, the content diagnosis with the pause, and continuity
+    codes. The interface shows it in English and Italian with an alert naming each missing pack;
+    the browser reload contract records it. See
+    [docs/08 section 10](08-memory-and-continuity.md#p095-restart-reconciliation-missing-dependencies-and-the-resume-card).
+  - Exit checks:
+    - Registry suite: available, unsealed, missing revision, an upgraded ruleset, a lost dependency
+      and changed bytes are diagnosed without writing, while loading keeps its exception types.
+    - Real PostgreSQL suite with sealed packs, production creation, real commands, the real
+      scheduler, journal and rehydration and scripted runtimes: checkpoint repair for corrupt,
+      diverged, ahead, outdated and unsafe cases with canonical state unchanged; stale and
+      rolled-back summary work retired, replaced once and kept stale; a lost dependency pausing a
+      fresh process's admission while replays work and the card explains it; interrupted
+      narration resuming once after a restart behind a narrator that does not replay the opening.
+    - HTTP: the read-only, localized card (EN and IT), 400/404/403, a corrupt pinned pack answering
+      409 `COMMAND_DEPENDENCIES_MISSING` until restored; a legacy unsealed campaign not paused.
+    - Startup wiring: the pass runs once per start before the web server and never aborts startup.
+    - Frontend parser, view and Italian-variant specs over the refreshed reload transcript.
+    - Deliberate weakening probes on an exported copy and every command of the project check plan.
+    - Not part of this task: a UI control for narration retry or session renewal, switching the
+      intent, narration and planner callers to envelopes, live-model or human evaluation of QA-08,
+      and a live dump and restore.
 
 **Exit:** a fresh AI thread resumes the correct pending decision with no invented history or replayed prologue. **Checks:** QA-08, QA-16–19, delayed promises, correction invalidation, input-budget limits. **Suggested commit:** `Add persistent memory and renewable narration sessions`.
 

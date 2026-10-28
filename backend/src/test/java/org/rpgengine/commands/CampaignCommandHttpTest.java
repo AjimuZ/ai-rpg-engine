@@ -219,6 +219,23 @@ class CampaignCommandHttpTest {
         assertEquals(202, post(commandsPath(), valid).status());
     }
 
+    /**
+     * P09.5: a legacy campaign whose pinned revision was never sealed is not paused. Its resume card
+     * reports the revision as unsealed with no issue and no localized name, and commands keep their
+     * earlier behavior (rules without definitions still commit).
+     */
+    @Test
+    void legacyUnsealedCampaignIsNotPaused() throws Exception {
+        var card = exchange("GET", "/api/v1/campaigns/" + campaign + "/resume?adventureId=" + adventure, "", headers());
+        assertEquals(200, card.status(), card.body());
+        JsonNode view = json.readTree(card.body());
+        assertEquals(json.readTree("{\"status\":\"UNSEALED\",\"mutationPaused\":false,\"issues\":[]}"),
+                view.get("dependencies"));
+        assertTrue(view.get("location").isNull() || view.get("location").get("name").isNull());
+        assertEquals(202, post(commandsPath(), envelope(UUID.randomUUID().toString(), 0, "{\"seconds\":10}")
+                .replace("\"MOVE\"", "\"WAIT\"")).status());
+    }
+
     /** Foreign campaigns and operations are indistinguishable from unknown ones. */
     @Test
     void hidesForeignScopes() throws Exception {

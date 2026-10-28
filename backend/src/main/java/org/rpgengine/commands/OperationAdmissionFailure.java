@@ -73,6 +73,13 @@ public final class OperationAdmissionFailure extends RuntimeException {
          */
         CONTENT_UNAVAILABLE,
         /**
+         * Mutation of the campaign is paused because its sealed pinned content closure is missing,
+         * corrupt or unusable under this engine build (P09.5, docs/08 section 10). Every fresh
+         * command is refused until the exact content is restored or imported; identical retries of
+         * earlier admissions still replay. The resume card names the issues (HTTP 409).
+         */
+        DEPENDENCIES_MISSING,
+        /**
          * The ability's effect program cannot be executed by the local exploration resolver: it
          * contains an effect type that needs later systems (damage/heal armor, conditions, forced
          * movement, reveals, item creation), reads attribute or resource values from a vocabulary

@@ -341,7 +341,7 @@ describe('Italian variant with the reviewed catalog', /** Register Italian rende
   afterEach(/** Destroying fixtures aborts long polls. */ () => TestBed.resetTestingModule());
 
   it('loads every reviewed message and detects English leftovers', /** The detector itself must have something to find. */ () => {
-    expect(CATALOG.size).toBe(317);
+    expect(CATALOG.size).toBe(340);
     expect(ENGLISH_MESSAGES.has('Send')).toBe(true);
     expect(ENGLISH_RUNS).toContain(message('campaign.view.composerHelp', {}, 'source'));
     // ICU branches are checked too: an untranslated plural would show "One passage".
@@ -410,6 +410,11 @@ describe('Italian variant with the reviewed catalog', /** Register Italian rende
     expect(text('#campaign-composer-help')).toBe(message('campaign.view.composerHelp'));
     expect(text('[data-send]')).toBe(message('campaign.view.send'));
     expect((root.querySelector('[data-send]') as HTMLButtonElement).disabled).toBe(true);
+    // P09.5 resume card: reviewed Italian labels around the server's Italian location name.
+    expect(text('#resume-title')).toBe(message('campaign.resume.title'));
+    expect(text('[data-location]')).toBe('Inizio del sentiero di Mosslight');
+    expect(root.querySelector('[data-location]')?.getAttribute('lang')).toBe('it');
+    expect(text('[data-decision]')).toBe(message('campaign.resume.decisionStart'));
     expect([...englishLeftovers(root), ...englishText(root)]).toEqual([]);
     expect(accessibilityProblems(root)).toEqual([]);
 

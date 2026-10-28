@@ -185,6 +185,7 @@ schema versions for persisted/imported data.
 | `GET /api/v1/campaigns/{id}/stream` | Resumable authorized event stream | Transport delivery only |
 | `GET /api/v1/campaigns/{id}/encounter` | Public current combat projection | No raw enemy secrets |
 | `POST /api/v1/campaigns/{id}/ai-session/renew` | Renew every AI session of an idle campaign (P09.4) | Does not advance the world or change the transcript; 409 while anything of the campaign runs |
+| `GET /api/v1/campaigns/{id}/resume` | Short factual resume card (P09.5) | No advancement or write; shows missing pinned content and the mutation pause |
 | `GET /api/v1/runtime/status` | Selected narration runtime (Codex or Claude), version, account and model readiness | No credentials or raw RPC identifiers; read-only, the runtime is changed through the launcher (ADR 0020) |
 | `GET /api/v1/models/status` | Slots, assigned backends and models, billing and privacy classes, probe results, hardware profile and admission state | No keys or endpoint credentials; read-only |
 | `PUT /api/v1/settings/models` | Owner-only slot assignment and same-class fallback lists | Validates, probes and audits; a class change needs acknowledgement; keys are never accepted here (ADR 0021) |
@@ -265,6 +266,7 @@ operation status is stored progress, not evidence that a worker is currently ali
 | 422 | `COMMAND_TARGET_ILLEGAL` | Target count violates the ability's policy, or the policy needs encounter zones |
 | 422 | `COMMAND_RESOURCE_INSUFFICIENT` | A declared cost exceeds the player's current resource above its minimum, or belongs to another pack's vocabulary |
 | 422 | `COMMAND_CONTENT_UNAVAILABLE` | The pinned content closure cannot be loaded by this engine build for a rule that needs it |
+| 409 | `COMMAND_DEPENDENCIES_MISSING` | P09.5: the campaign's sealed pinned closure is missing, corrupt or unusable, so every fresh command is refused until the same content is restored or imported (checked right after replay; nothing journaled) |
 | 422 | `COMMAND_EFFECT_UNSUPPORTED` | The ability's effect program needs a later system (damage, healing, conditions, movement, reveal, items), more than 128 draws, or actor values from another pack's vocabulary |
 | 429 | `COMMAND_ADMISSION_LIMIT` | Two live mutation permits already belong to this owner |
 | 503 | `COMMAND_STORAGE_UNAVAILABLE` | Required transaction/storage unavailable |
@@ -272,8 +274,8 @@ operation status is stored progress, not evidence that a worker is currently ali
 The existing filter supplies its local 403/415/429/503 codes before these handlers.
 Errors contain only `code`, with no SQL, submitted text or internal exception.
 Duplicate replay precedes revision, current typed/semantic/rule and busy/capacity checks.
-Fresh requests check exact revision, typed/common semantics, current-state rules, busy,
-then owner capacity. Concealment-sensitive rule failures share one code each, so a
+Fresh requests check the content pause (P09.5), exact revision, typed/common semantics,
+current-state rules, busy, then owner capacity. Concealment-sensitive rule failures share one code each, so a
 rejection never confirms that a hidden location, route or actor exists.
 New rejected requests consume
 no journal identity or capacity, and no action is queued. Retry an uncertain
@@ -369,6 +371,27 @@ refuse, it simply starts in the renewed sessions. Otherwise it answers 409
 names a session. Each line's next task starts a fresh conversation with a continuity block
 ([docs/08 section 7](08-memory-and-continuity.md#p094-renewal-triggers-session-records-and-rehydration)).
 No UI control calls it yet.
+
+### P09.5 resume card
+
+`GET /api/v1/campaigns/{campaignId}/resume?adventureId={uuid}` uses the admission, `no-store`
+policy and error codes of the campaign projections: 400 `CAMPAIGN_READ_INPUT_INVALID`, 404
+`CAMPAIGN_SCOPE_UNAVAILABLE`, 503 `CAMPAIGN_READ_STORAGE_UNAVAILABLE`, 403 from admission. It
+answers 200 with exactly `scope` (adventure, campaign and content revision IDs, state revision),
+`title`, `mode`, `gameTurn`, `worldTimeSeconds`, `location` (`id`, nullable public `name` in the
+narrative language with `nameLocale` and `nameFallback`; null for a legacy save without a player
+location), `presentActors` (`actorId`, `name` of actors the player last saw there and has not since
+found absent), `resources` (`key`, `minimum`, `current`, `maximum`), `encounter` (null until P11),
+`pendingDecision` (`STARTING_SITUATION`, `FREE_INPUT` or `OTHER`), `awaitingNarrationTotal`,
+`awaitingNarration` (newest 16 committed actions without published narration: `operationId`,
+`commandType`, `status`, `committedRevision`, the player-safe `receipt` and `narration` with `mode`
+`IN_PROGRESS` or `RECEIPT`, the public `reason` and `retriesRemaining`), `dependencies` (`status`
+`AVAILABLE`, `UNSEALED` or `MISSING`, `mutationPaused`, and `issues` of `code`, `packId`,
+`packVersion`) and `continuity` (`checkpoint` verification status, `publicSummary` state). Raw
+decision payloads, hashes, paths, private definitions, real NPC positions, seeds and job internals
+are never returned. Reading the card advances nothing and writes nothing. The playthrough view
+reads it with the state and shows it above the action list
+([docs/08 section 10](08-memory-and-continuity.md#p095-restart-reconciliation-missing-dependencies-and-the-resume-card)).
 
 ## 4. Stream contract
 
@@ -495,6 +518,12 @@ This is a planned P11/P12 contract. The P05.1 preview shells do not implement pl
 Every panel defines loading, empty, unavailable, and error states. Last committed state remains inspectable while AI works. Avoid replacing a valid inventory with an empty one when a request times out.
 
 Distinguish no installed pack, invalid pack, no campaign, missing asset, disconnected narration runtime, stale revision, awaiting clarification, cancelled before commit, committed with narration pending, and restore required. These are actionable states, not one generic “AI error.”
+
+Since P09.5 the playthrough view shows two of them on the resume card: committed actions whose
+narration is pending or resuming, each with its receipt, and an alert when the campaign is paused
+because pinned adventure content is missing or damaged, naming each pack and asking for a restore
+or a re-import of the same content. A paused command answers `COMMAND_DEPENDENCIES_MISSING`, which
+the interface explains in English and Italian.
 
 After reconnect, fetch operation status before enabling a retry. Reusing the original request identity is a retry; editing the action creates a new request. Keep an unsent draft separate from submitted text so a refresh cannot accidentally replay it.
 

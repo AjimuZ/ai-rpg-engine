@@ -88,6 +88,13 @@ summary of the uncovered tail; the request passes through the same job bounds (o
 job per audience, the installation cap, no retry of a failed range) and is produced later by
 the bounded worker. Renewal itself runs at the line's next dispatch, never as a job.
 
+P09.5 (28 October 2026) adds no background kind either. Restart reconciliation runs the summary-job
+recovery once per process whether or not summaries are enabled, and it now also cancels queued jobs
+whose range ends beyond the campaign's newest event (`RANGE_UNAVAILABLE`, never counted as a failed
+range). A summary built from a revision the campaign no longer has is stale (`rolled-back`) and is
+invalidated once, so a later history that reaches the same numbers cannot revive it; selective
+revalidation is unchanged otherwise.
+
 Planned AP-01–AP-12 cover selective staleness, query phantoms, admission races, duplicate workers, fencing, cancellation/EOF/restart, play-before-plan fallback, world-time separation, secret sinks, cross-adventure fairness/restore, author constraints and bilingual A/B/C evaluation. Compare single narration, narration plus planning, and optional review with measured quality, p50/p95 latency, usage and waste. P03.6 covers only the storage/admission subset above. P07.6 adds the transactional scope/content/author/typed-dependency gate and activation through ordinary commands, with deterministic real-PostgreSQL evidence for the AP-01–AP-05 admission assertions and AP-08's no-canonical-change rule; no full AP acceptance or superiority is claimed. Evidence, proposed objectives, ownership and source links are in the [planning specification](../28-asynchronous-narrative-planning.md).
 
 P08.7 (28 October 2026) implements the minimum bounded planner contract and fallback that

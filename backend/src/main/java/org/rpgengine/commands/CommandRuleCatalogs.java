@@ -7,7 +7,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+import org.rpgengine.content.CampaignDependencies;
 import org.rpgengine.content.PackRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -26,6 +28,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * they become {@link Content#UNAVAILABLE}, and only a fresh command whose rules actually need
  * pinned definitions fails, after matching-request replay. Catalogs hold no secret prose and
  * at most {@link #CACHE_ENTRIES} revisions are retained (least recently used first out).
+ *
+ * <p>Since P09.5 a failed load is classified by {@link CampaignDependencies}: a sealed closure
+ * that is missing, corrupt or unusable under this engine build yields {@link Content#PAUSED}, and
+ * admission then refuses every fresh command of the campaign ({@code DEPENDENCIES_MISSING}). A
+ * legacy unsealed revision stays {@link Content#UNAVAILABLE}, with the earlier per-rule behavior.
  */
 @Service
 public class CommandRuleCatalogs {
@@ -36,6 +43,7 @@ public class CommandRuleCatalogs {
 
     private final JdbcTemplate jdbc;
     private final PackRegistry packs;
+    private final CampaignDependencies dependencies;
     private final TransactionTemplate reads;
     private final Map<UUID, CommandRuleCatalog> cache = new LinkedHashMap<>(CACHE_ENTRIES, 0.75f, true) {
         private static final long serialVersionUID = 1L;
@@ -47,15 +55,31 @@ public class CommandRuleCatalogs {
     };
 
     /**
-     * Wire storage and the sealed pack registry; missing beans fail application startup.
+     * Wire storage and the sealed pack registry with a private dependency classifier (embedders and
+     * suites that build their own pipeline); null infrastructure fails construction.
      *
      * @param jdbc JDBC access joined to the read transaction
      * @param packs registry that reparses and verifies sealed revision bytes
      * @param manager shared transaction manager
      */
     public CommandRuleCatalogs(JdbcTemplate jdbc, PackRegistry packs, PlatformTransactionManager manager) {
+        this(jdbc, packs, manager, new CampaignDependencies(packs, jdbc));
+    }
+
+    /**
+     * Spring constructor sharing the application's dependency status cache.
+     *
+     * @param jdbc JDBC access joined to the read transaction
+     * @param packs registry that reparses and verifies sealed revision bytes
+     * @param manager shared transaction manager
+     * @param dependencies classifier of failed loads (P09.5)
+     */
+    @Autowired
+    public CommandRuleCatalogs(JdbcTemplate jdbc, PackRegistry packs, PlatformTransactionManager manager,
+            CampaignDependencies dependencies) {
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
         this.packs = Objects.requireNonNull(packs, "packs");
+        this.dependencies = Objects.requireNonNull(dependencies, "dependencies");
         reads = new TransactionTemplate(Objects.requireNonNull(manager, "manager"));
         reads.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         reads.setReadOnly(true);
@@ -65,8 +89,9 @@ public class CommandRuleCatalogs {
 
     /**
      * Return the pinned catalog for a command that may need it, without taking campaign locks.
-     * Unregistered types and WAIT receive {@link Content#UNAVAILABLE} immediately because no
-     * pinned definition participates in their validation.
+     * Unregistered types and WAIT receive no catalog, because no pinned definition participates
+     * in their validation, but since P09.5 they still learn whether the campaign is paused:
+     * {@link Content#PAUSED} or {@link Content#UNAVAILABLE}.
      *
      * @param owner locally admitted owner
      * @param adventure adventure that must own the campaign
@@ -81,10 +106,11 @@ public class CommandRuleCatalogs {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(adventure, "adventure");
         Objects.requireNonNull(campaign, "campaign");
-        if (!CONTENT_RULES.contains(commandType)) {
-            return Content.UNAVAILABLE;
+        Content pinned = pinned(owner, adventure, campaign);
+        if (CONTENT_RULES.contains(commandType)) {
+            return pinned;
         }
-        return pinned(owner, adventure, campaign);
+        return pinned.paused() ? Content.PAUSED : Content.UNAVAILABLE;
     }
 
     /**
@@ -93,15 +119,19 @@ public class CommandRuleCatalogs {
      * the effects (P09.1) needs concealment facts even for {@code WAIT}. Scope and failure handling
      * are those of {@link #preload}.
      *
-     * @return available catalog or the unavailable marker
+     * @return available catalog, {@link Content#PAUSED} when the sealed closure can no longer be
+     *         loaded, or {@link Content#UNAVAILABLE} (unknown scope or a legacy unsealed revision)
      * @throws IllegalStateException if called inside an ambient transaction
+     * @throws org.springframework.dao.DataAccessException for storage failures, including while
+     *         classifying a failed load
      */
     public Content pinned(UUID owner, UUID adventure, UUID campaign) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(adventure, "adventure");
         Objects.requireNonNull(campaign, "campaign");
         MutationLeaseService.requireNoTransaction();
-        return Objects.requireNonNull(reads.execute(status -> {
+        UUID[] failed = new UUID[1];
+        Content loaded = Objects.requireNonNull(reads.execute(status -> {
             jdbc.execute("set local statement_timeout = '30s'");
             List<UUID> pinned = jdbc.query("select c.content_revision_id from campaign c join adventure_workspace w "
                             + "on w.id = c.adventure_id where c.id = ? and c.adventure_id = ? and w.owner_id = ?",
@@ -126,19 +156,42 @@ public class CommandRuleCatalogs {
                 // Unsealed/legacy revisions, an unavailable pinned ruleset or changed stored bytes:
                 // fail closed later, only where a rule needs definitions. Diagnostics stay private.
                 status.setRollbackOnly();
+                failed[0] = revision;
                 return Content.UNAVAILABLE;
             }
         }));
+        // Classified outside the read transaction, which the diagnosis must not join. Only a sealed
+        // closure that can no longer be loaded pauses the campaign (P09.5).
+        if (failed[0] != null && dependencies.check(adventure, failed[0]).pausesMutation()) {
+            return Content.PAUSED;
+        }
+        return loaded;
     }
 
     /**
      * Result of {@link #preload}: a detached catalog or the unavailable marker.
      *
      * @param catalog immutable pinned rule facts, or null when unavailable
+     * @param paused true when the campaign's sealed pinned closure is missing or unusable, so
+     *        mutation is paused (P09.5); always false with a catalog
      */
-    public record Content(CommandRuleCatalog catalog) {
+    public record Content(CommandRuleCatalog catalog, boolean paused) {
         /** No pinned rule facts could be loaded or none were requested. */
-        public static final Content UNAVAILABLE = new Content(null);
+        public static final Content UNAVAILABLE = new Content(null, false);
+        /** The pinned closure is missing or unusable: fresh commands are refused. */
+        public static final Content PAUSED = new Content(null, true);
+
+        /** Require that a paused campaign carries no catalog. */
+        public Content {
+            if (paused && catalog != null) {
+                throw new IllegalArgumentException("a paused campaign has no usable catalog");
+            }
+        }
+
+        /** @param catalog available pinned rule facts */
+        Content(CommandRuleCatalog catalog) {
+            this(catalog, false);
+        }
 
         /**
          * Return the catalog for the campaign's frozen pinned revision.

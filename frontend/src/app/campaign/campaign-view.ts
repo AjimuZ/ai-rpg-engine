@@ -1,8 +1,11 @@
 /**
  * Read-only view of one persisted playthrough: its public starting situation (with explicit
- * source-language fallback disclosure), the operations seen on the resumable stream with
- * localized statuses and receipts, localized error and reconnect notices, and the scoped
- * persistent draft (docs/13 section 4, docs/29 sections 3 and 6).
+ * source-language fallback disclosure), the resume card (P09.5, docs/08 section 10: location,
+ * who the player knows to be there, resources, the next decision, saved actions still awaiting
+ * narration with their receipts, and a pause notice when adventure content is missing), the
+ * operations seen on the resumable stream with localized statuses and receipts, localized error
+ * and reconnect notices, and the scoped persistent draft (docs/13 section 4, docs/29 sections 3
+ * and 6).
  *
  * The component never submits anything: Send stays disabled, the draft is kept only by the
  * shared {@link StoryInputState}, and the stream/status reads go through
@@ -11,10 +14,10 @@
  */
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, input, LOCALE_ID, signal, untracked } from '@angular/core';
 import { StoryInputState } from '../preview/story-input-state';
-import { CampaignProtocolError, CampaignView, isPending } from './campaign-protocol';
+import { CampaignProtocolError, CampaignView, isPending, ResumeCard } from './campaign-protocol';
 import {
-  campaignErrorMessage, commandTypeLabel, fallbackNotice, languageName, narrationReasonMessage, operationStatusMessage,
-  receiptLines, streamResetMessage,
+  awaitingMessage, campaignErrorMessage, commandTypeLabel, decisionMessage, dependencyIssueMessage, fallbackNotice, languageName,
+  locationMessage, narrationReasonMessage, operationStatusMessage, presentMessage, receiptLines, resourceMessages, streamResetMessage,
 } from './campaign-messages';
 import { CampaignScope, CampaignSession, CampaignTransport } from './campaign-session';
 
@@ -50,6 +53,47 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
             }
           </section>
         } @else { <p class="muted" i18n="@@campaign.view.noSituation">No decision is waiting for you in this playthrough.</p> }
+        @if (resume(); as card) {
+          <section class="resume-card" aria-labelledby="resume-title" data-resume>
+            <h3 id="resume-title" i18n="@@campaign.resume.title">Where you are</h3>
+            @if (card.mutationPaused) {
+              <div class="notice" role="alert" data-paused>
+                <p i18n="@@campaign.resume.paused">This playthrough is paused: adventure content it depends on is missing or damaged. Nothing can change until the same content is restored from a backup or imported again.</p>
+                <ul>
+                  @for (issue of card.issues; track $index) { <li>{{ issueText(issue) }}</li> }
+                </ul>
+              </div>
+            }
+            <dl>
+              <dt i18n="@@campaign.resume.location">Location</dt>
+              <dd [attr.lang]="card.location?.nameLocale ?? null" data-location>{{ locationText(card) }}</dd>
+              <dt i18n="@@campaign.resume.present">Known to be here</dt>
+              <dd data-present>{{ presentText(card) }}</dd>
+              <dt i18n="@@campaign.resume.resources">Resources</dt>
+              <dd data-resources>{{ resourceText(card).join(' · ') }}</dd>
+              <dt i18n="@@campaign.resume.encounter">Encounter</dt>
+              <dd i18n="@@campaign.resume.noEncounter">None</dd>
+              <dt i18n="@@campaign.resume.decision">Next decision</dt>
+              <dd data-decision>{{ decisionText(card.pendingDecision) }}</dd>
+            </dl>
+            @if (card.awaitingNarrationTotal > 0) {
+              <h4 i18n="@@campaign.resume.awaiting">Saved actions awaiting narration</h4>
+              <ul class="awaiting-list">
+                @for (entry of card.awaitingNarration; track entry.operationId) {
+                  <li [attr.data-awaiting-id]="entry.operationId">
+                    <p><strong>{{ command(entry.commandType) }}</strong> · {{ awaitingText(entry) }}</p>
+                    @if (lines(entry.receipt); as receipt) {
+                      <ul class="receipt" [attr.aria-label]="receiptLabel">
+                        @for (line of receipt; track $index) { <li>{{ line }}</li> }
+                      </ul>
+                    }
+                  </li>
+                }
+              </ul>
+            }
+            <p class="muted" i18n="@@campaign.resume.readOnly">This summary is read from the last saved state; reading it does not advance time.</p>
+          </section>
+        }
       } @else if (failure()) { <p class="notice" role="alert" data-error>{{ failure() }}</p>
       } @else { <p role="status" i18n="@@campaign.view.loading">Loading the playthrough…</p> }
 
@@ -97,6 +141,8 @@ export class CampaignPlaythrough {
   private readonly locale = inject(LOCALE_ID);
   readonly receiptLabel = $localize`:@@campaign.view.receiptLabel:Result of the action`;
   readonly view = signal<CampaignView | null>(null);
+  /** Resume card of the shown revision; null until read (or for a scope without one). */
+  readonly resume = signal<ResumeCard | null>(null);
   readonly failure = signal('');
   readonly notice = signal('');
   readonly busy = signal(false);
@@ -133,6 +179,7 @@ export class CampaignPlaythrough {
   private start(scope: CampaignScope): void {
     this.run?.abort();
     this.view.set(null);
+    this.resume.set(null);
     this.failure.set('');
     this.notice.set('');
     this.state.set('connecting');
@@ -154,7 +201,12 @@ export class CampaignPlaythrough {
     while (!signal.aborted) {
       try {
         this.busy.set(true);
-        if (!loaded) { this.view.set(await this.transport.state(scope, signal)); loaded = true; }
+        if (!loaded) {
+          // State and resume card describe the same scope; both are re-read after any newer revision.
+          this.view.set(await this.transport.state(scope, signal));
+          this.resume.set(await this.transport.resume(scope, signal));
+          loaded = true;
+        }
         if (requery) { await this.session.requery(scope, signal); requery = false; }
         const result = await this.session.poll(scope, signal, () => {
           // The first chunk of a response proves a live connection even before any message exists.
@@ -200,6 +252,14 @@ export class CampaignPlaythrough {
   narration = narrationReasonMessage;
   fallbackText = fallbackNotice;
   languageText = languageName;
+  decisionText = decisionMessage;
+  awaitingText = awaitingMessage;
+  issueText = dependencyIssueMessage;
+  locationText = locationMessage;
+  presentText = presentMessage;
+
+  /** Localized resource lines of the resume card, formatted for the compiled locale. */
+  resourceText(card: ResumeCard): string[] { return resourceMessages(card, this.locale); }
 
   /** Localized receipt sentences, or null when the operation has no committed receipt. */
   lines(receipt: Parameters<typeof receiptLines>[0] | null | undefined): string[] | null {

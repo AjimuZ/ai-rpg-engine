@@ -1,8 +1,8 @@
 /**
  * Read-only campaign transport and durable operation/stream-cursor reconciliation.
  *
- * {@link CampaignTransport} issues same-origin GETs (campaign state, one operation's status,
- * one bounded stream long poll) and validates every reply. {@link CampaignSession} keeps, per
+ * {@link CampaignTransport} issues same-origin GETs (campaign state, the resume card, one
+ * operation's status, one bounded stream long poll) and validates every reply. {@link CampaignSession} keeps, per
  * adventure+campaign scope, the last delivered stream cursor and the identities, versions and
  * statuses of the operations seen so far. The record is written through to device storage so a
  * page reload — notably the explicit EN↔IT language reload — can resume exactly where it
@@ -14,7 +14,8 @@ import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { SavedLibraryClient, LIBRARY_FETCH } from '../library/saved-library-client';
 import {
   CampaignProtocolError, CampaignView, compareCursor, Cursor, FrameDecoder, isPending, OPERATION_STATUSES,
-  OperationStatus, OperationView, parseCampaignView, parseCursor, parseOperation, PublicReceipt, StreamEvent,
+  OperationStatus, OperationView, parseCampaignView, parseCursor, parseOperation, parseResumeCard, PublicReceipt, ResumeCard,
+  StreamEvent,
 } from './campaign-protocol';
 
 /** Adventure and campaign identity; display names never address a record. */
@@ -57,6 +58,12 @@ export class CampaignTransport {
   async state(scope: CampaignScope, signal: AbortSignal): Promise<CampaignView> {
     const body = await this.json(`/api/v1/campaigns/${scope.campaignId}/state?adventureId=${scope.adventureId}`, signal);
     return parseCampaignView(body, scope.adventureId, scope.campaignId);
+  }
+
+  /** Read and validate the resume card of one scope (P09.5); reading it never advances time. */
+  async resume(scope: CampaignScope, signal: AbortSignal): Promise<ResumeCard> {
+    const body = await this.json(`/api/v1/campaigns/${scope.campaignId}/resume?adventureId=${scope.adventureId}`, signal);
+    return parseResumeCard(body, scope.adventureId, scope.campaignId);
   }
 
   /** Read one operation's current status by identity; the safe query after a reload or a lost reply. */

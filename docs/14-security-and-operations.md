@@ -219,6 +219,15 @@ Startup order: load configuration → verify filesystem permissions → connect 
 
 An unavailable narration runtime does not prevent local inspection of a valid saved campaign. A missing database or incompatible schema blocks mutation. Startup never silently resets a campaign.
 
+Since P09.5 the "check content dependencies" step is the memory reconciliation pass, a lifecycle
+step after every recovery callback and before HTTP: it diagnoses each campaign's pinned content
+(a missing, corrupt or rules-incompatible closure pauses that campaign's mutation, which command
+admission enforces with 409 `COMMAND_DEPENDENCIES_MISSING`), replaces unusable checkpoints from
+canonical state and retires summary work of a diverged or rolled-back history. Unlike the journal
+pass, a failure there is logged and does not abort startup, because it repairs only derived data
+and every decision is re-derived where it is used
+([docs/08 section 10](08-memory-and-continuity.md#p095-restart-reconciliation-missing-dependencies-and-the-resume-card)).
+
 For the packaged profile, the backend closes owned turns/connections and Compose stops only that installation's services with an appropriate grace period. Direct child-process termination applies only to the local stdio probe/development profile. Stop and restart preserve persistent volumes; destructive reset and independent backup/restore remain separate owner operations.
 
 Shutdown: reject new mutation requests → stop admitting background jobs → request cancellation of live AI tasks → reconcile receipts → persist final operation states → stop or flush bounded jobs → close owned runtime input and wait → terminate only owned child processes if necessary → stop HTTP and close database pools. Closing a browser tab does not necessarily stop the backend. The UI must explain actual application status.

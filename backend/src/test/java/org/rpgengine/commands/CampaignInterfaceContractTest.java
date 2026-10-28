@@ -48,14 +48,15 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>Scenario, in phases the consumer advances explicitly:
  * <ol>
  *   <li>{@code first-load}: the English page bootstraps a session, reads the adventure, its
- *       playthrough list and the state (an Italian starting situation, because the campaign's
- *       narrative language is Italian), then opens the stream at its head and polls once
- *       without news.</li>
+ *       playthrough list, the state (an Italian starting situation, because the campaign's
+ *       narrative language is Italian) and the resume card (P09.5), then opens the stream at its
+ *       head and polls once without news.</li>
  *   <li>{@code actions}: another client (this fixture) moves the character; the background
  *       presentation worker settles narration as pending, and a second command is admitted
  *       but deliberately left unexecuted, so an operation is in flight at reload time.</li>
- *   <li>{@code before-reload}: the page receives the six stream messages, re-reads the state at
- *       the new revision and polls again without news.</li>
+ *   <li>{@code before-reload}: the page receives the six stream messages, re-reads the state and
+ *       the resume card (now listing the move whose narration is pending) at the new revision and
+ *       polls again without news.</li>
  *   <li>{@code during-reload}: the fixture cancels the in-flight operation while the page is
  *       reloading into the other language.</li>
  *   <li>{@code after-reload}: the reloaded page re-queries both operations by identity, resumes
@@ -164,6 +165,9 @@ class CampaignInterfaceContractTest {
         assertEquals(0, initial.get("scope").get("stateRevision").asLong());
         assertEquals("it", initial.get("startingSituation").get("locale").asText());
         assertFalse(initial.get("startingSituation").get("fallback").asBoolean());
+        JsonNode card = json.readTree(page("first-load", base + "/resume" + scope).body());
+        assertEquals("STARTING_SITUATION", card.get("pendingDecision").asText());
+        assertEquals("it", card.get("location").get("nameLocale").asText());
         assertEquals(List.of("stream.ready|0:0"), frames(page("first-load", stream).body()));
         assertEquals(List.of(), frames(page("first-load", stream + "&after=0%3A0").body()));
 
@@ -189,6 +193,9 @@ class CampaignInterfaceContractTest {
         JsonNode advanced = json.readTree(page("before-reload", base + "/state" + scope).body());
         assertEquals(1, advanced.get("scope").get("stateRevision").asLong());
         assertTrue(advanced.get("startingSituation").isNull());
+        JsonNode owed = json.readTree(page("before-reload", base + "/resume" + scope).body());
+        assertEquals(1, owed.get("awaitingNarrationTotal").asInt());
+        assertEquals("RECEIPT", owed.get("awaitingNarration").get(0).get("narration").get("mode").asText());
         assertEquals(List.of(), frames(page("before-reload", stream + "&after=0%3A6").body()));
 
         var cancelled = record("during-reload", "fixture", "POST", base + "/operations/" + wait + "/cancel" + scope, "{}");
@@ -196,6 +203,7 @@ class CampaignInterfaceContractTest {
 
         page("after-reload", "/api/v1/campaigns?adventureId=" + adventure + "&limit=50");
         page("after-reload", base + "/state" + scope);
+        page("after-reload", base + "/resume" + scope);
         assertEquals("CANCELLED", json.readTree(page("after-reload", base + "/operations/" + wait + scope).body())
                 .get("status").asText());
         JsonNode settled = json.readTree(page("after-reload", base + "/operations/" + move + scope).body());

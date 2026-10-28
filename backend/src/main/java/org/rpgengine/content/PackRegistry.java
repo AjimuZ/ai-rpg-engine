@@ -235,35 +235,169 @@ public class PackRegistry {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("campaign content loading requires a transaction");
         }
-        var closure = new CampaignClosure(adventureId);
+        var closure = new CampaignClosure(adventureId, null);
         CompiledPack root = closure.load(revisionId, 0);
         return new CampaignPackSnapshot(root, closure.packs);
     }
 
     /**
-     * Load one sealed revision under the caller's authorized transaction. Reparse and recompile
-     * its exact bytes; missing rows, incompatible rulesets or mismatched hashes fail closed.
+     * Diagnose whether this engine build can load a campaign's pinned closure (P09.5, docs/08
+     * section 10: "if content or ruleset dependencies are missing, pause mutation and offer
+     * restore/import diagnostics; do not substitute another pack").
+     *
+     * <p>The traversal is exactly {@link #loadForCampaign}'s, in its own read-only transaction, with
+     * one difference: a missing pinned dependency is recorded and skipped, and the packs that depend
+     * on it are not compiled (they could not be), so every missing dependency of the reachable
+     * closure is listed at once. Any other failure (an unavailable
+     * ruleset, bytes that no longer reproduce the pinned hash, a bound, cycle, version conflict or
+     * compile error) is recorded and ends the traversal. Nothing is cached here and nothing is written.
+     * The caller must authorize the scope first; the result names only fixed codes and pack
+     * coordinates.
+     *
+     * @param adventureId adventure that owns the campaign
+     * @param revisionId the campaign's frozen pinned root revision
+     * @return {@code AVAILABLE}, {@code UNSEALED} for a legacy root without a stored inventory, or
+     *         {@code MISSING} with its issues
+     * @throws IllegalStateException inside an ambient transaction
+     * @throws org.springframework.dao.DataAccessException for storage failures, which are never
+     *         reported as missing content
      */
-    private CompiledPack loadRevision(UUID adventureId, UUID revisionId) {
-        var hashes = jdbc.query("select c.content_hash, c.ruleset_hash from content_revision c "
+    public ClosureDiagnosis diagnose(UUID adventureId, UUID revisionId) {
+        Objects.requireNonNull(adventureId, "adventureId");
+        Objects.requireNonNull(revisionId, "revisionId");
+        requireNoTransaction();
+        return reads.execute(status -> {
+            jdbc.execute("set local statement_timeout = '30s'");
+            var root = jdbc.query("select c.pack_id, c.pack_version, exists(select 1 from content_revision_report r "
+                    + "where r.content_revision_id = c.id) from content_revision c where c.adventure_id = ? and c.id = ?",
+                    (row, index) -> new Object[] {row.getString(1), row.getString(2), row.getBoolean(3)},
+                    adventureId, revisionId);
+            if (root.isEmpty()) {
+                return new ClosureDiagnosis(ClosureDiagnosis.Status.MISSING,
+                        List.of(new ClosureDiagnosis.Issue(ClosureDiagnosis.Code.REVISION_MISSING, null, null)));
+            }
+            if (!(boolean) root.getFirst()[2]) {
+                return ClosureDiagnosis.UNSEALED;
+            }
+            var issues = new ArrayList<ClosureDiagnosis.Issue>();
+            var closure = new CampaignClosure(adventureId, issues);
+            try {
+                closure.load(revisionId, 0);
+            } catch (org.springframework.dao.DataAccessException | org.springframework.transaction.TransactionException
+                    storage) {
+                throw storage;
+            } catch (RuntimeException failure) {
+                issues.add(failure instanceof Classified classified ? classified.issue()
+                        : new ClosureDiagnosis.Issue(ClosureDiagnosis.Code.CLOSURE_INVALID,
+                                coordinate(closure.attempted, 0), coordinate(closure.attempted, 1)));
+            }
+            return issues.isEmpty() ? ClosureDiagnosis.AVAILABLE
+                    : new ClosureDiagnosis(ClosureDiagnosis.Status.MISSING, issues);
+        });
+    }
+
+    /** @return pack ID (0) or version (1) of a revision, or null when unknown */
+    private String coordinate(UUID revisionId, int column) {
+        if (revisionId == null) {
+            return null;
+        }
+        return jdbc.query("select pack_id, pack_version from content_revision where id = ?",
+                (row, index) -> row.getString(column + 1), revisionId).stream().findFirst().orElse(null);
+    }
+
+    /**
+     * Read and verify one sealed revision under the caller's authorized transaction: the pinned
+     * ruleset must be this build's and the stored bytes must reparse to the pinned content hash.
+     * Compilation is a separate step ({@link #compile}), taken after the revision's dependencies,
+     * which its definitions resolve against. The ruleset and hash failures are {@link Classified}
+     * subtypes of the exception types callers already handle, so {@link #diagnose} can name them
+     * without parsing messages.
+     */
+    private ParsedPack verifyRevision(UUID adventureId, UUID revisionId) {
+        var hashes = jdbc.query("select c.content_hash, c.ruleset_hash, c.pack_id, c.pack_version from content_revision c "
                 + "join content_revision_report r on r.content_revision_id = c.id "
                 + "where c.adventure_id = ? and c.id = ?",
-                (row, index) -> Map.entry(row.getString(1), row.getString(2)), adventureId, revisionId);
+                (row, index) -> new String[] {row.getString(1), row.getString(2), row.getString(3), row.getString(4)},
+                adventureId, revisionId);
         if (hashes.isEmpty()) {
             throw new IllegalArgumentException("sealed content revision is unavailable in this adventure");
         }
-        if (!contract.rulesetHash().equals(hashes.getFirst().getValue())) {
-            throw new IllegalArgumentException("pinned ruleset is unavailable in this engine build");
+        String[] pinned = hashes.getFirst();
+        if (!contract.rulesetHash().equals(pinned[1])) {
+            throw new UnavailableRevision("pinned ruleset is unavailable in this engine build",
+                    new ClosureDiagnosis.Issue(ClosureDiagnosis.Code.RULESET_UNAVAILABLE, pinned[2], pinned[3]));
         }
         Map<String, byte[]> files = new TreeMap<>();
         jdbc.query("select path, content from content_revision_file where content_revision_id = ? order by path",
                 (org.springframework.jdbc.core.RowCallbackHandler) row ->
                         files.put(row.getString(1), row.getBytes(2)), revisionId);
-        ParsedPack parsed = new PackParser().parse(files);
-        if (!parsed.contentHash().equals(hashes.getFirst().getKey())) {
-            throw new IllegalStateException("stored pack files do not match the pinned content hash");
+        ParsedPack parsed;
+        try {
+            parsed = new PackParser().parse(files);
+        } catch (PackException unreadable) {
+            // Intact sealed bytes that this build's parser refuses are an engine incompatibility
+            // (unclassified, so a closure-invalid diagnosis); bytes that changed are corruption.
+            // Both stay argument errors, as parse failures always were.
+            if (PackHashes.calculate(files).contentHash().equals(pinned[0])) {
+                throw unreadable;
+            }
+            throw new UnavailableRevision("stored pack files do not match the pinned content hash",
+                    new ClosureDiagnosis.Issue(ClosureDiagnosis.Code.CONTENT_CORRUPT, pinned[2], pinned[3]));
         }
+        if (!parsed.contentHash().equals(pinned[0])) {
+            throw new CorruptRevision("stored pack files do not match the pinned content hash",
+                    new ClosureDiagnosis.Issue(ClosureDiagnosis.Code.CONTENT_CORRUPT, pinned[2], pinned[3]));
+        }
+        return parsed;
+    }
+
+    /** Compile a verified revision against the sealed packs of its adventure. */
+    private CompiledPack compile(UUID adventureId, ParsedPack parsed) {
         return new PackCompiler(new Catalog(adventureId), contract).compile(parsed);
+    }
+
+    /** @return the parser-validated pinned dependency objects of a manifest; none when absent */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> dependencies(ParsedPack parsed) {
+        return (List<Map<String, Object>>) parsed.manifest().values().getOrDefault("dependencies", List.of());
+    }
+
+    /** A load failure that already knows its diagnosis. */
+    private interface Classified {
+        /** @return the classified issue */
+        ClosureDiagnosis.Issue issue();
+    }
+
+    /** An unusable pinned revision; an {@link IllegalArgumentException} like every other unavailable-content failure. */
+    private static final class UnavailableRevision extends IllegalArgumentException implements Classified {
+        private static final long serialVersionUID = 1L;
+        private final transient ClosureDiagnosis.Issue issue;
+
+        UnavailableRevision(String message, ClosureDiagnosis.Issue issue) {
+            super(message);
+            this.issue = issue;
+        }
+
+        @Override
+        public ClosureDiagnosis.Issue issue() {
+            return issue;
+        }
+    }
+
+    /** Stored bytes that no longer reproduce the pinned hash; an {@link IllegalStateException} as before P09.5. */
+    private static final class CorruptRevision extends IllegalStateException implements Classified {
+        private static final long serialVersionUID = 1L;
+        private final transient ClosureDiagnosis.Issue issue;
+
+        CorruptRevision(String message, ClosureDiagnosis.Issue issue) {
+            super(message);
+            this.issue = issue;
+        }
+
+        @Override
+        public ClosureDiagnosis.Issue issue() {
+            return issue;
+        }
     }
 
     /**
@@ -278,19 +412,32 @@ public class PackRegistry {
         private final Map<UUID, CompiledPack> loaded = new LinkedHashMap<>();
         private final Map<UUID, Integer> heights = new LinkedHashMap<>();
         private final java.util.Set<UUID> visiting = new java.util.HashSet<>();
+        /** Diagnosis mode when non-null: missing dependencies are recorded here and skipped. */
+        private final List<ClosureDiagnosis.Issue> missing;
+        /** Revision whose load step is running; names the culprit of an unclassified failure. */
+        private UUID attempted;
         private long bytes;
 
-        /** Initialize an empty traversal scoped to an already authorized adventure. */
-        CampaignClosure(UUID adventureId) {
+        /**
+         * Initialize an empty traversal scoped to an already authorized adventure.
+         *
+         * @param missing null to fail on the first missing dependency, or the diagnosis list
+         */
+        CampaignClosure(UUID adventureId, List<ClosureDiagnosis.Issue> missing) {
             this.adventureId = adventureId;
+            this.missing = missing;
         }
 
         /**
-         * Verify a revision and its transitive dependencies once. Reject cycles, ambiguous pack
-         * versions, more than 32 revisions, depth above 16 or over 250 MiB before parsing more
-         * bytes. These aggregate limits prevent many individually bounded packs exhausting memory.
+         * Verify a revision and its transitive dependencies once, then compile it. Reject cycles,
+         * ambiguous pack versions, more than 32 revisions, depth above 16 or over 250 MiB before
+         * parsing more bytes. These aggregate limits prevent many individually bounded packs
+         * exhausting memory.
+         *
+         * @return the compiled pack; null only in diagnosis mode, when a dependency below it is missing
          */
         CompiledPack load(UUID revisionId, int depth) {
+            attempted = revisionId;
             if (depth + heights.getOrDefault(revisionId, 0) > 16) {
                 throw new IllegalArgumentException("campaign dependency depth limit exceeded");
             }
@@ -308,31 +455,48 @@ public class PackRegistry {
             if (bytes > 250L * 1024 * 1024) {
                 throw new IllegalArgumentException("campaign dependency byte limit exceeded");
             }
-            CompiledPack pack = loadRevision(adventureId, revisionId);
-            String packId = pack.parsed().manifest().id();
-            CompiledPack previous = packs.putIfAbsent(packId, pack);
-            if (previous != null) {
-                throw new IllegalArgumentException("campaign dependency has conflicting versions: " + packId);
-            }
+            ParsedPack parsed = verifyRevision(adventureId, revisionId);
+            String packId = parsed.manifest().id();
             int height = 0;
-            for (var dependency : CampaignPackSnapshot.dependencies(pack)) {
+            boolean complete = true;
+            for (var dependency : dependencies(parsed)) {
                 var revisions = jdbc.query("select c.id from content_revision c "
                         + "join content_revision_report r on r.content_revision_id = c.id "
                         + "where c.adventure_id = ? and c.pack_id = ? and c.pack_version = ? and c.content_hash = ?",
                         (row, index) -> row.getObject(1, UUID.class), adventureId, dependency.get("id"),
                         dependency.get("version"), dependency.get("hash"));
                 if (revisions.isEmpty()) {
-                    throw new IllegalArgumentException("pinned sealed dependency is unavailable in this adventure");
+                    var absent = new ClosureDiagnosis.Issue(ClosureDiagnosis.Code.DEPENDENCY_MISSING,
+                            String.valueOf(dependency.get("id")), String.valueOf(dependency.get("version")));
+                    if (missing == null) {
+                        throw new UnavailableRevision("pinned sealed dependency is unavailable in this adventure", absent);
+                    }
+                    // Diagnosis lists every missing dependency; the skipped subtree contributes nothing else.
+                    missing.add(absent);
+                    complete = false;
+                    continue;
                 }
                 UUID child = revisions.getFirst();
-                load(child, depth + 1);
+                complete &= load(child, depth + 1) != null;
+                attempted = revisionId;
                 // A shared subtree loaded earlier at a shallower depth must not let a longer
                 // diamond path evade the depth cap when its bytes are reused from this cache.
                 height = Math.max(height, 1 + heights.get(child));
             }
             visiting.remove(revisionId);
-            loaded.put(revisionId, pack);
             heights.put(revisionId, height);
+            if (!complete) {
+                // Diagnosis only: a pack whose dependencies are missing cannot compile, and its
+                // missing dependencies are already recorded.
+                return null;
+            }
+            // Compiled after its dependencies, whose exports its definitions resolve against.
+            CompiledPack pack = compile(adventureId, parsed);
+            CompiledPack previous = packs.putIfAbsent(packId, pack);
+            if (previous != null) {
+                throw new IllegalArgumentException("campaign dependency has conflicting versions: " + packId);
+            }
+            loaded.put(revisionId, pack);
             return pack;
         }
     }

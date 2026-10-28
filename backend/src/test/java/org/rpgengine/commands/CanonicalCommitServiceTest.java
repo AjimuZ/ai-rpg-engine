@@ -451,8 +451,16 @@ class CanonicalCommitServiceTest {
         // The P07.3 rule-fact loader is itself local: sealed pack rows, a read transaction and a bounded cache.
         for (var field : CommandRuleCatalogs.class.getDeclaredFields()) {
             assertTrue(Set.of(JdbcTemplate.class, org.rpgengine.content.PackRegistry.class, TransactionTemplate.class,
-                            java.util.Map.class, int.class, java.util.Set.class).contains(field.getType()),
+                            java.util.Map.class, int.class, java.util.Set.class,
+                            org.rpgengine.content.CampaignDependencies.class).contains(field.getType()),
                     "Review rule-catalog dependency: " + field);
+        }
+        // P09.5: the classifier of failed loads is local as well: the registry's read-only diagnosis,
+        // JDBC and a bounded cache of available revisions.
+        for (var field : org.rpgengine.content.CampaignDependencies.class.getDeclaredFields()) {
+            assertTrue(Set.of(JdbcTemplate.class, org.rpgengine.content.PackRegistry.class, java.util.Map.class,
+                            int.class).contains(field.getType()),
+                    "Review dependency-classifier dependency: " + field);
         }
     }
 

@@ -22,9 +22,10 @@ import tools.jackson.databind.json.JsonMapper;
  *       state and draws.</li>
  * </ul>
  * Other actors' values, causal participants, request identities and unknown detail fields
- * are never copied, so a new internal field cannot leak by default.
+ * are never copied, so a new internal field cannot leak by default. Public since P09.5, because
+ * the resume card shows the receipts of committed actions still awaiting narration.
  */
-final class CommandReceipts {
+public final class CommandReceipts {
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     /** Static projection only. */
@@ -37,7 +38,7 @@ final class CommandReceipts {
      * @return detached ordered map of allowlisted values
      * @throws IllegalArgumentException if the stored text is not JSON
      */
-    static Map<String, Object> project(String stored) {
+    public static Map<String, Object> project(String stored) {
         JsonNode root = JSON.readTree(stored);
         var view = new LinkedHashMap<String, Object>();
         view.put("stateRevision", root.path("stateRevision").asLong());

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { routes } from '../app.routes';
 import { LIBRARY_FETCH } from '../library/saved-library-client';
 import { STORY_DRAFT_STORAGE } from '../preview/story-input-state';
-import { ADVENTURE, CAMPAIGN, CampaignServer, MemoryStore, OP1, operation, state, syncProvider } from './fixtures';
+import { ADVENTURE, CAMPAIGN, CampaignServer, MemoryStore, OP1, operation, resumeCard, state, syncProvider } from './fixtures';
 
 /** Wait until the routed screen satisfies a predicate. */
 async function settle(harness: RouterTestingHarness, ready: () => boolean): Promise<void> {
@@ -76,6 +76,30 @@ describe('Campaign playthrough view', /** Register integrated screen checks agai
     (root.querySelector('.campaign-playthrough button:not([data-send])') as HTMLButtonElement).click();
     await settle(harness, () => (root.querySelector('[data-error]')?.textContent ?? '').includes('The world has changed'));
     expect(root.textContent).not.toContain('COMMAND_STALE_REVISION');
+  });
+
+  it('shows the resume card with the pause notice and saved actions awaiting narration', /** P09.5: read-only, localized recap. */ async () => {
+    server.resumeBody = resumeCard({ paused: true, awaiting: true });
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl(`/saved/${ADVENTURE}?playthrough=${CAMPAIGN}`);
+    const root = harness.routeNativeElement as HTMLElement;
+    await settle(harness, () => root.querySelector('[data-resume]') !== null);
+    const card = root.querySelector('[data-resume]')!;
+    expect(card.querySelector('[data-location]')!.textContent).toContain('Lantern Shelter');
+    expect(card.querySelector('[data-location]')!.getAttribute('lang')).toBe('en');
+    expect(card.querySelector('[data-present]')!.textContent).toContain('Warden');
+    expect(card.querySelector('[data-resources]')!.textContent).toContain('vigor 11,000 of 12,000');
+    expect(card.querySelector('[data-decision]')!.textContent).toContain('Say or do what you want next.');
+    const paused = card.querySelector('[data-paused]')!;
+    expect(paused.getAttribute('role')).toBe('alert');
+    expect(paused.textContent).toContain('sample:lanterns 1.0.0 is not installed in this adventure.');
+    const owed = card.querySelector(`[data-awaiting-id="${OP1}"]`)!;
+    expect(owed.textContent).toContain('Narration is not available yet.');
+    expect(owed.textContent).toContain('Saved as world revision 2.');
+    expect(card.textContent).not.toContain('DEPENDENCY_MISSING');
+    // Reading the card only issued GETs: nothing was submitted.
+    expect(server.calls.some((url) => url.includes('/resume?'))).toBe(true);
+    expect(server.calls.some((url) => url.includes('/commands'))).toBe(false);
   });
 
   it('shows a safe generic explanation for an unknown server code', /** Unknown text is never displayed. */ async () => {

@@ -39,7 +39,9 @@ import tools.jackson.databind.json.JsonMapper;
  * <p><b>Freshness</b> ({@link #freshness}, {@link #usableWithin}) is computed, never stored:
  * <ul>
  *   <li>{@code STALE} when the campaign's recovery generation changed (restore), the output locale
- *       or its locale or glossary revision changed, a supplied knowledge record changed since
+ *       or its locale or glossary revision changed, the campaign is behind the summary's source
+ *       revision or event high-water mark (rolled back without a generation change, P09.5), a
+ *       supplied knowledge record changed or vanished since
  *       (belief or claim supersession, truth determination, commitment resolution: each steps
  *       the record's row version), or a later {@code memory_invalidation} names one of its
  *       events, sources or entities, or the whole campaign. A stale summary is never assembled
@@ -169,9 +171,12 @@ public class MemorySummaries {
             if (!force && operations.size() < settings.interval() && !scene) {
                 return new Request(Request.Outcome.NOT_DUE, null, from, to);
             }
+            // A range cancelled because its events were rolled back was never attempted, so events
+            // that later reuse those sequences may be summarized.
             Integer failed = jdbc.queryForObject("select count(*) from memory_summary_job where campaign_id = ? "
                     + "and campaign_generation = ? and audience = ? and range_from = ? and range_to = ? "
-                    + "and status in ('FAILED', 'CANCELLED')", Integer.class, campaign, generation, wire, from, to);
+                    + "and status in ('FAILED', 'CANCELLED') and failure_code <> 'RANGE_UNAVAILABLE'", Integer.class,
+                    campaign, generation, wire, from, to);
             if (failed != null && failed > 0) {
                 return new Request(Request.Outcome.GAVE_UP, null, from, to);
             }
@@ -192,10 +197,13 @@ public class MemorySummaries {
 
     /**
      * Retire what can no longer run: queued jobs past their window fail {@code EXPIRED}, queued jobs
-     * of a retired recovery generation are {@code CANCELLED} ({@code GENERATION_RETIRED}), and a
-     * running job whose lease expired is queued again with a fresh fence when attempts and window
-     * remain, otherwise failed {@code LEASE_EXPIRED}. Re-running a summary attempt is always safe:
-     * it writes only derived rows, idempotently per job.
+     * of a retired recovery generation are {@code CANCELLED} ({@code GENERATION_RETIRED}), queued
+     * jobs whose range ends beyond the campaign's newest event are {@code CANCELLED}
+     * ({@code RANGE_UNAVAILABLE}, P09.5: the events were rolled back), and a running job whose lease
+     * expired is queued again with a fresh fence when attempts and window remain, otherwise failed
+     * {@code LEASE_EXPIRED}. Re-running a summary attempt is always safe: it writes only derived
+     * rows, idempotently per job. Runs whether or not summaries are enabled, so startup
+     * reconciliation leaves no job of a retired history waiting for a later re-enable.
      *
      * @return number of jobs changed
      */
@@ -207,6 +215,9 @@ public class MemorySummaries {
             changed += jdbc.update("update memory_summary_job j set status = 'CANCELLED', failure_code = "
                     + "'GENERATION_RETIRED', updated_at = ?, row_version = j.row_version + 1 from campaign c where "
                     + "c.id = j.campaign_id and j.status = 'QUEUED' and j.campaign_generation <> c.recovery_generation", now);
+            changed += jdbc.update("update memory_summary_job j set status = 'CANCELLED', failure_code = "
+                    + "'RANGE_UNAVAILABLE', updated_at = ?, row_version = j.row_version + 1 from campaign c where "
+                    + "c.id = j.campaign_id and j.status = 'QUEUED' and j.range_to > c.event_sequence", now);
             changed += jdbc.update("update memory_summary_job set status = case when attempt_count < max_attempts and "
                     + "expires_at > ? then 'QUEUED' else 'FAILED' end, failure_code = 'LEASE_EXPIRED', lease_holder = null, "
                     + "lease_expires_at = null, fence = fence + 1, due_at = case when attempt_count < max_attempts and "
@@ -445,11 +456,12 @@ public class MemorySummaries {
     static Freshness evaluate(JdbcTemplate jdbc, UUID summary) {
         var rows = jdbc.query("select m.campaign_id, m.campaign_generation <> c.recovery_generation, m.locale <> "
                 + "coalesce(p.narrative_locale, w.source_locale) or m.locale_revision <> coalesce(p.locale_revision, 0), "
-                + "m.glossary_revision <> coalesce(p.glossary_revision, 0), m.covered_to from memory_summary m join campaign c "
+                + "m.glossary_revision <> coalesce(p.glossary_revision, 0), m.covered_to, m.source_revision > "
+                + "c.state_revision or m.event_high_water > c.event_sequence from memory_summary m join campaign c "
                 + "on c.id = m.campaign_id join adventure_workspace w on w.id = c.adventure_id left join "
                 + "presentation_campaign_settings p on p.campaign_id = c.id where m.id = ?", (row, index) -> new Object[] {
                         row.getObject(1, UUID.class), row.getBoolean(2), row.getBoolean(3), row.getBoolean(4),
-                        row.getLong(5)}, summary);
+                        row.getLong(5), row.getBoolean(6)}, summary);
         if (rows.isEmpty()) {
             throw new IllegalArgumentException("unknown summary");
         }
@@ -463,6 +475,12 @@ public class MemorySummaries {
         }
         if ((boolean) row[3]) {
             reasons.add("glossary");
+        }
+        // P09.5: the campaign no longer has the revision or the events the summary was built from
+        // (state rolled back without a generation change), so its covered events and sources may
+        // be gone or describe another history.
+        if ((boolean) row[5]) {
+            reasons.add("rolled-back");
         }
         // A supplied record whose row version moved (or that vanished) was superseded, determined or resolved.
         jdbc.queryForList("select s ->> 'ref' from memory_summary m cross join jsonb_array_elements(m.sources) s "
@@ -628,7 +646,7 @@ public class MemorySummaries {
      *
      * @param status CURRENT, BEHIND or STALE
      * @param reasons why it is stale ({@code generation}, {@code locale}, {@code glossary},
-     *        {@code source:<ref>}, {@code invalidated:<reason>}); empty unless stale
+     *        {@code rolled-back}, {@code source:<ref>}, {@code invalidated:<reason>}); empty unless stale
      * @param uncoveredEvents newer public events, counted up to 1,000
      */
     public record Freshness(Status status, List<String> reasons, int uncoveredEvents) {

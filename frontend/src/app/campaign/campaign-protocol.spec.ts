@@ -2,8 +2,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   CampaignProtocolError, compareCursor, FrameDecoder, isPending, MAX_FRAME_CHARS, parseCampaignView, parseCursor, parseOperation, parseReceipt,
+  parseResumeCard,
 } from './campaign-protocol';
-import { ADVENTURE, CAMPAIGN, frame, OP1, OP2, operation, OTHER_CAMPAIGN, receipt, state } from './fixtures';
+import { ADVENTURE, CAMPAIGN, frame, OP1, OP2, operation, OTHER_CAMPAIGN, receipt, resumeCard, state } from './fixtures';
 
 describe('Campaign protocol', /** Register validators that guard every rendered server value. */ () => {
   it('parses only canonical cursors and orders within a generation', /** Alternate spellings could bypass duplicate detection. */ () => {
@@ -48,6 +49,23 @@ describe('Campaign protocol', /** Register validators that guard every rendered 
     expect(() => new FrameDecoder(CAMPAIGN).push('x'.repeat(MAX_FRAME_CHARS + 1))).toThrow();
     // Narration reasons are an allowlist too.
     expect(() => new FrameDecoder(CAMPAIGN).push(frame('0:3', 'narrative.pending', { operationId: OP2, commandType: 'WAIT', status: 'COMMITTED_NARRATION_PENDING', operationVersion: 4, reason: '<b>x</b>' }))).toThrow();
+  });
+
+  it('validates the resume card against its scope and closed vocabularies', /** P09.5: unknown codes never render. */ () => {
+    const card = parseResumeCard(resumeCard({ paused: true, awaiting: true }), ADVENTURE, CAMPAIGN);
+    expect(card.mutationPaused).toBe(true);
+    expect(card.issues).toEqual([{ code: 'DEPENDENCY_MISSING', packId: 'sample:lanterns', packVersion: '1.0.0' }]);
+    expect(card.awaitingNarration[0]).toMatchObject({ operationId: OP1, mode: 'RECEIPT', reason: 'NARRATION_UNAVAILABLE', retriesRemaining: 3 });
+    expect(card.awaitingNarration[0].receipt?.stateRevision).toBe(2);
+    expect(card.location).toEqual({ id: 'trailhead', name: 'Lantern Shelter', nameLocale: 'en', nameFallback: false });
+    expect(parseResumeCard({ ...resumeCard(), location: null }, ADVENTURE, CAMPAIGN).location).toBeNull();
+    expect(() => parseResumeCard(resumeCard(), ADVENTURE, OTHER_CAMPAIGN)).toThrow(CampaignProtocolError);
+    expect(() => parseResumeCard(resumeCard({ decision: 'ANYTHING' }), ADVENTURE, CAMPAIGN)).toThrow();
+    const unknownIssue = resumeCard({ paused: true });
+    (unknownIssue.dependencies.issues as unknown[]) = [{ code: '<b>x</b>', packId: null, packVersion: null }];
+    expect(() => parseResumeCard(unknownIssue, ADVENTURE, CAMPAIGN)).toThrow();
+    expect(() => parseResumeCard({ ...resumeCard({ awaiting: true }), awaitingNarrationTotal: 0 }, ADVENTURE, CAMPAIGN)).toThrow();
+    expect(() => parseResumeCard({ ...resumeCard(), resources: [{ key: 'vigor', minimum: 0, current: 1.5, maximum: 2 }] }, ADVENTURE, CAMPAIGN)).toThrow();
   });
 
   it('binds the campaign view to the routed scope and reads the fallback flag', /** A foreign scope must not populate this screen. */ () => {

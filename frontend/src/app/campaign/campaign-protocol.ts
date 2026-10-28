@@ -1,7 +1,8 @@
 /**
  * Validators and value types for the browser side of the campaign operation protocol
  * (docs/13 sections 3–4, docs/29 section 6): operation bodies, public receipts, stream
- * frames, stream cursors and the campaign-state fields the interface renders.
+ * frames, stream cursors, the campaign-state fields the interface renders and, since P09.5,
+ * the resume card (docs/08 section 10).
  *
  * Every parser fails closed with {@link CampaignProtocolError}: a payload that is malformed,
  * oversized, foreign or carries an unknown enumeration never reaches a screen as partial
@@ -360,4 +361,118 @@ export function parseCampaignView(value: unknown, adventureId: string, campaignI
     startingSituation = { text: text as string, locale: locale as 'en' | 'it', fallback: flag(row, 'fallback') };
   }
   return { adventureId, campaignId, title: title as string, stateRevision: count(scope, 'stateRevision'), startingSituation };
+}
+
+/** Pending decision kinds of the resume card; the stored decision payload is never published. */
+export const DECISION_KINDS = ['STARTING_SITUATION', 'FREE_INPUT', 'OTHER'] as const;
+export type DecisionKind = (typeof DECISION_KINDS)[number];
+/** Pinned-content diagnosis statuses and issue codes (docs/08 section 10). */
+export const DEPENDENCY_STATUSES = ['AVAILABLE', 'UNSEALED', 'MISSING'] as const;
+export const DEPENDENCY_CODES = ['REVISION_MISSING', 'RULESET_UNAVAILABLE', 'CONTENT_CORRUPT', 'DEPENDENCY_MISSING', 'CLOSURE_INVALID'] as const;
+export type DependencyCode = (typeof DEPENDENCY_CODES)[number];
+/** Most entries the server lists per resume-card collection; larger lists are refused as invalid. */
+const MAX_CARD_ROWS = 1000;
+/** Most actions awaiting narration the server lists; the total is reported separately. */
+const MAX_AWAITING = 16;
+
+/** One missing or unusable pinned pack, named by its public coordinates. */
+export interface DependencyIssue { readonly code: DependencyCode; readonly packId: string | null; readonly packVersion: string | null }
+
+/** Presentation of a committed action whose narration is not published yet. */
+export interface AwaitingNarration {
+  readonly operationId: string;
+  readonly commandType: string;
+  readonly status: OperationStatus;
+  readonly committedRevision: number;
+  readonly receipt: PublicReceipt | null;
+  /** IN_PROGRESS resumes by itself; RECEIPT means the saved receipt is the presentation. */
+  readonly mode: 'IN_PROGRESS' | 'RECEIPT';
+  readonly reason: string | null;
+  readonly retriesRemaining: number;
+}
+
+/**
+ * The short factual resume card of a playthrough (docs/08 section 10, docs/13): where play stands
+ * at one committed revision. Reading it never advances time; the interface only displays it.
+ */
+export interface ResumeCard {
+  readonly stateRevision: number;
+  readonly location: { readonly id: string; readonly name: string | null; readonly nameLocale: 'en' | 'it' | null; readonly nameFallback: boolean } | null;
+  readonly presentActors: readonly { readonly actorId: string; readonly name: string }[];
+  readonly resources: readonly { readonly key: string; readonly minimum: number; readonly current: number; readonly maximum: number }[];
+  readonly pendingDecision: DecisionKind;
+  readonly awaitingNarrationTotal: number;
+  readonly awaitingNarration: readonly AwaitingNarration[];
+  readonly dependencyStatus: (typeof DEPENDENCY_STATUSES)[number];
+  readonly mutationPaused: boolean;
+  readonly issues: readonly DependencyIssue[];
+}
+
+/** Read one value of a closed enumeration. */
+function choice<T extends string>(source: Record<string, unknown>, field: string, allowed: readonly T[]): T {
+  const value = source[field];
+  return allowed.includes(value as T) ? value as T : invalid(field);
+}
+
+/** Read a nullable bounded token. */
+function optionalToken(source: Record<string, unknown>, field: string, max = 120): string | null {
+  return source[field] === null || source[field] === undefined ? null : token(source, field, max);
+}
+
+/**
+ * Validate a resume card body against the route's scope.
+ *
+ * @param value decoded JSON body of the resume endpoint
+ * @param adventureId adventure requested by the route
+ * @param campaignId campaign requested by the route
+ * @throws CampaignProtocolError `invalid` for a foreign scope, an unknown enumeration or an oversized list
+ */
+export function parseResumeCard(value: unknown, adventureId: string, campaignId: string): ResumeCard {
+  const source = record(value, 'resume');
+  const scope = record(source['scope'], 'scope');
+  if (uuid(scope, 'adventureId') !== adventureId || uuid(scope, 'campaignId') !== campaignId) invalid('scope');
+  let location: ResumeCard['location'] = null;
+  if (source['location'] !== null && source['location'] !== undefined) {
+    const row = record(source['location'], 'location');
+    const name = optionalToken(row, 'name', 200);
+    const nameLocale = row['nameLocale'] === null || row['nameLocale'] === undefined ? null : choice(row, 'nameLocale', ['en', 'it'] as const);
+    location = { id: token(row, 'id', 200), name, nameLocale, nameFallback: flag(row, 'nameFallback') };
+  }
+  const dependencies = record(source['dependencies'], 'dependencies');
+  const total = count(source, 'awaitingNarrationTotal');
+  const awaiting = list(source, 'awaitingNarration', MAX_AWAITING).map(/** One owed narration with its recap. */ (entry) => {
+    const row = record(entry, 'awaitingNarration');
+    const narration = record(row['narration'], 'narration');
+    const reason = narration['reason'];
+    if (reason !== null && (typeof reason !== 'string' || !(NARRATION_REASONS as readonly string[]).includes(reason))) invalid('reason');
+    return {
+      operationId: uuid(row, 'operationId'), commandType: token(row, 'commandType'), status: status(row, 'status'),
+      committedRevision: count(row, 'committedRevision'),
+      receipt: row['receipt'] === null || row['receipt'] === undefined ? null : parseReceipt(row['receipt']),
+      mode: choice(narration, 'mode', ['IN_PROGRESS', 'RECEIPT'] as const), reason: reason as string | null,
+      retriesRemaining: count(narration, 'retriesRemaining'),
+    };
+  });
+  if (awaiting.length > total) invalid('awaitingNarrationTotal');
+  return {
+    stateRevision: count(scope, 'stateRevision'),
+    location,
+    presentActors: list(source, 'presentActors', MAX_CARD_ROWS).map(/** Known co-present actors by name. */ (entry) => {
+      const row = record(entry, 'presentActors');
+      return { actorId: uuid(row, 'actorId'), name: token(row, 'name', 200) };
+    }),
+    resources: list(source, 'resources', MAX_CARD_ROWS).map(/** Exact values; keys stay literal identifiers. */ (entry) => {
+      const row = record(entry, 'resources');
+      return { key: token(row, 'key'), minimum: integer(row, 'minimum'), current: integer(row, 'current'), maximum: integer(row, 'maximum') };
+    }),
+    pendingDecision: choice(source, 'pendingDecision', DECISION_KINDS),
+    awaitingNarrationTotal: total,
+    awaitingNarration: awaiting,
+    dependencyStatus: choice(dependencies, 'status', DEPENDENCY_STATUSES),
+    mutationPaused: flag(dependencies, 'mutationPaused'),
+    issues: list(dependencies, 'issues', 64).map(/** Fixed codes with public pack coordinates. */ (entry) => {
+      const row = record(entry, 'issues');
+      return { code: choice(row, 'code', DEPENDENCY_CODES), packId: optionalToken(row, 'packId', 200), packVersion: optionalToken(row, 'packVersion', 64) };
+    }),
+  };
 }

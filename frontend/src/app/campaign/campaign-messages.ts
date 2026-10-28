@@ -1,6 +1,7 @@
 /**
- * Localized wording for campaign errors, operation statuses, receipts, stream notices and
- * source-language fallback disclosure (docs/29 sections 3 and 6).
+ * Localized wording for campaign errors, operation statuses, receipts, stream notices,
+ * source-language fallback disclosure (docs/29 sections 3 and 6) and the resume card (P09.5,
+ * docs/08 section 10).
  *
  * Every sentence is a `$localize` message with a stable `campaign.*` ID and named
  * placeholders, so the English source and the reviewed Italian target are checked for exact
@@ -9,7 +10,7 @@
  * sentence. Numeric effects come from the server unchanged and are only formatted for the
  * compiled locale; identifiers such as resource keys and destinations stay literal.
  */
-import { OperationStatus, PublicReceipt, ReceiptCalculation } from './campaign-protocol';
+import { AwaitingNarration, DecisionKind, DependencyIssue, OperationStatus, PublicReceipt, ReceiptCalculation, ResumeCard } from './campaign-protocol';
 
 /** Closed set of public error codes the backend can answer for campaign reads, commands and streams. */
 const ERRORS: Readonly<Record<string, () => string>> = {
@@ -35,6 +36,7 @@ const ERRORS: Readonly<Record<string, () => string>> = {
   COMMAND_RESOURCE_INSUFFICIENT: () => $localize`:@@campaign.error.resourceInsufficient:There are not enough resources for this action.`,
   COMMAND_CONTENT_UNAVAILABLE: () => $localize`:@@campaign.error.contentUnavailable:The adventure content needed for this action is unavailable.`,
   COMMAND_EFFECT_UNSUPPORTED: () => $localize`:@@campaign.error.effectUnsupported:This kind of effect is not supported yet. Nothing was changed.`,
+  COMMAND_DEPENDENCIES_MISSING: () => $localize`:@@campaign.error.dependenciesMissing:This playthrough is paused because adventure content it depends on is missing or damaged. Nothing was changed.`,
   COMMAND_STORAGE_UNAVAILABLE: () => $localize`:@@campaign.error.storageUnavailable:Storage is unavailable right now. Check the action status before retrying.`,
   CAMPAIGN_READ_STORAGE_UNAVAILABLE: () => $localize`:@@campaign.error.storageUnavailable:Storage is unavailable right now. Check the action status before retrying.`,
   CAMPAIGN_READ_CONTENT_UNAVAILABLE: () => $localize`:@@campaign.error.contentUnavailable:The adventure content needed for this action is unavailable.`,
@@ -166,4 +168,57 @@ export function receiptLines(receipt: PublicReceipt, locale: string): string[] {
     lines.push($localize`:@@campaign.receipt.draw:Draw ${ordinal}:ordinal:: ${value}:value: on a ${sides}:sides:-sided die`);
   }
   return lines;
+}
+
+/** Return the localized description of the pending decision shown on the resume card. */
+export function decisionMessage(kind: DecisionKind): string {
+  switch (kind) {
+    case 'STARTING_SITUATION': return $localize`:@@campaign.resume.decisionStart:Decide how to begin, as described in the starting situation.`;
+    case 'FREE_INPUT': return $localize`:@@campaign.resume.decisionFree:Say or do what you want next.`;
+    default: return $localize`:@@campaign.resume.decisionOther:A decision is waiting for you.`;
+  }
+}
+
+/** Return the localized state of a saved action whose narration is owed. */
+export function awaitingMessage(entry: AwaitingNarration): string {
+  return entry.mode === 'IN_PROGRESS'
+    ? $localize`:@@campaign.resume.narrationResumes:Saved; its narration resumes by itself.`
+    : narrationReasonMessage(entry.reason);
+}
+
+/** Return one localized dependency issue; pack coordinates stay literal identifiers. */
+export function dependencyIssueMessage(issue: DependencyIssue): string {
+  const pack = issue.packId ?? '?';
+  const version = issue.packVersion ?? '?';
+  switch (issue.code) {
+    case 'RULESET_UNAVAILABLE': return $localize`:@@campaign.resume.issueRuleset:${pack}:pack: ${version}:version: was made for rules that this engine version does not provide.`;
+    case 'CONTENT_CORRUPT': return $localize`:@@campaign.resume.issueCorrupt:The stored files of ${pack}:pack: ${version}:version: are damaged.`;
+    case 'DEPENDENCY_MISSING': return $localize`:@@campaign.resume.issueMissing:${pack}:pack: ${version}:version: is not installed in this adventure.`;
+    case 'CLOSURE_INVALID': return $localize`:@@campaign.resume.issueInvalid:${pack}:pack: ${version}:version: cannot be loaded by this engine version.`;
+    default: return $localize`:@@campaign.resume.issueRevision:The adventure content of this playthrough is missing.`;
+  }
+}
+
+/** Return the location line: the localized name when the pack has one, otherwise the literal identifier. */
+export function locationMessage(card: ResumeCard): string {
+  if (card.location === null) return $localize`:@@campaign.resume.noLocation:Unknown`;
+  return card.location.name ?? card.location.id;
+}
+
+/** Return the names of the actors the player last saw here, or a localized "nobody" sentence. */
+export function presentMessage(card: ResumeCard): string {
+  return card.presentActors.length === 0
+    ? $localize`:@@campaign.resume.nobody:Nobody you have seen here.`
+    : card.presentActors.map((actor) => actor.name).join(', ');
+}
+
+/** Return each resource as "key current/maximum" with locale digits; keys stay literal identifiers. */
+export function resourceMessages(card: ResumeCard, locale: string): string[] {
+  const numbers = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+  return card.resources.map((resource) => {
+    const key = resource.key;
+    const current = numbers.format(resource.current);
+    const maximum = numbers.format(resource.maximum);
+    return $localize`:@@campaign.resume.resource:${key}:resource: ${current}:current: of ${maximum}:maximum:`;
+  });
 }
