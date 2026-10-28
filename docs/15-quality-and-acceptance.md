@@ -1,5 +1,89 @@
 # Quality Strategy and Acceptance Criteria
 
+P08.2 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
+**35 focused cases in four new suites and all 525 packaged backend cases in 51 suites**,
+with zero failures, errors or skips. The executable jar is packaged.
+
+The new suites use the deterministic `ScriptedTaskPort` and a manual clock:
+
+- `IntentContractTest` (10) accepts each typed intention and a bounded Italian
+  clarification. It rejects:
+  - authored or misaddressed speech;
+  - unknown destinations, facts and abilities;
+  - unpermitted, excess or duplicate targets;
+  - another actor, a disallowed kind or an excessive wait;
+  - a second intention or effect fields;
+  - unbounded, unknown, privileged, wrong-language and wrong-term clarifications;
+  - malformed, duplicate-key, oversized and misbound envelopes.
+
+  It also proves that instructions carry the locale directive and glossary but no
+  privileged marker, and that the digest is deterministic.
+- `NarrationContractTest` (13) accepts attributed EN and IT narration with quick replies.
+  It rejects:
+  - player voice, unknown speakers and speaker-bearing narration;
+  - unknown references, uncited events and unpermitted numbers;
+  - a moved pending decision, four suggestions, unavailable actions and replies with
+    actions;
+  - privileged markers in passages and drafts;
+  - wrong glossary forms and altered capitalization;
+  - altered or unknown protected quotes;
+  - long wrong-language passages;
+  - effect fields, markup, and bound or duplicate violations;
+  - cannot-complete results with content.
+
+  It accepts short wrong-language text with a warning. It refuses to render a context that
+  contains a marker, and it binds output to the exact context and presentation generation.
+- `ContractRunnerTest` (9) covers:
+  - first-attempt acceptance with explicit request fields;
+  - one repair with the same context, session and slot, the remaining budget and only
+    violation codes (the rejected text is absent);
+  - rejection after the single repair;
+  - no repair for six transport statuses;
+  - a repair that did not complete;
+  - an exhausted budget;
+  - cancellation that reaches the attempt and prevents repair;
+  - scope refusal without submission;
+  - budget bounds.
+- `ContractSchemaTest` (3) keeps every schema object's properties, required list and closed
+  `additionalProperties` equal to the validators' field sets. It also checks the hashed
+  English templates.
+
+Fifteen deliberate weakening probes were run, and each was reverted byte-identically with
+the checksum verified. Each made the focused run fail. The weakened rules were:
+
+- non-verbatim speech;
+- a second intention;
+- unchecked targets;
+- an unchecked output leak;
+- an unchecked context scope;
+- unchecked glossary terms;
+- an unchecked locale;
+- a dropped digest echo;
+- unchecked numbers;
+- unchecked event coverage;
+- an unchecked pending decision;
+- player voice allowed;
+- unbounded repair;
+- repaired transport outcomes;
+- echoing the rejected output into the repair.
+
+Disabling the number check also failed the runner cases, whose invalid fixture relies on
+it. These were intentional probes, not gate outcomes. All 26 repository-policy tests pass
+with zero scan findings.
+
+Frontend sources are unchanged, and the frontend gates were not rerun. This is contract
+evidence against deterministic doubles. It is not:
+
+- live structured output from a runtime;
+- a gameplay path (P08.5 publishes);
+- human EN/IT narrative-quality review.
+
+Paraphrased secrets and implied consequences are beyond the mechanical checks (docs/21
+section 14, docs/17).
+
+The neutral implementation owner commit is `3caa39b`. Every check above passed on its
+exact sources, and only P08.2 then gains a completion mark (48 of 131 roadmap entries).
+
 P08.1 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **46 focused cases in seven new suites and all 490 packaged backend cases in 47 suites**,
 with zero failures, errors or skips. Rerun with the application, packaged-secret and

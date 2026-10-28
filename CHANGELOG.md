@@ -24,6 +24,10 @@
 - Pass 35 focused cases in four new suites; deliberate weakening probes were detected.
   Nothing in gameplay calls the contracts yet (publication is P08.5), and no live runtime
   produced output for them.
+- Pass all 525 packaged backend tests in 51 suites with zero failures/errors/skips; fifteen
+  weakening probes were detected and all 26 repository-policy tests pass with zero scan
+  findings. Record implementation owner commit `3caa39b` before marking P08.2 complete (48
+  of 131 roadmap entries).
 
 ## Unreleased — Narration task port and Codex transport, 28 October 2026
 

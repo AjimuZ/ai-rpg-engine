@@ -785,6 +785,11 @@ Tests use the deterministic `ScriptedTaskPort` and a manual clock; no database o
 needed. The suites are `IntentContractTest`, `NarrationContractTest`, `ContractRunnerTest` and
 `ContractSchemaTest`.
 
+Verified on 28 October 2026 with the unchanged scoped JDK 21 toolchain and disposable
+PostgreSQL 18.6 fixture: 35 focused cases and all 525 packaged backend cases in 51 suites
+pass with zero failures/errors/skips, fifteen deliberate weakening probes were detected, and
+the executable jar is packaged. See [evidence scope](../docs/15-quality-and-acceptance.md).
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.
