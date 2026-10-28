@@ -22,6 +22,7 @@ import org.rpgengine.inference.TaskRequest;
 import org.rpgengine.inference.TaskResult;
 import org.rpgengine.inference.session.AiRole;
 import org.rpgengine.inference.session.Audience;
+import org.rpgengine.inference.scheduling.SchedulerFixtures;
 import org.rpgengine.inference.session.ScopedSessions;
 import org.rpgengine.inference.session.SessionScope;
 import org.rpgengine.presentation.SupportedLocale;
@@ -39,7 +40,8 @@ class ContractSessionScopeTest {
 
     final ScriptedTaskPort port = new ScriptedTaskPort();
     final ScopedSessions sessions = new ScopedSessions(port, ScopedSessions.DEFAULT_CAPACITY);
-    final ContractRunner runner = new ContractRunner(sessions, Clock.systemUTC());
+    final ContractRunner runner = new ContractRunner(SchedulerFixtures.scheduler(sessions, port, Clock.systemUTC()),
+            Clock.systemUTC());
     final NarrationContract narration = new NarrationContract();
     final IntentContract intent = new IntentContract();
 
@@ -48,8 +50,14 @@ class ContractSessionScopeTest {
                 "a".repeat(64), policy);
     }
 
-    /** Run one valid narration under {@code binding} and return its single request. */
+    /**
+     * Run one valid narration under {@code binding}, with a fresh task identity (the scheduler's
+     * ledger refuses a repeated identity), and return its single request.
+     */
     TaskRequest narrate(TaskBinding binding) throws Exception {
+        binding = new TaskBinding(UUID.randomUUID(), binding.adventureId(), binding.campaignId(),
+                binding.campaignGeneration(), binding.baseRevision(), binding.outputLocale(), binding.localeRevision(),
+                binding.glossaryRevision(), binding.packHash(), binding.policyHash());
         var context = ContractFixtures.narration(binding, guard());
         port.completes(output(narration, context, "proposed", narrationBody(SupportedLocale.EN)));
         var outcome = runner.start(narration, context, InferenceSlot.STANDARD, Duration.ofSeconds(90)).outcome()

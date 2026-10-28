@@ -15,6 +15,8 @@ import org.rpgengine.inference.InferenceSlot;
 import org.rpgengine.inference.TaskHandle;
 import org.rpgengine.inference.TaskRequest;
 import org.rpgengine.inference.TaskResult;
+import org.rpgengine.inference.scheduling.InferenceScheduler;
+import org.rpgengine.inference.scheduling.ScheduledTask;
 import org.rpgengine.inference.session.ScopedSessions;
 import org.rpgengine.inference.session.SessionScope;
 
@@ -24,10 +26,12 @@ import org.rpgengine.inference.session.SessionScope;
  *
  * <p>Session scoping: the caller never names a session. The runner derives the
  * {@link SessionScope} from the contract's kind (role and audience) and the context's binding
- * (adventure, campaign, generation, pack and policy hashes) and submits through
+ * (adventure, campaign, generation, pack and policy hashes) and submits through the
+ * installation's {@link InferenceScheduler} (P08.6), which dispatches it in the scope's session of
  * {@link ScopedSessions}, so an interpreter and a narrator, two campaigns, or a public and a
  * privileged task can never share a runtime conversation, and a privileged planner session can
- * never be passed in to render narration. Both attempts of a call use the same scope.
+ * never be passed in to render narration. Both attempts of a call use the same scope and the
+ * kind's {@link TaskKind#workClass() work class}, so a repair waits in the same fair queue.
  *
  * <p>Algorithm:
  * <ol>
@@ -35,8 +39,9 @@ import org.rpgengine.inference.session.SessionScope;
  *       without submitting anything.</li>
  *   <li>Submit attempt 1 with the binding's task identity and the whole budget.</li>
  *   <li>A non-completed task status ends the call {@link ContractOutcome.NotCompleted}: transport
- *       failures, unavailability, timeouts and scope refusals of {@link ScopedSessions} (a stale
- *       campaign generation) are not output defects and are never repaired.</li>
+ *       failures, unavailability, timeouts, scope refusals (a stale campaign generation) and the
+ *       scheduler's admission refusals (queue places, quotas, account suspension) are not output
+ *       defects and are never repaired.</li>
  *   <li>A completed output is validated. Acceptance ends the call. Violations start the single
  *       repair: the same canonical context, the same session scope, a derived task identity and
  *       only the remaining budget, with the violation codes and pointers (never the rejected text)
@@ -48,18 +53,19 @@ import org.rpgengine.inference.session.SessionScope;
  * again; this runner never loops beyond one repair.
  *
  * <p>Thread-safety: one runner serves concurrent calls. Continuations run on whichever thread
- * completes the port's result stage; they only validate in memory and submit, which never blocks.
+ * completes the scheduler's result stage; they only validate in memory and submit, which never
+ * waits for inference.
  */
 public final class ContractRunner {
-    private final ScopedSessions sessions;
+    private final InferenceScheduler scheduler;
     private final Clock clock;
 
     /**
-     * @param sessions the installation's scoped submitter of the task port
-     * @param clock clock for the shared attempt budget
+     * @param scheduler the installation's fair inference scheduler
+     * @param clock clock for the shared attempt budget; the scheduler should use the same clock
      */
-    public ContractRunner(ScopedSessions sessions, Clock clock) {
-        this.sessions = Objects.requireNonNull(sessions, "sessions");
+    public ContractRunner(InferenceScheduler scheduler, Clock clock) {
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -142,8 +148,8 @@ public final class ContractRunner {
 
         /** Submit one attempt and continue when its result arrives. */
         void submit(UUID portTaskId, TaskContract.RenderedTask rendered, Duration timeout, boolean repair) {
-            TaskHandle handle = sessions.submit(scope, portTaskId, slot, rendered.instructions(),
-                    contract.outputSchema(), timeout);
+            TaskHandle handle = scheduler.submit(new ScheduledTask(portTaskId, scope, contract.kind().workClass(), slot,
+                    rendered.instructions(), contract.outputSchema(), timeout));
             boolean cancelNow;
             synchronized (this) {
                 current = handle;

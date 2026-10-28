@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.rpgengine.inference.InferenceSlot;
 import org.rpgengine.inference.TaskResult;
+import org.rpgengine.inference.scheduling.SchedulerFixtures;
 import org.rpgengine.inference.session.ScopedSessions;
 import org.rpgengine.presentation.SupportedLocale;
 
@@ -32,7 +33,7 @@ class ContractRunnerTest {
     final MutableClock clock = new MutableClock();
     final ScriptedTaskPort port = new ScriptedTaskPort();
     final ScopedSessions sessions = new ScopedSessions(port, ScopedSessions.DEFAULT_CAPACITY);
-    final ContractRunner runner = new ContractRunner(sessions, clock);
+    final ContractRunner runner = new ContractRunner(SchedulerFixtures.scheduler(sessions, port, clock), clock);
 
     /** @return the session the registry opened for the narration scope of {@link #context} */
     UUID narrationSession() {
@@ -117,7 +118,8 @@ class ContractRunnerTest {
                 TaskResult.Status.FAILED, TaskResult.Status.TIMED_OUT, TaskResult.Status.UNRESOLVED,
                 TaskResult.Status.CANCELLED)) {
             var scripted = new ScriptedTaskPort().ends(status, "fixture-code");
-            var outcome = new ContractRunner(new ScopedSessions(scripted, 1), clock).start(contract, context,
+            var outcome = new ContractRunner(SchedulerFixtures.scheduler(new ScopedSessions(scripted, 1), scripted, clock),
+                    clock).start(contract, context,
                     InferenceSlot.STANDARD, Duration.ofSeconds(90)).outcome().toCompletableFuture().get(5, TimeUnit.SECONDS);
             assertThat(outcome).as(status.name()).isInstanceOfSatisfying(ContractOutcome.NotCompleted.class, n -> {
                 assertThat(n.status()).isEqualTo(status);

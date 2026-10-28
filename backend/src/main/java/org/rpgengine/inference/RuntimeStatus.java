@@ -10,7 +10,9 @@ import java.util.Objects;
  * @param state lifecycle state
  * @param reasonCode fixed code explaining a non-ready state, or null when ready
  * @param queued tasks waiting for the active permit
- * @param active turns currently holding the permit (0 or 1 under the serialized default)
+ * @param active turns currently holding the permit, including work whose outcome is unconfirmed and
+ *        awaits reconciliation (0 or 1 under the serialized default); the P08.6 scheduler keeps
+ *        its turn permit while this is non-zero after an uncertain outcome
  */
 public record RuntimeStatus(String runtime, State state, String reasonCode, int queued, int active) {
     /** Lifecycle states of a task port. */

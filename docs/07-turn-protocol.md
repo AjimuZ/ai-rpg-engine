@@ -552,7 +552,8 @@ revision/busy/limit checks and one database transaction for journal insertion pl
 lease grant, with owner → campaign → journal/lease serialization. Its candidate
 limits are 32 KiB canonical data, two live campaign mutation permits per owner and
 a 180-second database-clock lease. These are unverified command-admission defaults;
-they do not change the separate single-active-inference-turn policy or grant
+they do not change the separate single-active-inference-turn policy (enforced since
+P08.6 by the fair inference scheduler and its V14 single-turn index) or grant
 background planners a campaign mutation lease. Status views omit internal permit
 tokens and unprojected receipt details.
 

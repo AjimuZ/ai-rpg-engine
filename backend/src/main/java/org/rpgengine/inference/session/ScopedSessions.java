@@ -30,7 +30,10 @@ import org.springframework.stereotype.Component;
  * privileged planner conversation can never be handed to the public narrator, and two campaigns,
  * roles, audiences or policies never share a runtime conversation. {@code SessionBoundaryTest}
  * fails the build if other main code builds a {@link TaskRequest} or calls the port's
- * {@code submit} or {@code retireSession}.
+ * {@code submit} or {@code retireSession}. Since P08.6 {@link #submit} is called only by the fair
+ * {@code org.rpgengine.inference.scheduling.InferenceScheduler} at dispatch time
+ * ({@code SchedulerBoundaryTest}), so the session is resolved when the task actually starts and a
+ * generation fence or supersession that happened while it waited still applies.
  *
  * <p>Rules, in the order {@link #submit} applies them:
  * <ol>

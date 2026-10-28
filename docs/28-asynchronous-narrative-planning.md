@@ -33,6 +33,18 @@ constraint rows, the quest-plan body contract, consumers that build commands fro
 dispatch and budgets remain P08.6–P08.7, P09.1 and P10. See the
 [P07.6 contract](07-turn-protocol.md#p076-plan-admission-and-activation).
 
+P08.6 (28 October 2026) implements the dispatch half of section 9: one durable fair
+priority queue (`InferenceScheduler`, V14 `inference_task`) in front of every inference
+task, with interactive-first selection, isolated and ordered role/audience lines, background
+aging and fair campaign rotation, separate interactive and background queue places,
+rolling usage quotas, a durable account backoff for background work, preemption of
+background work with the permit kept until its terminal result, reconciliation holds
+for unconfirmed outcomes, write-ahead runtime references and restart recovery. One active
+turn installation-wide stays the only accepted limit, enforced also by a database
+index. Only interactive task kinds exist yet; planners and other background kinds
+(P08.7, P09.3, P12, P15) will submit through the same queue. See
+[docs/06 section 12](06-codex-integration.md#p086-durable-fair-scheduling).
+
 Keep the playable loop small: validated intent when needed, deterministic resolution, canonical save, then public narration. Prepare selected expensive narrative situations separately, so accepting a mystery does not require generating its whole future before acknowledging the action. A prepared situation supplies motives, causal dependencies, clues and alternatives; it never prescribes the protagonist's choices or makes an anticipated outcome inevitable.
 
 This extends the existing [architecture](04-architecture.md), [turn protocol](07-turn-protocol.md), [memory model](08-memory-and-continuity.md), [authoring contract](09-adventure-packs.md), and [task envelopes](21-ai-task-contracts-and-prompts.md). Those remain authoritative for canonical mutations, supported mechanics and public narration. A plan is preparation, not a second world-state store.
@@ -243,10 +255,11 @@ or step the row version it changes. No new background world writer is added.
 P07.5 post-commit presentation jobs (`presentation_job`) are deliberately separate from
 `ai_job`: one per committed operation, created by the canonical transaction, settled
 together with the journal's presentation status and never admitted as an artifact. They
-cannot change world facts, time, rewards or draws. When P08 adds narration inference, the
-job's `NarrationPort` call is the point where the P08.6 fair queue and its runtime permits
-take over; the job keeps its own fence, lease and attempt budget, and its cancellation
-request follows the interrupt/reconcile rules of section 9.
+cannot change world facts, time, rewards or draws. Since P08.5/P08.6 the job's
+`NarrationPort` call is where the fair queue and its runtime permit take over: its
+narration runs as interactive work of the P08.6 scheduler, the time it waits counts
+against its narration budget, and the job keeps its own fence, lease and attempt budget;
+its cancellation request follows the interrupt/reconcile rules of section 9.
 
 ## 8. Plans, pending events, knowledge and canon
 
@@ -283,7 +296,7 @@ When an interactive request arrives during a planner turn, request interruption 
 
 If confirmation is lost, retire that runtime connection generation, reconcile on a fresh connection and keep the uncertain turn accounted for. Do not launch another turn under the assumption that a disconnected planner stopped. Do not terminate the shared runtime solely to make optional work appear cancelled; a controlled installation restart belongs to the existing owned-runtime lifecycle and reconciles every affected task. If safe bounded preemption cannot be qualified, run optional jobs only in an explicit idle maintenance window, or disable them. Baseline gameplay remains the release path.
 
-P01.7 records the bounded concurrent-turn/cancellation capability result; P08.6 must qualify the production dispatcher before enabling concurrency greater than one using the exact pinned runtime/policy/platform and an explicitly authorized account-backed neutral experiment. Require per-turn event routing without discarding another task's events; isolated failure/cancellation; terminal reconciliation; interactive priority under a running background task; quota/backpressure behavior; restart with uncertain turns; and measured p50/p95 latency plus usage against the serialized baseline. The scripted X/C overlap is a prerequisite fixture, not that qualification. A negative/unavailable capability result retains valid serialized operation and does not require a pool. Lack of measurable benefit also retains serialization.
+P01.7 records the bounded concurrent-turn/cancellation capability result. The P08.6 production dispatcher runs one turn installation-wide; enabling concurrency greater than one first requires qualifying it with the exact pinned runtime/policy/platform and an explicitly authorized account-backed neutral experiment. Require per-turn event routing without discarding another task's events; isolated failure/cancellation; terminal reconciliation; interactive priority under a running background task; quota/backpressure behavior; restart with uncertain turns; and measured p50/p95 latency plus usage against the serialized baseline. The scripted X/C overlap is a prerequisite fixture, not that qualification. A negative/unavailable capability result retains valid serialized operation and does not require a pool. Lack of measurable benefit also retains serialization.
 
 On account errors (`usageLimitExceeded`, rate limit, authentication failure or unknown quota), suspend optional admissions and expose a sanitized actionable status. Bound backoff with jitter and expiry; honor any supported retry timing. Never promise unlimited subscription inference, infer remaining tokens from a model catalog, enable paid overage, switch to API billing or another provider implicitly. Reserve estimated usage before dispatch, reconcile observed token/account information when supported, label estimates when not, and retain conservative usage for interrupted or unknown outcomes. Local budget reservations cannot guarantee that the provider will stop billing at an exact token count.
 
@@ -295,9 +308,14 @@ P01.7's [retained qualification](../tools/runtime_probe/CONCURRENCY.md) now
 explicitly selects that one-turn installation-wide baseline. The managed
 runtime passes bounded interleaved dispatch and targeted cancellation against
 an internal scripted upstream, including interrupt/reconcile/dispatch priority.
-Live simultaneity/headroom, service priority, quota behavior and cancellation
-latency remain unverified; production queue/fairness/recovery and the higher-limit
-gate above remain undelivered. Scripted overlap gives no live throughput result.
+P08.6 delivers the production queue, fairness, quotas, backoff and recovery with
+that baseline ([docs/06 section 12](06-codex-integration.md#p086-durable-fair-scheduling)):
+the concurrency and pending-background candidates of this section are its defaults
+(per-target plan limits and background attempt budgets belong to the P08.7 planner
+jobs), and the higher-limit gate
+above stays closed (`max-active` above 1 fails startup). Live simultaneity/headroom,
+service priority, quota behavior and cancellation latency remain unverified.
+Scripted overlap gives no live throughput result.
 
 Assess these first as internal policy presets behind one optional planning setting, not three mandatory player-facing screens:
 

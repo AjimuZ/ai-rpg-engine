@@ -10,7 +10,8 @@
  * performs the structural and semantic checks; the schema is never trusted as validation.
  *
  * <p>{@link org.rpgengine.inference.contract.ContractRunner} submits one contract task through
- * {@link org.rpgengine.inference.session.ScopedSessions} in the session scope derived from the
+ * the fair {@link org.rpgengine.inference.scheduling.InferenceScheduler} (P08.6), which dispatches
+ * it through {@link org.rpgengine.inference.session.ScopedSessions} in the session scope derived from the
  * task kind's role and audience and the binding's campaign, generation and hashes (P08.3), so no
  * caller chooses a session, validates the untrusted output and allows exactly one bounded repair
  * with the same canonical context. Every result keeps the presentation

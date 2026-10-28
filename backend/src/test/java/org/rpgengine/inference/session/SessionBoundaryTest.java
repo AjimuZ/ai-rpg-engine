@@ -30,6 +30,8 @@ class SessionBoundaryTest {
     static final Path INFERENCE = MAIN.resolve("inference");
     static final Path SESSION = INFERENCE.resolve("session");
     static final Path ADAPTER = INFERENCE.resolve("codex");
+    /** The fair scheduler holds the port for readiness and reconciliation only; SchedulerBoundaryTest pins that. */
+    static final Path SCHEDULING = INFERENCE.resolve("scheduling");
 
     static List<Path> sources() throws IOException {
         try (Stream<Path> files = Files.walk(MAIN)) {
@@ -57,7 +59,7 @@ class SessionBoundaryTest {
     void noOtherCodeSubmitsToOrRetiresSessionsOfThePort() throws IOException {
         List<String> callers = new ArrayList<>();
         for (Path source : sources()) {
-            if (portSide(source) || source.startsWith(SESSION)) {
+            if (portSide(source) || source.startsWith(SESSION) || source.startsWith(SCHEDULING)) {
                 continue;
             }
             String text = Files.readString(source);

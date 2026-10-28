@@ -89,6 +89,12 @@ final class ScriptedAppServer {
         }
     }
 
+    /** @return identities of a thread's turns in start order (empty for an unknown thread) */
+    synchronized List<String> turnIds(String threadId) {
+        ThreadState thread = threads.get(threadId);
+        return thread == null ? List.of() : thread.turns.stream().map(t -> t.id).toList();
+    }
+
     /** @return status of a turn, or null */
     synchronized String turnStatus(String threadId, String turnId) {
         ThreadState thread = threads.get(threadId);

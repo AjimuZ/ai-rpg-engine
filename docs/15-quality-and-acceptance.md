@@ -1,5 +1,70 @@
 # Quality Strategy and Acceptance Criteria
 
+P08.6 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
+**31 new cases (10 in `FairQueueTest`, 15 in `InferenceSchedulerTest`, 3 in
+`SchedulerBoundaryTest`, 2 in `CodexTaskAdapterTest`, one in `TaskPortSelectionTest`) and all
+614 packaged backend cases in 63 suites**, with zero failures, errors or skips; with the
+adapted contract, narration, session-boundary, presentation, schema and V14 migration suites the
+focused set has 92 cases. The executable jar is packaged. This is the deterministic part of
+QA-37 (AP-05/AP-06/AP-10 scheduling assertions); only the runtime is a double (`ControlledPort`,
+or the scripted app-server behind the real Codex adapter), while the ledger, V14 guards, session
+registry, scheduler and database are real:
+
+- every admission, dispatch and terminal transition is written to `inference_task`, one task
+  holds the turn permit at a time, the forwarded budget is the task's remaining budget, and two
+  scheduler processes on one database never run two turns (the second waits on the single-turn
+  index and dispatches after the first settles);
+- an interactive task preempts a running background task by its exact handle, does not start
+  until the interrupted turn's terminal result is settled, and the background caller sees
+  `CANCELLED`/`preempted` with its charge kept; campaigns take turns (A, B, C, then A again)
+  and background work waits for interactive work;
+- interactive and background queue places are separate and bounded installation-wide and per
+  campaign, and refused tasks leave no row; rolling quotas charge only started turns, refuse
+  background and then all-class work over the limit, survive a restart and roll after 24 hours;
+- `usageLimitExceeded` and `rateLimitExceeded` suspend background work for 30 and then 60
+  seconds (durably, across a restart) while interactive work continues, and a completed task
+  clears the backoff;
+- cancellation ends waiting work unsent and interrupts running work by its exact handle; a
+  waiting task whose budget falls below one second ends `queue-timeout` without dispatch;
+- an `UNRESOLVED` outcome keeps the permit in `RECONCILING` while the port reports activity,
+  ends waiting work `UNAVAILABLE` while the port cannot run anything, and releases only when the
+  port confirms; a restart abandons earlier queued rows, takes over the dispatched row with its
+  write-ahead reference, hands it to the port and starts new work only after confirmation, while
+  the old process's late result and stale queue entry are fenced;
+- admission refuses a campaign of another adventure, a stale generation and a repeated task
+  identity (also after completion and after a restart), and a restore while a task waits fences
+  it before dispatch; a start the journal cannot record runs no turn; shutdown cancels waiting
+  work and interrupts running work; the database refuses a second permit holder, illegal
+  transitions, charge and reference rewrites, identity or owner changes, deletions and changes
+  to terminal rows;
+- the real Codex adapter records the thread before `turn/start`, starts no turn when the record
+  fails or throws, and reconciles a thread left running by an earlier process (interrupting its
+  turn) before its first new turn, counting it as active until then; the Spring context wires
+  the scheduler with one permit and refuses `max-active=2` and malformed or out-of-range
+  settings without echoing values; `SchedulerBoundaryTest` proves that only the scheduler calls
+  the session registry and that contract callers take the scheduler;
+- twenty-four deliberate weakening probes each made their targeted suites fail and were
+  reverted byte-identically (SHA-256): unisolated lines, no rotation, no interactive permit
+  reservation, background before interactive, no aging, aging into the interactive class, the
+  permit freed at the preemption request, no preemption, shared queue places, no background
+  quota, released charges for started turns, a backoff forgotten on restart, suspended
+  interactive work, a reconciliation released while the port is active, restart references not
+  handed over, unenforced queue deadlines, an ignored waiting cancellation, earlier queued rows
+  not abandoned, a busy permit treated as dispatched, no dispatch generation fence, no admission
+  scope check, a skipped adapter journal, ignored restart threads and an adapter status that
+  ignores ambiguity. The first definition of the abandonment probe still executed the update
+  (it only zeroed the returned count) and was not detected; the corrected probe, which skips
+  the update, was detected.
+
+Frontend sources and the recorded interface transcript are unchanged, so the frontend gates
+were not rerun. All 26 repository-policy tests pass with zero findings.
+
+Not verified: more than one active turn (refused by configuration and by the database), live
+quota, rate-limit and service-priority behavior and live cancellation latency (no account or
+runtime was used; the QA-37 live part stays open), observed token usage (the estimates are
+labelled as such), background task kinds that do not exist yet (P08.7, P09.3, P12, P15), and an
+owner-facing scheduler status (P21.3).
+
 P08.5 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **9 new cases (8 in `GroundedNarrationTest`, one in `CampaignCommandHttpTest`) and all 583
 packaged backend cases in 60 suites**, with zero failures, errors or skips; with the adapted

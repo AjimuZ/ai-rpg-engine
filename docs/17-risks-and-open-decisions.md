@@ -156,7 +156,7 @@ Owners below are implementation responsibilities, not assigned people. The proje
 | Runtime cannot restrict tools/reads sufficiently on a target OS | Unwanted host access | Demonstrate effective policy; supported isolated runtime; do not expose canonical data or developer checkout. The 0.164.0 image has no system `bubblewrap`. P01.3 does not rely on the bundled sandbox: the managed profile removes every model tool, and the container is the boundary ([ADR 0013](adr/0013-narration-runtime-isolation.md)). The residual risk is that a runtime upgrade ignores a renamed key, so `test_isolation.py` must pass before any pin changes | Security / P01 |
 | Assumed account/subscription access fails | User cannot play AI scenes | Supported authentication setup, account readiness, entitlement/error messages, no free/unlimited claims | Product + AI / P01 |
 | Cloud inference mistaken for offline AI | Incorrect expectations/privacy claims | Explicit local-storage versus outbound-context documentation | Product / P14, P19 |
-| Runtime turn outcome unknown after a lost connection, unconfirmed interrupt or backend restart | Duplicate or orphaned upstream work; quota use | P08.1 marks the thread ambiguous, retires its sessions and keeps the single permit until resume/list/interrupt reconciliation confirms no turn is running; proposals have no authority until committed. Ambiguity is in memory only, so a backend restart forgets it: durable permit/receipt records remain P08.6/P09.5 | Engine / P08.1, P08.6, P09.5 |
+| Runtime turn outcome unknown after a lost connection, unconfirmed interrupt or backend restart | Duplicate or orphaned upstream work; quota use | P08.1 marks the thread ambiguous, retires its sessions and keeps the single permit until resume/list/interrupt reconciliation confirms no turn is running; proposals have no authority until committed. Since P08.6 the thread is recorded write-ahead in the durable scheduler ledger, the permit row stays `RECONCILING` until the runtime confirms, and a restarted backend hands the recorded threads back to the adapter for reconciliation before any new turn; durable operation receipts remain P09.5 | Engine / P08.1, P08.6, P09.5 |
 | AI text contradicts committed outcome | False player understanding | Narrate resolved bundles; structured claims; one repair; mechanical receipt fallback; human evaluations | AI + QA / P08, P18 |
 | Mechanical narration checks pass prose that paraphrases a secret, implies an unresolved consequence or uses the wrong language in short text | Hidden knowledge or false outcomes reach the player; mixed-language narration | P08.2 checks references, event coverage, permitted numbers, verbatim/whitespace-insensitive privileged markers, glossary forms, protected quotes and a function-word locale signal; short or mixed text only warns. Paraphrase and implication are not detected: keep markers specific, review EN/IT output with the human rubric (docs/21 section 13) and expand the invalid-output corpus from real failures | AI + QA / P08.2, P08.5, P18 |
 | Secret leakage through prior thread context | Spoilers or private information exposed | P08.3 scopes every AI session by campaign, recovery generation, role, audience and pack/policy hash. Player-facing roles can never be privileged, and the scoped registry is the runtime port's only submitter (source-level test). A planner sentinel stays on the planner's thread in adapter tests. Still needed: input filtering of public contexts (P08.5, P09.2) and sentinel tests across API, media and diagnostics. The registry is in memory, so a backend restart costs continuity, never isolation | Knowledge + QA / P08.3, P09, P18 |
@@ -185,15 +185,17 @@ Owners below are implementation responsibilities, not assigned people. The proje
 P01.7 explicitly selects [serialized inference](../tools/runtime_probe/CONCURRENCY.md),
 one active turn installation-wide. Its bounded scripted routing/cancellation
 evidence does not establish live simultaneity, headroom, service priority or
-quota behavior. P08.6 retains the increase gate and QA-37 owns production
-priority/fairness/recovery; the P01 live isolation recheck is still open.
+quota behavior. P08.6 implements production priority, fairness, quotas and
+recovery with deterministic QA-37 evidence and keeps the increase gate closed
+(`max-active` above 1 fails startup); the live QA-37 part and the P01 live isolation
+recheck are still open.
 
 Research-revision risks and defaults are tracked in the focused contracts:
 
 | Risk | Safe initial decision | Gate / evidence |
 | --- | --- | --- |
 | Planning from stale or incomplete dependencies | Engine-recorded read/query sets, branch invalidation and a second fenced transactional check; baseline when precision fails | P03.6/P07.6, QA-36 |
-| Background work increases latency or consumes shared quota | One durable queue, default active1, interactive reservation, bounded cancellation/reconciliation and persisted usage; no pool/provider fallback | P01.7/P08.6, QA-37 |
+| Background work increases latency or consumes shared quota | One durable queue, default active1, interactive reservation, bounded cancellation/reconciliation and persisted usage; no pool/provider fallback. Implemented by P08.6 with deterministic evidence; live quota behavior is unmeasured | P01.7/P08.6, QA-37 |
 | Extra roles improve appearance of sophistication without quality gain | Planner/reviewer/director optional enablement; paired bilingual baseline comparison and actual waste/usage metrics | P14/P18.6, QA-39 |
 | Italian merely translates labels while prose/voices regress | First-class EN/IT resources, direct generation, glossary/quote policies and competent human review | P04.6/P05.6, QA-35/39 |
 | Voice weights/recordings have separate restrictions or consent gaps | Conditional Qwen/Kokoro selection only after exact distributable/voice inventory; XTTS-v2 excluded from default commercial-compatible path | P17.7/P19.1, QA-38 |

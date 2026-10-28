@@ -110,7 +110,10 @@ admissions cannot be rewritten; dispositions append a new sequence. Job attempts
 retain write-once runtime/result/outcome history, a finite retry budget and a fence
 that increases on claim/release. `campaign.recovery_generation` is independent of
 canonical revision and advances on database restore. Usage counters are durable
-accounting primitives; global budget admission remains P08.6.
+accounting primitives. Since P08.6 global admission uses the separate inference ledger
+(V14 `inference_task`: rolling estimated-usage quotas, queue places and the single turn
+permit; [docs/06 section 12](06-codex-integration.md#p086-durable-fair-scheduling));
+`AiJob` budgets stay per job.
 
 P03.3 adds `V3__canonical_outbox.sql` and the internal `CanonicalCommitService`. A bounded immutable resolved plan commits world counters/mode/decision, typed resource adjustments, ordered events, settlements, a backend-built receipt and outbox intents together. The service serializes by campaign, rechecks snapshot tokens, rejects ambient transactions and returns only after COMMIT. Outbox kinds are `PUBLIC_STATE` and optional `NARRATION_REQUIRED`; envelopes contain only identity, campaign, operation, committed revision, kind and creation time. `(campaign_id, operation_id, kind)` is unique; a deferred composite foreign key requires the referenced journal outcome to be committed at the same revision. Rows cannot be updated/deleted. Historic operations receive no fabricated outbox records on upgrade. Delivery state/retention and workers are later work. See [commit contract and bounds](07-turn-protocol.md#5-canonical-commit).
 

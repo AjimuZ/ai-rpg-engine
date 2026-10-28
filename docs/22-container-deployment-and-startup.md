@@ -71,7 +71,8 @@ on the existing private IPC fixture, without account mounts or topology changes.
 It explicitly selects one active inference turn per installation; additional
 threads/campaigns/containers do not imply more qualified live capacity.
 Live simultaneity/headroom and authenticated packaged restart remain unverified.
-Production admission belongs to P08; any increase requires P08.6 evidence.
+Production admission is the P08.6 fair scheduler; any increase requires authorized
+live evidence, and the packaged backend refuses `max-active` above 1.
 
 ## 4. Planned repository artifacts
 

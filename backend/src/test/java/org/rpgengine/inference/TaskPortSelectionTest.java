@@ -7,6 +7,13 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.rpgengine.health.GameplayHealthIndicator;
+import org.rpgengine.inference.scheduling.InferenceScheduler;
+import org.rpgengine.inference.scheduling.JdbcTaskLedger;
+import org.rpgengine.inference.scheduling.MemoryTaskLedger;
+import org.rpgengine.inference.scheduling.ScheduledTask;
+import org.rpgengine.inference.scheduling.SchedulerSettings;
+import org.rpgengine.inference.scheduling.TaskLedger;
+import org.rpgengine.inference.scheduling.WorkClass;
 import org.rpgengine.inference.session.AiRole;
 import org.rpgengine.inference.session.Audience;
 import org.rpgengine.inference.session.ScopedSessions;
@@ -17,16 +24,26 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 /**
  * Spring selection of exactly one task port: the unavailable port by default, the Codex adapter
  * for {@code stdio}/{@code unix}, and a startup failure for any other transport or for a
- * half-assigned slot. The scoped session registry (P08.3) wraps whichever port is selected. Uses component scanning of the inference package, so the adapter is
- * reached only through the neutral interface.
+ * half-assigned slot. The scoped session registry (P08.3) wraps whichever port is selected, and the
+ * fair scheduler (P08.6) sits in front of the registry with the single qualified turn permit. Uses
+ * component scanning of the inference package, so the adapter is reached only through the neutral
+ * interface; the scan replaces the PostgreSQL ledger with the in-memory one because this context
+ * has no data source.
  */
 class TaskPortSelectionTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(Scan.class, GameplayHealthIndicator.class);
 
     @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
-    @org.springframework.context.annotation.ComponentScan("org.rpgengine.inference")
+    @org.springframework.context.annotation.ComponentScan(value = "org.rpgengine.inference",
+            excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(
+                    type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE,
+                    classes = JdbcTaskLedger.class))
     static class Scan {
+        @org.springframework.context.annotation.Bean
+        TaskLedger ledger() {
+            return new MemoryTaskLedger();
+        }
     }
 
     static TaskRequest request() {
@@ -61,6 +78,31 @@ class TaskPortSelectionTest {
         });
         runner.withPropertyValues("engine.inference.sessions.capacity=0").run(context -> assertThat(context)
                 .hasFailed().getFailure().hasStackTraceContaining("engine.inference.sessions.capacity must be 1..4096"));
+    }
+
+    @Test
+    void theSchedulerFrontsTheRegistryWithOneQualifiedPermitAndRefusesHigherConcurrency() {
+        runner.run(context -> {
+            InferenceScheduler scheduler = context.getBean(InferenceScheduler.class);
+            assertThat(scheduler.status().state()).isEqualTo(InferenceScheduler.State.READY);
+            assertThat(scheduler.status().maxActive()).isEqualTo(SchedulerSettings.QUALIFIED_MAX_ACTIVE).isEqualTo(1);
+            var scope = new SessionScope(UUID.randomUUID(), UUID.randomUUID(), 0, AiRole.NARRATOR, Audience.PUBLIC,
+                    "a".repeat(64), "b".repeat(64));
+            TaskResult result = scheduler.submit(new ScheduledTask(UUID.randomUUID(), scope, WorkClass.INTERACTIVE,
+                    InferenceSlot.STANDARD, "x", "{}", Duration.ofSeconds(5))).result().toCompletableFuture()
+                    .get(1, TimeUnit.SECONDS);
+            assertThat(result.status()).isEqualTo(TaskResult.Status.UNAVAILABLE);
+            assertThat(result.errorCode()).isEqualTo("runtime-not-configured");
+            assertThat(context.getBean(ScopedSessions.class).activeSession(scope)).isPresent();
+        });
+        runner.withPropertyValues("engine.inference.scheduler.max-active=2").run(context -> assertThat(context)
+                .hasFailed().getFailure().hasStackTraceContaining("max-active above 1 is concurrency-unqualified"));
+        runner.withPropertyValues("engine.inference.scheduler.background-per-campaign=777123").run(context -> assertThat(
+                context).hasFailed().getFailure().hasStackTraceContaining("background-per-campaign is outside")
+                .satisfies(failure -> assertThat(failure.toString()).doesNotContain("777123")));
+        runner.withPropertyValues("engine.inference.scheduler.daily-usage-limit=lots").run(context -> assertThat(
+                context).hasFailed().getFailure().hasStackTraceContaining("daily-usage-limit must be a whole number")
+                .satisfies(failure -> assertThat(failure.toString()).doesNotContain("lots")));
     }
 
     @Test

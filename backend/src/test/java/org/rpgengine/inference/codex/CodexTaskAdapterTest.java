@@ -11,7 +11,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.rpgengine.inference.EffectiveSettings;
@@ -56,6 +59,14 @@ class CodexTaskAdapterTest {
     }
 
     private CodexTaskAdapter start(int capacity) throws InterruptedException {
+        create(capacity);
+        adapter.start();
+        ScriptedAppServer.await(() -> adapter.status().state() != RuntimeStatus.State.STARTING);
+        return adapter;
+    }
+
+    /** Construct (without starting) an adapter over the shared scripted server: one backend process. */
+    private CodexTaskAdapter create(int capacity) {
         adapter = new CodexTaskAdapter(settings(capacity), resolver(slots::get), () -> {
             if (unreachable) {
                 throw new WireException("runtime-unreachable");
@@ -66,8 +77,6 @@ class CodexTaskAdapterTest {
             }
             return wire;
         });
-        adapter.start();
-        ScriptedAppServer.await(() -> adapter.status().state() != RuntimeStatus.State.STARTING);
         return adapter;
     }
 
@@ -360,5 +369,78 @@ class CodexTaskAdapterTest {
                 .containsExactly(Status.TIMED_OUT, "expired-in-queue");
         assertThat(result(held).status()).isEqualTo(Status.TIMED_OUT);
         assertThat(server.received("turn/start")).hasSize(1);
+    }
+
+    @Test
+    void recordsTheThreadBeforeTurnStartAndStartsNoTurnTheJournalCannotRecord() throws Exception {
+        start(4);
+        List<String> recorded = new CopyOnWriteArrayList<>();
+        AtomicBoolean accept = new AtomicBoolean(true);
+        adapter.attachJournal((taskId, reference) -> {
+            // Capture how many turns the runtime had seen when the record was made.
+            recorded.add(taskId + "@" + reference + "#" + server.received("turn/start").size());
+            return accept.get();
+        });
+        TaskRequest first = request(UUID.randomUUID(), InferenceSlot.STANDARD, "Narrate.", Duration.ofSeconds(5));
+        assertThat(result(adapter.submit(first)).status()).isEqualTo(Status.COMPLETED);
+        String thread = server.received("turn/start").getFirst().params().path("threadId").asString();
+        assertThat(recorded).containsExactly(first.taskId() + "@" + thread + "#0");
+
+        accept.set(false);
+        TaskResult refused = result(adapter.submit(request(UUID.randomUUID(), InferenceSlot.STANDARD, "Narrate.",
+                Duration.ofSeconds(5))));
+        assertThat(refused.status()).isEqualTo(Status.FAILED);
+        assertThat(refused.errorCode()).isEqualTo("dispatch-journal-unavailable");
+        assertThat(refused.provenance()).isNull();
+        assertThat(server.received("turn/start")).hasSize(1);
+        assertThat(adapter.status().active()).isZero();
+
+        adapter.attachJournal((taskId, reference) -> {
+            throw new IllegalStateException("storage down");
+        });
+        assertThat(result(adapter.submit(request(UUID.randomUUID(), InferenceSlot.STANDARD, "Narrate.",
+                Duration.ofSeconds(5)))).errorCode()).isEqualTo("dispatch-journal-unavailable");
+        assertThat(server.received("turn/start")).hasSize(1);
+    }
+
+    @Test
+    void reconcilesAThreadLeftRunningByAnEarlierProcessBeforeItsFirstTurn() throws Exception {
+        start(4);
+        Map<UUID, String> journal = new ConcurrentHashMap<>();
+        adapter.attachJournal((taskId, reference) -> journal.put(taskId, reference) == null);
+        TaskRequest held = request(UUID.randomUUID(), InferenceSlot.STANDARD, "Plan. scenario-hold",
+                Duration.ofSeconds(30));
+        TaskHandle orphan = adapter.submit(held);
+        awaitTurnStarts(1);
+        String thread = journal.get(held.taskId());
+        String turn = server.turnIds(thread).getFirst();
+
+        // The process dies: its connection drops and it never reaches the runtime again.
+        unreachable = true;
+        synchronized (wires) {
+            wires.getLast().serverEof();
+        }
+        assertThat(result(orphan).status()).isEqualTo(Status.UNRESOLVED);
+        adapter.stop();
+        assertThat(server.turnStatus(thread, turn)).isEqualTo("inProgress");
+        assertThat(server.received("turn/interrupt")).isEmpty();
+
+        // The next process learns the recorded thread before it starts and counts it as active.
+        unreachable = false;
+        create(4);
+        adapter.reconcile(List.of(thread, "not a reference"));
+        assertThat(adapter.status().active()).isEqualTo(1);
+        adapter.start();
+        ScriptedAppServer.await(() -> adapter.status().state() == RuntimeStatus.State.READY
+                && adapter.status().active() == 0);
+        assertThat(server.turnStatus(thread, turn)).isEqualTo("interrupted");
+
+        TaskResult next = run(UUID.randomUUID(), InferenceSlot.STANDARD, "Narrate.");
+        assertThat(next.status()).isEqualTo(Status.COMPLETED);
+        List<String> methods = server.received().stream().map(ScriptedAppServer.Received::method).toList();
+        int interrupt = methods.lastIndexOf("turn/interrupt");
+        assertThat(interrupt).isPositive().isLessThan(methods.lastIndexOf("turn/start"));
+        assertThat(server.received("turn/interrupt").getLast().params().path("turnId").asString()).isEqualTo(turn);
+        assertThat(server.received("turn/start")).hasSize(2);
     }
 }

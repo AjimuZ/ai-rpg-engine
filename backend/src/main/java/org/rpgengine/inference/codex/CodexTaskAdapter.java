@@ -1,6 +1,7 @@
 package org.rpgengine.inference.codex;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -15,6 +16,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.rpgengine.inference.CompletedTaskHandle;
+import org.rpgengine.inference.DispatchJournal;
 import org.rpgengine.inference.EffectiveSettings;
 import org.rpgengine.inference.NarrationTaskPort;
 import org.rpgengine.inference.RuntimeStatus;
@@ -34,8 +36,9 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>Admission and concurrency: submissions enter one bounded FIFO queue; a single dispatcher
  * thread holds the installation-wide active-turn permit and runs one turn at a time, the
- * serialized policy selected by P01.7. Fair priorities, durable queue records and any limit
- * above one are P08.6. A full queue rejects immediately ({@code queue-full}); while the runtime
+ * serialized policy selected by P01.7. Engine work arrives through the P08.6 fair scheduler,
+ * which forwards one task at a time and owns priorities, quotas and the durable ledger, so this
+ * queue is a hand-off. A full queue rejects immediately ({@code queue-full}); while the runtime
  * is not ready, submissions and queued tasks end UNAVAILABLE with the readiness reason.
  *
  * <p>Lifecycle: the dispatcher connects (owned stdio child or packaged socket), performs
@@ -56,7 +59,15 @@ import tools.jackson.databind.json.JsonMapper;
  * interrupt, protocol or isolation violation) the task ends UNRESOLVED or FAILED, the thread is
  * marked ambiguous and its session binding retired, and the dispatcher keeps the permit until
  * reconciliation (resume, list newest turns, interrupt anything in progress, await terminal)
- * succeeds. Ambiguity is held in memory only; durable permit records are P08.6.
+ * succeeds. While any thread is unconfirmed, {@link #status()} reports one active turn, so the
+ * scheduler keeps its permit too.
+ *
+ * <p>Restart (P08.6): before {@code turn/start} the thread identifier is handed to the attached
+ * {@link DispatchJournal}, which records it durably; when the record fails, no turn is started
+ * ({@code dispatch-journal-unavailable}). After a backend restart the scheduler passes the
+ * recorded identifiers to {@link #reconcile}; they join the ambiguous threads and are reconciled
+ * on the first connection before any task runs, so a turn left running by the previous process is
+ * interrupted and confirmed instead of overlapping new work.
  *
  * <p>No type of this package is visible outside it; callers see only neutral records.
  */
@@ -93,6 +104,11 @@ final class CodexTaskAdapter implements NarrationTaskPort, SmartLifecycle {
     private volatile Job active;
     private volatile Thread dispatcher;
     private volatile ShutdownRecord lastShutdown;
+    private volatile DispatchJournal journal = DispatchJournal.NONE;
+    /** Thread identifiers recorded by an earlier process, waiting for the dispatcher to reconcile them. */
+    private final Set<String> restartThreads = ConcurrentHashMap.newKeySet();
+    /** Mirror of {@code ambiguousThreads.size()} for {@link #status()}; written by the dispatcher only. */
+    private volatile int ambiguousCount;
 
     // Dispatcher-confined state.
     private RpcGeneration generation;
@@ -163,12 +179,38 @@ final class CodexTaskAdapter implements NarrationTaskPort, SmartLifecycle {
         }
     }
 
-    /** @return non-sensitive readiness and queue counts */
+    /**
+     * @return non-sensitive readiness and queue counts; {@code active} is 1 while a turn runs or
+     *         any thread awaits reconciliation (including identifiers handed over by
+     *         {@link #reconcile} and not yet confirmed)
+     */
     @Override
     public RuntimeStatus status() {
         RuntimeStatus.State current = state;
+        boolean busy = active != null || ambiguousCount > 0 || !restartThreads.isEmpty();
         return new RuntimeStatus(RUNTIME, current, current == RuntimeStatus.State.READY ? null : reason,
-                queue.size(), active == null ? 0 : 1);
+                queue.size(), busy ? 1 : 0);
+    }
+
+    /** Use {@code journal} for the write-ahead record of every later turn start. */
+    @Override
+    public void attachJournal(DispatchJournal journal) {
+        this.journal = Objects.requireNonNull(journal, "journal");
+    }
+
+    /**
+     * Treat thread identifiers recorded by an earlier process as ambiguous: the dispatcher resumes
+     * each one, lists its newest turns and interrupts and confirms any still in progress before it
+     * runs another task. Malformed identifiers cannot have been recorded and are ignored.
+     */
+    @Override
+    public void reconcile(Collection<String> references) {
+        Objects.requireNonNull(references, "references");
+        for (String reference : references) {
+            if (reference != null && DispatchJournal.REFERENCE.matcher(reference).matches()) {
+                restartThreads.add(reference);
+            }
+        }
     }
 
     /** @return how the last generation's wire ended, or null; for diagnostics and tests */
@@ -245,6 +287,7 @@ final class CodexTaskAdapter implements NarrationTaskPort, SmartLifecycle {
                         continue;
                     }
                 }
+                adoptRestartThreads();
                 if (!ambiguousThreads.isEmpty() && !reconcile()) {
                     if (generation != null && generation.failure() == null) {
                         // Usable connection but unconfirmed turns: keep the permit and retry later.
@@ -279,6 +322,16 @@ final class CodexTaskAdapter implements NarrationTaskPort, SmartLifecycle {
             }
             drainQueue(Status.CANCELLED, "shutdown");
             closeGeneration();
+        }
+    }
+
+    /** Move identifiers handed over by {@link #reconcile} into the ambiguous set; dispatcher only. */
+    private void adoptRestartThreads() {
+        for (String threadId : List.copyOf(restartThreads)) {
+            // Count the thread as ambiguous before it leaves the pending set, so status() never dips to idle.
+            ambiguousThreads.add(threadId);
+            ambiguousCount = ambiguousThreads.size();
+            restartThreads.remove(threadId);
         }
     }
 
@@ -449,6 +502,12 @@ final class CodexTaskAdapter implements NarrationTaskPort, SmartLifecycle {
             return;
         }
 
+        // Write-ahead record of the thread, so a later process can reconcile a turn this one leaves.
+        if (!recordStart(id, threadId)) {
+            finish(job, TaskResult.withoutTurn(id, Status.FAILED, "dispatch-journal-unavailable"));
+            return;
+        }
+
         // Start the turn with every setting explicit and register its exact identity.
         TurnInbox inbox;
         current.beginTurnStart(threadId);
@@ -546,9 +605,19 @@ final class CodexTaskAdapter implements NarrationTaskPort, SmartLifecycle {
         };
     }
 
+    /** @return true when the journal durably recorded the thread; a failing journal refuses the start */
+    private boolean recordStart(UUID taskId, String threadId) {
+        try {
+            return journal.recordStart(taskId, threadId);
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
     /** Record an unconfirmed thread and forget every session bound to it. */
     private void markAmbiguous(String threadId) {
         ambiguousThreads.add(threadId);
+        ambiguousCount = ambiguousThreads.size();
         synchronized (sessions) {
             sessions.values().removeIf(binding -> binding.threadId().equals(threadId));
         }
@@ -571,6 +640,7 @@ final class CodexTaskAdapter implements NarrationTaskPort, SmartLifecycle {
                 } catch (ProtocolException e) {
                     if (current.failure() == null && e.code().equals("runtime-rpc-error")) {
                         ambiguousThreads.remove(threadId);
+                        ambiguousCount = ambiguousThreads.size();
                         continue;
                     }
                     throw e;
@@ -582,6 +652,7 @@ final class CodexTaskAdapter implements NarrationTaskPort, SmartLifecycle {
                     }
                 }
                 ambiguousThreads.remove(threadId);
+                ambiguousCount = ambiguousThreads.size();
             } catch (ProtocolException e) {
                 return false;
             }

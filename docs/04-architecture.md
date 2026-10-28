@@ -187,7 +187,10 @@ one active inference turn; qualified concurrency is an opt-in capability, not a
 claim that threads create independent provider capacity. The [planning contract](28-asynchronous-narrative-planning.md)
 owns snapshots, dependency-sensitive admission, lifecycle, fairness and budgets;
 ADR 0014 preserves ADR 0013's verified tool-free runtime isolation. No broker,
-autonomous-agent framework, runtime pool or vector database is required.
+autonomous-agent framework, runtime pool or vector database is required. P08.6
+implements that queue as `InferenceScheduler` over V14 `inference_task` in front of the
+session registry, with one active turn installation-wide
+([docs/06 section 12](06-codex-integration.md#p086-durable-fair-scheduling)).
 
 Interactive work has reserved admission and bounded waiting. No transaction or
 campaign mutation lease is held while a deep background plan runs. Planning

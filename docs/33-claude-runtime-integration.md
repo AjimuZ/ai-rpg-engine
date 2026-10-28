@@ -11,7 +11,7 @@ This document covers only what differs from Codex. Everything else is shared and
 - capability and tool policy, model and effort routing, timeouts and the compatibility gate: [Codex integration §8–§11](06-codex-integration.md#8-capability-and-tool-policy) (those sections apply to the selected runtime);
 - renewal and rebuild from checkpoints: [memory and continuity](08-memory-and-continuity.md);
 - the container isolation profile and its evidence style: [ADR 0013](adr/0013-narration-runtime-isolation.md);
-- the installation-wide one-active-turn default (P01.7) and the durable queue (P08.6).
+- the installation-wide one-active-turn default (P01.7) and the durable fair queue (P08.6, [docs/06 section 12](06-codex-integration.md#p086-durable-fair-scheduling)). A Claude adapter must honor its neutral port duties: record an opaque reference through the attached `DispatchJournal` before each start and start nothing when that fails, count unconfirmed work in `RuntimeStatus.active` until it is confirmed idle, and confirm references handed over by `reconcile` after a restart before running new work (or report that its client process cannot outlive the backend, in which case references are confirmed idle).
 
 ## 2. Verified facts and sources
 

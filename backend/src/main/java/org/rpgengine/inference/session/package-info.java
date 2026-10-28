@@ -6,7 +6,9 @@
  * {@link org.rpgengine.inference.session.AiRole role}, {@link org.rpgengine.inference.session.Audience
  * audience} and the pinned content and policy hashes. {@link org.rpgengine.inference.session.ScopedSessions}
  * maps each scope to its own session identifier and is the only submitter of the port, so callers
- * name a scope and never a session. The role matrix forbids player-facing roles (interpreter,
+ * name a scope and never a session. Since P08.6 the registry's only caller is the fair
+ * {@link org.rpgengine.inference.scheduling.InferenceScheduler}, which decides when a scope's next
+ * task may start. The role matrix forbids player-facing roles (interpreter,
  * narrator, guide) in the privileged audience, which is where planners, directors, reviewers and
  * content or encounter proposers run; a privileged conversation therefore can never render player
  * text, and its earlier context never reaches a public task through a reused runtime conversation.

@@ -365,8 +365,10 @@ inboxes, terminal-only output acceptance and cancellation isolation. It selects
 one active inference turn installation-wide; neither scripted overlap nor
 historical single-task live output proves live simultaneous inference/headroom.
 Task-role priority is backend policy, not an instruction/prompt or a verified
-upstream priority guarantee. Production scheduling and any higher limit remain
-gated by P08/P08.6.
+upstream priority guarantee. P08.6 implements that policy in the fair scheduler
+(each contract kind has a work class; intent and narration are interactive); any
+higher limit remains gated by live qualification
+([docs/06 section 12](06-codex-integration.md#p086-durable-fair-scheduling)).
 
 `tools/runtime_probe/contract.py` defines a deliberately narrow compatibility envelope and `OUTPUT_SCHEMA` for the pinned runtime’s `turn/start.outputSchema`. The independent validator accepts only the exact neutral fact “The marker is blue.” with matching version, task, revision, digest, status, and body, after a confirmed completed turn. Duplicate keys, nonfinite JSON numbers, unknown fields, stale echoes, and oversized output fail closed. This is deterministic contract evidence, not a gameplay validator or a live structured-output result.
 

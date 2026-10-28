@@ -801,7 +801,8 @@ rules are in [docs/06 section 7](../docs/06-codex-integration.md#p083-session-sc
 - `AiRole` fixes the permitted audiences per role. `interpreter` and `narrator` are public
   only, `guide` and `tactician` use a character audience, and the planning and proposal roles
   are privileged only. No player-facing role permits `privileged`.
-- `ScopedSessions` (a Spring component) is the port's only submitter. It reuses the session
+- `ScopedSessions` (a Spring component) is the port's only submitter, and since P08.6 the fair
+  scheduler is its only caller (see below). It reuses the session
   of an equal scope, and it retires superseded lines (new generation, pack or policy hash).
   It also rejects a stale generation (`stale-campaign-generation`) or a campaign under two
   adventures (`session-scope-conflict`) without sending anything, and bounds active sessions.
@@ -900,3 +901,43 @@ Tests: `GroundedNarrationTest` (real PostgreSQL, real job service, assembler, ru
 and contract; only the runtime is the deterministic `NarratorTaskPort`), the retry case in
 `CampaignCommandHttpTest`, the adapted `PresentationJobTest`, and the V13 step of
 `CanonicalMigrationUpgradeTest`.
+
+## Durable fair inference scheduling (P08.6)
+
+`org.rpgengine.inference.scheduling` puts one durable fair priority queue in front of every
+inference task: `ContractRunner` → `InferenceScheduler` → `ScopedSessions` → task port. The rules
+are in [docs/06 section 12](../docs/06-codex-integration.md#p086-durable-fair-scheduling).
+
+- `InferenceScheduler` (a Spring component and lifecycle) admits a `ScheduledTask` (scope,
+  `WorkClass`, slot, instructions, schema, budget) into the ledger, waits for the turn permit,
+  dispatches it in its scope's session with the remaining budget and records the outcome. It
+  preempts running background work for interactive work, keeps the permit through
+  `RECONCILING` until the port confirms an unconfirmed outcome, suspends background work after
+  an account condition and recovers before any admission at startup.
+- `FairQueue` is the pure selection policy: interactive first, one task at a time per
+  campaign/role/audience line in admission order, background aging, fair campaign rotation and
+  the interactive permit reservation.
+- `JdbcTaskLedger` writes V14 `inference_task` (one row per task; identities, class, timing,
+  outcome codes, estimated usage and an internal runtime reference; never instructions or
+  output) and `inference_scheduler_state` (the account backoff). The partial unique index
+  `inference_task_one_turn_uk` allows one dispatched or reconciling task installation-wide.
+- `DispatchJournal` (neutral) is the write-ahead record the adapter makes before `turn/start`;
+  `NarrationTaskPort.reconcile` receives recorded references after a restart.
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `engine.inference.scheduler.max-active` | `1` | Runtime turns at once; above 1 fails startup (`concurrency-unqualified`) |
+| `engine.inference.scheduler.interactive-capacity` / `interactive-per-campaign` | `16` / `4` | Interactive tasks waiting or running, installation-wide / per campaign |
+| `engine.inference.scheduler.background-capacity` / `background-per-campaign` | `8` / `2` | Background tasks waiting or running, installation-wide / per campaign |
+| `engine.inference.scheduler.daily-usage-limit` / `background-daily-usage-limit` | `4000000` / `400000` | Estimated usage units per rolling 24 hours, all classes / background classes |
+| `engine.inference.scheduler.aging-step-seconds` | `60` | Waiting time that promotes a background task by one class |
+| `engine.inference.scheduler.backoff-initial-seconds` / `backoff-max-seconds` | `30` / `900` | Account backoff of background work, doubling with ±20% jitter |
+| `engine.inference.scheduler.tick-ms` | `100` | Timer for queue deadlines, reconciliation and backoff expiry |
+
+Tests: `FairQueueTest` (pure policy, including several permits), `InferenceSchedulerTest` (real
+PostgreSQL, real ledger, sessions and scheduler; only the runtime is the `ControlledPort`
+double), `SchedulerBoundaryTest`, the journal and restart cases of `CodexTaskAdapterTest`, the
+scheduler wiring case of `TaskPortSelectionTest`, the V14 step of
+`CanonicalMigrationUpgradeTest`, and `GroundedNarrationTest`, which now runs through the real
+scheduler and ledger. Suites without a database use `MemoryTaskLedger` through
+`SchedulerFixtures`.

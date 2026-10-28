@@ -91,6 +91,7 @@ final class ScriptedTaskPort implements NarrationTaskPort {
 
     @Override
     public RuntimeStatus status() {
-        throw new UnsupportedOperationException("not used by the contract runner");
+        // Read by the scheduler to confirm that nothing runs after an unresolved outcome.
+        return new RuntimeStatus("scripted", RuntimeStatus.State.READY, null, 0, 0);
     }
 }

@@ -68,7 +68,7 @@ class CampaignCreationPersistenceTest {
     void clear() {
         jdbc.execute("drop trigger if exists p061_fail on campaign_creation");
         jdbc.execute("drop function if exists p061_fail()");
-        jdbc.execute("truncate narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_activation, plan_disposition, "
+        jdbc.execute("truncate inference_task, narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_activation, plan_disposition, "
                 + "plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, "
                 + "query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, "
                 + "campaign_checkpoint, reward_settlement, campaign_event, operation_journal, actor_resource, actor, "

@@ -26,6 +26,9 @@ import org.rpgengine.identity.OwnerProfile;
 import org.rpgengine.inference.RuntimeStatus;
 import org.rpgengine.inference.contract.ContractRunner;
 import org.rpgengine.inference.contract.NarrationContract;
+import org.rpgengine.inference.scheduling.InferenceScheduler;
+import org.rpgengine.inference.scheduling.SchedulerSettings;
+import org.rpgengine.inference.scheduling.TaskLedger;
 import org.rpgengine.inference.session.ScopedSessions;
 import org.rpgengine.presentation.PresentationJobService;
 import org.rpgengine.presentation.SupportedLocale;
@@ -57,6 +60,7 @@ class GroundedNarrationTest {
     @Autowired private EntityManager entities;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager manager;
+    @Autowired private TaskLedger ledger;
     private NarratorTaskPort port;
     private PresentationJobService jobs;
     private UUID owner;
@@ -103,15 +107,19 @@ class GroundedNarrationTest {
         });
         revision = 0;
         port = new NarratorTaskPort();
-        var narration = new GroundedNarration(port, assembler, new ContractRunner(new ScopedSessions(port, 16),
-                Clock.systemUTC()), new NarrationContract(), Duration.ofSeconds(20));
+        // The real fair scheduler over the real ledger: narration is interactive work behind the single permit.
+        var scheduler = new InferenceScheduler(new ScopedSessions(port, 16), port, ledger, SchedulerSettings.defaults(),
+                Clock.systemUTC(), () -> 0.5);
+        scheduler.recover();
+        var narration = new GroundedNarration(port, assembler, new ContractRunner(scheduler, Clock.systemUTC()),
+                new NarrationContract(), Duration.ofSeconds(20));
         jobs = new PresentationJobService(entities, jdbc, manager, narration);
     }
 
     /** Remove disposable rows; constraints and triggers remain installed. */
     @AfterEach
     void clear() {
-        jdbc.execute("truncate narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, "
+        jdbc.execute("truncate inference_task, narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, "
                 + "campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, "
                 + "learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, "
                 + "quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, "

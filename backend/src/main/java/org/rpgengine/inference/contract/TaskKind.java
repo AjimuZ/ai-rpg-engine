@@ -2,6 +2,7 @@ package org.rpgengine.inference.contract;
 
 import java.time.Duration;
 
+import org.rpgengine.inference.scheduling.WorkClass;
 import org.rpgengine.inference.session.AiRole;
 import org.rpgengine.inference.session.Audience;
 import org.rpgengine.inference.session.SessionScope;
@@ -46,6 +47,14 @@ public enum TaskKind {
     /** @return the logical role; interpretation and narration are separate roles with separate sessions */
     public AiRole role() {
         return role;
+    }
+
+    /**
+     * @return the scheduling class (P08.6); intent interpretation and the narration of a committed
+     *         player action are what the player waits for, so both are interactive
+     */
+    public WorkClass workClass() {
+        return WorkClass.INTERACTIVE;
     }
 
     /** @return the disclosure audience; every P08.2 kind runs for the public player audience */

@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V13 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V14 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -238,6 +238,23 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(0, jdbc.queryForObject("select count(*) from narration_publication", Integer.class));
                     assertEquals(0, jdbc.queryForObject("select count(*) from presentation_job", Integer.class));
                     assertEquals(0, v13.migrate().migrationsExecuted);
+                    // V14 adds the scheduler ledger and backoff state without touching canonical rows or
+                    // inventing tasks; the single-turn index exists from the start.
+                    String v13Campaign = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
+                    Flyway v14 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("14").load();
+                    assertEquals(1, v14.migrate().migrationsExecuted);
+                    assertTrue(v14.validateWithResult().validationSuccessful);
+                    assertEquals(v13Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c",
+                            String.class));
+                    assertEquals(v12Journal, jdbc.queryForObject("select to_jsonb(o)::text from operation_journal o",
+                            String.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from inference_task", Integer.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from inference_scheduler_state",
+                            Integer.class));
+                    assertEquals(1, jdbc.queryForObject("select count(*) from pg_indexes where schemaname = ? "
+                            + "and indexname = 'inference_task_one_turn_uk'", Integer.class, schema));
+                    assertEquals(0, v14.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

@@ -1633,6 +1633,45 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     task identities/titles and the pending P98 follow-up are preserved; only P08.5 gains a
     completion mark.
 - [ ] P08.6 Implement one durable fair priority queue with isolated logical role/audience threads, interactive reservations, bounded quota/backoff/cancel/restart handling and conservative single-active-turn default; higher concurrency requires P01.7 evidence and QA-37.
+  - Package A — ledger and permit: V14 `inference_task` records every admitted task
+    (identities, campaign, generation, role, audience, work class, slot, outcome code,
+    owning process, estimated and charged usage, an internal write-ahead runtime reference,
+    preemption mark; never instructions or output) through `QUEUED`, `DISPATCHED`,
+    `RECONCILING` and terminal states under a guard trigger, and `inference_scheduler_state`
+    holds the durable account backoff. The partial unique index `inference_task_one_turn_uk`
+    keeps one dispatched or reconciling task installation-wide, also across processes;
+    `engine.inference.scheduler.max-active` above 1 fails startup (`concurrency-unqualified`).
+  - Package B — fair selection: the pure `FairQueue` policy serves interactive work first,
+    runs one task at a time per campaign/role/audience line in admission order, ages
+    background work (never into the interactive class), rotates campaigns fairly and keeps
+    the interactive permit reservation; `InferenceScheduler` admits through separate
+    interactive and background queue places, rolling 24-hour usage quotas and campaign
+    scope/generation/identity checks, dispatches through `ScopedSessions` with the remaining
+    budget, and preempts background work by exact handle, keeping the permit until its
+    terminal result.
+  - Package C — failures and restart: cancellation of waiting and running work, queue
+    deadlines, `RECONCILING` holds until the port confirms an unconfirmed outcome, a durable
+    jittered backoff of background work after account conditions, startup recovery
+    (abandon earlier queued rows, take over dispatched ones with the permit held, hand their
+    references to `NarrationTaskPort.reconcile`), ownership fencing, and the Codex adapter's
+    write-ahead `DispatchJournal` record before `turn/start`, restart-thread reconciliation
+    and unconfirmed threads counted as active. `ContractRunner` and grounded narration submit
+    through the scheduler. See [docs/06 section 12](06-codex-integration.md#p086-durable-fair-scheduling).
+  - Exit checks: pure policy tests (interactive priority, line isolation and order, rotation,
+    single- and multi-permit reservation, aging bounds, suspension, held permits, preemption
+    victim); real-PostgreSQL scheduler tests through the real ledger, sessions and scheduler
+    with only the runtime scripted (durable transitions, one turn at a time, preemption with
+    the permit kept until terminal, campaign rotation, bounded places, quotas surviving a
+    restart and releasing unstarted turns, durable backoff, cancellation, queue deadlines,
+    reconciliation holds, restart recovery with fencing, two processes on one database, scope,
+    generation and identity checks, the journal refusal, shutdown, database guards); the real
+    Codex adapter against the scripted app-server (write-ahead record before `turn/start`, no
+    turn without it, restart threads reconciled before the first turn); the boundary, Spring
+    wiring and settings refusals; the adapted contract, narration and V14 migration suites;
+    deliberate weakening probes; the full packaged backend and repository checks. Live
+    qualification of more than one turn, live quota and priority behavior, background task
+    kinds (P08.7, P09.3, P12, P15), owner-facing status and settings (P21.3) and observed token
+    accounting are not part of this task.
 - [ ] P08.7 Add the versioned bounded quest-plan contract and selective dependency validation/replanning with a playable no-plan baseline; prove contract/admission/fallback with deterministic fixtures. A live investigation comparison may be deferred/unavailable without blocking MVP; no forced player choice or waiting for a whole arc.
 
 **Exit:** an action runs through Codex interpretation when needed, deterministic resolution, save, and grounded narration without raw tool logs. **Checks:** protocol fixtures, invalid output corpus, no-secret projection tests, opt-in neutral real smoke. **Suggested commit:** `Integrate validated narrative orchestration`.

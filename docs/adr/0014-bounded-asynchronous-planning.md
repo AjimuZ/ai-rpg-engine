@@ -67,4 +67,13 @@ priority remain unverified. No production scheduler or throughput result is
 claimed. P08.6 still gates every increase, and the P01 live isolation recheck
 remains required. This confirms the existing decision without changing topology.
 
+P08.6 (28 October 2026) implements the selected topology's durable priority queue
+without changing this decision: one fair scheduler with isolated role/audience lines,
+interactive reservation and preemption, bounded queue places, rolling usage quotas,
+a durable account backoff, cancellation-terminal and restart reconciliation, and one
+active turn enforced by setting and by a database index. Its evidence is deterministic
+(real PostgreSQL with a scripted runtime, the real adapter against the scripted
+app-server); live concurrency, quota and priority behavior remain unqualified
+([docs/06 section 12](../06-codex-integration.md#p086-durable-fair-scheduling)).
+
 Planned AP-01–AP-12 cover selective staleness, query phantoms, admission races, duplicate workers, fencing, cancellation/EOF/restart, play-before-plan fallback, world-time separation, secret sinks, cross-adventure fairness/restore, author constraints and bilingual A/B/C evaluation. Compare single narration, narration plus planning, and optional review with measured quality, p50/p95 latency, usage and waste. P03.6 covers only the storage/admission subset above. P07.6 adds the transactional scope/content/author/typed-dependency gate and activation through ordinary commands, with deterministic real-PostgreSQL evidence for the AP-01–AP-05 admission assertions and AP-08's no-canonical-change rule; no full AP acceptance or superiority is claimed. Evidence, proposed objectives, ownership and source links are in the [planning specification](../28-asynchronous-narrative-planning.md).

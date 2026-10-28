@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — Durable fair inference scheduling, 28 October 2026
+
+- Put every AI task behind one durable fair priority queue. Interactive work (interpreting the
+  player's input and narrating the player's action) always goes first; background work waits,
+  ages fairly and is interrupted when the player needs the runtime. Campaigns take turns, and
+  each campaign/role/audience conversation runs one task at a time in order.
+- Keep one active runtime turn for the whole installation, as the earlier concurrency check
+  selected. A higher setting is refused at startup, and the database itself allows only one
+  dispatched or unconfirmed task, even with two backend processes.
+- Bound the queue: separate places for interactive and background work, rolling daily usage
+  estimates for all work and for background work, and a growing, jittered pause of background
+  work after a usage-limit, rate-limit, overload or authorization error. Limits and pauses
+  survive a restart and never switch runtime, model, account or billing.
+- Record every task's admission, dispatch and outcome without storing its text. A task whose
+  outcome could not be confirmed keeps the runtime reserved until the runtime confirms that
+  nothing still runs. The Codex adapter records its conversation before starting each turn, so
+  after a restart the engine first stops a turn the previous process left running, then
+  continues; waiting work of the previous process is dropped and re-requested by its owner.
+- Pass 92 focused cases, 31 of them new, and all 614 packaged backend tests in 63 suites with
+  zero failures/errors/skips; twenty-four deliberate weakening probes were detected. No live
+  runtime or account was used, so multi-turn concurrency and live quota behavior remain
+  unqualified.
+
 ## Unreleased — Validated narration publication, receipt fallback and narration-only retry, 28 October 2026
 
 - Narrate each committed action from its public events only: the engine states every public

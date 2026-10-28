@@ -114,6 +114,7 @@ A slot assignment is the backend, a model identifier, parameters (context size, 
 On the 12 GB host one heavy model is GPU-resident at a time. The coordinator of [local speech §8](30-local-speech-synthesis.md) is extended to text.
 
 - **Priorities.** Interactive text (intent, narration, tactics) first; image for the scene being read; speech; background summaries and planning; pre-generation last.
+- **Text queue.** Text tasks already pass through the P08.6 fair scheduler, which owns their priority classes, the single text turn permit, quotas and restart reconciliation ([docs/06 section 12](06-codex-integration.md#p086-durable-fair-scheduling)). The coordinator sits behind that permit for text (a text task holds a GPU lease only while it holds the scheduler's permit) and adds image and speech leases beside it; it never creates a second text queue.
 - **Lease.** An image or speech job asks for a lease. The coordinator saves the narration slot's prompt cache, unloads the text model with `POST /models/unload`, confirms the VRAM was freed, runs the batch, reloads with `POST /models/load` and restores the cache. Image batches are grouped to pay the swap once, and a lease has a time cap.
 - **Interruption.** A diffusion job checks for interactive demand between steps and yields. No lease starts while a text request is queued or expected within the reading window.
 - **Profiles.** Admission needs a measured VRAM and load-time profile for the exact model and precision. An unprofiled model is admitted only alone, with extra headroom.

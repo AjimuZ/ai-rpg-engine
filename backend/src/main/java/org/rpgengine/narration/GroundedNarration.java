@@ -22,7 +22,7 @@ import org.rpgengine.inference.contract.NarrationContext;
 import org.rpgengine.inference.contract.NarrationContract;
 import org.rpgengine.inference.contract.NarrationProposal;
 import org.rpgengine.inference.contract.TaskKind;
-import org.rpgengine.inference.session.ScopedSessions;
+import org.rpgengine.inference.scheduling.InferenceScheduler;
 import org.rpgengine.presentation.NarrationPort;
 import org.rpgengine.presentation.PresentationJobService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,8 +53,10 @@ import org.springframework.stereotype.Component;
  * the final locale and glossary currency check. Raw output text, prompts and runtime diagnostics
  * never leave this class except as the validated publication.
  *
- * <p>The caller is the single presentation worker, so at most one narration turn runs at a time,
- * matching the serialized-inference default of P01.7 until P08.6 qualifies more.
+ * <p>The caller is the single presentation worker. Its tasks are interactive work of the P08.6 fair
+ * scheduler: they wait for the installation's single turn permit (preempting background work), and
+ * their queue time counts against the narration budget. A scheduler refusal (queue places, quota)
+ * is a transport outcome and maps to {@link NarrationPort.Outcome#FAILED}.
  */
 @Component
 public class GroundedNarration implements NarrationPort {
@@ -68,22 +70,22 @@ public class GroundedNarration implements NarrationPort {
     private final Duration budget;
 
     /**
-     * Spring constructor: the installation's scoped submitter and the default narration budget.
+     * Spring constructor: the installation's fair scheduler and the default narration budget.
      *
      * @param port the installation's task port, read only for its readiness
      * @param assembler public context assembler
-     * @param sessions scoped task submitter (P08.3) over the same port
+     * @param scheduler fair inference scheduler (P08.6) in front of the scoped sessions of the same port
      */
     @Autowired
-    public GroundedNarration(NarrationTaskPort port, NarrationContextAssembler assembler, ScopedSessions sessions) {
-        this(port, assembler, new ContractRunner(sessions, Clock.systemUTC()), new NarrationContract(),
+    public GroundedNarration(NarrationTaskPort port, NarrationContextAssembler assembler, InferenceScheduler scheduler) {
+        this(port, assembler, new ContractRunner(scheduler, Clock.systemUTC()), new NarrationContract(),
                 TaskKind.NARRATION.defaultBudget());
     }
 
     /**
      * @param port task port whose readiness is checked first; tasks go through {@code runner}
      * @param assembler public context assembler
-     * @param runner contract runner over the scoped submitter
+     * @param runner contract runner over the fair scheduler
      * @param contract narration contract
      * @param budget total budget of both attempts; with {@link #WAIT_MARGIN} it must fit the job lease
      * @throws IllegalArgumentException when the budget is outside the task port range or the lease
