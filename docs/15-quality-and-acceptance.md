@@ -46,8 +46,8 @@ runtime scripted.
   preparation-owned `PlanAssumptions`. The retired-generation probe was added with it, and all
   13 probes were detected on the final code.
 
-All 26 repository-policy tests pass with zero findings. Frontend sources are unchanged, so the
-frontend gates were not rerun.
+All 26 repository-policy tests pass with zero findings. Frontend sources are unchanged. The
+frontend gates were not part of this first record and ran in the re-verification below.
 
 Not verified:
 - callers switched to envelopes: the intent, narration and planner contracts still build their
@@ -60,6 +60,28 @@ Not verified:
 
 The implementation owner commit is `2e6e32f`. Every check above passed on its exact sources,
 and only P09.2 then gains a completion mark (55 of 131 roadmap entries).
+
+P09.2 re-verification (28 October 2026). The completion was returned for missing checks, so
+every command of the project check plan was run on the clean tree at `801c8e4`. Backend and
+frontend sources are unchanged since `2e6e32f`. An interrupted later probe run had left the
+`assumption-unlabelled` weakening in `ContextEnvelope.java`. It was restored to the committed
+bytes before any check ran. Probes now mutate only an exported copy of HEAD.
+
+- **Passed:**
+  - `git diff --check HEAD`;
+  - repository checks (0 findings) and their 26 tests;
+  - frontend install, typecheck, 77 tests in 13 files, 5 localization checks and the localized
+    build;
+  - the full packaged backend `verify`: 687 tests in 70 suites with zero failures, errors or
+    skips, and the jar packaged;
+  - 9 backup tests;
+  - the runtime probe: 116 cases with 18 opt-in skips, and each of its eight modules separately.
+- **Focused:** the 13 context cases pass on the unmutated copy, and all 13 weakening probes are
+  detected again.
+- **Environment limit:** `tools/container_packaging` runs 23 cases with 2 opt-in skips. It
+  reports 4 errors: two BuildKit context cases and two Compose render cases. Each error is
+  `FileNotFoundError: 'docker'` because the development container has no Docker. P09.2 changes
+  no packaging input, and the hosted packaging job enforces these cases.
 
 P09.1 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **8 new cases and all 674 packaged backend cases in 68 suites**, with zero failures, errors

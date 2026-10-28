@@ -49,6 +49,10 @@
   and planning tasks adopt these contexts with checkpoints and renewal (P09.3 onward). Record
   implementation owner commit `2e6e32f` before marking P09.2 complete (55 of 131 roadmap
   entries).
+- Re-verify the context work against the complete project check plan on unchanged sources:
+  frontend gates, the full backend (687 tests), backup, repository and runtime-probe suites
+  pass and all 13 weakening probes are detected again. The Docker-dependent packaging cases
+  are left to hosted CI because the development container has no Docker.
 
 ## Unreleased — Typed knowledge, last known locations and unresolved commitments, 28 October 2026
 

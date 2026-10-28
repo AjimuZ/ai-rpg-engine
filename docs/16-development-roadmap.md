@@ -1937,6 +1937,27 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     commit: `2e6e32f`; all exit checks passed on that exact code before this completion mark.
     All 131 task identities/titles and the pending P98 follow-up are preserved; only P09.2
     gains a completion mark.
+  - Re-verification (28 October 2026), after the completion was returned for missing checks:
+    the earlier record had not run the frontend gates or the backup, runtime-probe and
+    packaging suites of the project check plan.
+    An interrupted later session had also left the `assumption-unlabelled` probe applied to
+    `ContextEnvelope.java` in the working tree. That line was restored to its committed bytes
+    (the blob is identical to `2e6e32f` and HEAD), and the probes now mutate only an exported
+    copy of HEAD, so a stopped run cannot leave the checkout weakened. Backend and frontend
+    sources are unchanged since `2e6e32f`. On the clean tree at `801c8e4` every command of the
+    project check plan ran:
+    - passed: `git diff --check HEAD`, the repository checks (0 findings) and their 26 tests,
+      frontend install, typecheck, 77 tests in 13 files, 5 localization checks and the
+      localized build, the full packaged backend `verify` (687 tests in 70 suites, zero
+      failures/errors/skips, jar packaged), the 9 backup tests and the runtime probe (116
+      cases, 18 opt-in skips; each of its eight modules also passed separately);
+    - focused: the 13 `ContextSelectionTest`/`ContextAssemblerTest` cases passed on the
+      unmutated copy, and all 13 weakening probes were detected again;
+    - environment: `tools/container_packaging` ran 23 cases with 4 errors (two BuildKit
+      context and two Compose render cases) and 2 opt-in skips; every error is
+      `FileNotFoundError: 'docker'` because this container has no Docker. This matches the
+      P09.1 record; P09.2 changes no packaging input, and the hosted packaging job enforces
+      these cases.
 - [ ] P09.3 Implement checkpoints, source-linked summaries, freshness/invalidation, and bounded background jobs.
 - [ ] P09.4 Implement count/context/error-triggered renewal and manual idle renewal, preserving transcript and campaign.
 - [ ] P09.5 Reconcile restart, committed narration pending, missing dependencies, and stale summaries.
