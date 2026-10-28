@@ -1784,7 +1784,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 
 **Depends on:** P08. **Areas:** knowledge, memory, retrieval, AI sessions, resume UI.
 
-- [ ] P09.1 Implement typed facts, beliefs, provenance, scopes, current/last-known location, and unresolved commitments.
+- [x] P09.1 Implement typed facts, beliefs, provenance, scopes, current/last-known location, and unresolved commitments.
   - Package A — typed records (V15, `org.rpgengine.knowledge`): `knowledge_claim` (typed
     `EXISTS`/`PROPERTY`/`RELATION`/`STATEMENT` proposition about an `actor:`/`item:` row or a
     `location:`/`definition:` content id, statement language, `COMMON`/`HOLDERS` disclosure,
@@ -1824,6 +1824,33 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     - Not part of this task: context envelopes and retrieval (P09.2), the `reveal` effect and
       plan consumers (P10), NPC-side observation and commitment witnesses (P11/P15), player
       panels (P10.5) and retiring the free-text `campaign_known_fact` projection.
+  - Verified evidence (28 October 2026): 8 new real-PostgreSQL cases in `KnowledgeLedgerTest`, the
+    V15 step of `CanonicalMigrationUpgradeTest`, and all 674 packaged backend cases in 68 suites
+    pass with zero failures/errors/skips on the scoped JDK 21/PostgreSQL 18.6 fixture; the jar is
+    packaged. Over a sealed pack, production campaign creation and the real admission, rules,
+    resolver and commit:
+    - holder views carry stance and acquisition but no truth, another holder's belief never
+      leaks, and determination, belief revision and claim supersession record exact event
+      sequences, row versions and scope epochs;
+    - ten refused premises each roll back the whole operation, including earlier valid writes;
+    - rumors, false or undetermined claims, another actor's knowledge, superseded beliefs and
+      free-text known facts never reveal; a believed true claim opens the secret cellar and a
+      common true claim the secret lurker;
+    - observation records the public warden and not the concealed lurker, the last known
+      location stays put when the warden really leaves, a later look records the absence and a
+      new sighting replaces it; a reported sighting keeps the informant's wrong account;
+    - commitments reach only their parties or everyone when common, become overdue without any
+      write, resolve once and refuse reopening, rewriting and deletion;
+    - a registered intention cannot write an uninvolved actor's knowledge.
+    Twenty-one deliberate weakening probes each made the suite fail and were reverted
+    byte-identically. The two-process scheduler test, which failed intermittently by completing
+    a task before its port registered it, now waits for the registration (8/8 clean reruns).
+    All 26 repository-policy tests pass with zero findings. Not verified: context assembly over
+    these views (P09.2), any writer from play (`reveal` effect, plan consumers, dialogue
+    promises; P10/P12/P15), NPC-side observation and player panels. Implementation owner
+    commit: `24dba76`; all exit checks passed on that exact code before this completion mark.
+    All 131 task identities/titles and the pending P98 follow-up are preserved; only P09.1
+    gains a completion mark.
 - [ ] P09.2 Build stamped context envelopes, mandatory/optional budgets, ID/full-text retrieval and overflow behavior; distinguish private planning assumptions from admitted facts and public narration, with language/glossary binding.
 - [ ] P09.3 Implement checkpoints, source-linked summaries, freshness/invalidation, and bounded background jobs.
 - [ ] P09.4 Implement count/context/error-triggered renewal and manual idle renewal, preserving transcript and campaign.

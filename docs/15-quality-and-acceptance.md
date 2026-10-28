@@ -1,5 +1,84 @@
 # Quality Strategy and Acceptance Criteria
 
+P09.1 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
+**8 new cases and all 674 packaged backend cases in 68 suites**, with zero failures, errors
+or skips; the executable jar is packaged. The new cases are in `KnowledgeLedgerTest`. The V15
+step of `CanonicalMigrationUpgradeTest` shows an upgraded save gains empty knowledge tables,
+exact canonical rows, unchanged P07.6 reference values and null (stale) `claim:`, `belief:` and
+`commitment:` references. The pack is sealed and registered, the campaign is created by
+production code, and admission, rules, resolver, commit and database are real; trusted internal
+operations stand in for the writers that later packages add.
+
+- **Truth versus belief:**
+  - The player's view of a rumored statement has its content, `RUMORED`, `TOLD` and the
+    informant, but no truth or disclosure.
+  - The warden's knowledge of the secret cellar stays out of the player's view, and a common
+    property claim appears once.
+  - Determining the statement `FALSE` and the player's `DOUBTS` revision step the claim and
+    belief row versions, close the old belief at that revision and bump `knowledge:claims` and
+    `knowledge:<player>` only.
+  - A superseding claim keeps the old one's truth and closes its interval.
+- **Rollback:** ten refused premises each leave every world and knowledge table exact, including
+  a valid claim written earlier in the same operation:
+  - `KNOWS` on an undetermined claim;
+  - a second current belief about one claim;
+  - a stale determination;
+  - an unrelated claim predecessor;
+  - a foreign-holder belief predecessor;
+  - foreign subject, holder and unknown item references;
+  - an observed sighting elsewhere than the real location;
+  - a second resolution.
+
+  Constructors refuse impossible shapes, and a change citing an event outside its operation is
+  refused.
+- **Reveals:** neither of these discloses the secret cellar or lurker: a rumor, a common
+  `FALSE` claim, an undetermined common claim, the warden's `KNOWS` or a free-text
+  `campaign_known_fact`. A believed `TRUE` claim admits and commits `MOVE cellar`, a determined
+  common claim admits `SPEAK` to the lurker, and a later `DOUBTS` closes the route again. Every
+  refusal writes nothing.
+- **Perception:** a committed `WAIT` sights the public warden and not the concealed lurker.
+  When the warden really moves away, the player's view still says trailhead, while the
+  privileged view shows both places. The next look records the absence, and moving to the grove
+  replaces it, citing the operation's first event. A reported sighting keeps the informant's
+  wrong place.
+- **Commitments:** each party sees its own and common commitments, not the warden's obligation
+  to the lurker. Waiting past the deadline makes the promise overdue without any write. It
+  resolves once with its revision and leaves the audience view. Reopening, rewriting and
+  deletion are refused.
+- **Attribution and guards:** a `SPEAK` to the warden cannot plant a belief in the lurker but
+  can teach the speaker. Direct SQL is refused for:
+  - wrong-revision provenance;
+  - shape and grammar violations;
+  - a changed determined truth;
+  - a frozen subject;
+  - deletes;
+  - `KNOWS` on an undetermined claim;
+  - a changed stance;
+  - a backward sighting.
+
+  Views refuse foreign audiences and ambient transactions.
+- **Probes:** 21 deliberate weakening probes each made `KnowledgeLedgerTest` fail and were
+  reverted byte-identically (SHA-256). The first run detected 20. Removing the ledger's
+  duplicate-belief check was then still refused by the database index, so the test now asserts
+  the specific exception per case, and the rerun detected it.
+- **Scheduler test:** `twoProcessesSharingTheDatabaseNeverRunTwoTurnsAtOnce` failed in the first
+  full run and in 1 of 3 isolated reruns, because it completed a task before the port double
+  registered it. It now waits for the registration and passed 8 of 8 reruns and the final full
+  run.
+
+All 26 repository-policy tests pass with zero findings. Frontend sources are unchanged, so the
+frontend gates were not rerun.
+
+Not verified:
+- context envelopes and retrieval over these views (P09.2);
+- writers from play: the `reveal` effect, plan consumers and dialogue promises (P10, P12,
+  P15);
+- NPC-side observation and player panels (P10.5);
+- QA-08 and delayed-promise recall, which need P09.2–P09.5.
+
+The implementation owner commit is `24dba76`. Every check above passed on its exact sources,
+and only P09.1 then gains a completion mark (54 of 131 roadmap entries).
+
 P08.7 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **52 new cases and all 666 packaged backend cases in 67 suites**, with zero failures, errors
 or skips; the executable jar is packaged. The new cases are 38 in `QuestPlanContractTest`, one

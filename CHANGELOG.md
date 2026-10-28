@@ -26,6 +26,11 @@
   versions and query scopes, so prepared quest plans that read them become stale correctly.
 - Make the two-process scheduler test wait for the real dispatch instead of a fixed delay, which
   failed intermittently (about one run in three) when the dispatch journal write was slow.
+- Pass 8 new cases and all 674 packaged backend tests in 68 suites with zero
+  failures/errors/skips; 21 deliberate weakening probes were detected. Writers from play
+  (reveal effects, plan consumers, promises made in dialogue) and context assembly over these
+  records come later. Record implementation owner commit `24dba76` before marking P09.1
+  complete (54 of 131 roadmap entries).
 
 ## Unreleased — Bounded quest-plan contract with selective replanning and a playable no-plan baseline, 28 October 2026
 
