@@ -23,6 +23,8 @@
   fencing. Pass configured frontend checks, both locale builds, all 22
   repository-policy tests with zero scan findings and the offline backup tests.
   Narration and browser binding remain later work.
+- Record implementation owner commit `dd122c0` before marking P07.5 complete (45 of
+  131 roadmap entries).
 
 ## Unreleased — Local command execution, 28 October 2026
 

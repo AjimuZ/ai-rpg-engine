@@ -49,7 +49,9 @@ offline database-backup tests for the V11 catalog. This adds cancellation-race,
 resumable-delivery and post-commit presentation evidence toward QA-03, QA-17, QA-18,
 QA-19 and QA-20 and the docs/07 interrupt matrix; it does not claim narration (P08),
 browser stream/cancel binding (P05.6/P05.7), a live V11 dump/restore rehearsal or full
-acceptance of those scenarios.
+acceptance of those scenarios. The neutral implementation owner commit is `dd122c0`;
+every check above passed on its exact Java and SQL sources, and only P07.5 then gains a
+completion mark (45 of 131 roadmap entries).
 
 P07.4 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks
 pass **151 focused command cases and all 414 packaged backend cases in 34 suites**,

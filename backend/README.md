@@ -675,3 +675,10 @@ commit through an advisory-lock trigger; equivalent-attempt draw streams),
 `PublicStreamTest`, `PresentationJobTest` and `CampaignStreamHttpTest`. Test fixtures that
 truncate tables must include `presentation_job`, `campaign_stream_message` and
 `campaign_stream_head`.
+
+Verified on 28 October 2026 with the unchanged scoped JDK 21 toolchain and disposable
+PostgreSQL 18.6 fixture: 173 focused cases and all 435 packaged backend cases in 38
+suites pass with zero failures/errors/skips, and the executable jar is packaged.
+Configured frontend checks, EN/IT builds, 22 repository policy tests, zero-finding scans
+and the offline backup tests also pass. See
+[evidence scope](../docs/15-quality-and-acceptance.md).
