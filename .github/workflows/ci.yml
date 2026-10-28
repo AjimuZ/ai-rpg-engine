@@ -157,7 +157,11 @@ jobs:
       # Exports real BuildKit contexts and renders Compose; starts no service. The
       # opt-in PACKAGING_DOCKER service-recreation check stays out of ordinary CI
       # until native Linux secret-mount ownership is qualified (docs/16 P02.3).
+      # PACKAGING_REQUIRE_DOCKER makes a missing docker executable fail here
+      # instead of taking the Docker-less development-host skip.
       - name: Check build contexts and Compose boundaries
+        env:
+          PACKAGING_REQUIRE_DOCKER: "1"
         run: python -B -m unittest discover -s tools/container_packaging -v
       - name: Lint the engine Dockerfile
         run: docker build --check -f docker/engine/Dockerfile .

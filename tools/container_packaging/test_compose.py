@@ -2,6 +2,8 @@
 
 Inputs are the tracked Compose and example environment files. Outputs are test
 assertions; missing Compose, invalid configuration, or unsafe mounts fail tests.
+A host with no `docker` executable at all skips them unless Docker is required
+(`docker_requirement.py`; hosted CI requires it, so the absence fails there).
 No services are started and no existing account or secret contents are read.
 """
 
@@ -10,10 +12,13 @@ from pathlib import Path
 import subprocess
 import unittest
 
+from docker_requirement import requires_docker_cli
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
+@requires_docker_cli
 class ComposeTest(unittest.TestCase):
     """Validate Compose's resolved configuration; unsafe service boundaries fail."""
 

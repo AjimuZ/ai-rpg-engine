@@ -2,7 +2,9 @@
 
 Run from any directory with Python and a Linux Docker/BuildKit daemon available.
 Tests create only disposable fixture files under the repository's ignored scratch
-area, export scratch-stage builds, and fail on missing tools or unexpected files.
+area, export scratch-stage builds, and fail on missing Buildx, daemon or build
+errors and on unexpected files. A host with no `docker` executable at all skips
+them unless Docker is required (`docker_requirement.py`; hosted CI requires it).
 No repository credentials are read, and no containers or volumes are started.
 """
 
@@ -11,12 +13,15 @@ import subprocess
 import tempfile
 import unittest
 
+from docker_requirement import requires_docker_cli
+
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRATCH = ROOT / ".local" / "scratch"
 FRONTEND = "docker/dockerfile:1.27.1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e"
 
 
+@requires_docker_cli
 class BuildContextTest(unittest.TestCase):
     """Export fixture contexts and compare allowed files; Docker errors fail tests."""
 

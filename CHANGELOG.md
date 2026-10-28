@@ -13,6 +13,20 @@
   The race had shown up once as an intermittent `CodexTaskAdapterTest` failure in a full
   backend run.
 
+## Unreleased — Packaging checks on hosts without Docker, 28 October 2026
+
+- On a development host with no `docker` executable, such as the Linux toolchain
+  container, the BuildKit build-context and rendered Compose boundary checks are now skipped.
+  The skip reason says that hosted CI enforces them. Previously each of the four cases
+  reported a `FileNotFoundError` that described the host, not the packaging inputs.
+- These checks stay mandatory where they matter. The CI packaging step sets
+  `PACKAGING_REQUIRE_DOCKER=1`, and any hosted GitHub Actions job counts as required too, so
+  a missing Docker still fails there. An installed but unusable Docker (no Buildx or Compose,
+  no daemon, a failed build) still fails everywhere. The generic `CI=true` does not count.
+- The policy lives in one tested module, `tools/container_packaging/docker_requirement.py`,
+  with four new cases. A skip on a Docker-less host proves nothing about build-context
+  filtering or Compose boundaries. It is reported as not run there.
+
 ## Unreleased — Database backup scope for narration, scheduling and typed knowledge, 28 October 2026
 
 - Extend the strict database backup schema/catalog allowlist to migration V15 and the seven

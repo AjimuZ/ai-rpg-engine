@@ -31,7 +31,31 @@ explicit failures. The path-with-spaces case checks file bytes recursively and
 refuses creation of private state. This fixture does not establish real Docker
 compatibility; actual BuildKit/Compose checks and opt-in lifecycle checks remain
 separate. The launcher minimum versions and production checks are unchanged.
-Missing Docker/BuildKit and build failures fail these checks; Ordinary CI runs this default suite ([workflow](../../.github/workflows/ci.yml), P02.4); the opt-in `PACKAGING_DOCKER=1` recreation check stays out of CI until native Linux secret-mount ownership is qualified.
+Missing Buildx or Compose, an unreachable daemon and build failures fail these
+checks. Ordinary CI runs this default suite ([workflow](../../.github/workflows/ci.yml),
+P02.4); the opt-in `PACKAGING_DOCKER=1` recreation check stays out of CI until native
+Linux secret-mount ownership is qualified.
+
+### Hosts without Docker
+
+A host with no `docker` executable on `PATH`, such as the Linux toolchain container,
+skips the BuildKit context and Compose render cases with an explicit reason. It does
+not report a `FileNotFoundError` for each case. The shared policy is in
+[`docker_requirement.py`](docker_requirement.py) and is tested by
+`test_docker_requirement.py`:
+
+| Host | BuildKit context and Compose render cases |
+| --- | --- |
+| `docker` on `PATH` | run; Buildx, Compose, daemon and build errors fail |
+| no `docker`, `PACKAGING_REQUIRE_DOCKER=1` or `GITHUB_ACTIONS=true` | run and fail on the missing tool |
+| no `docker`, neither set | skipped: "docker executable not found; hosted CI enforces this check" |
+
+The CI packaging step sets `PACKAGING_REQUIRE_DOCKER=1`. Any hosted GitHub Actions job
+also counts as required, so the skip never weakens CI. The generic `CI=true` does not
+count, because local tools set it to disable prompts. A skip on a Docker-less host
+proves nothing about build-context filtering or Compose boundaries. Report it as not
+run there and rely on the hosted packaging job, or run the suite on a Docker host.
+The launcher fixture cases and the static checks need no Docker and always run.
 
 ## Real packaged-shell recreation
 
