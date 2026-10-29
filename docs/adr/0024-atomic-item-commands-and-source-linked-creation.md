@@ -49,4 +49,4 @@ After P10.1 an actor could hold item stacks and wear items, but nothing in play 
 
 ## Verification
 
-Recorded in the [roadmap](../16-development-roadmap.md#p102-evidence) after the final plan run.
+Recorded with the P10.2 task in the [development roadmap](../16-development-roadmap.md) (29 October 2026): 817 backend tests pass with zero failures on PostgreSQL 18.6 (`InventoryModelTest`, `ItemContractPackTest`, `ItemCommandsTest`, the reward-sourced creation case of `CanonicalCommitServiceTest`, `EventStatementsTest` and the extended typed-command, resolved-commit and V19 upgrade tests). Eleven deliberate weakenings, applied to an exported copy only, each made at least one test fail: ignoring the trade balance, allowing a worn gift, allowing a worn consuming use, dropping the creation ledger entry, skipping the item writer, disabling merging, loosening the owner guard, skipping the equipment check, dropping the participant attribution, and citing the wrong announcing event. The attribution probe first survived the suite, which exposed a missing test; `attributionRefusesItemEffectsOnUninvolvedActors` now covers it.

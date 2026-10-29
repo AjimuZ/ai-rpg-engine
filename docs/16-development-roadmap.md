@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 59/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5 and P10.1. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 60/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1 and P10.2. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -2407,7 +2407,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     levels do not advance, condition ticks and rest are P10.4/P11, and no panel shows conditions or
     equipment (P10.5). Starting loadouts from dependency packs are checked at campaign creation, not
     by a dedicated persistence test. No live V18 dump and restore rehearsal ran.
-- [ ] P10.2 Implement atomic use/transfer/equip/trade commands and source-linked item creation.
+- [x] P10.2 Implement atomic use/transfer/equip/trade commands and source-linked item creation.
   - Package A — pack contract (`PackCompiler`): optional item `value` (1–1,000,000 trade units; absent
     means unpriced) and `use` (`consumes`, default true; optional `target` policy; `effects` in the exact
     ability grammar and node budget), and an optional `createItem.quantity` (1–99 per recipient). Existing
@@ -2432,6 +2432,24 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     ownership), unit conservation across transfer, trade, use and creation, every refusal writes nothing,
     replay never repeats an effect, a fault after the item rows rolls back rows, ledger, events and
     resources, the ledger is append-only and unique per source, the V19 upgrade step, and the full plan.
+  - Verification (29 October 2026, PostgreSQL 18.6, JDK 21, the runner's environment): backend suite 817 tests,
+    0 failures; `./mvnw --batch-mode verify` 817 tests, 0 failures, 4 skipped (`PackagedInterfaceTest`). New
+    and extended cases: `InventoryModelTest` (10 pure: merging, reassignment, splitting, determinism,
+    conservation), `ItemContractPackTest` (5), `ItemCommandsTest` (13 on the armory pack: QA-10 potion with
+    capped healing, whole and partial transfers, trades, equipment rules, creation ledger rows with
+    operation, event and source, targets and unsupported effects, consuming use of a worn item, fault after the
+    item rows, replay, stale writer guards, attribution), `CanonicalCommitServiceTest` (reward-sourced
+    creation commits and rolls back with its settlement), `TypedCommandTest`, `ResolvedCommitTest`,
+    `EventStatementsTest` and the V19 step of `CanonicalMigrationUpgradeTest`. Eleven weakenings applied to
+    an exported copy each failed at least one test (see ADR 0024); one first survived and gained a test.
+    Frontend: 79 tests, 349 reviewed EN/IT messages, typecheck and build pass. Repository checks and the
+    backup tool (schema version 19) pass.
+  - Limits: no inventory or equipment panel, journal line, world-time cost or quest reward uses these
+    commands yet (P10.3–P10.5); NPC stock exists only through gifts and creation, so a player must know an
+    instance identity to request it in a trade; weight, capacity and durability are not enforced; damage,
+    heal, move, condition and reveal effects stay refused as `EFFECT_UNSUPPORTED`; item intents are not
+    offered to the model-proposal contract; no live V19 dump and restore rehearsal ran; the 18 Docker-dependent
+    probe cases and the `unzip` wrapper cases are not proven in this container.
 - [ ] P10.3 Implement basic objective predicates, quest transitions, and one-time reward-source accounting.
 - [ ] P10.4 Implement movement duration, rest, and a bounded world clock without time advancement on queries.
 - [ ] P10.5 Integrate reliable state changes into panels and journal.

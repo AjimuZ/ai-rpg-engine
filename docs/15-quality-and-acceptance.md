@@ -1,5 +1,15 @@
 # Quality Strategy and Acceptance Criteria
 
+P10.2 verification (29 October 2026): the full backend suite passes 817 tests with zero failures on
+PostgreSQL 18.6, and `./mvnw --batch-mode verify` passes 817 with 4 skipped packaged-interface tests.
+Toward QA-10, `ItemCommandsTest` commits a potion's quantity and its capped healing together, moves
+and trades items with unit conservation, refuses a worn or foreign instance, keeps a unique item's
+identity across owners, links every created unit to its operation, event and source in the append-only
+ledger, rolls back rows, ledger, events and resources after a fault injected once the item rows were
+written, and replays a lost response without repeating the effect. Eleven deliberate weakenings of an
+exported copy each failed a test. Not claimed: a browser journey, inventory panels, durations,
+quest rewards, concurrency beyond the campaign lease, or a live V19 dump and restore.
+
 P09.5 verification (28 October 2026): fresh scoped JDK 21/PostgreSQL 18.6 checks pass
 **11 new backend cases and all 724 packaged backend cases in 74 suites**, with zero failures,
 errors or skips, and the jar is packaged; 79 frontend tests in 13 files pass. The new backend cases
