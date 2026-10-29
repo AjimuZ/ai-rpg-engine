@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 62/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3 and P10.4. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 63/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4 and P10.5. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -2528,7 +2528,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     Eighteen weakenings applied to an exported copy each failed at least one test; one (`rest-vocabulary-unchecked`)
     first survived and gained a test (see [ADR 0026](adr/0026-bounded-world-clock-travel-duration-and-rest.md)).
     Not proven here: the 18 Docker-dependent probe cases, the `unzip` wrapper cases and a live V21 dump and restore.
-- [ ] P10.5 Integrate reliable state changes into panels and journal.
+- [x] P10.5 Integrate reliable state changes into panels and journal.
   - Package A — projection (`org.rpgengine.panels`): `PlayPanels` reads clock, effective sheet (base and effective
     attributes, skills, recomputed derived statistics), resources, conditions, abilities, inventory with worn slots,
     equipment, engine-state quests, typed knowledge and a cursor-paged public event history in one read-only
@@ -2546,6 +2546,25 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
   - Limits: no encounter, shop, map, rumor or relationship panels, no journal search or filters, no names for
     dependency-pack definitions, journal lines name quests and locations by identifier, no weight, capacity or
     durability, and no browser journey ran in the Linux container (specs replay the recorded server replies).
+  - Verification (29 October 2026, PostgreSQL 18.6, JDK 21, the runner's environment): all 16 plan commands
+    passed on the implementation commit `ff1f7be` (backend suite 884 tests, 0 failures; `./mvnw --batch-mode
+    verify` the same count with 4 skipped `PackagedInterfaceTest` cases; frontend 99 tests, 412 reviewed EN/IT
+    messages) and again on the final commit (887 backend tests). New cases: `PlayPanelsTest` (11 on PostgreSQL
+    and the servlet stack, quest pack: the starting state; every committed change visible at its revision -
+    accepted quest, satisfied objective, paid outcome, taken-off shield; a hidden background quest and internal
+    events withheld, and an ended hidden quest listed without its secret text; a condition changing the effective
+    sheet; cursor paging with a stable past; Italian statements for an Italian campaign; typed discoveries with
+    stances, a statement-less belief skipped, promises with their direction and the legacy free-text fact ignored;
+    byte-identical repeated reads that wrote no row; a refused command changing nothing; a save without a player
+    and a save whose content cannot be loaded; a foreign owner; scope and input errors), `campaign-panels.spec.ts`
+    (20: 12 refused shapes, wording, the routed view, hidden names, source-language disclosure, older-event
+    paging), the panels read added to `WorldClockQueriesTest` and `CampaignInterfaceContractTest` (three recorded
+    replies in the reload transcript) and the Italian-variant assertions on the recorded replies. Fifteen
+    weakenings applied to an exported copy each failed at least one test; two first survived (a belief without a
+    statement, which gained a test, and a second, redundant owner check that the earlier lookup makes
+    unobservable). Frontend weakenings were not run.
+    Not proven here: the 18 Docker-dependent probe cases, the `unzip` wrapper cases, a browser journey (the specs
+    replay recorded server replies) and independent review of the 57 new Italian messages.
 
 **Exit:** a coherent noncombat adventure loop uses actual resources, abilities, and objectives. **Checks:** QA-09's shared state preparation, QA-10, quests/rewards, time and rest bounds. **Suggested commit:** `Add reusable character inventory and quest systems`.
 
