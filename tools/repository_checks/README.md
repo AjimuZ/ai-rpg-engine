@@ -38,7 +38,11 @@ the cache on the next run. The JDK may come from an absolute or a relative `JAVA
 or from `PATH`, and `find` is not needed. Without a pinned checksum, the upstream
 `.tar.gz` path still works. It also checks that a checksum mismatch or a failed download
 stops before anything is installed. A host with neither `unzip` nor a JDK, and a host
-with `unzip` but no downloader, fail fast with the remedy. The two cases with `unzip`
+with `unzip` but no downloader, fail fast with the remedy. An installed launcher that
+cannot be executed directly still runs through its `#!` interpreter: one case clears its
+execute bits, which works on any host, and one installs into a real `noexec` mount (the
+temporary directory or `/dev/shm`). The real-mount case skips where no writable `noexec`
+mount exists, which is usual on hosted CI runners. The two cases with `unzip`
 run where it is installed, such as the CI runner. No external network is used. The tests skip on Windows, and the cases
 that download skip when no JDK with `java`, `javac` and `jar` is found.
 

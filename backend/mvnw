@@ -31,6 +31,9 @@
 #   * When no downloader can run (no wget, curl or JDK), upstream goes on to
 #     report a checksum error for a file it never downloaded. This copy stops
 #     with that reason, and a failed Java download names the URL it tried.
+#   * When the installed launcher cannot be executed directly, typically because
+#     ~/.m2 is on a noexec mount, upstream exits with "Permission denied". This
+#     copy runs the launcher through the interpreter on its "#!" line instead.
 # Rationale: docs/adr/0009-toolchain-baseline.md. Regression test:
 # tools/repository_checks/test_maven_wrapper.py.
 #
@@ -160,6 +163,29 @@ MAVEN_HOME="${MAVEN_USER_HOME}/wrapper/dists/${distributionUrlNameMain-}/$(hash_
 
 exec_maven() {
   unset MVNW_VERBOSE MVNW_USERNAME MVNW_PASSWORD MVNW_REPOURL || :
+  # Local change: a launcher that cannot be executed directly is run through the
+  # interpreter on its "#!" line (sh when there is none). The usual cause is a
+  # MAVEN_USER_HOME, by default ~/.m2, on a filesystem mounted noexec, such as a
+  # tmpfs home in a hardened container: the kernel refuses execve() with EACCES
+  # although the launcher is 0755, and on Linux `test -x` reports the same through
+  # access(2). Upstream then exits with "Permission denied" (status 126). The
+  # launchers are shell scripts and the JVM they start comes from JAVA_HOME or
+  # PATH, so reading the script through its interpreter is all that is needed.
+  # This also covers an installation whose launchers lost their execute bit.
+  __MVNW_LAUNCHER="$MAVEN_HOME/bin/$MVN_CMD"
+  if [ -f "$__MVNW_LAUNCHER" ] && [ ! -x "$__MVNW_LAUNCHER" ]; then
+    __MVNW_SHEBANG=''
+    IFS= read -r __MVNW_SHEBANG <"$__MVNW_LAUNCHER" || :
+    case "$__MVNW_SHEBANG" in
+    '#!'*[![:space:]]*) __MVNW_INTERPRETER="${__MVNW_SHEBANG#'#!'}" ;;
+    *) __MVNW_INTERPRETER=sh ;;
+    esac
+    verbose "$__MVNW_LAUNCHER cannot be executed directly (noexec mount?); running it with $__MVNW_INTERPRETER"
+    # Unquoted on purpose: "/usr/bin/env bash" splits into a command and its
+    # argument, as the kernel would pass them. Pathname expansion is off (set -f).
+    # shellcheck disable=SC2086
+    exec $__MVNW_INTERPRETER "$__MVNW_LAUNCHER" "$@" || die "cannot run $__MVNW_LAUNCHER with $__MVNW_INTERPRETER"
+  fi
   exec "$MAVEN_HOME/bin/$MVN_CMD" "$@" || die "cannot exec $MAVEN_HOME/bin/$MVN_CMD"
 }
 

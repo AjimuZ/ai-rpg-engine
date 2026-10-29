@@ -5,7 +5,10 @@ missing. That archive can never match the ZIP checksum pinned in
 ``distributionSha256Sum``, so a host without ``unzip`` and with an empty wrapper cache
 always stopped with "Failed to validate Maven distribution SHA-256". When a checksum
 is pinned, the committed copy keeps the ZIP and extracts it with the JDK ``jar`` tool
-instead; without a pin the upstream ``.tar.gz`` path remains (ADR 0009). These tests
+instead; without a pin the upstream ``.tar.gz`` path remains (ADR 0009). The copy also
+runs an installed launcher through its ``#!`` interpreter when the launcher cannot be
+executed directly, as when ``~/.m2`` is on a ``noexec`` mount; upstream then exits with
+"Permission denied" (status 126). These tests
 run the real script against a small fixture distribution served from a loopback HTTP
 server, with a ``PATH`` that holds only the basic tools the script needs. That makes
 the missing-``unzip`` case reproducible on any host and needs no external network,
@@ -17,7 +20,10 @@ Cases that download need a JDK (``java``, ``javac`` and ``jar`` under ``JAVA_HOM
 or next to ``javac`` on ``PATH``): without ``curl`` or ``wget`` the wrapper compiles
 its own Java downloader, as on the development container. They skip with that reason
 when no JDK is found, because the fallback under test cannot run there either. Cases
-that need ``unzip`` skip on hosts that lack it.
+that need ``unzip`` skip on hosts that lack it. The real ``noexec`` case needs a
+writable ``noexec`` mount (the temporary directory or ``/dev/shm`` on Linux) and skips
+without one; a portable case with the launcher's execute bits cleared covers the same
+fallback everywhere.
 """
 
 from __future__ import annotations
@@ -29,6 +35,7 @@ import io
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -93,6 +100,24 @@ def fixture_tar() -> bytes:
             info.size, info.mode, info.mtime = len(data), mode, 1_793_232_000
             archive.addfile(info, io.BytesIO(data))
     return buffer.getvalue()
+
+
+def find_noexec_directory() -> Path | None:
+    """Return a writable directory on a ``noexec`` mount, or ``None``.
+
+    Only temporary locations are considered, never the user's home. ``ST_NOEXEC`` is
+    Linux-specific, so other systems return ``None`` and the real-mount case skips.
+    """
+    flag = getattr(os, "ST_NOEXEC", None)
+    if flag is None:
+        return None
+    for candidate in (Path(tempfile.gettempdir()), Path("/dev/shm")):
+        try:
+            if os.statvfs(candidate).f_flag & flag and os.access(candidate, os.W_OK | os.X_OK):
+                return candidate
+        except OSError:
+            continue
+    return None
 
 
 def find_jdk() -> Path | None:
@@ -274,6 +299,44 @@ class MavenWrapperTest(unittest.TestCase):
         self.assert_ran(self.run_wrapper(jdk=jdk))
         self.assertEqual(self.server.requests, [TAR_PATH])
         self.assert_installed(url[: -len(".zip")] + ".tar.gz")
+
+    def test_a_launcher_without_execute_bits_runs_through_its_interpreter(self) -> None:
+        # Portable stand-in for a noexec mount: with every execute bit cleared, execve()
+        # fails with EACCES and `test -x` is false, as on a noexec filesystem.
+        jdk = self.require_jdk()
+        url = self.write_properties()
+        self.assert_ran(self.run_wrapper(jdk=jdk))
+        self.assert_installed(url)
+        launcher = self.installed()[0] / "bin" / "mvn"
+        launcher.chmod(0o644)
+        result = self.run_wrapper(jdk=jdk)
+        self.assert_ran(result)
+        self.assertNotIn("Permission denied", result.stderr)
+        # The cached installation served the second run.
+        self.assertEqual(self.server.requests, [REPO_PATH])
+
+    def test_a_maven_user_home_on_a_noexec_mount_still_runs_maven(self) -> None:
+        # The independent verifier's HOME is a noexec tmpfs, so the wrapper installs
+        # Maven where no file can be executed, even with mode 0755.
+        noexec = find_noexec_directory()
+        if noexec is None:
+            self.skipTest("no writable noexec mount (temporary directory or /dev/shm)")
+        jdk = self.require_jdk()
+        self.home = Path(tempfile.mkdtemp(prefix="mvnw-home-", dir=noexec))
+        self.addCleanup(shutil.rmtree, self.home, True)
+        url = self.write_properties()
+        for _ in range(2):  # a fresh installation, then the cached one
+            result = self.run_wrapper(jdk=jdk)
+            self.assert_ran(result)
+            self.assertNotIn("Permission denied", result.stderr)
+        self.assertEqual(self.server.requests, [REPO_PATH])
+        dists = self.installed()
+        self.assertEqual(len(dists), 1, dists)
+        # os.access() reports the mount, so check the stored modes instead.
+        modes = {name: stat.S_IMODE((dists[0] / "bin" / name).stat().st_mode)
+                 for name in ("mvn", "mvn.cmd", "m2.conf")}
+        self.assertEqual(modes, {"mvn": 0o755, "mvn.cmd": 0o644, "m2.conf": 0o644})
+        self.assertEqual((dists[0] / "mvnw.url").read_text(encoding="utf-8").strip(), url)
 
     def test_a_checksum_mismatch_still_stops_before_installing(self) -> None:
         jdk = self.require_jdk()

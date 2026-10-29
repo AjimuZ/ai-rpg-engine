@@ -59,12 +59,27 @@ available`. A host with `unzip` but no downloader (no `wget`, `curl` or JDK) sto
 with `Cannot download …`, where upstream reported a checksum error for a file it
 never fetched. A failed Java download names the URL (`Java: Failed to fetch …`).
 
+**Homes on a `noexec` mount.** The wrapper installs Maven under `~/.m2`. When that
+directory is on a filesystem mounted `noexec` (for example a tmpfs home in a hardened
+container, as in the independent verification run), the kernel refuses to execute
+`bin/mvn` although it is 0755, and upstream exits with `./mvnw: …: exec: …/bin/mvn:
+Permission denied` (status 126). Since 29 October 2026 the wrapper detects a launcher
+that cannot be executed directly (`test -x` is false there on Linux) and runs it
+through the interpreter on its `#!` line, `/bin/sh` for Maven. The JVM itself comes
+from `JAVA_HOME` or `PATH` and must be on an executable mount. Maven 3.10.0 then logs
+`JLineNativeLoader` warnings ("Failed to load native library … failed to map segment
+from shared object"), because its terminal library cannot map native code from that
+mount or from a `noexec` `/tmp`. JLine falls back to its non-native terminal, and the
+build is not affected. Set `MAVEN_USER_HOME` to an executable location to avoid them.
+
 The wrapper caches Maven under `$MAVEN_USER_HOME/wrapper/dists/apache-maven-3.10.0/<hash>`
 (`MAVEN_USER_HOME` defaults to `~/.m2`; the hash is derived from `distributionUrl`). A
 directory there is reused as is, so delete it to force a fresh, verified download.
 `MVNW_VERBOSE=true ./mvnw --version` shows which download and extraction path is used.
 The regression test `tools/repository_checks/test_maven_wrapper.py` runs this script
-against a local fixture distribution, with and without `unzip`.
+against a local fixture distribution, with and without `unzip`, and with a launcher
+that cannot be executed directly (cleared execute bits, and a real `noexec` mount when
+the host has a writable one).
 
 Initial recovery prerequisite diagnostics (26 October 2026): the continuation
 environment could not run the backend at that checkpoint. Both `java` and `javac`

@@ -2382,6 +2382,16 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     Maven 3.10.0 and 574 artifacts from Central and passed `./mvnw --batch-mode verify`: 783 tests,
     0 failures, 4 skipped. `unzip` and cache seeding are no longer required; a first run needs a
     JDK and access to Maven Central.
+  - Second wrapper repair (29 October 2026): the third independent rerun got past the checksum,
+    then stopped with `./mvnw: 163: exec: ~/.m2/wrapper/dists/apache-maven-3.10.0/dae9a06d/bin/mvn:
+    Permission denied` (status 126). The verifier's home is a tmpfs mounted `noexec` (so is `/tmp`),
+    so no file in the wrapper cache can be executed, whatever its mode. The wrapper now runs a
+    launcher that cannot be executed directly through the interpreter on its `#!` line
+    ([ADR 0009](adr/0009-toolchain-baseline.md) second amendment). Reproduced first with `HOME` on a
+    `noexec` mount. `test_maven_wrapper.py` has two new cases (cleared execute bits; a real `noexec`
+    home); both fail against the previous script with status 126. A cold `./mvnw --batch-mode verify`
+    with `HOME` and a fresh repository on a `noexec` mount passed: 574 artifacts downloaded, 783
+    tests, 0 failures, 4 skipped. JLine logs native-library warnings there and falls back.
   - Limits: no play commands use these rules yet (atomic use/transfer/equip is P10.2), ranks and
     levels do not advance, condition ticks and rest are P10.4/P11, and no panel shows conditions or
     equipment (P10.5). Starting loadouts from dependency packs are checked at campaign creation, not

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Maven Wrapper runs from a `noexec` home, 29 October 2026
+
+- `./mvnw` now works when `~/.m2` is on a filesystem mounted `noexec`, such as a tmpfs home in a
+  hardened container. The kernel refuses to execute the installed `bin/mvn` there even with mode
+  0755, so a run stopped with `./mvnw: 163: exec: …/bin/mvn: Permission denied` (status 126). The
+  wrapper now runs a launcher that cannot be executed directly through the interpreter on its `#!`
+  line. Maven logs JLine native-library warnings on such a mount and falls back to its plain
+  terminal; builds are unaffected. Setting `MAVEN_USER_HOME` to an executable location avoids them.
+- The wrapper regression test has two more cases: a launcher whose execute bits were cleared, and an
+  installation on a real `noexec` mount, which runs where the host has a writable one. Both fail
+  against the previous script. The backend guide, ADR 0009 and the third-party notices describe
+  the change.
+
 ## Unreleased — Maven Wrapper works without `unzip`, 29 October 2026
 
 - `./mvnw` no longer needs `unzip`. The upstream wrapper fetched the `.tar.gz` archive when
