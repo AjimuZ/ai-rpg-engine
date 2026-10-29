@@ -1,13 +1,20 @@
 # Changelog
 
-## Unreleased — Maven Wrapper cache for hosts without `unzip`, 29 October 2026
+## Unreleased — Maven Wrapper works without `unzip`, 29 October 2026
 
-- The backend guide now explains why `./mvnw` can stop with "Failed to validate Maven distribution
-  SHA-256, your Maven distribution might be compromised" on a host that has no `unzip` and an empty
-  wrapper cache: the wrapper downloads the `.tar.gz` archive, which can never match the pinned ZIP
-  checksum. Nothing is compromised and the pin is correct (Maven Central serves a ZIP whose SHA-256
-  equals it). The guide lists the one-time, checksum-verified cache seeding for such hosts. No code,
-  pin or wrapper script changed.
+- `./mvnw` no longer needs `unzip`. The upstream wrapper fetched the `.tar.gz` archive when
+  `unzip` was missing, and that archive can never match the pinned ZIP checksum. A first run then
+  stopped with "Failed to validate Maven distribution SHA-256, your Maven distribution might be
+  compromised", although nothing was compromised. The committed script is now a marked, modified
+  copy of Maven Wrapper 3.3.4. It always downloads and verifies the pinned ZIP and, without `unzip`,
+  extracts it with the JDK's `jar` tool. No setup or cache seeding is needed. The checksum, the
+  Maven version and `mvnw.cmd` are unchanged.
+- The wrapper now says what is missing when it cannot download or extract Maven (no `unzip` and
+  no JDK, or no downloader at all), instead of reporting a checksum error for a file it never
+  downloaded. A failed download names its URL.
+- A new repository test runs the wrapper against a local fixture distribution, with and without
+  `unzip`, including a checksum mismatch and a failed download. The backend guide, ADR 0009 and the
+  third-party notices describe the change.
 
 ## Unreleased — Character rules: derived stats, conditions, rarity and equipment (P10.1), 29 October 2026
 

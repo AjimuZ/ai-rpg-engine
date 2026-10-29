@@ -21,6 +21,19 @@
 # ----------------------------------------------------------------------------
 # Apache Maven Wrapper startup batch script, version 3.3.4
 #
+# MODIFIED COPY (29 October 2026; Apache License 2.0, section 4(b)). Changes from
+# the upstream 3.3.4 only-script file, all marked "Local change" below:
+#   * Without `unzip`, upstream downloads the .tar.gz archive instead of the ZIP,
+#     which can never match the ZIP checksum in distributionSha256Sum. When a
+#     checksum is pinned, this copy keeps the ZIP, verifies it and, without
+#     `unzip`, extracts it with the JDK `jar` tool, then restores the launchers'
+#     execute bit. Without a pinned checksum the upstream .tar.gz path remains.
+#   * When no downloader can run (no wget, curl or JDK), upstream goes on to
+#     report a checksum error for a file it never downloaded. This copy stops
+#     with that reason, and a failed Java download names the URL it tried.
+# Rationale: docs/adr/0009-toolchain-baseline.md. Regression test:
+# tools/repository_checks/test_maven_wrapper.py.
+#
 # Optional ENV vars
 # -----------------
 #   JAVA_HOME - location of a JDK home dir, required when download maven via java source
@@ -175,15 +188,38 @@ verbose "Couldn't find MAVEN_HOME, downloading and installing it ..."
 verbose "Downloading from: $distributionUrl"
 verbose "Downloading to: $TMP_DOWNLOAD_DIR/$distributionUrlName"
 
-# select .zip or .tar.gz
-if ! command -v unzip >/dev/null; then
+# select .zip or .tar.gz, and the extractor
+# Local change: upstream always switches to the .tar.gz archive here when `unzip`
+# is missing, and that archive always fails a pinned ZIP checksum. With a pinned
+# checksum, keep the ZIP and fall back to the JDK `jar` tool, which every JDK
+# ships and which a Maven build needs anyway. The tool is resolved before
+# downloading so that a host without either extractor fails fast with an
+# actionable message. Without a pinned checksum (for example mvnd, which cannot
+# be validated), the upstream .tar.gz path needs only `tar` and stays as it was.
+if command -v unzip >/dev/null; then
+  __MVNW_EXTRACTOR=unzip
+elif [ -z "${distributionSha256Sum-}" ]; then
   distributionUrl="${distributionUrl%.zip}.tar.gz"
   distributionUrlName="${distributionUrl##*/}"
+  __MVNW_EXTRACTOR=tar
+else
+  set_java_home || die "Neither unzip nor a JDK is available to extract $distributionUrlName; install unzip or set JAVA_HOME to a JDK."
+  __MVNW_JAR="${JAVACCMD%/*}/jar"
+  [ -x "$__MVNW_JAR" ] || __MVNW_JAR="$(command -v jar)" \
+    || die "unzip is not installed and the JDK jar tool was not found next to $JAVACCMD; install unzip or set JAVA_HOME to a full JDK."
+  # The extraction runs inside the temporary directory, so a JDK reached through
+  # a relative JAVA_HOME or PATH entry must be resolved from here first.
+  case "$__MVNW_JAR" in
+  /*) ;;
+  *) __MVNW_JAR="$PWD/$__MVNW_JAR" ;;
+  esac
+  __MVNW_EXTRACTOR=jar
+  verbose "unzip not found; extracting with $__MVNW_JAR"
 fi
 
 # verbose opt
-__MVNW_QUIET_WGET=--quiet __MVNW_QUIET_CURL=--silent __MVNW_QUIET_UNZIP=-q __MVNW_QUIET_TAR=''
-[ "${MVNW_VERBOSE-}" != true ] || __MVNW_QUIET_WGET='' __MVNW_QUIET_CURL='' __MVNW_QUIET_UNZIP='' __MVNW_QUIET_TAR=v
+__MVNW_QUIET_WGET=--quiet __MVNW_QUIET_CURL=--silent __MVNW_QUIET_UNZIP=-q __MVNW_QUIET_TAR='' __MVNW_JAR_VERBOSE=''
+[ "${MVNW_VERBOSE-}" != true ] || __MVNW_QUIET_WGET='' __MVNW_QUIET_CURL='' __MVNW_QUIET_UNZIP='' __MVNW_QUIET_TAR=v __MVNW_JAR_VERBOSE=v
 
 # normalize http auth
 case "${MVNW_PASSWORD:+has-password}" in
@@ -219,7 +255,14 @@ elif set_java_home; then
   verbose " - Compiling Downloader.java ..."
   "$(native_path "$JAVACCMD")" "$(native_path "$javaSource")" || die "Failed to compile Downloader.java"
   verbose " - Running Downloader.java ..."
-  "$(native_path "$JAVACMD")" -cp "$(native_path "$TMP_DOWNLOAD_DIR")" Downloader "$distributionUrl" "$(native_path "$targetZip")"
+  # Local change: name the URL (upstream exits through `set -e` without a message).
+  "$(native_path "$JAVACMD")" -cp "$(native_path "$TMP_DOWNLOAD_DIR")" Downloader "$distributionUrl" "$(native_path "$targetZip")" \
+    || die "Java: Failed to fetch $distributionUrl"
+else
+  # Local change: no usable downloader. wget and curl are skipped when
+  # MVNW_USERNAME is set, and set_java_home printed why no JDK was found.
+  # Upstream falls through to a misleading checksum error here.
+  die "Cannot download $distributionUrl: no JDK, and no wget or curl usable (they are skipped when MVNW_USERNAME is set)."
 fi
 
 # If specified, validate the SHA-256 sum of the Maven distribution zip file
@@ -250,10 +293,14 @@ if [ -n "${distributionSha256Sum-}" ]; then
 fi
 
 # unzip and move
-if command -v unzip >/dev/null; then
+if [ "$__MVNW_EXTRACTOR" = unzip ]; then
   unzip ${__MVNW_QUIET_UNZIP:+"$__MVNW_QUIET_UNZIP"} "$TMP_DOWNLOAD_DIR/$distributionUrlName" -d "$TMP_DOWNLOAD_DIR" || die "failed to unzip"
-else
+elif [ "$__MVNW_EXTRACTOR" = tar ]; then
   tar xzf${__MVNW_QUIET_TAR:+"$__MVNW_QUIET_TAR"} "$TMP_DOWNLOAD_DIR/$distributionUrlName" -C "$TMP_DOWNLOAD_DIR" || die "failed to untar"
+else
+  # Local change: `jar x` extracts the verified ZIP into the working directory.
+  (cd -- "$TMP_DOWNLOAD_DIR" && "$(native_path "$__MVNW_JAR")" "x${__MVNW_JAR_VERBOSE}f" "$distributionUrlName") \
+    || die "failed to extract $distributionUrlName with $__MVNW_JAR"
 fi
 
 # Find the actual extracted directory name (handles snapshots where filename != directory name)
@@ -288,6 +335,20 @@ if [ -z "$actualDistributionDir" ]; then
 fi
 
 verbose "Found extracted Maven distribution directory: $actualDistributionDir"
+# Local change: `jar` ignores the Unix modes stored in the ZIP, so restore the
+# execute bit of the shell launchers (not the Windows .cmd files or m2.conf).
+# Native libraries under lib/ stay 0644: they are mapped by the JVM's loader,
+# which does not need the execute bit. A glob loop avoids depending on `find`.
+if [ "$__MVNW_EXTRACTOR" = jar ]; then
+  set +f
+  for launcher in "$TMP_DOWNLOAD_DIR/$actualDistributionDir"/bin/*; do
+    case "$launcher" in
+    *.cmd | *.conf) ;;
+    *) [ ! -f "$launcher" ] || chmod +x "$launcher" || die "failed to mark $launcher executable" ;;
+    esac
+  done
+  set -f
+fi
 printf %s\\n "$distributionUrl" >"$TMP_DOWNLOAD_DIR/$actualDistributionDir/mvnw.url"
 mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_HOME" ] || die "fail to move MAVEN_HOME"
 

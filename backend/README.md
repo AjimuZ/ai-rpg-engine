@@ -37,40 +37,40 @@ P07.1 stays unchecked and its implementation remains pending verification/commit
 
 Spring Boot 4.1.2 on Java 21, with Maven 3.10.0 through the checksum-verified
 Maven Wrapper 3.3.4. Run commands **from `backend/`** so `.mvn/maven.config`
-applies the Central-only mirror and strict checksums. Linux needs `unzip` for the
-wrapper's checksum-pinned ZIP. On Windows use `mvnw.cmd` instead of `./mvnw`.
+applies the Central-only mirror and strict checksums. On Linux the wrapper extracts
+its checksum-pinned ZIP with `unzip`, or with the JDK `jar` tool when `unzip` is
+missing (see below). On Windows use `mvnw.cmd` instead of `./mvnw`.
 The enforcer rejects other JDK majors, Maven outside 3.10.x, snapshots, and dynamic
 versions. Library and plugin versions come from the Boot parent/BOM.
 
-**Hosts without `unzip`.** When the wrapper cache is empty and `unzip` is absent, the
-wrapper fetches the `.tar.gz` distribution instead of the pinned ZIP. That archive can
-never match the committed checksum, so it stops with `Failed to validate Maven
-distribution SHA-256, your Maven distribution might be compromised`. The message is
-misleading: Maven Central serves the pinned ZIP, and its SHA-256 equals the pin; the
-wrapper asked for the other archive. Install `unzip` where you can. Where you cannot
-(for example a minimal development container), seed the wrapper cache once from the
-checksum-verified ZIP and run every wrapper command with the same `MAVEN_USER_HOME`
-(it defaults to `~/.m2`). From `backend/`, with `apache-maven-3.10.0-bin.zip` downloaded
-from the `distributionUrl` in `.mvn/wrapper/maven-wrapper.properties`:
+**Hosts without `unzip`.** Upstream Maven Wrapper 3.3.4 fetches the `.tar.gz`
+distribution when `unzip` is missing. That archive can never match the committed ZIP
+checksum, so a host with an empty wrapper cache stopped with `Failed to validate Maven
+distribution SHA-256, your Maven distribution might be compromised`. Nothing was
+compromised: Maven Central serves the pinned ZIP and its SHA-256 equals the pin.
 
-```sh
-pin="$(sed -n 's/^distributionSha256Sum=//p' .mvn/wrapper/maven-wrapper.properties)"
-echo "$pin  apache-maven-3.10.0-bin.zip" | sha256sum -c -    # must print OK
-MAVEN_USER_HOME="${MAVEN_USER_HOME:-$HOME/.m2}"
-dist="$MAVEN_USER_HOME/wrapper/dists/apache-maven-3.10.0/dae9a06d"
-tmp="$(mktemp -d)" && python3 -m zipfile -e apache-maven-3.10.0-bin.zip "$tmp"
-mkdir -p "$dist" && cp -R "$tmp/apache-maven-3.10.0/." "$dist/" && chmod +x "$dist/bin/mvn"
-```
+Since 29 October 2026 `./mvnw` is a marked, modified copy ([ADR 0009](../docs/adr/0009-toolchain-baseline.md)).
+It always downloads the pinned ZIP and checks its SHA-256. Without `unzip` it then
+extracts the ZIP with the `jar` tool of the JDK it finds through `JAVA_HOME` or `PATH`,
+and makes the `bin/` launchers executable. No setup or cache seeding is needed; a
+first run only needs the JDK and access to Maven Central. A host that has neither
+`unzip` nor a JDK now stops before downloading with `Neither unzip nor a JDK is
+available`. A host with `unzip` but no downloader (no `wget`, `curl` or JDK) stops
+with `Cannot download …`, where upstream reported a checksum error for a file it
+never fetched. A failed Java download names the URL (`Java: Failed to fetch …`).
 
-The last directory name is the wrapper's hash of the pinned `distributionUrl`; it only
-changes if that URL changes. `MVNW_VERBOSE=debug ./mvnw --version 2>&1 | grep -m1
-MAVEN_HOME=` prints the directory the wrapper expects. The pin and the wrapper script
-stay untouched; the cache only replaces the download.
+The wrapper caches Maven under `$MAVEN_USER_HOME/wrapper/dists/apache-maven-3.10.0/<hash>`
+(`MAVEN_USER_HOME` defaults to `~/.m2`; the hash is derived from `distributionUrl`). A
+directory there is reused as is, so delete it to force a fresh, verified download.
+`MVNW_VERBOSE=true ./mvnw --version` shows which download and extraction path is used.
+The regression test `tools/repository_checks/test_maven_wrapper.py` runs this script
+against a local fixture distribution, with and without `unzip`.
 
 Initial recovery prerequisite diagnostics (26 October 2026): the continuation
 environment could not run the backend at that checkpoint. Both `java` and `javac`
-must resolve to JDK 21 (or be available under `JAVA_HOME`); a JRE alone cannot satisfy the build. Provide `unzip`
-so the wrapper selects the pinned ZIP. `curl` or `wget` can download it; without
+must resolve to JDK 21 (or be available under `JAVA_HOME`); a JRE alone cannot satisfy the build. At that time
+the wrapper needed `unzip` to select the pinned ZIP (since 29 October the JDK `jar`
+tool is the fallback, see above). `curl` or `wget` can download it; without
 both, the wrapper falls back to compiling and running its Java downloader. An
 installed standalone Maven is unnecessary when the wrapper prerequisites are met.
 

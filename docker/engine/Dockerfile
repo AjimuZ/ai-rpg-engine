@@ -13,7 +13,8 @@ COPY frontend/ ./
 RUN npm run typecheck && npm test && npm run test:i18n && npm run build:locales
 
 FROM eclipse-temurin:21.0.12.1_1-jdk-resolute@sha256:3b59c79a788985965c89203cca233c53893f62293108bb825264740fac926724 AS verification
-# The checksum-verified Maven wrapper requires unzip to select its pinned ZIP.
+# The checksum-verified Maven wrapper extracts its pinned ZIP with unzip; without
+# it the wrapper falls back to the JDK jar tool (ADR 0009). Keep the usual path.
 # OS packages follow the reviewed base archive policy in ADR 0009.
 RUN apt-get update && apt-get install -y --no-install-recommends unzip \
  && rm -rf /var/lib/apt/lists/*

@@ -4,7 +4,8 @@ Credential-free checks used by the ordinary CI workflow
 ([`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)) and runnable locally
 before a push. They use only the Python standard library and local Git, need no
 network, account, environment variable or secret, and print only a file, line and
-rule name for each finding, never the matching text.
+rule name for each finding, never the matching text. The Maven Wrapper regression
+test also runs the POSIX shell and a JDK ([below](#maven-wrapper-regression-test)).
 
 ```sh
 py -B tools/repository_checks/checks.py all        # Windows launcher; use python3 -B elsewhere
@@ -25,6 +26,21 @@ raises an error instead of passing.
 | `localization` | Every `COMMAND_*`, `CAMPAIGN_*`, `STREAM_*` and `LOCAL_*` error code in the campaign controllers is a key of the browser's localized error table (`frontend/src/app/campaign/campaign-messages.ts`); a missing controller or message module is a finding. Findings name file and line, never the code. |
 | `contracts` | Each recorded real-server transcript that frontend specs replay is byte-identical to the golden file a backend test regenerates and compares (`backend/src/test/resources/contracts/campaign-reload-transcript.json` and `frontend/src/app/campaign/contract/campaign-reload-transcript.json`, produced by `CampaignInterfaceContractTest`). A missing file on either side is a finding; findings name the file, never its content. Refresh both with `mvn test -Dtest=CampaignInterfaceContractTest -Dengine.contract.update=true` after an intended protocol change. |
 | `images` | Every external Dockerfile `FROM`, `# syntax=` line, Compose `image:` and root-launcher `readonly *_IMAGE="…"` constant carries an exact tag and an index digest ([ADR 0009](../../docs/adr/0009-toolchain-baseline.md)). Earlier build stages and locally built Compose images are exempt. |
+
+## Maven Wrapper regression test
+
+`test_maven_wrapper.py` runs the committed `backend/mvnw`, a marked modified copy of
+the upstream script ([ADR 0009](../../docs/adr/0009-toolchain-baseline.md)), against a
+fixture Maven distribution served on 127.0.0.1, with a `PATH` limited to basic tools.
+It checks that without `unzip` the wrapper fetches only the pinned ZIP, accepts its
+SHA-256, extracts it with the JDK `jar` tool, makes the launcher executable and reuses
+the cache on the next run. The JDK may come from an absolute or a relative `JAVA_HOME`
+or from `PATH`, and `find` is not needed. Without a pinned checksum, the upstream
+`.tar.gz` path still works. It also checks that a checksum mismatch or a failed download
+stops before anything is installed. A host with neither `unzip` nor a JDK, and a host
+with `unzip` but no downloader, fail fast with the remedy. The two cases with `unzip`
+run where it is installed, such as the CI runner. No external network is used. The tests skip on Windows, and the cases
+that download skip when no JDK with `java`, `javac` and `jar` is found.
 
 ## Limits
 

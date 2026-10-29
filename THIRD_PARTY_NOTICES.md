@@ -36,9 +36,14 @@ The owner-supplied `the-world-i-can-develop-demo` informed the analysis of Codex
 
 ## Apache Maven Wrapper
 
-`backend/mvnw` and `backend/mvnw.cmd` are the official Apache Maven Wrapper 3.3.4
-only-script distribution, produced by the Apache Maven Wrapper plugin. Preserve
-their upstream headers and the accompanying [Apache License 2.0](backend/.mvn/wrapper/LICENSE)
+`backend/mvnw` and `backend/mvnw.cmd` come from the official Apache Maven Wrapper 3.3.4
+only-script distribution, produced by the Apache Maven Wrapper plugin. `mvnw.cmd` is
+unchanged. `backend/mvnw` is a **modified copy** (29 October 2026): without `unzip` it
+still downloads and verifies the checksum-pinned ZIP and extracts it with the JDK `jar`
+tool, and it names the reason when no download can run. Its header lists the changes
+and each changed block is marked "Local change", as section 4(b) of the license
+requires; the rationale is in [ADR 0009](docs/adr/0009-toolchain-baseline.md).
+Preserve the upstream headers and the accompanying [Apache License 2.0](backend/.mvn/wrapper/LICENSE)
 and [NOTICE](backend/.mvn/wrapper/NOTICE). The scripts are build tooling, separate
 from the project's MIT-licensed application code. Source:
 [Apache Maven Wrapper 3.3.4](https://github.com/apache/maven-wrapper/tree/maven-wrapper-3.3.4).

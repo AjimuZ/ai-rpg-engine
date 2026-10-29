@@ -2367,8 +2367,21 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     Maven Central's ZIP matches the pin (checked by download), and the failure reproduces by running
     the wrapper without `MAVEN_USER_HOME`. With the toolchain environment (`MAVEN_USER_HOME` holding
     a cache seeded from the checksum-verified ZIP) the wrapper runs offline. The procedure for hosts
-    without `unzip` is now in the [backend guide](../backend/README.md). Dependency that remains:
-    `unzip`, or a seeded wrapper cache, wherever the plan runs; the pin and wrapper are unchanged.
+    without `unzip` was then added to the [backend guide](../backend/README.md); the pin and wrapper were
+    left unchanged at that point.
+  - Wrapper repair (29 October 2026): the second independent rerun failed the same way. It ran
+    with `MAVEN_USER_HOME` unset (it left an empty `~/.m2/wrapper/dists/apache-maven-3.10.0`), so the
+    seeded cache never applied. The committed `backend/mvnw` is now a marked, modified copy of the
+    3.3.4 script. Without `unzip` it downloads and verifies the pinned ZIP and extracts it with the
+    JDK `jar` tool. When it cannot download, it says why ([ADR 0009](adr/0009-toolchain-baseline.md) amendment).
+    `tools/repository_checks/test_maven_wrapper.py` (9 cases, loopback fixture; the 2 that need
+    `unzip` skip here) passes against this copy; 6 of its cases fail against the upstream script.
+    An independent review found three defects before commit, each now fixed and tested: a relative
+    JDK path, the unpinned `.tar.gz` path, and a new `find` dependency. A cold run had no `unzip`, no
+    `MAVEN_USER_HOME`, `MAVEN_OPTS` or toolchain Maven, and a fresh wrapper cache. It downloaded
+    Maven 3.10.0 and 574 artifacts from Central and passed `./mvnw --batch-mode verify`: 783 tests,
+    0 failures, 4 skipped. `unzip` and cache seeding are no longer required; a first run needs a
+    JDK and access to Maven Central.
   - Limits: no play commands use these rules yet (atomic use/transfer/equip is P10.2), ranks and
     levels do not advance, condition ticks and rest are P10.4/P11, and no panel shows conditions or
     equipment (P10.5). Starting loadouts from dependency packs are checked at campaign creation, not
