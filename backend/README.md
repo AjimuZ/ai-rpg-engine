@@ -42,6 +42,31 @@ wrapper's checksum-pinned ZIP. On Windows use `mvnw.cmd` instead of `./mvnw`.
 The enforcer rejects other JDK majors, Maven outside 3.10.x, snapshots, and dynamic
 versions. Library and plugin versions come from the Boot parent/BOM.
 
+**Hosts without `unzip`.** When the wrapper cache is empty and `unzip` is absent, the
+wrapper fetches the `.tar.gz` distribution instead of the pinned ZIP. That archive can
+never match the committed checksum, so it stops with `Failed to validate Maven
+distribution SHA-256, your Maven distribution might be compromised`. The message is
+misleading: Maven Central serves the pinned ZIP, and its SHA-256 equals the pin; the
+wrapper asked for the other archive. Install `unzip` where you can. Where you cannot
+(for example a minimal development container), seed the wrapper cache once from the
+checksum-verified ZIP and run every wrapper command with the same `MAVEN_USER_HOME`
+(it defaults to `~/.m2`). From `backend/`, with `apache-maven-3.10.0-bin.zip` downloaded
+from the `distributionUrl` in `.mvn/wrapper/maven-wrapper.properties`:
+
+```sh
+pin="$(sed -n 's/^distributionSha256Sum=//p' .mvn/wrapper/maven-wrapper.properties)"
+echo "$pin  apache-maven-3.10.0-bin.zip" | sha256sum -c -    # must print OK
+MAVEN_USER_HOME="${MAVEN_USER_HOME:-$HOME/.m2}"
+dist="$MAVEN_USER_HOME/wrapper/dists/apache-maven-3.10.0/dae9a06d"
+tmp="$(mktemp -d)" && python3 -m zipfile -e apache-maven-3.10.0-bin.zip "$tmp"
+mkdir -p "$dist" && cp -R "$tmp/apache-maven-3.10.0/." "$dist/" && chmod +x "$dist/bin/mvn"
+```
+
+The last directory name is the wrapper's hash of the pinned `distributionUrl`; it only
+changes if that URL changes. `MVNW_VERBOSE=debug ./mvnw --version 2>&1 | grep -m1
+MAVEN_HOME=` prints the directory the wrapper expects. The pin and the wrapper script
+stay untouched; the cache only replaces the download.
+
 Initial recovery prerequisite diagnostics (26 October 2026): the continuation
 environment could not run the backend at that checkpoint. Both `java` and `javac`
 must resolve to JDK 21 (or be available under `JAVA_HOME`); a JRE alone cannot satisfy the build. Provide `unzip`

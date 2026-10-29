@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Maven Wrapper cache for hosts without `unzip`, 29 October 2026
+
+- The backend guide now explains why `./mvnw` can stop with "Failed to validate Maven distribution
+  SHA-256, your Maven distribution might be compromised" on a host that has no `unzip` and an empty
+  wrapper cache: the wrapper downloads the `.tar.gz` archive, which can never match the pinned ZIP
+  checksum. Nothing is compromised and the pin is correct (Maven Central serves a ZIP whose SHA-256
+  equals it). The guide lists the one-time, checksum-verified cache seeding for such hosts. No code,
+  pin or wrapper script changed.
+
 ## Unreleased — Character rules: derived stats, conditions, rarity and equipment (P10.1), 29 October 2026
 
 - Packs can declare **equipment slots** (capacity, accepted tags, the number of hands) and **derived

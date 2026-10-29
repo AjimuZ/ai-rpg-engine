@@ -2360,6 +2360,15 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     transaction requirement), the V18 populated-upgrade step, and the backup tool catalog at schema
     version 18. Full backend `./mvnw --batch-mode verify`: 783 tests, 0 failures, 4 skipped
     (`PackagedInterfaceTest`, outside the container).
+  - Re-verification (29 October 2026): an independent rerun of the plan rejected the first
+    completion because `./mvnw --batch-mode verify` stopped in the wrapper with "Failed to validate
+    Maven distribution SHA-256". The code was not at fault. The container has no `unzip`; a wrapper
+    with an empty cache then downloads the `.tar.gz`, which can never match the pinned ZIP checksum.
+    Maven Central's ZIP matches the pin (checked by download), and the failure reproduces by running
+    the wrapper without `MAVEN_USER_HOME`. With the toolchain environment (`MAVEN_USER_HOME` holding
+    a cache seeded from the checksum-verified ZIP) the wrapper runs offline. The procedure for hosts
+    without `unzip` is now in the [backend guide](../backend/README.md). Dependency that remains:
+    `unzip`, or a seeded wrapper cache, wherever the plan runs; the pin and wrapper are unchanged.
   - Limits: no play commands use these rules yet (atomic use/transfer/equip is P10.2), ranks and
     levels do not advance, condition ticks and rest are P10.4/P11, and no panel shows conditions or
     equipment (P10.5). Starting loadouts from dependency packs are checked at campaign creation, not
