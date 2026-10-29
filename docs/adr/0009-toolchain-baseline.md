@@ -222,6 +222,10 @@ Alternatives considered:
   - The amended script ran `bin/mvn` through `/bin/sh`, on the fresh installation and from the cache.
   - A cold `./mvnw --batch-mode verify` with `HOME` and a fresh local repository on that `noexec` mount, without `MAVEN_USER_HOME`, `MAVEN_HOME`, `unzip` or a toolchain Maven on `PATH`, downloaded the ZIP and 574 artifacts and passed 783 tests: 0 failures, and 4 skipped (`PackagedInterfaceTest`). Maven logged 8 `JLineNativeLoader` warnings.
   - `tools/repository_checks/test_maven_wrapper.py` now has 11 cases. Here, 9 pass and the two `unzip` cases skip. The two new cases, cleared execute bits and a real `noexec` home, fail against the previous script with status 126.
+- Third amendment check (29 October 2026), same container, in the environment the workspace check gives each step: `HOME` on the `noexec` tmpfs, the workspace JDK and Maven first on `PATH`, `CI=1`, and no `JAVA_HOME`, `MAVEN_*` or `SPRING_DATASOURCE_*`:
+  - Without the file, `./mvnw --batch-mode test -Dtest=EngineApplicationTest` reproduced the rejected rerun: 3 of 3 tests errored with "Failed to determine a suitable driver class".
+  - With an owner-only `backend/config/application.properties` that holds the test database connection, the same command passed 3 of 3 tests. On commit `7239175`, all 16 plan commands passed, including `./mvnw --batch-mode verify`: 783 tests, 0 failures, 4 skipped (`PackagedInterfaceTest`).
+  - `tools/repository_checks/test_checks.py` fails when either the `backend/config/` path rule or the required ignore entry is removed.
 - All 399 artifact origin records in the probe's fresh local repository name Maven Central. The extra repositories in `flyway-parent` answered HTTP 401 and supplied nothing.
 - `pg_dump -Fc` and `pg_restore` 18.6 restored the migrated database into a new database, preserving the Flyway history row and the JSONB row.
 - The probe containers and network were removed. No Docker volume was created.

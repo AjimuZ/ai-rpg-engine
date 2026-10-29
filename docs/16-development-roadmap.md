@@ -2401,6 +2401,8 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     `secrets` check treats it as private and requires the ignore rule, and exported variables still
     win ([local datasource file](../backend/README.md#local-datasource-file); [ADR 0009](adr/0009-toolchain-baseline.md)
     amendment). No test is skipped and there is no default URL or embedded database.
+    Final evidence (commit `7239175`, clean tree, steps run with the workspace check's environment):
+    all 16 plan commands passed (`./mvnw` step: 783 tests, 0 failures, 4 skipped).
   - Limits: no play commands use these rules yet (atomic use/transfer/equip is P10.2), ranks and
     levels do not advance, condition ticks and rest are P10.4/P11, and no panel shows conditions or
     equipment (P10.5). Starting loadouts from dependency packs are checked at campaign creation, not
