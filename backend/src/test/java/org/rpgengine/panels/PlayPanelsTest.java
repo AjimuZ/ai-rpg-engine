@@ -343,6 +343,10 @@ class PlayPanelsTest {
         jdbc.update("insert into knowledge_belief (id, campaign_id, holder_actor_id, claim_id, stance, acquisition, "
                 + "informant_actor_id, learned_revision, learned_world_time, learned_event_sequence) values (?, ?, ?, ?, "
                 + "'RUMORED', 'TOLD', ?, ?, 60, ?)", UUID.randomUUID(), campaign, player, rumor, warden, revision, sequence);
+        // The player also holds a belief about a claim that has no statement; there is nothing to show for it.
+        jdbc.update("insert into knowledge_belief (id, campaign_id, holder_actor_id, claim_id, stance, acquisition, "
+                + "learned_revision, learned_world_time, learned_event_sequence) values (?, ?, ?, ?, 'BELIEVES', "
+                + "'OBSERVED', ?, 60, ?)", UUID.randomUUID(), campaign, player, exists, revision, sequence);
         jdbc.update("insert into knowledge_belief (id, campaign_id, holder_actor_id, claim_id, stance, acquisition, "
                 + "learned_revision, learned_world_time, learned_event_sequence) values (?, ?, ?, ?, 'BELIEVES', "
                 + "'OBSERVED', ?, 60, ?)", UUID.randomUUID(), campaign, warden, wardens, revision, sequence);
