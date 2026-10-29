@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Backend tests read a private local datasource file, 29 October 2026
+
+- A checkout can keep its test database connection in `backend/config/application.properties`
+  instead of exporting `SPRING_DATASOURCE_*`. Spring Boot already reads that location when Maven runs
+  from `backend/`; exported variables still take precedence. The tests still require a real
+  PostgreSQL database: there is no default URL, no H2 and no skipped test.
+- `.gitignore` ignores `/backend/config/`. The `secrets` check rejects any file there that Git could
+  stage and fails if the ignore rule is removed. Its tests cover the new private path, a tracked test
+  resource with a similar name and an ignored file that contains a password.
+- Why: `./mvnw --batch-mode verify` run without the datasource variables stopped with 303 test
+  errors ("Failed to determine a suitable driver class"). The backend guide and ADR 0009 describe
+  the file, its precedence and its limits.
+
 ## Unreleased — Maven Wrapper runs from a `noexec` home, 29 October 2026
 
 - `./mvnw` now works when `~/.m2` is on a filesystem mounted `noexec`, such as a tmpfs home in a

@@ -2392,6 +2392,15 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     home); both fail against the previous script with status 126. A cold `./mvnw --batch-mode verify`
     with `HOME` and a fresh repository on a `noexec` mount passed: 574 artifacts downloaded, 783
     tests, 0 failures, 4 skipped. JLine logs native-library warnings there and falls back.
+  - Test database repair (29 October 2026): the fourth independent rerun got through the wrapper,
+    then 303 tests errored with "Failed to determine a suitable driver class". The workspace check
+    runs `./mvnw --batch-mode verify` with the JDK on `PATH` but without `SPRING_DATASOURCE_*`, so
+    no Spring context could reach PostgreSQL. Reproduced with that environment (3 of 3
+    `EngineApplicationTest` errors). Spring Boot's standard `backend/config/application.properties`
+    now holds a checkout's private connection: `.gitignore` ignores `/backend/config/`, the
+    `secrets` check treats it as private and requires the ignore rule, and exported variables still
+    win ([local datasource file](../backend/README.md#local-datasource-file); [ADR 0009](adr/0009-toolchain-baseline.md)
+    amendment). No test is skipped and there is no default URL or embedded database.
   - Limits: no play commands use these rules yet (atomic use/transfer/equip is P10.2), ranks and
     levels do not advance, condition ticks and rest are P10.4/P11, and no panel shows conditions or
     equipment (P10.5). Starting loadouts from dependency packs are checked at campaign creation, not

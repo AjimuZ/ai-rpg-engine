@@ -73,7 +73,8 @@ class PathRuleTest(unittest.TestCase):
         for path in [".env", "backend/.env.local", ".local/secrets/x", ".codex/auth.json",
                      ".claude/settings.local.json", ".agents/hooks/x", "AGENTS.md", "CLAUDE.md",
                      "runtime-data/db", "backups/dump.sql", "certs/server.pem", "home/id_rsa",
-                     "x/postgres-password", "config/secrets/token", "engine.log"]:
+                     "x/postgres-password", "config/secrets/token", "engine.log",
+                     "backend/config/application.properties"]:
             with self.subTest(path=path):
                 self.assertTrue(checks.scan_path(path), path)
 
@@ -81,7 +82,8 @@ class PathRuleTest(unittest.TestCase):
         """Sanitized examples and similarly named public fixtures are accepted."""
         for path in [".env.example", "docs/16-development-roadmap.md", "backend/pom.xml",
                      "tools/runtime_probe/isolation_fixture/home-AGENTS.md",
-                     "docker/codex-runtime/Dockerfile", ".github/workflows/ci.yml"]:
+                     "docker/codex-runtime/Dockerfile", ".github/workflows/ci.yml",
+                     "backend/src/test/resources/config/application.properties"]:
             with self.subTest(path=path):
                 self.assertEqual([], checks.scan_path(path))
 
@@ -173,7 +175,8 @@ class SecretScanRepositoryTest(unittest.TestCase):
     """End-to-end secret scan on fixture repositories with a real ``.gitignore``."""
 
     # Mirrors the project's private-path ignore rules so the policy check passes.
-    IGNORE = ".env\n.env.*\n!.env.example\n.local/\nruntime-data/\nbackups/\n*.log\n.codex/\n.claude/\n.agents/\nAGENTS.md\nCLAUDE.md\n"
+    IGNORE = (".env\n.env.*\n!.env.example\n/backend/config/\n.local/\nruntime-data/\nbackups/\n*.log\n"
+              ".codex/\n.claude/\n.agents/\nAGENTS.md\nCLAUDE.md\n")
 
     def test_clean_repository_passes(self) -> None:
         """Neutral files plus a sanitized example produce no findings."""
@@ -191,12 +194,17 @@ class SecretScanRepositoryTest(unittest.TestCase):
             findings = checks.check_secrets(repo.root)
             self.assertIn("notes.txt:1: cloud access key id", findings)
             self.assertTrue(any("private path is not ignored: CLAUDE.md" in f for f in findings))
+            self.assertIn(".gitignore:1: private path is not ignored: backend/config/application.properties",
+                          findings)
 
     def test_ignored_private_files_are_not_scanned(self) -> None:
         """Ignored local files never count; an unignored one is rejected by path."""
         with FixtureRepository() as repo:
             repo.write(".gitignore", self.IGNORE)
             repo.write(".local/secrets/postgres-password", "irrelevant\n")
+            # A checkout's own datasource file holds a real password, but it is ignored.
+            repo.write("backend/config/application.properties",
+                       "spring.datasource.password=" + "Zq7xLocalOnly4Pw9\n")
             self.assertEqual([], checks.check_secrets(repo.root))
             repo.write("config/auth.json", "{}\n")
             self.assertIn("config/auth.json:1: forbidden path (account state file)", checks.check_secrets(repo.root))

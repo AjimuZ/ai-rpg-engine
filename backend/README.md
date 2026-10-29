@@ -160,6 +160,9 @@ variables without committing values:
 - `SPRING_DATASOURCE_USERNAME`: database role.
 - `SPRING_DATASOURCE_PASSWORD`: private password.
 
+A checkout can keep the same three settings in an ignored file instead of exporting
+them; see [Local datasource file](#local-datasource-file).
+
 For a temporary host-development database, first set `POSTGRES_PASSWORD` privately
 in your shell environment, then run this foreground command in another terminal:
 
@@ -285,6 +288,45 @@ Full pinned JDK 21/PostgreSQL 18.6 `verify` passes 218 tests, skips the three
 separate packaged-interface profile tests (221 total), and builds the jar
 (24 October 2026). The initial full run exposed a V6-latest fixture assumption;
 the V1→V7 extension and subsequent full rerun both pass.
+
+## Local datasource file
+
+Spring Boot reads `config/application.properties` from the working directory in
+addition to the classpath. For Maven test runs and `spring-boot:run` started from
+`backend/`, that is `backend/config/application.properties`. A checkout whose build
+tools do not export `SPRING_DATASOURCE_*` keeps its private test database settings
+there:
+
+```properties
+spring.datasource.url=jdbc:postgresql://127.0.0.1:5432/engine
+spring.datasource.username=engine
+spring.datasource.password=<private value>
+```
+
+Rules and limits:
+
+- **Private.** `.gitignore` ignores `/backend/config/`. The `secrets` check in
+  [repository checks](../tools/repository_checks/README.md) rejects any file there
+  that Git could stage, and fails if the ignore rule is dropped. Restrict the folder
+  to its owner (`chmod 700 config`, `chmod 600 config/application.properties`).
+  Never commit it or copy it into an issue or log. The default-deny `.dockerignore`
+  keeps it out of image build contexts.
+- **Exported variables win.** `SPRING_DATASOURCE_*` environment variables outrank
+  the file, so CI and shells that export them behave as before. Command-line
+  arguments and test properties outrank both.
+- **Same requirements.** The file only supplies the connection. A missing or
+  unreachable database still fails `verify`; nothing skips or switches to H2. Use
+  a disposable database, because the persistence tests truncate their tables.
+- **Scope.** Only processes whose working directory is `backend/` read it.
+  `PackagedSecretsTest` sets an explicit `spring.config.location` and ignores it.
+  The packaged runtime runs elsewhere and never sees it.
+- **Why it exists (29 October 2026).** A workspace check ran
+  `./mvnw --batch-mode verify` from `backend/` with no datasource variables, and
+  every database-backed context failed with "Failed to determine a suitable driver
+  class" (303 errors). The file gives that run the same real PostgreSQL database
+  that the exported variables provide elsewhere. Embedding a default URL or
+  credentials, or skipping database tests without a URL, would weaken the contract
+  above. See [ADR 0009](../docs/adr/0009-toolchain-baseline.md#decision-backend-build-and-database-p002).
 
 ## Neutral genre imports (P04.5)
 

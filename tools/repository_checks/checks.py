@@ -4,7 +4,8 @@ Six independent checks run against the files Git considers part of the project
 (tracked files plus untracked files that are not ignored):
 
 * ``secrets``: refuse private paths that must never be published (local
-  environment files, account state, assistant configuration, key material),
+  environment files, local backend configuration, account state, assistant
+  configuration, key material),
   refuse content that looks like a credential or a developer-specific absolute
   path, and verify that ``.gitignore`` still covers every private location.
 * ``docs``: verify that Markdown fences are balanced and that every relative
@@ -53,6 +54,9 @@ ALLOW_MARKER = "secret-scan: allow"
 FORBIDDEN_PATHS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(^|/)\.env(\.(?!example$)[^/]*)?$"), "local environment file"),
     (re.compile(r"^\.local/"), "private local runtime directory"),
+    # Spring Boot reads ./config/ relative to backend/; a checkout keeps its private
+    # datasource settings there (backend/README.md, "Local datasource file").
+    (re.compile(r"^backend/config/"), "local backend configuration"),
     (re.compile(r"(^|/)\.(claude|agents|codex)/"), "private assistant configuration"),
     (re.compile(r"^(AGENTS|CLAUDE)(\.override|\.local)?\.md$"), "private assistant instructions"),
     (re.compile(r"(^|/)\.mcp\.json$"), "private tool configuration"),
@@ -71,6 +75,7 @@ REQUIRED_IGNORED = [
     ".env", ".env.local", ".local/secrets/postgres-password", ".local/automation/x",
     ".codex/auth.json", ".claude/settings.local.json", ".agents/hooks/x",
     "AGENTS.md", "CLAUDE.md", "runtime-data/campaign.db", "backups/dump.sql", "engine.log",
+    "backend/config/application.properties",
 ]
 
 # --- Content rules ------------------------------------------------------------
