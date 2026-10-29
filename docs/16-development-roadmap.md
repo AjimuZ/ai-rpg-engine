@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 63/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4 and P10.5. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 64/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5 and P11.1. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -2572,7 +2572,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
 
 **Depends on:** P10. **Areas:** combat domain, rules, persistence, fixtures.
 
-- [ ] P11.1 Implement encounter lifecycle, frozen per-adventure profiles around the default ruleset, zone graph, objectives and opening-action policy; validate supported customization without changing the scheduler kernel.
+- [x] P11.1 Implement encounter lifecycle, frozen per-adventure profiles around the default ruleset, zone graph, objectives and opening-action policy; validate supported customization without changing the scheduler kernel.
   - Package A — profiles (`org.rpgengine.rules`): `CombatProfile` = the fixed AI RPG Skirmish kernel
     (`skirmish-initiative-rounds/1`) plus the 25 provisional parameters of docs/11 section 17 with defaults,
     bounds and cross-parameter invariants; a pack `combat` rule maps the roles to its attributes, names Health
@@ -2594,6 +2594,25 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     end; the opening strike is not resolved yet (P11.2/P11.3); items carry no Guard or armor modifier; no
     concealed participants or hazards; the V16 checkpoint records no encounter (P11.6); no frontend control or
     encounter panel (P12.1).
+  - Verification (29 October 2026, PostgreSQL 18.6, JDK 21, the runner's environment): all 16 plan
+    commands passed on `85f8849` (backend suite 924 tests, 0 failures; `./mvnw --batch-mode verify` the
+    same count with 4 skipped `PackagedInterfaceTest` cases; frontend 99 tests, 413 reviewed EN/IT
+    messages; repository checks 0 findings) and again on the final commit. New cases: `CombatProfileTest`
+    and `ZoneGraphTest` (pure: documented defaults, every parameter bound, invariants, canonical hash;
+    range, movement cost, blocking, connectivity), `EncounterLifecycleTest` (the phase table is exactly
+    the docs/11 diagram; objective statuses), `CombatRulesTest` (projection, the worked example's Guard 12
+    and initiative modifier 4, distinct-role formulas, refused contradictions, a customized profile through
+    the same kernel), `CombatPackTest` (located diagnostics for another scheduler or space, unknown or
+    out-of-bound parameters, conflicts, mappings, zones, feasibility and rosters), `EncounterCommandsTest`
+    (7 on PostgreSQL: entry freezes everything with no draw, time or pool change and a pending opening
+    strike; a replayed retry; refusals writing nothing; encounter mode refusing exploration and a second
+    entry; the `first` policy; the V22 guards; a customized profile), plus additions to `TypedCommandTest`,
+    `EventStatementsTest`, `ResolvedCommitTest`, `CanonicalCommitServiceTest`, `PackCompilerTest` and the
+    V22 step of `CanonicalMigrationUpgradeTest`. Twenty-eight weakenings applied to an exported copy each
+    failed at least one test; two first survived (a one-sided range distance and an opening strike against
+    an ally) and gained tests.
+    Not proven here: the 18 Docker-dependent probe cases, the `unzip` wrapper cases, a live V22 dump and
+    restore, balance of the provisional numbers and independent review of the new Italian message.
 - [ ] P11.2 Implement initiative, rounds, activations, AP, movement, legal targeting and explicit end activation; enforce bounded speech and declared social/scene-action eligibility/costs at player decision boundaries.
 - [ ] P11.3 Implement attack/defense/strong-hit/armor/healing calculations with recorded draws.
 - [ ] P11.4 Implement predeclared reactions, stacking caps, effect phases, durations, cooldowns, and no-chain limits.
