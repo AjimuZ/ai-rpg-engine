@@ -46,8 +46,9 @@ Pack quests were compile-time data: visibility, an initial status, an optional `
 - `availableWhen` merges eligibility and discovery: becoming available is the discovery event. Rumor-style discovery by an issuer, and issuer proximity for accepting, belong with the knowledge integration (P10.5, P15).
 - A quest cannot be abandoned by a command; failure is an authored outcome. Rewards are item units for the protagonist; XP, currency as a separate concept, reputation and party shares belong to progression (P13.4, P15.2).
 - Deferred transitions (budgets) settle at the next command that runs the engine, not on a timer.
+- The operational checkpoint snapshot (V16, layout version 1) still lists only the player-known quests; changing its layout would make every stored checkpoint compare unequal, so it needs a snapshot schema version of its own. A quest change always advances the state revision, which the snapshot records, so a checkpoint taken before it is detected as stale, and the canonical quest rows are covered by the backup tool.
 - No live V20 dump and restore rehearsal ran.
 
 ## Verification
 
-Recorded with the P10.3 task in the [development roadmap](../16-development-roadmap.md).
+Recorded with the P10.3 task in the [development roadmap](../16-development-roadmap.md) (29 October 2026): 844 backend tests pass with zero failures on PostgreSQL 18.6 (`QuestPredicateTest`, `QuestPlanTest`, `QuestCommandsTest`, the reward bound of `PackCompilerTest`, and the extended typed-command, event-statement and V20 upgrade tests). Fifteen deliberate weakenings, applied to an exported copy only, each made at least one test fail: re-evaluating an ended quest, keying the settlement by outcome, forgetting satisfied objectives, not granting rewards, publishing hidden-quest steps, skipping the quest writer, not recording a move's origin, tracking a suspended quest, making a hidden quest addressable, skipping the reward-recipient attribution, ignoring the reward-unit budget, ignoring a stale storage version, taking the last matching outcome instead of the first, dropping the reward settlement, and not running the engine after movement.

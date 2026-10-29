@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 60/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1 and P10.2. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 61/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2 and P10.3. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -2450,7 +2450,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     heal, move, condition and reveal effects stay refused as `EFFECT_UNSUPPORTED`; item intents are not
     offered to the model-proposal contract; no live V19 dump and restore rehearsal ran; the 18 Docker-dependent
     probe cases and the `unzip` wrapper cases are not proven in this container.
-- [ ] P10.3 Implement basic objective predicates, quest transitions, and one-time reward-source accounting.
+- [x] P10.3 Implement basic objective predicates, quest transitions, and one-time reward-source accounting.
   - Package A — pure engine (`org.rpgengine.quests`): `QuestRules` (prose-free projection of every pinned
     quest), `QuestPredicate` (the compiled world grammar: `visited`, `possesses`, `questStatus`, `objective`
     and the boolean/integer operators, evaluated over committed facts with no dice or clock) and `QuestPlan`
@@ -2476,6 +2476,24 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     receipts before its ending; a fault after the quest writes rolls back rows, settlement, ledger, events and
     revision; the ended quest, the settlement and the objectives are immutable at the database; the V20 upgrade
     step; and the full plan.
+  - Verification (29 October 2026, PostgreSQL 18.6, JDK 21, the runner's environment, clean HEAD `7e40034`): all
+    16 plan commands passed; backend suite 844 tests, 0 failures; `./mvnw --batch-mode verify` 844 tests, 0 failures,
+    4 skipped (`PackagedInterfaceTest`). New and extended cases: `QuestPredicateTest` (5 pure: atoms, logic,
+    arithmetic, misuse), `QuestPlanTest` (10 pure: discovery, requests, sticky objectives, ordered outcomes,
+    cascades, rewards inside one evaluation, hidden quests, budgets, determinism, change derivation),
+    `QuestCommandsTest` (10 on the quest pack: accept, move and settle once, suspension, refusals, an item effect
+    and a quest ending in one commit, a chain of quests with a hidden one, fault after the quest writes, replay,
+    stale and ended-quest writers, attribution), the reward bound in `PackCompilerTest`, `TypedCommandTest`,
+    `EventStatementsTest` and the V20 step of `CanonicalMigrationUpgradeTest`. Fifteen weakenings applied to an
+    exported copy each failed at least one test (see [ADR 0025](adr/0025-quest-lifecycle-objective-predicates-and-one-time-rewards.md)). Frontend: 79 tests, 353 reviewed EN/IT
+    messages, typecheck and build pass. Repository checks and the backup tool (schema version 20) pass.
+  - Limits: no journal, panel or quest screen (P10.5); predicates cover visits, possessions and quest state only
+    (no acquired-fact, encounter, interaction or clock predicates yet); eligibility and discovery are one step
+    (`availableWhen`), accepting needs no issuer nearby, and a quest cannot be abandoned by command; rewards are
+    item units for the protagonist (no XP, reputation or party shares, P13.4/P15.2); consequence texts are not shown
+    anywhere yet; the operational checkpoint snapshot still lists only player-known quests; deferred transitions settle
+    at the next evaluating command; no live V20 dump and restore rehearsal ran; the 18 Docker-dependent probe cases
+    and the `unzip` wrapper cases are not proven in this container.
 - [ ] P10.4 Implement movement duration, rest, and a bounded world clock without time advancement on queries.
 - [ ] P10.5 Integrate reliable state changes into panels and journal.
 
