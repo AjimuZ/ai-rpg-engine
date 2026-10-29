@@ -70,6 +70,7 @@ class PlayPanelsTest {
     @Autowired private EntityManager entities;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager manager;
+    @Autowired private PlayPanels service;
     private UUID adventure;
     private UUID content;
     private UUID campaign;
@@ -380,6 +381,89 @@ class PlayPanelsTest {
                 + "terms_locale, quoted, disclosure, status, made_revision, made_world_time, made_event_sequence) "
                 + "values (?, ?, 'PROMISE', ?, ?, ?, 'en', false, 'PARTIES', 'OPEN', ?, 60, ?)", UUID.randomUUID(),
                 campaign, debtor, creditor, terms, revision, sequence);
+    }
+
+    /**
+     * A hidden background quest appears only once its ending is committed, and even then its secret text stays
+     * out: the panel lists its identity, status, outcome and the public names of the units it paid.
+     */
+    @Test
+    void anEndedHiddenQuestIsListedWithoutItsSecretText() throws Exception {
+        execute(new TypedCommand.AcceptQuest("survey"));
+        execute(new TypedCommand.Move("grove"));
+        assertEquals("active", jdbc.queryForObject("select status from quest_state where quest_id = 'shadow'", String.class));
+        assertEquals(List.of("gate", "supply", "survey"), ids(panels(campaign, "").get("quests")));
+        // Fifteen coins and a move make the hidden quest's objective hold, which ends it.
+        jdbc.update("update item_instance set quantity = 15, row_version = row_version + 1 where campaign_id = ? and "
+                + "definition_id = 'coin'", campaign);
+        execute(new TypedCommand.Move("trailhead"));
+        JsonNode panels = panels(campaign, "");
+        assertEquals(List.of("gate", "shadow", "supply", "survey"), ids(panels.get("quests")));
+        JsonNode shadow = byField(panels.get("quests"), "id", "shadow");
+        assertEquals("completed", shadow.get("status").asText());
+        assertTrue(shadow.get("name").isNull(), "the name of a secret quest is secret text");
+        assertTrue(shadow.get("summary").isNull());
+        assertEquals("success", shadow.at("/outcome/kind").asText());
+        assertEquals("Relic", shadow.at("/outcome/rewards/0/name/text").asText());
+        assertTrue(shadow.at("/objectives/0/description").isNull());
+        var statements = new ArrayList<String>();
+        panels.at("/journal/entries").forEach(entry -> statements.add(entry.get("statement").asText()));
+        assertTrue(statements.stream().anyMatch(text -> text.contains("shadow") && text.contains("completed")),
+                "its ending is public: " + statements);
+        assertEquals(1, statements.stream().filter(text -> text.contains("shadow")).count(),
+                "only the ending is public, not its start or progress: " + statements);
+    }
+
+    /** A save without a player and a save whose pinned content cannot be loaded still read, without names or quests. */
+    @Test
+    void legacyAndUnloadableCampaignsStillRead() throws Exception {
+        UUID legacy = UUID.randomUUID();
+        jdbc.update("insert into campaign (id, adventure_id, content_revision_id, title, seed_identity, mode, created_at, "
+                + "updated_at) values (?, ?, ?, 'Legacy save', 'private-legacy-seed', 'EXPLORATION', now(), now())",
+                legacy, adventure, content);
+        JsonNode bare = panels(legacy, "");
+        assertTrue(bare.get("contentAvailable").asBoolean());
+        assertTrue(bare.get("character").isNull());
+        assertEquals(1, bare.at("/clock/day").asInt());
+        assertTrue(bare.get("quests").isEmpty());
+        assertFalse(bare.toString().contains("private-legacy-seed"));
+
+        // The same revision without its sealed files: numbers and identifiers remain, names and quests do not.
+        UUID unsealed = UUID.randomUUID();
+        jdbc.update("insert into content_revision (id, adventure_id, pack_id, pack_version, content_hash, schema_version, "
+                + "ruleset_id, ruleset_version, ruleset_hash, source_locale, admitted_at) select ?, adventure_id, pack_id, "
+                + "'9.9.9', content_hash, schema_version, ruleset_id, ruleset_version, ruleset_hash, source_locale, "
+                + "admitted_at from content_revision where id = ?", unsealed, content);
+        UUID orphan = UUID.randomUUID();
+        UUID hero = UUID.randomUUID();
+        jdbc.update("insert into campaign (id, adventure_id, content_revision_id, title, seed_identity, mode, created_at, "
+                + "updated_at) values (?, ?, ?, 'Orphan', 'orphan-seed', 'EXPLORATION', now(), now())", orphan, adventure, unsealed);
+        jdbc.update("insert into actor (id, campaign_id, kind, display_name, location_id, created_revision, created_at) "
+                + "values (?, ?, 'CHARACTER', 'Orphan hero', 'trailhead', 0, now())", hero, orphan);
+        jdbc.update("insert into character_state (campaign_id, actor_id, attributes, skills) values (?, ?, "
+                + "'{\"might\":2}'::jsonb, '{}'::jsonb)", orphan, hero);
+        jdbc.update("insert into campaign_creation (adventure_id, request_id, payload_hash, campaign_id, actor_id, profile_id, "
+                + "choices, created_at) values (?, ?, ?, ?, ?, 'surveyor', '{}'::jsonb, now())", adventure, UUID.randomUUID(),
+                "a".repeat(64), orphan, hero);
+        JsonNode orphaned = panels(orphan, "");
+        assertFalse(orphaned.get("contentAvailable").asBoolean());
+        assertEquals("Orphan hero", orphaned.at("/character/name").asText());
+        JsonNode might = byField(orphaned.at("/character/attributes"), "key", "might");
+        assertEquals(2, might.get("base").asLong());
+        assertEquals(2, might.get("effective").asLong());
+        assertTrue(might.get("name").isNull());
+        assertTrue(orphaned.get("quests").isEmpty());
+        assertTrue(orphaned.at("/character/derived").isEmpty());
+    }
+
+    /** Another owner's identity cannot read a campaign, even with the right adventure and campaign identities. */
+    @Test
+    void anotherOwnerCannotReadTheCampaign() {
+        UUID stranger = UUID.randomUUID();
+        jdbc.update("insert into identity_owner_profile (id, display_name, ui_locale, created_at, updated_at) "
+                + "values (?, 'Stranger', 'en', now(), now())", stranger);
+        assertThrows(PlayPanels.ScopeUnavailable.class, () -> service.read(stranger, adventure, campaign, null, 25));
+        assertEquals(0, service.read(OWNER, adventure, campaign, null, 25).scope().stateRevision());
     }
 
     // --- helpers -------------------------------------------------------------------------------------------
