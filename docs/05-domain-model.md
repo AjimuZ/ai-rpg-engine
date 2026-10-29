@@ -262,7 +262,7 @@ It contains no prose, selected action or branching script. State/continue resolv
 only the pinned public entrypoint in the saved narrative locale, retaining actual
 language/fallback metadata and typed free-input decision metadata. Cleared or
 unsupported decisions and legacy saves receive no invented starting presentation.
-Mutable inventory/progression commands and equipment remain later work.
+Mutable inventory/progression commands remain later work (P10.2); equipment state and its rules arrived in P10.1.
 Creation verifies the complete pinned sealed dependency closure before writing;
 external profiles, skills, locations and grants resolve in their declaring pack.
 Dependency IDs persist as `pack#definition`; root IDs retain their local form.
@@ -286,6 +286,39 @@ These hold only explicitly revealed player text and confidence/objective/status;
 secret authored truth and quest graphs stay elsewhere. No legacy knowledge is
 backfilled. Canonical reveal/progression writers remain later command work and
 must persist their evidence and these audience records atomically.
+
+### Character rules and state (P10.1)
+
+V18 adds `actor_condition` (one row per actor and condition: stacks 1–10, remaining rounds
+1–10,000, applied and updated revision) and `equipment_assignment` (one row per worn item
+instance: slot, hands, equip revision), plus a unique `item_instance (campaign_id, actor_id, id)`
+that lets an assignment prove the instance belongs to the same actor. Nothing is backfilled: an
+older save has no conditions and nothing equipped. Both tables are character state, not events;
+they change only through `CharacterService`, which checks the campaign's pinned
+`CharacterRuleCatalog` and runs inside the caller's transaction ([ADR 0023](adr/0023-character-rules-and-equipment-constraints.md)).
+
+- **Sheet.** The effective attributes (stored base plus per-stack condition modifiers, held inside
+  each attribute's declared range), skill ranks, derived statistics and active conditions are
+  recomputed from committed rows on every read; nothing derived is stored. A derived statistic is a
+  pure function of attributes and skills, its result must lie in the bounds declared by the pack, and
+  a statistic whose attributes the actor lacks is absent.
+- **Vocabulary.** Attribute ranges, derived statistics, hands and slots come from the pack that
+  declares the actor's creation profile; skills, abilities, items and conditions use canonical
+  identities (`pack#id` for dependencies). An item whose slot key is missing from that vocabulary is
+  not wearable.
+- **Equipment.** Wearing checks slot existence, tag compatibility, slot capacity and the actor's total
+  hands together and reports every violated constraint. An equipped instance cannot be transferred
+  (foreign key) until unequipped, an equipped item must not stack, and the database bounds stack size
+  and total hands at four even for a stray writer. Only an explicit `equipped: true` starting item is
+  worn at creation.
+- **Conditions.** Application follows the definition's `none`, `refresh` or `stack` policy and its
+  `maxStacks`; elapsed rounds shorten durations and delete exhausted rows. Condition ticks, rest
+  removal and time passage are later work (P10.4, P11).
+- **Abilities.** `learnAbility` checks the pinned skill ranks and prerequisite abilities against the
+  actor's stored skills and learned abilities, then records rank 1 with the acquisition revision.
+  Advancement of ranks, levels or attributes is a separate operation and is not offered.
+- **Rarity.** The catalog carries the declared tier ID of each item and no appearance data, so
+  artwork, price and inspection cannot change a tier, slot, hands, tags or bonus.
 
 ### Local consultation presentation (P06.4)
 
@@ -325,7 +358,7 @@ canonical commit to increment revision, turn, time or event sequence.
 - Hand occupancy, slots, capacity, ammunition, charges, and binding rules are checked together.
 - Consumption and effect resolution are atomic. An attack cannot consume ammunition twice on a network retry.
 - Item descriptions do not create mechanical bonuses. Bonuses require a validated effect definition.
-- Item rarity is a validated tier reference; art, color, purchase and inspection cannot change it. Shop and owned-instance views resolve the same visual identity unless an explicit visible variant is admitted.
+- Item rarity is a validated tier reference; art, color, purchase and inspection cannot change it. Shop and owned-instance views resolve the same visual identity unless an explicit visible variant is admitted. Since P10.1 the rule catalog stores only the tier ID and storage rejects an equipment assignment for a stack or for an instance of another actor.
 
 ### Knowledge and progression
 

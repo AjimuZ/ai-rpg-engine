@@ -126,6 +126,8 @@ Use a neutral category icon/portrait and visible pending/error state until art i
 
 Rarity is validated item data, independent from image quality or price. A pack may define supported tier IDs, localized names and presentation tokens. Proposed default labels are common, uncommon, rare, epic and legendary; they are presentation/authoring defaults, not automatic stat multipliers, price formulas or drop chances. A ruleset must explicitly define any supported mechanical consequences. Do not promise every genre uses those labels.
 
+Since P10.1 the backend rule catalog stores only the declared tier ID of an item; it has no appearance, color or image field, and tests prove that an ornate appearance leaves tier, slot, hands and tags unchanged ([ADR 0023](adr/0023-character-rules-and-equipment-constraints.md)).
+
 Show the known tier as text plus an icon/frame treatment; color is supplementary. Shop, tooltip, inventory and equipment use the same admitted tier and visual identity. Unknown rarity stays unknown. A generated ornate sword is not upgraded to legendary because of its art. Rarity changes, if supported, require a validated, source-linked content or progression operation; they cannot be a media job side effect.
 
 ## 6. Provenance and acceptance

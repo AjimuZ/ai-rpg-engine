@@ -8,6 +8,8 @@ import java.util.TreeMap;
 import org.rpgengine.content.CompiledPack;
 import org.rpgengine.content.CampaignPackSnapshot;
 import org.rpgengine.content.Definition;
+import org.rpgengine.characters.CharacterRuleCatalog;
+import org.rpgengine.rules.EquipmentRules;
 
 /**
  * Pure creation resolution from a compiled, sealed pack and bounded player choices.
@@ -114,6 +116,7 @@ public final class CharacterCreation {
         List<StartingItem> items = new ArrayList<>();
         Map<String, Integer> quantities = new TreeMap<>();
         Map<String, Integer> maxima = new TreeMap<>();
+        List<String> equipped = new ArrayList<>();
         for (var grant : objects(profile, "startingItems")) {
             var resolved = snapshot.resolve(source, (String) grant.get("item"), "item");
             String id = resolved.id();
@@ -126,12 +129,50 @@ public final class CharacterCreation {
                 throw new IllegalArgumentException("starting loadout exceeds its stack limit");
             }
             maxima.put(id, maximum);
+            if (Boolean.TRUE.equals(grant.get("equipped"))) {
+                // One assignment names one item instance, so only a single, non-stacking item can be worn.
+                if (quantity != 1 || maximum != 1 || equipped.contains(id)) {
+                    throw new IllegalArgumentException("only one non-stacking item can be equipped per grant");
+                }
+                equipped.add(id);
+            }
         }
-        quantities.forEach((id, quantity) -> items.add(new StartingItem(id, quantity, maxima.get(id))));
+        var gear = requireWearable(snapshot, profileId, equipped);
+        quantities.forEach((id, quantity) -> items.add(new StartingItem(id, quantity, maxima.get(id),
+                gear.containsKey(id) ? gear.get(id).slot() : null, gear.containsKey(id) ? gear.get(id).hands() : 0)));
         List<String> abilities = strings(profile, "startingAbilities").stream()
                 .map(id -> snapshot.resolve(source, id, "ability").id()).toList();
         // Explicit authored grants do not run action predicates or spend resources during creation.
         return new InitialCharacter(profileId, location, attributes, skills, resources, items, abilities);
+    }
+
+    /**
+     * Check that the equipped starting items can be worn together under the creation profile's pack
+     * vocabulary: slots, slot capacity, tag compatibility and hands are checked as at any later
+     * equip (P10.1). Items from another pack must name a slot of that vocabulary. Order is the
+     * authored grant order, so the first conflicting item is the one reported.
+     */
+    private static Map<String, EquipmentRules.Gear> requireWearable(CampaignPackSnapshot snapshot, String profileId,
+            List<String> equipped) {
+        if (equipped.isEmpty()) {
+            return Map.of();
+        }
+        var catalog = CharacterRuleCatalog.from(snapshot);
+        var vocabulary = catalog.vocabularyOf(profileId);
+        if (vocabulary == null) {
+            throw new IllegalArgumentException("starting loadout cannot be equipped without a character vocabulary");
+        }
+        var worn = new ArrayList<EquipmentRules.Worn>();
+        Map<String, EquipmentRules.Gear> gear = new TreeMap<>();
+        for (String id : equipped) {
+            var item = catalog.items().get(id);
+            gear.put(id, item.gear());
+            worn.add(new EquipmentRules.Worn(id, item.gear().slot(), item.gear().hands()));
+        }
+        if (!EquipmentRules.audit(vocabulary.hands(), vocabulary.slots(), worn, gear).isEmpty()) {
+            throw new IllegalArgumentException("starting loadout cannot be equipped under the slot and hand rules");
+        }
+        return gear;
     }
 
     /** Qualify authored preset skill keys, preserving their ranks and rejecting unresolved references. */
@@ -179,8 +220,18 @@ public final class CharacterCreation {
         return result;
     }
 
-    /** One engine-resolved item stack, with a pinned stack bound; no equipment is implicitly assigned. */
-    public record StartingItem(String definitionId, int quantity, int maximumStack) {
+    /**
+     * One engine-resolved item stack, with a pinned stack bound.
+     *
+     * @param slot the slot key when the profile explicitly equips it at the start, else null; nothing is
+     *        ever equipped implicitly, and an equipped stack has quantity and bound one
+     * @param hands hands the equipped item occupies; zero when not equipped
+     */
+    public record StartingItem(String definitionId, int quantity, int maximumStack, String slot, int hands) {
+        /** @return whether the item starts equipped */
+        public boolean equipped() {
+            return slot != null;
+        }
     }
 
     /** Immutable resolution output for trusted persistence, not a public projection or a live state patch. */

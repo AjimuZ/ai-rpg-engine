@@ -321,6 +321,51 @@ class CanonicalMigrationUpgradeTest {
                             + "'ACTIVE', retired_reason = null, retired_at = null, row_version = row_version + 1 "
                             + "where id = ?", record));
                     assertEquals(0, v17.migrate().migrationsExecuted);
+                    // V18 adds conditions and equipment empty: an old save is unchanged and gets no invented
+                    // worn item or condition; storage bounds hold even for a stray SQL writer.
+                    String v17Campaign = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
+                    Flyway v18 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("18").load();
+                    assertEquals(1, v18.migrate().migrationsExecuted);
+                    assertTrue(v18.validateWithResult().validationSuccessful);
+                    assertEquals(v17Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c",
+                            String.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from actor_condition", Integer.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from equipment_assignment", Integer.class));
+                    UUID wearer = UUID.randomUUID();
+                    UUID sword = UUID.randomUUID();
+                    UUID shield = UUID.randomUUID();
+                    UUID arrows = UUID.randomUUID();
+                    jdbc.update("insert into actor (id, campaign_id, kind, display_name, created_revision, created_at) "
+                            + "values (?, ?, 'CHARACTER', 'Wearer', 0, now())", wearer, campaign);
+                    for (UUID item : new UUID[] {sword, shield, arrows}) {
+                        jdbc.update("insert into item_instance (id, campaign_id, actor_id, definition_id, quantity, "
+                                + "maximum_stack, acquired_revision) values (?, ?, ?, ?, 1, ?, 0)", item, campaign,
+                                wearer, "item", item.equals(arrows) ? 20 : 1);
+                    }
+                    String wear = "insert into equipment_assignment (campaign_id, actor_id, item_instance_id, slot_id, "
+                            + "hands, equipped_revision) values (?, ?, ?, 'main-hand', ?, 1)";
+                    // A stack cannot be worn, and nothing may claim an instance of another actor.
+                    assertThrows(DataAccessException.class, () -> jdbc.update(wear, campaign, wearer, arrows, 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(wear, campaign, actor, sword, 1));
+                    assertEquals(1, jdbc.update(wear, campaign, wearer, sword, 3));
+                    // Wearing the same instance twice and exceeding the four-hand storage bound both fail.
+                    assertThrows(DataAccessException.class, () -> jdbc.update(wear, campaign, wearer, sword, 0));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(wear, campaign, wearer, shield, 2));
+                    // Slot, hands and owner are frozen, and an equipped instance cannot change hands.
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update equipment_assignment set "
+                            + "slot_id = 'off-hand', row_version = row_version + 1"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update item_instance set actor_id = ? "
+                            + "where id = ?", actor, sword));
+                    String condition = "insert into actor_condition (campaign_id, actor_id, condition_id, stacks, "
+                            + "remaining_rounds, applied_revision, updated_revision) values (?, ?, 'dazed', ?, ?, 1, 1)";
+                    assertThrows(DataAccessException.class, () -> jdbc.update(condition, campaign, wearer, 11, 3));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(condition, campaign, wearer, 1, 0));
+                    assertEquals(1, jdbc.update(condition, campaign, wearer, 2, 3));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(condition, campaign, wearer, 1, 3));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update actor_condition set "
+                            + "applied_revision = 0, row_version = row_version + 1"));
+                    assertEquals(0, v18.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — Character rules: derived stats, conditions, rarity and equipment (P10.1), 29 October 2026
+
+- Packs can declare **equipment slots** (capacity, accepted tags, the number of hands) and **derived
+  statistics** (a formula over attributes and skills with declared bounds). Items name their slot,
+  the hands they occupy and tags; conditions can stack up to a cap. Invalid combinations, such as an
+  unknown slot, a stackable equippable item, a formula that reads dice, or a starting loadout that
+  needs more hands than the character has, are rejected when the pack is checked, with the item and
+  slot in the diagnostic.
+- A new character service computes the **effective sheet** (attributes after conditions, skills,
+  derived statistics) from saved state, applies and expires **conditions** by their stacking policy,
+  records **learned abilities** only when their skill and ability prerequisites hold, and checks
+  **equipment** by slot, tags, capacity and hands together, reporting every violated rule.
+- A starting item can be marked `equipped`; nothing is ever equipped implicitly. Rarity is the tier
+  the pack declares: artwork, color, price or description never change it, a slot or a bonus.
+- Database migration V18 adds `actor_condition` and `equipment_assignment`; an equipped item cannot be
+  transferred, a stack cannot be worn and the backup tool covers both tables (schema version 18).
+- Not done yet: play commands that use, transfer and equip items, advancement of ranks and levels,
+  condition ticks and rest, and the inventory, equipment and condition panels (P10.2–P10.5).
+
 ## Unreleased — Hardware profile, pinned model server and model catalog (P21.1 checkpoint), 29 October 2026
 
 - New `./start.sh --models profile [--gpu-check]` writes `.local/hardware.json`, a profile of the

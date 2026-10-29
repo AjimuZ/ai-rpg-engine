@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 58/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7 and P09.1–P09.5. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 59/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5 and P10.1. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -2336,7 +2336,34 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
 
 **Depends on:** P07–P09. **Areas:** characters, inventory, quests, world clock, related UI.
 
-- [ ] P10.1 Implement attributes, skills, derived stats, learned abilities, conditions, explicit item rarity tiers, equipment and hand/slot constraints; never derive mechanics from artwork.
+- [x] P10.1 Implement attributes, skills, derived stats, learned abilities, conditions, explicit item rarity tiers, equipment and hand/slot constraints; never derive mechanics from artwork.
+  - Package A — pack contract (`PackCompiler`): new `equipment` rule (hands 1–4, slots with capacity
+    and accepted tags) and `derivedStats` rule (formula over attributes and skills only; dice and
+    resource atoms rejected; proven interval inside the declared bounds); item `hands` and `tags`
+    with `slot` validated against the pack's slots (`REFERENCE_UNKNOWN` listing the defined slots),
+    equippable items must not stack; condition `maxStacks`; creation `startingItems[].equipped`
+    checked for slot capacity and hands. Derived rules are validated after the others.
+  - Package B — pure rules (`rules`: `StatFormula`, `ConditionRules`, `EquipmentRules`,
+    `CharacterSheet`): exact long arithmetic, `none`/`refresh`/`stack` conditions with a stack cap
+    and expiry by rounds, combined slot/tag/capacity/hands check reporting every violation, and an
+    effective sheet recomputed from base values (condition modifiers clamped to the attribute range;
+    a statistic with an unheld attribute is absent, never zero).
+  - Package C — persistence and service (`V18`, `CharacterRuleCatalog`, `CharacterService`,
+    `CharacterCreation`): `actor_condition` and `equipment_assignment`, a composite foreign key that
+    blocks transferring an equipped instance, storage bounds on stacks and total hands, a catalog
+    that carries the declared rarity tier and no appearance data, learned abilities with skill and
+    ability prerequisites, and explicit equipped starting items. Operations run inside the caller's
+    transaction under an actor row lock. Decision: [ADR 0023](adr/0023-character-rules-and-equipment-constraints.md).
+  - Verification (29 October 2026): `CharacterRulesPackTest` (9 compile cases), `StatFormulaTest`,
+    `ConditionRulesTest`, `EquipmentRulesTest`, `CharacterSheetTest` and `CharacterServiceTest`
+    (PostgreSQL 18.6: catalog, sheet, conditions, abilities, equipment constraints, transfer block,
+    transaction requirement), the V18 populated-upgrade step, and the backup tool catalog at schema
+    version 18. Full backend `./mvnw --batch-mode verify`: 783 tests, 0 failures, 4 skipped
+    (`PackagedInterfaceTest`, outside the container).
+  - Limits: no play commands use these rules yet (atomic use/transfer/equip is P10.2), ranks and
+    levels do not advance, condition ticks and rest are P10.4/P11, and no panel shows conditions or
+    equipment (P10.5). Starting loadouts from dependency packs are checked at campaign creation, not
+    by a dedicated persistence test. No live V18 dump and restore rehearsal ran.
 - [ ] P10.2 Implement atomic use/transfer/equip/trade commands and source-linked item creation.
 - [ ] P10.3 Implement basic objective predicates, quest transitions, and one-time reward-source accounting.
 - [ ] P10.4 Implement movement duration, rest, and a bounded world clock without time advancement on queries.

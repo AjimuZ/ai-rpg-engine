@@ -1,4 +1,4 @@
-# Database backup and restore (V17 scope)
+# Database backup and restore (V18 scope)
 
 A trusted-owner disaster-recovery tool for the canonical PostgreSQL database. It
 uses only the Python standard library and the `pg_dump`/`pg_restore` clients inside
@@ -19,7 +19,7 @@ py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
 ## What it does
 
 - **Backup** checks the exact server and client version, the exact table set and
-  successful migrations V1–V17, including immutable pack bytes and sealed reports. It then creates the target directory, which must
+  successful migrations V1–V18, including immutable pack bytes and sealed reports. It then creates the target directory, which must
   not already exist, and writes `database.dump` (custom format, no owners or
   privileges). It re-reads the catalog and writes `manifest.json` last. The manifest
   holds the format, schema and PostgreSQL versions, the scope, the byte count, the
@@ -148,3 +148,10 @@ as retired with reason `RESTART`, no runtime conversation survives a restart, an
 advanced recovery generation makes each line's next session rehydrate from the restored
 state. Offline checks cover the V17 manifest/catalog; no live V17 dump/restore rehearsal
 has been run.
+
+V18 scope (P10.1) adds `actor_condition` (active conditions with stacks and remaining rounds)
+and `equipment_assignment` (which item instance each actor wears, with its slot and hands), and
+a unique constraint on `item_instance (campaign_id, actor_id, id)`. Both tables are canonical
+character state: restore them with the campaign rows they reference. They need no extra
+restore step. Offline checks cover the V18 manifest/catalog; no live V18 dump/restore
+rehearsal has been run.

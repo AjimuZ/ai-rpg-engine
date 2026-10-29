@@ -14,7 +14,8 @@ import java.util.TreeSet;
 /**
  * Semantic validation of a {@link ParsedPack}: stable IDs, dependency resolution, cross-references,
  * creation profiles, item rarity/appearance identities, skills, abilities, conditions, quests and
- * initial world definitions (P04.2), plus bounded expressions/effects, relation cycles, engine and
+ * initial world definitions (P04.2), derived statistics, equipment slots, hands and stacking
+ * conditions (P10.1), plus bounded expressions/effects, relation cycles, engine and
  * ruleset compatibility, module support, hash conflicts and the generation policy (P04.3).
  *
  * <p>Boundaries: this stage reads only the immutable parser output, a caller-supplied
@@ -48,6 +49,12 @@ public final class PackCompiler {
     /** Kinds a generation constraint may name: every kind of a known content category. */
     private static final Set<String> ALL_KINDS = Set.copyOf(CATEGORY_KINDS.values());
     private static final int LIST_MAX = 64;
+    /** Hands available when a pack's equipment rule does not say otherwise (docs/10 section 3). */
+    static final int DEFAULT_HANDS = 2;
+    /** Most hands a pack may declare; larger values would make hand occupancy uninformative. */
+    static final int MAX_HANDS = 4;
+    /** Cap on stacks of a stacking condition; bounds how far one condition can move an attribute. */
+    static final int MAX_CONDITION_STACKS = 10;
     private static final int VALUE_MAX = 1_000_000;
     /** Effect nodes per ability or condition tick list, nested conditional nodes included (docs/09 section 7). */
     static final int EFFECT_NODES = 20;
@@ -108,6 +115,12 @@ public final class PackCompiler {
         /** Resource ID to its maximum; filled from "resources" rule definitions. */
         private final Map<String, Integer> resources = new HashMap<>();
         private final Set<String> rarityTiers = new HashSet<>();
+        /** Derived statistic IDs; they share no namespace with attributes so a formula atom is never ambiguous. */
+        private final Set<String> derivedStats = new HashSet<>();
+        /** Equipment slot ID to {capacity, accepted tags}; filled from the "equipment" rule definition. */
+        private final Map<String, EquipmentSlot> equipmentSlots = new HashMap<>();
+        /** Simultaneous hands this pack's actors have; used to check two-handed items and loadouts. */
+        private int handCapacity = DEFAULT_HANDS;
         /** Appearance identities must be unique across items so artwork binds to exactly one item. */
         private final Set<String> appearances = new HashSet<>();
         /** "Requires" relations whose cycles would make content unsatisfiable or loop forever. */
@@ -135,8 +148,14 @@ public final class PackCompiler {
             resolveDependencies();
             List<Definition> all = collect();
             // Rules first: they define the attribute/resource/rarity vocabularies others reference.
+            // Derived statistics read attributes, so they follow the other rules whatever the file order.
             for (Definition definition : all) {
-                if (definition.kind().equals("rule")) {
+                if (definition.kind().equals("rule") && !"derivedStats".equals(definition.data().get("ruleType"))) {
+                    validate(definition);
+                }
+            }
+            for (Definition definition : all) {
+                if (definition.kind().equals("rule") && "derivedStats".equals(definition.data().get("ruleType"))) {
                     validate(definition);
                 }
             }
@@ -390,7 +409,8 @@ public final class PackCompiler {
 
         /** Register the rule vocabularies; unknown rule types fail closed rather than being ignored. */
         private void rule(Fields f) {
-            String type = f.choice("ruleType", Set.of("attributes", "resources", "rarityTiers"), null);
+            String type = f.choice("ruleType", Set.of("attributes", "resources", "rarityTiers",
+                    "derivedStats", "equipment"), null);
             switch (type) {
                 case "attributes" -> {
                     for (Fields a : f.objects("attributes", 1, 16)) {
@@ -418,6 +438,8 @@ public final class PackCompiler {
                         }
                     }
                 }
+                case "derivedStats" -> derivedStats(f);
+                case "equipment" -> equipment(f);
                 default -> {
                     for (Fields t : f.objects("tiers", 1, 16)) {
                         String id = t.id("id", true);
@@ -431,6 +453,118 @@ public final class PackCompiler {
                     }
                 }
             }
+        }
+
+        /**
+         * Derived statistics: pure functions of attribute values and skill ranks (docs/10 section 1).
+         * A formula may read neither dice nor current resource values, so a derived value is
+         * reproducible from the stored base values and never depends on a draw or on spent
+         * resources. Its proven interval must lie inside the declared bounds, so a consumer can
+         * rely on the range without clamping; use {@code clamp} in the formula to narrow it.
+         */
+        private void derivedStats(Fields f) {
+            for (Fields stat : f.objects("stats", 1, 16)) {
+                String id = stat.id("id", true);
+                stat.text("name", true);
+                int min = stat.integer("min", -VALUE_MAX, VALUE_MAX, 0);
+                int max = stat.integer("max", -VALUE_MAX, VALUE_MAX, null);
+                if (max < min) {
+                    throw stat.fail("max", "Maximum must not be below minimum");
+                }
+                if (attributes.containsKey(id) || resources.containsKey(id)) {
+                    throw stat.fail("DUPLICATE", "id", "Derived statistic ID is already an attribute or resource");
+                }
+                Object formula = stat.value("formula", true);
+                if (readsAtom(formula, "dice") || readsAtom(formula, "resource")) {
+                    throw stat.fail("formula", "A derived statistic may read only attributes and skills");
+                }
+                var result = Expressions.analyze(stat.document(), stat.at("formula"), formula, Expressions.Scope.ACTOR,
+                        Expressions.Type.NUMBER, this);
+                if (result.min() < min || result.max() > max) {
+                    throw stat.fail("RANGE", "formula", "Formula may range " + result.min() + ".." + result.max()
+                            + "; declared " + min + ".." + max);
+                }
+                stat.close();
+                if (!derivedStats.add(id)) {
+                    throw stat.fail("DUPLICATE", "id", "Derived statistic ID already defined");
+                }
+            }
+        }
+
+        /** Whether any node of an expression tree is the named atom; the tree is already size-bounded. */
+        private static boolean readsAtom(Object node, String atom) {
+            if (node instanceof Map<?, ?> map) {
+                return map.entrySet().stream().anyMatch(entry -> atom.equals(entry.getKey()) || readsAtom(entry.getValue(), atom));
+            }
+            return node instanceof List<?> list && list.stream().anyMatch(child -> readsAtom(child, atom));
+        }
+
+        /**
+         * Equipment vocabulary: the hands an actor has and the named slots with a capacity and
+         * optional compatibility tags. Only one equipment rule may exist per pack, because two
+         * would have to be merged by an unstated precedence.
+         */
+        private void equipment(Fields f) {
+            if (!equipmentSlots.isEmpty()) {
+                throw f.fail("DUPLICATE", "slots", "A pack may define one equipment rule");
+            }
+            handCapacity = f.integer("hands", 1, MAX_HANDS, DEFAULT_HANDS);
+            for (Fields slot : f.objects("slots", 1, 16)) {
+                String id = slot.id("id", true);
+                slot.text("name", true);
+                int capacity = slot.integer("capacity", 1, 8, 1);
+                var accepts = Set.copyOf(slot.ids("accepts", 16));
+                slot.close();
+                if (equipmentSlots.putIfAbsent(id, new EquipmentSlot(capacity, accepts)) != null) {
+                    throw slot.fail("DUPLICATE", "id", "Equipment slot ID already defined");
+                }
+            }
+        }
+
+        /** Slot and hand usage of the items a creation profile equips at the start. */
+        private static final class StartingLoadout {
+            private final Map<String, Integer> slotUse = new HashMap<>();
+            private int hands;
+            private final List<String> items = new ArrayList<>();
+        }
+
+        /**
+         * Check that one starting item can be worn together with those already equipped by the same
+         * profile. Only local definitions are comparable here; an external item is rechecked against the
+         * pinned closure when the campaign is created. The diagnostic lists every item involved so the
+         * author sees the conflict, not just the last item read (docs/09 section 10).
+         */
+        private void startingEquipment(Fields loadout, String reference, StartingLoadout worn) {
+            Definition definition = byId.get(reference);
+            if (definition == null) {
+                return;
+            }
+            // Equippable items never stack (checked on the item), so the stack-limit check above already
+            // limits an equipped grant to quantity 1.
+            String slot = (String) definition.data().get("slot");
+            if (slot == null) {
+                throw loadout.fail("equipped", "Item '" + reference + "' has no equipment slot");
+            }
+            var slotRule = equipmentSlots.get(slot);
+            if (slotRule == null) {
+                // The item definition itself reports the unknown slot; this is only its starting use.
+                return;
+            }
+            worn.items.add(reference);
+            int hands = definition.data().get("hands") instanceof Number number ? number.intValue() : 0;
+            if (worn.slotUse.merge(slot, 1, Integer::sum) > slotRule.capacity()) {
+                throw loadout.fail("CONSTRAINT_CONFLICT", "equipped", "Starting loadout overfills slot '" + slot
+                        + "'; equipped items: " + worn.items);
+            }
+            worn.hands += hands;
+            if (worn.hands > handCapacity) {
+                throw loadout.fail("CONSTRAINT_CONFLICT", "equipped", "Starting loadout needs " + worn.hands
+                        + " hands; the pack's actors have " + handCapacity + "; equipped items: " + worn.items);
+            }
+        }
+
+        /** Compiled facts of one equipment slot: how many items fit and which item tags it accepts (empty: any). */
+        private record EquipmentSlot(int capacity, Set<String> accepts) {
         }
 
         /** Read the knowledge-visibility facts shared by world definitions. */
@@ -497,13 +631,42 @@ public final class PackCompiler {
             facts(f);
         }
 
-        /** Item: type, stack/slot policy, validated rarity tier, appearance identity and plain integer properties. */
+        /**
+         * Item: type, stack and equipment policy, validated rarity tier, appearance identity and plain
+         * integer properties. An item is equippable exactly when it names a {@code slot}, which must be
+         * one the pack's equipment rule defines (docs/09 section 10); {@code hands} says how many of the
+         * actor's hands it occupies while equipped and {@code tags} are matched against the slot's
+         * accepted tags. Rarity is a tier reference only: it never reads the appearance.
+         */
         private void item(Fields f) {
             f.text("name", true);
             f.text("description", true);
             f.choice("itemType", ITEM_TYPES, null);
-            f.integer("maxStack", 1, 9999, 1);
-            f.id("slot", false);
+            int maxStack = f.integer("maxStack", 1, 9999, 1);
+            String slot = f.id("slot", false);
+            int hands = f.integer("hands", 0, MAX_HANDS, 0);
+            List<String> tags = f.ids("tags", 16);
+            if (slot == null && hands > 0) {
+                throw f.fail("hands", "An item that occupies hands must name the equipment slot it is carried in");
+            }
+            if (slot != null && maxStack != 1) {
+                // An equipment assignment names one item instance, so a stack cannot be worn.
+                throw f.fail("maxStack", "An equippable item must not stack");
+            }
+            if (slot != null) {
+                EquipmentSlot definition = equipmentSlots.get(slot);
+                if (definition == null) {
+                    throw f.fail("REFERENCE_UNKNOWN", "slot", "Unknown equipment slot '" + slot
+                            + "'; defined slots: " + new TreeSet<>(equipmentSlots.keySet()));
+                }
+                if (hands > handCapacity) {
+                    throw f.fail("RANGE", "hands", "Item needs " + hands + " hands; the pack's actors have " + handCapacity);
+                }
+                if (!definition.accepts().isEmpty() && tags.stream().noneMatch(definition.accepts()::contains)) {
+                    throw f.fail("CONSTRAINT_CONFLICT", "tags", "Slot '" + slot + "' accepts only items tagged "
+                            + new TreeSet<>(definition.accepts()));
+                }
+            }
             String rarity = f.id("rarity", false);
             if (rarity == null && !rarityTiers.isEmpty()) {
                 throw f.fail("rarity", "This pack defines rarity tiers, so every item needs one");
@@ -543,8 +706,13 @@ public final class PackCompiler {
         private void condition(Fields f, Definition self) {
             f.text("name", true);
             f.text("description", true);
-            f.choice("stacking", Set.of("none", "refresh", "stack"), "refresh");
+            String stacking = f.choice("stacking", Set.of("none", "refresh", "stack"), "refresh");
             f.integer("durationRounds", 1, 10_000, 1);
+            // Only a stacking condition can hold several stacks; the cap keeps modifier totals bounded.
+            int maxStacks = f.integer("maxStacks", 1, MAX_CONDITION_STACKS, stacking.equals("stack") ? 3 : 1);
+            if (!stacking.equals("stack") && maxStacks != 1) {
+                throw f.fail("maxStacks", "Only a stacking condition may allow more than one stack");
+            }
             Set<String> modified = new HashSet<>();
             for (Fields modifier : f.objects("modifiers", 0, 8)) {
                 String attribute = modifier.id("attribute", true);
@@ -776,6 +944,7 @@ public final class PackCompiler {
                 }
                 archetype.close();
             }
+            var worn = new StartingLoadout();
             for (Fields loadout : f.objects("startingItems", 0, LIST_MAX)) {
                 String item = loadout.ref("item", ITEM, true);
                 int quantity = loadout.integer("quantity", 1, 9999, 1);
@@ -784,6 +953,9 @@ public final class PackCompiler {
                 if (definition != null && definition.data().get("maxStack") instanceof Number stack
                         && quantity > stack.intValue()) {
                     throw loadout.fail("RANGE", "quantity", "Quantity exceeds the item's maxStack " + stack);
+                }
+                if (loadout.bool("equipped", false)) {
+                    startingEquipment(loadout, item, worn);
                 }
                 loadout.close();
             }

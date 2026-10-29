@@ -113,9 +113,15 @@ public class CampaignCreationService {
                 + "created_at, updated_at) values (?, ?, ?, ?, 0, ?, ?, 0, now(), now())",
                 UUID.randomUUID(), campaignId, actorId, key, maximum, maximum));
         for (var item : initial.items()) {
+            UUID instanceId = UUID.randomUUID();
             jdbc.update("insert into item_instance (id, campaign_id, actor_id, definition_id, quantity, "
-                    + "maximum_stack, acquired_revision) values (?, ?, ?, ?, ?, ?, 0)", UUID.randomUUID(),
+                    + "maximum_stack, acquired_revision) values (?, ?, ?, ?, ?, ?, 0)", instanceId,
                     campaignId, actorId, item.definitionId(), item.quantity(), item.maximumStack());
+            if (item.equipped()) {
+                jdbc.update("insert into equipment_assignment (campaign_id, actor_id, item_instance_id, slot_id, "
+                        + "hands, equipped_revision) values (?, ?, ?, ?, ?, 0)", campaignId, actorId, instanceId,
+                        item.slot(), item.hands());
+            }
         }
         for (String ability : initial.abilities()) {
             jdbc.update("insert into learned_ability (campaign_id, actor_id, definition_id, rank, acquired_revision) "

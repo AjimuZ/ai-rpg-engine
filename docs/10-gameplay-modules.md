@@ -12,6 +12,15 @@ abilities and exploration objectives through the same engine. This is content
 import evidence only. No loadable module runtime exists yet; both fixtures leave
 guide, creative abilities and romance disabled, without claiming gameplay checks.
 
+Since P10.1 the character part of this model is executable: attributes with ranges, skills with a
+maximum rank, derived statistics, learned abilities with prerequisites, conditions with stacking,
+explicit item rarity tiers and equipment slots with hand limits are pack rules the backend
+validates and applies ([ADR 0023](adr/0023-character-rules-and-equipment-constraints.md),
+[domain model](05-domain-model.md#character-rules-and-state-p101)). Using them during play
+(atomic use, transfer and equip commands, quests, time, panels) is P10.2–P10.5. Mechanics are
+never derived from artwork or prose: an item's tier, slot, hands, tags and any bonus come from its
+definition.
+
 ## 2. Exploration and action resolution
 
 Locations form a directed graph with traversal requirements and durations. A character's actual position is separate from map discovery. Moving checks accessibility, presence, hazards, and equipment. Travel can produce a proposed encounter, but the engine must admit that encounter before reporting an attack.
