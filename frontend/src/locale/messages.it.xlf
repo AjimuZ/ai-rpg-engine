@@ -2627,6 +2627,33 @@
       <target>Scambio di oggetti</target>
       </segment>
     </unit>
+    <unit id="campaign.command.acceptQuest">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:123</note>
+      </notes>
+      <segment>
+        <source>Accept a quest</source>
+      <target>Accetta una missione</target>
+      </segment>
+    </unit>
+    <unit id="campaign.command.suspendQuest">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:124</note>
+      </notes>
+      <segment>
+        <source>Set a quest aside</source>
+      <target>Metti da parte una missione</target>
+      </segment>
+    </unit>
+    <unit id="campaign.command.resumeQuest">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:125</note>
+      </notes>
+      <segment>
+        <source>Resume a quest</source>
+      <target>Riprendi una missione</target>
+      </segment>
+    </unit>
     <unit id="campaign.receipt.succeeded">
       <notes>
         <note category="location">src/app/campaign/campaign-messages.ts:121</note>
@@ -2895,6 +2922,15 @@
       <segment>
         <source>The other party does not accept this exchange. Nothing was changed.</source>
       <target>L’altra parte non accetta questo scambio. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.questUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:43</note>
+      </notes>
+      <segment>
+        <source>That quest is not available for this action. Nothing was changed.</source>
+      <target>Questa missione non è disponibile per questa azione. Non è stato modificato nulla.</target>
       </segment>
     </unit>
     <unit id="campaign.error.dependenciesMissing">

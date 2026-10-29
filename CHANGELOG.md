@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — Quest transitions, objective predicates and one-time rewards (P10.3), 29 October 2026
+
+- Pack quests now run. After every command that can change a fact a quest predicate reads (movement,
+  item commands, ability use and the new quest commands) the engine re-evaluates the pinned quests over
+  committed state and writes the result in the same commit as the command: an undiscovered quest
+  becomes available when its `availableWhen` holds, an active quest marks objectives satisfied
+  (`visited`, `possesses`, quest status and objective predicates) and the first outcome that holds ends
+  it. Nothing reads prose, dice or the clock.
+- The player can accept an available quest and suspend and resume an active one
+  (`ACCEPT_QUEST`, `SUSPEND_QUEST`, `RESUME_QUEST`). A suspended quest tracks nothing; an ended quest
+  never changes again. A quest declared `secret` is hidden background content: it starts by itself and
+  only its ending is announced.
+- An ending quest settles its item rewards once, to the protagonist, under the source key
+  `quest:<id>:outcome`. Three independent guards stop a second payment: ended quests are immutable and
+  never re-evaluated, the reward settlement is unique per source and recipient, and the units are
+  created through the shared creation ledger. One command can finish a chain of quests, because granted
+  reward units count for later predicates in the same commit.
+- Migration V20 adds `quest_state`, `quest_objective` and `location_visit`. Old saves gain empty tables
+  and keep reading every quest at its pack-declared initial status. The backup tool covers schema
+  version 20. The pack compiler now rejects an outcome that rewards more than 32 item units.
+- One new refusal code (`COMMAND_QUEST_UNAVAILABLE`) with reviewed English and Italian wording, three
+  command labels, seven quest events with bilingual narration statements, and a `quests` list in the
+  player-safe receipt when a public transition happened.
+- Not included: a journal or quest screen (P10.5), world-time and clock predicates (P10.4), predicates
+  for facts, encounters and interactions, rumor-style discovery, abandoning a quest by command, XP and
+  reputation rewards. See [ADR 0025](docs/adr/0025-quest-lifecycle-objective-predicates-and-one-time-rewards.md).
+
 ## Unreleased — Atomic item commands and source-linked item creation (P10.2), 29 October 2026
 
 - The player can now use, equip, take off, give and trade items through the ordinary command route

@@ -21,6 +21,7 @@ import org.rpgengine.preparation.PlanAdmissionService;
 import org.rpgengine.preparation.PreparationJobService;
 import org.rpgengine.preparation.QueryEpochs;
 import org.rpgengine.presentation.PresentationJobService;
+import org.rpgengine.quests.QuestWriter;
 import org.rpgengine.progression.RewardSettlement;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -43,7 +44,9 @@ import tools.jackson.databind.json.JsonMapper;
  * (P07.6); every commit then re-evaluates admitted plans against the rows it changed. Typed
  * item mutations, creation ledger entries and equipment changes (P10.2) are written beside the
  * events that announce them, guarded by the exact owner, quantity and storage version the resolver
- * read; knowledge changes are written beside the events they cite, and after a registered player
+ * read; quest status rows, satisfied objectives and first visits (P10.3) are written beside the events
+ * that announce them, and the reward settlements of ended quests are persisted with the events so a
+ * replayed source fails on the settlement's uniqueness; knowledge changes are written beside the events they cite, and after a registered player
  * intention the player's perception at its resulting location updates its last known locations
  * of other actors (P09.1); the query scopes both touch are bumped with the preparation scopes.
  * This internal service has no controller, network port or callback.
@@ -231,6 +234,9 @@ public class CanonicalCommitService {
         InventoryWriter.applyWithin(jdbc, campaign.getId(), operation.getId(), counters.stateRevision(), firstSequence,
                 plan.items(), now);
         applyEquipment(plan.items(), rules, campaign, counters.stateRevision());
+        // Quest rows cite the same events by sequence; a stale row version or an ended quest throws and
+        // rolls back everything, including the reward settlement and the units it created (P10.3).
+        QuestWriter.applyWithin(jdbc, campaign.getId(), counters.stateRevision(), firstSequence, plan.quests());
         if (plan.narrationRequired()) {
             // The owed presentation is durable exactly when the world change is (P07.5): one
             // NARRATION job per operation, checked against this committed revision at COMMIT.
@@ -250,6 +256,7 @@ public class CanonicalCommitService {
                 plan.events().size());
         var scopes = new LinkedHashSet<>(preparation.queryScopes());
         scopes.addAll(InventoryWriter.scopes(plan.items()));
+        scopes.addAll(QuestWriter.scopes(plan.quests()));
         scopes.addAll(KnowledgeLedger.applyWithin(jdbc, campaign.getId(), at, plan.knowledge()));
         if (player != null) {
             var perception = CommandRules.perceived(jdbc, campaign.getId(), player, rules);

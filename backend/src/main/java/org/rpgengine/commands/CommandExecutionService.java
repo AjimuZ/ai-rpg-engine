@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
 import org.rpgengine.inventory.InventoryModel;
+import org.rpgengine.quests.QuestStore;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -24,6 +25,10 @@ import tools.jackson.databind.json.JsonMapper;
  * operation journal. It runs in the caller's thread with no inference, network client or
  * background worker; narration becomes a durable post-commit presentation job that the
  * presentation worker settles later (P07.5).
+ *
+ * <p>Since P10.3 the prepare step also reads the stored quest rows and the player's visits when the pinned
+ * content has quests, so the resolver can run the quest engine over the facts the command produces, and the
+ * commit writes quest rows and one-time reward settlements beside the events that announce them.
  *
  * <p>Since P10.2 the same pipeline executes the item commands: the prepare step also reads every
  * participant's item stacks, and the commit applies the resolved {@link org.rpgengine.inventory.ItemPlan}.
@@ -127,9 +132,9 @@ public class CommandExecutionService {
                 var resolution = LocalActionResolver.resolve(intent.command(), prepared.snapshot(), prepared.catalog(),
                         (ordinal, sides) -> draws.reserve(context, ordinal, sides).value());
                 commits.commit(new ResolvedCommit(context, resolution.world(), resolution.resources(),
-                        resolution.events(), List.of(), resolution.receiptDetails(), true,
+                        resolution.events(), resolution.rewards(), resolution.receiptDetails(), true,
                         new ResolvedCommit.Preparation(resolution.queryScopes(), List.of()), intent,
-                        resolution.placements(), List.of(), resolution.items()));
+                        resolution.placements(), List.of(), resolution.items(), resolution.quests()));
             }
         } catch (OperationAdmissionFailure rejected) {
             // Current state changed after admission in a way the rules refuse; nothing was applied.
@@ -237,15 +242,22 @@ public class CommandExecutionService {
                                 row.getInt(3), row.getInt(4), row.getLong(5)));
                     }, campaign, participant);
         }
+        // Quest state is read only when the content has quests, so quest-free adventures pay nothing.
+        var stored = catalog != null && !catalog.quests().quests().isEmpty()
+                ? QuestStore.read(jdbc, campaign, player) : QuestStore.Stored.NONE;
         return new LocalActionResolver.Snapshot(player, actor.getKey().orElse(null), actor.getValue(),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[0]),
-                state.isEmpty() ? Map.of() : integers(state.getFirst()[1]), pools, vocabularies, operation, stacks);
+                state.isEmpty() ? Map.of() : integers(state.getFirst()[1]), pools, vocabularies, operation, stacks,
+                stored);
     }
 
-    /** Whether resolving the intention consults pinned definitions: abilities and every item command. */
+    /**
+     * Whether resolving the intention consults pinned definitions: abilities, every item command, the
+     * quest commands, and movement (a new visit can satisfy a quest objective). Waiting and speech change
+     * no fact a quest predicate reads.
+     */
     private static boolean needsCatalog(TypedCommand command) {
-        return !(command instanceof TypedCommand.Move || command instanceof TypedCommand.Wait
-                || command instanceof TypedCommand.Speak);
+        return !(command instanceof TypedCommand.Wait || command instanceof TypedCommand.Speak);
     }
 
     /** Integral members of a stored JSON object; other values are omitted and so read as unknown. */

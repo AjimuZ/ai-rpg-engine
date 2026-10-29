@@ -162,3 +162,11 @@ reward). It references `operation_journal`, `campaign_event` and `actor`, so res
 campaign rows; it needs no extra restore step, and a restored ledger keeps a replayed source from
 creating a second time. Offline checks cover the V19 manifest/catalog; no live V19 dump/restore
 rehearsal has been run.
+
+V20 scope (P10.3) adds `quest_state` (one row per quest that has left its pack-declared initial
+status, with its outcome once it has ended), `quest_objective` (objectives that were satisfied; rows
+are never changed) and `location_visit` (locations an actor has been recorded at). They reference
+`campaign`, `campaign_event` and `actor`, so restore them with the campaign rows. A restored ended quest
+stays ended and its reward settlement in `reward_settlement` stays unique, so a restore cannot pay a
+quest reward a second time. Offline checks cover the V20 manifest/catalog; no live V20 dump/restore
+rehearsal has been run.

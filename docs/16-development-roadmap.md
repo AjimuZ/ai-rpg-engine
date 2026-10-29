@@ -2451,6 +2451,31 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     offered to the model-proposal contract; no live V19 dump and restore rehearsal ran; the 18 Docker-dependent
     probe cases and the `unzip` wrapper cases are not proven in this container.
 - [ ] P10.3 Implement basic objective predicates, quest transitions, and one-time reward-source accounting.
+  - Package A — pure engine (`org.rpgengine.quests`): `QuestRules` (prose-free projection of every pinned
+    quest), `QuestPredicate` (the compiled world grammar: `visited`, `possesses`, `questStatus`, `objective`
+    and the boolean/integer operators, evaluated over committed facts with no dice or clock) and `QuestPlan`
+    (deterministic transitions: derived discovery, accept/suspend/resume requests, sticky objectives, ordered
+    outcomes, cascades to a fixed point, rewards visible to later predicates, event and reward-unit budgets
+    that defer instead of dropping).
+  - Package B — persistence (`V20`): `quest_state` (terminal rows immutable, no return to `available`),
+    `quest_objective` and `location_visit` (append-only); `QuestStore` reads, `QuestWriter` applies inside the
+    commit with compare-and-set on the storage version. Old saves read every quest at its initial status.
+  - Package C — commands and commit: `ACCEPT_QUEST`, `SUSPEND_QUEST`, `RESUME_QUEST` and the refusal category
+    `QUEST_UNAVAILABLE`; `LocalActionResolver` runs the engine after movement, item commands, ability use and
+    the quest commands, `ResolvedCommit` carries `QuestChanges`, `CanonicalCommitService` writes them beside the
+    events; the pack compiler bounds an outcome at 32 reward units.
+  - Package D — one-time accounting and surfaces: an ending settles its item rewards for the player under
+    `quest:<id>:outcome` through one `reward_settlement` (unique per source and recipient) and `REWARD`-sourced
+    `item_creation` rows, so three guards stop a second payment; hidden (`secret`) quests start by themselves
+    and only their ending is public; seven quest events with EN/IT narration, a player-safe receipt `quests`
+    list, frontend messages (353 reviewed), backup tool at schema version 20. Decision:
+    [ADR 0025](adr/0025-quest-lifecycle-objective-predicates-and-one-time-rewards.md).
+  - Exit checks: reaching a place and holding items finish objectives and endings in the commit that caused
+    them; a quest reward is paid once however often the player returns, replays or retries; a suspended quest
+    tracks nothing and resumes with an immediate evaluation; a hidden quest never leaks into public events or
+    receipts before its ending; a fault after the quest writes rolls back rows, settlement, ledger, events and
+    revision; the ended quest, the settlement and the objectives are immutable at the database; the V20 upgrade
+    step; and the full plan.
 - [ ] P10.4 Implement movement duration, rest, and a bounded world clock without time advancement on queries.
 - [ ] P10.5 Integrate reliable state changes into panels and journal.
 

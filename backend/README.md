@@ -951,6 +951,41 @@ guards), `CanonicalCommitServiceTest` (reward-sourced creation and rollback), `T
 Limits: no NPC stock or shop screens, no weight/capacity/durability, no durations (P10.4) and no
 panels (P10.5).
 
+## Quests, objective predicates and one-time rewards (P10.3)
+
+Three more registered intentions — `ACCEPT_QUEST`, `SUSPEND_QUEST` and `RESUME_QUEST` — and the
+quest engine that runs after every fact-changing command ([rules and categories](../docs/07-turn-protocol.md#p103-quest-intentions),
+[ADR 0025](../docs/adr/0025-quest-lifecycle-objective-predicates-and-one-time-rewards.md)). Package
+`org.rpgengine.quests` holds the pieces:
+
+- `QuestRules` is the prose-free projection of every pinned quest (initial status, discovery predicate,
+  objectives, outcomes and merged item rewards); `CommandRuleCatalog` carries it, so a cached catalog
+  keeps no authored text.
+- `QuestPredicate` copies the compiled world expression grammar (`visited`, `possesses`, `questStatus`,
+  `objective`, boolean and integer operators) and evaluates it over a `Facts` view. No atom reads dice,
+  the clock or prose.
+- `QuestPlan` is the pure transition engine. `LocalActionResolver` runs it over the working
+  `InventoryModel`, the destination of a move and the stored state; passes repeat in quest-identity
+  order until nothing changes, and reward units are deposited through the same inventory model so later
+  predicates in the same commit count them. It budgets events and reward units and defers, never drops.
+- `QuestChanges` is the immutable result a `ResolvedCommit` carries (quest state writes, satisfied
+  objectives, first visits, each citing its announcing event). `QuestWriter` applies it inside the
+  commit after the events are flushed: updates are compare-and-set on the storage version, terminal rows
+  are immutable by trigger, objectives and visits are append-only (V20). `QuestStore` reads the stored
+  state under the campaign lock.
+- An ending with rewards adds a `ResolvedCommit.Reward` keyed `quest:<id>:outcome` for the player and
+  `REWARD`-sourced `ItemPlan.Creation`s, so `reward_settlement` (unique per source and recipient) and the
+  `item_creation` ledger both record it. `EventStatements` states the seven quest events in both
+  languages and `CommandReceipts` projects a public `quests` list.
+
+Tests: `QuestPredicateTest` and `QuestPlanTest` (pure), `QuestCommandsTest` (real PostgreSQL on the
+`QuestPack` variant of the armory pack: accept/move/settle once, suspension, refusals, an item effect and
+a quest ending in one commit, a chain of quests and a hidden quest, fault after the quest writes, replay,
+stale and ended-quest writers, attribution), plus the pack reward bound in `PackCompilerTest`,
+`TypedCommandTest`, `EventStatementsTest` and the V20 step of `CanonicalMigrationUpgradeTest`. Limits: no
+journal or quest screen (P10.5), no clock, fact, encounter or interaction predicates, no abandon command,
+no XP or reputation rewards, no live V20 dump and restore rehearsal.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

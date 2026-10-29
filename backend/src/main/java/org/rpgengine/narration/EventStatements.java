@@ -136,6 +136,37 @@ public final class EventStatements {
                         : it ? actor + (worn ? " indossa " : " rimuove ") + item + " (" + slot + ")."
                         : actor + (worn ? " equips " : " unequips ") + item + " (" + slot + ").";
             }
+            case "QUEST_AVAILABLE" -> {
+                String quest = token(payload, "questId");
+                yield quest == null ? null : it ? "Missione disponibile: " + quest + "." : "Quest available: " + quest + ".";
+            }
+            case "QUEST_ACCEPTED", "QUEST_SUSPENDED", "QUEST_RESUMED" -> {
+                String actor = name(payload, "actorId", names);
+                String quest = token(payload, "questId");
+                yield actor == null || quest == null ? null : switch (type) {
+                    case "QUEST_ACCEPTED" -> it ? actor + " accetta la missione " + quest + "."
+                            : actor + " accepts the quest " + quest + ".";
+                    case "QUEST_SUSPENDED" -> it ? actor + " mette da parte la missione " + quest + "."
+                            : actor + " sets the quest " + quest + " aside.";
+                    default -> it ? actor + " riprende la missione " + quest + "."
+                            : actor + " resumes the quest " + quest + ".";
+                };
+            }
+            case "QUEST_OBJECTIVE_SATISFIED" -> {
+                String quest = token(payload, "questId");
+                String objective = token(payload, "objectiveId");
+                yield quest == null || objective == null ? null
+                        : it ? "Missione " + quest + ": obiettivo raggiunto (" + objective + ")."
+                        : "Quest " + quest + ": objective reached (" + objective + ").";
+            }
+            case "QUEST_COMPLETED", "QUEST_FAILED" -> {
+                String quest = token(payload, "questId");
+                String outcome = token(payload, "outcomeId");
+                boolean done = type.equals("QUEST_COMPLETED");
+                yield quest == null || outcome == null ? null
+                        : it ? "Missione " + quest + (done ? " completata" : " fallita") + " (esito " + outcome + ")."
+                        : "Quest " + quest + (done ? " is completed" : " has failed") + " (outcome " + outcome + ").";
+            }
             default -> null;
         };
         return text == null || text.length() > PublicFact.MAX_TEXT ? Optional.empty() : Optional.of(text);

@@ -386,6 +386,13 @@ class PackCompilerTest {
                 "\"objectives\":[{\"id\":\"rope\",\"description\":\"A.\",\"when\":true},{\"id\":\"rope\",\"description\":\"B.\",\"when\":true}")))));
         assertEquals("REFERENCE_KIND", failure(withFile("quests.json", "quests",
                 envelope(ferry.replace("\"issuer\":\"keeper\"", "\"issuer\":\"guild\"")))));
+        // One ending settles in a single commit, so its rewards are bounded (P10.3): 32 units pass, 33 do not.
+        assertNotNull(new PackCompiler().compile(parse(withFile("quests.json", "quests",
+                envelope(ferry.replace("\"quantity\":2", "\"quantity\":32"))))));
+        assertEquals("LIMIT", failure(withFile("quests.json", "quests",
+                envelope(ferry.replace("\"quantity\":2", "\"quantity\":33")))));
+        assertEquals("LIMIT", failure(withFile("quests.json", "quests", envelope(ferry.replace(
+                "{\"item\":\"rope\",\"quantity\":2}", "{\"item\":\"rope\",\"quantity\":20},{\"item\":\"rope\",\"quantity\":13}")))));
     }
 
     /** Generation policy with one bounded and one catalog-only category plus fixed author constraints. */

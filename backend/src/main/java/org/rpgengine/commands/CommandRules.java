@@ -11,6 +11,8 @@ import org.rpgengine.characters.CharacterService;
 import org.rpgengine.inventory.ItemChange;
 import org.rpgengine.knowledge.KnowledgeLedger;
 import org.rpgengine.knowledge.KnowledgeRefs;
+import org.rpgengine.quests.QuestStatus;
+import org.rpgengine.quests.QuestStore;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -41,6 +43,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       P10.1 equipment constraints; {@code TRANSFER_ITEM} gives units of an unworn instance to a
  *       perceivable actor; {@code TRADE_ITEMS} needs a perceivable counterparty, unworn instances
  *       on both sides, every item priced and a counterparty that receives at least the value it gives.</li>
+ *   <li><b>Quests (P10.3)</b> — {@code ACCEPT_QUEST}, {@code SUSPEND_QUEST} and {@code RESUME_QUEST} name a
+ *       pinned, non-secret quest whose stored status (or initial status, when it has no row) is
+ *       {@code available}, {@code active} and {@code suspended} respectively. An unknown, undiscovered,
+ *       hidden or ended quest, and any other status, share one category ({@code QUEST_UNAVAILABLE}).</li>
  *   <li><b>Causal attribution</b> — at commit, resolved effects may only touch the participants
  *       this intention lawfully involves ({@link #requireAttributed}).</li>
  * </ul>
@@ -105,6 +111,9 @@ final class CommandRules {
                 check.give(gift.itemInstanceId(), gift.quantity());
                 participants.add(gift.recipientActorId());
             }
+            case TypedCommand.AcceptQuest accept -> check.quest(accept.questId(), QuestStatus.AVAILABLE);
+            case TypedCommand.SuspendQuest suspend -> check.quest(suspend.questId(), QuestStatus.ACTIVE);
+            case TypedCommand.ResumeQuest resume -> check.quest(resume.questId(), QuestStatus.SUSPENDED);
             case TypedCommand.TradeItems trade -> {
                 if (trade.counterpartyActorId().equals(player)) {
                     throw fail(OperationAdmissionFailure.Kind.ACTOR_UNAVAILABLE);
@@ -120,7 +129,8 @@ final class CommandRules {
     /**
      * Reject resolved effects that the admitted intention cannot have caused: every adjusted
      * resource, placed actor, item mutation, created item and equipment change must belong to a
-     * participant, and every event actor must be absent or a participant. A resolver bug or a forged plan therefore cannot charge or credit an
+     * participant, every settled reward addressed to an actor must name one as its recipient, every recorded visit must be a
+     * participant's, and every event actor must be absent or a participant. A resolver bug or a forged plan therefore cannot charge or credit an
      * uninvolved actor. Runs under the commit's campaign lock before any entity changes.
      *
      * @throws IllegalStateException for an unattributable or out-of-scope effect
@@ -160,6 +170,20 @@ final class CommandRules {
                 throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
             }
         }
+        // A reward whose recipient names an actor must name a participant; other recipient keys (a group or
+        // faction recipient policy) do not identify an actor and are not attributed here. A recorded visit
+        // belongs to the visiting participant.
+        for (var reward : plan.rewards()) {
+            if (isActorKey(reward.recipientKey()) && participants.stream()
+                    .noneMatch(actor -> actor.toString().equals(reward.recipientKey()))) {
+                throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
+            }
+        }
+        for (var visit : plan.quests().visits()) {
+            if (!participants.contains(visit.actorId())) {
+                throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
+            }
+        }
         for (var event : plan.events()) {
             if (event.actorId() != null && !participants.contains(event.actorId())) {
                 throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
@@ -171,6 +195,15 @@ final class CommandRules {
             if (!participants.containsAll(change.actors())) {
                 throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
             }
+        }
+    }
+
+    /** Whether a reward recipient key is the canonical text of an actor identity. */
+    private static boolean isActorKey(String key) {
+        try {
+            return UUID.fromString(key).toString().equals(key);
+        } catch (IllegalArgumentException notAnActor) {
+            return false;
         }
     }
 
@@ -301,6 +334,23 @@ final class CommandRules {
                     || (!target.disclosed() && !KnowledgeLedger.revealedTo(jdbc, campaign, player,
                             KnowledgeRefs.location(destination)))) {
                 throw fail(OperationAdmissionFailure.Kind.DESTINATION_UNAVAILABLE);
+            }
+        }
+
+        /**
+         * A quest request needs a pinned, addressable quest in exactly the status the transition leaves.
+         * A quest without a stored row is read at its pack-declared initial status, so an undiscovered
+         * quest is indistinguishable from an unknown one.
+         */
+        void quest(String questId, QuestStatus needed) {
+            var quest = catalog().quests().quests().get(questId);
+            if (quest == null || quest.secret()) {
+                throw fail(OperationAdmissionFailure.Kind.QUEST_UNAVAILABLE);
+            }
+            var stored = QuestStore.read(jdbc, campaign, player).states().get(questId);
+            QuestStatus status = stored == null ? quest.initial() : stored.status();
+            if (status != needed) {
+                throw fail(OperationAdmissionFailure.Kind.QUEST_UNAVAILABLE);
             }
         }
 

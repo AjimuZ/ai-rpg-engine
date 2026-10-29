@@ -40,6 +40,7 @@ const ERRORS: Readonly<Record<string, () => string>> = {
   COMMAND_EQUIPMENT_ILLEGAL: () => $localize`:@@campaign.error.equipmentIllegal:That item cannot be worn or taken off right now. Nothing was changed.`,
   COMMAND_QUANTITY_ILLEGAL: () => $localize`:@@campaign.error.quantityIllegal:That is more than the available quantity. Nothing was changed.`,
   COMMAND_TRADE_REFUSED: () => $localize`:@@campaign.error.tradeRefused:The other party does not accept this exchange. Nothing was changed.`,
+  COMMAND_QUEST_UNAVAILABLE: () => $localize`:@@campaign.error.questUnavailable:That quest is not available for this action. Nothing was changed.`,
   COMMAND_DEPENDENCIES_MISSING: () => $localize`:@@campaign.error.dependenciesMissing:This playthrough is paused because adventure content it depends on is missing or damaged. Nothing was changed.`,
   COMMAND_STORAGE_UNAVAILABLE: () => $localize`:@@campaign.error.storageUnavailable:Storage is unavailable right now. Check the action status before retrying.`,
   CAMPAIGN_READ_STORAGE_UNAVAILABLE: () => $localize`:@@campaign.error.storageUnavailable:Storage is unavailable right now. Check the action status before retrying.`,
@@ -120,6 +121,9 @@ export function commandTypeLabel(commandType: string): string {
     case 'UNEQUIP_ITEM': return $localize`:@@campaign.command.unequipItem:Take off an item`;
     case 'TRANSFER_ITEM': return $localize`:@@campaign.command.transferItem:Give an item`;
     case 'TRADE_ITEMS': return $localize`:@@campaign.command.tradeItems:Trade items`;
+    case 'ACCEPT_QUEST': return $localize`:@@campaign.command.acceptQuest:Accept a quest`;
+    case 'SUSPEND_QUEST': return $localize`:@@campaign.command.suspendQuest:Set a quest aside`;
+    case 'RESUME_QUEST': return $localize`:@@campaign.command.resumeQuest:Resume a quest`;
     default: return commandType;
   }
 }

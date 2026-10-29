@@ -29,7 +29,9 @@ class TypedCommandTest {
                 new TypedCommand.TradeItems(UUID.randomUUID(),
                         List.of(new TypedCommand.TradeItems.Line(UUID.randomUUID(), 2),
                                 new TypedCommand.TradeItems.Line(UUID.randomUUID(), 1)),
-                        List.of(new TypedCommand.TradeItems.Line(UUID.randomUUID(), 5))))) {
+                        List.of(new TypedCommand.TradeItems.Line(UUID.randomUUID(), 5))),
+                new TypedCommand.AcceptQuest("survey"), new TypedCommand.SuspendQuest("dep#survey"),
+                new TypedCommand.ResumeQuest("quest.main:1"))) {
             byte[] canonical = CommandCanonicalForm.encode(command.type(), 3, command.payload(), 32_768);
             assertEquals(command, TypedCommand.decode(canonical));
             assertThrows(UnsupportedOperationException.class, () -> command.payload().put("patch", "bad"));
@@ -165,6 +167,29 @@ class TypedCommandTest {
         UUID second = UUID.fromString("00000000-0000-0000-0000-00000000000b");
         assertEquals(new TypedCommand.UseItem(instance, List.of(first, second)).attemptPayload(),
                 new TypedCommand.UseItem(instance, List.of(second, first)).attemptPayload());
+    }
+
+    /**
+     * Quest intentions name one stable quest identity and nothing else: no status, outcome, objective or
+     * reward can be supplied, and blank, oversized or non-text identities fail like any malformed payload.
+     */
+    @Test
+    void rejectsMalformedQuestPayloads() {
+        for (String type : List.of("ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST")) {
+            assertInvalid(type, Map.of());
+            assertInvalid(type, Map.of("questId", 7));
+            assertInvalid(type, Map.of("questId", ""));
+            assertInvalid(type, Map.of("questId", "   "));
+            assertInvalid(type, Map.of("questId", "x".repeat(257)));
+            assertInvalid(type, Map.of("questId", "survey", "status", "completed"));
+            assertInvalid(type, Map.of("questId", "survey", "outcomeId", "won"));
+            assertInvalid(type, Map.of("quest", "survey"));
+            assertTrue(TypedCommand.registered(type));
+        }
+        assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.AcceptQuest(null));
+        assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.SuspendQuest("\ud800"));
+        assertEquals("ACCEPT_QUEST", new TypedCommand.AcceptQuest("survey").type());
+        assertEquals(Map.of("questId", "survey"), new TypedCommand.ResumeQuest("survey").payload());
     }
 
     /** Direct record callers cannot bypass the wire validation of bounds or Unicode scalar text. */

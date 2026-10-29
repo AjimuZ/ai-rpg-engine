@@ -291,6 +291,7 @@ public class CampaignCreationController {
             case EQUIPMENT_ILLEGAL -> error(422, "COMMAND_EQUIPMENT_ILLEGAL");
             case QUANTITY_ILLEGAL -> error(422, "COMMAND_QUANTITY_ILLEGAL");
             case TRADE_REFUSED -> error(422, "COMMAND_TRADE_REFUSED");
+            case QUEST_UNAVAILABLE -> error(422, "COMMAND_QUEST_UNAVAILABLE");
         };
     }
 

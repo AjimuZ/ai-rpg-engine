@@ -61,6 +61,34 @@ class EventStatementsTest {
         assertEquals("Mira rimuove sword (main-hand).", state(SupportedLocale.IT, "ITEM_UNEQUIPPED", worn));
     }
 
+    /** Quest events state their transition in both locales, using the canonical quest and outcome identities. */
+    @Test
+    void statesQuestEvents() {
+        String quest = "{\"actorId\":\"" + PLAYER + "\",\"questId\":\"survey\"}";
+        assertEquals("Quest available: survey.", state(SupportedLocale.EN, "QUEST_AVAILABLE", quest));
+        assertEquals("Missione disponibile: survey.", state(SupportedLocale.IT, "QUEST_AVAILABLE", quest));
+        assertEquals("Mira accepts the quest survey.", state(SupportedLocale.EN, "QUEST_ACCEPTED", quest));
+        assertEquals("Mira accetta la missione survey.", state(SupportedLocale.IT, "QUEST_ACCEPTED", quest));
+        assertEquals("Mira sets the quest survey aside.", state(SupportedLocale.EN, "QUEST_SUSPENDED", quest));
+        assertEquals("Mira mette da parte la missione survey.", state(SupportedLocale.IT, "QUEST_SUSPENDED", quest));
+        assertEquals("Mira resumes the quest survey.", state(SupportedLocale.EN, "QUEST_RESUMED", quest));
+        assertEquals("Mira riprende la missione survey.", state(SupportedLocale.IT, "QUEST_RESUMED", quest));
+        String objective = "{\"questId\":\"survey\",\"objectiveId\":\"reach\"}";
+        assertEquals("Quest survey: objective reached (reach).", state(SupportedLocale.EN, "QUEST_OBJECTIVE_SATISFIED", objective));
+        assertEquals("Missione survey: obiettivo raggiunto (reach).", state(SupportedLocale.IT, "QUEST_OBJECTIVE_SATISFIED", objective));
+        String ended = "{\"questId\":\"survey\",\"outcomeId\":\"surveyed\"}";
+        assertEquals("Quest survey is completed (outcome surveyed).", state(SupportedLocale.EN, "QUEST_COMPLETED", ended));
+        assertEquals("Quest survey has failed (outcome surveyed).", state(SupportedLocale.EN, "QUEST_FAILED", ended));
+        assertEquals("Missione survey completata (esito surveyed).", state(SupportedLocale.IT, "QUEST_COMPLETED", ended));
+        assertEquals("Missione survey fallita (esito surveyed).", state(SupportedLocale.IT, "QUEST_FAILED", ended));
+        // Incomplete payloads and unknown actors state nothing.
+        assertEquals(null, state(SupportedLocale.EN, "QUEST_AVAILABLE", "{}"));
+        assertEquals(null, state(SupportedLocale.EN, "QUEST_ACCEPTED", "{\"questId\":\"survey\"}"));
+        assertEquals(null, state(SupportedLocale.EN, "QUEST_OBJECTIVE_SATISFIED", "{\"questId\":\"survey\"}"));
+        assertEquals(null, state(SupportedLocale.EN, "QUEST_COMPLETED", "{\"questId\":\"survey\"}"));
+        assertEquals(null, state(SupportedLocale.EN, "QUEST_RESUMED", "{\"actorId\":\"" + UUID.randomUUID() + "\",\"questId\":\"q\"}"));
+    }
+
     /** An unknown actor, a missing field or an empty trade side yields no statement, never an invented one. */
     @Test
     void makesNoStatementFromIncompletePayloads() {

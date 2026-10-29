@@ -1,6 +1,7 @@
 package org.rpgengine.persistence;
 
 import java.sql.Connection;
+import java.util.List;
 import java.util.UUID;
 
 import javax.sql.DataSource;
@@ -18,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V19 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V20 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -400,6 +401,57 @@ class CanonicalMigrationUpgradeTest {
                     assertThrows(DataAccessException.class, () -> jdbc.update("update item_creation set quantity = 4"));
                     assertThrows(DataAccessException.class, () -> jdbc.update("delete from item_creation"));
                     assertEquals(0, v19.migrate().migrationsExecuted);
+                    // V20 adds quest state, satisfied objectives and visits empty: an old save invents no quest
+                    // progress and reads every quest at its pack-declared initial status.
+                    String v19Campaign = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
+                    Flyway v20 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("20").load();
+                    assertEquals(1, v20.migrate().migrationsExecuted);
+                    assertTrue(v20.validateWithResult().validationSuccessful);
+                    assertEquals(v19Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
+                    for (String table : List.of("quest_state", "quest_objective", "location_visit")) {
+                        assertEquals(0, jdbc.queryForObject("select count(*) from " + table, Integer.class));
+                    }
+                    String quest = "insert into quest_state (campaign_id, quest_id, status, outcome_id, event_sequence, "
+                            + "updated_revision) values (?, ?, ?, ?, ?, 7)";
+                    assertEquals(1, jdbc.update(quest, campaign, "survey", "active", null, 1));
+                    assertEquals(1, jdbc.update(quest, campaign, "rescue", "available", null, 1));
+                    // One row per quest; unknown statuses, a terminal row without an outcome, an outcome on a
+                    // running quest and an event outside the campaign are refused.
+                    assertThrows(DataAccessException.class, () -> jdbc.update(quest, campaign, "survey", "active", null, 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(quest, campaign, "other", "paused", null, 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(quest, campaign, "other", "completed", null, 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(quest, campaign, "other", "active", "won", 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(quest, campaign, "other", "active", null, 99));
+                    // Updates step the row version; discovery cannot be repeated; an ended quest never changes.
+                    String advance = "update quest_state set status = ?, outcome_id = ?, row_version = row_version + 1 "
+                            + "where quest_id = ?";
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update quest_state set status = 'suspended' "
+                            + "where quest_id = 'survey'"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(advance, "available", null, "survey"));
+                    assertEquals(1, jdbc.update(advance, "completed", "surveyed", "survey"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(advance, "failed", "abandoned", "survey"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(advance, "active", null, "survey"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update quest_state set "
+                            + "row_version = row_version + 1, quest_id = 'renamed' where quest_id = 'rescue'"));
+                    // A satisfied objective needs its quest and a real event, and is never changed or removed.
+                    String objective = "insert into quest_objective (campaign_id, quest_id, objective_id, event_sequence, "
+                            + "satisfied_revision) values (?, ?, ?, ?, 7)";
+                    assertEquals(1, jdbc.update(objective, campaign, "survey", "reach", 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(objective, campaign, "survey", "reach", 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(objective, campaign, "unknown", "reach", 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(objective, campaign, "survey", "other", 99));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update quest_objective set satisfied_revision = 8"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("delete from quest_objective"));
+                    // A visit belongs to an actor of the campaign and is immutable.
+                    String visit = "insert into location_visit (campaign_id, actor_id, location_id, first_revision) "
+                            + "values (?, ?, ?, 7)";
+                    assertEquals(1, jdbc.update(visit, campaign, wearer, "grove"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(visit, campaign, wearer, "grove"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(visit, campaign, UUID.randomUUID(), "trail"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update location_visit set first_revision = 8"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("delete from location_visit"));
+                    assertEquals(0, v20.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

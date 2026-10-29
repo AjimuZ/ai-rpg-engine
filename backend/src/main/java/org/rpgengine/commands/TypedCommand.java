@@ -13,7 +13,8 @@ import org.rpgengine.content.PackTextParser;
  * Closed vocabulary of player intentions, never effects or generic field writes.
  * Exploration currently admits movement, waiting, addressed speech, use of a learned
  * ability and, since P10.2, using, equipping, unequipping, giving and trading item instances the
- * player holds. Encounter intentions must acquire explicit contracts and validators before
+ * player holds. Since P10.3 the player can also accept, suspend and resume a quest by its stable
+ * identity; every other quest transition is derived by the engine from committed facts. Encounter intentions must acquire explicit contracts and validators before
  * registration; unknown types fail closed. Structural decoding here
  * is followed by current-state rule validation in {@link CommandRules}; resolution
  * remains backend-owned (P07.4). Every value is immutable and can reproduce its exact
@@ -22,7 +23,7 @@ import org.rpgengine.content.PackTextParser;
 public sealed interface TypedCommand
         permits TypedCommand.Move, TypedCommand.Wait, TypedCommand.Speak, TypedCommand.UseAbility,
         TypedCommand.UseItem, TypedCommand.EquipItem, TypedCommand.UnequipItem, TypedCommand.TransferItem,
-        TypedCommand.TradeItems {
+        TypedCommand.TradeItems, TypedCommand.AcceptQuest, TypedCommand.SuspendQuest, TypedCommand.ResumeQuest {
     /** @return registered, case-sensitive wire identifier */
     String type();
 
@@ -105,6 +106,18 @@ public sealed interface TypedCommand
                     yield new TradeItems(CampaignCommandJson.uuid(payload.get("counterpartyActorId")),
                             lines(payload.get("offered")), lines(payload.get("requested")));
                 }
+                case "ACCEPT_QUEST" -> {
+                    fields(payload, "questId");
+                    yield new AcceptQuest(text(payload.get("questId"), 256));
+                }
+                case "SUSPEND_QUEST" -> {
+                    fields(payload, "questId");
+                    yield new SuspendQuest(text(payload.get("questId"), 256));
+                }
+                case "RESUME_QUEST" -> {
+                    fields(payload, "questId");
+                    yield new ResumeQuest(text(payload.get("questId"), 256));
+                }
                 default -> throw invalid();
             };
         } catch (IllegalArgumentException | ArithmeticException failure) {
@@ -116,7 +129,7 @@ public sealed interface TypedCommand
     /** Whether the journal type requires typed evidence at canonical commit. */
     static boolean registered(String type) {
         return Set.of("MOVE", "WAIT", "SPEAK", "USE_ABILITY", "USE_ITEM", "EQUIP_ITEM", "UNEQUIP_ITEM",
-                "TRANSFER_ITEM", "TRADE_ITEMS").contains(type);
+                "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST").contains(type);
     }
 
     /** Require an exact integer quantity of 1..9999 without coercion from decimals or text. */
@@ -376,5 +389,37 @@ public sealed interface TypedCommand
                     "offered", offered.stream().map(Line::payload).toList(),
                     "requested", requested.stream().map(Line::payload).toList());
         }
+    }
+    /**
+     * Request to take on an available quest. Which quests exist and are available is a current-state
+     * rule; a quest the player has not discovered answers exactly like one that does not exist.
+     */
+    record AcceptQuest(String questId) implements TypedCommand {
+        /** Require a bounded stable quest identity. */
+        public AcceptQuest { questId = text(questId, 256); }
+        /** @return the fixed accept identifier */
+        public String type() { return "ACCEPT_QUEST"; }
+        /** @return the single quest field */
+        public Map<String, Object> payload() { return Map.of("questId", questId); }
+    }
+
+    /** Request to set an active quest aside; nothing is tracked for it until it is resumed. */
+    record SuspendQuest(String questId) implements TypedCommand {
+        /** Require a bounded stable quest identity. */
+        public SuspendQuest { questId = text(questId, 256); }
+        /** @return the fixed suspend identifier */
+        public String type() { return "SUSPEND_QUEST"; }
+        /** @return the single quest field */
+        public Map<String, Object> payload() { return Map.of("questId", questId); }
+    }
+
+    /** Request to return a suspended quest to active; its predicates are evaluated at once. */
+    record ResumeQuest(String questId) implements TypedCommand {
+        /** Require a bounded stable quest identity. */
+        public ResumeQuest { questId = text(questId, 256); }
+        /** @return the fixed resume identifier */
+        public String type() { return "RESUME_QUEST"; }
+        /** @return the single quest field */
+        public Map<String, Object> payload() { return Map.of("questId", questId); }
     }
 }

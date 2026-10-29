@@ -104,6 +104,13 @@ public final class OperationAdmissionFailure extends RuntimeException {
          * The counterparty does not accept the exchange: an item has no declared value, or the value the
          * counterparty receives is lower than the value it gives (HTTP 422, P10.2).
          */
-        TRADE_REFUSED
+        TRADE_REFUSED,
+        /**
+         * The named quest does not exist, has not been discovered, is hidden background content, or is
+         * not in the status the request needs (accept needs {@code available}, suspend {@code active},
+         * resume {@code suspended}). One category avoids confirming that an undiscovered quest exists
+         * (HTTP 422, P10.3).
+         */
+        QUEST_UNAVAILABLE
     }
 }

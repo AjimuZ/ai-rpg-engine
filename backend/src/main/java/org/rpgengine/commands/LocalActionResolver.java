@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -17,6 +18,10 @@ import org.rpgengine.campaign.EventVisibility;
 import org.rpgengine.inventory.InventoryModel;
 import org.rpgengine.inventory.InventoryWriter;
 import org.rpgengine.inventory.ItemPlan;
+import org.rpgengine.quests.QuestChanges;
+import org.rpgengine.quests.QuestPlan;
+import org.rpgengine.quests.QuestRules;
+import org.rpgengine.quests.QuestStore;
 import org.rpgengine.rules.DeterministicDraw;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -37,6 +42,13 @@ import tools.jackson.databind.node.ObjectNode;
  * ledger source key {@code <operation>#<effect path>}. New instance identities derive from the
  * operation, so the same operation always proposes the same rows. Every item command takes no world
  * time and, like the other intentions, advances the game turn once.
+ *
+ * <p>Quests (P10.3): after the command's own effects, the pure {@link QuestPlan} runs over the facts the
+ * effects produce (visited locations, the player's possessions in the working {@link InventoryModel}, quest
+ * statuses and satisfied objectives) and its ordered steps become events, quest writes, reward settlements
+ * and reward-sourced item creations in this same resolution. A quest ending grants its rewards through the
+ * inventory model, so later predicates in the same commit already see them. The three quest commands are
+ * only the player's request that starts the plan.
  *
  * <p>Determinism: the same intention, snapshot and draw values always give byte-identical
  * output. Draw ordinals are assigned in evaluation order starting at zero, one per die, so
@@ -101,10 +113,19 @@ final class LocalActionResolver {
      * @param vocabularies declaring pack of each participant's origin, or no entry when unknown
      * @param operationId committing operation; seeds new item identities and ledger source keys
      * @param stacks every item stack held by a participant
+     * @param stored stored quest rows with satisfied objectives, and the player's recorded visits (P10.3)
      */
     record Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
             Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
-            UUID operationId, List<InventoryModel.Stack> stacks) {
+            UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored) {
+        /** Snapshot without quest facts, the shape used before P10.3. */
+        Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
+                Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
+                UUID operationId, List<InventoryModel.Stack> stacks) {
+            this(player, location, playerRowVersion, attributes, skills, pools, vocabularies, operationId, stacks,
+                    QuestStore.Stored.NONE);
+        }
+
         /** Snapshot without item facts, the shape used before P10.2. */
         Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
                 Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies) {
@@ -122,6 +143,7 @@ final class LocalActionResolver {
             vocabularies = Map.copyOf(vocabularies);
             Objects.requireNonNull(operationId, "operationId");
             stacks = List.copyOf(stacks);
+            Objects.requireNonNull(stored, "stored");
         }
     }
 
@@ -135,10 +157,20 @@ final class LocalActionResolver {
      * @param receiptDetails owner-safe receipt details JSON object
      * @param queryScopes sorted distinct query scopes whose truth the effects change
      * @param items item mutations, created and consumed units and equipment changes
+     * @param rewards one-time reward settlements of quests that ended in this resolution (P10.3)
+     * @param quests quest status, objective and visit writes (P10.3)
      */
     record Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
             List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
-            List<String> queryScopes, ItemPlan items) { }
+            List<String> queryScopes, ItemPlan items, List<ResolvedCommit.Reward> rewards, QuestChanges quests) {
+        /** Resolution without quest effects, the shape used before P10.3. */
+        Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
+                List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
+                List<String> queryScopes, ItemPlan items) {
+            this(world, resources, placements, events, receiptDetails, queryScopes, items, List.of(),
+                    QuestChanges.NONE);
+        }
+    }
 
     /**
      * Calculate the effects of an intention that already passed {@link CommandRules}.
@@ -171,6 +203,9 @@ final class LocalActionResolver {
         private final List<ItemPlan.Creation> creations = new ArrayList<>();
         private final List<ItemPlan.Consumption> consumptions = new ArrayList<>();
         private final List<ItemPlan.EquipmentChange> equipment = new ArrayList<>();
+        private final List<ResolvedCommit.Reward> rewards = new ArrayList<>();
+        private final ArrayNode questLines = JSON.createArrayNode();
+        private QuestChanges questChanges = QuestChanges.NONE;
         private final InventoryModel inventory;
         private int nextOrdinal;
         private int nextInstance;
@@ -228,7 +263,12 @@ final class LocalActionResolver {
                         Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.TransferItem gift -> give(gift);
                 case TypedCommand.TradeItems trade -> trade(trade, Objects.requireNonNull(catalog, "catalog"));
+                // The quest commands only start the quest engine below; its step is the command's event.
+                case TypedCommand.AcceptQuest accept -> details.put("questId", accept.questId());
+                case TypedCommand.SuspendQuest suspend -> details.put("questId", suspend.questId());
+                case TypedCommand.ResumeQuest resume -> details.put("questId", resume.questId());
             }
+            quests(command, catalog);
             details.put("elapsedSeconds", elapsed);
             details.put("turnAdvanced", true);
             details.putNull("pendingDecision");
@@ -237,13 +277,156 @@ final class LocalActionResolver {
             if (!itemLines.isEmpty()) {
                 details.set("items", itemLines);
             }
+            if (!questLines.isEmpty()) {
+                details.set("quests", questLines);
+            }
             var scopes = new TreeSet<String>();
             resources.forEach(change -> scopes.add(scope(owner(change.resourceId()))));
             placements.forEach(placement -> scopes.add(scope(placement.actorId())));
             scopes.addAll(InventoryWriter.scopes(items));
             return new Resolution(new ResolvedCommit.WorldChange(true, elapsed, CampaignMode.EXPLORATION, null),
                     resources, List.copyOf(placements), List.copyOf(events), JSON.writeValueAsString(details),
-                    List.copyOf(scopes), items);
+                    List.copyOf(scopes), items, List.copyOf(rewards), questChanges);
+        }
+
+        /**
+         * Run the quest engine over the facts this command's effects produce, then record its steps.
+         * Skipped when the command carries no pinned catalog (waiting and speech change no quest fact) or
+         * the content has no quests. The player's current location, the destination of a move and the
+         * recorded visits all count as visited; a move also records its origin, so a place the player
+         * started in is not forgotten once they leave it.
+         */
+        private void quests(TypedCommand command, CommandRuleCatalog catalog) {
+            if (catalog == null || catalog.quests().quests().isEmpty()) {
+                return;
+            }
+            var stored = snapshot.stored();
+            var visited = new LinkedHashSet<String>(stored.visited());
+            var newVisits = new ArrayList<QuestChanges.VisitWrite>();
+            if (snapshot.location() != null) {
+                visited.add(snapshot.location());
+            }
+            if (command instanceof TypedCommand.Move move) {
+                for (String place : new String[] {snapshot.location(), move.destinationId()}) {
+                    if (place != null && !stored.visited().contains(place)) {
+                        newVisits.add(new QuestChanges.VisitWrite(snapshot.player(), place));
+                    }
+                }
+                visited.add(move.destinationId());
+            }
+            var world = new QuestPlan.World() {
+                @Override public boolean visited(String location) { return visited.contains(location); }
+
+                @Override public long possessed(String item) { return inventory.total(snapshot.player(), item); }
+
+                @Override
+                public void grant(String item, int quantity) {
+                    var rule = catalog.characters().items().get(item);
+                    if (rule == null) {
+                        throw new IllegalStateException("rewarded item is missing from the pinned catalog");
+                    }
+                    inventory.deposit(snapshot.player(), item, rule.maxStack(), quantity);
+                }
+            };
+            QuestPlan.Request request = switch (command) {
+                case TypedCommand.AcceptQuest accept -> new QuestPlan.Request(QuestPlan.Action.ACCEPT, accept.questId());
+                case TypedCommand.SuspendQuest suspend -> new QuestPlan.Request(QuestPlan.Action.SUSPEND, suspend.questId());
+                case TypedCommand.ResumeQuest resume -> new QuestPlan.Request(QuestPlan.Action.RESUME, resume.questId());
+                default -> null;
+            };
+            var result = QuestPlan.evaluate(catalog.quests(), stored.states(), world, request,
+                    ResolvedCommit.MAX_EVENTS - events.size());
+            var indexes = new ArrayList<Integer>();
+            for (QuestPlan.Step step : result.steps()) {
+                indexes.add(events.size());
+                announce(step);
+            }
+            questChanges = QuestChanges.of(result, indexes, newVisits);
+        }
+
+        /**
+         * Emit the event, receipt line and (for an ending) the reward settlement and reward-sourced item
+         * creations of one quest step. Steps of a secret quest stay engine-internal until it ends.
+         */
+        private void announce(QuestPlan.Step step) {
+            String player = snapshot.player().toString();
+            var visibility = step.secret() && !(step instanceof QuestPlan.Ended) ? EventVisibility.INTERNAL
+                    : EventVisibility.PUBLIC;
+            var payload = payload().put("actorId", player).put("questId", step.questId());
+            String kind;
+            switch (step) {
+                case QuestPlan.Discovered ignored -> {
+                    kind = "DISCOVERED";
+                    event("QUEST_AVAILABLE", visibility, payload);
+                }
+                case QuestPlan.Accepted accepted -> {
+                    kind = "ACCEPTED";
+                    payload.put("automatic", accepted.automatic());
+                    event("QUEST_ACCEPTED", visibility, payload);
+                }
+                case QuestPlan.Suspended ignored -> {
+                    kind = "SUSPENDED";
+                    event("QUEST_SUSPENDED", visibility, payload);
+                }
+                case QuestPlan.Resumed ignored -> {
+                    kind = "RESUMED";
+                    event("QUEST_RESUMED", visibility, payload);
+                }
+                case QuestPlan.ObjectiveSatisfied satisfied -> {
+                    kind = "OBJECTIVE";
+                    payload.put("objectiveId", satisfied.objectiveId());
+                    event("QUEST_OBJECTIVE_SATISFIED", visibility, payload);
+                }
+                case QuestPlan.Ended ended -> {
+                    var outcome = ended.outcome();
+                    boolean completed = outcome.kind().ends() == org.rpgengine.quests.QuestStatus.COMPLETED;
+                    kind = completed ? "COMPLETED" : "FAILED";
+                    String source = "quest:" + step.questId() + ":outcome";
+                    payload.put("outcomeId", outcome.id()).put("outcomeKind", outcome.kind().wire());
+                    if (!outcome.rewards().isEmpty()) {
+                        payload.put("sourceKey", source);
+                    }
+                    event(completed ? "QUEST_COMPLETED" : "QUEST_FAILED", visibility, payload);
+                    settle(source, ended);
+                }
+            }
+            if (visibility == EventVisibility.PUBLIC) {
+                var line = questLines.addObject().put("kind", kind).put("questId", step.questId());
+                if (step instanceof QuestPlan.ObjectiveSatisfied satisfied) {
+                    line.put("objectiveId", satisfied.objectiveId());
+                }
+                if (step instanceof QuestPlan.Ended ended) {
+                    line.put("outcomeId", ended.outcome().id());
+                }
+            }
+        }
+
+        /**
+         * Settle an ending's rewards once: one reward settlement for the player under the quest's source
+         * key, and for each rewarded definition one ledger creation citing that settlement and one
+         * announcing event. The units themselves were already deposited in the inventory model.
+         */
+        private void settle(String source, QuestPlan.Ended ended) {
+            var granted = ended.outcome().rewards();
+            if (granted.isEmpty()) {
+                return;
+            }
+            var items = JSON.createArrayNode();
+            for (QuestRules.Reward reward : granted) {
+                items.addObject().put("definitionId", reward.item()).put("quantity", reward.quantity());
+            }
+            var body = payload().put("questId", ended.questId()).put("outcomeId", ended.outcome().id());
+            body.set("items", items);
+            rewards.add(new ResolvedCommit.Reward(source, snapshot.player().toString(),
+                    JSON.writeValueAsString(body)));
+            for (QuestRules.Reward reward : granted) {
+                creations.add(new ItemPlan.Creation(snapshot.player(), reward.item(), reward.quantity(),
+                        ItemPlan.SourceKind.REWARD, source, events.size()));
+                event("ITEM_CREATED", EventVisibility.PUBLIC, payload().put("actorId", snapshot.player().toString())
+                        .put("recipientActorId", snapshot.player().toString()).put("definitionId", reward.item())
+                        .put("quantity", reward.quantity()).put("sourceKey", source));
+                line("CREATED", reward.item(), null, reward.quantity());
+            }
         }
 
         /**

@@ -324,6 +324,27 @@ probing identities reveals nothing. The commit repeats every rule under the camp
 plan's owners to the intention's participants and applies the plan with compare-and-set guards
 ([ADR 0024](adr/0024-atomic-item-commands-and-source-linked-creation.md)).
 
+### P10.3 quest intentions
+
+Three more exploration intentions name one quest by its stable identity and nothing else. Status,
+outcome, objective and reward are never payload fields; the engine derives every other quest transition
+from committed facts after the command's own effects.
+
+| Type | Exact payload | Rule (category `QUEST_UNAVAILABLE` on failure) |
+| --- | --- | --- |
+| `ACCEPT_QUEST` | `questId` (1..256 characters) | The pinned, non-hidden quest is `available` |
+| `SUSPEND_QUEST` | `questId` | The quest is `active` |
+| `RESUME_QUEST` | `questId` | The quest is `suspended`; its predicates are evaluated in the same commit |
+
+A quest without a stored row is read at its pack-declared initial status, so an undiscovered quest, a
+hidden background quest and an unknown identity are indistinguishable. The commit repeats the rule
+under the campaign lock. Movement, every item command and ability use also run the quest engine over
+the facts they produce, so reaching a place or obtaining an item can finish an objective, end a quest
+and settle its reward in the same commit ([ADR 0025](adr/0025-quest-lifecycle-objective-predicates-and-one-time-rewards.md)).
+Receipts gain a `quests` list of public transitions (`DISCOVERED`, `ACCEPTED`, `SUSPENDED`, `RESUMED`,
+`OBJECTIVE`, `COMPLETED`, `FAILED`, each with `questId`, plus `objectiveId` or `outcomeId`) only when
+one happened; reward units appear as `CREATED` item lines.
+
 ### P07.4 local action execution
 
 `CommandExecutionService` turns one registered intention into one canonical commit in the

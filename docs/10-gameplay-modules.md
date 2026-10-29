@@ -17,7 +17,7 @@ maximum rank, derived statistics, learned abilities with prerequisites, conditio
 explicit item rarity tiers and equipment slots with hand limits are pack rules the backend
 validates and applies ([ADR 0023](adr/0023-character-rules-and-equipment-constraints.md),
 [domain model](05-domain-model.md#character-rules-and-state-p101)). Using them during play
-is P10.2 (atomic use, transfer, equip and trade commands and source-linked item creation, done) and P10.3–P10.5 (quests, time, panels). Mechanics are
+is P10.2 (atomic use, transfer, equip and trade commands and source-linked item creation, done), P10.3 (quest transitions and one-time rewards, done below) and P10.4–P10.5 (time, panels). Mechanics are
 never derived from artwork or prose: an item's tier, slot, hands, tags and any bonus come from its
 definition.
 
@@ -52,6 +52,17 @@ Creation previews are read-only. Campaign creation commits actor, loadout, initi
 Supported lifecycle: undiscovered → available → active → completed or failed; active may become suspended and return to active. Availability and discovery are distinct. A journal shows only discovered information. Quest objective predicates include acquired fact, visited location, possession/transfer, defeated encounter, completed interaction, and a bounded clock threshold.
 
 Progress is derived from committed events and checked state. Avoid natural-language completion tests as the sole authority. A model can propose that an objective appears satisfied, but the engine evaluates its predicate. Completed quests cannot be re-awarded under a new paraphrase of the same source. Alternative outcomes have explicit settlement policies and consequences.
+
+Since P10.3 this lifecycle is executable ([ADR 0025](adr/0025-quest-lifecycle-objective-predicates-and-one-time-rewards.md)). After every command that can change a fact a predicate reads (movement, item commands, ability use and the quest commands), a deterministic engine re-evaluates the pinned quests over committed state and the commit writes the result with the command's own effects:
+
+- an `undiscovered` quest becomes `available` once its `availableWhen` holds (always, when it has none); becoming available is the discovery event, so eligibility and knowledge are not yet separate (rumors and issuers arrive with P10.5 and P15);
+- the player accepts an `available` quest, may suspend an `active` one and resume it; nothing else is a player request, and accepting does not need the issuer nearby yet;
+- an `active` quest marks each objective satisfied when its predicate holds (`visited` a location, `possesses` units of an item, another quest's status or objective); a satisfied objective stays satisfied even if the proof is given away;
+- the first outcome, in authored order, whose predicate holds ends the quest: `success` and `alternative` complete it, `failure` fails it. Its item rewards are granted to the protagonist at that moment, once, and later predicates in the same commit already count them, so one command can finish a chain of quests;
+- suspended quests track nothing, ended quests never change again, and a returning player is never paid twice;
+- a quest declared `secret` is hidden background content: it starts by itself, no command addresses it, its progress stays internal and only its ending is public.
+
+Predicates for acquired facts, defeated encounters, completed interactions and a bounded clock are not in the compiled grammar yet; the engine evaluates what the grammar offers and does not read prose. There is still no journal or quest screen (P10.5).
 
 An emergent quest is validated content: it needs an identity, achievable conditions, issuer/source, known or hidden scope, reward budget, and failure/expiry behavior. It is not simply an AI sentence ending in “quest completed.”
 

@@ -85,6 +85,8 @@ Each encounter declares a reward source, eligibility, outcome-dependent policy, 
 
 Since P10.2 the creation primitive exists: units that enter a campaign are written to the append-only `item_creation` ledger with their operation, announcing event and a source key (a `REWARD` source must name a reward settlement of the same commit), and a transfer moves an existing instance without creating units. Loot ownership, container rules and reward tables remain P13.4. Loot derives from admitted inventories, containers, or an authored/generated reward table. An item cannot both remain equipped on a living enemy and appear in the player's pack unless a transfer event explains it. Default defeated-enemy loot is available to inspect/collect, not automatically owned.
 
+Since P10.3 quest rewards use that primitive: an ending quest settles its item rewards once for the protagonist under the source key `quest:<quest id>:outcome`, and the settlement is unique per source and recipient, so a returning player, a replayed request or a restored save cannot pay it twice. The same table will carry `challengeSourceId` settlements for encounters (P13.4); a quest key and a challenge key are distinct sources, which is how a quest milestone can pay in addition to the fight's XP.
+
 A quest and its associated fight may refer to the same `challengeSourceId`. The default policy awards that challenge XP once; a separate quest milestone can reward an additional distinct objective. Do not duplicate rewards through aliases, repeated journal views, respawn abuse, or restore/retry delivery.
 
 ## 9. Default advancement proposal

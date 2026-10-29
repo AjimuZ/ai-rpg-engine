@@ -13,6 +13,7 @@ import org.rpgengine.knowledge.KnowledgeChange;
 import org.rpgengine.persistence.CanonicalValues;
 import org.rpgengine.preparation.JobRequest;
 import org.rpgengine.preparation.PlanActivations;
+import org.rpgengine.quests.QuestChanges;
 import org.rpgengine.progression.RewardSettlement;
 
 /**
@@ -31,14 +32,19 @@ import org.rpgengine.progression.RewardSettlement;
  * (claims, beliefs, sightings, commitments), each citing one of this plan's events as provenance.
  * P10.2 adds an {@link ItemPlan}: instance mutations that provably conserve units, the creation
  * ledger entries that link every created unit to its source and announcing event, and equipment
- * changes. Preparation intents
+ * changes. P10.3 adds {@link QuestChanges}: quest status rows, satisfied objectives and first visits,
+ * each citing the plan event that announced it; a quest ending settles its item rewards through the
+ * same plan's {@link Reward}s and {@link ItemPlan} creations. Preparation intents
  * (query-scope epoch bumps, critical preparation jobs and cited plan branches) are data
  * too; they commit or roll back with the world change that caused them.
  */
 public record ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources,
         List<Event> events, List<Reward> rewards, String receiptDetails, boolean narrationRequired,
         Preparation preparation, CommandIntent intent, List<Placement> placements, List<KnowledgeChange> knowledge,
-        ItemPlan items) {
+        ItemPlan items, QuestChanges quests) {
+    /** Most events one plan may carry; the quest engine budgets its steps against what the command already used. */
+    public static final int MAX_EVENTS = 128;
+
     /**
      * Copy bounded lists to freeze the plan; reject duplicate resource or placement effects,
      * missing events, knowledge changes and item creations citing an event outside this plan, and a
@@ -50,7 +56,7 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
         Objects.requireNonNull(preparation, "preparation");
         resources = bounded(resources, 128, "resources");
         placements = bounded(placements, 16, "placements");
-        events = bounded(events, 128, "events");
+        events = bounded(events, MAX_EVENTS, "events");
         rewards = bounded(rewards, 128, "rewards");
         knowledge = bounded(knowledge, 128, "knowledge");
         if (events.isEmpty()) {
@@ -74,6 +80,23 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
             }
         }
         Objects.requireNonNull(items, "items");
+        Objects.requireNonNull(quests, "quests");
+        for (QuestChanges.StateWrite write : quests.states()) {
+            if (write.eventIndex() >= events.size()) {
+                throw new IllegalArgumentException("quest state cites an event outside this plan");
+            }
+        }
+        for (QuestChanges.ObjectiveWrite write : quests.objectives()) {
+            if (write.eventIndex() >= events.size()) {
+                throw new IllegalArgumentException("quest objective cites an event outside this plan");
+            }
+        }
+        var settled = new HashSet<String>();
+        for (Reward reward : rewards) {
+            if (!settled.add(reward.sourceKey() + "\u0000" + reward.recipientKey())) {
+                throw new IllegalArgumentException("a reward source settles once per recipient");
+            }
+        }
         for (ItemPlan.Creation creation : items.creations()) {
             if (creation.eventIndex() >= events.size()) {
                 throw new IllegalArgumentException("item creation cites an event outside this plan");
@@ -86,12 +109,20 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
         CanonicalValues.requireJsonObject(receiptDetails, "receiptDetails", 32_768);
     }
 
+    /** Plan without quest effects, the shape used before P10.3. */
+    public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
+            List<Reward> rewards, String receiptDetails, boolean narrationRequired, Preparation preparation,
+            CommandIntent intent, List<Placement> placements, List<KnowledgeChange> knowledge, ItemPlan items) {
+        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, preparation, intent,
+                placements, knowledge, items, QuestChanges.NONE);
+    }
+
     /** Plan without item effects, the shape used before P10.2. */
     public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
             List<Reward> rewards, String receiptDetails, boolean narrationRequired, Preparation preparation,
             CommandIntent intent, List<Placement> placements, List<KnowledgeChange> knowledge) {
         this(context, world, resources, events, rewards, receiptDetails, narrationRequired, preparation, intent,
-                placements, knowledge, ItemPlan.NONE);
+                placements, knowledge, ItemPlan.NONE, QuestChanges.NONE);
     }
 
     /** Plan without knowledge changes, the shape used before P09.1. */
@@ -99,7 +130,7 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
             List<Reward> rewards, String receiptDetails, boolean narrationRequired, Preparation preparation,
             CommandIntent intent, List<Placement> placements) {
         this(context, world, resources, events, rewards, receiptDetails, narrationRequired, preparation, intent,
-                placements, List.of(), ItemPlan.NONE);
+                placements, List.of(), ItemPlan.NONE, QuestChanges.NONE);
     }
 
     /** Plan without actor placements, the shape used before P07.4 movement execution. */
@@ -107,7 +138,7 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
             List<Reward> rewards, String receiptDetails, boolean narrationRequired, Preparation preparation,
             CommandIntent intent) {
         this(context, world, resources, events, rewards, receiptDetails, narrationRequired, preparation, intent,
-                List.of(), List.of(), ItemPlan.NONE);
+                List.of(), List.of(), ItemPlan.NONE, QuestChanges.NONE);
     }
 
     /**
@@ -118,14 +149,14 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
     public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
             List<Reward> rewards, String receiptDetails, boolean narrationRequired, Preparation preparation) {
         this(context, world, resources, events, rewards, receiptDetails, narrationRequired, preparation, null,
-                List.of(), List.of(), ItemPlan.NONE);
+                List.of(), List.of(), ItemPlan.NONE, QuestChanges.NONE);
     }
 
     /** Build a commit without preparation intents (no epoch bumps, no critical jobs). */
     public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
             List<Reward> rewards, String receiptDetails, boolean narrationRequired) {
         this(context, world, resources, events, rewards, receiptDetails, narrationRequired, Preparation.NONE, null,
-                List.of(), List.of(), ItemPlan.NONE);
+                List.of(), List.of(), ItemPlan.NONE, QuestChanges.NONE);
     }
 
     /** Return a defensive copy of at most limit non-null entries; fail before taking any locks. */

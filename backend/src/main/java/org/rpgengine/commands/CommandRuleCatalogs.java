@@ -40,7 +40,7 @@ public class CommandRuleCatalogs {
     static final int CACHE_ENTRIES = 16;
     /** Registered intentions whose rules may consult pinned definitions; WAIT needs none. */
     private static final Set<String> CONTENT_RULES = Set.of("MOVE", "SPEAK", "USE_ABILITY", "USE_ITEM", "EQUIP_ITEM",
-            "UNEQUIP_ITEM", "TRANSFER_ITEM", "TRADE_ITEMS");
+            "UNEQUIP_ITEM", "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST");
 
     private final JdbcTemplate jdbc;
     private final PackRegistry packs;

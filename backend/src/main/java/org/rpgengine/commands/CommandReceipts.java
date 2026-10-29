@@ -20,7 +20,9 @@ import tools.jackson.databind.json.JsonMapper;
  *       world seconds, turn advancement, destination of a move, the acting player's own
  *       resource changes and the ability calculations, which read only the player's own
  *       state and draws, plus (since P10.2) the item lines of the player's own inventory: units
- *       created, consumed, given, received, equipped or taken off.</li>
+ *       created, consumed, given, received, equipped or taken off, and (since P10.3) the public quest
+ *       transitions the operation caused: discovered, accepted, suspended, resumed, objective reached,
+ *       completed or failed.</li>
  * </ul>
  * Other actors' values, causal participants, request identities and unknown detail fields
  * are never copied, so a new internal field cannot leak by default. Public since P09.5, because
@@ -90,6 +92,24 @@ public final class CommandReceipts {
                     items.add(entry);
                 }
                 view.put("items", List.copyOf(items));
+            }
+            if (details.path("quests").isArray() && !details.path("quests").isEmpty()) {
+                // Present only when a public quest transition happened, so earlier receipt shapes stay
+                // byte-identical. Steps of hidden background quests are never written to the receipt.
+                var quests = new ArrayList<Map<String, Object>>();
+                for (JsonNode line : details.path("quests")) {
+                    var entry = new LinkedHashMap<String, Object>();
+                    entry.put("kind", line.path("kind").asString());
+                    entry.put("questId", line.path("questId").asString());
+                    if (line.path("objectiveId").isString()) {
+                        entry.put("objectiveId", line.path("objectiveId").asString());
+                    }
+                    if (line.path("outcomeId").isString()) {
+                        entry.put("outcomeId", line.path("outcomeId").asString());
+                    }
+                    quests.add(entry);
+                }
+                view.put("quests", List.copyOf(quests));
             }
         }
         var draws = new ArrayList<Map<String, Object>>();

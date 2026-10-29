@@ -13,6 +13,7 @@ import org.rpgengine.characters.CharacterRuleCatalog;
 import org.rpgengine.content.CampaignPackSnapshot;
 import org.rpgengine.content.CompiledPack;
 import org.rpgengine.content.Definition;
+import org.rpgengine.quests.QuestRules;
 
 /**
  * Compact immutable projection of the pinned rule facts that command validation and local
@@ -42,13 +43,16 @@ import org.rpgengine.content.Definition;
  * @param items trade valuation and use contract of every item definition, keyed by canonical item ID (P10.2)
  * @param characters the character rule projection of the same closure: stack bounds, equipment facts
  *        and the equipment vocabularies the equip and unequip commands check against (P10.1)
+ * @param quests the prose-free quest rules of the closure: discovery and objective predicates, outcomes and
+ *        item rewards (P10.3)
  */
 record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
         Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
-        Map<String, ItemRule> items, CharacterRuleCatalog characters) {
+        Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests) {
     /** Freeze every index; null parts are construction bugs and fail immediately. */
     CommandRuleCatalog {
         Objects.requireNonNull(revisionId, "revisionId");
+        Objects.requireNonNull(quests, "quests");
         items = Map.copyOf(items);
         Objects.requireNonNull(characters, "characters");
         locations = Map.copyOf(locations);
@@ -56,6 +60,14 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         resourceVocabularies = Map.copyOf(resourceVocabularies);
         actorPacks = Map.copyOf(actorPacks);
         abilities = Map.copyOf(abilities);
+    }
+
+    /** Catalog without quest rules, the shape used before P10.3. */
+    CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
+            Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
+            Map<String, ItemRule> items, CharacterRuleCatalog characters) {
+        this(revisionId, locations, actorDefinitions, resourceVocabularies, actorPacks, abilities, items, characters,
+                QuestRules.NONE);
     }
 
     /** Catalog without item rules, the shape used before P10.2 (tests that exercise only movement and abilities). */
@@ -116,7 +128,7 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
             }
         }
         return new CommandRuleCatalog(revisionId, locations, actors, vocabularies, origins, abilities, items,
-                CharacterRuleCatalog.from(snapshot));
+                CharacterRuleCatalog.from(snapshot), QuestRules.from(snapshot));
     }
 
     /**

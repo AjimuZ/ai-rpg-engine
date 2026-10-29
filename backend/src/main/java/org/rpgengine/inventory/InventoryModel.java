@@ -80,6 +80,23 @@ public final class InventoryModel {
     }
 
     /**
+     * Units of a definition an actor holds across all its live stacks, worn or not.
+     *
+     * @param owner holding actor
+     * @param definition canonical definition ID
+     * @return the total, zero when the actor holds none
+     */
+    public long total(UUID owner, String definition) {
+        long total = 0;
+        for (Work work : stacks.values()) {
+            if (work.owner.equals(owner) && work.definition.equals(definition)) {
+                total += work.quantity;
+            }
+        }
+        return total;
+    }
+
+    /**
      * Use up units of a stack.
      *
      * @param id stack to reduce

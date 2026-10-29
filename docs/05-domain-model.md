@@ -346,6 +346,32 @@ only through an `ItemPlan` that a canonical commit applies beside the events tha
   `ITEM_TRANSFERRED`, `ITEM_TRADED`, `ITEM_EQUIPPED`, `ITEM_UNEQUIPPED`; resource effects of a use reuse
   `EFFECT_RESOLVED`. Receipts list the player's own item lines.
 
+### Quests, visits and reward settlement (P10.3)
+
+V20 adds `quest_state`, `quest_objective` and `location_visit`. A pure `QuestPlan` derives every quest
+transition from committed facts after each fact-changing command, and the same canonical commit that
+changed the facts writes the transition, its events and its one-time reward
+([ADR 0025](adr/0025-quest-lifecycle-objective-predicates-and-one-time-rewards.md)).
+
+- **Rows.** `quest_state` is keyed by campaign and canonical quest ID and exists only once a quest has
+  left its pack-declared initial status; a quest without a row reads at that initial status. It stores
+  the status, the outcome of a terminal quest, the announcing event and a storage version. Terminal rows
+  are immutable and nothing returns to `available` (trigger). `quest_objective` rows (satisfied
+  objectives) and `location_visit` rows (first visits per actor) are immutable.
+- **Lifecycle.** `undiscovered -> available -> active -> completed | failed`, `active <-> suspended`.
+  Discovery, objective satisfaction and outcome selection are derived; accept, suspend and resume are
+  the only player requests. Objective satisfaction is sticky.
+- **Reward source.** An ending with item rewards writes one `reward_settlement` for the player with the
+  source key `quest:<canonical quest id>:outcome` (recipient key: the actor ID) and reward-sourced
+  `item_creation` rows citing it. The settlement is unique per campaign, source and recipient, so a
+  quest pays at most once whatever outcome or paraphrase is presented later.
+- **Events (version 1).** `QUEST_AVAILABLE`, `QUEST_ACCEPTED`, `QUEST_SUSPENDED`, `QUEST_RESUMED`,
+  `QUEST_OBJECTIVE_SATISFIED`, `QUEST_COMPLETED`, `QUEST_FAILED`; reward units are announced by
+  `ITEM_CREATED` with the settlement's source key. The steps of a hidden background quest are internal
+  until its ending.
+- **Visits.** A move records its origin and its destination; the actor's current location counts as
+  visited without a row.
+
 ### Local consultation presentation (P06.4)
 
 `LocalConsultation` parses a bounded exact alias and transforms an authorized
@@ -391,7 +417,7 @@ canonical commit to increment revision, turn, time or event sequence.
 - A rumor is not a confirmed world fact; a believed fact can differ from truth.
 - Current real location and an observer's last known location are separate records
   (`actor.location_id` and `actor_sighting` since P09.1).
-- A reward source has one settlement per defined recipient policy.
+- A reward source has one settlement per defined recipient policy. Since P10.3 a quest's source is `quest:<id>:outcome` for the player, enforced by the unique settlement and the immutable terminal quest row.
 - Level/skill/stat changes require a supported advancement operation; narration cannot award them directly.
 - A correction appends evidence of what changed; it does not edit the historical event that originally occurred.
 

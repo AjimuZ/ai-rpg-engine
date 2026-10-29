@@ -29,6 +29,11 @@ import java.util.TreeSet;
  * Success never admits content; it returns a {@link CompiledPack}.
  */
 public final class PackCompiler {
+    /**
+     * Most item units one quest outcome may reward. An ending settles in a single canonical commit, which
+     * bounds the rows, ledger entries and events it can write; the quest engine budgets against the same number.
+     */
+    public static final int MAX_QUEST_REWARD_UNITS = 32;
     private static final Map<String, String> CATEGORY_KINDS = Map.ofEntries(
             Map.entry("locations", "location"), Map.entry("factions", "faction"), Map.entry("creation", "creation"),
             Map.entry("npcs", "npc"), Map.entry("items", "item"), Map.entry("skills", "skill"),
@@ -1031,10 +1036,16 @@ public final class PackCompiler {
                 questCondition(outcome, "when", self);
                 Fields settlement = outcome.object("settlement", false);
                 if (settlement != null) {
+                    int units = 0;
                     for (Fields reward : settlement.objects("rewards", 0, 8)) {
                         reward.ref("item", ITEM, true);
-                        reward.integer("quantity", 1, 9999, 1);
+                        units += reward.integer("quantity", 1, 9999, 1);
                         reward.close();
+                        // One outcome settles in a single commit, which bounds the units it can create (P10.3).
+                        if (units > MAX_QUEST_REWARD_UNITS) {
+                            throw settlement.fail("LIMIT", "rewards", "An outcome rewards at most "
+                                    + MAX_QUEST_REWARD_UNITS + " units in total");
+                        }
                     }
                     settlement.texts("consequences", 8);
                     settlement.close();

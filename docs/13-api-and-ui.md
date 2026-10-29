@@ -272,6 +272,7 @@ operation status is stored progress, not evidence that a worker is currently ali
 | 422 | `COMMAND_EQUIPMENT_ILLEGAL` | P10.2: wearing the item breaks a pinned slot, tag, capacity or hand rule (or it is already worn), or the item to take off is not worn |
 | 422 | `COMMAND_QUANTITY_ILLEGAL` | P10.2: more units are named than the stack holds |
 | 422 | `COMMAND_TRADE_REFUSED` | P10.2: an item has no declared value, or the counterparty would receive less value than it gives |
+| 422 | `COMMAND_QUEST_UNAVAILABLE` | P10.3: the quest is unknown, undiscovered, hidden background content, ended, or not in the status the request needs (accept needs `available`, suspend `active`, resume `suspended`) |
 | 429 | `COMMAND_ADMISSION_LIMIT` | Two live mutation permits already belong to this owner |
 | 503 | `COMMAND_STORAGE_UNAVAILABLE` | Required transaction/storage unavailable |
 
