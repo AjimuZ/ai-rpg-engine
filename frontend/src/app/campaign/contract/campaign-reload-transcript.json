@@ -64,6 +64,16 @@
       "phase": "first-load",
       "client": "page",
       "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/panels?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"scope\":{\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"stateRevision\":0},\"locale\":\"it\",\"contentAvailable\":true,\"clock\":{\"seconds\":0,\"day\":1,\"hour\":0,\"minute\":0,\"second\":0},\"character\":{\"actorId\":\"00000000-0000-4000-8000-000000000004\",\"name\":\"Mara\",\"role\":null,\"location\":{\"id\":\"trailhead\",\"name\":{\"text\":\"Inizio del sentiero di Mosslight\",\"locale\":\"it\",\"fallback\":false}},\"attributes\":[{\"key\":\"awareness\",\"name\":{\"text\":\"Consapevolezza\",\"locale\":\"it\",\"fallback\":false},\"base\":2,\"effective\":2}],\"skills\":[{\"key\":\"fieldwork\",\"name\":{\"text\":\"Conoscenza dei sentieri\",\"locale\":\"it\",\"fallback\":false},\"rank\":1}],\"derived\":[]},\"resources\":[{\"key\":\"vigor\",\"name\":{\"text\":\"Vigore\",\"locale\":\"it\",\"fallback\":false},\"minimum\":0,\"current\":8,\"maximum\":8}],\"conditions\":[],\"abilities\":[{\"id\":\"steady\",\"name\":{\"text\":\"Riprendere fiato\",\"locale\":\"it\",\"fallback\":false},\"rank\":1}],\"inventory\":[{\"itemId\":\"00000000-0000-4000-8000-000000000005\",\"definitionId\":\"kit\",\"name\":{\"text\":\"Kit da escursione\",\"locale\":\"it\",\"fallback\":false},\"quantity\":1,\"rarity\":\"ordinary\",\"rarityName\":{\"text\":\"Ordinario\",\"locale\":\"it\",\"fallback\":false},\"wornIn\":null}],\"equipment\":[],\"quests\":[{\"id\":\"survey\",\"name\":{\"text\":\"Trova la pietra segnavia\",\"locale\":\"it\",\"fallback\":false},\"summary\":{\"text\":\"Visita il boschetto ed esamina la sua pietra segnavia.\",\"locale\":\"it\",\"fallback\":false},\"status\":\"available\",\"updatedRevision\":0,\"objectives\":[],\"outcome\":null}],\"knowledge\":{\"discoveriesTotal\":0,\"discoveries\":[],\"promisesTotal\":0,\"promises\":[]},\"journal\":{\"entries\":[],\"nextBefore\":null}}"
+    },
+    {
+      "phase": "first-load",
+      "client": "page",
+      "method": "GET",
       "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001",
       "requestBody": null,
       "status": 200,
@@ -124,6 +134,16 @@
       "phase": "before-reload",
       "client": "page",
       "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/panels?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"scope\":{\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"stateRevision\":1},\"locale\":\"it\",\"contentAvailable\":true,\"clock\":{\"seconds\":0,\"day\":1,\"hour\":0,\"minute\":0,\"second\":0},\"character\":{\"actorId\":\"00000000-0000-4000-8000-000000000004\",\"name\":\"Mara\",\"role\":null,\"location\":{\"id\":\"grove\",\"name\":{\"text\":\"Boschetto delle lanterne\",\"locale\":\"it\",\"fallback\":false}},\"attributes\":[{\"key\":\"awareness\",\"name\":{\"text\":\"Consapevolezza\",\"locale\":\"it\",\"fallback\":false},\"base\":2,\"effective\":2}],\"skills\":[{\"key\":\"fieldwork\",\"name\":{\"text\":\"Conoscenza dei sentieri\",\"locale\":\"it\",\"fallback\":false},\"rank\":1}],\"derived\":[]},\"resources\":[{\"key\":\"vigor\",\"name\":{\"text\":\"Vigore\",\"locale\":\"it\",\"fallback\":false},\"minimum\":0,\"current\":8,\"maximum\":8}],\"conditions\":[],\"abilities\":[{\"id\":\"steady\",\"name\":{\"text\":\"Riprendere fiato\",\"locale\":\"it\",\"fallback\":false},\"rank\":1}],\"inventory\":[{\"itemId\":\"00000000-0000-4000-8000-000000000005\",\"definitionId\":\"kit\",\"name\":{\"text\":\"Kit da escursione\",\"locale\":\"it\",\"fallback\":false},\"quantity\":1,\"rarity\":\"ordinary\",\"rarityName\":{\"text\":\"Ordinario\",\"locale\":\"it\",\"fallback\":false},\"wornIn\":null}],\"equipment\":[],\"quests\":[{\"id\":\"survey\",\"name\":{\"text\":\"Trova la pietra segnavia\",\"locale\":\"it\",\"fallback\":false},\"summary\":{\"text\":\"Visita il boschetto ed esamina la sua pietra segnavia.\",\"locale\":\"it\",\"fallback\":false},\"status\":\"available\",\"updatedRevision\":0,\"objectives\":[],\"outcome\":null}],\"knowledge\":{\"discoveriesTotal\":0,\"discoveries\":[],\"promisesTotal\":0,\"promises\":[]},\"journal\":{\"entries\":[{\"sequence\":1,\"type\":\"ACTOR_MOVED\",\"stateRevision\":1,\"clock\":{\"seconds\":0,\"day\":1,\"hour\":0,\"minute\":0,\"second\":0},\"statement\":\"Spostamento di Mara: da trailhead a grove.\"}],\"nextBefore\":null}}"
+    },
+    {
+      "phase": "before-reload",
+      "client": "page",
+      "method": "GET",
       "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/stream?adventureId=00000000-0000-4000-8000-000000000001&after=0%3A6",
       "requestBody": null,
       "status": 200,
@@ -169,6 +189,16 @@
       "status": 200,
       "contentType": "application/json",
       "body": "{\"scope\":{\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"stateRevision\":1},\"title\":\"Lantern walk\",\"mode\":\"EXPLORATION\",\"gameTurn\":1,\"worldTimeSeconds\":0,\"location\":{\"id\":\"grove\",\"name\":\"Boschetto delle lanterne\",\"nameLocale\":\"it\",\"nameFallback\":false},\"presentActors\":[],\"resources\":[{\"key\":\"vigor\",\"minimum\":0,\"current\":8,\"maximum\":8}],\"encounter\":null,\"pendingDecision\":\"FREE_INPUT\",\"awaitingNarrationTotal\":1,\"awaitingNarration\":[{\"operationId\":\"00000000-0000-4000-8000-000000000007\",\"commandType\":\"MOVE\",\"status\":\"COMMITTED_NARRATION_PENDING\",\"committedRevision\":1,\"receipt\":{\"stateRevision\":1,\"firstEventSequence\":1,\"lastEventSequence\":1,\"commandType\":\"MOVE\",\"elapsedSeconds\":0,\"turnAdvanced\":true,\"destinationId\":\"grove\",\"resources\":[],\"calculations\":[],\"randomDraws\":[]},\"narration\":{\"mode\":\"RECEIPT\",\"reason\":\"NARRATION_UNAVAILABLE\",\"retriesRemaining\":3}}],\"dependencies\":{\"status\":\"AVAILABLE\",\"mutationPaused\":false,\"issues\":[]},\"continuity\":{\"checkpoint\":\"NONE\",\"publicSummary\":\"NONE\"}}"
+    },
+    {
+      "phase": "after-reload",
+      "client": "page",
+      "method": "GET",
+      "path": "/api/v1/campaigns/00000000-0000-4000-8000-000000000002/panels?adventureId=00000000-0000-4000-8000-000000000001",
+      "requestBody": null,
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"scope\":{\"adventureId\":\"00000000-0000-4000-8000-000000000001\",\"campaignId\":\"00000000-0000-4000-8000-000000000002\",\"contentRevisionId\":\"00000000-0000-4000-8000-000000000003\",\"stateRevision\":1},\"locale\":\"it\",\"contentAvailable\":true,\"clock\":{\"seconds\":0,\"day\":1,\"hour\":0,\"minute\":0,\"second\":0},\"character\":{\"actorId\":\"00000000-0000-4000-8000-000000000004\",\"name\":\"Mara\",\"role\":null,\"location\":{\"id\":\"grove\",\"name\":{\"text\":\"Boschetto delle lanterne\",\"locale\":\"it\",\"fallback\":false}},\"attributes\":[{\"key\":\"awareness\",\"name\":{\"text\":\"Consapevolezza\",\"locale\":\"it\",\"fallback\":false},\"base\":2,\"effective\":2}],\"skills\":[{\"key\":\"fieldwork\",\"name\":{\"text\":\"Conoscenza dei sentieri\",\"locale\":\"it\",\"fallback\":false},\"rank\":1}],\"derived\":[]},\"resources\":[{\"key\":\"vigor\",\"name\":{\"text\":\"Vigore\",\"locale\":\"it\",\"fallback\":false},\"minimum\":0,\"current\":8,\"maximum\":8}],\"conditions\":[],\"abilities\":[{\"id\":\"steady\",\"name\":{\"text\":\"Riprendere fiato\",\"locale\":\"it\",\"fallback\":false},\"rank\":1}],\"inventory\":[{\"itemId\":\"00000000-0000-4000-8000-000000000005\",\"definitionId\":\"kit\",\"name\":{\"text\":\"Kit da escursione\",\"locale\":\"it\",\"fallback\":false},\"quantity\":1,\"rarity\":\"ordinary\",\"rarityName\":{\"text\":\"Ordinario\",\"locale\":\"it\",\"fallback\":false},\"wornIn\":null}],\"equipment\":[],\"quests\":[{\"id\":\"survey\",\"name\":{\"text\":\"Trova la pietra segnavia\",\"locale\":\"it\",\"fallback\":false},\"summary\":{\"text\":\"Visita il boschetto ed esamina la sua pietra segnavia.\",\"locale\":\"it\",\"fallback\":false},\"status\":\"available\",\"updatedRevision\":0,\"objectives\":[],\"outcome\":null}],\"knowledge\":{\"discoveriesTotal\":0,\"discoveries\":[],\"promisesTotal\":0,\"promises\":[]},\"journal\":{\"entries\":[{\"sequence\":1,\"type\":\"ACTOR_MOVED\",\"stateRevision\":1,\"clock\":{\"seconds\":0,\"day\":1,\"hour\":0,\"minute\":0,\"second\":0},\"statement\":\"Spostamento di Mara: da trailhead a grove.\"}],\"nextBefore\":null}}"
     },
     {
       "phase": "after-reload",

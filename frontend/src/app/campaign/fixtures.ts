@@ -70,6 +70,40 @@ export function resumeCard(options: { paused?: boolean; awaiting?: boolean; deci
     continuity: { checkpoint: 'VALID', publicSummary: 'NONE' } };
 }
 
+/**
+ * Panels body (P10.5) shaped as the backend writes it: a clock at day 2, one attribute changed by a
+ * condition, worn equipment, an active quest with a satisfied and an open objective, a rumor, a promise
+ * and two journal events. `contentAvailable: false` removes every pack name.
+ */
+export function panelsBody(options: { contentAvailable?: boolean; nextBefore?: number | null; fallback?: boolean } = {}) {
+  const named = options.contentAvailable !== false;
+  const text = (value: string, locale = 'en') => (named ? { text: value, locale, fallback: options.fallback ?? false } : null);
+  return { scope: { adventureId: ADVENTURE, campaignId: CAMPAIGN, contentRevisionId: OP2, stateRevision: 2 }, locale: 'en',
+    contentAvailable: named, clock: { seconds: 90_000 + 3_660, day: 2, hour: 2, minute: 1, second: 0 },
+    character: { actorId: OP1, name: 'Mara', role: 'Surveyor', location: { id: 'trailhead', name: text('Lantern Shelter') },
+      attributes: [{ key: 'awareness', name: text('Awareness'), base: 3, effective: 1 }, { key: 'might', name: text('Might'), base: 2, effective: 2 }],
+      skills: [{ key: 'fieldwork', name: text('Trailcraft'), rank: 2 }], derived: [{ key: 'guard', value: 5 }] },
+    resources: [{ key: 'vigor', name: text('Vigor'), minimum: 0, current: 6, maximum: 8 }],
+    conditions: [{ id: 'dazed', name: text('Dazed'), stacks: 1, remainingRounds: 3 }],
+    abilities: [{ id: 'steady', name: text('Catch Breath'), rank: 1 }],
+    inventory: [{ itemId: OP1, definitionId: 'sword', name: text('Sword'), quantity: 1, rarity: 'ordinary', rarityName: text('Ordinary'), wornIn: 'main-hand' },
+      { itemId: OP2, definitionId: 'coin', name: text('Coin'), quantity: 10, rarity: null, rarityName: null, wornIn: null }],
+    equipment: [{ itemId: OP1, definitionId: 'sword', name: text('Sword'), slot: 'main-hand', hands: 1 }],
+    quests: [{ id: 'survey', name: text('Find the Waystone'), summary: text('Visit the grove.'), status: 'active', updatedRevision: 1,
+      objectives: [{ id: 'reach', description: text('Reach the grove.'), optional: false, satisfied: true },
+        { id: 'provisions', description: text('Carry two potions.'), optional: true, satisfied: false }], outcome: null },
+    { id: 'gate', name: text('Light the Gate'), summary: text('Bring oil to the gate lamp.'), status: 'completed', updatedRevision: 2,
+      objectives: [], outcome: { id: 'lit', kind: 'success', description: null, rewards: [{ itemId: 'coin', name: text('Coin'), quantity: 5 }] } }],
+    knowledge: { discoveriesTotal: 1, discoveries: [{ claimId: OP1, stance: 'RUMORED', acquisition: 'TOLD', statement: 'The warden hides a key.',
+      statementLocale: 'en', learnedRevision: 1, learnedWorldTime: 60 }],
+      promisesTotal: 1, promises: [{ commitmentId: OP2, kind: 'PROMISE', direction: 'YOU_OWE', debtor: 'Mara', creditor: 'Warden',
+        terms: 'Guard the gate.', termsLocale: 'en', dueWorldTime: 100_000, overdue: false, madeRevision: 1 }] },
+    journal: { entries: [{ sequence: 4, type: 'ACTOR_MOVED', stateRevision: 2, clock: { seconds: 90_000, day: 2, hour: 1, minute: 0, second: 0 },
+      statement: 'Mara moved from grove to trailhead.' },
+    { sequence: 3, type: 'TIME_PASSED', stateRevision: 1, clock: { seconds: 60, day: 1, hour: 0, minute: 1, second: 0 },
+      statement: 'Waiting: 60 seconds pass.' }], nextBefore: options.nextBefore === undefined ? null : options.nextBefore } };
+}
+
 /** Scriptable fake server for the campaign endpoints. */
 export class CampaignServer {
   readonly calls: string[] = [];
@@ -77,6 +111,9 @@ export class CampaignServer {
   operations = new Map<string, ReturnType<typeof operation>>();
   stateBody: unknown = state();
   resumeBody: unknown = resumeCard();
+  panelsBody: unknown = panelsBody();
+  /** Journal pages served for `before=` requests, keyed by cursor. */
+  olderPages = new Map<number, unknown>();
   failStream = 0;
   statusCode = 200;
   errorCode = '';
@@ -94,6 +131,10 @@ export class CampaignServer {
     if (this.errorCode) return Promise.resolve(json({ code: this.errorCode }, this.statusCode));
     if (url.includes('/state?')) return Promise.resolve(json(this.stateBody));
     if (url.includes('/resume?')) return Promise.resolve(json(this.resumeBody));
+    if (url.includes('/panels?')) {
+      const before = /[?&]before=(\d+)/.exec(url);
+      return Promise.resolve(json(before ? this.olderPages.get(Number(before[1])) ?? { code: 'CAMPAIGN_SCOPE_UNAVAILABLE' } : this.panelsBody));
+    }
     const op = /\/operations\/([0-9a-f-]{36})\?/.exec(url);
     if (op) {
       const view = this.operations.get(op[1]);

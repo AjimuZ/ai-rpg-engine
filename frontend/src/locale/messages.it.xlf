@@ -3135,5 +3135,518 @@
         <source>This summary is read from the last saved state; reading it does not advance time.</source>
       <target>Questo riepilogo è letto dall’ultimo stato salvato; leggerlo non fa avanzare il tempo.</target></segment>
     </unit>
+    <unit id="campaign.panels.clock">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:254</note>
+      </notes>
+      <segment>
+        <source>Day <ph id="0" equiv="day" disp="day" />, <ph id="1" equiv="time" disp="time" /></source>
+      <target>Giorno <ph id="0" equiv="day" disp="day" />, <ph id="1" equiv="time" disp="time" /></target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.questAvailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:260</note>
+      </notes>
+      <segment>
+        <source>Available</source>
+      <target>Disponibile</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.questActive">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:261</note>
+      </notes>
+      <segment>
+        <source>In progress</source>
+      <target>In corso</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.questSuspended">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:262</note>
+      </notes>
+      <segment>
+        <source>Set aside</source>
+      <target>Messa da parte</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.questCompleted">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:263</note>
+      </notes>
+      <segment>
+        <source>Completed</source>
+      <target>Completata</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.questFailed">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:264</note>
+      </notes>
+      <segment>
+        <source>Failed</source>
+      <target>Fallita</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.outcomeSuccess">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:271</note>
+      </notes>
+      <segment>
+        <source>Success</source>
+      <target>Successo</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.outcomeFailure">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:272</note>
+      </notes>
+      <segment>
+        <source>Failure</source>
+      <target>Fallimento</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.outcomeAlternative">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:273</note>
+      </notes>
+      <segment>
+        <source>Alternative ending</source>
+      <target>Finale alternativo</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.objectiveDone">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:279</note>
+      </notes>
+      <segment>
+        <source>Done</source>
+      <target>Fatto</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.objectiveOptional">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:280</note>
+      </notes>
+      <segment>
+        <source>Optional</source>
+      <target>Facoltativo</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.objectiveOpen">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:280</note>
+      </notes>
+      <segment>
+        <source>Open</source>
+      <target>Da fare</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.attributeChanged">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:289</note>
+      </notes>
+      <segment>
+        <source><ph id="0" equiv="effective" disp="effective" /> (base <ph id="1" equiv="base" disp="base" />)</source>
+      <target><ph id="0" equiv="effective" disp="effective" /> (base <ph id="1" equiv="base" disp="base" />)</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.condition">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:298</note>
+      </notes>
+      <segment>
+        <source><ph id="0" equiv="name" disp="name" /> ×<ph id="1" equiv="stacks" disp="stacks" />, <ph id="2" equiv="rounds" disp="rounds" /> rounds left</source>
+      <target><ph id="0" equiv="name" disp="name" /> ×<ph id="1" equiv="stacks" disp="stacks" />, ancora <ph id="2" equiv="rounds" disp="rounds" /> round</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.stanceKnows">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:304</note>
+      </notes>
+      <segment>
+        <source>You know this</source>
+      <target>Lo sai</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.stanceBelieves">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:305</note>
+      </notes>
+      <segment>
+        <source>You believe this</source>
+      <target>Lo credi</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.stanceRumored">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:306</note>
+      </notes>
+      <segment>
+        <source>A rumor you heard</source>
+      <target>Una voce che hai sentito</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.stanceSuspects">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:307</note>
+      </notes>
+      <segment>
+        <source>You suspect this</source>
+      <target>Lo sospetti</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.stanceDoubts">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:308</note>
+      </notes>
+      <segment>
+        <source>You doubt this</source>
+      <target>Ne dubiti</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.stanceCommon">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:309</note>
+      </notes>
+      <segment>
+        <source>Common knowledge</source>
+      <target>Conoscenza comune</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.kindPromise">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:317</note>
+      </notes>
+      <segment>
+        <source>Promise</source>
+      <target>Promessa</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.kindObligation">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:318</note>
+      </notes>
+      <segment>
+        <source>Obligation</source>
+      <target>Obbligo</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.kindAgreement">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:318</note>
+      </notes>
+      <segment>
+        <source>Agreement</source>
+      <target>Accordo</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.youOwe">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:320</note>
+      </notes>
+      <segment>
+        <source><ph id="0" equiv="kind" disp="kind" /> · you owe <ph id="1" equiv="creditor" disp="creditor" /></source>
+      <target><ph id="0" equiv="kind" disp="kind" /> · devi qualcosa a <ph id="1" equiv="creditor" disp="creditor" /></target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.owedToYou">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:321</note>
+      </notes>
+      <segment>
+        <source><ph id="0" equiv="kind" disp="kind" /> · <ph id="1" equiv="debtor" disp="debtor" /> owes you</source>
+      <target><ph id="0" equiv="kind" disp="kind" /> · <ph id="1" equiv="debtor" disp="debtor" /> ti deve qualcosa</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.betweenOthers">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:322</note>
+      </notes>
+      <segment>
+        <source><ph id="0" equiv="kind" disp="kind" /> · <ph id="1" equiv="debtor" disp="debtor" /> owes <ph id="2" equiv="creditor" disp="creditor" /></source>
+      <target><ph id="0" equiv="kind" disp="kind" /> · <ph id="1" equiv="debtor" disp="debtor" /> deve qualcosa a <ph id="2" equiv="creditor" disp="creditor" /></target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.overdue">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:330</note>
+      </notes>
+      <segment>
+        <source>Overdue since <ph id="0" equiv="due" disp="clock" /></source>
+      <target>Scaduta dal <ph id="0" equiv="due" disp="clock" /></target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.due">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:330</note>
+      </notes>
+      <segment>
+        <source>Due <ph id="0" equiv="due" disp="clock" /></source>
+      <target>Scadenza: <ph id="0" equiv="due" disp="clock" /></target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.title">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:25,26</note>
+      </notes>
+      <segment>
+        <source>Character, belongings and journal</source>
+      <target>Personaggio, oggetti e diario</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.clockLabel">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:26,27</note>
+      </notes>
+      <segment>
+        <source>In-world time</source>
+      <target>Tempo nel mondo</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.contentMissing">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:28,31</note>
+      </notes>
+      <segment>
+        <source>Adventure names and quests cannot be shown because the adventure content is unavailable. The numbers below are exact.</source>
+      <target>I nomi e le missioni dell’avventura non si possono mostrare perché il contenuto dell’avventura non è disponibile. I numeri qui sotto sono esatti.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.placeLabel">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:36</note>
+      </notes>
+      <segment>
+        <source>Location</source>
+      <target>Luogo</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.attributes">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:39,40</note>
+      </notes>
+      <segment>
+        <source>Attributes</source>
+      <target>Attributi</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.skills">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:47,48</note>
+      </notes>
+      <segment>
+        <source>Skills</source>
+      <target>Competenze</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.derived">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:55,56</note>
+      </notes>
+      <segment>
+        <source>Derived statistics</source>
+      <target>Statistiche derivate</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.resources">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:64,65</note>
+      </notes>
+      <segment>
+        <source>Resources</source>
+      <target>Risorse</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.noResources">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:65,67</note>
+      </notes>
+      <segment>
+        <source>No resources to show.</source>
+      <target>Nessuna risorsa da mostrare.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.conditions">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:76,77</note>
+      </notes>
+      <segment>
+        <source>Conditions</source>
+      <target>Condizioni</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.noConditions">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:77,78</note>
+      </notes>
+      <segment>
+        <source>No active conditions.</source>
+      <target>Nessuna condizione attiva.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.abilities">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:82,83</note>
+      </notes>
+      <segment>
+        <source>Abilities</source>
+      <target>Abilità</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.noAbilities">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:83,84</note>
+      </notes>
+      <segment>
+        <source>No abilities learned yet.</source>
+      <target>Nessuna abilità appresa finora.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.inventory">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:88,89</note>
+      </notes>
+      <segment>
+        <source>Inventory</source>
+      <target>Inventario</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.noItems">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:89,91</note>
+      </notes>
+      <segment>
+        <source>You carry nothing.</source>
+      <target>Non porti nulla con te.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.worn">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:95</note>
+      </notes>
+      <segment>
+        <source>Worn</source>
+      <target>Indossato</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.equipment">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:102,103</note>
+      </notes>
+      <segment>
+        <source>Worn equipment</source>
+      <target>Equipaggiamento indossato</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.noEquipment">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:103,105</note>
+      </notes>
+      <segment>
+        <source>Nothing is worn.</source>
+      <target>Non indossi nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.quests">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:112,113</note>
+      </notes>
+      <segment>
+        <source>Quests</source>
+      <target>Missioni</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.noQuests">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:113,114</note>
+      </notes>
+      <segment>
+        <source>No quests discovered yet.</source>
+      <target>Nessuna missione scoperta finora.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.knowledge">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:144,145</note>
+      </notes>
+      <segment>
+        <source>What you know</source>
+      <target>Ciò che sai</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.noKnowledge">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:145,147</note>
+      </notes>
+      <segment>
+        <source>No recorded discoveries.</source>
+      <target>Nessuna scoperta registrata.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.moreKnowledge">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:152,156</note>
+      </notes>
+      <segment>
+        <source>Only the newest discoveries are listed.</source>
+      <target>Sono elencate solo le scoperte più recenti.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.promises">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:157,158</note>
+      </notes>
+      <segment>
+        <source>Promises and agreements</source>
+      <target>Promesse e accordi</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.noPromises">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:158,160</note>
+      </notes>
+      <segment>
+        <source>No open promises.</source>
+      <target>Nessuna promessa aperta.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.history">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:171,172</note>
+      </notes>
+      <segment>
+        <source>Event history</source>
+      <target>Cronologia degli eventi</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.noEvents">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:172,173</note>
+      </notes>
+      <segment>
+        <source>Nothing has happened yet.</source>
+      <target>Non è ancora successo nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.older">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:179,181</note>
+      </notes>
+      <segment>
+        <source>Show older events</source>
+      <target>Mostra gli eventi precedenti</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.rewards">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:197</note>
+      </notes>
+      <segment>
+        <source>Reward</source>
+      <target>Ricompensa</target>
+      </segment>
+    </unit>
   </file>
 </xliff>

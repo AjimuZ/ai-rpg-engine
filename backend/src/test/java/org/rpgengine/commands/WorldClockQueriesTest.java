@@ -116,7 +116,7 @@ class WorldClockQueriesTest {
                 "/api/v1/campaigns", "/api/v1/campaigns" + scope, base + "/state" + scope, base + "/continue" + scope,
                 base + "/known-state" + scope, base + "/inventory" + scope, base + "/quests" + scope,
                 base + "/abilities" + scope, base + "/consultation" + scope + "&command=status",
-                base + "/resume" + scope, base + "/operations/" + last.operation().operationId() + scope,
+                base + "/resume" + scope, base + "/panels" + scope, base + "/operations/" + last.operation().operationId() + scope,
                 base + "/stream" + scope));
         for (int round = 0; round < 3; round++) {
             for (String path : reads) {

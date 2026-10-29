@@ -1,7 +1,7 @@
 /**
  * Localized wording for campaign errors, operation statuses, receipts, stream notices,
- * source-language fallback disclosure (docs/29 sections 3 and 6) and the resume card (P09.5,
- * docs/08 section 10).
+ * source-language fallback disclosure (docs/29 sections 3 and 6), the resume card (P09.5,
+ * docs/08 section 10) and the panels and journal (P10.5, docs/13, "P10.5 panels and journal").
  *
  * Every sentence is a `$localize` message with a stable `campaign.*` ID and named
  * placeholders, so the English source and the reviewed Italian target are checked for exact
@@ -10,7 +10,10 @@
  * sentence. Numeric effects come from the server unchanged and are only formatted for the
  * compiled locale; identifiers such as resource keys and destinations stay literal.
  */
-import { AwaitingNarration, DecisionKind, DependencyIssue, OperationStatus, PublicReceipt, ReceiptCalculation, ResumeCard } from './campaign-protocol';
+import {
+  AwaitingNarration, DecisionKind, DependencyIssue, OperationStatus, PanelAttribute, PanelClock, PanelCondition, PanelDiscovery, PanelPromise,
+  PanelText, PublicReceipt, QuestStatusName, ReceiptCalculation, ResumeCard,
+} from './campaign-protocol';
 
 /** Closed set of public error codes the backend can answer for campaign reads, commands and streams. */
 const ERRORS: Readonly<Record<string, () => string>> = {
@@ -236,4 +239,100 @@ export function resourceMessages(card: ResumeCard, locale: string): string[] {
     const maximum = numbers.format(resource.maximum);
     return $localize`:@@campaign.resume.resource:${key}:resource: ${current}:current: of ${maximum}:maximum:`;
   });
+}
+
+/** Return a pack name when the server sent a public one, otherwise the literal identifier. */
+export function displayName(name: PanelText | null, id: string): string {
+  return name?.text ?? id;
+}
+
+/** Return the clock as "Day N, HH:MM"; the server numbers days from 1 and digits follow the compiled locale. */
+export function clockMessage(clock: PanelClock, locale: string): string {
+  const numbers = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+  const day = numbers.format(clock.day);
+  const time = `${String(clock.hour).padStart(2, '0')}:${String(clock.minute).padStart(2, '0')}`;
+  return $localize`:@@campaign.panels.clock:Day ${day}:day:, ${time}:time:`;
+}
+
+/** Return the localized status of a discovered quest. */
+export function questStatusMessage(status: QuestStatusName): string {
+  switch (status) {
+    case 'available': return $localize`:@@campaign.panels.questAvailable:Available`;
+    case 'active': return $localize`:@@campaign.panels.questActive:In progress`;
+    case 'suspended': return $localize`:@@campaign.panels.questSuspended:Set aside`;
+    case 'completed': return $localize`:@@campaign.panels.questCompleted:Completed`;
+    case 'failed': return $localize`:@@campaign.panels.questFailed:Failed`;
+  }
+}
+
+/** Return the localized kind of an ended quest's outcome. */
+export function outcomeKindMessage(kind: 'success' | 'failure' | 'alternative'): string {
+  switch (kind) {
+    case 'success': return $localize`:@@campaign.panels.outcomeSuccess:Success`;
+    case 'failure': return $localize`:@@campaign.panels.outcomeFailure:Failure`;
+    case 'alternative': return $localize`:@@campaign.panels.outcomeAlternative:Alternative ending`;
+  }
+}
+
+/** Return whether an objective is done, still open or optional, for text that does not rely on colour. */
+export function objectiveStateMessage(satisfied: boolean, optional: boolean): string {
+  if (satisfied) return $localize`:@@campaign.panels.objectiveDone:Done`;
+  return optional ? $localize`:@@campaign.panels.objectiveOptional:Optional` : $localize`:@@campaign.panels.objectiveOpen:Open`;
+}
+
+/** Return the effective value of an attribute and, when conditions changed it, the stored base value. */
+export function attributeMessage(attribute: PanelAttribute, locale: string): string {
+  const numbers = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+  const effective = numbers.format(attribute.effective);
+  if (attribute.effective === attribute.base) return effective;
+  const base = numbers.format(attribute.base);
+  return $localize`:@@campaign.panels.attributeChanged:${effective}:effective: (base ${base}:base:)`;
+}
+
+/** Return one active condition with its stacks and the rounds it still lasts. */
+export function conditionMessage(condition: PanelCondition, locale: string): string {
+  const numbers = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 });
+  const name = displayName(condition.name, condition.id);
+  const stacks = numbers.format(condition.stacks);
+  const rounds = numbers.format(condition.remainingRounds);
+  return $localize`:@@campaign.panels.condition:${name}:name: ×${stacks}:stacks:, ${rounds}:rounds: rounds left`;
+}
+
+/** Return the stance a known statement is held with; this is never a claim that it is true. */
+export function stanceMessage(stance: PanelDiscovery['stance']): string {
+  switch (stance) {
+    case 'KNOWS': return $localize`:@@campaign.panels.stanceKnows:You know this`;
+    case 'BELIEVES': return $localize`:@@campaign.panels.stanceBelieves:You believe this`;
+    case 'RUMORED': return $localize`:@@campaign.panels.stanceRumored:A rumor you heard`;
+    case 'SUSPECTS': return $localize`:@@campaign.panels.stanceSuspects:You suspect this`;
+    case 'DOUBTS': return $localize`:@@campaign.panels.stanceDoubts:You doubt this`;
+    case 'COMMON': return $localize`:@@campaign.panels.stanceCommon:Common knowledge`;
+  }
+}
+
+/** Return who owes what to whom for a promise, with the kind of commitment. */
+export function promiseMessage(promise: PanelPromise): string {
+  const debtor = promise.debtor ?? '?';
+  const creditor = promise.creditor ?? '?';
+  const kind = promise.kind === 'PROMISE' ? $localize`:@@campaign.panels.kindPromise:Promise`
+    : promise.kind === 'OBLIGATION' ? $localize`:@@campaign.panels.kindObligation:Obligation` : $localize`:@@campaign.panels.kindAgreement:Agreement`;
+  switch (promise.direction) {
+    case 'YOU_OWE': return $localize`:@@campaign.panels.youOwe:${kind}:kind: · you owe ${creditor}:creditor:`;
+    case 'OWED_TO_YOU': return $localize`:@@campaign.panels.owedToYou:${kind}:kind: · ${debtor}:debtor: owes you`;
+    default: return $localize`:@@campaign.panels.betweenOthers:${kind}:kind: · ${debtor}:debtor: owes ${creditor}:creditor:`;
+  }
+}
+
+/** Return the due time of a promise as a clock reading, or null when it has none. */
+export function promiseDueMessage(promise: PanelPromise, locale: string): string | null {
+  if (promise.dueWorldTime === null) return null;
+  const clock = clockMessage(readClock(promise.dueWorldTime), locale);
+  return promise.overdue ? $localize`:@@campaign.panels.overdue:Overdue since ${clock}:due:` : $localize`:@@campaign.panels.due:Due ${clock}:due:`;
+}
+
+/** Split world seconds into the calendar reading the server uses (86,400 seconds a day). */
+function readClock(seconds: number): PanelClock {
+  const elapsedDays = Math.floor(seconds / 86_400);
+  const rest = seconds - elapsedDays * 86_400;
+  return { seconds, day: elapsedDays + 1, hour: Math.floor(rest / 3_600), minute: Math.floor((rest % 3_600) / 60), second: rest % 60 };
 }

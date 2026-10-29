@@ -168,6 +168,11 @@ class CampaignInterfaceContractTest {
         JsonNode card = json.readTree(page("first-load", base + "/resume" + scope).body());
         assertEquals("STARTING_SITUATION", card.get("pendingDecision").asText());
         assertEquals("it", card.get("location").get("nameLocale").asText());
+        // P10.5: the panels report the same revision and clock, worded in the campaign's Italian.
+        JsonNode panels = json.readTree(page("first-load", base + "/panels" + scope).body());
+        assertEquals(0, panels.at("/scope/stateRevision").asLong());
+        assertEquals("it", panels.get("locale").asText());
+        assertEquals(1, panels.at("/clock/day").asInt());
         assertEquals(List.of("stream.ready|0:0"), frames(page("first-load", stream).body()));
         assertEquals(List.of(), frames(page("first-load", stream + "&after=0%3A0").body()));
 
@@ -196,6 +201,10 @@ class CampaignInterfaceContractTest {
         JsonNode owed = json.readTree(page("before-reload", base + "/resume" + scope).body());
         assertEquals(1, owed.get("awaitingNarrationTotal").asInt());
         assertEquals("RECEIPT", owed.get("awaitingNarration").get(0).get("narration").get("mode").asText());
+        JsonNode movedPanels = json.readTree(page("before-reload", base + "/panels" + scope).body());
+        assertEquals(1, movedPanels.at("/scope/stateRevision").asLong());
+        assertEquals("grove", movedPanels.at("/character/location/id").asText());
+        assertEquals("ACTOR_MOVED", movedPanels.at("/journal/entries/0/type").asText());
         assertEquals(List.of(), frames(page("before-reload", stream + "&after=0%3A6").body()));
 
         var cancelled = record("during-reload", "fixture", "POST", base + "/operations/" + wait + "/cancel" + scope, "{}");
@@ -204,6 +213,7 @@ class CampaignInterfaceContractTest {
         page("after-reload", "/api/v1/campaigns?adventureId=" + adventure + "&limit=50");
         page("after-reload", base + "/state" + scope);
         page("after-reload", base + "/resume" + scope);
+        page("after-reload", base + "/panels" + scope);
         assertEquals("CANCELLED", json.readTree(page("after-reload", base + "/operations/" + wait + scope).body())
                 .get("status").asText());
         JsonNode settled = json.readTree(page("after-reload", base + "/operations/" + move + scope).body());

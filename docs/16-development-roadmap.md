@@ -2529,6 +2529,23 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     first survived and gained a test (see [ADR 0026](adr/0026-bounded-world-clock-travel-duration-and-rest.md)).
     Not proven here: the 18 Docker-dependent probe cases, the `unzip` wrapper cases and a live V21 dump and restore.
 - [ ] P10.5 Integrate reliable state changes into panels and journal.
+  - Package A — projection (`org.rpgengine.panels`): `PlayPanels` reads clock, effective sheet (base and effective
+    attributes, skills, recomputed derived statistics), resources, conditions, abilities, inventory with worn slots,
+    equipment, engine-state quests, typed knowledge and a cursor-paged public event history in one read-only
+    repeatable-read snapshot; `PanelContents`/`PanelContent` cache the pinned quest rules, character rules and
+    public localized text per sealed revision; `PlayPanelsController` serves `GET /api/v1/campaigns/{id}/panels`.
+  - Package B — rules of disclosure: quests come from `quest_state`/`quest_objective` joined with the pinned rules
+    (a row-less quest stands at its initial status); undiscovered quests and hidden background quests that have
+    not ended are withheld; only `PUBLIC` events are worded (`EventStatements`, campaign language); names are public
+    pack text or the stable identifier; unloadable content gives numbers without names or quests.
+  - Package C — frontend: strict `parsePlayPanels`, `CampaignTransport.panels`, the read-only `CampaignPanels`
+    component inside the playthrough view (re-read on every newer revision, older-events paging, fallback
+    disclosure, content-missing notice), 57 reviewed EN/IT messages (catalog 412), re-recorded reload transcript.
+  - Package D — docs: ADR 0027, docs 08/10/13/15/17, backend README, CHANGELOG. The old free-text
+    `campaign_known_fact`/`campaign_known_quest` tables stay for the planner and checkpoint but no panel reads them.
+  - Limits: no encounter, shop, map, rumor or relationship panels, no journal search or filters, no names for
+    dependency-pack definitions, journal lines name quests and locations by identifier, no weight, capacity or
+    durability, and no browser journey ran in the Linux container (specs replay the recorded server replies).
 
 **Exit:** a coherent noncombat adventure loop uses actual resources, abilities, and objectives. **Checks:** QA-09's shared state preparation, QA-10, quests/rewards, time and rest bounds. **Suggested commit:** `Add reusable character inventory and quest systems`.
 

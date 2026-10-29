@@ -476,3 +476,228 @@ export function parseResumeCard(value: unknown, adventureId: string, campaignId:
     }),
   };
 }
+
+/** Most rows the server lists per panel collection; larger lists are refused as invalid. */
+const MAX_PANEL_ROWS = 1000;
+/** Most journal entries one page can hold, and most discoveries or promises listed. */
+const MAX_JOURNAL_PAGE = 100;
+const MAX_KNOWLEDGE_ROWS = 100;
+/** Quest statuses and outcome kinds the panels know (docs/10 section 5). */
+export const QUEST_STATUSES = ['available', 'active', 'suspended', 'completed', 'failed'] as const;
+export type QuestStatusName = (typeof QUEST_STATUSES)[number];
+export const OUTCOME_KINDS = ['success', 'failure', 'alternative'] as const;
+export const STANCES = ['KNOWS', 'BELIEVES', 'RUMORED', 'SUSPECTS', 'DOUBTS', 'COMMON'] as const;
+export const PROMISE_KINDS = ['PROMISE', 'OBLIGATION', 'AGREEMENT'] as const;
+export const PROMISE_DIRECTIONS = ['YOU_OWE', 'OWED_TO_YOU', 'BETWEEN_OTHERS'] as const;
+
+/** Public pack text with its actual language and whether the source language replaced a missing overlay. */
+export interface PanelText { readonly text: string; readonly locale: 'en' | 'it'; readonly fallback: boolean }
+/** The in-world clock: total seconds and the calendar reading the server computed. */
+export interface PanelClock { readonly seconds: number; readonly day: number; readonly hour: number; readonly minute: number; readonly second: number }
+export interface PanelAttribute { readonly key: string; readonly name: PanelText | null; readonly base: number; readonly effective: number }
+export interface PanelSkill { readonly key: string; readonly name: PanelText | null; readonly rank: number }
+export interface PanelCharacter {
+  readonly actorId: string;
+  readonly name: string;
+  readonly role: string | null;
+  readonly location: { readonly id: string; readonly name: PanelText | null } | null;
+  readonly attributes: readonly PanelAttribute[];
+  readonly skills: readonly PanelSkill[];
+  readonly derived: readonly { readonly key: string; readonly value: number }[];
+}
+export interface PanelResource { readonly key: string; readonly name: PanelText | null; readonly minimum: number; readonly current: number; readonly maximum: number }
+export interface PanelCondition { readonly id: string; readonly name: PanelText | null; readonly stacks: number; readonly remainingRounds: number }
+export interface PanelAbility { readonly id: string; readonly name: PanelText | null; readonly rank: number }
+export interface PanelItem {
+  readonly itemId: string;
+  readonly definitionId: string;
+  readonly name: PanelText | null;
+  readonly quantity: number;
+  readonly rarity: string | null;
+  readonly rarityName: PanelText | null;
+  readonly wornIn: string | null;
+}
+export interface PanelWorn { readonly itemId: string; readonly definitionId: string; readonly name: PanelText | null; readonly slot: string; readonly hands: number }
+export interface PanelObjective { readonly id: string; readonly description: PanelText | null; readonly optional: boolean; readonly satisfied: boolean }
+export interface PanelReward { readonly itemId: string; readonly name: PanelText | null; readonly quantity: number }
+export interface PanelOutcome { readonly id: string; readonly kind: (typeof OUTCOME_KINDS)[number]; readonly description: PanelText | null; readonly rewards: readonly PanelReward[] }
+export interface PanelQuest {
+  readonly id: string;
+  readonly name: PanelText | null;
+  readonly summary: PanelText | null;
+  readonly status: QuestStatusName;
+  readonly updatedRevision: number;
+  readonly objectives: readonly PanelObjective[];
+  readonly outcome: PanelOutcome | null;
+}
+export interface PanelDiscovery {
+  readonly claimId: string;
+  readonly stance: (typeof STANCES)[number];
+  readonly acquisition: string | null;
+  readonly statement: string;
+  readonly statementLocale: 'en' | 'it';
+  readonly learnedRevision: number;
+}
+export interface PanelPromise {
+  readonly commitmentId: string;
+  readonly kind: (typeof PROMISE_KINDS)[number];
+  readonly direction: (typeof PROMISE_DIRECTIONS)[number];
+  readonly debtor: string | null;
+  readonly creditor: string | null;
+  readonly terms: string;
+  readonly termsLocale: 'en' | 'it';
+  readonly dueWorldTime: number | null;
+  readonly overdue: boolean;
+}
+/** One worded public event; the statement is in the campaign's narrative language. */
+export interface JournalEntry { readonly sequence: number; readonly type: string; readonly stateRevision: number; readonly clock: PanelClock; readonly statement: string }
+
+/**
+ * The player panels and journal at one committed revision (P10.5, docs/13, "P10.5 panels and journal"). Everything here is
+ * display data the server decided: the interface never derives a bonus, a restoration or a quest result.
+ */
+export interface PlayPanels {
+  readonly stateRevision: number;
+  readonly locale: 'en' | 'it';
+  readonly contentAvailable: boolean;
+  readonly clock: PanelClock;
+  readonly character: PanelCharacter | null;
+  readonly resources: readonly PanelResource[];
+  readonly conditions: readonly PanelCondition[];
+  readonly abilities: readonly PanelAbility[];
+  readonly inventory: readonly PanelItem[];
+  readonly equipment: readonly PanelWorn[];
+  readonly quests: readonly PanelQuest[];
+  readonly discoveriesTotal: number;
+  readonly discoveries: readonly PanelDiscovery[];
+  readonly promisesTotal: number;
+  readonly promises: readonly PanelPromise[];
+  readonly journal: readonly JournalEntry[];
+  /** Cursor for the next older journal page, or null when the oldest event is listed. */
+  readonly nextBefore: number | null;
+}
+
+/** Read an optional pack text (`null` when the pack has none). */
+function panelText(source: Record<string, unknown>, field: string): PanelText | null {
+  const value = source[field];
+  if (value === null || value === undefined) return null;
+  const row = record(value, field);
+  const text = row['text'];
+  if (typeof text !== 'string' || text.trim().length === 0 || text.length > 4000) invalid(field);
+  return { text: text as string, locale: choice(row, 'locale', ['en', 'it'] as const), fallback: flag(row, 'fallback') };
+}
+
+/** Read a statement-like free text field bounded to 2000 characters. */
+function statement(source: Record<string, unknown>, field: string): string {
+  const value = source[field];
+  if (typeof value !== 'string' || value.trim().length === 0 || value.length > 2000) invalid(field);
+  return value as string;
+}
+
+/** Read a calendar reading and refuse an impossible one. */
+function panelClock(value: unknown, field: string): PanelClock {
+  const row = record(value, field);
+  const clock = { seconds: count(row, 'seconds'), day: count(row, 'day'), hour: count(row, 'hour'), minute: count(row, 'minute'), second: count(row, 'second') };
+  if (clock.hour > 23 || clock.minute > 59 || clock.second > 59) invalid(field);
+  return clock;
+}
+
+/**
+ * Validate a panels body against the route's scope.
+ *
+ * @param value decoded JSON body of the panels endpoint
+ * @param adventureId adventure requested by the route
+ * @param campaignId campaign requested by the route
+ * @throws CampaignProtocolError `invalid` for a foreign scope, an unknown enumeration or an oversized list
+ */
+export function parsePlayPanels(value: unknown, adventureId: string, campaignId: string): PlayPanels {
+  const source = record(value, 'panels');
+  const scope = record(source['scope'], 'scope');
+  if (uuid(scope, 'adventureId') !== adventureId || uuid(scope, 'campaignId') !== campaignId) invalid('scope');
+  const rows = (field: string, max = MAX_PANEL_ROWS): Record<string, unknown>[] => list(source, field, max).map((entry) => record(entry, field));
+  let character: PanelCharacter | null = null;
+  if (source['character'] !== null && source['character'] !== undefined) {
+    const row = record(source['character'], 'character');
+    const place = row['location'] === null || row['location'] === undefined ? null : record(row['location'], 'location');
+    character = {
+      actorId: uuid(row, 'actorId'), name: token(row, 'name', 200), role: optionalToken(row, 'role', 200),
+      location: place ? { id: token(place, 'id', 200), name: panelText(place, 'name') } : null,
+      attributes: list(row, 'attributes', MAX_PANEL_ROWS).map((entry) => {
+        const item = record(entry, 'attributes');
+        return { key: token(item, 'key'), name: panelText(item, 'name'), base: integer(item, 'base'), effective: integer(item, 'effective') };
+      }),
+      skills: list(row, 'skills', MAX_PANEL_ROWS).map((entry) => {
+        const item = record(entry, 'skills');
+        return { key: token(item, 'key'), name: panelText(item, 'name'), rank: count(item, 'rank') };
+      }),
+      derived: list(row, 'derived', MAX_PANEL_ROWS).map((entry) => {
+        const item = record(entry, 'derived');
+        return { key: token(item, 'key'), value: integer(item, 'value') };
+      }),
+    };
+  }
+  const knowledge = record(source['knowledge'], 'knowledge');
+  const journal = record(source['journal'], 'journal');
+  const next = journal['nextBefore'];
+  if (next !== null && next !== undefined && !(typeof next === 'number' && Number.isSafeInteger(next) && next > 0)) invalid('nextBefore');
+  const entries = list(journal, 'entries', MAX_JOURNAL_PAGE).map((entry): JournalEntry => {
+    const row = record(entry, 'entries');
+    return { sequence: count(row, 'sequence'), type: token(row, 'type', 128), stateRevision: count(row, 'stateRevision'),
+      clock: panelClock(row['clock'], 'clock'), statement: statement(row, 'statement') };
+  });
+  const discoveries = list(knowledge, 'discoveries', MAX_KNOWLEDGE_ROWS).map((entry): PanelDiscovery => {
+    const row = record(entry, 'discoveries');
+    return { claimId: uuid(row, 'claimId'), stance: choice(row, 'stance', STANCES), acquisition: optionalToken(row, 'acquisition', 32),
+      statement: statement(row, 'statement'), statementLocale: choice(row, 'statementLocale', ['en', 'it'] as const),
+      learnedRevision: count(row, 'learnedRevision') };
+  });
+  const promises = list(knowledge, 'promises', MAX_KNOWLEDGE_ROWS).map((entry): PanelPromise => {
+    const row = record(entry, 'promises');
+    const due = row['dueWorldTime'];
+    if (due !== null && due !== undefined && !(typeof due === 'number' && Number.isSafeInteger(due) && due >= 0)) invalid('dueWorldTime');
+    return { commitmentId: uuid(row, 'commitmentId'), kind: choice(row, 'kind', PROMISE_KINDS), direction: choice(row, 'direction', PROMISE_DIRECTIONS),
+      debtor: optionalToken(row, 'debtor', 200), creditor: optionalToken(row, 'creditor', 200), terms: statement(row, 'terms'),
+      termsLocale: choice(row, 'termsLocale', ['en', 'it'] as const), dueWorldTime: (due as number | null | undefined) ?? null, overdue: flag(row, 'overdue') };
+  });
+  const discoveriesTotal = count(knowledge, 'discoveriesTotal');
+  const promisesTotal = count(knowledge, 'promisesTotal');
+  if (discoveries.length > discoveriesTotal || promises.length > promisesTotal) invalid('knowledge');
+  return {
+    stateRevision: count(scope, 'stateRevision'),
+    locale: choice(source, 'locale', ['en', 'it'] as const),
+    contentAvailable: flag(source, 'contentAvailable'),
+    clock: panelClock(source['clock'], 'clock'),
+    character,
+    resources: rows('resources').map((row) => ({ key: token(row, 'key'), name: panelText(row, 'name'), minimum: integer(row, 'minimum'),
+      current: integer(row, 'current'), maximum: integer(row, 'maximum') })),
+    conditions: rows('conditions').map((row) => ({ id: token(row, 'id'), name: panelText(row, 'name'), stacks: count(row, 'stacks'),
+      remainingRounds: count(row, 'remainingRounds') })),
+    abilities: rows('abilities').map((row) => ({ id: token(row, 'id'), name: panelText(row, 'name'), rank: count(row, 'rank') })),
+    inventory: rows('inventory').map((row) => ({ itemId: uuid(row, 'itemId'), definitionId: token(row, 'definitionId', 200),
+      name: panelText(row, 'name'), quantity: count(row, 'quantity'), rarity: optionalToken(row, 'rarity', 200),
+      rarityName: panelText(row, 'rarityName'), wornIn: optionalToken(row, 'wornIn', 200) })),
+    equipment: rows('equipment').map((row) => ({ itemId: uuid(row, 'itemId'), definitionId: token(row, 'definitionId', 200),
+      name: panelText(row, 'name'), slot: token(row, 'slot', 200), hands: count(row, 'hands') })),
+    quests: rows('quests').map((row): PanelQuest => {
+      const outcome = row['outcome'] === null || row['outcome'] === undefined ? null : record(row['outcome'], 'outcome');
+      return {
+        id: token(row, 'id', 260), name: panelText(row, 'name'), summary: panelText(row, 'summary'),
+        status: choice(row, 'status', QUEST_STATUSES), updatedRevision: count(row, 'updatedRevision'),
+        objectives: list(row, 'objectives', 32).map((entry) => {
+          const item = record(entry, 'objectives');
+          return { id: token(item, 'id', 260), description: panelText(item, 'description'), optional: flag(item, 'optional'), satisfied: flag(item, 'satisfied') };
+        }),
+        outcome: outcome ? {
+          id: token(outcome, 'id', 260), kind: choice(outcome, 'kind', OUTCOME_KINDS), description: panelText(outcome, 'description'),
+          rewards: list(outcome, 'rewards', 8).map((entry) => {
+            const item = record(entry, 'rewards');
+            return { itemId: token(item, 'itemId', 260), name: panelText(item, 'name'), quantity: count(item, 'quantity') };
+          }),
+        } : null,
+      };
+    }),
+    discoveriesTotal, discoveries, promisesTotal, promises,
+    journal: entries,
+    nextBefore: (next as number | null | undefined) ?? null,
+  };
+}

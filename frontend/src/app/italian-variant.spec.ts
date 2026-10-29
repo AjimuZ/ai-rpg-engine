@@ -341,7 +341,7 @@ describe('Italian variant with the reviewed catalog', /** Register Italian rende
   afterEach(/** Destroying fixtures aborts long polls. */ () => TestBed.resetTestingModule());
 
   it('loads every reviewed message and detects English leftovers', /** The detector itself must have something to find. */ () => {
-    expect(CATALOG.size).toBe(355);
+    expect(CATALOG.size).toBe(412);
     expect(ENGLISH_MESSAGES.has('Send')).toBe(true);
     expect(ENGLISH_RUNS).toContain(message('campaign.view.composerHelp', {}, 'source'));
     // ICU branches are checked too: an untranslated plural would show "One passage".
@@ -415,6 +415,11 @@ describe('Italian variant with the reviewed catalog', /** Register Italian rende
     expect(text('[data-location]')).toBe('Inizio del sentiero di Mosslight');
     expect(root.querySelector('[data-location]')?.getAttribute('lang')).toBe('it');
     expect(text('[data-decision]')).toBe(message('campaign.resume.decisionStart'));
+    // P10.5 panels: reviewed Italian headings and clock around the server's own values and pack names.
+    expect(text('#panels-title')).toBe(message('campaign.panels.title'));
+    expect(text('[data-clock]')).toBe(`${message('campaign.panels.clockLabel')}: ${message('campaign.panels.clock', { day: '1', time: '00:00' })}`);
+    expect(text('#conditions-title')).toBe(message('campaign.panels.conditions'));
+    expect(text('[data-conditions] p')).toBe(message('campaign.panels.noConditions'));
     expect([...englishLeftovers(root), ...englishText(root)]).toEqual([]);
     expect(accessibilityProblems(root)).toEqual([]);
 

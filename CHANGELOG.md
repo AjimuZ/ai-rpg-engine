@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — Reliable state changes in panels and journal (P10.5), 29 October 2026
+
+- A playthrough now shows what its commits stored. The playthrough page reads one new snapshot,
+  `GET /api/v1/campaigns/{id}/panels`, and displays the in-world clock, the character with attributes (the
+  base value is shown beside an effective value that a condition changed), skills and derived statistics,
+  resources, active conditions with their remaining rounds, learned abilities, the inventory with the slot of
+  each worn item and the worn equipment, the discovered quests with their objectives and outcome, what the
+  player knows (with how sure they are: knows, believes, rumor, suspects, doubts, common knowledge) and open
+  promises, and an event history worded in the campaign's language.
+- Every list comes from one committed revision and is refreshed when the world revision advances. Reading
+  changes nothing: no row, no clock, no draw. A quest that is hidden background content stays out of the panels
+  and the history until its ending; undiscovered quests, internal events, truth values and secret names are
+  never sent. When pack names are unavailable the panels say so and show the stable identifiers with exact
+  numbers. The history is paged newest first with a stable cursor and an "older events" control.
+- Quests no longer come from the old free-text tables. Those tables keep their planner reader and have no panel
+  reader; they are retired once the planner no longer needs them.
+- Frontend: 57 new reviewed English and Italian messages (the Italian wording still needs independent human
+  review), a strict parser for the new reply and an updated recorded reload transcript. No migration, command
+  or table was added.
+- Not included: encounter, shop, map, rumor and relationship panels, journal search and filters, names of
+  dependency-pack definitions, quest and location names inside history lines (they use identifiers), item
+  weight, capacity and durability. See [ADR 0027](docs/adr/0027-player-panels-and-journal-projection.md).
+
 ## Unreleased — Bounded world clock, travel duration and rest (P10.4), 29 October 2026
 
 - World time now has rules. It is a counter of whole seconds that only a committed command moves: a journey
@@ -19,7 +42,7 @@
   wording, four new events (`REST_COMPLETED`, `REST_INTERRUPTED`, `RESOURCE_RECOVERED`, `CONDITION_REMOVED`) and
   a `rest` summary in the player-safe receipt. A move event now carries its duration. A wait longer than four
   hours, which used to commit, is refused.
-- Not included: any screen that shows the clock (P10.5), encounters that interrupt a rest (P11), condition ticks
+- Not included: any screen that shows the clock (added by P10.5), encounters that interrupt a rest (P11), condition ticks
   over world time, faction or event clocks and bounded catch-up (P15.2). See
   [ADR 0026](docs/adr/0026-bounded-world-clock-travel-duration-and-rest.md).
 

@@ -152,10 +152,13 @@ deterministic evidence only. Open risks:
 
 P09.1 adds typed claims, beliefs, last known locations and commitments. Open risks:
 
-- Two knowledge stores exist until P10.5: the free-text `campaign_known_fact` projection (no
-  writer, still read by the player projection and the planner's `fact-known-to` predicate) and
-  the typed records. Since P09.2 context assembly reads only the typed records. P10.5 moves the
-  panel and retires the old table, which needs a migration decision.
+- Two knowledge stores still exist: the free-text `campaign_known_fact` and `campaign_known_quest`
+  projections (no writer; read only by the planner's `fact-known-to` predicate, the planning snapshot,
+  the V16 operational checkpoint and the legacy `/quests` and `/known-state` sections) and the typed
+  records. Since P09.2 context assembly and since P10.5 the player panels read only typed records and
+  the engine's quest state ([ADR 0027](adr/0027-player-panels-and-journal-projection.md)). Dropping the
+  old tables is deferred until the planner and checkpoint stop reading them (P15); doing it earlier
+  would break saved planning snapshots.
 - Observation is player-only and refreshes every co-present sighting on every action. That
   bumps `sightings:<player>` often, so a future reader that records this scope will see
   frequent staleness. More than 64 co-present actors records no observation at all.

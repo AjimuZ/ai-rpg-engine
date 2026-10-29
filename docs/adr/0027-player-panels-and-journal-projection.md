@@ -1,0 +1,35 @@
+# ADR 0027: Player panels and journal as one snapshot projection
+
+- Status: Accepted and implemented in P10.5 (29 October 2026). Encounter panels (P11–P12), shop and loot screens (P13.4), faction and rumor panels (P15) and the bounded `journal` search of later work build on it.
+- Date: 29 October 2026
+- Builds on: [ADR 0003](0003-canonical-transactions.md) (one canonical commit), [ADR 0023](0023-character-rules-and-equipment-constraints.md) (sheet, conditions, equipment), [ADR 0024](0024-atomic-item-commands-and-source-linked-creation.md) (items), [ADR 0025](0025-quest-lifecycle-objective-predicates-and-one-time-rewards.md) (quests), [ADR 0026](0026-bounded-world-clock-travel-duration-and-rest.md) (clock) and the typed knowledge records of P09.1.
+
+## Context
+
+P10.1–P10.4 made character, item, quest and clock state executable, but the playthrough screen showed only the starting situation and the resume card. The player-facing projection (`/state`, `/inventory`, `/quests`, `/known-state`) still read two older stores: the free-text `campaign_known_quest` and `campaign_known_fact` tables from P06.2, which have no writer, and a bare list of item definition IDs. A player could therefore commit a trade, win a quest or rest through the night and see none of it. The specification asks that panels show reliable state changes, that "a journal shows only discovered information", that the interface never infers a bonus or restoration from prose, and that reads never advance the world (docs/10 sections 3, 5 and 8, docs/13 section 4).
+
+## Decision
+
+- One new read, `GET /api/v1/campaigns/{id}/panels?adventureId=…&before=…&limit=…`, answers every panel in a **single read-only repeatable-read snapshot** after the owner, adventure and campaign are authorized. All lists therefore describe one state revision, which the reply names. It writes nothing, draws nothing and never moves the clock.
+- It contains the clock (seconds plus the day/hour/minute reading of `WorldClock`), the creation-bound character (stored base and effective attributes after active conditions, skills, derived statistics recomputed by the pinned rules, location), resources, conditions with stacks and remaining rounds, learned abilities, the inventory with the slot each worn instance occupies and the equipment list, the discovered quests, typed knowledge and one page of the event history.
+- **Quests come from the engine's state** (`quest_state`, `quest_objective`) joined with the pinned rules, not from `campaign_known_quest`. A quest without a row stands at its initial status, so one that starts available is discovered from revision zero. Undiscovered quests and hidden background quests are not listed until their ending is committed, which is exactly when the engine publishes their events. Objectives appear once a quest is accepted; an ended quest shows its outcome kind, its public outcome text and the item units the pinned outcome settles.
+- **Knowledge comes from the typed records only** (`KnowledgeView.forActorWithin`): beliefs that carry a statement keep their stance (knows, believes, rumored, suspects, doubts) and how they were acquired, common-knowledge statements are labeled common, and open commitments show who owes whom. Truth is never sent. The free-text `campaign_known_fact` and `campaign_known_quest` tables are no longer a panel source.
+- **The journal is the `PUBLIC` event log**, worded by `EventStatements` in the campaign's narrative language and paged newest first by an exclusive `before` sequence cursor (default 25, at most 100 events, at most 1,000 stored events examined per call). `INTERNAL` events, raw payloads and events the statements cannot word faithfully never appear. A cursor taken earlier keeps paging the same past after new commits.
+- **Names are public pack text only.** Item, ability, condition, skill, location and quest names, objective and outcome descriptions and attribute, resource and rarity names are resolved from the pinned root pack; secret text, a missing field and a dependency-pack reference read as absent and the interface then shows the stable identifier. A revision that cannot be loaded still yields all numbers, no quests and no names, with `contentAvailable: false`, because hiding what cannot be checked is safer than guessing which quest is secret.
+- The frontend renders the reply read-only inside the playthrough view and re-reads it whenever the world revision advances (the same trigger as the state and the resume card). It parses strictly: an unknown enumeration, a foreign scope, an impossible clock or an oversized list rejects the whole body.
+
+## Alternatives considered
+
+- Extending `/state` and its section routes: rejected; `/state` is the small public save projection recorded in the browser reload contract, and one large body for every consumer would make the reload transcript depend on rarely used lists.
+- Writing the engine's quest results into `campaign_known_quest`: rejected; it would keep two copies of quest truth that can drift, and the planner and checkpoints read that table's free-text shape.
+- Dropping `campaign_known_fact` and `campaign_known_quest` now: deferred. The quest planner's `fact-known-to` predicate, the planning snapshots and the V16 operational checkpoint still read them, so a migration needs the planner to move to typed claims first (P15). The tables are unchanged, have no writer and no panel reads them. Their legacy `/known-state` and `/quests` sections stay documented as legacy.
+- Paging the journal by offset: rejected; new commits would shift the pages. A sequence cursor over an append-only log is stable.
+- Sending localized strings for events from the frontend catalog: rejected; the grounded statements already exist per event type and language for narration, so the journal and the narrator can never disagree.
+- Computing derived values in the browser: rejected; the backend recomputes them from the pinned rules and the interface only displays them.
+
+## Consequences
+
+- No migration, no new table and no new command. New package `org.rpgengine.panels` (`PlayPanels`, `PlayPanelsController`, `PanelContents`, `PanelContent`); the backup tool is unchanged.
+- The browser reload transcript gains a `panels` read in three phases; the frontend gains 57 reviewed message IDs (the Italian wording still needs independent human review) and a `CampaignPanels` component.
+- Journal lines use the canonical identifiers for quests, locations and abilities that `EventStatements` already uses, until packs supply public names for them; the quest panel beside the journal shows the names.
+- Limits: no equipment or shop actions, no map, no sorting or filtering, no search of the journal, no rumors or relationship panels, and no panel for an encounter (P11–P12). Item weight, capacity and durability are not modeled. Dependency-pack definitions have no names in the panels. The journal examines at most 1,000 events per call, so a page can be short on a log dominated by events that cannot be worded (then `nextBefore` continues the scan).

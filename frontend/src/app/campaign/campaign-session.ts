@@ -14,7 +14,7 @@ import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { SavedLibraryClient, LIBRARY_FETCH } from '../library/saved-library-client';
 import {
   CampaignProtocolError, CampaignView, compareCursor, Cursor, FrameDecoder, isPending, OPERATION_STATUSES,
-  OperationStatus, OperationView, parseCampaignView, parseCursor, parseOperation, parseResumeCard, PublicReceipt, ResumeCard,
+  OperationStatus, OperationView, parseCampaignView, parseCursor, parseOperation, parsePlayPanels, parseResumeCard, PlayPanels, PublicReceipt, ResumeCard,
   StreamEvent,
 } from './campaign-protocol';
 
@@ -64,6 +64,16 @@ export class CampaignTransport {
   async resume(scope: CampaignScope, signal: AbortSignal): Promise<ResumeCard> {
     const body = await this.json(`/api/v1/campaigns/${scope.campaignId}/resume?adventureId=${scope.adventureId}`, signal);
     return parseResumeCard(body, scope.adventureId, scope.campaignId);
+  }
+
+  /**
+   * Read and validate the player panels and journal of one scope (P10.5). `before` pages the journal
+   * backwards from a previous page's cursor; reading never advances time or writes anything.
+   */
+  async panels(scope: CampaignScope, signal: AbortSignal, before: number | null = null): Promise<PlayPanels> {
+    const cursor = before === null ? '' : `&before=${before}`;
+    const body = await this.json(`/api/v1/campaigns/${scope.campaignId}/panels?adventureId=${scope.adventureId}${cursor}`, signal);
+    return parsePlayPanels(body, scope.adventureId, scope.campaignId);
   }
 
   /** Read one operation's current status by identity; the safe query after a reload or a lost reply. */

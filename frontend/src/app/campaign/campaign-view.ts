@@ -3,6 +3,7 @@
  * source-language fallback disclosure), the resume card (P09.5, docs/08 section 10: location,
  * who the player knows to be there, resources, the next decision, saved actions still awaiting
  * narration with their receipts, and a pause notice when adventure content is missing), the
+ * panels and journal (P10.5: clock, character, conditions, inventory, quests, discoveries, promises, events), the
  * operations seen on the resumable stream with localized statuses and receipts, localized error
  * and reconnect notices, and the scoped persistent draft (docs/13 section 4, docs/29 sections 3
  * and 6).
@@ -14,7 +15,8 @@
  */
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, input, LOCALE_ID, signal, untracked } from '@angular/core';
 import { StoryInputState } from '../preview/story-input-state';
-import { CampaignProtocolError, CampaignView, isPending, ResumeCard } from './campaign-protocol';
+import { CampaignProtocolError, CampaignView, isPending, JournalEntry, PlayPanels, ResumeCard } from './campaign-protocol';
+import { CampaignPanels } from './campaign-panels';
 import {
   awaitingMessage, campaignErrorMessage, commandTypeLabel, decisionMessage, dependencyIssueMessage, fallbackNotice, languageName,
   locationMessage, narrationReasonMessage, operationStatusMessage, presentMessage, receiptLines, resourceMessages, streamResetMessage,
@@ -38,7 +40,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 
 /** Show a playthrough's authorized public projection and follow its resumable stream while mounted. */
 @Component({
-  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CampaignPanels],
   template: `
     <section class="panel campaign-playthrough" [attr.data-campaign-id]="campaignId()" aria-labelledby="campaign-title">
       @if (view(); as current) {
@@ -94,6 +96,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
             <p class="muted" i18n="@@campaign.resume.readOnly">This summary is read from the last saved state; reading it does not advance time.</p>
           </section>
         }
+        <app-campaign-panels [panels]="panels()" [older]="older()" [nextBefore]="cursor()" [loadingOlder]="loadingOlder()" (olderRequested)="loadOlder()" />
       } @else if (failure()) { <p class="notice" role="alert" data-error>{{ failure() }}</p>
       } @else { <p role="status" i18n="@@campaign.view.loading">Loading the playthrough…</p> }
 
@@ -143,6 +146,13 @@ export class CampaignPlaythrough {
   readonly view = signal<CampaignView | null>(null);
   /** Resume card of the shown revision; null until read (or for a scope without one). */
   readonly resume = signal<ResumeCard | null>(null);
+  /** Panels and journal of the shown revision (P10.5); null until read. */
+  readonly panels = signal<PlayPanels | null>(null);
+  /** Older journal pages fetched on request, newest first; cleared whenever the first page is re-read. */
+  readonly older = signal<readonly JournalEntry[]>([]);
+  /** Cursor of the next older journal page, or null at the oldest event. */
+  readonly cursor = signal<number | null>(null);
+  readonly loadingOlder = signal(false);
   readonly failure = signal('');
   readonly notice = signal('');
   readonly busy = signal(false);
@@ -180,6 +190,9 @@ export class CampaignPlaythrough {
     this.run?.abort();
     this.view.set(null);
     this.resume.set(null);
+    this.panels.set(null);
+    this.older.set([]);
+    this.cursor.set(null);
     this.failure.set('');
     this.notice.set('');
     this.state.set('connecting');
@@ -205,6 +218,10 @@ export class CampaignPlaythrough {
           // State and resume card describe the same scope; both are re-read after any newer revision.
           this.view.set(await this.transport.state(scope, signal));
           this.resume.set(await this.transport.resume(scope, signal));
+          const panels = await this.transport.panels(scope, signal);
+          this.panels.set(panels);
+          this.older.set([]);
+          this.cursor.set(panels.nextBefore);
           loaded = true;
         }
         if (requery) { await this.session.requery(scope, signal); requery = false; }
@@ -241,6 +258,26 @@ export class CampaignPlaythrough {
         this.input.setStatus('reconnecting', epoch);
       } finally { this.busy.set(false); }
     }
+  }
+
+  /**
+   * Fetch the next older journal page and append it. A failure keeps what is shown and reports the usual
+   * localized error; the cursor stays so the player can try again.
+   */
+  async loadOlder(): Promise<void> {
+    const before = this.cursor();
+    const run = this.run;
+    if (before === null || run === undefined || this.loadingOlder()) return;
+    this.loadingOlder.set(true);
+    try {
+      const page = await this.transport.panels(this.scope(), run.signal, before);
+      if (run.signal.aborted) return;
+      this.older.update((entries) => [...entries, ...page.journal]);
+      this.cursor.set(page.nextBefore);
+    } catch (error) {
+      if (run.signal.aborted) return;
+      this.failure.set(campaignErrorMessage(error instanceof CampaignProtocolError ? error.code : null));
+    } finally { this.loadingOlder.set(false); }
   }
 
   /** Check once for updates now; the continuous follower resumes by itself. */

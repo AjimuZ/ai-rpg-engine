@@ -115,8 +115,8 @@ Decisions and limits:
 
 - The P06.2 free-text `campaign_known_fact` projection stays unchanged and has no writer. It is
   not a rule source, and the quest planner's `fact-known-to` predicate still reads it. Context
-  assembly (P09.2) reads only the typed views. Panels move in P10.5, which also retires the old
-  table.
+  assembly (P09.2) reads only the typed views. Since P10.5 the panels read the typed records and the engine's quest state; the old table keeps its
+  planner reader and checkpoint column, has no panel reader and is retired together with the planner move (P15).
 - Only trusted resolvers write knowledge. No player command, effect node or HTTP route creates
   claims or commitments yet: the pack `reveal` effect, plan consumers (opportunities, adopted
   pending events) and item creation stay P10. NPC-side observation, witnesses of a commitment
@@ -277,7 +277,7 @@ Decisions and limits:
   `org.rpgengine.preparation.PlanAssumptions.usableWithin` and never queries plan tables.
 - The assembler never reads the free-text `campaign_known_fact` projection. That table keeps no
   writer and is still read by the player panel and the planner's `fact-known-to` predicate. It
-  is retired together with the panel move in P10.5.
+  is no longer read by any player panel since P10.5; its retirement waits for the planner's typed predicates (P15).
 - The P08.2 intent and narration contracts and the P08.7 planner still build their own contexts.
   Feeding them from `ContextAssembler` is the job of each caller (P10 and later gameplay callers).
   This task supplies the envelope, the budget, retrieval and overflow behaviour they must use. The

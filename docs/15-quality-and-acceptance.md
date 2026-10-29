@@ -309,7 +309,7 @@ Not verified:
 - context envelopes and retrieval over these views (P09.2);
 - writers from play: the `reveal` effect, plan consumers and dialogue promises (P10, P12,
   P15);
-- NPC-side observation and player panels (P10.5);
+- NPC-side observation (P11/P15); the player panels read these views since P10.5;
 - QA-08 and delayed-promise recall, which need P09.2–P09.5.
 
 The implementation owner commit is `24dba76`. Every check above passed on its exact sources,

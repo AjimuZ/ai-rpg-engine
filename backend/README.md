@@ -948,8 +948,7 @@ Tests: `InventoryModelTest` (pure: merging, reassignment, splitting, determinism
 potion, transfers, trades, equipment, creation ledger, refusals, replay, fault after item writes, stale
 guards), `CanonicalCommitServiceTest` (reward-sourced creation and rollback), `TypedCommandTest`,
 `ResolvedCommitTest` and `EventStatementsTest`. `ArmoryPack` is the shared in-memory pack variant.
-Limits: no NPC stock or shop screens, no weight/capacity/durability, no durations (P10.4) and no
-panels (P10.5).
+Limits: no NPC stock or shop screens and no weight/capacity/durability (the panels arrived with P10.5).
 
 ## Quests, objective predicates and one-time rewards (P10.3)
 
@@ -983,7 +982,7 @@ Tests: `QuestPredicateTest` and `QuestPlanTest` (pure), `QuestCommandsTest` (rea
 a quest ending in one commit, a chain of quests and a hidden quest, fault after the quest writes, replay,
 stale and ended-quest writers, attribution), plus the pack reward bound in `PackCompilerTest`,
 `TypedCommandTest`, `EventStatementsTest` and the V20 step of `CanonicalMigrationUpgradeTest`. Limits: no
-journal or quest screen (P10.5), no clock, fact, encounter or interaction predicates, no abandon command,
+clock (P10.4 added it), fact, encounter or interaction predicates, no abandon command,
 no XP or reputation rewards, no live V20 dump and restore rehearsal.
 
 ## World clock, travel and rest (P10.4)
@@ -1012,10 +1011,40 @@ clamped recovery, condition removal, a recorded interruption and its replay, ref
 a wait and by a rest, a failed commit leaving the clock alone, attribution), `WorldClockQueriesTest` (every read
 endpoint repeated while real time passes: no row and no clock change), plus the link, rest and `worldTime`
 validation in `PackCompilerTest`, `TypedCommandTest`, `EventStatementsTest`, `ResolvedCommitTest`,
-`CommandRulesTest` (a dependency pack's rest policy is refused), `CampaignFoundationsTest` and the V21 step of `CanonicalMigrationUpgradeTest`. Limits: no panel or journal shows
-the clock (P10.5); a rest is interrupted by a draw, not by an encounter (P11); condition durations are in rounds,
+`CommandRulesTest` (a dependency pack's rest policy is refused), `CampaignFoundationsTest` and the V21 step of `CanonicalMigrationUpgradeTest`. Limits: the panels show the clock since
+P10.5; a rest is interrupted by a draw, not by an encounter (P11); condition durations are in rounds,
 so neither waiting nor rest ticks them; no faction or event clocks or bounded catch-up (P15.2); one link per move;
 no live V21 dump and restore rehearsal.
+
+## Player panels and journal (P10.5)
+
+One read shows the committed state of a playthrough ([ADR 0027](../docs/adr/0027-player-panels-and-journal-projection.md),
+[API](../docs/13-api-and-ui.md#p105-panels-and-journal)): `GET /api/v1/campaigns/{id}/panels`.
+
+- `org.rpgengine.panels.PlayPanels` authorizes the owner, adventure and campaign, then reads clock, effective sheet
+  (`CharacterService.sheet`, so conditions and derived statistics are recomputed from the pinned rules), resources,
+  conditions, abilities, inventory with worn slots, equipment, quests (`quest_state` and `quest_objective` joined
+  with `QuestRules`), typed knowledge (`KnowledgeView.forActorWithin`) and one page of the public event log in a
+  single read-only repeatable-read transaction. It writes nothing, draws nothing and never moves the clock.
+- `PanelContents` caches, per sealed content revision, the quest rules, character rules and root-pack localization
+  (`PanelContent`). Only text whose source visibility is public is returned; a revision that cannot be loaded yields
+  numbers without names or quests (`contentAvailable: false`).
+- A quest with no stored row stands at its initial status, so quests that start available are listed from revision
+  zero. Undiscovered quests, and hidden (`secret`) background quests until they end, are never listed.
+- The journal lists `PUBLIC` events only, worded by `EventStatements` in the campaign's narrative language, newest
+  first, paged by an exclusive sequence cursor (`before`), at most 100 events per page and 1,000 stored events
+  examined per call; events the statements cannot word are skipped.
+- `PlayPanelsController` answers with the codes of the other campaign reads. The legacy `/quests` and `/known-state`
+  sections of the state endpoint still read the free-text tables; no panel does.
+
+Tests: `PlayPanelsTest` (real PostgreSQL and servlet stack on the quest pack: starting state, every committed change
+visible at its revision, the hidden quest and internal events withheld, conditions changing the effective sheet,
+cursor paging with a stable past, campaign language, typed knowledge with stances and promises, free-text facts
+ignored, byte-identical repeated reads, a refused command changing nothing, scope and input errors),
+`WorldClockQueriesTest` (the panels join the reads that never move the clock) and `CampaignInterfaceContractTest`
+(three recorded `panels` replies). Limits: no encounter, shop, map, rumor or relationship panels, no journal search or
+filters, dependency-pack definitions have no names, journal lines name quests and locations by identifier, and the
+legacy free-text tables remain until the planner stops reading them.
 
 ## Interface reload contract (P05.6)
 

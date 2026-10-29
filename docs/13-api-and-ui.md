@@ -176,7 +176,8 @@ schema versions for persisted/imported data.
 | `POST /api/v1/campaigns` | Create from pack/ruleset revision and creation choices | Transactional and idempotent |
 | `GET /api/v1/campaigns` | Owner's campaigns | Scope to local owner |
 | `GET /api/v1/campaigns/{id}/state` | Player projection at one revision | No advancement |
-| `GET /api/v1/campaigns/{id}/journal` | Known events and quests with cursor | No secret notes |
+| `GET /api/v1/campaigns/{id}/panels` | Player panels and journal at one revision (P10.5): clock, sheet, conditions, inventory and worn equipment, discovered quests, typed knowledge and promises, cursor-paged public event history | No advancement or write; public pack text only, no hidden quests or internal events ([details](#p105-panels-and-journal)) |
+| `GET /api/v1/campaigns/{id}/journal` | Planned separate journal search; the P10.5 journal is the `events` page of `panels` | No secret notes |
 | `GET /api/v1/campaigns/{id}/actions` | Legal current actions and known reasons | No hidden-information hints |
 | `POST /api/v1/campaigns/{id}/commands` | Submit typed action or free-text intent | Returns durable operation |
 | `GET /api/v1/campaigns/{id}/operations/{operationId}` | Operation progress, receipt, or clarification | Safe retry/reconnect path |
@@ -399,6 +400,44 @@ decision payloads, hashes, paths, private definitions, real NPC positions, seeds
 are never returned. Reading the card advances nothing and writes nothing. The playthrough view
 reads it with the state and shows it above the action list
 ([docs/08 section 10](08-memory-and-continuity.md#p095-restart-reconciliation-missing-dependencies-and-the-resume-card)).
+
+### P10.5 panels and journal
+
+`GET /api/v1/campaigns/{campaignId}/panels?adventureId={uuid}[&before={sequence}][&limit={1..100}]` uses
+the admission, `no-store` policy and error codes of the other campaign reads (400
+`CAMPAIGN_READ_INPUT_INVALID` for a noncanonical identity, a `before` that is not a positive integer or a
+`limit` outside 1..100; 404 `CAMPAIGN_SCOPE_UNAVAILABLE`; 503 `CAMPAIGN_READ_STORAGE_UNAVAILABLE`; 403 from
+admission). It answers 200 with exactly one consistent snapshot ([ADR 0027](adr/0027-player-panels-and-journal-projection.md)):
+
+- `scope` (adventure, campaign and content revision IDs, `stateRevision`), `locale` (the campaign's narrative
+  language, in which the event statements are worded), `contentAvailable` (false when the pinned content cannot be
+  loaded: no names, no quests) and `clock` (`seconds`, `day` from 1, `hour`, `minute`, `second`).
+- `character` (null for a legacy save without a player): `actorId`, `name`, `role`, `location` (`id`, nullable
+  public `name`), `attributes` (`key`, `name`, stored `base` and `effective` value after active conditions),
+  `skills`, and `derived` statistics recomputed from the pinned rules. `resources` (`key`, `name`, `minimum`,
+  `current`, `maximum`), `conditions` (`id`, `name`, `stacks`, `remainingRounds`) and `abilities` (`id`, `name`,
+  `rank`; learned, not necessarily usable now).
+- `inventory` (`itemId`, `definitionId`, `name`, `quantity`, `rarity`, `rarityName`, `wornIn` slot or null) and
+  `equipment` (`itemId`, `definitionId`, `name`, `slot`, `hands`).
+- `quests`: discovered quests only (`available`, `active`, `suspended`, `completed`, `failed`) in identity order, each
+  with `name`, `summary`, `status`, `updatedRevision`, `objectives` (listed once accepted: `id`, `description`,
+  `optional`, `satisfied`) and, once ended, an `outcome` (`id`, `kind`, `description`, `rewards` of item units).
+  Undiscovered quests and hidden background quests that have not ended are never listed.
+- `knowledge`: `discoveries` (typed statements with `stance` KNOWS, BELIEVES, RUMORED, SUSPECTS, DOUBTS or COMMON,
+  `acquisition`, `statement` and its language; never truth) and `promises` (`kind`, `direction` YOU_OWE, OWED_TO_YOU or
+  BETWEEN_OTHERS, party names, `terms`, `dueWorldTime`, `overdue`), newest first, at most 100 each, with the full
+  `discoveriesTotal` and `promisesTotal`.
+- `journal`: `entries` (`sequence`, `type`, `stateRevision`, the `clock` reading and a `statement` worded by the
+  deterministic event statements in the narrative language), newest first, and `nextBefore`, the cursor for the next
+  older page or null at the oldest event. A cursor is a sequence number of an append-only log, so an old cursor keeps
+  paging the same past after new commits.
+
+Every `name`, `summary` and `description` is `{text, locale, fallback}` public pack text or null; the interface then
+shows the stable identifier. Raw payloads, `INTERNAL` events, hidden quests, truth values, seeds, hashes and private
+definitions are never returned. Reading the panels advances nothing and writes nothing. The playthrough view reads
+them with the state and the resume card, re-reads them when the stream reports a newer revision, renders them
+read-only, and fetches older journal pages on request. The legacy `/quests` and `/known-state` sections of the
+state endpoint still read the unchanged free-text tables and are not used by the interface.
 
 ## 4. Stream contract
 
