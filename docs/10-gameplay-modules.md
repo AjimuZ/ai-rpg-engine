@@ -17,13 +17,13 @@ maximum rank, derived statistics, learned abilities with prerequisites, conditio
 explicit item rarity tiers and equipment slots with hand limits are pack rules the backend
 validates and applies ([ADR 0023](adr/0023-character-rules-and-equipment-constraints.md),
 [domain model](05-domain-model.md#character-rules-and-state-p101)). Using them during play
-is P10.2 (atomic use, transfer, equip and trade commands and source-linked item creation, done), P10.3 (quest transitions and one-time rewards, done below) and P10.4–P10.5 (time, panels). Mechanics are
+is P10.2 (atomic use, transfer, equip and trade commands and source-linked item creation, done), P10.3 (quest transitions and one-time rewards, done below), P10.4 (movement duration, rest and the bounded world clock, done) and P10.5 (panels). Mechanics are
 never derived from artwork or prose: an item's tier, slot, hands, tags and any bonus come from its
 definition.
 
 ## 2. Exploration and action resolution
 
-Locations form a directed graph with traversal requirements and durations. A character's actual position is separate from map discovery. Moving checks accessibility, presence, hazards, and equipment. Travel can produce a proposed encounter, but the engine must admit that encounter before reporting an attack.
+Locations form a directed graph with traversal requirements and durations (since P10.4 a link's `minutes` is the time a move along it adds to the world clock, see [ADR 0026](adr/0026-bounded-world-clock-travel-duration-and-rest.md)). A character's actual position is separate from map discovery. Moving checks accessibility, presence, hazards, and equipment. Travel can produce a proposed encounter, but the engine must admit that encounter before reporting an attack.
 
 Use a deterministic result for an obviously possible or impossible action. An uncertain action uses the configured check formula and difficulty. The default AI RPG Skirmish noncombat check is `2d10 + relevant attribute + trained skill + bounded situational modifier` against 8 routine, 12 demanding, 16 difficult, 20 severe, or 24 exceptional. Do not roll a routine action solely to manufacture failure. Skill/attribute selection and difficulty are disclosed before a player commits a consequential attempt when the character can reasonably judge them.
 
@@ -62,7 +62,7 @@ Since P10.3 this lifecycle is executable ([ADR 0025](adr/0025-quest-lifecycle-ob
 - suspended quests track nothing, ended quests never change again, and a returning player is never paid twice;
 - a quest declared `secret` is hidden background content: it starts by itself, no command addresses it, its progress stays internal and only its ending is public.
 
-Predicates for acquired facts, defeated encounters, completed interactions and a bounded clock are not in the compiled grammar yet; the engine evaluates what the grammar offers and does not read prose. There is still no journal or quest screen (P10.5).
+Predicates for acquired facts, defeated encounters and completed interactions are not in the compiled grammar yet (the bounded clock is, since P10.4); the engine evaluates what the grammar offers and does not read prose. There is still no journal or quest screen (P10.5).
 
 An emergent quest is validated content: it needs an identity, achievable conditions, issuer/source, known or hidden scope, reward budget, and failure/expiry behavior. It is not simply an AI sentence ending in “quest completed.”
 
@@ -78,13 +78,15 @@ Relationship dimensions are pack-defined bounded values, such as trust or respec
 
 Factions maintain goals, reputation, resources, relationships, and bounded event clocks. A player action can start or advance a clock. Trigger evaluation is causal and deterministic for mechanics; Codex can suggest narrative interpretation or candidate developments.
 
+**World clock (P10.4, implemented).** The campaign's in-world time is a counter of whole seconds. It moves only when a committed command resolves a duration (travel along a link, a wait of at most four hours, or a rest), by at most one in-world day per command, and it never passes one hundred years; the database refuses any other change. Looking at the game (state, resume card, stream, any `GET`) never advances it, and neither does real time. Quest predicates can read it with `worldTime`. Faction and event clocks below remain planned (P15.2).
+
 A clock has owner, current value, target, tick policy, trigger, visibility, and settlement identity. On a long time jump, process due boundaries in order with a cap; if too many accumulate, pause for bounded catch-up rather than blocking indefinitely or skipping consequential events. UI reads do not trigger hidden world advancement.
 
 Knowledge propagates through witnesses, messages, travel, or other declared mechanisms. A remote town does not instantly know a player's private conversation. Off-scene events cannot grant the protagonist knowledge without a recorded discovery.
 
 ## 8. Rest, recovery, and defeat
 
-Rest requires a location, duration, interruption policy, resource recovery table, and condition-removal rules. It is an action, not a session reset. Short and extended rest are configurable labels and policies, with no required external ruleset behavior.
+Rest requires a location, duration, interruption policy, resource recovery table, and condition-removal rules. It is an action, not a session reset. **Implemented in P10.4:** the `REST` command names a pack rest policy (`ruleType: rest`) with a duration, an optional location tag, an interruption chance, a resource recovery table and a list of conditions it removes. One recorded percentile draw decides interruption; an interrupted rest passes half the time, restores half and removes no condition. The player cannot choose the duration or the amounts. Ending combat still refills nothing (P11). Short and extended rest are configurable labels and policies, with no required external ruleset behavior.
 
 Default extended recovery takes eight in-world hours in a safe place and restores supported recoverable resources; injuries or story conditions may need specific treatment. Ending combat does not automatically refill health. Defeat follows the pack's declared recovery, capture, retreat, or permanent-loss policy. Irreversible risks must be communicated through known stakes and rules.
 

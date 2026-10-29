@@ -31,7 +31,7 @@ class TypedCommandTest {
                                 new TypedCommand.TradeItems.Line(UUID.randomUUID(), 1)),
                         List.of(new TypedCommand.TradeItems.Line(UUID.randomUUID(), 5))),
                 new TypedCommand.AcceptQuest("survey"), new TypedCommand.SuspendQuest("dep#survey"),
-                new TypedCommand.ResumeQuest("quest.main:1"))) {
+                new TypedCommand.ResumeQuest("quest.main:1"), new TypedCommand.Rest("night"))) {
             byte[] canonical = CommandCanonicalForm.encode(command.type(), 3, command.payload(), 32_768);
             assertEquals(command, TypedCommand.decode(canonical));
             assertThrows(UnsupportedOperationException.class, () -> command.payload().put("patch", "bad"));
@@ -190,6 +190,26 @@ class TypedCommandTest {
         assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.SuspendQuest("\ud800"));
         assertEquals("ACCEPT_QUEST", new TypedCommand.AcceptQuest("survey").type());
         assertEquals(Map.of("questId", "survey"), new TypedCommand.ResumeQuest("survey").payload());
+    }
+
+    /**
+     * A rest names one stable policy and nothing else: duration, recovery, interruption and condition removal
+     * are pack rules, so none of them can be supplied, and blank, oversized or non-text identities fail.
+     */
+    @Test
+    void rejectsMalformedRestPayloads() {
+        assertTrue(TypedCommand.registered("REST"));
+        assertInvalid("REST", Map.of());
+        assertInvalid("REST", Map.of("restId", 7));
+        assertInvalid("REST", Map.of("restId", ""));
+        assertInvalid("REST", Map.of("restId", "x".repeat(257)));
+        assertInvalid("REST", Map.of("restId", "night", "seconds", 3600));
+        assertInvalid("REST", Map.of("restId", "night", "restores", Map.of("vigor", 99)));
+        assertInvalid("REST", Map.of("rest", "night"));
+        assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.Rest(null));
+        assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.Rest("\ud800"));
+        assertEquals("REST", new TypedCommand.Rest("night").type());
+        assertEquals(Map.of("restId", "night"), new TypedCommand.Rest("night").payload());
     }
 
     /** Direct record callers cannot bypass the wire validation of bounds or Unicode scalar text. */

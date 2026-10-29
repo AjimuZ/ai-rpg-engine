@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — Bounded world clock, travel duration and rest (P10.4), 29 October 2026
+
+- World time now has rules. It is a counter of whole seconds that only a committed command moves: a journey
+  adds the time its location link declares (`minutes`, default none), a wait adds the seconds asked for (now at
+  most four hours), and the new `REST` command adds its rest policy's length. One command can add at most one
+  in-world day and the clock stops at one hundred years. Looking at the game never moves it: state, resume
+  card, stream and every other read leave the clock and every row alone, and so does real time passing.
+- PostgreSQL enforces the same limits against any writer (migration V21, no new table): the clock is bounded
+  on `campaign` and `campaign_event`, and it can change only in the update that also advances the state
+  revision, by at most one day. The backup tool covers schema version 21.
+- Packs can declare rest policies (`ruleType: rest`): duration, an optional location tag, an interruption
+  chance, resources to restore (up to their maximum) and conditions to remove. The player only names the
+  policy. One recorded percentile draw decides interruption; an interrupted rest passes half the time,
+  restores half and removes nothing. Quests can wait for the clock with the `worldTime` atom, so a wait, a
+  journey or a rest can finish a quest in the commit that moves the time.
+- Two new refusal codes (`COMMAND_TIME_ILLEGAL`, `COMMAND_REST_UNAVAILABLE`) with reviewed English and Italian
+  wording, four new events (`REST_COMPLETED`, `REST_INTERRUPTED`, `RESOURCE_RECOVERED`, `CONDITION_REMOVED`) and
+  a `rest` summary in the player-safe receipt. A move event now carries its duration. A wait longer than four
+  hours, which used to commit, is refused.
+- Not included: any screen that shows the clock (P10.5), encounters that interrupt a rest (P11), condition ticks
+  over world time, faction or event clocks and bounded catch-up (P15.2). See
+  [ADR 0026](docs/adr/0026-bounded-world-clock-travel-duration-and-rest.md).
+
 ## Unreleased — Quest transitions, objective predicates and one-time rewards (P10.3), 29 October 2026
 
 - Pack quests now run. After every command that can change a fact a quest predicate reads (movement,

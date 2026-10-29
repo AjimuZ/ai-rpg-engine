@@ -15,6 +15,7 @@ import org.rpgengine.preparation.JobRequest;
 import org.rpgengine.preparation.PlanActivations;
 import org.rpgengine.quests.QuestChanges;
 import org.rpgengine.progression.RewardSettlement;
+import org.rpgengine.rules.WorldClock;
 
 /**
  * Immutable, bounded output of trusted backend resolution, never a transport DTO or
@@ -34,14 +35,16 @@ import org.rpgengine.progression.RewardSettlement;
  * ledger entries that link every created unit to its source and announcing event, and equipment
  * changes. P10.3 adds {@link QuestChanges}: quest status rows, satisfied objectives and first visits,
  * each citing the plan event that announced it; a quest ending settles its item rewards through the
- * same plan's {@link Reward}s and {@link ItemPlan} creations. Preparation intents
+ * same plan's {@link Reward}s and {@link ItemPlan} creations. P10.4 adds {@link ConditionRemoval}s (a
+ * rest ends listed active conditions) and bounds the world clock: the plan's elapsed time may not exceed
+ * {@link WorldClock#MAX_STEP_SECONDS}. Preparation intents
  * (query-scope epoch bumps, critical preparation jobs and cited plan branches) are data
  * too; they commit or roll back with the world change that caused them.
  */
 public record ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources,
         List<Event> events, List<Reward> rewards, String receiptDetails, boolean narrationRequired,
         Preparation preparation, CommandIntent intent, List<Placement> placements, List<KnowledgeChange> knowledge,
-        ItemPlan items, QuestChanges quests) {
+        ItemPlan items, QuestChanges quests, List<ConditionRemoval> conditions) {
     /** Most events one plan may carry; the quest engine budgets its steps against what the command already used. */
     public static final int MAX_EVENTS = 128;
 
@@ -59,6 +62,13 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
         events = bounded(events, MAX_EVENTS, "events");
         rewards = bounded(rewards, 128, "rewards");
         knowledge = bounded(knowledge, 128, "knowledge");
+        conditions = bounded(conditions, 16, "conditions");
+        var removed = new HashSet<String>();
+        for (ConditionRemoval removal : conditions) {
+            if (!removed.add(removal.actorId() + "/" + removal.conditionId())) {
+                throw new IllegalArgumentException("duplicate condition removal");
+            }
+        }
         if (events.isEmpty()) {
             throw new IllegalArgumentException("a canonical commit requires an event");
         }
@@ -107,6 +117,15 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
             }
         }
         CanonicalValues.requireJsonObject(receiptDetails, "receiptDetails", 32_768);
+    }
+
+    /** Plan without condition removals, the shape used before P10.4. */
+    public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
+            List<Reward> rewards, String receiptDetails, boolean narrationRequired, Preparation preparation,
+            CommandIntent intent, List<Placement> placements, List<KnowledgeChange> knowledge, ItemPlan items,
+            QuestChanges quests) {
+        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, preparation, intent,
+                placements, knowledge, items, quests, List.of());
     }
 
     /** Plan without quest effects, the shape used before P10.3. */
@@ -183,15 +202,33 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
         }
     }
 
-    /** Resolved time/turn effects and the resulting mode/decision; null clears the decision. */
+    /**
+     * Resolved time/turn effects and the resulting mode/decision; null clears the decision. The elapsed time
+     * is the only way the committed world clock moves, and it is bounded per operation.
+     */
     public record WorldChange(boolean advancesTurn, long elapsedSeconds, CampaignMode mode, String pendingDecision) {
-        /** Reject negative duration, missing mode or an oversized/non-object decision. */
+        /** Reject negative or over-long duration (above one in-world day), missing mode or an oversized/non-object decision. */
         public WorldChange {
             CanonicalValues.requireNonNegative(elapsedSeconds, "elapsedSeconds");
+            if (elapsedSeconds > WorldClock.MAX_STEP_SECONDS) {
+                throw new IllegalArgumentException("elapsedSeconds exceeds the world clock step bound");
+            }
             Objects.requireNonNull(mode, "mode");
             if (pendingDecision != null) {
                 CanonicalValues.requireJsonObject(pendingDecision, "pendingDecision", 16_384);
             }
+        }
+    }
+
+    /**
+     * End one active condition of a participant, as a rest does. Whether the condition is active is read by
+     * the resolver under the campaign lock; the commit deletes the row and a missing row is a stale plan.
+     */
+    public record ConditionRemoval(UUID actorId, String conditionId) {
+        /** Reject a missing actor or malformed condition reference. */
+        public ConditionRemoval {
+            Objects.requireNonNull(actorId, "actorId");
+            CanonicalValues.requireText(conditionId, "conditionId", 256);
         }
     }
 

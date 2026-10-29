@@ -312,8 +312,8 @@ they change only through `CharacterService`, which checks the campaign's pinned
   and total hands at four even for a stray writer. Only an explicit `equipped: true` starting item is
   worn at creation.
 - **Conditions.** Application follows the definition's `none`, `refresh` or `stack` policy and its
-  `maxStacks`; elapsed rounds shorten durations and delete exhausted rows. Condition ticks, rest
-  removal and time passage are later work (P10.4, P11).
+  `maxStacks`; elapsed rounds shorten durations and delete exhausted rows. A rest removes the conditions its
+  policy lists (P10.4). Condition ticks over rounds and the effect of world time on durations are later work (P11).
 - **Abilities.** `learnAbility` checks the pinned skill ranks and prerequisite abilities against the
   actor's stored skills and learned abilities, then records rank 1 with the acquisition revision.
   Advancement of ranks, levels or attributes is a separate operation and is not offered.
@@ -345,6 +345,22 @@ only through an `ItemPlan` that a canonical commit applies beside the events tha
 - **Events (version 1).** `ITEM_USED`, `ITEM_CREATED` (internal when the recipient is not the player),
   `ITEM_TRANSFERRED`, `ITEM_TRADED`, `ITEM_EQUIPPED`, `ITEM_UNEQUIPPED`; resource effects of a use reuse
   `EFFECT_RESOLVED`. Receipts list the player's own item lines.
+
+### World clock, travel and rest (P10.4)
+
+`campaign.world_time_seconds` is the in-world clock: whole seconds since the campaign began, copied onto every
+event and checkpoint. V21 bounds it (at most 3,155,760,000, one hundred 365.25-day years) and lets it change
+only in an update that also advances `state_revision`, by at most 86,400 seconds
+([ADR 0026](adr/0026-bounded-world-clock-travel-duration-and-rest.md)). It is changed in exactly one place, the
+canonical commit, from the resolved plan's elapsed time; every read leaves it alone. `WorldClock` converts it to
+a calendar reading (day from 1, hour, minute, second) for presentation.
+
+- **Travel.** A location link's `minutes` is the elapsed time of a move along it. `ACTOR_MOVED` records `seconds`.
+- **Waiting.** At most four hours per command.
+- **Rest.** `REST` applies a pack `rest` policy: recovery per resource (clamped to the pool maximum), removal
+  of listed conditions through `ResolvedCommit.ConditionRemoval`, and one recorded percentile draw when the
+  policy can be interrupted. Events `REST_COMPLETED`/`REST_INTERRUPTED`, `RESOURCE_RECOVERED` and
+  `CONDITION_REMOVED` (version 1).
 
 ### Quests, visits and reward settlement (P10.3)
 

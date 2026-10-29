@@ -48,7 +48,9 @@ import tools.jackson.databind.json.JsonMapper;
  * that announce them, and the reward settlements of ended quests are persisted with the events so a
  * replayed source fails on the settlement's uniqueness; knowledge changes are written beside the events they cite, and after a registered player
  * intention the player's perception at its resulting location updates its last known locations
- * of other actors (P09.1); the query scopes both touch are bumped with the preparation scopes.
+ * of other actors (P09.1); the query scopes both touch are bumped with the preparation scopes. Condition
+ * removals of a rest (P10.4) are guarded by the row they delete; the clock itself moves only through the
+ * plan's bounded elapsed time and the V21 trigger that ties world time to a revision step.
  * This internal service has no controller, network port or callback.
  * Any validation, persistence, timeout or commit failure rolls back all its writes.
  */
@@ -234,6 +236,15 @@ public class CanonicalCommitService {
         InventoryWriter.applyWithin(jdbc, campaign.getId(), operation.getId(), counters.stateRevision(), firstSequence,
                 plan.items(), now);
         applyEquipment(plan.items(), rules, campaign, counters.stateRevision());
+        // A rest ends conditions it found active; a vanished row means the plan is stale and rolls back.
+        if (!plan.conditions().isEmpty()) {
+            var characters = new CharacterService(jdbc);
+            for (var removal : plan.conditions()) {
+                if (!characters.removeCondition(campaign.getId(), removal.actorId(), removal.conditionId())) {
+                    throw new IllegalStateException("stale condition removal");
+                }
+            }
+        }
         // Quest rows cite the same events by sequence; a stale row version or an ended quest throws and
         // rolls back everything, including the reward settlement and the units it created (P10.3).
         QuestWriter.applyWithin(jdbc, campaign.getId(), counters.stateRevision(), firstSequence, plan.quests());

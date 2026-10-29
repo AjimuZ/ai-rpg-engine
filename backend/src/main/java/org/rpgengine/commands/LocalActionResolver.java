@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 
@@ -23,6 +24,8 @@ import org.rpgengine.quests.QuestPlan;
 import org.rpgengine.quests.QuestRules;
 import org.rpgengine.quests.QuestStore;
 import org.rpgengine.rules.DeterministicDraw;
+import org.rpgengine.rules.RestRules;
+import org.rpgengine.rules.WorldClock;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -56,11 +59,18 @@ import tools.jackson.databind.node.ObjectNode;
  * invents a value: an attribute or resource that an expression reads but the save lacks is
  * a resolver failure ({@link IllegalStateException}), never a silent zero.
  *
- * <p>Provisional exploration timing until the world clock (P10.4): every action advances
- * the game turn once; {@code WAIT} advances world time by exactly the requested seconds and
- * movement, speech and ability use take no world time, because pinned links and abilities
- * declare no duration yet. Every action resolves to "no pending decision" (null), which also
- * clears the creation starting marker: the player may submit any registered intention next.
+ * <p>Time (P10.4): every action advances the game turn once. World time advances only by the
+ * duration the rules resolve, never by a query: {@code WAIT} adds exactly the requested seconds,
+ * {@code MOVE} adds the authored duration of the link it follows, {@code REST} adds its policy's
+ * duration (half of it when the recorded interruption draw interrupts it), and speech, abilities
+ * and item commands take no world time because they declare no duration. The rule gate has proved
+ * the step fits the bounded {@link WorldClock}; the step is at most one in-world day. Every action
+ * resolves to "no pending decision" (null), which also clears the creation starting marker: the
+ * player may submit any registered intention next.
+ *
+ * <p>Rest (P10.4): the pinned policy restores its resources up to each pool's maximum and, when not
+ * interrupted, ends the listed conditions the player has. An interruption is one recorded percentile
+ * draw; it halves the time and the restoration and removes no condition ({@link RestRules}).
  */
 final class LocalActionResolver {
     /** Receipt marker of this resolver; the player-safe projection trusts only receipts carrying it. */
@@ -114,10 +124,21 @@ final class LocalActionResolver {
      * @param operationId committing operation; seeds new item identities and ledger source keys
      * @param stacks every item stack held by a participant
      * @param stored stored quest rows with satisfied objectives, and the player's recorded visits (P10.3)
+     * @param worldTimeSeconds the committed world clock before this command (P10.4)
+     * @param conditions canonical IDs of the conditions currently active on the player (P10.4)
      */
     record Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
             Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
-            UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored) {
+            UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored, long worldTimeSeconds,
+            Set<String> conditions) {
+        /** Snapshot without clock and condition facts, the shape used before P10.4. */
+        Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
+                Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
+                UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored) {
+            this(player, location, playerRowVersion, attributes, skills, pools, vocabularies, operationId, stacks,
+                    stored, 0, Set.of());
+        }
+
         /** Snapshot without quest facts, the shape used before P10.3. */
         Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
                 Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
@@ -144,6 +165,10 @@ final class LocalActionResolver {
             Objects.requireNonNull(operationId, "operationId");
             stacks = List.copyOf(stacks);
             Objects.requireNonNull(stored, "stored");
+            if (worldTimeSeconds < 0 || worldTimeSeconds > WorldClock.END_SECONDS) {
+                throw new IllegalArgumentException("world time outside the bounded clock");
+            }
+            conditions = Set.copyOf(conditions);
         }
     }
 
@@ -159,10 +184,19 @@ final class LocalActionResolver {
      * @param items item mutations, created and consumed units and equipment changes
      * @param rewards one-time reward settlements of quests that ended in this resolution (P10.3)
      * @param quests quest status, objective and visit writes (P10.3)
+     * @param conditions conditions a rest ends (P10.4)
      */
     record Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
             List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
-            List<String> queryScopes, ItemPlan items, List<ResolvedCommit.Reward> rewards, QuestChanges quests) {
+            List<String> queryScopes, ItemPlan items, List<ResolvedCommit.Reward> rewards, QuestChanges quests,
+            List<ResolvedCommit.ConditionRemoval> conditions) {
+        /** Resolution without condition removals, the shape used before P10.4. */
+        Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
+                List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
+                List<String> queryScopes, ItemPlan items, List<ResolvedCommit.Reward> rewards, QuestChanges quests) {
+            this(world, resources, placements, events, receiptDetails, queryScopes, items, rewards, quests, List.of());
+        }
+
         /** Resolution without quest effects, the shape used before P10.3. */
         Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
                 List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
@@ -206,6 +240,8 @@ final class LocalActionResolver {
         private final List<ResolvedCommit.Reward> rewards = new ArrayList<>();
         private final ArrayNode questLines = JSON.createArrayNode();
         private QuestChanges questChanges = QuestChanges.NONE;
+        private final List<ResolvedCommit.ConditionRemoval> removals = new ArrayList<>();
+        private long elapsed;
         private final InventoryModel inventory;
         private int nextOrdinal;
         private int nextInstance;
@@ -226,7 +262,6 @@ final class LocalActionResolver {
 
         /** Dispatch on the closed intention vocabulary, then assemble the effect set. */
         Resolution resolve(TypedCommand command, CommandRuleCatalog catalog) {
-            long elapsed = 0;
             details.put("resolver", RESOLVER);
             details.put("commandType", command.type());
             details.put("actorId", snapshot.player().toString());
@@ -237,12 +272,20 @@ final class LocalActionResolver {
                     }
                     placements.add(new ResolvedCommit.Placement(snapshot.player(), snapshot.playerRowVersion(),
                             move.destinationId()));
+                    // The authored duration of the link followed; the rule gate proved the link exists.
+                    var origin = Objects.requireNonNull(catalog, "catalog").locations().get(snapshot.location());
+                    if (origin == null) {
+                        throw new IllegalStateException("validated movement origin is missing from the pinned catalog");
+                    }
+                    elapsed = origin.travelSeconds(move.destinationId());
                     var location = details.putObject("location");
                     location.put("from", snapshot.location());
                     location.put("to", move.destinationId());
+                    location.put("seconds", elapsed);
                     event("ACTOR_MOVED", EventVisibility.PUBLIC, payload()
                             .put("actorId", snapshot.player().toString())
-                            .put("from", snapshot.location()).put("to", move.destinationId()));
+                            .put("from", snapshot.location()).put("to", move.destinationId())
+                            .put("seconds", elapsed));
                 }
                 case TypedCommand.Wait wait -> {
                     elapsed = wait.seconds();
@@ -255,6 +298,7 @@ final class LocalActionResolver {
                             .put("recipientActorId", speech.recipientActorId().toString())
                             .put("text", speech.text()));
                 }
+                case TypedCommand.Rest rest -> rest(rest, Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.UseAbility use -> ability(use, Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.UseItem use -> useItem(use, Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.EquipItem equip -> wear(equip.itemInstanceId(), true,
@@ -269,6 +313,8 @@ final class LocalActionResolver {
                 case TypedCommand.ResumeQuest resume -> details.put("questId", resume.questId());
             }
             quests(command, catalog);
+            // Defence in depth: the rule gate bounded the step; the clock itself is bounded again at commit.
+            elapsed = WorldClock.advance(snapshot.worldTimeSeconds(), elapsed) - snapshot.worldTimeSeconds();
             details.put("elapsedSeconds", elapsed);
             details.put("turnAdvanced", true);
             details.putNull("pendingDecision");
@@ -283,10 +329,11 @@ final class LocalActionResolver {
             var scopes = new TreeSet<String>();
             resources.forEach(change -> scopes.add(scope(owner(change.resourceId()))));
             placements.forEach(placement -> scopes.add(scope(placement.actorId())));
+            removals.forEach(removal -> scopes.add(scope(removal.actorId())));
             scopes.addAll(InventoryWriter.scopes(items));
             return new Resolution(new ResolvedCommit.WorldChange(true, elapsed, CampaignMode.EXPLORATION, null),
                     resources, List.copyOf(placements), List.copyOf(events), JSON.writeValueAsString(details),
-                    List.copyOf(scopes), items, List.copyOf(rewards), questChanges);
+                    List.copyOf(scopes), items, List.copyOf(rewards), questChanges, List.copyOf(removals));
         }
 
         /**
@@ -318,6 +365,9 @@ final class LocalActionResolver {
                 @Override public boolean visited(String location) { return visited.contains(location); }
 
                 @Override public long possessed(String item) { return inventory.total(snapshot.player(), item); }
+
+                // The clock as it reads once this command's own duration has passed.
+                @Override public long worldTime() { return snapshot.worldTimeSeconds() + elapsed; }
 
                 @Override
                 public void grant(String item, int quantity) {
@@ -426,6 +476,65 @@ final class LocalActionResolver {
                         .put("recipientActorId", snapshot.player().toString()).put("definitionId", reward.item())
                         .put("quantity", reward.quantity()).put("sourceKey", source));
                 line("CREATED", reward.item(), null, reward.quantity());
+            }
+        }
+
+        /**
+         * Rest under a pinned policy. One recorded percentile draw decides interruption when the policy can
+         * be interrupted; then each restored pool rises by the policy amount (halved when interrupted) up to
+         * its maximum, and an uninterrupted rest ends every listed condition the player has. One event
+         * announces the rest, then one event per changed pool and per ended condition. The time the rest takes
+         * becomes the command's elapsed world time.
+         */
+        private void rest(TypedCommand.Rest command, CommandRuleCatalog catalog) {
+            var policy = catalog.rests().get(command.restId());
+            if (policy == null) {
+                throw new IllegalStateException("validated rest policy is missing from the pinned catalog");
+            }
+            boolean interrupted = false;
+            var rest = details.putObject("rest");
+            rest.put("restId", command.restId());
+            var announced = payload().put("actorId", snapshot.player().toString()).put("restId", command.restId());
+            if (policy.interruptible()) {
+                int ordinal = nextOrdinal++;
+                int draw = draws.value(ordinal, RestRules.INTERRUPTION_SIDES);
+                if (draw < 1 || draw > RestRules.INTERRUPTION_SIDES) {
+                    throw new IllegalStateException("draw outside its bound");
+                }
+                interrupted = RestRules.interrupted(policy, draw);
+                rest.put("drawOrdinal", ordinal);
+                announced.put("drawOrdinal", ordinal);
+            }
+            elapsed = RestRules.elapsedSeconds(policy, interrupted);
+            rest.put("interrupted", interrupted);
+            rest.put("seconds", elapsed);
+            announced.put("interrupted", interrupted).put("seconds", elapsed);
+            event(interrupted ? "REST_INTERRUPTED" : "REST_COMPLETED", EventVisibility.PUBLIC, announced);
+            for (var restores : policy.restores().entrySet()) {
+                Pool pool = pool(snapshot.player(), restores.getKey());
+                if (pool == null) {
+                    continue;
+                }
+                long before = value(snapshot.player(), restores.getKey());
+                long added = RestRules.restored(restores.getValue(), interrupted, pool.maximum() - before);
+                if (added == 0) {
+                    continue;
+                }
+                values.get(snapshot.player()).put(restores.getKey(), before + added);
+                event("RESOURCE_RECOVERED", EventVisibility.PUBLIC, payload()
+                        .put("actorId", snapshot.player().toString()).put("resourceKey", restores.getKey())
+                        .put("amount", added).put("before", before).put("after", before + added));
+            }
+            if (!interrupted) {
+                var ended = rest.putArray("conditionsEnded");
+                for (String condition : policy.removes()) {
+                    if (snapshot.conditions().contains(condition)) {
+                        removals.add(new ResolvedCommit.ConditionRemoval(snapshot.player(), condition));
+                        ended.add(condition);
+                        event("CONDITION_REMOVED", EventVisibility.PUBLIC, payload()
+                                .put("actorId", snapshot.player().toString()).put("conditionId", condition));
+                    }
+                }
             }
         }
 

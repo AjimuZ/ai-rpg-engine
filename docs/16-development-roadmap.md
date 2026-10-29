@@ -2495,6 +2495,25 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     at the next evaluating command; no live V20 dump and restore rehearsal ran; the 18 Docker-dependent probe cases
     and the `unzip` wrapper cases are not proven in this container.
 - [ ] P10.4 Implement movement duration, rest, and a bounded world clock without time advancement on queries.
+  - Package A — pure rules (`org.rpgengine.rules`): `WorldClock` (bounds: one in-world day per operation, a
+    four-hour legal wait, a clock end at 3,155,760,000 seconds; calendar reading; quest units) and `RestRules`
+    (policy value, interruption from a recorded draw, elapsed time, clamped and halved restoration).
+  - Package B — pack contract: location link `minutes` (0..1,440, default 0), `rule` type `rest` (policies with
+    duration, optional location tag, interruption chance, restores, removed conditions; validated after the
+    resource vocabulary) and the world-scope quest atom `worldTime` (seconds, minutes, hours, days).
+  - Package C — persistence (`V21`, no new table): the clock is bounded on `campaign` and `campaign_event`, and
+    the `campaign_world_time_step` trigger lets it change only together with a state-revision step, by at most
+    one day, so no read or stray writer can advance it. Backup tool schema 21.
+  - Package D — commands: `REST` (names a policy only), refusals `TIME_ILLEGAL` and `REST_UNAVAILABLE` (HTTP 422),
+    `CommandRules` bounds wait and every duration, `LocalActionResolver` sets elapsed time per command, resolves
+    a rest (one draw when interruptible) and feeds the clock to the quest engine; `ResolvedCommit` carries typed
+    `ConditionRemoval`s and bounds the step; `WAIT` loads the catalog when available.
+  - Package E — surfaces and docs: `ACTOR_MOVED` states its duration, `REST_COMPLETED`/`REST_INTERRUPTED`,
+    `RESOURCE_RECOVERED` and `CONDITION_REMOVED` with EN/IT narration, a `rest` receipt summary, two reviewed
+    frontend messages (355 in the catalog), ADR 0026, docs 05/07/09/10/13, backend README, CHANGELOG.
+  - Limits: no panel or journal shows the clock (P10.5); a rest is interrupted by a draw, not an encounter
+    (P11); condition durations are rounds, so waiting and rest do not tick them; no faction or event clocks or
+    bounded catch-up (P15.2); one link per move; no live V21 dump and restore rehearsal.
 - [ ] P10.5 Integrate reliable state changes into panels and journal.
 
 **Exit:** a coherent noncombat adventure loop uses actual resources, abilities, and objectives. **Checks:** QA-09's shared state preparation, QA-10, quests/rewards, time and rest bounds. **Suggested commit:** `Add reusable character inventory and quest systems`.

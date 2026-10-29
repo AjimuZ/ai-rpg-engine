@@ -14,6 +14,8 @@ import org.rpgengine.content.CampaignPackSnapshot;
 import org.rpgengine.content.CompiledPack;
 import org.rpgengine.content.Definition;
 import org.rpgengine.quests.QuestRules;
+import org.rpgengine.rules.RestRules;
+import org.rpgengine.rules.WorldClock;
 
 /**
  * Compact immutable projection of the pinned rule facts that command validation and local
@@ -45,14 +47,18 @@ import org.rpgengine.quests.QuestRules;
  *        and the equipment vocabularies the equip and unequip commands check against (P10.1)
  * @param quests the prose-free quest rules of the closure: discovery and objective predicates, outcomes and
  *        item rewards (P10.3)
+ * @param rests rest policies keyed by canonical ID: duration, location tag, interruption chance, restored
+ *        resources and removed conditions (P10.4)
  */
 record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
         Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
-        Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests) {
+        Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests,
+        Map<String, RestRules.Policy> rests) {
     /** Freeze every index; null parts are construction bugs and fail immediately. */
     CommandRuleCatalog {
         Objects.requireNonNull(revisionId, "revisionId");
         Objects.requireNonNull(quests, "quests");
+        rests = Map.copyOf(rests);
         items = Map.copyOf(items);
         Objects.requireNonNull(characters, "characters");
         locations = Map.copyOf(locations);
@@ -60,6 +66,14 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         resourceVocabularies = Map.copyOf(resourceVocabularies);
         actorPacks = Map.copyOf(actorPacks);
         abilities = Map.copyOf(abilities);
+    }
+
+    /** Catalog without rest policies, the shape used before P10.4. */
+    CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
+            Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
+            Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests) {
+        this(revisionId, locations, actorDefinitions, resourceVocabularies, actorPacks, abilities, items, characters,
+                quests, Map.of());
     }
 
     /** Catalog without quest rules, the shape used before P10.3. */
@@ -93,6 +107,7 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         var origins = new HashMap<String, String>();
         var abilities = new HashMap<String, Ability>();
         var items = new HashMap<String, ItemRule>();
+        var rests = new HashMap<String, RestRules.Policy>();
         for (CompiledPack pack : snapshot.packs().values()) {
             String packId = pack.parsed().manifest().id();
             for (Definition definition : pack.definitions()) {
@@ -103,12 +118,28 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
                         // Only links the author marked accessible are traversable; a blocked
                         // link is a known route that the player cannot currently use.
                         var reachable = new LinkedHashSet<String>();
+                        var minutes = new HashMap<String, Integer>();
                         for (Map<?, ?> link : objects(data.get("links"))) {
                             if (Boolean.TRUE.equals(link.get("accessible"))) {
-                                reachable.add(snapshot.resolve(pack, (String) link.get("to"), "location").id());
+                                String destination = snapshot.resolve(pack, (String) link.get("to"), "location").id();
+                                reachable.add(destination);
+                                minutes.put(destination, number(link.get("minutes"), 0));
                             }
                         }
-                        locations.put(id, new Location(disclosed(data), reachable));
+                        var tags = new LinkedHashSet<String>();
+                        if (data.get("tags") instanceof List<?> declared) {
+                            declared.forEach(tag -> tags.add((String) tag));
+                        }
+                        locations.put(id, new Location(disclosed(data), reachable, minutes, tags));
+                    }
+                    case "rule" -> {
+                        if ("rest".equals(data.get("ruleType"))) {
+                            for (Map<?, ?> policy : objects(data.get("policies"))) {
+                                String policyId = pack == snapshot.root() ? (String) policy.get("id")
+                                        : packId + "#" + policy.get("id");
+                                rests.put(policyId, rest(snapshot, pack, policy));
+                            }
+                        }
                     }
                     case "npc" -> {
                         actors.put(id, disclosed(data));
@@ -128,7 +159,27 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
             }
         }
         return new CommandRuleCatalog(revisionId, locations, actors, vocabularies, origins, abilities, items,
-                CharacterRuleCatalog.from(snapshot), QuestRules.from(snapshot));
+                CharacterRuleCatalog.from(snapshot), QuestRules.from(snapshot), rests);
+    }
+
+    /**
+     * Read one validated rest policy. Condition references are canonicalized like every other
+     * cross-reference; resource keys stay unqualified because they belong to the declaring pack.
+     */
+    private static RestRules.Policy rest(CampaignPackSnapshot snapshot, CompiledPack pack, Map<?, ?> policy) {
+        var restores = new HashMap<String, Integer>();
+        for (Map<?, ?> restored : objects(policy.get("restores"))) {
+            restores.put((String) restored.get("resource"), number(restored.get("amount"), 0));
+        }
+        var removes = new ArrayList<String>();
+        if (policy.get("removesConditions") instanceof List<?> conditions) {
+            for (Object condition : conditions) {
+                removes.add(snapshot.resolve(pack, (String) condition, "condition").id());
+            }
+        }
+        return new RestRules.Policy(pack.parsed().manifest().id(), number(policy.get("minutes"), 1),
+                (String) policy.get("locationTag"), number(policy.get("interruptionChancePercent"), 0), restores,
+                removes);
     }
 
     /**
@@ -196,10 +247,27 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
      *
      * @param disclosed false when the author marked the location's knowledge as secret
      * @param accessibleLinks canonical destinations reachable by one ordinary move
+     * @param travelMinutes minutes a move to each accessible destination takes; a missing entry is zero
+     * @param tags location tags, which rest policies and later rules may require
      */
-    record Location(boolean disclosed, Set<String> accessibleLinks) {
-        /** Freeze the link set. */
-        Location { accessibleLinks = Set.copyOf(accessibleLinks); }
+    record Location(boolean disclosed, Set<String> accessibleLinks, Map<String, Integer> travelMinutes,
+            Set<String> tags) {
+        /** Freeze the link and tag collections. */
+        Location {
+            accessibleLinks = Set.copyOf(accessibleLinks);
+            travelMinutes = Map.copyOf(travelMinutes);
+            tags = Set.copyOf(tags);
+        }
+
+        /** Location with instantaneous links and no tags, the shape used before P10.4. */
+        Location(boolean disclosed, Set<String> accessibleLinks) {
+            this(disclosed, accessibleLinks, Map.of(), Set.of());
+        }
+
+        /** @return seconds a move to the destination takes; zero for an instantaneous or unknown link */
+        long travelSeconds(String destination) {
+            return WorldClock.seconds(travelMinutes.getOrDefault(destination, 0));
+        }
     }
 
     /**

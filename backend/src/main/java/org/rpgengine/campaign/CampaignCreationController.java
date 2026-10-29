@@ -292,6 +292,8 @@ public class CampaignCreationController {
             case QUANTITY_ILLEGAL -> error(422, "COMMAND_QUANTITY_ILLEGAL");
             case TRADE_REFUSED -> error(422, "COMMAND_TRADE_REFUSED");
             case QUEST_UNAVAILABLE -> error(422, "COMMAND_QUEST_UNAVAILABLE");
+            case TIME_ILLEGAL -> error(422, "COMMAND_TIME_ILLEGAL");
+            case REST_UNAVAILABLE -> error(422, "COMMAND_REST_UNAVAILABLE");
         };
     }
 

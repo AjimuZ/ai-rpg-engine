@@ -16,6 +16,7 @@ import org.hibernate.type.SqlTypes;
 import org.rpgengine.content.ContentRevision;
 import org.rpgengine.persistence.CanonicalValues;
 import org.rpgengine.persistence.VersionedEntity;
+import org.rpgengine.rules.WorldClock;
 
 /**
  * Campaign aggregate root (docs/05 section 2): one playthrough of exactly one adventure,
@@ -105,7 +106,8 @@ public class Campaign extends VersionedEntity {
      * Apply a resolved world's counters, mode and decision within the canonical commit.
      * Inputs are the exact base revision, resolved turn/time effects, positive event
      * count and new decision (null clears it). Returns the new counters. Rejects stale
-     * revisions, malformed values or arithmetic overflow before changing this entity.
+     * revisions, malformed values, arithmetic overflow, an elapsed time above one in-world day or
+     * one that would pass the end of the bounded world clock before changing this entity.
      * The caller must persist events, journal and outbox in the same transaction.
      */
     public CampaignCounters commitWorld(long expectedRevision, boolean advancesTurn, long elapsedSeconds,
@@ -114,6 +116,9 @@ public class Campaign extends VersionedEntity {
             throw new IllegalStateException("stale campaign revision");
         }
         CanonicalValues.requireNonNegative(elapsedSeconds, "elapsedSeconds");
+        if (!WorldClock.fits(counters.worldTimeSeconds(), elapsedSeconds)) {
+            throw new IllegalArgumentException("elapsedSeconds outside the bounded world clock");
+        }
         CanonicalValues.requirePositive(eventCount, "eventCount");
         Objects.requireNonNull(nextMode, "nextMode");
         if (nextDecision != null) {

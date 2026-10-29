@@ -13,6 +13,8 @@ import org.rpgengine.knowledge.KnowledgeLedger;
 import org.rpgengine.knowledge.KnowledgeRefs;
 import org.rpgengine.quests.QuestStatus;
 import org.rpgengine.quests.QuestStore;
+import org.rpgengine.rules.RestRules;
+import org.rpgengine.rules.WorldClock;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -47,11 +49,17 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       pinned, non-secret quest whose stored status (or initial status, when it has no row) is
  *       {@code available}, {@code active} and {@code suspended} respectively. An unknown, undiscovered,
  *       hidden or ended quest, and any other status, share one category ({@code QUEST_UNAVAILABLE}).</li>
+ *   <li><b>Time and rest (P10.4)</b> — a wait is at most four hours, and every duration (travel along an
+ *       authored link, waiting, a rest policy's full length) must fit the bounded clock. {@code REST} names a
+ *       pinned policy whose required location tag the player's location carries and whose resource vocabulary
+ *       is the player's, otherwise the one {@code REST_UNAVAILABLE} category applies.</li>
  *   <li><b>Causal attribution</b> — at commit, resolved effects may only touch the participants
  *       this intention lawfully involves ({@link #requireAttributed}).</li>
  * </ul>
- * {@code WAIT} has no additional rule here; its legal duration belongs to the world clock
- * (P10.4). {@link LocalActionResolver} calculates the effects of an intention that passed here.
+ * {@code WAIT} is legal up to {@link WorldClock#MAX_WAIT_SECONDS}; {@code MOVE}, {@code WAIT} and
+ * {@code REST} must also fit what is left of the bounded world clock ({@code TIME_ILLEGAL}). {@code REST}
+ * needs a pinned rest policy the player can take here ({@code REST_UNAVAILABLE}, P10.4).
+ * {@link LocalActionResolver} calculates the effects of an intention that passed here.
  * A reveal is a typed knowledge record ({@link KnowledgeLedger#revealedTo}): a current TRUE
  * {@code EXISTS} claim about the location or actor that is common knowledge or that the player
  * KNOWS or BELIEVES. Free-text {@code campaign_known_fact} rows, rumors and suspicions never reveal.
@@ -91,7 +99,8 @@ final class CommandRules {
         participants.add(player);
         switch (command) {
             case TypedCommand.Move move -> check.reachable(move.destinationId());
-            case TypedCommand.Wait ignored -> { }
+            case TypedCommand.Wait wait -> check.waitable(wait.seconds());
+            case TypedCommand.Rest rest -> check.rest(rest.restId());
             case TypedCommand.Speak speech -> {
                 if (speech.recipientActorId().equals(player)) {
                     throw fail(OperationAdmissionFailure.Kind.ACTOR_UNAVAILABLE);
@@ -162,6 +171,11 @@ final class CommandRules {
         }
         for (var creation : plan.items().creations()) {
             if (!participants.contains(creation.recipientId())) {
+                throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
+            }
+        }
+        for (var removal : plan.conditions()) {
+            if (!participants.contains(removal.actorId())) {
                 throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
             }
         }
@@ -334,6 +348,48 @@ final class CommandRules {
                     || (!target.disclosed() && !KnowledgeLedger.revealedTo(jdbc, campaign, player,
                             KnowledgeRefs.location(destination)))) {
                 throw fail(OperationAdmissionFailure.Kind.DESTINATION_UNAVAILABLE);
+            }
+            // The journey's authored duration must fit what is left of the bounded clock.
+            timeFits(origin.travelSeconds(destination));
+        }
+
+        /**
+         * A wait is legal up to {@link WorldClock#MAX_WAIT_SECONDS}; anything longer is a rest or a journey,
+         * which declare their own duration. It must also fit what is left of the bounded clock.
+         */
+        void waitable(long seconds) {
+            if (seconds > WorldClock.MAX_WAIT_SECONDS) {
+                throw fail(OperationAdmissionFailure.Kind.TIME_ILLEGAL);
+            }
+            timeFits(seconds);
+        }
+
+        /**
+         * A rest names a pinned policy that the player can take here: any required location tag is present,
+         * the policy's resource vocabulary is the player's (only needed when it restores a resource), and its
+         * full duration fits the clock. An interrupted rest takes less time, so the full duration is the bound.
+         */
+        void rest(String restId) {
+            var policy = catalog().rests().get(restId);
+            String current = here();
+            if (policy == null || current == null) {
+                throw fail(OperationAdmissionFailure.Kind.REST_UNAVAILABLE);
+            }
+            var location = catalog().locations().get(current);
+            if (policy.locationTag() != null && (location == null || !location.tags().contains(policy.locationTag()))) {
+                throw fail(OperationAdmissionFailure.Kind.REST_UNAVAILABLE);
+            }
+            if (!policy.restores().isEmpty() && !policy.pack().equals(vocabulary())) {
+                throw fail(OperationAdmissionFailure.Kind.REST_UNAVAILABLE);
+            }
+            timeFits(RestRules.elapsedSeconds(policy, false));
+        }
+
+        /** Fail with {@code TIME_ILLEGAL} unless the campaign's committed clock can take the step. */
+        private void timeFits(long seconds) {
+            long now = jdbc.queryForObject("select world_time_seconds from campaign where id = ?", Long.class, campaign);
+            if (!WorldClock.fits(now, seconds)) {
+                throw fail(OperationAdmissionFailure.Kind.TIME_ILLEGAL);
             }
         }
 

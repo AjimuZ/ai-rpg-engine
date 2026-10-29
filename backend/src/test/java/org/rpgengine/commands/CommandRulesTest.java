@@ -331,7 +331,9 @@ class CommandRulesTest {
     /** The rule-fact loader authorizes scope first, retains no prose and binds a catalog to one revision. */
     @Test
     void ruleCatalogIsScopedProseFreeAndRevisionBound() {
-        assertSame(CommandRuleCatalogs.Content.UNAVAILABLE, catalogs.preload(owner, adventure, campaign, "WAIT"));
+        // A wait loads the catalog since P10.4 (clock-driven quests), though it needs no definition to be legal.
+        assertNotNull(catalogs.preload(owner, adventure, campaign, "WAIT").catalog());
+        assertSame(CommandRuleCatalogs.Content.UNAVAILABLE, catalogs.preload(owner, adventure, campaign, "UNREGISTERED"));
         assertSame(CommandRuleCatalogs.Content.UNAVAILABLE, catalogs.preload(UUID.randomUUID(), adventure, campaign, "MOVE"));
         assertSame(CommandRuleCatalogs.Content.UNAVAILABLE, catalogs.preload(owner, UUID.randomUUID(), campaign, "MOVE"));
         var content = catalogs.preload(owner, adventure, campaign, "USE_ABILITY");

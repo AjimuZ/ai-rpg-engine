@@ -131,6 +131,74 @@ class LocalActionResolverTest {
         assertEquals(PLAYER.toString(), payload(self, 1).path("outcomes").get(0).path("actorId").asString());
     }
 
+    /** Movement adds the authored duration of its link, stays within the clock and needs the pinned origin. */
+    @Test
+    void movementTakesTheDurationOfItsLink() {
+        var move = LocalActionResolver.resolve(new TypedCommand.Move("grove"), snapshot(), places(45), (o, s) -> 1);
+        assertEquals(2_700, move.world().elapsedSeconds());
+        assertEquals(2_700, JSON.readTree(move.events().getFirst().body().payload()).path("seconds").asLong());
+        assertEquals(2_700, details(move).path("elapsedSeconds").asLong());
+        assertEquals(2_700, details(move).path("location").path("seconds").asLong());
+        // The clock is bounded again where time is resolved: a defect cannot carry the world past its end.
+        var late = snapshotAt(org.rpgengine.rules.WorldClock.END_SECONDS - 10, Set.of());
+        assertThrows(IllegalArgumentException.class,
+                () -> LocalActionResolver.resolve(new TypedCommand.Move("grove"), late, places(45), (o, s) -> 1));
+        assertThrows(NullPointerException.class,
+                () -> LocalActionResolver.resolve(new TypedCommand.Move("grove"), snapshot(), null, (o, s) -> 1));
+        assertThrows(IllegalStateException.class, () -> LocalActionResolver.resolve(new TypedCommand.Move("grove"),
+                snapshot(), new CommandRuleCatalog(UUID.randomUUID(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of()),
+                (o, s) -> 1));
+    }
+
+    /**
+     * A rest follows its recorded interruption draw: a draw at or under the chance halves the time and the
+     * restoration and ends no condition, any other draw runs to the end. A policy that cannot be interrupted
+     * reserves no draw.
+     */
+    @Test
+    void restFollowsItsRecordedDraw() {
+        var requested = new ArrayList<int[]>();
+        var cut = LocalActionResolver.resolve(new TypedCommand.Rest("camp"), snapshotAt(1_000, Set.of("dazed", "rattled")),
+                restCatalog(), (ordinal, sides) -> {
+                    requested.add(new int[] {ordinal, sides});
+                    return 40;
+                });
+        assertEquals(List.of(List.of(0, 100)), requested.stream().map(pair -> List.of(pair[0], pair[1])).toList());
+        assertEquals(14_400, cut.world().elapsedSeconds());
+        assertEquals(List.of("REST_INTERRUPTED", "RESOURCE_RECOVERED"),
+                cut.events().stream().map(event -> event.body().eventType()).toList());
+        // Vigor 3 of 8 gains half of 6, and no condition ends.
+        assertEquals(List.of(new ResolvedCommit.ResourceChange(VIGOR, 7, 3)), cut.resources());
+        assertTrue(cut.conditions().isEmpty());
+        var rest = details(cut).path("rest");
+        assertTrue(rest.path("interrupted").asBoolean());
+        assertEquals(0, rest.path("drawOrdinal").asInt());
+        assertEquals(List.of("actor:" + PLAYER), cut.queryScopes());
+
+        var full = LocalActionResolver.resolve(new TypedCommand.Rest("camp"), snapshotAt(1_000, Set.of("dazed", "rattled")),
+                restCatalog(), (ordinal, sides) -> 41);
+        assertEquals(28_800, full.world().elapsedSeconds());
+        assertEquals(List.of("REST_COMPLETED", "RESOURCE_RECOVERED", "CONDITION_REMOVED"),
+                full.events().stream().map(event -> event.body().eventType()).toList());
+        // The five missing units fit below the maximum of 8: the six declared units are clamped.
+        assertEquals(List.of(new ResolvedCommit.ResourceChange(VIGOR, 7, 5)), full.resources());
+        assertEquals(List.of(new ResolvedCommit.ConditionRemoval(PLAYER, "dazed")), full.conditions());
+        assertFalse(details(full).path("rest").path("interrupted").asBoolean());
+        assertEquals("[\"dazed\"]", details(full).path("rest").path("conditionsEnded").toString());
+
+        // A policy that cannot be interrupted never touches the draw source.
+        var calm = LocalActionResolver.resolve(new TypedCommand.Rest("calm"), snapshotAt(0, Set.of()), restCatalog(),
+                (ordinal, sides) -> {
+                    throw new AssertionError("no draw expected");
+                });
+        assertEquals(600, calm.world().elapsedSeconds());
+        assertFalse(details(calm).path("rest").has("drawOrdinal"));
+        // Restoring a pool that is not the player's vocabulary key changes nothing and is not an error.
+        assertTrue(calm.conditions().isEmpty());
+        assertEquals(new ResolvedCommit.WorldChange(true, 600, org.rpgengine.campaign.CampaignMode.EXPLORATION, null),
+                calm.world());
+    }
+
     /** Missing attributes, foreign draws and stale premises fail closed instead of reading zero. */
     @Test
     void failsClosedOnUnknownValuesAndBadDraws() {
@@ -151,12 +219,13 @@ class LocalActionResolverTest {
     /** Exploration intentions produce exact placements, durations, events and the cleared decision. */
     @Test
     void resolvesMovementWaitingAndSpeech() {
-        var move = LocalActionResolver.resolve(new TypedCommand.Move("grove"), snapshot(), null, (o, s) -> 1);
+        // An instantaneous link: the pack declared no travel time.
+        var move = LocalActionResolver.resolve(new TypedCommand.Move("grove"), snapshot(), places(0), (o, s) -> 1);
         assertEquals(List.of(new ResolvedCommit.Placement(PLAYER, 4, "grove")), move.placements());
         assertEquals(new ResolvedCommit.WorldChange(true, 0, org.rpgengine.campaign.CampaignMode.EXPLORATION, null),
                 move.world());
         assertEquals("ACTOR_MOVED", move.events().getFirst().body().eventType());
-        assertEquals("{\"actorId\":\"" + PLAYER + "\",\"from\":\"trailhead\",\"to\":\"grove\"}",
+        assertEquals("{\"actorId\":\"" + PLAYER + "\",\"from\":\"trailhead\",\"to\":\"grove\",\"seconds\":0}",
                 move.events().getFirst().body().payload());
         assertEquals(List.of("actor:" + PLAYER), move.queryScopes());
         var wait = LocalActionResolver.resolve(new TypedCommand.Wait(90), snapshot(), null, (o, s) -> 1);
@@ -190,6 +259,31 @@ class LocalActionResolverTest {
         var catalog = new CommandRuleCatalog(UUID.randomUUID(), Map.of(), Map.of(), Map.of(), Map.of(),
                 Map.of("subject", ability));
         return LocalActionResolver.resolve(new TypedCommand.UseAbility("subject", targets), snapshot(), catalog, draws);
+    }
+
+    /** Catalog with one link from the trailhead to the grove that takes the given minutes. */
+    private static CommandRuleCatalog places(int minutes) {
+        return new CommandRuleCatalog(UUID.randomUUID(), Map.of("trailhead",
+                new CommandRuleCatalog.Location(true, Set.of("grove"), Map.of("grove", minutes), Set.of())),
+                Map.of(), Map.of(), Map.of(), Map.of());
+    }
+
+    /** Catalog with two rest policies of pack:a: an interruptible camp and a calm short rest. */
+    private static CommandRuleCatalog restCatalog() {
+        var camp = new org.rpgengine.rules.RestRules.Policy("pack:a", 480, null, 40, Map.of("vigor", 6, "ghost", 2),
+                List.of("dazed"));
+        var calm = new org.rpgengine.rules.RestRules.Policy("pack:a", 10, null, 0, Map.of("ghost", 1), List.of());
+        return new CommandRuleCatalog(UUID.randomUUID(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(),
+                new org.rpgengine.characters.CharacterRuleCatalog(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of()),
+                org.rpgengine.quests.QuestRules.NONE, Map.of("camp", camp, "calm", calm));
+    }
+
+    /** The standard snapshot with a given world clock and the player's active conditions. */
+    private static LocalActionResolver.Snapshot snapshotAt(long clock, Set<String> conditions) {
+        var base = snapshot();
+        return new LocalActionResolver.Snapshot(base.player(), base.location(), base.playerRowVersion(),
+                base.attributes(), base.skills(), base.pools(), base.vocabularies(), base.operationId(), base.stacks(),
+                base.stored(), clock, conditions);
     }
 
     /** Player at trailhead with vigor 3/8 and focus 5/10; the ally shares pack:a, the stranger uses pack:b. */

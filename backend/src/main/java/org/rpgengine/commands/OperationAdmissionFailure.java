@@ -111,6 +111,16 @@ public final class OperationAdmissionFailure extends RuntimeException {
          * resume {@code suspended}). One category avoids confirming that an undiscovered quest exists
          * (HTTP 422, P10.3).
          */
-        QUEST_UNAVAILABLE
+        QUEST_UNAVAILABLE,
+        /**
+         * The requested time cannot pass: a wait longer than the legal wait, or a duration (waiting, travel
+         * or rest) that would carry the bounded world clock past its end (HTTP 422, P10.4).
+         */
+        TIME_ILLEGAL,
+        /**
+         * The named rest policy does not exist, cannot be taken at the player's location (a required location
+         * tag is missing), or belongs to a vocabulary the player's resources do not use (HTTP 422, P10.4).
+         */
+        REST_UNAVAILABLE
     }
 }

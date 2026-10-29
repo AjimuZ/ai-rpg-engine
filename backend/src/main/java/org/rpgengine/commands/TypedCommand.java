@@ -14,7 +14,9 @@ import org.rpgengine.content.PackTextParser;
  * Exploration currently admits movement, waiting, addressed speech, use of a learned
  * ability and, since P10.2, using, equipping, unequipping, giving and trading item instances the
  * player holds. Since P10.3 the player can also accept, suspend and resume a quest by its stable
- * identity; every other quest transition is derived by the engine from committed facts. Encounter intentions must acquire explicit contracts and validators before
+ * identity; every other quest transition is derived by the engine from committed facts. Since P10.4 the
+ * player can also rest under a pack-declared rest policy; its duration, interruption and recovery are
+ * rule data, never part of the intention. Encounter intentions must acquire explicit contracts and validators before
  * registration; unknown types fail closed. Structural decoding here
  * is followed by current-state rule validation in {@link CommandRules}; resolution
  * remains backend-owned (P07.4). Every value is immutable and can reproduce its exact
@@ -23,7 +25,8 @@ import org.rpgengine.content.PackTextParser;
 public sealed interface TypedCommand
         permits TypedCommand.Move, TypedCommand.Wait, TypedCommand.Speak, TypedCommand.UseAbility,
         TypedCommand.UseItem, TypedCommand.EquipItem, TypedCommand.UnequipItem, TypedCommand.TransferItem,
-        TypedCommand.TradeItems, TypedCommand.AcceptQuest, TypedCommand.SuspendQuest, TypedCommand.ResumeQuest {
+        TypedCommand.TradeItems, TypedCommand.AcceptQuest, TypedCommand.SuspendQuest, TypedCommand.ResumeQuest,
+        TypedCommand.Rest {
     /** @return registered, case-sensitive wire identifier */
     String type();
 
@@ -118,6 +121,10 @@ public sealed interface TypedCommand
                     fields(payload, "questId");
                     yield new ResumeQuest(text(payload.get("questId"), 256));
                 }
+                case "REST" -> {
+                    fields(payload, "restId");
+                    yield new Rest(text(payload.get("restId"), 256));
+                }
                 default -> throw invalid();
             };
         } catch (IllegalArgumentException | ArithmeticException failure) {
@@ -129,7 +136,7 @@ public sealed interface TypedCommand
     /** Whether the journal type requires typed evidence at canonical commit. */
     static boolean registered(String type) {
         return Set.of("MOVE", "WAIT", "SPEAK", "USE_ABILITY", "USE_ITEM", "EQUIP_ITEM", "UNEQUIP_ITEM",
-                "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST").contains(type);
+                "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST").contains(type);
     }
 
     /** Require an exact integer quantity of 1..9999 without coercion from decimals or text. */
@@ -194,7 +201,7 @@ public sealed interface TypedCommand
 
     /** Bounded requested wait, not an authoritative elapsed-time delta. */
     record Wait(long seconds) implements TypedCommand {
-        /** Accept one second through one day; rules may impose a tighter world-clock bound. */
+        /** Accept one second through one day as a structural bound; {@link CommandRules} enforces the tighter legal wait. */
         public Wait {
             if (seconds < 1 || seconds > 86_400) { throw invalid(); }
         }
@@ -421,5 +428,18 @@ public sealed interface TypedCommand
         public String type() { return "RESUME_QUEST"; }
         /** @return the single quest field */
         public Map<String, Object> payload() { return Map.of("questId", questId); }
+    }
+
+    /**
+     * Request to rest under one pack-declared rest policy (P10.4). The intention names only the policy;
+     * duration, interruption, restored resources and removed conditions come from the pinned rule.
+     */
+    record Rest(String restId) implements TypedCommand {
+        /** Require a bounded stable policy identity. */
+        public Rest { restId = text(restId, 256); }
+        /** @return the fixed rest identifier */
+        public String type() { return "REST"; }
+        /** @return the single policy field */
+        public Map<String, Object> payload() { return Map.of("restId", restId); }
     }
 }

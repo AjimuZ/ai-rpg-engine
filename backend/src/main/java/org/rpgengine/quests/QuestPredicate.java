@@ -10,6 +10,7 @@ import java.util.Set;
 
 import org.rpgengine.content.CampaignPackSnapshot;
 import org.rpgengine.content.CompiledPack;
+import org.rpgengine.rules.WorldClock;
 
 /**
  * Closed, immutable tree of the pack expression language in world scope (docs/09 section 7) and its
@@ -19,8 +20,9 @@ import org.rpgengine.content.CompiledPack;
  *
  * <p>Atoms: {@code visited} (a location the player has stood in), {@code possesses} (units of an item
  * definition the player holds), {@code questStatus} and {@code objective} (a satisfied objective of a
- * quest). No atom rolls dice or reads the clock, so evaluation is a pure function of the facts and
- * never depends on randomness or wall-clock time.
+ * quest) and {@code worldTime} (whole elapsed units of the bounded in-world clock). No atom rolls dice
+ * or reads the wall clock, so evaluation is a pure function of the facts and never depends on randomness
+ * or real time; the in-world clock moves only when a committed command resolves a duration.
  *
  * <p>{@code all} and {@code any} stop at the first deciding operand; with pure atoms this only saves
  * work.
@@ -46,6 +48,9 @@ public sealed interface QuestPredicate {
 
         /** @return whether the objective of the canonical quest has been satisfied (it stays satisfied) */
         boolean satisfied(String quest, String objective);
+
+        /** @return in-world seconds elapsed since the campaign began, as the bounded world clock reads after this commit */
+        long worldTime();
     }
 
     /**
@@ -110,6 +115,7 @@ public sealed interface QuestPredicate {
                         QuestStatus.parse((String) fields.get("status")).orElseThrow(
                                 () -> new IllegalArgumentException("unknown quest status")));
             }
+            case "worldTime" -> new WorldTime((String) argument);
             case "objective" -> {
                 var fields = (Map<?, ?>) argument;
                 yield new Objective(snapshot.resolve(pack, (String) fields.get("quest"), "quest").id(),
@@ -192,6 +198,21 @@ public sealed interface QuestPredicate {
         }
         @Override public boolean test(Facts facts) { return facts.satisfied(quest, objective); }
         @Override public long value(Facts facts) { throw numeric(); }
+    }
+
+    /**
+     * The bounded in-world clock read in whole units, rounded down. Numeric; combine it with a
+     * comparison, for example {@code {"ge": [{"worldTime": "hours"}, 8]}}.
+     *
+     * @param unit one of {@code seconds}, {@code minutes}, {@code hours}, {@code days}
+     */
+    record WorldTime(String unit) implements QuestPredicate {
+        /** Require a unit the clock can express. */
+        public WorldTime {
+            WorldClock.inUnits(0, Objects.requireNonNull(unit, "unit"));
+        }
+        @Override public boolean test(Facts facts) { throw boolean_(); }
+        @Override public long value(Facts facts) { return WorldClock.inUnits(facts.worldTime(), unit); }
     }
 
     /**

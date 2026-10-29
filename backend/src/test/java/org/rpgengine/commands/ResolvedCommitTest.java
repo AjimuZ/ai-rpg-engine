@@ -21,6 +21,39 @@ class ResolvedCommitTest {
     ResolvedCommitTest() {
     }
 
+    /** The world clock moves by at most one in-world day per plan, and a rest ends each condition once. */
+    @Test
+    void boundsTheClockStepAndConditionRemovals() {
+        assertEquals(86_400, new ResolvedCommit.WorldChange(true, 86_400, CampaignMode.EXPLORATION, null).elapsedSeconds());
+        assertThrows(IllegalArgumentException.class,
+                () -> new ResolvedCommit.WorldChange(true, 86_401, CampaignMode.EXPLORATION, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ResolvedCommit.WorldChange(true, -1, CampaignMode.EXPLORATION, null));
+        var context = new ResolvedCommit.Context(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                UUID.randomUUID(), "a".repeat(64), 0, 2, new MutationLeaseService.Token(UUID.randomUUID(), 1));
+        var world = new ResolvedCommit.WorldChange(true, 600, CampaignMode.EXPLORATION, null);
+        var event = new ResolvedCommit.Event(null, null, EventVisibility.PUBLIC,
+                new CampaignEvent.Body("REST_COMPLETED", 1, 1, "{}"));
+        UUID actor = UUID.randomUUID();
+        var removal = new ResolvedCommit.ConditionRemoval(actor, "dazed");
+        var plan = new ResolvedCommit(context, world, List.of(), List.of(event), List.of(), "{}", false,
+                ResolvedCommit.Preparation.NONE, null, List.of(), List.of(), org.rpgengine.inventory.ItemPlan.NONE,
+                org.rpgengine.quests.QuestChanges.NONE, List.of(removal));
+        assertEquals(List.of(removal), plan.conditions());
+        assertThrows(UnsupportedOperationException.class, () -> plan.conditions().clear());
+        assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit(context, world, List.of(), List.of(event),
+                List.of(), "{}", false, ResolvedCommit.Preparation.NONE, null, List.of(), List.of(),
+                org.rpgengine.inventory.ItemPlan.NONE, org.rpgengine.quests.QuestChanges.NONE, List.of(removal, removal)));
+        assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit(context, world, List.of(), List.of(event),
+                List.of(), "{}", false, ResolvedCommit.Preparation.NONE, null, List.of(), List.of(),
+                org.rpgengine.inventory.ItemPlan.NONE, org.rpgengine.quests.QuestChanges.NONE,
+                java.util.Collections.nCopies(17, removal)));
+        assertThrows(NullPointerException.class, () -> new ResolvedCommit.ConditionRemoval(null, "dazed"));
+        assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit.ConditionRemoval(actor, " "));
+        // Plans built before P10.4 carry no removal.
+        assertTrue(new ResolvedCommit(context, world, List.of(), List.of(event), List.of(), "{}", false).conditions().isEmpty());
+    }
+
     /** Reject unbounded/ambiguous effects before acquiring locks, and isolate a plan from caller list mutation. */
     @Test
     void boundsAndFreezesResolvedEffects() {

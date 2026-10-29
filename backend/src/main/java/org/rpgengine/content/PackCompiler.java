@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.rpgengine.rules.WorldClock;
+
 /**
  * Semantic validation of a {@link ParsedPack}: stable IDs, dependency resolution, cross-references,
  * creation profiles, item rarity/appearance identities, skills, abilities, conditions, quests and
@@ -122,6 +124,8 @@ public final class PackCompiler {
         /** Resource ID to its maximum; filled from "resources" rule definitions. */
         private final Map<String, Integer> resources = new HashMap<>();
         private final Set<String> rarityTiers = new HashSet<>();
+        /** Rest policy IDs, unique within the pack. */
+        private final Set<String> restPolicies = new HashSet<>();
         /** Derived statistic IDs; they share no namespace with attributes so a formula atom is never ambiguous. */
         private final Set<String> derivedStats = new HashSet<>();
         /** Equipment slot ID to {capacity, accepted tags}; filled from the "equipment" rule definition. */
@@ -155,14 +159,15 @@ public final class PackCompiler {
             resolveDependencies();
             List<Definition> all = collect();
             // Rules first: they define the attribute/resource/rarity vocabularies others reference.
-            // Derived statistics read attributes, so they follow the other rules whatever the file order.
+            // Derived statistics read attributes and rest policies read resources, so both follow the other
+            // rules whatever the file order.
             for (Definition definition : all) {
-                if (definition.kind().equals("rule") && !"derivedStats".equals(definition.data().get("ruleType"))) {
+                if (definition.kind().equals("rule") && !readsVocabulary(definition)) {
                     validate(definition);
                 }
             }
             for (Definition definition : all) {
-                if (definition.kind().equals("rule") && "derivedStats".equals(definition.data().get("ruleType"))) {
+                if (definition.kind().equals("rule") && readsVocabulary(definition)) {
                     validate(definition);
                 }
             }
@@ -393,6 +398,11 @@ public final class PackCompiler {
             entry.close();
         }
 
+        /** Whether a rule definition refers to vocabularies that other rule definitions declare. */
+        private static boolean readsVocabulary(Definition definition) {
+            return Set.of("derivedStats", "rest").contains(definition.data().get("ruleType"));
+        }
+
         /** Dispatch one definition to its kind-specific validator. */
         private void validate(Definition definition) {
             PackDocument document = pack.documents().get(definition.file());
@@ -417,7 +427,7 @@ public final class PackCompiler {
         /** Register the rule vocabularies; unknown rule types fail closed rather than being ignored. */
         private void rule(Fields f) {
             String type = f.choice("ruleType", Set.of("attributes", "resources", "rarityTiers",
-                    "derivedStats", "equipment"), null);
+                    "derivedStats", "equipment", "rest"), null);
             switch (type) {
                 case "attributes" -> {
                     for (Fields a : f.objects("attributes", 1, 16)) {
@@ -447,6 +457,7 @@ public final class PackCompiler {
                 }
                 case "derivedStats" -> derivedStats(f);
                 case "equipment" -> equipment(f);
+                case "rest" -> rest(f);
                 default -> {
                     for (Fields t : f.objects("tiers", 1, 16)) {
                         String id = t.id("id", true);
@@ -458,6 +469,43 @@ public final class PackCompiler {
                             throw t.fail("DUPLICATE", "id", "Rarity tier ID already defined");
                         }
                     }
+                }
+            }
+        }
+
+        /**
+         * Rest policies (docs/10 section 8): how long a rest takes, where it may be taken (a location
+         * tag), how likely an interruption is, which resources it restores and which conditions it
+         * removes. Every policy must change something, and a resource is restored at most once, so a
+         * rest can never be an empty action that only passes time.
+         */
+        private void rest(Fields f) {
+            for (Fields policy : f.objects("policies", 1, 16)) {
+                String id = policy.id("id", true);
+                policy.text("name", true);
+                policy.integer("minutes", 1, WorldClock.MAX_MINUTES, null);
+                policy.id("locationTag", false);
+                policy.integer("interruptionChancePercent", 0, 99, 0);
+                Set<String> restored = new HashSet<>();
+                for (Fields restores : policy.objects("restores", 0, 8)) {
+                    String resource = restores.id("resource", true);
+                    if (!resources.containsKey(resource)) {
+                        throw restores.fail("REFERENCE_UNKNOWN", "resource", "Unknown resource '" + resource
+                                + "'; defined resources: " + new TreeSet<>(resources.keySet()));
+                    }
+                    if (!restored.add(resource)) {
+                        throw restores.fail("DUPLICATE", "resource", "Duplicate restoration of one resource");
+                    }
+                    restores.integer("amount", 1, VALUE_MAX, null);
+                    restores.close();
+                }
+                List<String> removed = policy.refs("removesConditions", CONDITION, 8);
+                if (restored.isEmpty() && removed.isEmpty()) {
+                    throw policy.fail("restores", "A rest policy must restore a resource or remove a condition");
+                }
+                policy.close();
+                if (!restPolicies.add(id)) {
+                    throw policy.fail("DUPLICATE", "id", "Rest policy ID already defined");
                 }
             }
         }
@@ -596,6 +644,8 @@ public final class PackCompiler {
                     throw link.fail("to", "A location cannot link to itself or repeat a link");
                 }
                 link.bool("accessible", true);
+                // Travel time along this link; zero keeps the move instantaneous (docs/10 section 2).
+                link.integer("minutes", 0, WorldClock.MAX_MINUTES, 0);
                 link.close();
             }
             f.refs("conditions", CONDITION, 16);

@@ -40,7 +40,10 @@ public class CommandRuleCatalogs {
     static final int CACHE_ENTRIES = 16;
     /** Registered intentions whose rules may consult pinned definitions; WAIT needs none. */
     private static final Set<String> CONTENT_RULES = Set.of("MOVE", "SPEAK", "USE_ABILITY", "USE_ITEM", "EQUIP_ITEM",
-            "UNEQUIP_ITEM", "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST");
+            "UNEQUIP_ITEM", "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST",
+            // WAIT needs no definition to be legal, but a clock predicate can become true as it passes (P10.4).
+            // It uses the catalog when one is available and never fails for lack of it (see Content#optional).
+            "WAIT");
 
     private final JdbcTemplate jdbc;
     private final PackRegistry packs;
@@ -192,6 +195,17 @@ public class CommandRuleCatalogs {
         /** @param catalog available pinned rule facts */
         Content(CommandRuleCatalog catalog) {
             this(catalog, false);
+        }
+
+        /**
+         * Return the catalog for the campaign's frozen pinned revision when there is one, for commands that
+         * are legal without definitions and only use them to evaluate clock-driven quests.
+         *
+         * @param pinnedRevision revision read under the caller's campaign lock
+         * @return the matching catalog, or null when absent or for another revision
+         */
+        CommandRuleCatalog optional(UUID pinnedRevision) {
+            return catalog != null && catalog.revisionId().equals(pinnedRevision) ? catalog : null;
         }
 
         /**

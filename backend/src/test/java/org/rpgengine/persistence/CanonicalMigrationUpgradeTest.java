@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V20 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V21 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -452,6 +452,24 @@ class CanonicalMigrationUpgradeTest {
                     assertThrows(DataAccessException.class, () -> jdbc.update("update location_visit set first_revision = 8"));
                     assertThrows(DataAccessException.class, () -> jdbc.update("delete from location_visit"));
                     assertEquals(0, v20.migrate().migrationsExecuted);
+                    // V21 bounds the world clock: it keeps its value, may not pass its end, and moves only with
+                    // its revision, by at most one in-world day, and never backwards.
+                    String v20Campaign = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
+                    Flyway v21 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("21").load();
+                    assertEquals(1, v21.migrate().migrationsExecuted);
+                    assertTrue(v21.validateWithResult().validationSuccessful);
+                    assertEquals(v20Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
+                    long clock = jdbc.queryForObject("select world_time_seconds from campaign", Long.class);
+                    String tick = "update campaign set world_time_seconds = ?, state_revision = state_revision + ?, "
+                            + "row_version = row_version + 1";
+                    assertThrows(DataAccessException.class, () -> jdbc.update(tick, clock + 5, 0));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(tick, clock + 86_401, 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(tick, 3_155_760_001L, 1));
+                    assertEquals(v20Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
+                    assertEquals(1, jdbc.update(tick, clock + 86_400, 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(tick, clock + 1, 1));
+                    assertEquals(0, v21.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

@@ -8,6 +8,7 @@ import org.rpgengine.content.ContentRevision;
 import org.rpgengine.memory.CampaignCheckpoint;
 import org.rpgengine.persistence.CanonicalValues;
 import org.rpgengine.presentation.SupportedLocale;
+import org.rpgengine.rules.WorldClock;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -56,9 +57,18 @@ class CampaignFoundationsTest {
     void rejectsWorldOverflowWithoutPartialMutation() {
         UUID adventure = UUID.randomUUID();
         Campaign campaign = Campaign.start(adventure, revision(adventure), "Campaign", "seed", NOW);
-        var before = campaign.commitWorld(0, false, Long.MAX_VALUE, 1,
+        // Walk the bounded clock to its very end one in-world day at a time.
+        long days = WorldClock.END_SECONDS / WorldClock.DAY;
+        for (long day = 0; day < days - 1; day++) {
+            campaign.commitWorld(day, false, WorldClock.DAY, 1, CampaignMode.EXPLORATION, null, NOW);
+        }
+        var before = campaign.commitWorld(days - 1, false, WorldClock.DAY, 1,
                 CampaignMode.EXPLORATION, "{\"kind\":\"choose\"}", NOW);
-        assertThrows(ArithmeticException.class, () -> campaign.commitWorld(1, true, 1, 1,
+        assertEquals(WorldClock.END_SECONDS, before.worldTimeSeconds());
+        // Neither one second more nor a step above one day is a legal clock movement.
+        assertThrows(IllegalArgumentException.class, () -> campaign.commitWorld(days, true, 1, 1,
+                CampaignMode.EXPLORATION, null, NOW.plusSeconds(1)));
+        assertThrows(IllegalArgumentException.class, () -> campaign.commitWorld(days, true, WorldClock.DAY + 1, 1,
                 CampaignMode.EXPLORATION, null, NOW.plusSeconds(1)));
         assertEquals(before, campaign.getCounters());
         assertEquals("{\"kind\":\"choose\"}", campaign.getPendingDecision());

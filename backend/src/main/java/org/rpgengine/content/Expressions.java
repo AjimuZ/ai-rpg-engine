@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.rpgengine.rules.WorldClock;
+
 /**
  * Static analyzer for the closed, data-only expression language used by formulas, effect amounts,
  * conditional effects and quest predicates (docs/09 section 7).
@@ -19,7 +21,7 @@ import java.util.Set;
  *
  * <p>Scopes keep evaluation deterministic and side-effect free: {@link Scope#ACTOR} expressions
  * read an acting character (attributes, resources, skill ranks, dice); {@link Scope#WORLD}
- * predicates read canonical world state (visited locations, possessions, quest status, objectives)
+ * predicates read canonical world state (visited locations, possessions, quest status, objectives and the bounded world clock)
  * and may not roll dice, so quest progress never depends on randomness.
  *
  * <p>Failure behavior: the first violation throws a located {@link PackException} with code
@@ -42,6 +44,8 @@ final class Expressions {
     static final long CONSTANT_MAX = 1_000_000L;
 
     /** Quest statuses of the docs/10 section 5 lifecycle. */
+    /** Units a {@code worldTime} atom can read the clock in. */
+    static final Set<String> CLOCK_UNITS = Set.of("seconds", "minutes", "hours", "days");
     static final Set<String> QUEST_STATUSES = Set.of("undiscovered", "available", "active", "completed", "failed",
             "suspended");
 
@@ -57,7 +61,7 @@ final class Expressions {
     enum Scope {
         /** Acting character: attributes, resources, skill ranks and dice. */
         ACTOR,
-        /** Canonical world: visited locations, possessions, quest status and objectives. */
+        /** Canonical world: visited locations, possessions, quest status, objectives and the world clock. */
         WORLD
     }
 
@@ -290,7 +294,7 @@ final class Expressions {
         /** Analyze a state-reading atom after checking it is readable in this scope. */
         private Interval atom(String name, Object argument, String at, boolean required) {
             boolean actor = Set.of("attribute", "resource", "skill", "dice").contains(name);
-            boolean world = Set.of("visited", "possesses", "questStatus", "objective").contains(name);
+            boolean world = Set.of("visited", "possesses", "questStatus", "objective", "worldTime").contains(name);
             if (!actor && !world) {
                 throw error("SCHEMA", at, "Unknown operator or atom '" + name + "'");
             }
@@ -330,6 +334,13 @@ final class Expressions {
                 case "visited" -> {
                     reference(argument, at, Set.of("location"));
                     return Interval.bool();
+                }
+                case "worldTime" -> {
+                    // Whole elapsed units of the bounded world clock; the proven interval is the clock's own.
+                    if (!(argument instanceof String unit) || !CLOCK_UNITS.contains(unit)) {
+                        throw error("SCHEMA", at, "Expected one of the clock units " + CLOCK_UNITS);
+                    }
+                    return new Interval(Type.NUMBER, 0, WorldClock.maxUnits(unit));
                 }
                 case "possesses" -> {
                     var f = new Fields(document, at, argument, context);

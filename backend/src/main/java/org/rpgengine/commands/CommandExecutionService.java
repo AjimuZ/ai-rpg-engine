@@ -134,7 +134,8 @@ public class CommandExecutionService {
                 commits.commit(new ResolvedCommit(context, resolution.world(), resolution.resources(),
                         resolution.events(), resolution.rewards(), resolution.receiptDetails(), true,
                         new ResolvedCommit.Preparation(resolution.queryScopes(), List.of()), intent,
-                        resolution.placements(), List.of(), resolution.items(), resolution.quests()));
+                        resolution.placements(), List.of(), resolution.items(), resolution.quests(),
+                        resolution.conditions()));
             }
         } catch (OperationAdmissionFailure rejected) {
             // Current state changed after admission in a way the rules refuse; nothing was applied.
@@ -193,7 +194,10 @@ public class CommandExecutionService {
             // Admission's checks are not a reusable stamp: re-derive every premise under this lock.
             UUID player = CommandSemantics.requireEligible(jdbc, owner, adventure, campaign, intent.command());
             Set<UUID> participants = CommandRules.require(jdbc, campaign, player, intent.command(), content);
-            var catalog = needsCatalog(intent.command()) ? content.require(pinned.getValue()) : null;
+            // A wait is legal without definitions; it only uses them to evaluate clock-driven quests.
+            var catalog = !needsCatalog(intent.command()) ? null
+                    : intent.command() instanceof TypedCommand.Wait ? content.optional(pinned.getValue())
+                    : content.require(pinned.getValue());
             return new Prepared(context, catalog, snapshot(campaign, player, participants, catalog, operation));
         } catch (OperationAdmissionFailure rejected) {
             journal.transitionTo(OperationStatus.REJECTED, now);
@@ -245,19 +249,24 @@ public class CommandExecutionService {
         // Quest state is read only when the content has quests, so quest-free adventures pay nothing.
         var stored = catalog != null && !catalog.quests().quests().isEmpty()
                 ? QuestStore.read(jdbc, campaign, player) : QuestStore.Stored.NONE;
+        // The committed clock and the player's active conditions, read under the same locks (P10.4).
+        long clock = jdbc.queryForObject("select world_time_seconds from campaign where id = ?", Long.class, campaign);
+        var conditions = new java.util.HashSet<>(jdbc.queryForList("select condition_id from actor_condition "
+                + "where campaign_id = ? and actor_id = ?", String.class, campaign, player));
         return new LocalActionResolver.Snapshot(player, actor.getKey().orElse(null), actor.getValue(),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[0]),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[1]), pools, vocabularies, operation, stacks,
-                stored);
+                stored, clock, conditions);
     }
 
     /**
      * Whether resolving the intention consults pinned definitions: abilities, every item command, the
-     * quest commands, and movement (a new visit can satisfy a quest objective). Waiting and speech change
-     * no fact a quest predicate reads.
+     * quest commands, rest, and movement (a new visit or its duration can satisfy a quest objective).
+     * Waiting needs it too since P10.4, because a clock predicate can become true as time passes. Only
+     * speech changes no fact a quest predicate reads.
      */
     private static boolean needsCatalog(TypedCommand command) {
-        return !(command instanceof TypedCommand.Wait || command instanceof TypedCommand.Speak);
+        return !(command instanceof TypedCommand.Speak);
     }
 
     /** Integral members of a stored JSON object; other values are omitted and so read as unknown. */

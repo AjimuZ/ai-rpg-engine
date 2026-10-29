@@ -986,6 +986,37 @@ stale and ended-quest writers, attribution), plus the pack reward bound in `Pack
 journal or quest screen (P10.5), no clock, fact, encounter or interaction predicates, no abandon command,
 no XP or reputation rewards, no live V20 dump and restore rehearsal.
 
+## World clock, travel and rest (P10.4)
+
+Time is a bounded counter owned by the canonical commit ([ADR 0026](../docs/adr/0026-bounded-world-clock-travel-duration-and-rest.md)).
+
+- `org.rpgengine.rules.WorldClock` (pure) holds the bounds (one day per operation, a legal wait of four hours,
+  a century in total), the calendar reading and the units a quest threshold reads. `RestRules` holds the rest
+  policy value and its three calculations (interruption from a recorded draw, elapsed time, restoration).
+- `CommandRuleCatalog` projects each location's per-link `travelMinutes` and `tags` and the pack's rest policies.
+  `CommandRules` refuses a wait over four hours, a duration that does not fit the clock (`TIME_ILLEGAL`) and an
+  unusable rest (`REST_UNAVAILABLE`). `LocalActionResolver` sets the command's elapsed time (link minutes, wait
+  seconds or the rest's own length), resolves a rest (one draw when interruptible) and passes the clock to the
+  quest engine, whose `worldTime` atom sees the time after this command.
+- `ResolvedCommit.WorldChange` rejects a step over one day; `Campaign.commitWorld` re-checks the end of the
+  clock; V21 enforces the same bounds in PostgreSQL and ties a time change to its revision step.
+  `ResolvedCommit.ConditionRemoval` carries the conditions a rest ends; the commit applies them guarded by the
+  row it deletes.
+- `EventStatements` states `ACTOR_MOVED` (with its duration), `REST_COMPLETED`, `REST_INTERRUPTED`,
+  `RESOURCE_RECOVERED` and `CONDITION_REMOVED`; `CommandReceipts` projects a `rest` summary only for a rest.
+
+Tests: `WorldClockTest` and `RestRulesTest` (pure), `LocalActionResolverTest` (link duration, the clock bound, both
+interruption branches with stub draws), `ClockCommandsTest` (real PostgreSQL on the `ClockPack` variant of the
+armory pack: authored travel time, bounded waits, the end of the clock, the V21 guards against any writer, full and
+clamped recovery, condition removal, a recorded interruption and its replay, refusals, a clock quest completed by
+a wait and by a rest, a failed commit leaving the clock alone, attribution), `WorldClockQueriesTest` (every read
+endpoint repeated while real time passes: no row and no clock change), plus the link, rest and `worldTime`
+validation in `PackCompilerTest`, `TypedCommandTest`, `EventStatementsTest`, `ResolvedCommitTest`,
+`CampaignFoundationsTest` and the V21 step of `CanonicalMigrationUpgradeTest`. Limits: no panel or journal shows
+the clock (P10.5); a rest is interrupted by a draw, not by an encounter (P11); condition durations are in rounds,
+so neither waiting nor rest ticks them; no faction or event clocks or bounded catch-up (P15.2); one link per move;
+no live V21 dump and restore rehearsal.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

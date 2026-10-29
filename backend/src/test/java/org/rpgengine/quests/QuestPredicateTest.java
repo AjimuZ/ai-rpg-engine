@@ -12,7 +12,10 @@ import org.junit.jupiter.api.Test;
 
 /** Pure evaluation of world predicates over committed facts (P10.3): atoms, logic, arithmetic and misuse. */
 class QuestPredicateTest {
-    /** Fixed facts: the player visited the grove, holds 3 coins, quest "a" is active with objective "x" satisfied. */
+    /**
+     * Fixed facts: the player visited the grove, holds 3 coins, quest "a" is active with objective "x" satisfied
+     * and the world clock reads one day, two hours and five seconds.
+     */
     private static final QuestPredicate.Facts FACTS = new QuestPredicate.Facts() {
         @Override public boolean visited(String location) { return location.equals("grove"); }
 
@@ -24,10 +27,26 @@ class QuestPredicateTest {
         }
 
         @Override public boolean satisfied(String quest, String objective) { return quest.equals("a") && objective.equals("x"); }
+
+        @Override public long worldTime() { return 86_400 + 2 * 3_600 + 5; }
     };
 
     /** Construct the stateless fixture. */
     QuestPredicateTest() { }
+
+    /** The clock atom reads whole elapsed units of the bounded world clock, rounded down. */
+    @Test
+    void worldTimeReadsWholeClockUnits() {
+        assertEquals(93_605, new QuestPredicate.WorldTime("seconds").value(FACTS));
+        assertEquals(1_560, new QuestPredicate.WorldTime("minutes").value(FACTS));
+        assertEquals(26, new QuestPredicate.WorldTime("hours").value(FACTS));
+        assertEquals(1, new QuestPredicate.WorldTime("days").value(FACTS));
+        var atLeastTwoDays = new QuestPredicate.Operation("ge",
+                List.of(new QuestPredicate.WorldTime("days"), new QuestPredicate.Constant(2)));
+        assertFalse(atLeastTwoDays.test(FACTS));
+        assertThrows(IllegalArgumentException.class, () -> new QuestPredicate.WorldTime("fortnights"));
+        assertThrows(IllegalStateException.class, () -> new QuestPredicate.WorldTime("days").test(FACTS));
+    }
 
     /** Each atom reads exactly its own fact. */
     @Test

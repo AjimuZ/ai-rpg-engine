@@ -61,6 +61,40 @@ class EventStatementsTest {
         assertEquals("Mira rimuove sword (main-hand).", state(SupportedLocale.IT, "ITEM_UNEQUIPPED", worn));
     }
 
+    /** Travel states its duration only when the link took time; rest and recovery state their numbers in both locales. */
+    @Test
+    void statesTimeAndRestEvents() {
+        String instant = "{\"actorId\":\"" + PLAYER + "\",\"from\":\"trailhead\",\"to\":\"grove\",\"seconds\":0}";
+        assertEquals("Mira moved from trailhead to grove.", state(SupportedLocale.EN, "ACTOR_MOVED", instant));
+        String legacy = "{\"actorId\":\"" + PLAYER + "\",\"from\":\"trailhead\",\"to\":\"grove\"}";
+        assertEquals("Mira moved from trailhead to grove.", state(SupportedLocale.EN, "ACTOR_MOVED", legacy));
+        String trip = "{\"actorId\":\"" + PLAYER + "\",\"from\":\"trailhead\",\"to\":\"grove\",\"seconds\":2700}";
+        assertEquals("Mira moved from trailhead to grove. The trip takes 45 minutes.", state(SupportedLocale.EN, "ACTOR_MOVED", trip));
+        assertEquals("Spostamento di Mira: da trailhead a grove. Il viaggio dura 45 minuti.",
+                state(SupportedLocale.IT, "ACTOR_MOVED", trip));
+        String brief = "{\"actorId\":\"" + PLAYER + "\",\"from\":\"a\",\"to\":\"b\",\"seconds\":60}";
+        assertEquals("Mira moved from a to b. The trip takes 1 minute.", state(SupportedLocale.EN, "ACTOR_MOVED", brief));
+        assertEquals("Spostamento di Mira: da a a b. Il viaggio dura 1 minuto.", state(SupportedLocale.IT, "ACTOR_MOVED", brief));
+        String odd = "{\"actorId\":\"" + PLAYER + "\",\"from\":\"a\",\"to\":\"b\",\"seconds\":90}";
+        assertEquals("Mira moved from a to b. The trip takes 90 seconds.", state(SupportedLocale.EN, "ACTOR_MOVED", odd));
+
+        String done = "{\"actorId\":\"" + PLAYER + "\",\"restId\":\"night\",\"interrupted\":false,\"seconds\":28800}";
+        assertEquals("Mira completes the rest night after 480 minutes.", state(SupportedLocale.EN, "REST_COMPLETED", done));
+        assertEquals("Mira completa il riposo night dopo 480 minuti.", state(SupportedLocale.IT, "REST_COMPLETED", done));
+        String cut = "{\"actorId\":\"" + PLAYER + "\",\"restId\":\"night\",\"interrupted\":true,\"seconds\":14400}";
+        assertEquals("Mira is interrupted during the rest night after 240 minutes.", state(SupportedLocale.EN, "REST_INTERRUPTED", cut));
+        assertEquals("Mira interrompe il riposo night dopo 240 minuti.", state(SupportedLocale.IT, "REST_INTERRUPTED", cut));
+        String recovered = "{\"actorId\":\"" + PLAYER + "\",\"resourceKey\":\"vigor\",\"amount\":5,\"before\":3,\"after\":8}";
+        assertEquals("Mira recovers 5 vigor (from 3 to 8).", state(SupportedLocale.EN, "RESOURCE_RECOVERED", recovered));
+        assertEquals("Mira recupera 5 di vigor (da 3 a 8).", state(SupportedLocale.IT, "RESOURCE_RECOVERED", recovered));
+        String ended = "{\"actorId\":\"" + PLAYER + "\",\"conditionId\":\"dazed\"}";
+        assertEquals("Mira is no longer dazed.", state(SupportedLocale.EN, "CONDITION_REMOVED", ended));
+        assertEquals("Mira non è più soggetto a dazed.", state(SupportedLocale.IT, "CONDITION_REMOVED", ended));
+        // Incomplete payloads fall back to the receipt instead of guessing a number.
+        assertEquals(null, state(SupportedLocale.EN, "REST_COMPLETED", "{\"actorId\":\"" + PLAYER + "\",\"restId\":\"night\"}"));
+        assertEquals(null, state(SupportedLocale.EN, "RESOURCE_RECOVERED", "{\"actorId\":\"" + PLAYER + "\",\"resourceKey\":\"vigor\"}"));
+    }
+
     /** Quest events state their transition in both locales, using the canonical quest and outcome identities. */
     @Test
     void statesQuestEvents() {

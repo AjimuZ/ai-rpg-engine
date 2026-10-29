@@ -2933,6 +2933,24 @@
       <target>Questa missione non è disponibile per questa azione. Non è stato modificato nulla.</target>
       </segment>
     </unit>
+    <unit id="campaign.error.timeIllegal">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:44</note>
+      </notes>
+      <segment>
+        <source>That much time cannot pass at once. Nothing was changed.</source>
+      <target>Non può trascorrere così tanto tempo in una volta. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.restUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:45</note>
+      </notes>
+      <segment>
+        <source>You cannot rest like that here. Nothing was changed.</source>
+      <target>Qui non puoi riposare in questo modo. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
     <unit id="campaign.error.dependenciesMissing">
       <notes>
         <note category="location">src/app/campaign/campaign-messages.ts:39</note>

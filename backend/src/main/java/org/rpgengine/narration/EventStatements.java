@@ -53,14 +53,45 @@ public final class EventStatements {
                 String actor = name(payload, "actorId", names);
                 String from = token(payload, "from");
                 String to = token(payload, "to");
+                Long seconds = number(payload, "seconds");
+                // The duration is stated only when the link took time; older events carry none.
+                String trip = seconds == null || seconds == 0 ? "" : it ? " Il viaggio dura " + span(true, seconds) + "."
+                        : " The trip takes " + span(false, seconds) + ".";
                 yield actor == null || from == null || to == null ? null
-                        : it ? "Spostamento di " + actor + ": da " + from + " a " + to + "."
-                        : actor + " moved from " + from + " to " + to + ".";
+                        : it ? "Spostamento di " + actor + ": da " + from + " a " + to + "." + trip
+                        : actor + " moved from " + from + " to " + to + "." + trip;
             }
             case "TIME_PASSED" -> {
                 Long seconds = number(payload, "seconds");
                 yield seconds == null ? null
                         : it ? "Attesa: trascorrono " + seconds + " secondi." : "Waiting: " + seconds + " seconds pass.";
+            }
+            case "REST_COMPLETED", "REST_INTERRUPTED" -> {
+                String actor = name(payload, "actorId", names);
+                String policy = token(payload, "restId");
+                Long seconds = number(payload, "seconds");
+                boolean cut = type.equals("REST_INTERRUPTED");
+                yield actor == null || policy == null || seconds == null ? null
+                        : it ? actor + (cut ? " interrompe il riposo " : " completa il riposo ") + policy + " dopo "
+                                + span(true, seconds) + "."
+                        : actor + (cut ? " is interrupted during the rest " : " completes the rest ") + policy
+                                + " after " + span(false, seconds) + ".";
+            }
+            case "RESOURCE_RECOVERED" -> {
+                String actor = name(payload, "actorId", names);
+                String resource = token(payload, "resourceKey");
+                Long amount = number(payload, "amount");
+                Long before = number(payload, "before");
+                Long after = number(payload, "after");
+                yield actor == null || resource == null || amount == null || before == null || after == null ? null
+                        : it ? actor + " recupera " + amount + " di " + resource + " (da " + before + " a " + after + ")."
+                        : actor + " recovers " + amount + " " + resource + " (from " + before + " to " + after + ").";
+            }
+            case "CONDITION_REMOVED" -> {
+                String actor = name(payload, "actorId", names);
+                String condition = token(payload, "conditionId");
+                yield actor == null || condition == null ? null
+                        : it ? actor + " non è più soggetto a " + condition + "." : actor + " is no longer " + condition + ".";
             }
             case "SPEECH_DELIVERED" -> {
                 String speaker = name(payload, "speakerActorId", names);
@@ -202,6 +233,18 @@ public final class EventStatements {
         }
         String joined = String.join("; ", parts);
         return (it ? "Effetto: " : "Effect: ") + joined + ".";
+    }
+
+    /**
+     * Whole-unit duration wording: minutes when the span is a whole number of minutes, otherwise seconds.
+     * Every number printed here is one the narration may state.
+     */
+    private static String span(boolean it, long seconds) {
+        if (seconds % 60 == 0) {
+            long minutes = seconds / 60;
+            return it ? minutes + (minutes == 1 ? " minuto" : " minuti") : minutes + (minutes == 1 ? " minute" : " minutes");
+        }
+        return it ? seconds + (seconds == 1 ? " secondo" : " secondi") : seconds + (seconds == 1 ? " second" : " seconds");
     }
 
     /** @return the known display name of the actor referenced by {@code field}, or null */

@@ -171,6 +171,9 @@ public final class QuestPlan {
         /** @return units of the item the player holds, including units granted earlier in this evaluation */
         long possessed(String item);
 
+        /** @return the bounded world clock in seconds after the command's own duration has passed */
+        long worldTime();
+
         /**
          * Hand reward units to the player.
          *
@@ -270,6 +273,8 @@ public final class QuestPlan {
         @Override public boolean visited(String location) { return world.visited(location); }
 
         @Override public long possessed(String item) { return world.possessed(item); }
+
+        @Override public long worldTime() { return world.worldTime(); }
 
         @Override
         public QuestStatus status(String quest) {

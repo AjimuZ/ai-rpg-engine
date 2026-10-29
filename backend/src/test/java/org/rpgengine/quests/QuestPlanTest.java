@@ -33,6 +33,9 @@ class QuestPlanTest {
         final Set<String> visited = new HashSet<>();
         final Map<String, Long> held = new HashMap<>();
         final List<String> grants = new ArrayList<>();
+        long time;
+
+        @Override public long worldTime() { return time; }
 
         @Override public boolean visited(String location) { return visited.contains(location); }
 

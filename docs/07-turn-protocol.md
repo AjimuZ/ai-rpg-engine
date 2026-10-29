@@ -169,7 +169,7 @@ closed until their contracts and rule services are implemented.
 Text remains exact: no trimming, Unicode normalization or decimal/string coercion.
 The wait cap is an input ceiling, not permission to advance a day. P07.3 below adds
 `USE_ABILITY` plus reachability, recipient knowledge/range, ownership, prerequisite,
-resource and causal rules; legal wait duration remains P10.4. P07.4 below executes an
+resource and causal rules; the legal wait duration is the world clock's since P10.4 (below). P07.4 below executes an
 admitted intention locally in the same request; `ACCEPTED` on its own means only durable
 admission after the checks implemented here.
 
@@ -234,13 +234,14 @@ and actor overrides are never part of it; the server derives them during resolut
 | Intention | Rules, in order; the first failure wins | Category |
 | --- | --- | --- |
 | `MOVE` | The player has a current location; the destination differs from it, exists in the pinned closure, is not `knowledge: secret`, and an `accessible: true` authored link leads there from the current location | `DESTINATION_UNAVAILABLE` |
+| | P10.4: the link's duration fits what is left of the bounded world clock | `TIME_ILLEGAL` |
 | `SPEAK` | The recipient is another actor of this campaign, shares the player's non-null current location and is perceivable (below) | `ACTOR_UNAVAILABLE` |
 | `USE_ABILITY` | Ownership: a pinned ability the player has a `learned_ability` row for | `ABILITY_UNAVAILABLE` |
 | | Prerequisites: every prerequisite ability learned and every skill at or above its rank in `character_state.skills` (missing means rank 0) | `PREREQUISITE_UNMET` |
 | | Target policy: `self` takes no explicit target, `single` exactly one, `multiple` one to `maxTargets`; `area` needs encounter zones (P11) and every unknown policy fails closed | `TARGET_ILLEGAL` |
 | | Every explicit target is perceivable and co-present; a single-target ability may name the player itself | `ACTOR_UNAVAILABLE` |
 | | Resources: each nonzero declared cost is at most the player's current value above its minimum, in the vocabulary of the ability's declaring pack | `RESOURCE_INSUFFICIENT` |
-| `WAIT` | No rule beyond P07.2; legal duration belongs to the world clock (P10.4) | — |
+| `WAIT` | P10.4: at most 14,400 seconds (four hours) and the step fits the bounded world clock | `TIME_ILLEGAL` |
 
 **Knowledge.** An actor is perceivable when it has no authored origin, or its origin
 resolves in the pinned closure and is not `knowledge: secret`. A creation profile is
@@ -324,6 +325,29 @@ probing identities reveals nothing. The commit repeats every rule under the camp
 plan's owners to the intention's participants and applies the plan with compare-and-set guards
 ([ADR 0024](adr/0024-atomic-item-commands-and-source-linked-creation.md)).
 
+### P10.4 world clock, travel and rest
+
+World time is a bounded counter of whole seconds that only a committed command moves
+([ADR 0026](adr/0026-bounded-world-clock-travel-duration-and-rest.md)). One operation adds at most
+86,400 seconds, the counter never passes 3,155,760,000 seconds, and PostgreSQL refuses a change of
+`world_time_seconds` that does not come with a state-revision step. No read, stream, projection or worker
+advances it.
+
+| Type | Exact payload | Rule (category on failure) |
+| --- | --- | --- |
+| `WAIT` | `seconds` (exact integer 1..86,400 on the wire) | At most 14,400 and the step fits the clock (`TIME_ILLEGAL`) |
+| `MOVE` | `destinationId` | As before, plus the link's duration fits the clock (`TIME_ILLEGAL`) |
+| `REST` | `restId` (1..256 characters) | The pinned rest policy exists, the player's location carries its `locationTag` if it has one, a restoring policy uses the player's resource vocabulary, and the full duration fits the clock (`REST_UNAVAILABLE`, or `TIME_ILLEGAL` for the clock) |
+
+The rest policy, not the payload, decides the duration, the interruption chance, the restored amounts and
+the conditions removed. A policy with an interruption chance reserves one durable percentile draw: a draw
+at or below the chance interrupts (half the time, half the restoration, no condition removed). Events are
+`REST_COMPLETED` or `REST_INTERRUPTED` {actorId, restId, interrupted, seconds, drawOrdinal?}, then
+`RESOURCE_RECOVERED` {actorId, resourceKey, amount, before, after} per changed pool and `CONDITION_REMOVED`
+{actorId, conditionId} per ended condition. The receipt gains `rest` {restId, interrupted, seconds,
+conditionsEnded} only for a rest. A rest or wait can satisfy a `worldTime` quest predicate in the same
+commit that moves the clock.
+
 ### P10.3 quest intentions
 
 Three more exploration intentions name one quest by its stable identity and nothing else. Status,
@@ -373,7 +397,7 @@ operation, never reused by another one and never re-rolled for it.
 
 | Intention | Effects | World time | Events (all v1) |
 | --- | --- | --- | --- |
-| `MOVE` | Typed `Placement` of the player at the destination, guarded by its actor row version | 0 s | `ACTOR_MOVED` {actorId, from, to} |
+| `MOVE` | Typed `Placement` of the player at the destination, guarded by its actor row version | The authored `minutes` of the link (0 when it declares none) | `ACTOR_MOVED` {actorId, from, to, seconds} |
 | `WAIT` | None | Exactly the requested seconds | `TIME_PASSED` {seconds} |
 | `SPEAK` | None | 0 s | `SPEECH_DELIVERED` {speakerActorId, recipientActorId, text} |
 | `USE_ABILITY` | Exact cost payment, then the effect program | 0 s | `ABILITY_USED`, one `RESOURCE_SPENT` per nonzero cost, one `EFFECT_RESOLVED` per executed resource node, one `ITEM_CREATED` per recipient of a `createItem` node |
@@ -385,8 +409,8 @@ operation, never reused by another one and never re-rolled for it.
 Every action advances the game turn once and resolves to **no pending decision** (`null`),
 which also clears the creation `STARTING_SITUATION` marker: the player may then submit any
 registered exploration intention. Typed clarification, choice and encounter decisions arrive
-with P08.2, P10.3 and P11. The durations are provisional: pinned links and abilities declare
-no duration yet, and P10.4 adds movement duration, rest and a tighter legal wait. Every
+with P08.2, P10.3 and P11. Durations follow the P10.4 world clock: only travel, waiting and rest
+take world time; abilities, speech and item commands take none. Every
 commit requires narration (`NARRATION_REQUIRED` outbox intent); narration itself is P08.
 
 **Effect programs.** The rule catalog compiles each ability's validated effect tree into

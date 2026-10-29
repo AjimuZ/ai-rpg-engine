@@ -22,7 +22,8 @@ import tools.jackson.databind.json.JsonMapper;
  *       state and draws, plus (since P10.2) the item lines of the player's own inventory: units
  *       created, consumed, given, received, equipped or taken off, and (since P10.3) the public quest
  *       transitions the operation caused: discovered, accepted, suspended, resumed, objective reached,
- *       completed or failed.</li>
+ *       completed or failed, and (since P10.4) the rest summary: policy, whether it was interrupted, the
+ *       seconds it took and the conditions it ended.</li>
  * </ul>
  * Other actors' values, causal participants, request identities and unknown detail fields
  * are never copied, so a new internal field cannot leak by default. Public since P09.5, because
@@ -92,6 +93,19 @@ public final class CommandReceipts {
                     items.add(entry);
                 }
                 view.put("items", List.copyOf(items));
+            }
+            if (details.path("rest").isObject()) {
+                // Present only for a rest, so earlier receipt shapes stay byte-identical. The interruption draw
+                // itself is listed with the committed draws; nothing here is another actor's state.
+                var rest = details.path("rest");
+                var entry = new LinkedHashMap<String, Object>();
+                entry.put("restId", rest.path("restId").asString());
+                entry.put("interrupted", rest.path("interrupted").asBoolean());
+                entry.put("seconds", rest.path("seconds").asLong());
+                var ended = new ArrayList<String>();
+                rest.path("conditionsEnded").forEach(condition -> ended.add(condition.asString()));
+                entry.put("conditionsEnded", List.copyOf(ended));
+                view.put("rest", java.util.Collections.unmodifiableMap(entry));
             }
             if (details.path("quests").isArray() && !details.path("quests").isEmpty()) {
                 // Present only when a public quest transition happened, so earlier receipt shapes stay

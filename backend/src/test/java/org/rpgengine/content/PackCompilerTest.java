@@ -395,6 +395,82 @@ class PackCompilerTest {
                 "{\"item\":\"rope\",\"quantity\":2}", "{\"item\":\"rope\",\"quantity\":20},{\"item\":\"rope\",\"quantity\":13}")))));
     }
 
+    /** The reference pack plus a rest rule with the given policy objects (P10.4). */
+    private static Map<String, String> withRest(String policies) {
+        var files = sources();
+        String rules = files.get("rules.json");
+        int end = rules.lastIndexOf("]}");
+        files.put("rules.json", rules.substring(0, end) + ",{\"id\":\"rules.rest\",\"kind\":\"rule\",\"data\":"
+                + "{\"ruleType\":\"rest\",\"policies\":[" + policies + "]}}" + rules.substring(end));
+        return files;
+    }
+
+    /** One valid rest policy with the given fields appended to its identity and name. */
+    private static String policy(String id, String fields) {
+        return "{\"id\":\"" + id + "\",\"name\":\"Rest\"," + fields + "}";
+    }
+
+    /** Link durations are whole minutes within one day; zero keeps a link instantaneous. */
+    @Test
+    void validatesTravelDurations() {
+        assertNotNull(compile("world.json", "\"links\":[{\"to\":\"market\",\"accessible\":true}]",
+                "\"links\":[{\"to\":\"market\",\"accessible\":true,\"minutes\":1440}]"));
+        assertNotNull(compile("world.json", "\"links\":[{\"to\":\"market\",\"accessible\":true}]",
+                "\"links\":[{\"to\":\"market\",\"accessible\":true,\"minutes\":0}]"));
+        for (String bad : List.of("1441", "-1", "1.5", "\"10\"")) {
+            rejects("SCHEMA", "world.json", "\"links\":[{\"to\":\"market\",\"accessible\":true}]",
+                    "\"links\":[{\"to\":\"market\",\"accessible\":true,\"minutes\":" + bad + "}]");
+        }
+    }
+
+    /** Rest policies name known resources and conditions, change something, and stay within their bounds. */
+    @Test
+    void validatesRestPolicies() {
+        var valid = policy("night", "\"minutes\":480,\"locationTag\":\"safe\",\"interruptionChancePercent\":20,"
+                + "\"restores\":[{\"resource\":\"stamina\",\"amount\":10}],\"removesConditions\":[\"dazed\"]");
+        assertNotNull(new PackCompiler().compile(parse(withRest(valid))));
+        // A condition-only and a resource-only policy are both useful rests.
+        assertNotNull(new PackCompiler().compile(parse(withRest(
+                policy("tonic", "\"minutes\":1,\"removesConditions\":[\"dazed\"]") + ","
+                + policy("nap", "\"minutes\":1440,\"restores\":[{\"resource\":\"stamina\",\"amount\":1}]")))));
+        String restores = "\"restores\":[{\"resource\":\"stamina\",\"amount\":3}]";
+        // A rest that changes nothing would only pass time, so it is not a rest.
+        assertEquals("SCHEMA", failure(withRest(policy("idle", "\"minutes\":10"))));
+        assertEquals("REFERENCE_UNKNOWN", failure(withRest(policy("x",
+                "\"minutes\":10,\"restores\":[{\"resource\":\"mana\",\"amount\":3}]"))));
+        assertEquals("REFERENCE_UNKNOWN", failure(withRest(policy("x", "\"minutes\":10,\"removesConditions\":[\"ghost\"]"))));
+        assertEquals("REFERENCE_KIND", failure(withRest(policy("x", "\"minutes\":10,\"removesConditions\":[\"harbor\"]"))));
+        assertEquals("DUPLICATE", failure(withRest(policy("x", "\"minutes\":10,\"restores\":[{\"resource\":\"stamina\","
+                + "\"amount\":3},{\"resource\":\"stamina\",\"amount\":4}]"))));
+        assertEquals("DUPLICATE", failure(withRest(policy("x", "\"minutes\":10," + restores) + "," + policy("x",
+                "\"minutes\":10," + restores))));
+        for (String bad : List.of("\"minutes\":0", "\"minutes\":1441", "\"minutes\":10,\"interruptionChancePercent\":100",
+                "\"minutes\":10,\"interruptionChancePercent\":-1", "\"minutes\":10,\"unknown\":1", "\"minutes\":10,"
+                + "\"restores\":[{\"resource\":\"stamina\",\"amount\":0}]")) {
+            failure(withRest(policy("x", bad + (bad.contains("restores") ? "" : "," + restores))));
+        }
+        // The policy list is bounded and needs at least one policy.
+        assertEquals("SCHEMA", failure(withRest("")));
+    }
+
+    /** The clock atom reads whole units in a world predicate only, and is bounded like every other number. */
+    @Test
+    void validatesTheClockAtom() {
+        String late = "{\"ge\":[{\"worldTime\":\"hours\"},8]}";
+        assertNotNull(new PackCompiler().compile(parse(withFile("quests.json", "quests", envelope(quest("ferry", late))))));
+        for (String unit : List.of("seconds", "minutes", "days")) {
+            assertNotNull(new PackCompiler().compile(parse(withFile("quests.json", "quests", envelope(
+                    quest("ferry", late.replace("hours", unit)))))));
+        }
+        assertEquals("SCHEMA", failure(withFile("quests.json", "quests", envelope(quest("ferry", late.replace("hours", "weeks"))))));
+        assertEquals("SCHEMA", failure(withFile("quests.json", "quests", envelope(quest("ferry", late.replace("\"hours\"", "3"))))));
+        // An actor-scope formula cannot read the world clock.
+        rejectsAmount("SCHEMA", "{\"worldTime\":\"hours\"}");
+        // Seconds of a century fit the proven interval, so an arithmetic use stays inside the limits.
+        assertNotNull(new PackCompiler().compile(parse(withFile("quests.json", "quests", envelope(quest("ferry",
+                "{\"gt\":[{\"mul\":[{\"worldTime\":\"days\"},24]},100]}"))))));
+    }
+
     /** Generation policy with one bounded and one catalog-only category plus fixed author constraints. */
     private static final String POLICY = """
             {"categories":{"npcs":{"mode":"bounded","maxNewPerScene":2,"maxNewPerCampaign":10,"tags":["sailor"],

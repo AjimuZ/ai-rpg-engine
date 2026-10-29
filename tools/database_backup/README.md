@@ -170,3 +170,10 @@ are never changed) and `location_visit` (locations an actor has been recorded at
 stays ended and its reward settlement in `reward_settlement` stays unique, so a restore cannot pay a
 quest reward a second time. Offline checks cover the V20 manifest/catalog; no live V20 dump/restore
 rehearsal has been run.
+
+V21 scope (P10.4) adds no table: it bounds `campaign.world_time_seconds` and `campaign_event.world_time_seconds`
+at 3,155,760,000 seconds (check constraints) and adds the `campaign_world_time_step` trigger, which lets the clock
+change only in an update that also advances `state_revision`, by at most 86,400 seconds. A restore inserts rows,
+so only the check constraints apply to restored values: a dump whose clock passes the bound is refused, while the
+step trigger guards later updates and does not re-check restored history. Offline checks cover the V21
+manifest/catalog; no live V21 dump/restore rehearsal has been run.

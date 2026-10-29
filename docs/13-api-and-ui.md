@@ -273,6 +273,8 @@ operation status is stored progress, not evidence that a worker is currently ali
 | 422 | `COMMAND_QUANTITY_ILLEGAL` | P10.2: more units are named than the stack holds |
 | 422 | `COMMAND_TRADE_REFUSED` | P10.2: an item has no declared value, or the counterparty would receive less value than it gives |
 | 422 | `COMMAND_QUEST_UNAVAILABLE` | P10.3: the quest is unknown, undiscovered, hidden background content, ended, or not in the status the request needs (accept needs `available`, suspend `active`, resume `suspended`) |
+| 422 | `COMMAND_TIME_ILLEGAL` | P10.4: a wait longer than four hours, or a duration (waiting, travel or rest) that would carry the bounded world clock past its end |
+| 422 | `COMMAND_REST_UNAVAILABLE` | P10.4: the rest policy is unknown, the location lacks its required tag, or it restores resources of another vocabulary than the player's |
 | 429 | `COMMAND_ADMISSION_LIMIT` | Two live mutation permits already belong to this owner |
 | 503 | `COMMAND_STORAGE_UNAVAILABLE` | Required transaction/storage unavailable |
 
