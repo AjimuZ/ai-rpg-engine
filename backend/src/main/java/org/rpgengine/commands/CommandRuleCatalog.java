@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+import org.rpgengine.characters.CharacterRuleCatalog;
 import org.rpgengine.content.CampaignPackSnapshot;
 import org.rpgengine.content.CompiledPack;
 import org.rpgengine.content.Definition;
@@ -38,17 +39,30 @@ import org.rpgengine.content.Definition;
  * @param actorPacks declaring pack ID of every NPC and creation-profile origin, keyed by canonical ID;
  *        an actor's resource keys belong to this pack's vocabulary (P07.4 effect targets)
  * @param abilities ability contracts keyed by canonical ability ID
+ * @param items trade valuation and use contract of every item definition, keyed by canonical item ID (P10.2)
+ * @param characters the character rule projection of the same closure: stack bounds, equipment facts
+ *        and the equipment vocabularies the equip and unequip commands check against (P10.1)
  */
 record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
-        Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities) {
+        Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
+        Map<String, ItemRule> items, CharacterRuleCatalog characters) {
     /** Freeze every index; null parts are construction bugs and fail immediately. */
     CommandRuleCatalog {
         Objects.requireNonNull(revisionId, "revisionId");
+        items = Map.copyOf(items);
+        Objects.requireNonNull(characters, "characters");
         locations = Map.copyOf(locations);
         actorDefinitions = Map.copyOf(actorDefinitions);
         resourceVocabularies = Map.copyOf(resourceVocabularies);
         actorPacks = Map.copyOf(actorPacks);
         abilities = Map.copyOf(abilities);
+    }
+
+    /** Catalog without item rules, the shape used before P10.2 (tests that exercise only movement and abilities). */
+    CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
+            Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities) {
+        this(revisionId, locations, actorDefinitions, resourceVocabularies, actorPacks, abilities, Map.of(),
+                new CharacterRuleCatalog(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of()));
     }
 
     /**
@@ -66,6 +80,7 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         var vocabularies = new HashMap<String, String>();
         var origins = new HashMap<String, String>();
         var abilities = new HashMap<String, Ability>();
+        var items = new HashMap<String, ItemRule>();
         for (CompiledPack pack : snapshot.packs().values()) {
             String packId = pack.parsed().manifest().id();
             for (Definition definition : pack.definitions()) {
@@ -95,11 +110,31 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
                         origins.put(id, packId);
                     }
                     case "ability" -> abilities.put(id, ability(snapshot, pack, data));
+                    case "item" -> items.put(id, item(snapshot, pack, data));
                     default -> { }
                 }
             }
         }
-        return new CommandRuleCatalog(revisionId, locations, actors, vocabularies, origins, abilities);
+        return new CommandRuleCatalog(revisionId, locations, actors, vocabularies, origins, abilities, items,
+                CharacterRuleCatalog.from(snapshot));
+    }
+
+    /**
+     * Read an item's trade valuation and optional use contract. The use contract is held as an
+     * {@link Ability} without prerequisites or costs, so item use and ability use share one effect
+     * resolver; it is declared by the item's own pack, which owns the unqualified resource keys.
+     */
+    private static ItemRule item(CampaignPackSnapshot snapshot, CompiledPack pack, Map<String, Object> data) {
+        int value = number(data.get("value"), 0);
+        Use use = null;
+        if (data.get("use") instanceof Map<?, ?> declared) {
+            var target = declared.get("target") instanceof Map<?, ?> targeting ? targeting : Map.of();
+            String policy = target.get("policy") instanceof String text ? text : "self";
+            var contract = new Ability(pack.parsed().manifest().id(), List.of(), Set.of(), Map.of(), policy,
+                    number(target.get("maxTargets"), 1), EffectProgram.compile(declared.get("effects"), snapshot, pack, null));
+            use = new Use(contract, !Boolean.FALSE.equals(declared.get("consumes")));
+        }
+        return new ItemRule(value == 0 ? null : value, use);
     }
 
     /** Canonicalize one ability contract's prerequisites, costs, target policy and effect program. */
@@ -177,6 +212,25 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
             Objects.requireNonNull(targetPolicy, "targetPolicy");
             effects = List.copyOf(effects);
         }
+    }
+
+    /**
+     * Item facts the command rules need beyond the character catalog.
+     *
+     * @param value trade valuation units, or null when the item is unpriced and cannot be traded
+     * @param use use contract, or null when the item cannot be used
+     */
+    record ItemRule(Integer value, Use use) { }
+
+    /**
+     * What happens when an item is used.
+     *
+     * @param contract targeting policy and effect program, with the item's pack as the vocabulary owner
+     * @param consumes whether one unit is used up by the action
+     */
+    record Use(Ability contract, boolean consumes) {
+        /** Require the contract. */
+        Use { Objects.requireNonNull(contract, "contract"); }
     }
 
     /**

@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased — Atomic item commands and source-linked item creation (P10.2), 29 October 2026
+
+- The player can now use, equip, take off, give and trade items through the ordinary command route
+  (`USE_ITEM`, `EQUIP_ITEM`, `UNEQUIP_ITEM`, `TRANSFER_ITEM`, `TRADE_ITEMS`). Each is one atomic
+  commit: item rows, resources, events, receipt and journal outcome succeed or fail together, a
+  matching retry replays the receipt without repeating the effect, and a fault after the item rows
+  were written rolls everything back. Unit conservation is proved before the commit and every
+  update is a compare-and-set on owner, quantity and storage version.
+- Moving a whole stack hands over the same item instance, so a unique item keeps its identity and
+  artwork; other units merge into the receiver's open stacks. A worn item cannot be given, traded or
+  used up until it is taken off. Equip and unequip reuse the P10.1 slot, tag, capacity and hand rules.
+- Pack items may declare a trade `value` and a `use` contract (consumption, targets and effects in the
+  ability grammar); `createItem` effects take an optional `quantity` and now execute, in items and in
+  abilities. A trade is accepted by rule: every item needs a value and the counterparty must receive at
+  least the value it gives. Existing packs and their hashes are unchanged.
+- Migration V19 adds the append-only `item_creation` ledger. Every created unit is linked to its
+  operation, the announcing `ITEM_CREATED` event and a source (an effect node, or a settled reward),
+  and a replayed source cannot create twice. The database backup tool covers schema version 19.
+- Four new refusal codes (`COMMAND_ITEM_UNAVAILABLE`, `COMMAND_EQUIPMENT_ILLEGAL`,
+  `COMMAND_QUANTITY_ILLEGAL`, `COMMAND_TRADE_REFUSED`) with reviewed English and Italian messages and
+  command labels; receipts list the player's own item lines; narration states the six new events in
+  both languages.
+- Not included: inventory and equipment panels and journal entries (P10.5), world-time costs (P10.4),
+  quest rewards (P10.3), NPC stock, weight, capacity and durability. See
+  [ADR 0024](docs/adr/0024-atomic-item-commands-and-source-linked-creation.md).
+
 ## Unreleased — Backend tests read a private local datasource file, 29 October 2026
 
 - A checkout can keep its test database connection in `backend/config/application.properties`

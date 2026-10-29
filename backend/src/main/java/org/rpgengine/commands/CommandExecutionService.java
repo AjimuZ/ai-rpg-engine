@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
+import org.rpgengine.inventory.InventoryModel;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -23,6 +24,9 @@ import tools.jackson.databind.json.JsonMapper;
  * operation journal. It runs in the caller's thread with no inference, network client or
  * background worker; narration becomes a durable post-commit presentation job that the
  * presentation worker settles later (P07.5).
+ *
+ * <p>Since P10.2 the same pipeline executes the item commands: the prepare step also reads every
+ * participant's item stacks, and the commit applies the resolved {@link org.rpgengine.inventory.ItemPlan}.
  *
  * <p>Sequence for a fresh request, each step its own bounded transaction:
  * <ol>
@@ -125,7 +129,7 @@ public class CommandExecutionService {
                 commits.commit(new ResolvedCommit(context, resolution.world(), resolution.resources(),
                         resolution.events(), List.of(), resolution.receiptDetails(), true,
                         new ResolvedCommit.Preparation(resolution.queryScopes(), List.of()), intent,
-                        resolution.placements()));
+                        resolution.placements(), List.of(), resolution.items()));
             }
         } catch (OperationAdmissionFailure rejected) {
             // Current state changed after admission in a way the rules refuse; nothing was applied.
@@ -184,8 +188,8 @@ public class CommandExecutionService {
             // Admission's checks are not a reusable stamp: re-derive every premise under this lock.
             UUID player = CommandSemantics.requireEligible(jdbc, owner, adventure, campaign, intent.command());
             Set<UUID> participants = CommandRules.require(jdbc, campaign, player, intent.command(), content);
-            var catalog = intent.command() instanceof TypedCommand.UseAbility ? content.require(pinned.getValue()) : null;
-            return new Prepared(context, catalog, snapshot(campaign, player, participants, catalog));
+            var catalog = needsCatalog(intent.command()) ? content.require(pinned.getValue()) : null;
+            return new Prepared(context, catalog, snapshot(campaign, player, participants, catalog, operation));
         } catch (OperationAdmissionFailure rejected) {
             journal.transitionTo(OperationStatus.REJECTED, now);
             MutationLeaseService.releaseHeld(jdbc, campaign, operation, token);
@@ -200,7 +204,7 @@ public class CommandExecutionService {
      * attribute fails closed during calculation instead of reading zero.
      */
     private LocalActionResolver.Snapshot snapshot(UUID campaign, UUID player, Set<UUID> participants,
-            CommandRuleCatalog catalog) {
+            CommandRuleCatalog catalog, UUID operation) {
         var actor = jdbc.queryForObject("select location_id, row_version from actor where campaign_id = ? and id = ?",
                 (row, index) -> Map.entry(java.util.Optional.ofNullable(row.getString(1)), row.getLong(2)),
                 campaign, player);
@@ -224,9 +228,24 @@ public class CommandExecutionService {
                 vocabularies.put(participant, pack);
             }
         }
+        // Every participant's stacks: transfers and creations merge into the recipients' open stacks.
+        var stacks = new java.util.ArrayList<InventoryModel.Stack>();
+        for (UUID participant : participants.stream().sorted().toList()) {
+            jdbc.query("select id, definition_id, quantity, maximum_stack, row_version from item_instance "
+                    + "where campaign_id = ? and actor_id = ? order by id", row -> {
+                        stacks.add(new InventoryModel.Stack(row.getObject(1, UUID.class), participant, row.getString(2),
+                                row.getInt(3), row.getInt(4), row.getLong(5)));
+                    }, campaign, participant);
+        }
         return new LocalActionResolver.Snapshot(player, actor.getKey().orElse(null), actor.getValue(),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[0]),
-                state.isEmpty() ? Map.of() : integers(state.getFirst()[1]), pools, vocabularies);
+                state.isEmpty() ? Map.of() : integers(state.getFirst()[1]), pools, vocabularies, operation, stacks);
+    }
+
+    /** Whether resolving the intention consults pinned definitions: abilities and every item command. */
+    private static boolean needsCatalog(TypedCommand command) {
+        return !(command instanceof TypedCommand.Move || command instanceof TypedCommand.Wait
+                || command instanceof TypedCommand.Speak);
     }
 
     /** Integral members of a stored JSON object; other values are omitted and so read as unknown. */

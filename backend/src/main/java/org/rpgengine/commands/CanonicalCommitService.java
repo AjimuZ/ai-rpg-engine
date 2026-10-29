@@ -10,7 +10,10 @@ import jakarta.persistence.LockModeType;
 import org.rpgengine.campaign.Campaign;
 import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.characters.ActorResource;
+import org.rpgengine.characters.CharacterService;
 import org.rpgengine.content.ContentRevision;
+import org.rpgengine.inventory.InventoryWriter;
+import org.rpgengine.inventory.ItemPlan;
 import org.rpgengine.knowledge.KnowledgeLedger;
 import org.rpgengine.preparation.JobRequest;
 import org.rpgengine.preparation.PlanActivations;
@@ -38,7 +41,9 @@ import tools.jackson.databind.json.JsonMapper;
  * trigger, and a narration-requiring commit inserts its post-commit presentation job here, in
  * the same transaction. Cited plan branches are rechecked before any effect and recorded once
  * (P07.6); every commit then re-evaluates admitted plans against the rows it changed. Typed
- * knowledge changes are written beside the events they cite, and after a registered player
+ * item mutations, creation ledger entries and equipment changes (P10.2) are written beside the
+ * events that announce them, guarded by the exact owner, quantity and storage version the resolver
+ * read; knowledge changes are written beside the events they cite, and after a registered player
  * intention the player's perception at its resulting location updates its last known locations
  * of other actors (P09.1); the query scopes both touch are bumped with the preparation scopes.
  * This internal service has no controller, network port or callback.
@@ -221,6 +226,11 @@ public class CanonicalCommitService {
             entities.persist(new OutboxMessage(operation, OutboxMessage.Kind.NARRATION_REQUIRED, now));
         }
         entities.flush();
+        // Items follow the flush: the creation ledger cites this operation's events by sequence. A
+        // stale or constraint-violating item change throws and rolls back every earlier write.
+        InventoryWriter.applyWithin(jdbc, campaign.getId(), operation.getId(), counters.stateRevision(), firstSequence,
+                plan.items(), now);
+        applyEquipment(plan.items(), rules, campaign, counters.stateRevision());
         if (plan.narrationRequired()) {
             // The owed presentation is durable exactly when the world change is (P07.5): one
             // NARRATION job per operation, checked against this committed revision at COMMIT.
@@ -239,6 +249,7 @@ public class CanonicalCommitService {
         var at = new KnowledgeLedger.Provenance(counters.stateRevision(), counters.worldTimeSeconds(), firstSequence,
                 plan.events().size());
         var scopes = new LinkedHashSet<>(preparation.queryScopes());
+        scopes.addAll(InventoryWriter.scopes(plan.items()));
         scopes.addAll(KnowledgeLedger.applyWithin(jdbc, campaign.getId(), at, plan.knowledge()));
         if (player != null) {
             var perception = CommandRules.perceived(jdbc, campaign.getId(), player, rules);
@@ -265,6 +276,26 @@ public class CanonicalCommitService {
         // identical, even though PostgreSQL normalizes whitespace and object key order.
         entities.refresh(operation);
         return receipt(operation);
+    }
+
+    /**
+     * Apply the worn-state changes through the character rules, which re-check slots, tags,
+     * capacity and hands against the rows just written. Runs inside the commit's transaction.
+     */
+    private void applyEquipment(ItemPlan items, CommandRuleCatalogs.Content rules, Campaign campaign, long revision) {
+        if (items.equipment().isEmpty()) {
+            return;
+        }
+        var characters = new CharacterService(jdbc);
+        var catalog = rules.require(campaign.getContentRevisionId()).characters();
+        for (ItemPlan.EquipmentChange change : items.equipment()) {
+            switch (change) {
+                case ItemPlan.Equip equip -> characters.equip(campaign.getId(), equip.actorId(), equip.itemInstanceId(),
+                        catalog, revision);
+                case ItemPlan.Unequip unequip -> characters.unequip(campaign.getId(), unequip.actorId(),
+                        unequip.itemInstanceId());
+            }
+        }
     }
 
     /** Copy a committed journal outcome into detached scalars; a missing outcome is a programming error. */

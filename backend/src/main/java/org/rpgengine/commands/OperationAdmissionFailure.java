@@ -86,6 +86,24 @@ public final class OperationAdmissionFailure extends RuntimeException {
          * other than the acting player's, or could need more durable draws than one operation may
          * reserve. Nothing is journaled (HTTP 422).
          */
-        EFFECT_UNSUPPORTED
+        EFFECT_UNSUPPORTED,
+        /**
+         * An item instance is not held by the party that must hold it, does not exist, cannot be used
+         * (no use contract) or is worn when the action would use it up, give it away or trade it.
+         * One category avoids confirming that another actor's instance exists (HTTP 422, P10.2).
+         */
+        ITEM_UNAVAILABLE,
+        /**
+         * Wearing the item breaks a pinned equipment rule (not equippable, unknown or incompatible
+         * slot, slot full, hands exceeded, already worn), or the item to take off is not worn (HTTP 422, P10.2).
+         */
+        EQUIPMENT_ILLEGAL,
+        /** More units are named than the stack holds (HTTP 422, P10.2). */
+        QUANTITY_ILLEGAL,
+        /**
+         * The counterparty does not accept the exchange: an item has no declared value, or the value the
+         * counterparty receives is lower than the value it gives (HTTP 422, P10.2).
+         */
+        TRADE_REFUSED
     }
 }

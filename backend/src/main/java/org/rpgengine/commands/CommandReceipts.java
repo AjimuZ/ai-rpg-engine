@@ -19,7 +19,8 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>only for receipts written by {@link LocalActionResolver}: command type, elapsed
  *       world seconds, turn advancement, destination of a move, the acting player's own
  *       resource changes and the ability calculations, which read only the player's own
- *       state and draws.</li>
+ *       state and draws, plus (since P10.2) the item lines of the player's own inventory: units
+ *       created, consumed, given, received, equipped or taken off.</li>
  * </ul>
  * Other actors' values, causal participants, request identities and unknown detail fields
  * are never copied, so a new internal field cannot leak by default. Public since P09.5, because
@@ -75,6 +76,21 @@ public final class CommandReceipts {
                 calculations.add(entry);
             }
             view.put("calculations", List.copyOf(calculations));
+            if (details.path("items").isArray() && !details.path("items").isEmpty()) {
+                // Present only for item-bearing receipts, so earlier receipt shapes stay byte-identical.
+                var items = new ArrayList<Map<String, Object>>();
+                for (JsonNode line : details.path("items")) {
+                    var entry = new LinkedHashMap<String, Object>();
+                    entry.put("kind", line.path("kind").asString());
+                    entry.put("definitionId", line.path("definitionId").asString());
+                    if (line.path("itemInstanceId").isString()) {
+                        entry.put("itemInstanceId", line.path("itemInstanceId").asString());
+                    }
+                    entry.put("quantity", line.path("quantity").asLong());
+                    items.add(entry);
+                }
+                view.put("items", List.copyOf(items));
+            }
         }
         var draws = new ArrayList<Map<String, Object>>();
         for (JsonNode draw : root.path("randomDraws")) {

@@ -17,10 +17,12 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Test fixture: the neutral {@code fantasy-exploration} pack with P10.1 character rules added in
  * memory (attributes, derived statistics, rarity tiers, equipment slots, skills, learnable abilities,
- * conditions and an equipped starting loadout). The bundled fixture on disk is untouched, so the
- * other suites that pin its hash keep their expectations.
+ * conditions and an equipped starting loadout). Since P10.2 several items carry a trade {@code value}
+ * and use contracts (a public warden NPC, a potion, a reusable oil press, a purse that creates coins and oil, a flare whose
+ * damage effect is not executable yet). The bundled fixture on disk is untouched, so the other suites
+ * that pin its hash keep their expectations.
  */
-final class ArmoryPack {
+public final class ArmoryPack {
     private static final String RULES = """
             {"schemaVersion":1,"definitions":[
             {"id":"rules.attributes","kind":"rule","data":{"ruleType":"attributes","attributes":[
@@ -70,24 +72,55 @@ final class ArmoryPack {
             {"schemaVersion":1,"definitions":[
             {"id":"kit","kind":"item","data":{"name":"Trail Kit","description":"A pouch of tools.","itemType":"tool","maxStack":1,
               "rarity":"ordinary","appearance":{"id":"kit.canvas","summary":"A green pouch."}}},
-            {"id":"sword","kind":"item","data":{"name":"Sword","description":"Steel.","itemType":"weapon","slot":"main-hand","hands":1,
+            {"id":"sword","kind":"item","data":{"value":30,"name":"Sword","description":"Steel.","itemType":"weapon","slot":"main-hand","hands":1,
               "tags":["weapon"],"rarity":"ordinary","appearance":{"id":"sword.steel","summary":"A plain steel sword."}}},
-            {"id":"greatsword","kind":"item","data":{"name":"Greatsword","description":"Heavy.","itemType":"weapon","slot":"main-hand","hands":2,
+            {"id":"greatsword","kind":"item","data":{"value":80,"name":"Greatsword","description":"Heavy.","itemType":"weapon","slot":"main-hand","hands":2,
               "tags":["weapon"],"rarity":"rare","appearance":{"id":"great.steel","summary":"A broad sword."}}},
-            {"id":"shield","kind":"item","data":{"name":"Shield","description":"Wood.","itemType":"armor","slot":"off-hand","hands":1,
+            {"id":"shield","kind":"item","data":{"value":20,"name":"Shield","description":"Wood.","itemType":"armor","slot":"off-hand","hands":1,
               "tags":["shield"],"rarity":"ordinary","appearance":{"id":"shield.wood","summary":"A round shield."}}},
-            {"id":"lantern","kind":"item","data":{"name":"Lantern","description":"Light.","itemType":"tool","slot":"off-hand","hands":1,
+            {"id":"lantern","kind":"item","data":{"value":8,"name":"Lantern","description":"Light.","itemType":"tool","slot":"off-hand","hands":1,
               "tags":["light"],"rarity":"ordinary","appearance":{"id":"lantern.plain","summary":"A plain tin lantern."}}},
-            {"id":"gilded-lantern","kind":"item","data":{"name":"Gilded Lantern","description":"Light.","itemType":"tool","slot":"off-hand","hands":1,
+            {"id":"gilded-lantern","kind":"item","data":{"value":8,"name":"Gilded Lantern","description":"Light.","itemType":"tool","slot":"off-hand","hands":1,
               "tags":["light"],"rarity":"ordinary","appearance":{"id":"lantern.gilded","summary":"Ornate gold filigree set with gems and glowing runes."}}},
-            {"id":"cloak","kind":"item","data":{"name":"Cloak","description":"Wool.","itemType":"armor","slot":"body","rarity":"rare",
+            {"id":"cloak","kind":"item","data":{"value":15,"name":"Cloak","description":"Wool.","itemType":"armor","slot":"body","rarity":"rare",
               "appearance":{"id":"cloak.wool","summary":"A grey cloak."}}},
-            {"id":"ring","kind":"item","data":{"name":"Ring","description":"Tin.","itemType":"treasure","slot":"trinket","rarity":"ordinary",
+            {"id":"ring","kind":"item","data":{"value":12,"name":"Ring","description":"Tin.","itemType":"treasure","slot":"trinket","rarity":"ordinary",
               "appearance":{"id":"ring.tin","summary":"A tin ring."}}},
-            {"id":"arrows","kind":"item","data":{"name":"Arrows","description":"Shafts.","itemType":"consumable","maxStack":20,
+            {"id":"arrows","kind":"item","data":{"value":1,"name":"Arrows","description":"Shafts.","itemType":"consumable","maxStack":20,
               "rarity":"ordinary","appearance":{"id":"arrows.bundle","summary":"A bundle."}}},
             {"id":"relic","kind":"item","data":{"name":"Relic","description":"Old.","itemType":"treasure","rarity":"legendary",
-              "appearance":{"id":"relic.plain","summary":"A small grey stone."}}}]}""";
+              "appearance":{"id":"relic.plain","summary":"A small grey stone."}}},
+            {"id":"potion","kind":"item","data":{"name":"Potion","description":"Restores vigor.","itemType":"consumable","maxStack":5,
+              "rarity":"ordinary","value":10,"use":{"target":{"policy":"self"},
+              "effects":[{"type":"modifyResource","resource":"vigor","amount":4}]},
+              "appearance":{"id":"potion.red","summary":"A red vial."}}},
+            {"id":"elixir","kind":"item","data":{"name":"Elixir","description":"Heals a companion.","itemType":"consumable","maxStack":3,
+              "rarity":"rare","value":25,"use":{"target":{"policy":"single"},
+              "effects":[{"type":"modifyResource","resource":"vigor","amount":3,"target":"target"}]},
+              "appearance":{"id":"elixir.blue","summary":"A blue vial."}}},
+            {"id":"lamp-oil","kind":"item","data":{"name":"Lamp Oil","description":"Fuel.","itemType":"consumable","maxStack":10,
+              "rarity":"ordinary","value":2,"appearance":{"id":"oil.flask","summary":"A flask of oil."}}},
+            {"id":"coin","kind":"item","data":{"name":"Coin","description":"Currency.","itemType":"treasure","maxStack":999,
+              "rarity":"ordinary","value":1,"appearance":{"id":"coin.brass","summary":"A brass coin."}}},
+            {"id":"oil-press","kind":"item","data":{"name":"Oil Press","description":"Presses oil.","itemType":"tool",
+              "rarity":"ordinary","value":25,"use":{"consumes":false,"target":{"policy":"self"},
+              "effects":[{"type":"createItem","item":"lamp-oil","quantity":2}]},
+              "appearance":{"id":"press.iron","summary":"An iron press."}}},
+            {"id":"lucky-purse","kind":"item","data":{"name":"Lucky Purse","description":"Opens once.","itemType":"consumable",
+              "maxStack":4,"rarity":"ordinary","value":6,"use":{"target":{"policy":"self"},"effects":[
+              {"type":"createItem","item":"coin","quantity":50},{"type":"createItem","item":"lamp-oil","quantity":4}]},
+              "appearance":{"id":"purse.felt","summary":"A felt purse."}}},
+            {"id":"torch","kind":"item","data":{"name":"Torch","description":"Burns down.","itemType":"tool","slot":"off-hand","hands":1,
+              "tags":["light"],"rarity":"ordinary","value":3,"use":{"consumes":true,"target":{"policy":"self"},
+              "effects":[{"type":"modifyResource","resource":"vigor","amount":1}]},
+              "appearance":{"id":"torch.pitch","summary":"A pitch torch."}}},
+            {"id":"flare","kind":"item","data":{"name":"Flare","description":"Burns.","itemType":"consumable","maxStack":3,
+              "rarity":"ordinary","value":4,"use":{"target":{"policy":"single"},"effects":[{"type":"damage","amount":1}]},
+              "appearance":{"id":"flare.red","summary":"A red flare."}}}]}""";
+
+    private static final String NPCS = """
+            {"schemaVersion":1,"definitions":[
+            {"id":"warden","kind":"npc","data":{"name":"Warden","role":"Trail keeper","location":"trailhead"}}]}""";
 
     private static final String CREATION = """
             {"schemaVersion":1,"definitions":[
@@ -107,7 +140,7 @@ final class ArmoryPack {
      *
      * @return file index ready for staging
      */
-    static Map<String, byte[]> files() throws URISyntaxException {
+    public static Map<String, byte[]> files() throws URISyntaxException {
         var files = new TreeMap<>(new PackStaging(PackStaging.Limits.standard())
                 .directory(Path.of(ArmoryPack.class.getResource("/packs/fantasy-exploration").toURI())).files());
         // Drop localization: this variant adds vocabulary the bundled translations do not cover.
@@ -118,6 +151,7 @@ final class ArmoryPack {
         files.put("conditions.json", CONDITIONS.getBytes(StandardCharsets.UTF_8));
         files.put("items.json", ITEMS.getBytes(StandardCharsets.UTF_8));
         files.put("creation.json", CREATION.getBytes(StandardCharsets.UTF_8));
+        files.put("npcs.json", NPCS.getBytes(StandardCharsets.UTF_8));
         @SuppressWarnings("unchecked")
         Map<String, Object> manifest = JsonMapper.builder().build().readValue(files.get("adventure.json"), Map.class);
         var listed = new ArrayList<Map<String, Object>>();
@@ -130,6 +164,7 @@ final class ArmoryPack {
             }
         }
         listed.add(Map.of("path", "conditions.json", "category", "conditions"));
+        listed.add(Map.of("path", "npcs.json", "category", "npcs"));
         manifest.put("files", listed);
         manifest.put("id", "sample:armory");
         manifest.remove("textResources");
@@ -139,7 +174,7 @@ final class ArmoryPack {
     }
 
     /** Zip a file map without compression, as the registry accepts it. */
-    static byte[] zip(Map<String, byte[]> files) throws java.io.IOException {
+    public static byte[] zip(Map<String, byte[]> files) throws java.io.IOException {
         var output = new ByteArrayOutputStream();
         try (var zip = new ZipOutputStream(output)) {
             zip.setLevel(0);

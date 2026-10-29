@@ -287,6 +287,10 @@ public class CampaignCreationController {
             case CONTENT_UNAVAILABLE -> error(422, "COMMAND_CONTENT_UNAVAILABLE");
             case DEPENDENCIES_MISSING -> error(409, "COMMAND_DEPENDENCIES_MISSING");
             case EFFECT_UNSUPPORTED -> error(422, "COMMAND_EFFECT_UNSUPPORTED");
+            case ITEM_UNAVAILABLE -> error(422, "COMMAND_ITEM_UNAVAILABLE");
+            case EQUIPMENT_ILLEGAL -> error(422, "COMMAND_EQUIPMENT_ILLEGAL");
+            case QUANTITY_ILLEGAL -> error(422, "COMMAND_QUANTITY_ILLEGAL");
+            case TRADE_REFUSED -> error(422, "COMMAND_TRADE_REFUSED");
         };
     }
 

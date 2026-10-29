@@ -11,15 +11,18 @@ import org.rpgengine.content.PackTextParser;
 
 /**
  * Closed vocabulary of player intentions, never effects or generic field writes.
- * Exploration currently admits movement, waiting, addressed speech and use of a learned
- * ability. Item, trade and encounter intentions must acquire explicit contracts and
- * validators before registration; unknown types fail closed. Structural decoding here
+ * Exploration currently admits movement, waiting, addressed speech, use of a learned
+ * ability and, since P10.2, using, equipping, unequipping, giving and trading item instances the
+ * player holds. Encounter intentions must acquire explicit contracts and validators before
+ * registration; unknown types fail closed. Structural decoding here
  * is followed by current-state rule validation in {@link CommandRules}; resolution
  * remains backend-owned (P07.4). Every value is immutable and can reproduce its exact
  * version-1 hash input.
  */
 public sealed interface TypedCommand
-        permits TypedCommand.Move, TypedCommand.Wait, TypedCommand.Speak, TypedCommand.UseAbility {
+        permits TypedCommand.Move, TypedCommand.Wait, TypedCommand.Speak, TypedCommand.UseAbility,
+        TypedCommand.UseItem, TypedCommand.EquipItem, TypedCommand.UnequipItem, TypedCommand.TransferItem,
+        TypedCommand.TradeItems {
     /** @return registered, case-sensitive wire identifier */
     String type();
 
@@ -75,6 +78,33 @@ public sealed interface TypedCommand
                     yield new UseAbility(text(payload.get("abilityId"), 256),
                             targets.stream().map(CampaignCommandJson::uuid).toList());
                 }
+                case "USE_ITEM" -> {
+                    fields(payload, "itemInstanceId", "targetActorIds");
+                    if (!(payload.get("targetActorIds") instanceof List<?> targets)
+                            || targets.size() > UseAbility.MAX_TARGETS) {
+                        throw invalid();
+                    }
+                    yield new UseItem(CampaignCommandJson.uuid(payload.get("itemInstanceId")),
+                            targets.stream().map(CampaignCommandJson::uuid).toList());
+                }
+                case "EQUIP_ITEM" -> {
+                    fields(payload, "itemInstanceId");
+                    yield new EquipItem(CampaignCommandJson.uuid(payload.get("itemInstanceId")));
+                }
+                case "UNEQUIP_ITEM" -> {
+                    fields(payload, "itemInstanceId");
+                    yield new UnequipItem(CampaignCommandJson.uuid(payload.get("itemInstanceId")));
+                }
+                case "TRANSFER_ITEM" -> {
+                    fields(payload, "itemInstanceId", "recipientActorId", "quantity");
+                    yield new TransferItem(CampaignCommandJson.uuid(payload.get("itemInstanceId")),
+                            CampaignCommandJson.uuid(payload.get("recipientActorId")), quantity(payload.get("quantity")));
+                }
+                case "TRADE_ITEMS" -> {
+                    fields(payload, "counterpartyActorId", "offered", "requested");
+                    yield new TradeItems(CampaignCommandJson.uuid(payload.get("counterpartyActorId")),
+                            lines(payload.get("offered")), lines(payload.get("requested")));
+                }
                 default -> throw invalid();
             };
         } catch (IllegalArgumentException | ArithmeticException failure) {
@@ -85,7 +115,30 @@ public sealed interface TypedCommand
 
     /** Whether the journal type requires typed evidence at canonical commit. */
     static boolean registered(String type) {
-        return Set.of("MOVE", "WAIT", "SPEAK", "USE_ABILITY").contains(type);
+        return Set.of("MOVE", "WAIT", "SPEAK", "USE_ABILITY", "USE_ITEM", "EQUIP_ITEM", "UNEQUIP_ITEM",
+                "TRANSFER_ITEM", "TRADE_ITEMS").contains(type);
+    }
+
+    /** Require an exact integer quantity of 1..9999 without coercion from decimals or text. */
+    private static int quantity(Object value) {
+        if (!(value instanceof BigInteger number) || number.signum() < 1 || number.compareTo(BigInteger.valueOf(9999)) > 0) {
+            throw invalid();
+        }
+        return number.intValueExact();
+    }
+
+    /** Decode one side of a trade: a list of exact {@code {itemInstanceId, quantity}} objects. */
+    private static List<TradeItems.Line> lines(Object value) {
+        if (!(value instanceof List<?> list) || list.size() > TradeItems.MAX_LINES) {
+            throw invalid();
+        }
+        return list.stream().map(entry -> {
+            if (!(entry instanceof Map<?, ?> line)) {
+                throw invalid();
+            }
+            fields(line, "itemInstanceId", "quantity");
+            return new TradeItems.Line(CampaignCommandJson.uuid(line.get("itemInstanceId")), quantity(line.get("quantity")));
+        }).toList();
     }
 
     /** Require the exact payload field set; missing, extra and effect-bearing keys all fail. */
@@ -194,6 +247,134 @@ public sealed interface TypedCommand
         public Map<String, Object> attemptPayload() {
             return Map.of("abilityId", abilityId,
                     "targetActorIds", targetActorIds.stream().map(UUID::toString).sorted().toList());
+        }
+    }
+    /**
+     * Request to use one held item instance on explicit targets. Whether the item can be used, what
+     * it does and whether a unit is consumed come from its pinned use contract, never from the
+     * intention. Ownership, targets and the effect program are checked by {@link CommandRules}.
+     */
+    record UseItem(UUID itemInstanceId, List<UUID> targetActorIds) implements TypedCommand {
+        /**
+         * Require an instance and at most eight distinct target identities in submitted order; an
+         * empty list means "no explicit target", as for abilities.
+         */
+        public UseItem {
+            if (itemInstanceId == null || targetActorIds == null || targetActorIds.size() > UseAbility.MAX_TARGETS) {
+                throw invalid();
+            }
+            var distinct = new HashSet<UUID>();
+            for (UUID target : targetActorIds) {
+                if (target == null || !distinct.add(target)) { throw invalid(); }
+            }
+            targetActorIds = List.copyOf(targetActorIds);
+        }
+        /** @return the fixed item-use identifier */
+        public String type() { return "USE_ITEM"; }
+        /** @return the instance identity and canonical target UUID texts in submitted order */
+        public Map<String, Object> payload() {
+            return Map.of("itemInstanceId", itemInstanceId.toString(),
+                    "targetActorIds", targetActorIds.stream().map(UUID::toString).toList());
+        }
+        /** @return the instance and its targets in ascending text order, because target order cannot change the outcome */
+        public Map<String, Object> attemptPayload() {
+            return Map.of("itemInstanceId", itemInstanceId.toString(),
+                    "targetActorIds", targetActorIds.stream().map(UUID::toString).sorted().toList());
+        }
+    }
+
+    /** Request to wear one held item instance; slot, hands and tags come from its definition. */
+    record EquipItem(UUID itemInstanceId) implements TypedCommand {
+        /** Require an instance identity. */
+        public EquipItem { if (itemInstanceId == null) { throw invalid(); } }
+        /** @return the fixed equip identifier */
+        public String type() { return "EQUIP_ITEM"; }
+        /** @return the single instance field */
+        public Map<String, Object> payload() { return Map.of("itemInstanceId", itemInstanceId.toString()); }
+    }
+
+    /** Request to take off one worn item instance; it stays in the inventory. */
+    record UnequipItem(UUID itemInstanceId) implements TypedCommand {
+        /** Require an instance identity. */
+        public UnequipItem { if (itemInstanceId == null) { throw invalid(); } }
+        /** @return the fixed unequip identifier */
+        public String type() { return "UNEQUIP_ITEM"; }
+        /** @return the single instance field */
+        public Map<String, Object> payload() { return Map.of("itemInstanceId", itemInstanceId.toString()); }
+    }
+
+    /**
+     * Gift of units of one held item instance to a co-present actor. The recipient does not pay and
+     * is not asked; an exchange needs {@link TradeItems}.
+     */
+    record TransferItem(UUID itemInstanceId, UUID recipientActorId, int quantity) implements TypedCommand {
+        /** Require both identities and 1..9999 units; the held quantity is a current-state rule. */
+        public TransferItem {
+            if (itemInstanceId == null || recipientActorId == null || quantity < 1 || quantity > 9999) {
+                throw invalid();
+            }
+        }
+        /** @return the fixed transfer identifier */
+        public String type() { return "TRANSFER_ITEM"; }
+        /** @return instance, recipient and exact unit count */
+        public Map<String, Object> payload() {
+            return Map.of("itemInstanceId", itemInstanceId.toString(), "recipientActorId", recipientActorId.toString(),
+                    "quantity", quantity);
+        }
+    }
+
+    /**
+     * One atomic exchange between the player and a co-present actor: the units the player offers
+     * against the units the player requests. The counterparty's acceptance is decided by rule
+     * (the valuation balance of {@link CommandRules}), never by wording; a price rumor is not an offer.
+     */
+    record TradeItems(UUID counterpartyActorId, List<Line> offered, List<Line> requested) implements TypedCommand {
+        /** Upper bound of lines per side. */
+        static final int MAX_LINES = 8;
+
+        /**
+         * Units of one instance.
+         *
+         * @param itemInstanceId the instance
+         * @param quantity units, 1..9999
+         */
+        public record Line(UUID itemInstanceId, int quantity) {
+            /** Require an identity and a bounded unit count. */
+            public Line {
+                if (itemInstanceId == null || quantity < 1 || quantity > 9999) { throw invalid(); }
+            }
+            /** @return the canonical object form */
+            Map<String, Object> payload() {
+                return Map.of("itemInstanceId", itemInstanceId.toString(), "quantity", quantity);
+            }
+        }
+
+        /**
+         * Require a counterparty, one to eight lines per side and no instance named twice across
+         * both sides, so one trade can neither pay with what it receives nor request the same stack twice.
+         */
+        public TradeItems {
+            if (counterpartyActorId == null || offered == null || requested == null || offered.isEmpty()
+                    || requested.isEmpty() || offered.size() > MAX_LINES || requested.size() > MAX_LINES) {
+                throw invalid();
+            }
+            var distinct = new HashSet<UUID>();
+            for (Line line : offered) {
+                if (line == null || !distinct.add(line.itemInstanceId())) { throw invalid(); }
+            }
+            for (Line line : requested) {
+                if (line == null || !distinct.add(line.itemInstanceId())) { throw invalid(); }
+            }
+            offered = List.copyOf(offered);
+            requested = List.copyOf(requested);
+        }
+        /** @return the fixed trade identifier */
+        public String type() { return "TRADE_ITEMS"; }
+        /** @return counterparty and both ordered line lists */
+        public Map<String, Object> payload() {
+            return Map.of("counterpartyActorId", counterpartyActorId.toString(),
+                    "offered", offered.stream().map(Line::payload).toList(),
+                    "requested", requested.stream().map(Line::payload).toList());
         }
     }
 }

@@ -2408,6 +2408,30 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     equipment (P10.5). Starting loadouts from dependency packs are checked at campaign creation, not
     by a dedicated persistence test. No live V18 dump and restore rehearsal ran.
 - [ ] P10.2 Implement atomic use/transfer/equip/trade commands and source-linked item creation.
+  - Package A — pack contract (`PackCompiler`): optional item `value` (1–1,000,000 trade units; absent
+    means unpriced) and `use` (`consumes`, default true; optional `target` policy; `effects` in the exact
+    ability grammar and node budget), and an optional `createItem.quantity` (1–99 per recipient). Existing
+    packs and content hashes are unchanged.
+  - Package B — pure inventory (`org.rpgengine.inventory`): `InventoryModel` (consume, transfer, deposit with
+    identity-preserving whole-stack moves and merging in identity order), `ItemChange`/`ItemPlan` (minimal
+    mutations, declared creations and consumptions, per-definition unit conservation proved at
+    construction) and `InventoryWriter` (compare-and-set on owner, quantity, definition and storage
+    version; ledger rows).
+  - Package C — commands (`commands`): `USE_ITEM`, `EQUIP_ITEM`, `UNEQUIP_ITEM`, `TRANSFER_ITEM` and
+    `TRADE_ITEMS` in the closed vocabulary; rule gate with the stable categories `ITEM_UNAVAILABLE`,
+    `EQUIPMENT_ILLEGAL`, `QUANTITY_ILLEGAL`, `TRADE_REFUSED` (plus the existing target, actor and effect
+    categories); resolver branches, `createItem` executable in abilities and items; trade accepted by the
+    value-balance rule; `CharacterService.equipViolations` shares the equip check; attribution of every item
+    effect to the intention's participants.
+  - Package D — persistence and surfaces (`V19`): append-only `item_creation` ledger (operation, announcing
+    event, `EFFECT`/`REWARD` source key, recipient, definition, quantity; unique per source), commit applies
+    items after the events inside the same transaction, six v1 events with bilingual narration statements,
+    player-safe receipt `items` lines, HTTP codes, English/Italian frontend messages (349 reviewed
+    messages), backup tool at schema version 19. Decision: [ADR 0024](adr/0024-atomic-item-commands-and-source-linked-creation.md).
+  - Exit checks: QA-10 (potion quantity and capped healing commit together; equipment cannot duplicate
+    ownership), unit conservation across transfer, trade, use and creation, every refusal writes nothing,
+    replay never repeats an effect, a fault after the item rows rolls back rows, ledger, events and
+    resources, the ledger is append-only and unique per source, the V19 upgrade step, and the full plan.
 - [ ] P10.3 Implement basic objective predicates, quest transitions, and one-time reward-source accounting.
 - [ ] P10.4 Implement movement duration, rest, and a bounded world clock without time advancement on queries.
 - [ ] P10.5 Integrate reliable state changes into panels and journal.

@@ -53,6 +53,8 @@ public final class PackCompiler {
     static final int DEFAULT_HANDS = 2;
     /** Most hands a pack may declare; larger values would make hand occupancy uninformative. */
     static final int MAX_HANDS = 4;
+    /** Most units one {@code createItem} node may create per recipient (P10.2). */
+    static final int MAX_CREATED_QUANTITY = 99;
     /** Cap on stacks of a stacking condition; bounds how far one condition can move an attribute. */
     static final int MAX_CONDITION_STACKS = 10;
     private static final int VALUE_MAX = 1_000_000;
@@ -677,6 +679,13 @@ public final class PackCompiler {
             // Properties are plain integers: formulas and effects must use the bounded expression
             // layer (P04.3), so prose or text cannot smuggle a mechanical bonus in here.
             f.intMap("properties", -VALUE_MAX, VALUE_MAX, 32);
+            // Trade valuation (P10.2): explicit units, never derived from rarity, artwork or prose. An item
+            // without a value cannot be priced, so the trade rule refuses it instead of guessing.
+            f.integer("value", 1, VALUE_MAX, 0);
+            Fields use = f.object("use", false);
+            if (use != null) {
+                useContract(use);
+            }
             Fields appearance = f.object("appearance", true);
             String appearanceId = appearance.id("id", true);
             appearance.text("summary", true);
@@ -685,6 +694,24 @@ public final class PackCompiler {
                 throw appearance.fail("DUPLICATE", "id", "Appearance identity already used by another item");
             }
             f.text("provenance", false);
+        }
+
+        /**
+         * Item use contract (P10.2): whether one unit is consumed, who may be targeted and the effect
+         * program that runs when the item is used. The grammar, bounds and node budget are exactly those
+         * of an ability's effects, so a potion and an ability share one validated effect language.
+         */
+        private void useContract(Fields use) {
+            use.bool("consumes", true);
+            Fields target = use.object("target", false);
+            if (target != null) {
+                target.choice("policy", TARGET_POLICIES, null);
+                target.integer("maxTargets", 1, 8, 1);
+                target.close();
+            }
+            effectNodes = 0;
+            effects(use, "effects", 1, null, 1, null);
+            use.close();
         }
 
         /** Skill: optional governing attribute and a bounded maximum rank. */
@@ -857,6 +884,8 @@ public final class PackCompiler {
             }
             if (type.equals("createItem")) {
                 e.ref("item", ITEM, true);
+                // Units created per recipient; the resolver splits them into stacks (docs/10 section 3).
+                e.integer("quantity", 1, MAX_CREATED_QUANTITY, 1);
             }
             if (type.equals("move")) {
                 e.ref("destination", LOCATION, true);

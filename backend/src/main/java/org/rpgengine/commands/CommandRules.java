@@ -6,6 +6,9 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import org.rpgengine.characters.CharacterRuleViolation;
+import org.rpgengine.characters.CharacterService;
+import org.rpgengine.inventory.ItemChange;
 import org.rpgengine.knowledge.KnowledgeLedger;
 import org.rpgengine.knowledge.KnowledgeRefs;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -32,6 +35,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *   <li><b>Executable effects</b> — the ability's effect program must be one the local resolver
  *       executes, read actor values only in the player's own vocabulary and fit the per-operation
  *       durable draw budget (P07.4).</li>
+ *   <li><b>Items (P10.2)</b> — {@code USE_ITEM} needs an instance the player holds whose pinned
+ *       definition has a use contract (targets and effects are checked like an ability's, and a
+ *       consuming use needs the instance unworn); {@code EQUIP_ITEM}/{@code UNEQUIP_ITEM} apply the
+ *       P10.1 equipment constraints; {@code TRANSFER_ITEM} gives units of an unworn instance to a
+ *       perceivable actor; {@code TRADE_ITEMS} needs a perceivable counterparty, unworn instances
+ *       on both sides, every item priced and a counterparty that receives at least the value it gives.</li>
  *   <li><b>Causal attribution</b> — at commit, resolved effects may only touch the participants
  *       this intention lawfully involves ({@link #requireAttributed}).</li>
  * </ul>
@@ -46,8 +55,17 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * Both escape the caller's transaction and therefore roll back everything it wrote.
  */
 final class CommandRules {
+    /**
+     * Most units one operation may create across all recipients. It keeps the instance mutations,
+     * ledger entries and announcing events of a single commit far below the plan bounds.
+     */
+    static final int MAX_CREATED_UNITS = 64;
+
     /** Static transaction participant with no lifecycle or external clients. */
     private CommandRules() { }
+
+    /** One held instance as read under the campaign lock: definition, units and whether it is worn. */
+    private record Held(String definition, int quantity, boolean worn) { }
 
     /**
      * Validate one decoded intention for the already eligible acting player.
@@ -76,14 +94,33 @@ final class CommandRules {
                 participants.add(speech.recipientActorId());
             }
             case TypedCommand.UseAbility use -> participants.addAll(check.ability(use));
+            case TypedCommand.UseItem use -> participants.addAll(check.itemUse(use));
+            case TypedCommand.EquipItem equip -> check.equip(equip.itemInstanceId());
+            case TypedCommand.UnequipItem unequip -> check.unequip(unequip.itemInstanceId());
+            case TypedCommand.TransferItem gift -> {
+                if (gift.recipientActorId().equals(player)) {
+                    throw fail(OperationAdmissionFailure.Kind.ACTOR_UNAVAILABLE);
+                }
+                check.perceivable(gift.recipientActorId());
+                check.give(gift.itemInstanceId(), gift.quantity());
+                participants.add(gift.recipientActorId());
+            }
+            case TypedCommand.TradeItems trade -> {
+                if (trade.counterpartyActorId().equals(player)) {
+                    throw fail(OperationAdmissionFailure.Kind.ACTOR_UNAVAILABLE);
+                }
+                check.perceivable(trade.counterpartyActorId());
+                check.trade(trade);
+                participants.add(trade.counterpartyActorId());
+            }
         }
         return Set.copyOf(participants);
     }
 
     /**
      * Reject resolved effects that the admitted intention cannot have caused: every adjusted
-     * resource and every placed actor must belong to a participant, and every event actor must
-     * be absent or a participant. A resolver bug or a forged plan therefore cannot charge or credit an
+     * resource, placed actor, item mutation, created item and equipment change must belong to a
+     * participant, and every event actor must be absent or a participant. A resolver bug or a forged plan therefore cannot charge or credit an
      * uninvolved actor. Runs under the commit's campaign lock before any entity changes.
      *
      * @throws IllegalStateException for an unattributable or out-of-scope effect
@@ -98,6 +135,28 @@ final class CommandRules {
         }
         for (var placement : plan.placements()) {
             if (!participants.contains(placement.actorId())) {
+                throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
+            }
+        }
+        // Items: every instance mutation, creation and equipment change must stay between participants.
+        for (ItemChange change : plan.items().changes()) {
+            boolean attributable = switch (change) {
+                case ItemChange.Update update -> participants.contains(update.expectedOwner())
+                        && participants.contains(update.newOwner());
+                case ItemChange.Delete delete -> participants.contains(delete.expectedOwner());
+                case ItemChange.Insert insert -> participants.contains(insert.ownerId());
+            };
+            if (!attributable) {
+                throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
+            }
+        }
+        for (var creation : plan.items().creations()) {
+            if (!participants.contains(creation.recipientId())) {
+                throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
+            }
+        }
+        for (var change : plan.items().equipment()) {
+            if (!participants.contains(change.actorId())) {
                 throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
             }
         }
@@ -296,20 +355,7 @@ final class CommandRules {
                     throw fail(OperationAdmissionFailure.Kind.PREREQUISITE_UNMET);
                 }
             }
-            int count = use.targetActorIds().size();
-            boolean legal = switch (ability.targetPolicy()) {
-                case "self" -> count == 0;
-                case "single" -> count == 1;
-                case "multiple" -> count >= 1 && count <= ability.maxTargets();
-                // Area targeting needs encounter zones (P11); unknown future policies fail closed.
-                default -> false;
-            };
-            if (!legal) {
-                throw fail(OperationAdmissionFailure.Kind.TARGET_ILLEGAL);
-            }
-            for (UUID target : use.targetActorIds()) {
-                perceivable(target);
-            }
+            targets(ability.targetPolicy(), ability.maxTargets(), use.targetActorIds());
             // Sorted keys give a deterministic first failure when several costs are unaffordable.
             for (var cost : new TreeMap<>(ability.costs()).entrySet()) {
                 if (cost.getValue() == 0) {
@@ -329,17 +375,149 @@ final class CommandRules {
                     throw fail(OperationAdmissionFailure.Kind.RESOURCE_INSUFFICIENT);
                 }
             }
-            // Effects the resolver cannot execute are refused now, before a journal row, permit or
-            // draw exists. Attribute/resource atoms and resource changes use unqualified keys, so
-            // reading them is meaningful only in the player's own vocabulary. Writing a foreign
-            // vocabulary key is allowed: the resolver records that actor as explicitly unaffected.
-            var effects = ability.effects();
+            runnable(ability, use.targetActorIds().size());
+            return use.targetActorIds();
+        }
+
+        /**
+         * Target count must fit the policy, and every explicit target must be perceivable. Shared by
+         * abilities and item uses so both follow one targeting rule.
+         */
+        private void targets(String policy, int maxTargets, List<UUID> targets) {
+            int count = targets.size();
+            boolean legal = switch (policy) {
+                case "self" -> count == 0;
+                case "single" -> count == 1;
+                case "multiple" -> count >= 1 && count <= maxTargets;
+                // Area targeting needs encounter zones (P11); unknown future policies fail closed.
+                default -> false;
+            };
+            if (!legal) {
+                throw fail(OperationAdmissionFailure.Kind.TARGET_ILLEGAL);
+            }
+            for (UUID target : targets) {
+                perceivable(target);
+            }
+        }
+
+        /**
+         * Effects the resolver cannot execute are refused now, before a journal row, permit or draw
+         * exists. Attribute/resource atoms and resource changes use unqualified keys, so reading them
+         * is meaningful only in the player's own vocabulary. Writing a foreign vocabulary key is
+         * allowed: the resolver records that actor as explicitly unaffected. The units an action can
+         * create are bounded so a single operation writes a bounded number of rows and ledger entries.
+         */
+        private void runnable(CommandRuleCatalog.Ability contract, int targetCount) {
+            var effects = contract.effects();
             if (!EffectProgram.supported(effects)
                     || EffectProgram.maxDraws(effects) > org.rpgengine.rules.DeterministicDraw.MAX_DRAWS
-                    || (EffectProgram.readsActorValues(effects) && !ability.pack().equals(vocabulary()))) {
+                    || (EffectProgram.readsActorValues(effects) && !contract.pack().equals(vocabulary()))
+                    || (long) EffectProgram.maxCreatedUnits(effects) * Math.max(1, targetCount) > MAX_CREATED_UNITS) {
                 throw fail(OperationAdmissionFailure.Kind.EFFECT_UNSUPPORTED);
             }
+        }
+
+        /**
+         * Item use: a held instance whose pinned definition declares a use contract. A contract that
+         * consumes a unit needs the instance unworn, because a worn instance is bound to its slot.
+         *
+         * @return explicit targets that become commit participants
+         */
+        List<UUID> itemUse(TypedCommand.UseItem use) {
+            Held item = held(use.itemInstanceId(), player);
+            var rule = catalog().items().get(item.definition());
+            if (rule == null || rule.use() == null || (rule.use().consumes() && item.worn())) {
+                throw fail(OperationAdmissionFailure.Kind.ITEM_UNAVAILABLE);
+            }
+            var contract = rule.use().contract();
+            targets(contract.targetPolicy(), contract.maxTargets(), use.targetActorIds());
+            runnable(contract, use.targetActorIds().size());
             return use.targetActorIds();
+        }
+
+        /**
+         * Wearing an instance: it must be held and unworn, and the P10.1 equipment constraints (slot,
+         * tags, capacity, hands) must all hold. Facts the character rules do not know reject the action.
+         */
+        void equip(UUID instance) {
+            held(instance, player);
+            try {
+                if (!new CharacterService(jdbc).equipViolations(campaign, player, instance, catalog().characters()).isEmpty()) {
+                    throw fail(OperationAdmissionFailure.Kind.EQUIPMENT_ILLEGAL);
+                }
+            } catch (CharacterRuleViolation violation) {
+                throw fail(violation.reason() == CharacterRuleViolation.Reason.UNKNOWN_ITEM
+                        ? OperationAdmissionFailure.Kind.ITEM_UNAVAILABLE : OperationAdmissionFailure.Kind.EQUIPMENT_ILLEGAL);
+            }
+        }
+
+        /** Taking off requires an instance the player actually wears. */
+        void unequip(UUID instance) {
+            if (!Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from equipment_assignment "
+                    + "where campaign_id = ? and actor_id = ? and item_instance_id = ?)", Boolean.class, campaign,
+                    player, instance))) {
+                throw fail(OperationAdmissionFailure.Kind.EQUIPMENT_ILLEGAL);
+            }
+        }
+
+        /** A gift moves units of an unworn instance of the player; the player cannot give more than held. */
+        void give(UUID instance, int quantity) {
+            Held item = held(instance, player);
+            if (item.worn()) {
+                throw fail(OperationAdmissionFailure.Kind.ITEM_UNAVAILABLE);
+            }
+            if (quantity > item.quantity()) {
+                throw fail(OperationAdmissionFailure.Kind.QUANTITY_ILLEGAL);
+            }
+        }
+
+        /**
+         * Trade lines must be unworn instances held by the right side in the stated quantities, every
+         * item must carry a declared value, and the counterparty must receive at least the value it
+         * gives. Sums use exact long arithmetic (value &le; 10^6, quantity &le; 9999, at most 16 lines).
+         */
+        void trade(TypedCommand.TradeItems trade) {
+            long given = value(trade.offered(), player);
+            long received = value(trade.requested(), trade.counterpartyActorId());
+            if (given < received) {
+                throw fail(OperationAdmissionFailure.Kind.TRADE_REFUSED);
+            }
+        }
+
+        /** Total declared value of lines that {@code holder} must hold; unpriced items refuse the trade. */
+        private long value(List<TypedCommand.TradeItems.Line> lines, UUID holder) {
+            long total = 0;
+            for (var line : lines) {
+                Held item = held(line.itemInstanceId(), holder);
+                if (item.worn()) {
+                    throw fail(OperationAdmissionFailure.Kind.ITEM_UNAVAILABLE);
+                }
+                if (line.quantity() > item.quantity()) {
+                    throw fail(OperationAdmissionFailure.Kind.QUANTITY_ILLEGAL);
+                }
+                var rule = catalog().items().get(item.definition());
+                if (rule == null || rule.value() == null) {
+                    throw fail(OperationAdmissionFailure.Kind.TRADE_REFUSED);
+                }
+                total = Math.addExact(total, Math.multiplyExact((long) rule.value(), line.quantity()));
+            }
+            return total;
+        }
+
+        /**
+         * Read one instance that {@code owner} must hold. A missing instance and an instance of
+         * another actor share one category, so probing identities reveals nothing.
+         */
+        private Held held(UUID instance, UUID owner) {
+            var rows = jdbc.query("select i.definition_id, i.quantity, exists(select 1 from equipment_assignment e "
+                    + "where e.campaign_id = i.campaign_id and e.item_instance_id = i.id) from item_instance i "
+                    + "where i.campaign_id = ? and i.id = ? and i.actor_id = ?",
+                    (row, index) -> new Held(row.getString(1), row.getInt(2), row.getBoolean(3)), campaign, instance,
+                    owner);
+            if (rows.isEmpty()) {
+                throw fail(OperationAdmissionFailure.Kind.ITEM_UNAVAILABLE);
+            }
+            return rows.getFirst();
         }
 
         /**

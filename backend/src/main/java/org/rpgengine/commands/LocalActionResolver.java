@@ -1,6 +1,7 @@
 package org.rpgengine.commands;
 
 import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,6 +14,9 @@ import java.util.UUID;
 import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.campaign.CampaignMode;
 import org.rpgengine.campaign.EventVisibility;
+import org.rpgengine.inventory.InventoryModel;
+import org.rpgengine.inventory.InventoryWriter;
+import org.rpgengine.inventory.ItemPlan;
 import org.rpgengine.rules.DeterministicDraw;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -27,6 +31,12 @@ import tools.jackson.databind.node.ObjectNode;
  * ordered events with calculation inputs and draw ordinals, receipt details and the query
  * scopes the effects change. It performs no I/O of its own; only the supplied
  * {@link Draws} reaches storage, and only to reserve or replay draws.
+ *
+ * <p>Items (P10.2): item commands edit an {@link InventoryModel} of the participants' stacks and
+ * return the resulting {@link ItemPlan}; ability and item-use effects may create items, each with a
+ * ledger source key {@code <operation>#<effect path>}. New instance identities derive from the
+ * operation, so the same operation always proposes the same rows. Every item command takes no world
+ * time and, like the other intentions, advances the game turn once.
  *
  * <p>Determinism: the same intention, snapshot and draw values always give byte-identical
  * output. Draw ordinals are assigned in evaluation order starting at zero, one per die, so
@@ -89,9 +99,18 @@ final class LocalActionResolver {
      * @param skills player's skill ranks by canonical skill ID
      * @param pools resource pools of every participant, by actor then unqualified key
      * @param vocabularies declaring pack of each participant's origin, or no entry when unknown
+     * @param operationId committing operation; seeds new item identities and ledger source keys
+     * @param stacks every item stack held by a participant
      */
     record Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
-            Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies) {
+            Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
+            UUID operationId, List<InventoryModel.Stack> stacks) {
+        /** Snapshot without item facts, the shape used before P10.2. */
+        Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
+                Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies) {
+            this(player, location, playerRowVersion, attributes, skills, pools, vocabularies, new UUID(0, 0), List.of());
+        }
+
         /** Freeze the maps; nested pool maps are copied too. */
         Snapshot {
             Objects.requireNonNull(player, "player");
@@ -101,6 +120,8 @@ final class LocalActionResolver {
             pools.forEach((actor, byKey) -> frozen.put(actor, Map.copyOf(byKey)));
             pools = Map.copyOf(frozen);
             vocabularies = Map.copyOf(vocabularies);
+            Objects.requireNonNull(operationId, "operationId");
+            stacks = List.copyOf(stacks);
         }
     }
 
@@ -113,10 +134,11 @@ final class LocalActionResolver {
      * @param events ordered events (at least one)
      * @param receiptDetails owner-safe receipt details JSON object
      * @param queryScopes sorted distinct query scopes whose truth the effects change
+     * @param items item mutations, created and consumed units and equipment changes
      */
     record Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
             List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
-            List<String> queryScopes) { }
+            List<String> queryScopes, ItemPlan items) { }
 
     /**
      * Calculate the effects of an intention that already passed {@link CommandRules}.
@@ -145,12 +167,21 @@ final class LocalActionResolver {
         private final List<ResolvedCommit.Placement> placements = new ArrayList<>();
         private final ObjectNode details = JSON.createObjectNode();
         private final ArrayNode calculations = JSON.createArrayNode();
+        private final ArrayNode itemLines = JSON.createArrayNode();
+        private final List<ItemPlan.Creation> creations = new ArrayList<>();
+        private final List<ItemPlan.Consumption> consumptions = new ArrayList<>();
+        private final List<ItemPlan.EquipmentChange> equipment = new ArrayList<>();
+        private final InventoryModel inventory;
         private int nextOrdinal;
+        private int nextInstance;
 
-        /** Copy current pool values into the running state. */
+        /** Copy current pool values and item stacks into the running state. */
         Run(Snapshot snapshot, Draws draws) {
             this.snapshot = snapshot;
             this.draws = draws;
+            // Deterministic identities: a retried resolution of this operation proposes the same rows.
+            this.inventory = new InventoryModel(snapshot.stacks(), () -> UUID.nameUUIDFromBytes(
+                    (snapshot.operationId() + "/instance/" + nextInstance++).getBytes(StandardCharsets.UTF_8)));
             snapshot.pools().forEach((actor, byKey) -> {
                 var current = new TreeMap<String, Long>();
                 byKey.forEach((key, pool) -> current.put(key, pool.current()));
@@ -190,17 +221,29 @@ final class LocalActionResolver {
                             .put("text", speech.text()));
                 }
                 case TypedCommand.UseAbility use -> ability(use, Objects.requireNonNull(catalog, "catalog"));
+                case TypedCommand.UseItem use -> useItem(use, Objects.requireNonNull(catalog, "catalog"));
+                case TypedCommand.EquipItem equip -> wear(equip.itemInstanceId(), true,
+                        Objects.requireNonNull(catalog, "catalog"));
+                case TypedCommand.UnequipItem unequip -> wear(unequip.itemInstanceId(), false,
+                        Objects.requireNonNull(catalog, "catalog"));
+                case TypedCommand.TransferItem gift -> give(gift);
+                case TypedCommand.TradeItems trade -> trade(trade, Objects.requireNonNull(catalog, "catalog"));
             }
             details.put("elapsedSeconds", elapsed);
             details.put("turnAdvanced", true);
             details.putNull("pendingDecision");
             var resources = changes();
+            var items = new ItemPlan(inventory.changes(), creations, consumptions, equipment);
+            if (!itemLines.isEmpty()) {
+                details.set("items", itemLines);
+            }
             var scopes = new TreeSet<String>();
             resources.forEach(change -> scopes.add(scope(owner(change.resourceId()))));
             placements.forEach(placement -> scopes.add(scope(placement.actorId())));
+            scopes.addAll(InventoryWriter.scopes(items));
             return new Resolution(new ResolvedCommit.WorldChange(true, elapsed, CampaignMode.EXPLORATION, null),
                     resources, List.copyOf(placements), List.copyOf(events), JSON.writeValueAsString(details),
-                    List.copyOf(scopes));
+                    List.copyOf(scopes), items);
         }
 
         /**
@@ -237,23 +280,154 @@ final class LocalActionResolver {
                         .put("actorId", snapshot.player().toString()).put("resourceKey", cost.getKey())
                         .put("amount", cost.getValue()).put("before", before).put("after", after));
             }
+            runEffects(ability, use.targetActorIds(), catalog);
+        }
+
+        /**
+         * Item use: announce, use up one unit when the contract consumes, then run the contract's
+         * effect program exactly like an ability's. The rule gate proved the instance is held, unworn
+         * when consumed, and that the item declares a runnable use contract.
+         */
+        private void useItem(TypedCommand.UseItem use, CommandRuleCatalog catalog) {
+            var stack = inventory.find(use.itemInstanceId())
+                    .orElseThrow(() -> new IllegalStateException("validated item instance is missing"));
+            var rule = catalog.items().get(stack.definition());
+            if (rule == null || rule.use() == null) {
+                throw new IllegalStateException("validated item has no use contract");
+            }
+            details.put("itemInstanceId", use.itemInstanceId().toString());
+            details.put("definitionId", stack.definition());
+            var targets = details.putArray("targetActorIds");
+            use.targetActorIds().forEach(target -> targets.add(target.toString()));
+            var announced = payload().put("actorId", snapshot.player().toString())
+                    .put("itemInstanceId", use.itemInstanceId().toString()).put("definitionId", stack.definition())
+                    .put("consumed", rule.use().consumes() ? 1 : 0);
+            announced.set("targetActorIds", targets.deepCopy());
+            event("ITEM_USED", EventVisibility.PUBLIC, announced);
+            if (rule.use().consumes()) {
+                inventory.consume(use.itemInstanceId(), 1);
+                consumptions.add(new ItemPlan.Consumption(stack.definition(), 1));
+                line("CONSUMED", stack.definition(), use.itemInstanceId(), 1);
+            }
+            runEffects(rule.use().contract(), use.targetActorIds(), catalog);
+        }
+
+        /** Run top-level {@code pre} nodes before {@code post} nodes, each group in authored order. */
+        private void runEffects(CommandRuleCatalog.Ability contract, List<UUID> targets, CommandRuleCatalog catalog) {
             var ordered = new ArrayList<Integer>();
             for (String timing : List.of("pre", "post")) {
-                for (int index = 0; index < ability.effects().size(); index++) {
-                    if (ability.effects().get(index).timing().equals(timing)) {
+                for (int index = 0; index < contract.effects().size(); index++) {
+                    if (contract.effects().get(index).timing().equals(timing)) {
                         ordered.add(index);
                     }
                 }
             }
             for (int index : ordered) {
-                effect(ability.effects().get(index), "effects/" + index, ability, use);
+                effect(contract.effects().get(index), "effects/" + index, contract, targets, catalog);
             }
             details.set("calculations", calculations);
         }
 
+        /** Put on or take off one held instance; the rule gate proved the constraints, commit re-proves them. */
+        private void wear(UUID instance, boolean equip, CommandRuleCatalog catalog) {
+            var stack = inventory.find(instance)
+                    .orElseThrow(() -> new IllegalStateException("validated item instance is missing"));
+            var item = catalog.characters().items().get(stack.definition());
+            if (item == null) {
+                throw new IllegalStateException("validated item is missing from the pinned catalog");
+            }
+            equipment.add(equip ? new ItemPlan.Equip(snapshot.player(), instance)
+                    : new ItemPlan.Unequip(snapshot.player(), instance));
+            details.put("itemInstanceId", instance.toString());
+            details.put("definitionId", stack.definition());
+            event(equip ? "ITEM_EQUIPPED" : "ITEM_UNEQUIPPED", EventVisibility.PUBLIC, payload()
+                    .put("actorId", snapshot.player().toString()).put("itemInstanceId", instance.toString())
+                    .put("definitionId", stack.definition()).put("slot", item.gear().slot())
+                    .put("hands", item.gear().hands()));
+            line(equip ? "EQUIPPED" : "UNEQUIPPED", stack.definition(), instance, 1);
+        }
+
+        /** Gift units of an instance to the recipient. */
+        private void give(TypedCommand.TransferItem gift) {
+            var stack = move(gift.itemInstanceId(), gift.quantity(), snapshot.player(), gift.recipientActorId());
+            details.put("recipientActorId", gift.recipientActorId().toString());
+            event("ITEM_TRANSFERRED", EventVisibility.PUBLIC, payload().put("fromActorId", snapshot.player().toString())
+                    .put("toActorId", gift.recipientActorId().toString()).put("itemInstanceId", stack.id().toString())
+                    .put("definitionId", stack.definition()).put("quantity", gift.quantity()));
+            line("GIVEN", stack.definition(), stack.id(), gift.quantity());
+        }
+
+        /**
+         * Exchange both sides in one event: offered units move to the counterparty first, requested
+         * units to the player second, so every merge sees the stacks in the same order on every run.
+         */
+        private void trade(TypedCommand.TradeItems trade, CommandRuleCatalog catalog) {
+            UUID counterparty = trade.counterpartyActorId();
+            details.put("counterpartyActorId", counterparty.toString());
+            var offered = JSON.createArrayNode();
+            var requested = JSON.createArrayNode();
+            long given = 0;
+            long received = 0;
+            for (var line : trade.offered()) {
+                var stack = move(line.itemInstanceId(), line.quantity(), snapshot.player(), counterparty);
+                given = Math.addExact(given, worth(catalog, stack.definition(), line.quantity()));
+                offered.addObject().put("itemInstanceId", stack.id().toString()).put("definitionId", stack.definition())
+                        .put("quantity", line.quantity());
+                line("GIVEN", stack.definition(), stack.id(), line.quantity());
+            }
+            for (var line : trade.requested()) {
+                var stack = move(line.itemInstanceId(), line.quantity(), counterparty, snapshot.player());
+                received = Math.addExact(received, worth(catalog, stack.definition(), line.quantity()));
+                requested.addObject().put("itemInstanceId", stack.id().toString()).put("definitionId", stack.definition())
+                        .put("quantity", line.quantity());
+                line("RECEIVED", stack.definition(), stack.id(), line.quantity());
+            }
+            if (given < received) {
+                throw new IllegalStateException("validated trade is unbalanced");
+            }
+            var body = payload().put("actorId", snapshot.player().toString())
+                    .put("counterpartyActorId", counterparty.toString());
+            body.set("offered", offered);
+            body.set("requested", requested);
+            body.put("givenValue", given).put("receivedValue", received);
+            event("ITEM_TRADED", EventVisibility.PUBLIC, body);
+        }
+
+        /** Declared value of units of a definition; the rule gate refused unpriced items. */
+        private static long worth(CommandRuleCatalog catalog, String definition, int quantity) {
+            var rule = catalog.items().get(definition);
+            if (rule == null || rule.value() == null) {
+                throw new IllegalStateException("validated trade item has no value");
+            }
+            return Math.multiplyExact((long) rule.value(), quantity);
+        }
+
+        /** Move units between two actors in the model, returning the source stack as it was before the move. */
+        private InventoryModel.Stack move(UUID instance, int quantity, UUID from, UUID to) {
+            var stack = inventory.find(instance)
+                    .orElseThrow(() -> new IllegalStateException("validated item instance is missing"));
+            if (!stack.owner().equals(from)) {
+                throw new IllegalStateException("validated item instance changed owner");
+            }
+            inventory.transfer(instance, quantity, to);
+            return stack;
+        }
+
+        /**
+         * Record one item line of the player's receipt. A created line names no instance: the units
+         * may have merged into an existing stack, so no single instance identifies them.
+         */
+        private void line(String kind, String definition, UUID instance, int quantity) {
+            var line = itemLines.addObject().put("kind", kind).put("definitionId", definition);
+            if (instance != null) {
+                line.put("itemInstanceId", instance.toString());
+            }
+            line.put("quantity", quantity);
+        }
+
         /** Execute one supported node; the rule gate already refused unsupported programs. */
         private void effect(EffectProgram.Effect effect, String path, CommandRuleCatalog.Ability ability,
-                TypedCommand.UseAbility use) {
+                List<UUID> targets, CommandRuleCatalog catalog) {
             switch (effect) {
                 case EffectProgram.Conditional branch -> {
                     var ordinals = new ArrayList<Integer>();
@@ -262,12 +436,43 @@ final class LocalActionResolver {
                     var chosen = holds ? branch.then() : branch.otherwise();
                     String label = holds ? "/then/" : "/else/";
                     for (int index = 0; index < chosen.size(); index++) {
-                        effect(chosen.get(index), path + label + index, ability, use);
+                        effect(chosen.get(index), path + label + index, ability, targets, catalog);
                     }
                 }
-                case EffectProgram.ModifyResource change -> modify(change, path, ability, use);
+                case EffectProgram.ModifyResource change -> modify(change, path, ability, targets);
+                case EffectProgram.CreateItem create -> create(create, path, targets, catalog);
                 case EffectProgram.Unsupported unsupported ->
                         throw new IllegalStateException("unsupported effect reached local resolution");
+            }
+        }
+
+        /**
+         * Create units for each affected actor. The units merge into the recipient's open stacks of the
+         * item first, then open new stacks; each recipient gets one creation ledger entry citing this
+         * operation and effect path as its source, and one announcing event. A recipient that is not
+         * the player is announced as an engine-internal event, because another actor's inventory is
+         * hidden information.
+         */
+        private void create(EffectProgram.CreateItem create, String path, List<UUID> targets,
+                CommandRuleCatalog catalog) {
+            var item = catalog.characters().items().get(create.item());
+            if (item == null) {
+                throw new IllegalStateException("created item is missing from the pinned catalog");
+            }
+            List<UUID> recipients = create.target().equals("self") || targets.isEmpty()
+                    ? List.of(snapshot.player()) : targets;
+            for (UUID recipient : recipients) {
+                String source = snapshot.operationId() + "#" + path;
+                creations.add(new ItemPlan.Creation(recipient, create.item(), create.quantity(),
+                        ItemPlan.SourceKind.EFFECT, source, events.size()));
+                inventory.deposit(recipient, create.item(), item.maxStack(), create.quantity());
+                event("ITEM_CREATED", recipient.equals(snapshot.player()) ? EventVisibility.PUBLIC
+                        : EventVisibility.INTERNAL, payload().put("actorId", snapshot.player().toString())
+                        .put("recipientActorId", recipient.toString()).put("definitionId", create.item())
+                        .put("quantity", create.quantity()).put("path", path).put("sourceKey", source));
+                if (recipient.equals(snapshot.player())) {
+                    line("CREATED", create.item(), null, create.quantity());
+                }
             }
         }
 
@@ -278,14 +483,14 @@ final class LocalActionResolver {
          * is recorded as explicitly unaffected instead of receiving an invented pool.
          */
         private void modify(EffectProgram.ModifyResource change, String path, CommandRuleCatalog.Ability ability,
-                TypedCommand.UseAbility use) {
+                List<UUID> targets) {
             var ordinals = new ArrayList<Integer>();
             long amount = number(change.amount(), ordinals);
             calculation(path + "/amount", "amount", JSON.getNodeFactory().numberNode(amount), ordinals);
             // "self" is the actor; "target"/"targets" are the explicit targets, or the actor itself
             // for a self-policy ability that accepts none.
-            List<UUID> affected = change.target().equals("self") || use.targetActorIds().isEmpty()
-                    ? List.of(snapshot.player()) : use.targetActorIds();
+            List<UUID> affected = change.target().equals("self") || targets.isEmpty()
+                    ? List.of(snapshot.player()) : targets;
             var payload = payload().put("actorId", snapshot.player().toString()).put("path", path)
                     .put("resourceKey", change.resource()).put("amount", amount);
             payload.set("drawOrdinals", ordinals(ordinals));

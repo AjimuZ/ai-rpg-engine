@@ -267,7 +267,11 @@ operation status is stored progress, not evidence that a worker is currently ali
 | 422 | `COMMAND_RESOURCE_INSUFFICIENT` | A declared cost exceeds the player's current resource above its minimum, or belongs to another pack's vocabulary |
 | 422 | `COMMAND_CONTENT_UNAVAILABLE` | The pinned content closure cannot be loaded by this engine build for a rule that needs it |
 | 409 | `COMMAND_DEPENDENCIES_MISSING` | P09.5: the campaign's sealed pinned closure is missing, corrupt or unusable, so every fresh command is refused until the same content is restored or imported (checked right after replay; nothing journaled) |
-| 422 | `COMMAND_EFFECT_UNSUPPORTED` | The ability's effect program needs a later system (damage, healing, conditions, movement, reveal, items), more than 128 draws, or actor values from another pack's vocabulary |
+| 422 | `COMMAND_EFFECT_UNSUPPORTED` | The ability's or item's effect program needs a later system (damage, healing, conditions, movement, reveal), more than 128 draws, more than 64 created units, or actor values from another pack's vocabulary |
+| 422 | `COMMAND_ITEM_UNAVAILABLE` | P10.2: an item instance is not held by the party that must hold it, does not exist, has no use contract, or is worn when the action would use it up, give it away or trade it |
+| 422 | `COMMAND_EQUIPMENT_ILLEGAL` | P10.2: wearing the item breaks a pinned slot, tag, capacity or hand rule (or it is already worn), or the item to take off is not worn |
+| 422 | `COMMAND_QUANTITY_ILLEGAL` | P10.2: more units are named than the stack holds |
+| 422 | `COMMAND_TRADE_REFUSED` | P10.2: an item has no declared value, or the counterparty would receive less value than it gives |
 | 429 | `COMMAND_ADMISSION_LIMIT` | Two live mutation permits already belong to this owner |
 | 503 | `COMMAND_STORAGE_UNAVAILABLE` | Required transaction/storage unavailable |
 

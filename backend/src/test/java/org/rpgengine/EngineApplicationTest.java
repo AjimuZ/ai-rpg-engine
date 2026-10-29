@@ -32,11 +32,11 @@ class EngineApplicationTest {
     @Autowired
     private Flyway flyway;
 
-    /** Tables created by V1–V17, sorted by name; identifiers are constants, never user input. */
+    /** Tables created by V1–V19, sorted by name; identifiers are constants, never user input. */
     private static final List<String> CANONICAL_TABLES = List.of(
             "actor", "actor_commitment", "actor_condition", "actor_resource", "actor_sighting", "adventure_workspace", "ai_job", "ai_job_attempt", "ai_session_record", "campaign", "campaign_checkpoint", "campaign_creation", "campaign_event",
             "campaign_known_fact", "campaign_known_quest", "campaign_mutation_lease", "campaign_random_seed",
-            "campaign_stream_head", "campaign_stream_message", "canonical_outbox", "character_state", "content_revision", "content_revision_file", "content_revision_report", "equipment_assignment", "identity_owner_profile", "inference_scheduler_state", "inference_task", "item_instance", "knowledge_belief", "knowledge_claim", "learned_ability", "memory_invalidation", "memory_summary", "memory_summary_job", "narration_publication", "operation_journal",
+            "campaign_stream_head", "campaign_stream_message", "canonical_outbox", "character_state", "content_revision", "content_revision_file", "content_revision_report", "equipment_assignment", "identity_owner_profile", "inference_scheduler_state", "inference_task", "item_creation", "item_instance", "knowledge_belief", "knowledge_claim", "learned_ability", "memory_invalidation", "memory_summary", "memory_summary_job", "narration_publication", "operation_journal",
             "operation_random_draw",
             "plan_activation", "plan_admission", "plan_dependency", "plan_disposition", "planning_snapshot",
             "presentation_campaign_settings", "presentation_job", "query_epoch", "quest_plan_artifact",

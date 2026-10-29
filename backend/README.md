@@ -920,6 +920,37 @@ suites pass with zero failures/errors/skips, fifteen deliberate weakening probes
 detected, and the executable jar is packaged. See
 [evidence scope](../docs/15-quality-and-acceptance.md).
 
+## Item commands and source-linked creation (P10.2)
+
+Five more registered intentions — `USE_ITEM`, `EQUIP_ITEM`, `UNEQUIP_ITEM`, `TRANSFER_ITEM` and
+`TRADE_ITEMS` — run through the same pipeline as the P07.4 actions ([rules and categories](../docs/07-turn-protocol.md#p102-item-intentions),
+[ADR 0024](../docs/adr/0024-atomic-item-commands-and-source-linked-creation.md)). Package `org.rpgengine.inventory`
+holds the pieces:
+
+- `InventoryModel` is the pure working copy `LocalActionResolver` edits (consume, transfer, deposit) and
+  turns into a minimal `ItemChange` list: whole-stack moves reassign the same instance, other units
+  merge into the receiver's open stacks in identity order, and new identities derive from the operation.
+- `ItemPlan` carries the changes, the units created (with source kind, key and announcing event index)
+  and consumed, and the equipment changes. Its constructor proves unit conservation per definition.
+- `InventoryWriter` applies a plan inside the commit under the campaign lock: every update and delete
+  is a compare-and-set on owner, quantity, definition and storage version, and every created unit gets an
+  `item_creation` row (V19, append-only) citing the operation and the `ITEM_CREATED` event.
+  `CanonicalCommitService` calls it after the events are flushed and applies equipment changes through
+  `CharacterService`, so an equip is checked twice (rule gate and commit).
+- `CommandRuleCatalog` now also holds each item's `value` and `use` contract and the `CharacterRuleCatalog`
+  of the closure.
+
+Pack items may declare `value`, `use` and a `createItem` `quantity` ([pack contract](../docs/09-adventure-packs.md#7-bounded-expressions-and-effects)).
+Item and ability effects share one resolver, so `createItem` now also works inside abilities.
+
+Tests: `InventoryModelTest` (pure: merging, reassignment, splitting, determinism, conservation),
+`ItemContractPackTest` (pack contract), `ItemCommandsTest` (real PostgreSQL on the armory pack: QA-10
+potion, transfers, trades, equipment, creation ledger, refusals, replay, fault after item writes, stale
+guards), `CanonicalCommitServiceTest` (reward-sourced creation and rollback), `TypedCommandTest`,
+`ResolvedCommitTest` and `EventStatementsTest`. `ArmoryPack` is the shared in-memory pack variant.
+Limits: no NPC stock or shop screens, no weight/capacity/durability, no durations (P10.4) and no
+panels (P10.5).
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

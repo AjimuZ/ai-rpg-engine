@@ -17,7 +17,7 @@ maximum rank, derived statistics, learned abilities with prerequisites, conditio
 explicit item rarity tiers and equipment slots with hand limits are pack rules the backend
 validates and applies ([ADR 0023](adr/0023-character-rules-and-equipment-constraints.md),
 [domain model](05-domain-model.md#character-rules-and-state-p101)). Using them during play
-(atomic use, transfer and equip commands, quests, time, panels) is P10.2–P10.5. Mechanics are
+is P10.2 (atomic use, transfer, equip and trade commands and source-linked item creation, done) and P10.3–P10.5 (quests, time, panels). Mechanics are
 never derived from artwork or prose: an item's tier, slot, hands, tags and any bonus come from its
 definition.
 
@@ -34,6 +34,8 @@ The default situational modifier range is -3 to +3 after combining supported sou
 Support stackable consumables, unique equipment, containers, quest objects, materials, and currency. Pack-defined equipment slots include capacity and compatibility tags. Inspecting an item is a query; drawing, equipping, trading, consuming, or discarding is an action when the rules assign time/cost.
 
 Trades commit the offered items, prices, currency, ownership, and event together. A price rumor is not an accepted offer. Currency cannot become negative unless an explicit debt system is enabled. Unique objects cannot be held by two actors. A generated reward must be admitted as a valid definition/instance with a recorded source.
+
+Since P10.2 these rules are executable. The player can use an item, wear and take off equipment, give units to a co-present actor and trade; each is one atomic commit of the rows, resources, events and receipt ([ADR 0024](adr/0024-atomic-item-commands-and-source-linked-creation.md)). An item's pack data declares whether it can be used (`use`), what it does (the ability effect grammar, with `consumes` deciding whether a unit is used up) and what it is worth (`value`). A trade is accepted by rule, not by wording: every item must have a declared value and the counterparty must receive at least the value it gives. Currency is an item with a value, so it cannot go negative, and the player's whole stack of a unique item keeps its identity and artwork when it changes hands. Units that enter the campaign through an effect are written to an append-only creation ledger with the operation, the announcing event and the source, so a replayed source cannot create them twice. Weight, capacity and durability, NPC stock and shop screens remain later work (P10.5 and P13.4).
 
 Weight/capacity and durability are supported configurable policies in v1, with clear disabled behavior. Inventory displays quantities and current equipment from the backend. The UI must not infer magical bonuses or resource restoration from text.
 

@@ -262,7 +262,7 @@ It contains no prose, selected action or branching script. State/continue resolv
 only the pinned public entrypoint in the saved narrative locale, retaining actual
 language/fallback metadata and typed free-input decision metadata. Cleared or
 unsupported decisions and legacy saves receive no invented starting presentation.
-Mutable inventory/progression commands remain later work (P10.2); equipment state and its rules arrived in P10.1.
+Equipment state and its rules arrived in P10.1 and the item commands that change inventories in P10.2 (below); progression commands remain later work.
 Creation verifies the complete pinned sealed dependency closure before writing;
 external profiles, skills, locations and grants resolve in their declaring pack.
 Dependency IDs persist as `pack#definition`; root IDs retain their local form.
@@ -320,6 +320,32 @@ they change only through `CharacterService`, which checks the campaign's pinned
 - **Rarity.** The catalog carries the declared tier ID of each item and no appearance data, so
   artwork, price and inspection cannot change a tier, slot, hands, tags or bonus.
 
+### Item commands and creation (P10.2)
+
+V19 adds the append-only `item_creation` ledger. The item commands (`USE_ITEM`, `EQUIP_ITEM`,
+`UNEQUIP_ITEM`, `TRANSFER_ITEM`, `TRADE_ITEMS`) and the executable `createItem` effect change inventories
+only through an `ItemPlan` that a canonical commit applies beside the events that announce it
+([ADR 0024](adr/0024-atomic-item-commands-and-source-linked-creation.md)).
+
+- **Conservation.** For every definition, the net unit change of the instance mutations equals the
+  units declared as created minus those declared as consumed. A transfer or trade creates and destroys
+  nothing. The plan proves this when it is built, and the writer guards every update and delete with the
+  exact owner, quantity, definition and storage version that were read; a stale plan rolls the whole
+  commit back.
+- **Ownership.** An instance has exactly one owner. Moving the rest of a stack reassigns the same
+  instance (a unique item keeps its identity and artwork); otherwise units fill the receiver's open
+  stacks of the definition in ascending identity order and then open new stacks. A worn instance cannot
+  be given, traded or consumed (rule gate and equipment foreign key).
+- **Creation ledger.** Every created unit has a row naming the operation, the announcing event, a source
+  kind (`EFFECT` keyed `<operation>#<effect path>`, or `REWARD` keyed by a settlement of the same commit),
+  the recipient, definition and quantity. Rows are immutable, unique per source, recipient and
+  definition, and have no foreign key to the instance, so history outlives a consumed stack.
+- **Trade.** Items carry an optional explicit `value`; the counterparty accepts iff every item is priced
+  and it receives at least the value it gives. Currency is an item with a value.
+- **Events (version 1).** `ITEM_USED`, `ITEM_CREATED` (internal when the recipient is not the player),
+  `ITEM_TRANSFERRED`, `ITEM_TRADED`, `ITEM_EQUIPPED`, `ITEM_UNEQUIPPED`; resource effects of a use reuse
+  `EFFECT_RESOLVED`. Receipts list the player's own item lines.
+
 ### Local consultation presentation (P06.4)
 
 `LocalConsultation` parses a bounded exact alias and transforms an authorized
@@ -352,8 +378,8 @@ canonical commit to increment revision, turn, time or event sequence.
 
 ### Inventory
 
-- Quantities are integers and nonnegative; zero stacks may be archived but history remains.
-- A unique item has exactly one owner/container at a time.
+- Quantities are integers and positive while a row exists; a used-up or fully merged stack is deleted, and its history remains in the events and, for created units, the creation ledger (P10.2).
+- A unique item has exactly one owner/container at a time. Since P10.2 commands move instances by compare-and-set on owner, quantity and storage version, and a unit-conservation proof covers every commit.
 - Equipment references an item actually possessed and available to the actor.
 - Hand occupancy, slots, capacity, ammunition, charges, and binding rules are checked together.
 - Consumption and effect resolution are atomic. An attack cannot consume ammunition twice on a network retry.

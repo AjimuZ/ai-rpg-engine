@@ -2582,6 +2582,51 @@
       <target>Uso di un’abilità</target>
       </segment>
     </unit>
+    <unit id="campaign.command.useItem">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:118</note>
+      </notes>
+      <segment>
+        <source>Use an item</source>
+      <target>Uso di un oggetto</target>
+      </segment>
+    </unit>
+    <unit id="campaign.command.equipItem">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:119</note>
+      </notes>
+      <segment>
+        <source>Equip an item</source>
+      <target>Equipaggiamento di un oggetto</target>
+      </segment>
+    </unit>
+    <unit id="campaign.command.unequipItem">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:120</note>
+      </notes>
+      <segment>
+        <source>Take off an item</source>
+      <target>Rimozione di un oggetto</target>
+      </segment>
+    </unit>
+    <unit id="campaign.command.transferItem">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:121</note>
+      </notes>
+      <segment>
+        <source>Give an item</source>
+      <target>Consegna di un oggetto</target>
+      </segment>
+    </unit>
+    <unit id="campaign.command.tradeItems">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:122</note>
+      </notes>
+      <segment>
+        <source>Trade items</source>
+      <target>Scambio di oggetti</target>
+      </segment>
+    </unit>
     <unit id="campaign.receipt.succeeded">
       <notes>
         <note category="location">src/app/campaign/campaign-messages.ts:121</note>
@@ -2814,6 +2859,42 @@
       <segment>
         <source>Checking the playthrough…</source>
       <target>Controllo della partita…</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.itemUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:39</note>
+      </notes>
+      <segment>
+        <source>That item is not available for this action. Nothing was changed.</source>
+      <target>Questo oggetto non è disponibile per questa azione. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.equipmentIllegal">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:40</note>
+      </notes>
+      <segment>
+        <source>That item cannot be worn or taken off right now. Nothing was changed.</source>
+      <target>Questo oggetto non può essere indossato o rimosso in questo momento. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.quantityIllegal">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:41</note>
+      </notes>
+      <segment>
+        <source>That is more than the available quantity. Nothing was changed.</source>
+      <target>È più della quantità disponibile. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.tradeRefused">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:42</note>
+      </notes>
+      <segment>
+        <source>The other party does not accept this exchange. Nothing was changed.</source>
+      <target>L’altra parte non accetta questo scambio. Non è stato modificato nulla.</target>
       </segment>
     </unit>
     <unit id="campaign.error.dependenciesMissing">

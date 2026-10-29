@@ -19,12 +19,11 @@ import org.rpgengine.content.CompiledPack;
  * that {@link LocalActionResolver} can evaluate without reparsing pack bytes.
  *
  * <p>Only effect types the exploration resolver can execute are represented precisely
- * ({@code modifyResource} and {@code conditional}). Every other compiled type
- * ({@code damage}, {@code heal}, {@code move}, condition changes, {@code reveal},
- * {@code createItem}) becomes {@link Unsupported}: those need armor, conditions, forced
- * movement, knowledge records or item instances that later tasks supply (P09.1, P10, P11),
- * so {@link CommandRules} rejects such abilities as {@code EFFECT_UNSUPPORTED} before any
- * journal write instead of guessing a meaning.
+ * ({@code modifyResource}, {@code createItem} since P10.2, and {@code conditional}). Every other
+ * compiled type ({@code damage}, {@code heal}, {@code move}, condition changes, {@code reveal})
+ * becomes {@link Unsupported}: those need armor, conditions, forced movement or knowledge records
+ * that later tasks supply (P09.1, P10.4, P11), so {@link CommandRules} rejects such abilities
+ * and item uses as {@code EFFECT_UNSUPPORTED} before any journal write instead of guessing a meaning.
  */
 final class EffectProgram {
     /** Static compilation helpers only. */
@@ -56,6 +55,9 @@ final class EffectProgram {
                 case "conditional" -> new Conditional(timing, Formula.compile(node.get("when"), snapshot, pack),
                         compile(node.get("then"), snapshot, pack, timing),
                         compile(node.get("else"), snapshot, pack, timing));
+                case "createItem" -> new CreateItem(timing, target(node),
+                        snapshot.resolve(pack, (String) node.get("item"), "item").id(),
+                        node.get("quantity") instanceof Number quantity ? quantity.intValue() : 1);
                 default -> new Unsupported(timing, type);
             });
         }
@@ -83,9 +85,28 @@ final class EffectProgram {
                     }
                 }
                 case ModifyResource ignored -> { }
+                case CreateItem ignored -> { }
             }
         }
         return true;
+    }
+
+    /**
+     * Worst-case units the list can create for one recipient: every {@code createItem} node in
+     * every branch counted once. The rule gate multiplies it by the recipient count to bound the
+     * rows and ledger entries one operation can write.
+     */
+    static int maxCreatedUnits(List<Effect> effects) {
+        int total = 0;
+        for (Effect effect : effects) {
+            total += switch (effect) {
+                case CreateItem create -> create.quantity();
+                case Conditional branch -> maxCreatedUnits(branch.then()) + maxCreatedUnits(branch.otherwise());
+                case ModifyResource ignored -> 0;
+                case Unsupported ignored -> 0;
+            };
+        }
+        return total;
     }
 
     /**
@@ -100,6 +121,7 @@ final class EffectProgram {
                 case ModifyResource change -> change.amount().dice();
                 case Conditional branch -> branch.when().dice() + maxDraws(branch.then())
                         + maxDraws(branch.otherwise());
+                case CreateItem ignored -> 0;
                 case Unsupported ignored -> 0;
             };
         }
@@ -119,6 +141,7 @@ final class EffectProgram {
                 case ModifyResource change -> change.amount().readsActorValues();
                 case Conditional branch -> branch.when().readsActorValues() || readsActorValues(branch.then())
                         || readsActorValues(branch.otherwise());
+                case CreateItem ignored -> false;
                 case Unsupported ignored -> false;
             };
             if (reads) {
@@ -129,7 +152,7 @@ final class EffectProgram {
     }
 
     /** One compiled effect node; timing is {@code pre} or {@code post}. */
-    sealed interface Effect permits ModifyResource, Conditional, Unsupported {
+    sealed interface Effect permits ModifyResource, Conditional, CreateItem, Unsupported {
         /** @return resolution phase of the node, inherited inside conditionals */
         String timing();
     }
@@ -149,6 +172,27 @@ final class EffectProgram {
             Objects.requireNonNull(target, "target");
             Objects.requireNonNull(resource, "resource");
             Objects.requireNonNull(amount, "amount");
+        }
+    }
+
+    /**
+     * Create units of an item for the affected actors (P10.2). Every created unit is linked to its
+     * source: the operation and this node's path, recorded in the creation ledger.
+     *
+     * @param timing resolution phase
+     * @param target {@code self}, {@code target} or {@code targets}
+     * @param item canonical item definition ID
+     * @param quantity units per recipient, 1..99
+     */
+    record CreateItem(String timing, String target, String item, int quantity) implements Effect {
+        /** Require every part and a quantity within the compiler's bound. */
+        CreateItem {
+            Objects.requireNonNull(timing, "timing");
+            Objects.requireNonNull(target, "target");
+            Objects.requireNonNull(item, "item");
+            if (quantity < 1 || quantity > 99) {
+                throw new IllegalArgumentException("created quantity is outside the compiler's bound");
+            }
         }
     }
 

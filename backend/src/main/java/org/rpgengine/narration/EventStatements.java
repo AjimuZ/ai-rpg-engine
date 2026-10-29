@@ -91,6 +91,51 @@ public final class EventStatements {
                         : actor + " spends " + amount + " " + resource + " (from " + before + " to " + after + ").";
             }
             case "EFFECT_RESOLVED" -> effect(it, payload, names);
+            case "ITEM_USED" -> {
+                String actor = name(payload, "actorId", names);
+                String item = token(payload, "definitionId");
+                List<String> targets = names(payload.path("targetActorIds"), names);
+                if (actor == null || item == null || targets == null) {
+                    yield null;
+                }
+                String on = targets.isEmpty() ? "" : (it ? " su " : " on ") + String.join(", ", targets);
+                yield it ? actor + " usa " + item + on + "." : actor + " uses " + item + on + ".";
+            }
+            case "ITEM_CREATED" -> {
+                String actor = name(payload, "recipientActorId", names);
+                String item = token(payload, "definitionId");
+                Long quantity = number(payload, "quantity");
+                yield actor == null || item == null || quantity == null ? null
+                        : it ? actor + " ottiene " + quantity + " × " + item + "."
+                        : actor + " obtains " + quantity + " × " + item + ".";
+            }
+            case "ITEM_TRANSFERRED" -> {
+                String from = name(payload, "fromActorId", names);
+                String to = name(payload, "toActorId", names);
+                String item = token(payload, "definitionId");
+                Long quantity = number(payload, "quantity");
+                yield from == null || to == null || item == null || quantity == null ? null
+                        : it ? from + " dà " + quantity + " × " + item + " a " + to + "."
+                        : from + " gives " + quantity + " × " + item + " to " + to + ".";
+            }
+            case "ITEM_TRADED" -> {
+                String actor = name(payload, "actorId", names);
+                String counterparty = name(payload, "counterpartyActorId", names);
+                String offered = lines(payload.path("offered"));
+                String requested = lines(payload.path("requested"));
+                yield actor == null || counterparty == null || offered == null || requested == null ? null
+                        : it ? actor + " scambia con " + counterparty + ": offre " + offered + ", riceve " + requested + "."
+                        : actor + " trades with " + counterparty + ": gives " + offered + ", receives " + requested + ".";
+            }
+            case "ITEM_EQUIPPED", "ITEM_UNEQUIPPED" -> {
+                String actor = name(payload, "actorId", names);
+                String item = token(payload, "definitionId");
+                String slot = token(payload, "slot");
+                boolean worn = type.equals("ITEM_EQUIPPED");
+                yield actor == null || item == null || slot == null ? null
+                        : it ? actor + (worn ? " indossa " : " rimuove ") + item + " (" + slot + ")."
+                        : actor + (worn ? " equips " : " unequips ") + item + " (" + slot + ").";
+            }
             default -> null;
         };
         return text == null || text.length() > PublicFact.MAX_TEXT ? Optional.empty() : Optional.of(text);
@@ -164,7 +209,8 @@ public final class EventStatements {
     /** @return every actor identity a supported payload may reference, for one bounded name lookup */
     public static List<UUID> referencedActors(JsonNode payload) {
         var actors = new ArrayList<UUID>();
-        for (String field : List.of("actorId", "speakerActorId", "recipientActorId")) {
+        for (String field : List.of("actorId", "speakerActorId", "recipientActorId", "fromActorId", "toActorId",
+                "counterpartyActorId")) {
             add(payload.path(field), actors);
         }
         payload.path("targetActorIds").forEach(entry -> add(entry, actors));
@@ -181,6 +227,23 @@ public final class EventStatements {
                 // An unknown reference makes the statement empty, which falls back to the receipt.
             }
         }
+    }
+
+    /** @return the comma-joined {@code quantity × definition} lines of a trade side, or null when malformed */
+    private static String lines(JsonNode array) {
+        if (!array.isArray() || array.isEmpty()) {
+            return null;
+        }
+        var parts = new ArrayList<String>();
+        for (JsonNode line : array) {
+            String item = token(line, "definitionId");
+            Long quantity = number(line, "quantity");
+            if (item == null || quantity == null) {
+                return null;
+            }
+            parts.add(quantity + " × " + item);
+        }
+        return String.join(", ", parts);
     }
 
     /** @return a non-blank string field, or null */

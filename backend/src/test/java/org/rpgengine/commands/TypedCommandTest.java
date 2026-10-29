@@ -21,7 +21,15 @@ class TypedCommandTest {
     void supportedIntentionsRoundTripAndPreserveExactText() {
         for (TypedCommand command : List.of(new TypedCommand.Move("harbor:door"), new TypedCommand.Wait(86_400),
                 new TypedCommand.Speak(UUID.randomUUID(), "  È qui? 😀\n"), new TypedCommand.UseAbility("steady", List.of()),
-                new TypedCommand.UseAbility("dep#mend", List.of(UUID.randomUUID(), UUID.randomUUID())))) {
+                new TypedCommand.UseAbility("dep#mend", List.of(UUID.randomUUID(), UUID.randomUUID())),
+                new TypedCommand.UseItem(UUID.randomUUID(), List.of()),
+                new TypedCommand.UseItem(UUID.randomUUID(), List.of(UUID.randomUUID(), UUID.randomUUID())),
+                new TypedCommand.EquipItem(UUID.randomUUID()), new TypedCommand.UnequipItem(UUID.randomUUID()),
+                new TypedCommand.TransferItem(UUID.randomUUID(), UUID.randomUUID(), 9999),
+                new TypedCommand.TradeItems(UUID.randomUUID(),
+                        List.of(new TypedCommand.TradeItems.Line(UUID.randomUUID(), 2),
+                                new TypedCommand.TradeItems.Line(UUID.randomUUID(), 1)),
+                        List.of(new TypedCommand.TradeItems.Line(UUID.randomUUID(), 5))))) {
             byte[] canonical = CommandCanonicalForm.encode(command.type(), 3, command.payload(), 32_768);
             assertEquals(command, TypedCommand.decode(canonical));
             assertThrows(UnsupportedOperationException.class, () -> command.payload().put("patch", "bad"));
@@ -53,8 +61,8 @@ class TypedCommandTest {
 
     /** Effect, batch, administrative and not-yet-supported action types cannot masquerade as player intentions. */
     @ParameterizedTest
-    @ValueSource(strings = {"PATCH", "SET_FIELD", "UPDATE", "BATCH", "ADMIN_CORRECTION", "USE_ITEM",
-            "EQUIP_ITEM", "TRANSFER_ITEM", "ATTACK", "FREE_TEXT", "UNKNOWN"})
+    @ValueSource(strings = {"PATCH", "SET_FIELD", "UPDATE", "BATCH", "ADMIN_CORRECTION", "DROP_ITEM", "BUY_ITEM",
+            "CRAFT_ITEM", "ATTACK", "FREE_TEXT", "UNKNOWN"})
     void rejectsUnregisteredCommands(String type) {
         assertInvalid(type, Map.of());
     }
@@ -98,6 +106,65 @@ class TypedCommandTest {
                 Map.of("abilityId", "steady", "targetActorIds", List.of(Map.of("id", target))))) {
             assertInvalid("USE_ABILITY", payload);
         }
+    }
+
+    /**
+     * Item intentions name instances, recipients and unit counts only: no prices, values, slots, targets
+     * of a patch, nested overrides, fractional or textual numbers, duplicated instances or empty trades.
+     */
+    @Test
+    void rejectsMalformedItemPayloads() {
+        String item = UUID.randomUUID().toString();
+        String other = UUID.randomUUID().toString();
+        String actor = UUID.randomUUID().toString();
+        for (Map<String, Object> payload : List.<Map<String, Object>>of(Map.of(), Map.of("itemInstanceId", item),
+                Map.of("itemInstanceId", item, "targetActorIds", List.of(), "cost", 1),
+                Map.of("itemInstanceId", "not-a-uuid", "targetActorIds", List.of()),
+                Map.of("itemInstanceId", item.toUpperCase(), "targetActorIds", List.of()),
+                Map.of("itemInstanceId", item, "targetActorIds", List.of(actor, actor)),
+                Map.of("itemInstanceId", item, "targetActorIds", actor))) {
+            assertInvalid("USE_ITEM", payload);
+        }
+        for (String type : List.of("EQUIP_ITEM", "UNEQUIP_ITEM")) {
+            assertInvalid(type, Map.of());
+            assertInvalid(type, Map.of("itemInstanceId", 7));
+            assertInvalid(type, Map.of("itemInstanceId", item, "slot", "main-hand"));
+        }
+        for (Object quantity : List.of(0, -1, 10_000, "2", new BigDecimal("2.0"), true)) {
+            assertInvalid("TRANSFER_ITEM", Map.of("itemInstanceId", item, "recipientActorId", actor, "quantity", quantity));
+        }
+        assertInvalid("TRANSFER_ITEM", Map.of("itemInstanceId", item, "recipientActorId", actor));
+        assertInvalid("TRANSFER_ITEM", Map.of("itemInstanceId", item, "recipientActorId", actor, "quantity", 1, "price", 3));
+        Map<String, Object> line = Map.of("itemInstanceId", item, "quantity", 1);
+        Map<String, Object> otherLine = Map.of("itemInstanceId", other, "quantity", 1);
+        for (Map<String, Object> payload : List.<Map<String, Object>>of(
+                Map.of("counterpartyActorId", actor, "offered", List.of(line)),
+                Map.of("counterpartyActorId", actor, "offered", List.of(), "requested", List.of(otherLine)),
+                Map.of("counterpartyActorId", actor, "offered", List.of(line), "requested", List.of()),
+                Map.of("counterpartyActorId", actor, "offered", List.of(line), "requested", List.of(line)),
+                Map.of("counterpartyActorId", actor, "offered", List.of(line, line), "requested", List.of(otherLine)),
+                Map.of("counterpartyActorId", actor, "offered", List.of(line), "requested", List.of(otherLine), "currency", 5),
+                Map.of("counterpartyActorId", actor, "offered", List.of(Map.of("itemInstanceId", item, "quantity", 1, "price", 2)),
+                        "requested", List.of(otherLine)),
+                Map.of("counterpartyActorId", actor, "offered", List.of(Map.of("itemInstanceId", item)), "requested", List.of(otherLine)),
+                Map.of("counterpartyActorId", actor, "offered", "all", "requested", List.of(otherLine)),
+                Map.of("counterpartyActorId", actor, "offered", java.util.Collections.nCopies(9, line), "requested", List.of(otherLine)),
+                Map.of("counterpartyActorId", actor, "offered", java.util.stream.Stream.generate(
+                        () -> Map.<String, Object>of("itemInstanceId", UUID.randomUUID().toString(), "quantity", 1)).limit(9).toList(),
+                        "requested", List.of(otherLine)))) {
+            assertInvalid("TRADE_ITEMS", payload);
+        }
+        // Order of lines is part of the hashed intention and is kept as submitted.
+        var trade = new TypedCommand.TradeItems(UUID.randomUUID(), List.of(new TypedCommand.TradeItems.Line(UUID.randomUUID(), 1),
+                new TypedCommand.TradeItems.Line(UUID.randomUUID(), 2)), List.of(new TypedCommand.TradeItems.Line(UUID.randomUUID(), 1)));
+        assertEquals(trade, TypedCommand.decode(CommandCanonicalForm.encode(trade.type(), 0, trade.payload(), 32_768)));
+        assertThrows(UnsupportedOperationException.class, () -> trade.offered().add(trade.requested().getFirst()));
+        // The equivalent-attempt identity of an item use ignores target order, as for abilities.
+        UUID instance = UUID.randomUUID();
+        UUID first = UUID.fromString("00000000-0000-0000-0000-00000000000a");
+        UUID second = UUID.fromString("00000000-0000-0000-0000-00000000000b");
+        assertEquals(new TypedCommand.UseItem(instance, List.of(first, second)).attemptPayload(),
+                new TypedCommand.UseItem(instance, List.of(second, first)).attemptPayload());
     }
 
     /** Direct record callers cannot bypass the wire validation of bounds or Unicode scalar text. */

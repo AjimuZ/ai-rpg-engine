@@ -155,3 +155,10 @@ a unique constraint on `item_instance (campaign_id, actor_id, id)`. Both tables 
 character state: restore them with the campaign rows they reference. They need no extra
 restore step. Offline checks cover the V18 manifest/catalog; no live V18 dump/restore
 rehearsal has been run.
+
+V19 scope (P10.2) adds `item_creation`, the append-only ledger that links every item unit created
+after campaign creation to its operation, announcing event and source (an effect node or a settled
+reward). It references `operation_journal`, `campaign_event` and `actor`, so restore it with the
+campaign rows; it needs no extra restore step, and a restored ledger keeps a replayed source from
+creating a second time. Offline checks cover the V19 manifest/catalog; no live V19 dump/restore
+rehearsal has been run.

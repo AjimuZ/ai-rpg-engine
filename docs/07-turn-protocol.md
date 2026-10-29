@@ -277,7 +277,7 @@ effects are attributable; P07.4 below spends the cost and applies the effects.
 it authorizes owner/adventure/campaign scope in a short read-only transaction, then
 reparses and recompiles the campaign's sealed revision closure through `PackRegistry`.
 It keeps only location links/disclosure, actor-origin disclosure, creation-profile
-vocabularies and ability contracts under canonical IDs (root IDs unqualified,
+vocabularies, ability contracts and (P10.2) item valuations and use contracts plus the P10.1 character rule projection (stack bounds, equipment facts and slot vocabularies) under canonical IDs (root IDs unqualified,
 dependency IDs `pack#id`); no prose, secret text, effect tree or localization is
 retained. At most 16 revisions are cached (least recently used evicted); pinned
 revisions are frozen by trigger and sealed bytes are immutable, so a cached catalog
@@ -286,11 +286,43 @@ Load failures never throw from preload: a fresh command whose rules need definit
 then fails with `CONTENT_UNAVAILABLE`, while `WAIT` and speech to an actor without an
 authored origin need no catalog. Recompilation therefore never extends lock hold time.
 
-Item, trade and encounter intentions (`USE_ITEM`, `EQUIP_ITEM`, `TRANSFER_ITEM`,
-`ATTACK` and similar) remain unregistered and fail closed: pack items currently carry
-no use contract, and item ownership/equipment checks arrive with their commands in
-P10.1–P10.2. A forged item or ability therefore cannot reach canonical state through
-any current route.
+Encounter intentions (`ATTACK` and similar) remain unregistered and fail closed. Since P10.2 the
+item intentions below are registered; an unknown item type, a forged instance or an attempted generic
+field patch still cannot reach canonical state through any route.
+
+### P10.2 item intentions
+
+Five more exploration intentions name item instances, never effects. Prices, slots, magnitudes and
+resulting quantities are never payload fields; the server derives them from pinned definitions and the
+current rows.
+
+| Type | Exact payload | Structural bounds |
+| --- | --- | --- |
+| `USE_ITEM` | `itemInstanceId`, `targetActorIds` | Canonical UUID; at most eight distinct canonical UUIDs in submitted order (hashed; the equivalent-attempt identity sorts them) |
+| `EQUIP_ITEM`, `UNEQUIP_ITEM` | `itemInstanceId` | Canonical UUID |
+| `TRANSFER_ITEM` | `itemInstanceId`, `recipientActorId`, `quantity` | Canonical UUIDs; exact integer 1..9999 |
+| `TRADE_ITEMS` | `counterpartyActorId`, `offered`, `requested` | Canonical UUID; each side one to eight `{itemInstanceId, quantity}` lines (order hashed), no instance named twice across both sides |
+
+| Intention | Rules, in order; the first failure wins | Category |
+| --- | --- | --- |
+| `USE_ITEM` | The instance is held by the player and its pinned definition has a `use` contract; a contract that consumes needs the instance unworn | `ITEM_UNAVAILABLE` |
+| | Target policy and perceivable targets, exactly as for abilities | `TARGET_ILLEGAL`, `ACTOR_UNAVAILABLE` |
+| | The effect program is executable (no damage, heal, move, condition or reveal node), fits the 128-draw budget, reads actor values only in the player's vocabulary and creates at most 64 units across all recipients | `EFFECT_UNSUPPORTED` |
+| `EQUIP_ITEM` | The instance is held by the player | `ITEM_UNAVAILABLE` |
+| | The definition names a slot of the player's vocabulary whose tags accept it, the slot has room, the hands suffice and the instance is not worn | `EQUIPMENT_ILLEGAL` |
+| `UNEQUIP_ITEM` | The player wears the instance | `EQUIPMENT_ILLEGAL` |
+| `TRANSFER_ITEM` | The recipient is another perceivable actor | `ACTOR_UNAVAILABLE` |
+| | The instance is held by the player and unworn | `ITEM_UNAVAILABLE` |
+| | The quantity does not exceed the units held | `QUANTITY_ILLEGAL` |
+| `TRADE_ITEMS` | The counterparty is another perceivable actor | `ACTOR_UNAVAILABLE` |
+| | Offered instances are held unworn by the player, requested instances unworn by the counterparty | `ITEM_UNAVAILABLE` |
+| | Every quantity is within the units held | `QUANTITY_ILLEGAL` |
+| | Every item has a declared `value`, and the value the counterparty receives is at least the value it gives | `TRADE_REFUSED` |
+
+An instance that does not exist and an instance held by someone else share `ITEM_UNAVAILABLE`, so
+probing identities reveals nothing. The commit repeats every rule under the campaign lock, re-binds the
+plan's owners to the intention's participants and applies the plan with compare-and-set guards
+([ADR 0024](adr/0024-atomic-item-commands-and-source-linked-creation.md)).
 
 ### P07.4 local action execution
 
@@ -323,7 +355,11 @@ operation, never reused by another one and never re-rolled for it.
 | `MOVE` | Typed `Placement` of the player at the destination, guarded by its actor row version | 0 s | `ACTOR_MOVED` {actorId, from, to} |
 | `WAIT` | None | Exactly the requested seconds | `TIME_PASSED` {seconds} |
 | `SPEAK` | None | 0 s | `SPEECH_DELIVERED` {speakerActorId, recipientActorId, text} |
-| `USE_ABILITY` | Exact cost payment, then the effect program | 0 s | `ABILITY_USED`, one `RESOURCE_SPENT` per nonzero cost, one `EFFECT_RESOLVED` per executed resource node |
+| `USE_ABILITY` | Exact cost payment, then the effect program | 0 s | `ABILITY_USED`, one `RESOURCE_SPENT` per nonzero cost, one `EFFECT_RESOLVED` per executed resource node, one `ITEM_CREATED` per recipient of a `createItem` node |
+| `USE_ITEM` | One unit used up when the contract consumes, then the effect program | 0 s | `ITEM_USED`, then `EFFECT_RESOLVED` / `ITEM_CREATED` as above |
+| `EQUIP_ITEM`, `UNEQUIP_ITEM` | Worn-state change through the P10.1 constraints | 0 s | `ITEM_EQUIPPED` / `ITEM_UNEQUIPPED` {actorId, itemInstanceId, definitionId, slot, hands} |
+| `TRANSFER_ITEM` | Units move to the recipient (reassign, merge or split) | 0 s | `ITEM_TRANSFERRED` {fromActorId, toActorId, itemInstanceId, definitionId, quantity} |
+| `TRADE_ITEMS` | Both legs move in one commit, offered first | 0 s | `ITEM_TRADED` {actorId, counterpartyActorId, offered, requested, givenValue, receivedValue} |
 
 Every action advances the game turn once and resolves to **no pending decision** (`null`),
 which also clears the creation `STARTING_SITUATION` marker: the player may then submit any
@@ -334,9 +370,8 @@ commit requires narration (`NARRATION_REQUIRED` outbox intent); narration itself
 
 **Effect programs.** The rule catalog compiles each ability's validated effect tree into
 prose-free values (`EffectProgram`). Locally executable nodes are `modifyResource` and
-`conditional`; `damage`, `heal`, `move`, condition changes, `reveal` and `createItem` need
-armor, conditions, forced movement, a resolver for `reveal` over the P09.1 knowledge records, or item instances from P10 and
-P11. `CommandRules` therefore adds a last ability rule, `EFFECT_UNSUPPORTED` (HTTP 422
+`conditional`; since P10.2 also `createItem`; `damage`, `heal`, `move`, condition changes and `reveal` need
+armor, conditions, forced movement or a resolver for `reveal` over the P09.1 knowledge records (P10.4, P11). `CommandRules` therefore adds a last ability rule, `EFFECT_UNSUPPORTED` (HTTP 422
 `COMMAND_EFFECT_UNSUPPORTED`), refused before any journal row, permit or draw when the program
 contains such a node, could need more than 128 draws (every die of every expression in every
 branch, the per-operation draw ordinal limit) or reads `attribute`/`resource` atoms although

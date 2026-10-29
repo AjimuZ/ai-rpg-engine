@@ -89,7 +89,7 @@ class CanonicalCommitServiceTest {
             jdbc.execute("drop trigger if exists p033_fault on " + table);
         }
         jdbc.execute("drop function if exists p033_fail()");
-        jdbc.execute("truncate equipment_assignment, actor_condition, ai_session_record, memory_invalidation, memory_summary, memory_summary_job, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
+        jdbc.execute("truncate item_creation, equipment_assignment, actor_condition, ai_session_record, memory_invalidation, memory_summary, memory_summary_job, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
                 + "operation_journal, actor_resource, actor, presentation_campaign_settings, campaign, "
                 + "content_revision_report, content_revision_file, content_revision, adventure_workspace, identity_owner_profile");
     }
@@ -159,6 +159,62 @@ class CanonicalCommitServiceTest {
         return new ResolvedCommit(base.context(), base.world(), base.resources(), base.events(), base.rewards(),
                 base.receiptDetails(), base.narrationRequired(),
                 new ResolvedCommit.Preparation(List.of("quest:gate"), List.of(job)));
+    }
+
+    /**
+     * A settled reward can create items (P10.2): the stack, the creation ledger row citing the operation and
+     * the announcing event, and the reward settlement commit together; a failure after the item rows rolls
+     * all of them back, and the settlement key alone cannot create the same units a second time.
+     */
+    @Test
+    void rewardSourcedItemCreationCommitsWithItsSettlementAndRollsBackTogether() {
+        var base = plan(fixture, fixture.operation());
+        UUID hero = fixture.resource().getActorId();
+        UUID stack = UUID.randomUUID();
+        var items = new org.rpgengine.inventory.ItemPlan(
+                List.of(new org.rpgengine.inventory.ItemChange.Insert(stack, hero, "coin", 7, 99)),
+                List.of(new org.rpgengine.inventory.ItemPlan.Creation(hero, "coin", 7,
+                        org.rpgengine.inventory.ItemPlan.SourceKind.REWARD, "site:first", 0)), List.of(), List.of());
+        var rewarded = new ResolvedCommit(base.context(), base.world(), base.resources(), base.events(), base.rewards(),
+                base.receiptDetails(), base.narrationRequired(), ResolvedCommit.Preparation.NONE, null, List.of(),
+                List.of(), items);
+        var before = snapshot();
+        // The query-epoch bump runs after the item rows and the ledger were written, so this fault proves their rollback.
+        installFailure("query_epoch");
+        assertThrows(RuntimeException.class, () -> commits.commit(rewarded));
+        assertEquals(before, snapshot());
+        assertEquals(0, count("item_instance"));
+        assertEquals(0, count("item_creation"));
+        jdbc.execute("drop trigger p033_fault on query_epoch");
+        jdbc.execute("drop function p033_fail()");
+
+        commits.commit(rewarded);
+        assertEquals(7, jdbc.queryForObject("select quantity from item_instance where id = ?", Integer.class, stack));
+        var ledger = jdbc.queryForMap("select operation_id, source_kind, source_key, event_sequence, quantity "
+                + "from item_creation");
+        assertEquals(fixture.operation().getId(), ledger.get("operation_id"));
+        assertEquals("REWARD", ledger.get("source_kind"));
+        assertEquals("site:first", ledger.get("source_key"));
+        assertEquals(1L, ledger.get("event_sequence"));
+        assertEquals(1, count("reward_settlement"));
+        // A matching retry replays the receipt and creates nothing more.
+        var afterFirst = snapshot();
+        commits.commit(rewarded);
+        assertEquals(afterFirst, snapshot());
+        // A second operation citing the same settlement is refused by the settlement identity, and with it
+        // the units it would have created.
+        var second = operation(fixture.campaign(), 1);
+        leaseOperation(fixture.campaign(), second);
+        var again = plan(fixture, second);
+        var duplicate = new ResolvedCommit(again.context(), again.world(), List.of(), again.events(), again.rewards(),
+                again.receiptDetails(), again.narrationRequired(), ResolvedCommit.Preparation.NONE, null, List.of(),
+                List.of(), new org.rpgengine.inventory.ItemPlan(
+                        List.of(new org.rpgengine.inventory.ItemChange.Insert(UUID.randomUUID(), hero, "coin", 7, 99)),
+                        List.of(new org.rpgengine.inventory.ItemPlan.Creation(hero, "coin", 7,
+                                org.rpgengine.inventory.ItemPlan.SourceKind.REWARD, "site:first", 0)), List.of(), List.of()));
+        assertThrows(RuntimeException.class, () -> commits.commit(duplicate));
+        assertEquals(7, jdbc.queryForObject("select sum(quantity) from item_instance", Integer.class));
+        assertEquals(1, count("item_creation"));
     }
 
     /** All effects persist together; lost acknowledgments and later narration never spend again. */

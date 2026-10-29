@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V17 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V19 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -366,6 +366,40 @@ class CanonicalMigrationUpgradeTest {
                     assertThrows(DataAccessException.class, () -> jdbc.update("update actor_condition set "
                             + "applied_revision = 0, row_version = row_version + 1"));
                     assertEquals(0, v18.migrate().migrationsExecuted);
+                    // V19 adds the item creation ledger empty: an old save gets no invented creation, and the
+                    // ledger is append-only, unique per source, and tied to a real operation, event and actor.
+                    String v18Campaign = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
+                    Flyway v19 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("19").load();
+                    assertEquals(1, v19.migrate().migrationsExecuted);
+                    assertTrue(v19.validateWithResult().validationSuccessful);
+                    assertEquals(v18Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from item_creation", Integer.class));
+                    jdbc.update("insert into campaign_event (id, campaign_id, sequence, operation_id, actor_id, "
+                            + "correlation_id, event_type, event_version, state_revision, world_time_seconds, "
+                            + "ruleset_hash, visibility, payload_schema_version, payload, created_at) values "
+                            + "(?, ?, 1, ?, ?, ?, 'ITEM_CREATED', 1, 7, 60, ?, 'PUBLIC', 1, '{}'::jsonb, now())",
+                            UUID.randomUUID(), campaign, operation, wearer, operation, "b".repeat(64));
+                    String creation = "insert into item_creation (id, campaign_id, operation_id, event_sequence, "
+                            + "source_kind, source_key, recipient_actor_id, definition_id, quantity, applied_revision, "
+                            + "created_at) values (?, ?, ?, ?, ?, ?, ?, 'item', ?, 7, now())";
+                    assertEquals(1, jdbc.update(creation, UUID.randomUUID(), campaign, operation, 1, "EFFECT",
+                            operation + "#effects/0", wearer, 3));
+                    // One creation per source, recipient and definition: a replayed source cannot pay twice.
+                    assertThrows(DataAccessException.class, () -> jdbc.update(creation, UUID.randomUUID(), campaign,
+                            operation, 1, "EFFECT", operation + "#effects/0", wearer, 3));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(creation, UUID.randomUUID(), campaign,
+                            operation, 1, "GIFT", operation + "#effects/1", wearer, 3));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(creation, UUID.randomUUID(), campaign,
+                            operation, 1, "EFFECT", operation + "#effects/1", wearer, 0));
+                    // The announcing event and the recipient must exist in the same campaign.
+                    assertThrows(DataAccessException.class, () -> jdbc.update(creation, UUID.randomUUID(), campaign,
+                            operation, 99, "EFFECT", operation + "#effects/1", wearer, 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(creation, UUID.randomUUID(), campaign,
+                            operation, 1, "EFFECT", operation + "#effects/1", UUID.randomUUID(), 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update item_creation set quantity = 4"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("delete from item_creation"));
+                    assertEquals(0, v19.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

@@ -36,6 +36,10 @@ const ERRORS: Readonly<Record<string, () => string>> = {
   COMMAND_RESOURCE_INSUFFICIENT: () => $localize`:@@campaign.error.resourceInsufficient:There are not enough resources for this action.`,
   COMMAND_CONTENT_UNAVAILABLE: () => $localize`:@@campaign.error.contentUnavailable:The adventure content needed for this action is unavailable.`,
   COMMAND_EFFECT_UNSUPPORTED: () => $localize`:@@campaign.error.effectUnsupported:This kind of effect is not supported yet. Nothing was changed.`,
+  COMMAND_ITEM_UNAVAILABLE: () => $localize`:@@campaign.error.itemUnavailable:That item is not available for this action. Nothing was changed.`,
+  COMMAND_EQUIPMENT_ILLEGAL: () => $localize`:@@campaign.error.equipmentIllegal:That item cannot be worn or taken off right now. Nothing was changed.`,
+  COMMAND_QUANTITY_ILLEGAL: () => $localize`:@@campaign.error.quantityIllegal:That is more than the available quantity. Nothing was changed.`,
+  COMMAND_TRADE_REFUSED: () => $localize`:@@campaign.error.tradeRefused:The other party does not accept this exchange. Nothing was changed.`,
   COMMAND_DEPENDENCIES_MISSING: () => $localize`:@@campaign.error.dependenciesMissing:This playthrough is paused because adventure content it depends on is missing or damaged. Nothing was changed.`,
   COMMAND_STORAGE_UNAVAILABLE: () => $localize`:@@campaign.error.storageUnavailable:Storage is unavailable right now. Check the action status before retrying.`,
   CAMPAIGN_READ_STORAGE_UNAVAILABLE: () => $localize`:@@campaign.error.storageUnavailable:Storage is unavailable right now. Check the action status before retrying.`,
@@ -111,6 +115,11 @@ export function commandTypeLabel(commandType: string): string {
     case 'WAIT': return $localize`:@@campaign.command.wait:Wait`;
     case 'SPEAK': return $localize`:@@campaign.command.speak:Speak`;
     case 'USE_ABILITY': return $localize`:@@campaign.command.useAbility:Use an ability`;
+    case 'USE_ITEM': return $localize`:@@campaign.command.useItem:Use an item`;
+    case 'EQUIP_ITEM': return $localize`:@@campaign.command.equipItem:Equip an item`;
+    case 'UNEQUIP_ITEM': return $localize`:@@campaign.command.unequipItem:Take off an item`;
+    case 'TRANSFER_ITEM': return $localize`:@@campaign.command.transferItem:Give an item`;
+    case 'TRADE_ITEMS': return $localize`:@@campaign.command.tradeItems:Trade items`;
     default: return commandType;
   }
 }

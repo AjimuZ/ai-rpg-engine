@@ -245,6 +245,42 @@ public class CharacterService {
             long revision) {
         requireTransaction();
         var vocabulary = vocabulary(actorId, campaignId, catalog, true);
+        var check = evaluate(campaignId, actorId, itemInstanceId, catalog, vocabulary);
+        if (!check.violations().isEmpty()) {
+            throw new CharacterRuleViolation(CharacterRuleViolation.Reason.EQUIPMENT,
+                    "item " + check.definitionId() + " cannot be equipped: " + check.violations(), check.violations());
+        }
+        var gear = check.item().gear();
+        jdbc.update("insert into equipment_assignment (campaign_id, actor_id, item_instance_id, slot_id, hands, "
+                + "equipped_revision) values (?, ?, ?, ?, ?, ?)", campaignId, actorId, itemInstanceId, gear.slot(),
+                gear.hands(), revision);
+        return new Equipped(itemInstanceId, check.definitionId(), gear.slot(), gear.hands());
+    }
+
+    /**
+     * Report why an item instance could not be worn right now, without writing or locking. The
+     * commands' rule gate uses it to refuse an impossible equip before anything is journaled, with
+     * exactly the check {@link #equip} repeats under the commit's locks.
+     *
+     * @param itemInstanceId instance the actor holds
+     * @return every violated constraint in declaration order; empty when the item can be worn
+     * @throws CharacterRuleViolation {@code UNKNOWN_ACTOR}, {@code UNKNOWN_DEFINITION} or {@code UNKNOWN_ITEM}
+     */
+    public List<EquipmentRules.Violation> equipViolations(UUID campaignId, UUID actorId, UUID itemInstanceId,
+            CharacterRuleCatalog catalog) {
+        requireTransaction();
+        return evaluate(campaignId, actorId, itemInstanceId, catalog, vocabulary(actorId, campaignId, catalog, false))
+                .violations();
+    }
+
+    /** Facts of one equip check: the held definition, its rules and the violations against current equipment. */
+    private record Evaluation(String definitionId, CharacterRuleCatalog.Item item,
+            List<EquipmentRules.Violation> violations) {
+    }
+
+    /** Resolve the held instance and check it against the actor's slots and hands together. */
+    private Evaluation evaluate(UUID campaignId, UUID actorId, UUID itemInstanceId, CharacterRuleCatalog catalog,
+            CharacterRuleCatalog.Vocabulary vocabulary) {
         var held = jdbc.queryForList("select definition_id from item_instance where campaign_id = ? and actor_id = ? "
                 + "and id = ?", String.class, campaignId, actorId, itemInstanceId);
         if (held.isEmpty()) {
@@ -260,16 +296,8 @@ public class CharacterService {
         for (var entry : equipment(campaignId, actorId)) {
             worn.add(new EquipmentRules.Worn(entry.itemInstanceId().toString(), entry.slot(), entry.hands()));
         }
-        var violations = EquipmentRules.check(vocabulary.hands(), vocabulary.slots(), worn,
-                itemInstanceId.toString(), item.gear());
-        if (!violations.isEmpty()) {
-            throw new CharacterRuleViolation(CharacterRuleViolation.Reason.EQUIPMENT,
-                    "item " + held.getFirst() + " cannot be equipped: " + violations, violations);
-        }
-        jdbc.update("insert into equipment_assignment (campaign_id, actor_id, item_instance_id, slot_id, hands, "
-                + "equipped_revision) values (?, ?, ?, ?, ?, ?)", campaignId, actorId, itemInstanceId,
-                item.gear().slot(), item.gear().hands(), revision);
-        return new Equipped(itemInstanceId, held.getFirst(), item.gear().slot(), item.gear().hands());
+        return new Evaluation(held.getFirst(), item, EquipmentRules.check(vocabulary.hands(), vocabulary.slots(), worn,
+                itemInstanceId.toString(), item.gear()));
     }
 
     /**
