@@ -41,6 +41,8 @@ public class CommandRuleCatalogs {
     /** Registered intentions whose rules may consult pinned definitions; WAIT needs none. */
     private static final Set<String> CONTENT_RULES = Set.of("MOVE", "SPEAK", "USE_ABILITY", "USE_ITEM", "EQUIP_ITEM",
             "UNEQUIP_ITEM", "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST",
+            // Entering an encounter freezes the pinned combat profile and template (P11.1).
+            "ENGAGE",
             // WAIT needs no definition to be legal, but a clock predicate can become true as it passes (P10.4).
             // It uses the catalog when one is available and never fails for lack of it (see Content#optional).
             "WAIT");

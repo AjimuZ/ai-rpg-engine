@@ -276,6 +276,7 @@ operation status is stored progress, not evidence that a worker is currently ali
 | 422 | `COMMAND_QUEST_UNAVAILABLE` | P10.3: the quest is unknown, undiscovered, hidden background content, ended, or not in the status the request needs (accept needs `available`, suspend `active`, resume `suspended`) |
 | 422 | `COMMAND_TIME_ILLEGAL` | P10.4: a wait longer than four hours, or a duration (waiting, travel or rest) that would carry the bounded world clock past its end |
 | 422 | `COMMAND_REST_UNAVAILABLE` | P10.4: the rest policy is unknown, the location lacks its required tag, or it restores resources of another vocabulary than the player's |
+| 422 | `COMMAND_ENCOUNTER_UNAVAILABLE` | P11.1: the encounter is unknown, belongs to another location or vocabulary, the player is defeated (Health at its minimum) or lacks a mapped role attribute, an encounter is already active, or the declared opening strike is forbidden by the template or names no hostile participant |
 | 429 | `COMMAND_ADMISSION_LIMIT` | Two live mutation permits already belong to this owner |
 | 503 | `COMMAND_STORAGE_UNAVAILABLE` | Required transaction/storage unavailable |
 

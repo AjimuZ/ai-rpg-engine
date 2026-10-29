@@ -37,6 +37,8 @@ stateDiagram-v2
 
 Before entry, persist a validated roster, profiles, zones, equipment, conditions, objectives, risk policy, ruleset hash, and initiating cause. A saved active encounter must include phase, actor cursor, round, remaining action points, reaction state, effect timers, and pending decision. AI thread renewal changes none of these.
 
+**Implemented in P11.1** ([ADR 0028](adr/0028-encounter-lifecycle-frozen-profiles-and-zone-graph.md)). `EncounterPhase` holds exactly these states and arrows, and the V22 migration repeats them as a trigger. Proposed, Validated and Rejected are in-memory states of an entry request: a refused entry stores nothing. The `ENGAGE` commit stores the encounter at `ENTERING` (round 0) with its initiating operation and event, the pinned content revision and ruleset hash, the frozen combat profile, zones, objectives, opening policy and target, the defeat policy (`incapacitated`) and one frozen profile per participant (with the player's worn items and active conditions), each as canonical JSON with a SHA-256. A campaign has at most one active encounter. Initiative, activations, action points, reaction state and effect timers are added by P11.2–P11.4; the operational checkpoint includes the encounter in P11.6.
+
 ## 3. Encounter entry
 
 A committed action, world trigger, or player-confirmed hostile intent can request combat. A mere narrative mention of a monster does not start a fight. Codex may propose an encounter when appropriate, but the engine validates it before any attack or resource loss.
@@ -44,6 +46,8 @@ A committed action, world trigger, or player-confirmed hostile intent can reques
 Entry reveals only observable participants, positions, threats, escape options, and stakes. Hidden participants require registered concealment, an entry condition, and budget accounting. They are not created after a die roll to negate success. The player can negotiate, withdraw, or avoid combat when the established situation permits it.
 
 The transition to combat is atomic with the triggering consequences. If the player's action is already the attack that starts combat, use the explicit opening-action policy: initialize initiative, then execute that attack only at its allowed opening slot. Never apply the same attack once in narrative mode and again on the first tactical turn.
+
+Since P11.1 the player enters an authored encounter with the explicit `ENGAGE` intention at the template's location, optionally naming the hostile participant of an opening strike. Each template declares its opening-action policy: `initiative` (default; the strike resolves at the initiator's own initiative slot in round one and is paid from that activation), `first` (it resolves in an opening slot before round one's first activation, still paid from the initiator's round-one activation, so surprise moves the blow but never adds one) or `forbidden` (the encounter cannot be opened by an attack). Entry draws no die and changes no Health: the strike is stored once as pending and resolved once by the scheduler (P11.2/P11.3). Concealed participants are not supported yet; every participant of a template is observable at entry.
 
 ## 4. Default actor profile
 
@@ -76,6 +80,8 @@ Melee requires the same zone unless an ability specifies reach. Ordinary ranged 
 Move normally costs one action point per traversed normal edge. Difficult terrain doubles the edge's action cost. A character cannot pass a blocked edge or hidden destination. Flying, teleporting, or forced movement requires an explicit capability and valid arrival zone. Leaving a zone does not create a universal free attack; only a declared reaction ability can do so.
 
 Use zones to keep dynamic encounter creation practical. A grid-based tactical map is future scope and must not be implied by a decorative image.
+
+Since P11.1 `ZoneGraph` implements this space: 1–16 zones with tags, cover, visibility and optional capacity, and directed edges that may be difficult or blocked. Range distance counts bordering steps in either direction, through blocked edges too; movement follows unblocked directed edges at `moveCost` per edge, multiplied by `difficultTerrainMultiplier` on difficult terrain. Authors' graphs must be connected, and escape and objective zones must be reachable along unblocked edges from the player's starting zone.
 
 ## 6. Initiative and round order
 
@@ -239,6 +245,8 @@ The confirmation has two parts:
 | Threat heuristic | `baseCapacity = 8 + 2 × (level - 1)`; preparedness `0.55 + 0.30 × health + 0.15 × resource`, clamped to 0.55–1.00; bands 60–80/90–110/120–140/150–170%; costs minor 4, standard 8, elite 12, anchor 20; level scaling `ceil(baseCost × (1 + 0.20 × (level - 1)))`; at most party size + 2 hostile bodies | [encounters §4](12-encounters-and-progression.md#4-initial-threat-heuristic) | P13, P18.3 |
 | Advancement | Cumulative XP `50 × L × (L - 1)`; awards 10/20/35; one training point per level; one attribute point per even level; attribute cap 6; no default maximum level, which a pack may declare | [advancement](12-encounters-and-progression.md#9-default-advancement-proposal) | P13, P18.3 |
 | Generation and repair | One proposal repair per encounter and per tactic before the deterministic fallback | [§12](#12-legal-actions-and-ai-tactics), [encounters §3](12-encounters-and-progression.md#3-planning-pipeline) | P13 |
+
+Since P11.1 these structural rules and numbers are executable data: `CombatProfile` holds the kernel identity (`skirmish-initiative-rounds/1`) and every value of the table above that a pack may tune, with its default and bound; a pack's `combat` rule maps the four roles to its attributes, Health and Focus to its resources, and may override values inside their bounds ([pack contract](09-adventure-packs.md#4-definition-model)). The resolved profile is frozen into each encounter at entry. Scheduler, spatial model, dice and reaction depth cannot be changed by a pack.
 
 Rules for changing these values:
 

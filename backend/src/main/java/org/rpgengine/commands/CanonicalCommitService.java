@@ -11,6 +11,8 @@ import org.rpgengine.campaign.Campaign;
 import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.characters.ActorResource;
 import org.rpgengine.characters.CharacterService;
+import org.rpgengine.combat.EncounterWriter;
+import org.rpgengine.campaign.CampaignMode;
 import org.rpgengine.content.ContentRevision;
 import org.rpgengine.inventory.InventoryWriter;
 import org.rpgengine.inventory.ItemPlan;
@@ -50,7 +52,9 @@ import tools.jackson.databind.json.JsonMapper;
  * intention the player's perception at its resulting location updates its last known locations
  * of other actors (P09.1); the query scopes both touch are bumped with the preparation scopes. Condition
  * removals of a rest (P10.4) are guarded by the row they delete; the clock itself moves only through the
- * plan's bounded elapsed time and the V21 trigger that ties world time to a revision step.
+ * plan's bounded elapsed time and the V21 trigger that ties world time to a revision step. An encounter entry
+ * (P11.1) is stored beside the event that announces it; a plan may move the campaign from exploration into
+ * encounter mode only together with that entry.
  * This internal service has no controller, network port or callback.
  * Any validation, persistence, timeout or commit failure rolls back all its writes.
  */
@@ -158,6 +162,11 @@ public class CanonicalCommitService {
         for (PlanActivations.Request activation : plan.preparation().activations()) {
             PlanActivations.requireUsable(jdbc, campaign.getId(), activation);
         }
+        // Tactical mode is entered only by storing the encounter that holds it (P11.1).
+        if (campaign.getMode() == CampaignMode.EXPLORATION && plan.world().mode() == CampaignMode.ENCOUNTER
+                && plan.encounter() == null) {
+            throw new IllegalStateException("encounter mode requires an encounter entry");
+        }
         ContentRevision content = entities.find(ContentRevision.class, campaign.getContentRevisionId());
         Instant now = Instant.now();
         long firstSequence = Math.addExact(campaign.getCounters().eventSequence(), 1);
@@ -248,6 +257,12 @@ public class CanonicalCommitService {
         // Quest rows cite the same events by sequence; a stale row version or an ended quest throws and
         // rolls back everything, including the reward settlement and the units it created (P10.3).
         QuestWriter.applyWithin(jdbc, campaign.getId(), counters.stateRevision(), firstSequence, plan.quests());
+        if (plan.encounter() != null) {
+            // The frozen encounter cites its announcing event; a second active encounter violates a unique index.
+            EncounterWriter.insertWithin(jdbc, campaign.getId(), operation.getId(), counters.stateRevision(),
+                    firstSequence + plan.encounter().eventIndex(), content.getId(), content.getRuleset().rulesetHash(),
+                    plan.encounter().frozen(), now);
+        }
         if (plan.narrationRequired()) {
             // The owed presentation is durable exactly when the world change is (P07.5): one
             // NARRATION job per operation, checked against this committed revision at COMMIT.

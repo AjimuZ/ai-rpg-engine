@@ -121,6 +121,12 @@ public final class OperationAdmissionFailure extends RuntimeException {
          * The named rest policy does not exist, cannot be taken at the player's location (a required location
          * tag is missing), or belongs to a vocabulary the player's resources do not use (HTTP 422, P10.4).
          */
-        REST_UNAVAILABLE
+        REST_UNAVAILABLE,
+        /**
+         * The named encounter does not exist, cannot be entered at the player's location or with the player's
+         * vocabulary, the player is defeated or already in an encounter, or the declared opening strike is not
+         * allowed or names no hostile participant (HTTP 422, P11.1).
+         */
+        ENCOUNTER_UNAVAILABLE
     }
 }

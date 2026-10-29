@@ -30,6 +30,9 @@ import tools.jackson.databind.json.JsonMapper;
  * content has quests, so the resolver can run the quest engine over the facts the command produces, and the
  * commit writes quest rows and one-time reward settlements beside the events that announce them.
  *
+ * <p>Since P11.1 the prepare step also reads the player's worn items, and an {@code ENGAGE} commit stores the frozen
+ * encounter beside the event that announces it.
+ *
  * <p>Since P10.2 the same pipeline executes the item commands: the prepare step also reads every
  * participant's item stacks, and the commit applies the resolved {@link org.rpgengine.inventory.ItemPlan}.
  *
@@ -135,7 +138,7 @@ public class CommandExecutionService {
                         resolution.events(), resolution.rewards(), resolution.receiptDetails(), true,
                         new ResolvedCommit.Preparation(resolution.queryScopes(), List.of()), intent,
                         resolution.placements(), List.of(), resolution.items(), resolution.quests(),
-                        resolution.conditions()));
+                        resolution.conditions(), resolution.encounter()));
             }
         } catch (OperationAdmissionFailure rejected) {
             // Current state changed after admission in a way the rules refuse; nothing was applied.
@@ -253,10 +256,14 @@ public class CommandExecutionService {
         long clock = jdbc.queryForObject("select world_time_seconds from campaign where id = ?", Long.class, campaign);
         var conditions = new java.util.HashSet<>(jdbc.queryForList("select condition_id from actor_condition "
                 + "where campaign_id = ? and actor_id = ?", String.class, campaign, player));
+        // Worn items, which an encounter entry records in the player's frozen profile (P11.1).
+        var worn = jdbc.queryForList("select i.definition_id from equipment_assignment e join item_instance i "
+                + "on i.campaign_id = e.campaign_id and i.id = e.item_instance_id where e.campaign_id = ? "
+                + "and e.actor_id = ? order by i.definition_id", String.class, campaign, player);
         return new LocalActionResolver.Snapshot(player, actor.getKey().orElse(null), actor.getValue(),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[0]),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[1]), pools, vocabularies, operation, stacks,
-                stored, clock, conditions);
+                stored, clock, conditions, worn);
     }
 
     /**

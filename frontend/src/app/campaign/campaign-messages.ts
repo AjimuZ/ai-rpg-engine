@@ -46,6 +46,7 @@ const ERRORS: Readonly<Record<string, () => string>> = {
   COMMAND_QUEST_UNAVAILABLE: () => $localize`:@@campaign.error.questUnavailable:That quest is not available for this action. Nothing was changed.`,
   COMMAND_TIME_ILLEGAL: () => $localize`:@@campaign.error.timeIllegal:That much time cannot pass at once. Nothing was changed.`,
   COMMAND_REST_UNAVAILABLE: () => $localize`:@@campaign.error.restUnavailable:You cannot rest like that here. Nothing was changed.`,
+  COMMAND_ENCOUNTER_UNAVAILABLE: () => $localize`:@@campaign.error.encounterUnavailable:That encounter cannot begin here and now. Nothing was changed.`,
   COMMAND_DEPENDENCIES_MISSING: () => $localize`:@@campaign.error.dependenciesMissing:This playthrough is paused because adventure content it depends on is missing or damaged. Nothing was changed.`,
   COMMAND_STORAGE_UNAVAILABLE: () => $localize`:@@campaign.error.storageUnavailable:Storage is unavailable right now. Check the action status before retrying.`,
   CAMPAIGN_READ_STORAGE_UNAVAILABLE: () => $localize`:@@campaign.error.storageUnavailable:Storage is unavailable right now. Check the action status before retrying.`,

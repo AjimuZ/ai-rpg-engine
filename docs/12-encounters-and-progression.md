@@ -6,6 +6,8 @@ Codex composes context-sensitive candidates. The engine provides allowed templat
 
 Separate **encounter planning**, **encounter execution**, and **outcome settlement**. Generation occurs before entry, not repeatedly before every enemy action.
 
+Since P11.1 authored encounter templates exist as pack data (location, zones, roster with explicit statistics and threat tier, objectives, escape zones and opening policy) and the player can enter one explicitly; the compiler enforces the default roster limit of section 4 (at most party size plus two hostile bodies). Planning, threat budgets and generated proposals (sections 2–7) remain P13.
+
 ## 2. Encounter input snapshot
 
 Capture pack/ruleset hashes, source revision, scene tags, known threats, participating actors, health and resource ratios, conditions, equipped and accessible items, ammunition, learned abilities, skill ranks, party size, mobility, damage/defense coverage, escape options, objective, recent challenge history, and selected difficulty policy.

@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.campaign.CampaignMode;
 import org.rpgengine.campaign.EventVisibility;
+import org.rpgengine.combat.FrozenEncounter;
 import org.rpgengine.inventory.ItemPlan;
 import org.rpgengine.knowledge.KnowledgeChange;
 import org.rpgengine.persistence.CanonicalValues;
@@ -37,14 +38,16 @@ import org.rpgengine.rules.WorldClock;
  * each citing the plan event that announced it; a quest ending settles its item rewards through the
  * same plan's {@link Reward}s and {@link ItemPlan} creations. P10.4 adds {@link ConditionRemoval}s (a
  * rest ends listed active conditions) and bounds the world clock: the plan's elapsed time may not exceed
- * {@link WorldClock#MAX_STEP_SECONDS}. Preparation intents
+ * {@link WorldClock#MAX_STEP_SECONDS}. P11.1 adds an optional {@link EncounterEntry}: the frozen encounter an
+ * {@code ENGAGE} intention starts, citing the plan event that announces it; a plan carrying one must put the
+ * campaign in encounter mode. Preparation intents
  * (query-scope epoch bumps, critical preparation jobs and cited plan branches) are data
  * too; they commit or roll back with the world change that caused them.
  */
 public record ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources,
         List<Event> events, List<Reward> rewards, String receiptDetails, boolean narrationRequired,
         Preparation preparation, CommandIntent intent, List<Placement> placements, List<KnowledgeChange> knowledge,
-        ItemPlan items, QuestChanges quests, List<ConditionRemoval> conditions) {
+        ItemPlan items, QuestChanges quests, List<ConditionRemoval> conditions, EncounterEntry encounter) {
     /** Most events one plan may carry; the quest engine budgets its steps against what the command already used. */
     public static final int MAX_EVENTS = 128;
 
@@ -116,7 +119,24 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
                 throw new IllegalArgumentException("a reward-sourced item creation needs its reward settlement");
             }
         }
+        if (encounter != null) {
+            if (world.mode() != CampaignMode.ENCOUNTER) {
+                throw new IllegalArgumentException("an encounter entry puts the campaign in encounter mode");
+            }
+            if (encounter.eventIndex() >= events.size()) {
+                throw new IllegalArgumentException("encounter entry cites an event outside this plan");
+            }
+        }
         CanonicalValues.requireJsonObject(receiptDetails, "receiptDetails", 32_768);
+    }
+
+    /** Plan without an encounter entry, the shape used before P11.1. */
+    public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
+            List<Reward> rewards, String receiptDetails, boolean narrationRequired, Preparation preparation,
+            CommandIntent intent, List<Placement> placements, List<KnowledgeChange> knowledge, ItemPlan items,
+            QuestChanges quests, List<ConditionRemoval> conditions) {
+        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, preparation, intent,
+                placements, knowledge, items, quests, conditions, null);
     }
 
     /** Plan without condition removals, the shape used before P10.4. */
@@ -216,6 +236,23 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
             Objects.requireNonNull(mode, "mode");
             if (pendingDecision != null) {
                 CanonicalValues.requireJsonObject(pendingDecision, "pendingDecision", 16_384);
+            }
+        }
+    }
+
+    /**
+     * Start one encounter (P11.1). The commit stores the frozen definition, profile and roster beside the event
+     * that announces the entry; the database rejects a second active encounter of the campaign.
+     *
+     * @param frozen everything the encounter fixes at entry
+     * @param eventIndex index in this plan of the event announcing the entry
+     */
+    public record EncounterEntry(FrozenEncounter frozen, int eventIndex) {
+        /** Require the frozen encounter and a non-negative event index. */
+        public EncounterEntry {
+            Objects.requireNonNull(frozen, "frozen");
+            if (eventIndex < 0) {
+                throw new IllegalArgumentException("eventIndex must not be negative");
             }
         }
     }

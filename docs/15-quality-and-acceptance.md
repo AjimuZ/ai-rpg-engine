@@ -1610,6 +1610,16 @@ Renew/reconnect during a social check and after an accepted agreement must reuse
 the original operation/draws and settle once. These are planned checks, not results
 claimed by the current preview shells.
 
+P11.1 (29 October 2026) adds the first combat-foundation evidence, which is not a
+QA-09/QA-11–13 result: pure checks of the combat profile bounds and kernel, the zone
+graph, the lifecycle table and objective statuses; compiler diagnostics for the
+`combat` rule and encounter templates; and real PostgreSQL checks that `ENGAGE`
+freezes the encounter without a draw, time or pool change, records the opening
+strike once, replays a lost response, refuses ineligible entries without writes,
+blocks exploration in encounter mode, keeps the V22 guards and freezes a customized
+profile through the same kernel. Initiative, arithmetic, effects, outcomes and
+mid-round recovery remain P11.2–P11.6.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

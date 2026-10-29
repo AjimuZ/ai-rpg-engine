@@ -16,8 +16,9 @@ import org.rpgengine.content.PackTextParser;
  * player holds. Since P10.3 the player can also accept, suspend and resume a quest by its stable
  * identity; every other quest transition is derived by the engine from committed facts. Since P10.4 the
  * player can also rest under a pack-declared rest policy; its duration, interruption and recovery are
- * rule data, never part of the intention. Encounter intentions must acquire explicit contracts and validators before
- * registration; unknown types fail closed. Structural decoding here
+ * rule data, never part of the intention. Since P11.1 the player can enter an authored encounter, optionally
+ * declaring the attack that opens it; the tactical intentions inside an encounter must acquire explicit contracts
+ * and validators before registration (P11.2); unknown types fail closed. Structural decoding here
  * is followed by current-state rule validation in {@link CommandRules}; resolution
  * remains backend-owned (P07.4). Every value is immutable and can reproduce its exact
  * version-1 hash input.
@@ -26,7 +27,7 @@ public sealed interface TypedCommand
         permits TypedCommand.Move, TypedCommand.Wait, TypedCommand.Speak, TypedCommand.UseAbility,
         TypedCommand.UseItem, TypedCommand.EquipItem, TypedCommand.UnequipItem, TypedCommand.TransferItem,
         TypedCommand.TradeItems, TypedCommand.AcceptQuest, TypedCommand.SuspendQuest, TypedCommand.ResumeQuest,
-        TypedCommand.Rest {
+        TypedCommand.Rest, TypedCommand.Engage {
     /** @return registered, case-sensitive wire identifier */
     String type();
 
@@ -125,6 +126,15 @@ public sealed interface TypedCommand
                     fields(payload, "restId");
                     yield new Rest(text(payload.get("restId"), 256));
                 }
+                case "ENGAGE" -> {
+                    // The opening strike is optional: its key is either absent or names a participant.
+                    if (payload.containsKey("openingStrike")) {
+                        fields(payload, "encounterId", "openingStrike");
+                        yield new Engage(text(payload.get("encounterId"), 256), text(payload.get("openingStrike"), 128));
+                    }
+                    fields(payload, "encounterId");
+                    yield new Engage(text(payload.get("encounterId"), 256), null);
+                }
                 default -> throw invalid();
             };
         } catch (IllegalArgumentException | ArithmeticException failure) {
@@ -136,7 +146,7 @@ public sealed interface TypedCommand
     /** Whether the journal type requires typed evidence at canonical commit. */
     static boolean registered(String type) {
         return Set.of("MOVE", "WAIT", "SPEAK", "USE_ABILITY", "USE_ITEM", "EQUIP_ITEM", "UNEQUIP_ITEM",
-                "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST").contains(type);
+                "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST", "ENGAGE").contains(type);
     }
 
     /** Require an exact integer quantity of 1..9999 without coercion from decimals or text. */
@@ -441,5 +451,29 @@ public sealed interface TypedCommand
         public String type() { return "REST"; }
         /** @return the single policy field */
         public Map<String, Object> payload() { return Map.of("restId", restId); }
+    }
+
+    /**
+     * Request to enter one authored encounter at the player's location (P11.1). The intention names only the
+     * template and, when the entering action is itself an attack, the hostile participant it strikes. Roster,
+     * zones, profile, objectives and the slot at which the opening strike resolves come from pinned rules;
+     * entry itself resolves no attack.
+     *
+     * @param encounterId canonical encounter template ID
+     * @param openingStrike hostile participant ID of the opening attack, or null when entry carries none
+     */
+    record Engage(String encounterId, String openingStrike) implements TypedCommand {
+        /** Require a bounded template identity and, when present, a bounded participant identity. */
+        public Engage {
+            encounterId = text(encounterId, 256);
+            openingStrike = openingStrike == null ? null : text(openingStrike, 128);
+        }
+        /** @return the fixed entry identifier */
+        public String type() { return "ENGAGE"; }
+        /** @return the template field and, only when declared, the opening strike target */
+        public Map<String, Object> payload() {
+            return openingStrike == null ? Map.of("encounterId", encounterId)
+                    : Map.of("encounterId", encounterId, "openingStrike", openingStrike);
+        }
     }
 }

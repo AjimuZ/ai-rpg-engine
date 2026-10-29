@@ -95,6 +95,25 @@ class EventStatementsTest {
         assertEquals(null, state(SupportedLocale.EN, "RESOURCE_RECOVERED", "{\"actorId\":\"" + PLAYER + "\",\"resourceKey\":\"vigor\"}"));
     }
 
+    /** Encounter entry states the template and the player's zone, and a declared opening strike (P11.1). */
+    @Test
+    void statesEncounterEntry() {
+        String plain = "{\"actorId\":\"" + PLAYER + "\",\"templateId\":\"trail-ambush\",\"zone\":\"entry\"}";
+        assertEquals("Combat trail-ambush begins: Mira stands in zone entry.",
+                state(SupportedLocale.EN, "ENCOUNTER_STARTED", plain));
+        assertEquals("Inizia il combattimento trail-ambush: Mira si trova nella zona entry.",
+                state(SupportedLocale.IT, "ENCOUNTER_STARTED", plain));
+        String strike = "{\"actorId\":\"" + PLAYER + "\",\"templateId\":\"trail-ambush\",\"zone\":\"entry\","
+                + "\"openingStrike\":\"raider\"}";
+        assertEquals("Combat trail-ambush begins: Mira stands in zone entry. Opening strike declared against raider.",
+                state(SupportedLocale.EN, "ENCOUNTER_STARTED", strike));
+        assertEquals("Inizia il combattimento trail-ambush: Mira si trova nella zona entry. Attacco d'apertura "
+                + "dichiarato contro raider.", state(SupportedLocale.IT, "ENCOUNTER_STARTED", strike));
+        // A malformed strike or a missing zone falls back to the receipt.
+        assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_STARTED", strike.replace("\"raider\"", "7")));
+        assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_STARTED", plain.replace("\"zone\"", "\"area\"")));
+    }
+
     /** Quest events state their transition in both locales, using the canonical quest and outcome identities. */
     @Test
     void statesQuestEvents() {

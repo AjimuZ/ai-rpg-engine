@@ -172,11 +172,12 @@ class PackCompilerTest {
     @Test
     void failsClosed() {
         rejects("SCHEMA", "world.json", "\"name\":\"Harbor\"", "\"name\":\"Harbor\",\"damageBonus\":5");
-        // Encounters have no semantic schema yet, so a well-formed encounter definition is refused, not ignored.
+        // Narrative anchors have no semantic schema yet, so a well-formed anchor definition is refused, not ignored.
+        // (Encounters had none either until P11.1; CombatPackTest covers their schema.)
         var files = sources();
         files.put("adventure.json", files.get("adventure.json").replace("\"conditions.json\",\"category\":\"conditions\"",
-                "\"conditions.json\",\"category\":\"encounters\""));
-        files.put("conditions.json", files.get("conditions.json").replace("\"kind\":\"condition\"", "\"kind\":\"encounter\""));
+                "\"conditions.json\",\"category\":\"anchors\""));
+        files.put("conditions.json", files.get("conditions.json").replace("\"kind\":\"condition\"", "\"kind\":\"anchor\""));
         assertEquals("UNSUPPORTED_KIND", failure(files));
     }
 

@@ -31,7 +31,8 @@ class TypedCommandTest {
                                 new TypedCommand.TradeItems.Line(UUID.randomUUID(), 1)),
                         List.of(new TypedCommand.TradeItems.Line(UUID.randomUUID(), 5))),
                 new TypedCommand.AcceptQuest("survey"), new TypedCommand.SuspendQuest("dep#survey"),
-                new TypedCommand.ResumeQuest("quest.main:1"), new TypedCommand.Rest("night"))) {
+                new TypedCommand.ResumeQuest("quest.main:1"), new TypedCommand.Rest("night"),
+                new TypedCommand.Engage("trail-ambush", null), new TypedCommand.Engage("dep#ambush", "raider"))) {
             byte[] canonical = CommandCanonicalForm.encode(command.type(), 3, command.payload(), 32_768);
             assertEquals(command, TypedCommand.decode(canonical));
             assertThrows(UnsupportedOperationException.class, () -> command.payload().put("patch", "bad"));
@@ -232,6 +233,28 @@ class TypedCommandTest {
     }
 
     /** Decode bounded canonical input and require only the sanitized semantic category. */
+    /** Encounter entry names a template and optionally the opening strike's target, nothing else (P11.1). */
+    @Test
+    void rejectsMalformedEngagePayloads() {
+        assertTrue(TypedCommand.registered("ENGAGE"));
+        assertInvalid("ENGAGE", Map.of());
+        assertInvalid("ENGAGE", Map.of("encounterId", 7));
+        assertInvalid("ENGAGE", Map.of("encounterId", ""));
+        assertInvalid("ENGAGE", Map.of("encounterId", "x".repeat(257)));
+        assertInvalid("ENGAGE", Map.of("encounterId", "ambush", "openingStrike", ""));
+        assertInvalid("ENGAGE", Map.of("encounterId", "ambush", "openingStrike", "x".repeat(129)));
+        assertInvalid("ENGAGE", Map.of("encounterId", "ambush", "openingStrike", List.of("raider")));
+        assertInvalid("ENGAGE", Map.of("encounterId", "ambush", "zone", "yard"));
+        assertInvalid("ENGAGE", Map.of("encounterId", "ambush", "openingStrike", "raider", "damage", 8));
+        assertInvalid("ENGAGE", Map.of("encounterId", "ambush", "profile", Map.of("actionPoints", 9)));
+        assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.Engage(null, null));
+        assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.Engage("ambush", " "));
+        assertEquals("ENGAGE", new TypedCommand.Engage("ambush", null).type());
+        assertEquals(Map.of("encounterId", "ambush"), new TypedCommand.Engage("ambush", null).payload());
+        assertEquals(Map.of("encounterId", "ambush", "openingStrike", "raider"),
+                new TypedCommand.Engage("ambush", "raider").payload());
+    }
+
     private static void assertInvalid(String type, Map<String, Object> payload) {
         var failure = assertThrows(OperationAdmissionFailure.class,
                 () -> TypedCommand.decode(CommandCanonicalForm.encode(type, 0, payload, 32_768)));

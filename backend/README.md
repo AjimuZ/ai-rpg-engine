@@ -1046,6 +1046,42 @@ ignored, byte-identical repeated reads, a refused command changing nothing, scop
 filters, dependency-pack definitions have no names, journal lines name quests and locations by identifier, and the
 legacy free-text tables remain until the planner stops reading them.
 
+## Encounter lifecycle, combat profiles and zones (P11.1)
+
+Entering combat freezes an authored encounter ([ADR 0028](../docs/adr/0028-encounter-lifecycle-frozen-profiles-and-zone-graph.md),
+[combat](../docs/11-combat-system.md#2-combat-state-machine)).
+
+- `org.rpgengine.rules.CombatProfile` (pure) is one adventure's profile: the fixed scheduler kernel
+  (`skirmish-initiative-rounds/1`) plus the 25 provisional parameters of docs/11 section 17, each with its default and
+  bound, the cross-parameter invariants, the role mapping (force, finesse, insight, resolve to pack attributes) and
+  the Health and optional Focus resources. `canonical()` and `hash()` give its frozen identity. `CanonicalJson`
+  writes sorted, whitespace-free JSON for frozen values. `ZoneGraph` (pure) is the encounter space: range distance
+  over bordering zones, movement cost over unblocked directed edges, reachability and validation.
+- `org.rpgengine.combat`: `EncounterPhase` (the docs/11 state machine), `OpeningPolicy` (`initiative`, `first`,
+  `forbidden`), `EncounterObjective` (pure predicate evaluation), `EncounterTemplate` (prose-free template with
+  structural invariants), `CombatRules` (profiles and templates projected from a pinned closure, carried by
+  `CommandRuleCatalog.combat()`), `FrozenEncounter` (pure freezing of template, profile and the player's committed
+  facts) and `EncounterWriter` (stores the encounter and its roster inside the commit; reads the active encounter).
+- `PackCompiler` validates `ruleType: combat` and the `encounter` kind with located diagnostics. `ENGAGE` is checked by
+  `CommandRules.engage` (`ENCOUNTER_UNAVAILABLE`), resolved by `LocalActionResolver` (no time, no draw, no pool change;
+  encounter mode; one public `ENCOUNTER_STARTED` event) and committed with `ResolvedCommit.EncounterEntry`. The
+  commit refuses encounter mode without an entry; V22 keeps frozen columns immutable, the lifecycle on the diagram's
+  arrows, the opening strike resolvable once and one active encounter per campaign. `EventStatements` states the
+  entry in both languages and `CommandReceipts` projects an `encounter` summary for an entry.
+
+Tests: `CombatProfileTest` and `ZoneGraphTest` (pure), `EncounterLifecycleTest` (phase table, objective
+evaluation), `CombatRulesTest` (projection, freezing with the worked example's Guard 12 and initiative modifier 4,
+refused contradictions, a customized profile through the same kernel, template invariants), `CombatPackTest`
+(compiler diagnostics for kernel, parameters, mappings, zones, feasibility and rosters), `EncounterCommandsTest`
+(real PostgreSQL on the `EncounterPack` variant of the armory pack: entry freezes everything and resolves nothing,
+a replayed retry, every refusal writing nothing, encounter mode refusing exploration and a second entry, the
+`first` opening policy, the database guards, a customized profile), plus additions to `TypedCommandTest`,
+`EventStatementsTest`, `ResolvedCommitTest`, `PackCompilerTest` and the V22 step of `CanonicalMigrationUpgradeTest`.
+Limits: no initiative, activation or tactical intention yet (P11.2), so an entered encounter cannot progress or
+end; the opening strike is stored, not resolved (P11.2/P11.3); items carry no Guard or armor modifier; no concealed
+participants or hazards; the V16 checkpoint still records no encounter (P11.6); no frontend control sends `ENGAGE`
+and no panel shows an encounter (P12.1); no live V22 dump and restore rehearsal.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

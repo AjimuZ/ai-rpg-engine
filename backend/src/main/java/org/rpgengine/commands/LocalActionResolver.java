@@ -16,6 +16,7 @@ import java.util.UUID;
 import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.campaign.CampaignMode;
 import org.rpgengine.campaign.EventVisibility;
+import org.rpgengine.combat.FrozenEncounter;
 import org.rpgengine.inventory.InventoryModel;
 import org.rpgengine.inventory.InventoryWriter;
 import org.rpgengine.inventory.ItemPlan;
@@ -67,6 +68,12 @@ import tools.jackson.databind.node.ObjectNode;
  * the step fits the bounded {@link WorldClock}; the step is at most one in-world day. Every action
  * resolves to "no pending decision" (null), which also clears the creation starting marker: the
  * player may submit any registered intention next.
+ *
+ * <p>Encounter entry (P11.1): {@code ENGAGE} freezes the pinned template, its pack's combat profile and the
+ * player's committed facts into a {@link FrozenEncounter} whose identity derives from the operation, announces it
+ * with one public {@code ENCOUNTER_STARTED} event and moves the campaign into encounter mode. Entry takes no world
+ * time, draws no die and changes no pool: a declared opening strike is only recorded, to be resolved once at the
+ * slot the template's opening policy allows (P11.2/P11.3).
  *
  * <p>Rest (P10.4): the pinned policy restores its resources up to each pool's maximum and, when not
  * interrupted, ends the listed conditions the player has. An interruption is one recorded percentile
@@ -126,11 +133,21 @@ final class LocalActionResolver {
      * @param stored stored quest rows with satisfied objectives, and the player's recorded visits (P10.3)
      * @param worldTimeSeconds the committed world clock before this command (P10.4)
      * @param conditions canonical IDs of the conditions currently active on the player (P10.4)
+     * @param worn canonical item definitions the player wears, recorded by an encounter entry (P11.1)
      */
     record Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
             Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
             UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored, long worldTimeSeconds,
-            Set<String> conditions) {
+            Set<String> conditions, List<String> worn) {
+        /** Snapshot without worn items, the shape used before P11.1. */
+        Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
+                Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
+                UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored, long worldTimeSeconds,
+                Set<String> conditions) {
+            this(player, location, playerRowVersion, attributes, skills, pools, vocabularies, operationId, stacks,
+                    stored, worldTimeSeconds, conditions, List.of());
+        }
+
         /** Snapshot without clock and condition facts, the shape used before P10.4. */
         Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
                 Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
@@ -169,6 +186,7 @@ final class LocalActionResolver {
                 throw new IllegalArgumentException("world time outside the bounded clock");
             }
             conditions = Set.copyOf(conditions);
+            worn = List.copyOf(worn);
         }
     }
 
@@ -185,11 +203,21 @@ final class LocalActionResolver {
      * @param rewards one-time reward settlements of quests that ended in this resolution (P10.3)
      * @param quests quest status, objective and visit writes (P10.3)
      * @param conditions conditions a rest ends (P10.4)
+     * @param encounter the encounter an {@code ENGAGE} starts, or null (P11.1)
      */
     record Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
             List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
             List<String> queryScopes, ItemPlan items, List<ResolvedCommit.Reward> rewards, QuestChanges quests,
-            List<ResolvedCommit.ConditionRemoval> conditions) {
+            List<ResolvedCommit.ConditionRemoval> conditions, ResolvedCommit.EncounterEntry encounter) {
+        /** Resolution without an encounter entry, the shape used before P11.1. */
+        Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
+                List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
+                List<String> queryScopes, ItemPlan items, List<ResolvedCommit.Reward> rewards, QuestChanges quests,
+                List<ResolvedCommit.ConditionRemoval> conditions) {
+            this(world, resources, placements, events, receiptDetails, queryScopes, items, rewards, quests, conditions,
+                    null);
+        }
+
         /** Resolution without condition removals, the shape used before P10.4. */
         Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
                 List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
@@ -242,6 +270,9 @@ final class LocalActionResolver {
         private QuestChanges questChanges = QuestChanges.NONE;
         private final List<ResolvedCommit.ConditionRemoval> removals = new ArrayList<>();
         private long elapsed;
+        /** Mode the commit leaves the campaign in; only an encounter entry changes it. */
+        private CampaignMode mode = CampaignMode.EXPLORATION;
+        private ResolvedCommit.EncounterEntry encounter;
         private final InventoryModel inventory;
         private int nextOrdinal;
         private int nextInstance;
@@ -299,6 +330,7 @@ final class LocalActionResolver {
                             .put("text", speech.text()));
                 }
                 case TypedCommand.Rest rest -> rest(rest, Objects.requireNonNull(catalog, "catalog"));
+                case TypedCommand.Engage engage -> engage(engage, Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.UseAbility use -> ability(use, Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.UseItem use -> useItem(use, Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.EquipItem equip -> wear(equip.itemInstanceId(), true,
@@ -331,9 +363,9 @@ final class LocalActionResolver {
             placements.forEach(placement -> scopes.add(scope(placement.actorId())));
             removals.forEach(removal -> scopes.add(scope(removal.actorId())));
             scopes.addAll(InventoryWriter.scopes(items));
-            return new Resolution(new ResolvedCommit.WorldChange(true, elapsed, CampaignMode.EXPLORATION, null),
+            return new Resolution(new ResolvedCommit.WorldChange(true, elapsed, mode, null),
                     resources, List.copyOf(placements), List.copyOf(events), JSON.writeValueAsString(details),
-                    List.copyOf(scopes), items, List.copyOf(rewards), questChanges, List.copyOf(removals));
+                    List.copyOf(scopes), items, List.copyOf(rewards), questChanges, List.copyOf(removals), encounter);
         }
 
         /**
@@ -476,6 +508,59 @@ final class LocalActionResolver {
                         .put("recipientActorId", snapshot.player().toString()).put("definitionId", reward.item())
                         .put("quantity", reward.quantity()).put("sourceKey", source));
                 line("CREATED", reward.item(), null, reward.quantity());
+            }
+        }
+
+        /**
+         * Freeze and announce an encounter entry. The rule gate proved the template applies here, its profile is
+         * the player's vocabulary, the player has the mapped attributes and a standing Health pool, and the opening
+         * target is lawful; a contradiction is a resolver failure. The single public event lists the observable
+         * roster (every participant is observable in P11.1; concealed participants need registered concealment).
+         */
+        private void engage(TypedCommand.Engage engage, CommandRuleCatalog catalog) {
+            var template = catalog.combat().templates().get(engage.encounterId());
+            if (template == null) {
+                throw new IllegalStateException("validated encounter is missing from the pinned catalog");
+            }
+            var profile = catalog.combat().profiles().get(template.pack());
+            var health = pool(snapshot.player(), profile.health());
+            if (health == null) {
+                throw new IllegalStateException("validated entry has no Health pool");
+            }
+            var focus = profile.focus() == null ? null : pool(snapshot.player(), profile.focus());
+            var facts = new FrozenEncounter.PlayerFacts(snapshot.player(), snapshot.attributes(),
+                    new FrozenEncounter.Pool(health.current(), health.maximum()),
+                    focus == null ? null : new FrozenEncounter.Pool(focus.current(), focus.maximum()), snapshot.worn(),
+                    snapshot.conditions());
+            // Deterministic identity: a retried resolution of this operation freezes the same encounter.
+            UUID id = UUID.nameUUIDFromBytes((snapshot.operationId() + "/encounter").getBytes(StandardCharsets.UTF_8));
+            var frozen = FrozenEncounter.freeze(id, template, profile, facts, engage.openingStrike());
+            mode = CampaignMode.ENCOUNTER;
+            var announced = payload().put("actorId", snapshot.player().toString()).put("encounterId", id.toString())
+                    .put("templateId", template.id()).put("location", template.location())
+                    .put("zone", template.playerZone()).put("openingPolicy", template.opening().wire());
+            if (engage.openingStrike() != null) {
+                announced.put("openingStrike", engage.openingStrike());
+            }
+            var roster = announced.putArray("participants");
+            for (var participant : frozen.participants().subList(1, frozen.participants().size())) {
+                roster.addObject().put("id", participant.id()).put("side", participant.side().wire())
+                        .put("zone", participant.zone());
+            }
+            encounter = new ResolvedCommit.EncounterEntry(frozen, events.size());
+            event("ENCOUNTER_STARTED", EventVisibility.PUBLIC, announced);
+            var line = details.putObject("encounter");
+            line.put("encounterId", id.toString());
+            line.put("templateId", template.id());
+            line.put("phase", "ENTERING");
+            line.put("zone", template.playerZone());
+            line.put("profileHash", profile.hash());
+            line.put("definitionHash", frozen.definitionHash());
+            line.put("openingPolicy", template.opening().wire());
+            if (engage.openingStrike() == null) {
+                line.putNull("openingStrike");
+            } else {
+                line.put("openingStrike", engage.openingStrike());
             }
         }
 

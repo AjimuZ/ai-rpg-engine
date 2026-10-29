@@ -294,6 +294,7 @@ public class CampaignCreationController {
             case QUEST_UNAVAILABLE -> error(422, "COMMAND_QUEST_UNAVAILABLE");
             case TIME_ILLEGAL -> error(422, "COMMAND_TIME_ILLEGAL");
             case REST_UNAVAILABLE -> error(422, "COMMAND_REST_UNAVAILABLE");
+            case ENCOUNTER_UNAVAILABLE -> error(422, "COMMAND_ENCOUNTER_UNAVAILABLE");
         };
     }
 

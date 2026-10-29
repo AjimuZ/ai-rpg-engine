@@ -23,7 +23,9 @@ import tools.jackson.databind.json.JsonMapper;
  *       created, consumed, given, received, equipped or taken off, and (since P10.3) the public quest
  *       transitions the operation caused: discovered, accepted, suspended, resumed, objective reached,
  *       completed or failed, and (since P10.4) the rest summary: policy, whether it was interrupted, the
- *       seconds it took and the conditions it ended.</li>
+ *       seconds it took and the conditions it ended, and (since P11.1) the encounter an entry started: its
+ *       identity, template, phase, the player's starting zone, the opening policy and the declared opening
+ *       strike target (the frozen roster and profile stay in the engine).</li>
  * </ul>
  * Other actors' values, causal participants, request identities and unknown detail fields
  * are never copied, so a new internal field cannot leak by default. Public since P09.5, because
@@ -106,6 +108,19 @@ public final class CommandReceipts {
                 rest.path("conditionsEnded").forEach(condition -> ended.add(condition.asString()));
                 entry.put("conditionsEnded", List.copyOf(ended));
                 view.put("rest", java.util.Collections.unmodifiableMap(entry));
+            }
+            if (details.path("encounter").isObject()) {
+                // Present only for an encounter entry, so earlier receipt shapes stay byte-identical.
+                var encounter = details.path("encounter");
+                var entry = new LinkedHashMap<String, Object>();
+                entry.put("encounterId", encounter.path("encounterId").asString());
+                entry.put("templateId", encounter.path("templateId").asString());
+                entry.put("phase", encounter.path("phase").asString());
+                entry.put("zone", encounter.path("zone").asString());
+                entry.put("openingPolicy", encounter.path("openingPolicy").asString());
+                entry.put("openingStrike", encounter.path("openingStrike").isString()
+                        ? encounter.path("openingStrike").asString() : null);
+                view.put("encounter", java.util.Collections.unmodifiableMap(entry));
             }
             if (details.path("quests").isArray() && !details.path("quests").isEmpty()) {
                 // Present only when a public quest transition happened, so earlier receipt shapes stay

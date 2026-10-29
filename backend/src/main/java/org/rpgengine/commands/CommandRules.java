@@ -8,6 +8,8 @@ import java.util.UUID;
 
 import org.rpgengine.characters.CharacterRuleViolation;
 import org.rpgengine.characters.CharacterService;
+import org.rpgengine.combat.EncounterTemplate;
+import org.rpgengine.combat.OpeningPolicy;
 import org.rpgengine.inventory.ItemChange;
 import org.rpgengine.knowledge.KnowledgeLedger;
 import org.rpgengine.knowledge.KnowledgeRefs;
@@ -53,6 +55,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       authored link, waiting, a rest policy's full length) must fit the bounded clock. {@code REST} names a
  *       pinned policy whose required location tag the player's location carries and whose resource vocabulary
  *       is the player's, otherwise the one {@code REST_UNAVAILABLE} category applies.</li>
+ *   <li><b>Encounter entry (P11.1)</b> — {@code ENGAGE} names a pinned encounter template whose location is the
+ *       player's current location and whose pack is the player's vocabulary (its combat profile maps the player's own
+ *       attributes and Health pool); the player has every mapped role attribute and Health above its minimum, no
+ *       encounter of the campaign is active, and an opening strike is declared only when the template's policy allows
+ *       one and it names a hostile participant. Every refusal shares {@code ENCOUNTER_UNAVAILABLE}.</li>
  *   <li><b>Causal attribution</b> — at commit, resolved effects may only touch the participants
  *       this intention lawfully involves ({@link #requireAttributed}).</li>
  * </ul>
@@ -101,6 +108,7 @@ final class CommandRules {
             case TypedCommand.Move move -> check.reachable(move.destinationId());
             case TypedCommand.Wait wait -> check.waitable(wait.seconds());
             case TypedCommand.Rest rest -> check.rest(rest.restId());
+            case TypedCommand.Engage engage -> check.engage(engage);
             case TypedCommand.Speak speech -> {
                 if (speech.recipientActorId().equals(player)) {
                     throw fail(OperationAdmissionFailure.Kind.ACTOR_UNAVAILABLE);
@@ -191,6 +199,14 @@ final class CommandRules {
             if (isActorKey(reward.recipientKey()) && participants.stream()
                     .noneMatch(actor -> actor.toString().equals(reward.recipientKey()))) {
                 throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
+            }
+        }
+        // An encounter entry may name campaign actors only among the participants (the player in P11.1).
+        if (plan.encounter() != null) {
+            for (var participant : plan.encounter().frozen().participants()) {
+                if (participant.actorId() != null && !participants.contains(participant.actorId())) {
+                    throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
+                }
             }
         }
         for (var visit : plan.quests().visits()) {
@@ -383,6 +399,50 @@ final class CommandRules {
                 throw fail(OperationAdmissionFailure.Kind.REST_UNAVAILABLE);
             }
             timeFits(RestRules.elapsedSeconds(policy, false));
+        }
+
+        /**
+         * Entry needs the named template here, a profile over the player's own vocabulary, a standing player and no
+         * active encounter; an opening strike also needs a policy that allows one and a hostile target. Template
+         * existence, location, vocabulary and target share one category, so a refusal does not confirm that an
+         * encounter exists elsewhere.
+         */
+        void engage(TypedCommand.Engage engage) {
+            var combat = catalog().combat();
+            var template = combat.templates().get(engage.encounterId());
+            String current = here();
+            if (template == null || current == null || !current.equals(template.location())
+                    || !template.pack().equals(vocabulary())) {
+                throw fail(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE);
+            }
+            var profile = combat.profiles().get(template.pack());
+            // A defeated (minimum Health) player cannot start a fight, and a save without the Health pool has none.
+            var health = jdbc.query("select current_value > minimum_value from actor_resource where campaign_id = ? "
+                    + "and actor_id = ? and resource_key = ?", (row, index) -> row.getBoolean(1), campaign, player,
+                    profile.health());
+            if (health.isEmpty() || !health.getFirst()) {
+                throw fail(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE);
+            }
+            // Every role attribute must be a stored number: the frozen profile never reads a silent zero.
+            for (String attribute : new java.util.TreeSet<>(profile.roles().values())) {
+                var kind = jdbc.query("select jsonb_typeof(attributes -> ?) from character_state where campaign_id = ? "
+                        + "and actor_id = ?", (row, index) -> row.getString(1), attribute, campaign, player);
+                if (kind.isEmpty() || !"number".equals(kind.getFirst())) {
+                    throw fail(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE);
+                }
+            }
+            // The mode gate already refuses entry during combat; the stored lifecycle is checked as well.
+            if (Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from encounter where campaign_id = ? "
+                    + "and phase not in ('SETTLED', 'NARRATIVE_RESUME'))", Boolean.class, campaign))) {
+                throw fail(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE);
+            }
+            if (engage.openingStrike() != null) {
+                var target = template.participant(engage.openingStrike());
+                if (template.opening() == OpeningPolicy.FORBIDDEN || target == null
+                        || target.side() != EncounterTemplate.Side.HOSTILE) {
+                    throw fail(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE);
+                }
+            }
         }
 
         /** Fail with {@code TIME_ILLEGAL} unless the campaign's committed clock can take the step. */

@@ -183,6 +183,18 @@ public final class EventStatements {
                             : actor + " resumes the quest " + quest + ".";
                 };
             }
+            case "ENCOUNTER_STARTED" -> {
+                // P11.1: entry freezes the fight; an opening strike is declared here and resolved later, once.
+                String actor = name(payload, "actorId", names);
+                String encounter = token(payload, "templateId");
+                String zone = token(payload, "zone");
+                String strike = payload.has("openingStrike") ? token(payload, "openingStrike") : "";
+                yield actor == null || encounter == null || zone == null || strike == null ? null
+                        : it ? "Inizia il combattimento " + encounter + ": " + actor + " si trova nella zona " + zone + "."
+                                + (strike.isEmpty() ? "" : " Attacco d'apertura dichiarato contro " + strike + ".")
+                        : "Combat " + encounter + " begins: " + actor + " stands in zone " + zone + "."
+                                + (strike.isEmpty() ? "" : " Opening strike declared against " + strike + ".");
+            }
             case "QUEST_OBJECTIVE_SATISFIED" -> {
                 String quest = token(payload, "questId");
                 String objective = token(payload, "objectiveId");

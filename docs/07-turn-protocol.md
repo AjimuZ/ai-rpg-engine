@@ -348,6 +348,27 @@ at or below the chance interrupts (half the time, half the restoration, no condi
 conditionsEnded} only for a rest. A rest or wait can satisfy a `worldTime` quest predicate in the same
 commit that moves the clock.
 
+### P11.1 encounter entry
+
+`ENGAGE` enters one authored encounter at the player's location
+([ADR 0028](adr/0028-encounter-lifecycle-frozen-profiles-and-zone-graph.md),
+[combat](11-combat-system.md#3-encounter-entry)). The intention names the template and, when the entering
+action is itself an attack, the hostile participant it strikes. Roster, zones, profile, objectives and the
+slot where the opening strike resolves are pinned rules, never payload fields.
+
+| Type | Exact payload | Rule (category `ENCOUNTER_UNAVAILABLE` on failure) |
+| --- | --- | --- |
+| `ENGAGE` | `encounterId` (1..256 characters) and optionally `openingStrike` (1..128 characters); no other field | The pinned template exists, its location is the player's current location and its pack is the player's vocabulary pack; the player has every role attribute the pack's combat profile maps and Health above its minimum; no encounter of the campaign is active; an opening strike needs a policy other than `forbidden` and names a hostile participant |
+
+In encounter mode the common semantic gate refuses every exploration intention, `ENGAGE` included, with
+`MODE_ILLEGAL` before these rules run. The commit freezes the encounter (`FrozenEncounter`: canonical profile
+and definition with their SHA-256, one row per participant), moves the campaign to `ENCOUNTER` mode, advances
+the game turn and writes one public `ENCOUNTER_STARTED` event {actorId, encounterId, templateId, location, zone,
+openingPolicy, openingStrike?, participants: [{id, side, zone}]}. It takes no world time, reserves no draw and
+changes no pool or item. The receipt gains `encounter` {encounterId, templateId, phase, zone, openingPolicy,
+openingStrike} only for an entry. The opening strike is stored as `PENDING` and resolved once by P11.2/P11.3.
+A plan that enters encounter mode without an encounter, or a second active encounter, rolls the commit back.
+
 ### P10.3 quest intentions
 
 Three more exploration intentions name one quest by its stable identity and nothing else. Status,

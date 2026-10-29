@@ -2573,6 +2573,27 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
 **Depends on:** P10. **Areas:** combat domain, rules, persistence, fixtures.
 
 - [ ] P11.1 Implement encounter lifecycle, frozen per-adventure profiles around the default ruleset, zone graph, objectives and opening-action policy; validate supported customization without changing the scheduler kernel.
+  - Package A — profiles (`org.rpgengine.rules`): `CombatProfile` = the fixed AI RPG Skirmish kernel
+    (`skirmish-initiative-rounds/1`) plus the 25 provisional parameters of docs/11 section 17 with defaults,
+    bounds and cross-parameter invariants; a pack `combat` rule maps the roles to its attributes, names Health
+    and Focus and may tune parameters inside their bounds; another scheduler, space or unknown parameter is a
+    located pack error. `CanonicalJson` freezes values with a SHA-256.
+  - Package B — space and templates: `ZoneGraph` (range over bordering zones, movement over unblocked directed
+    edges with difficult terrain, reachability, connectivity), the `encounter` pack kind (location, zones,
+    edges, player and escape zones, participants with explicit statistics and threat tier, predicate objectives
+    `defeatHostiles`/`escape`/`reachZone`/`survive`/`protect`, opening policy `initiative`/`first`/`forbidden`)
+    with feasibility checks, `CombatRules` and `EncounterTemplate` in `org.rpgengine.combat`.
+  - Package C — lifecycle and entry: `EncounterPhase` (the docs/11 state machine), the `ENGAGE` intention
+    (`ENCOUNTER_UNAVAILABLE`), `FrozenEncounter` (player defenses from the role mapping, actual pools, worn
+    items, conditions), one public `ENCOUNTER_STARTED` event, encounter mode, no time, draw or pool change, the
+    opening strike stored once as pending; V22 `encounter`/`encounter_participant` with frozen-column,
+    lifecycle, single-resolution and one-active-encounter guards; backup schema 22.
+  - Package D — docs and interface: ADR 0028, docs 05/07/09/10/11/12/13/15, backend README, backup README,
+    CHANGELOG, one reviewed EN/IT refusal message (catalog 413).
+  - Limits: no initiative, activation or tactical intention (P11.2), so an entered encounter cannot progress or
+    end; the opening strike is not resolved yet (P11.2/P11.3); items carry no Guard or armor modifier; no
+    concealed participants or hazards; the V16 checkpoint records no encounter (P11.6); no frontend control or
+    encounter panel (P12.1).
 - [ ] P11.2 Implement initiative, rounds, activations, AP, movement, legal targeting and explicit end activation; enforce bounded speech and declared social/scene-action eligibility/costs at player decision boundaries.
 - [ ] P11.3 Implement attack/defense/strong-hit/armor/healing calculations with recorded draws.
 - [ ] P11.4 Implement predeclared reactions, stacking caps, effect phases, durations, cooldowns, and no-chain limits.

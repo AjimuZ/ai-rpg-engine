@@ -54,6 +54,37 @@ class ResolvedCommitTest {
         assertTrue(new ResolvedCommit(context, world, List.of(), List.of(event), List.of(), "{}", false).conditions().isEmpty());
     }
 
+    /** An encounter entry moves the campaign into encounter mode and cites one of the plan's events (P11.1). */
+    @Test
+    void anEncounterEntryNeedsEncounterModeAndItsEvent() throws Exception {
+        var context = new ResolvedCommit.Context(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                UUID.randomUUID(), "a".repeat(64), 0, 2, new MutationLeaseService.Token(UUID.randomUUID(), 1));
+        var event = new ResolvedCommit.Event(null, null, EventVisibility.PUBLIC,
+                new CampaignEvent.Body("ENCOUNTER_STARTED", 1, 1, "{}"));
+        var rules = org.rpgengine.combat.EncounterPack.rules(org.rpgengine.combat.EncounterPack.files());
+        var frozen = org.rpgengine.combat.FrozenEncounter.freeze(UUID.randomUUID(), rules.templates().get("trail-ambush"),
+                rules.profiles().get("sample:armory"), new org.rpgengine.combat.FrozenEncounter.PlayerFacts(UUID.randomUUID(),
+                        java.util.Map.of("awareness", 2L, "might", 2L), new org.rpgengine.combat.FrozenEncounter.Pool(8, 8),
+                        null, List.of(), java.util.Set.of()), null);
+        var tactical = new ResolvedCommit.WorldChange(true, 0, CampaignMode.ENCOUNTER, null);
+        var plan = new ResolvedCommit(context, tactical, List.of(), List.of(event), List.of(), "{}", false,
+                ResolvedCommit.Preparation.NONE, null, List.of(), List.of(), org.rpgengine.inventory.ItemPlan.NONE,
+                org.rpgengine.quests.QuestChanges.NONE, List.of(), new ResolvedCommit.EncounterEntry(frozen, 0));
+        assertEquals(frozen, plan.encounter().frozen());
+        var exploring = new ResolvedCommit.WorldChange(true, 0, CampaignMode.EXPLORATION, null);
+        assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit(context, exploring, List.of(), List.of(event),
+                List.of(), "{}", false, ResolvedCommit.Preparation.NONE, null, List.of(), List.of(),
+                org.rpgengine.inventory.ItemPlan.NONE, org.rpgengine.quests.QuestChanges.NONE, List.of(),
+                new ResolvedCommit.EncounterEntry(frozen, 0)));
+        assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit(context, tactical, List.of(), List.of(event),
+                List.of(), "{}", false, ResolvedCommit.Preparation.NONE, null, List.of(), List.of(),
+                org.rpgengine.inventory.ItemPlan.NONE, org.rpgengine.quests.QuestChanges.NONE, List.of(),
+                new ResolvedCommit.EncounterEntry(frozen, 1)));
+        assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit.EncounterEntry(frozen, -1));
+        // Plans built before P11.1 carry no entry.
+        assertNull(new ResolvedCommit(context, exploring, List.of(), List.of(event), List.of(), "{}", false).encounter());
+    }
+
     /** Reject unbounded/ambiguous effects before acquiring locks, and isolate a plan from caller list mutation. */
     @Test
     void boundsAndFreezesResolvedEffects() {

@@ -177,3 +177,13 @@ change only in an update that also advances `state_revision`, by at most 86,400 
 so only the check constraints apply to restored values: a dump whose clock passes the bound is refused, while the
 step trigger guards later updates and does not re-check restored history. Offline checks cover the V21
 manifest/catalog; no live V21 dump/restore rehearsal has been run.
+
+V22 scope (P11.1) adds `encounter` (one row per started encounter: template, location, pinned content revision
+and ruleset hash, the frozen combat profile and definition with their SHA-256, the opening policy and the
+lifecycle phase, round and opening-strike status) and `encounter_participant` (the frozen roster: the player
+at ordinal 0 backed by its actor, template participants with encounter-local Health and Focus). They reference
+`campaign`, `content_revision`, `operation_journal`, `campaign_event` and `actor`, so restore them with the
+campaign rows. `pg_restore` creates triggers after loading data, so a restored encounter in any phase loads;
+the lifecycle, frozen-column and one-active-encounter guards apply to later writes, and the partial unique
+index is built over the restored rows. Offline checks cover the V22 manifest/catalog; no live V22 dump/restore
+rehearsal has been run.

@@ -11,18 +11,22 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.rpgengine.rules.CombatProfile;
 import org.rpgengine.rules.WorldClock;
+import org.rpgengine.rules.ZoneGraph;
 
 /**
  * Semantic validation of a {@link ParsedPack}: stable IDs, dependency resolution, cross-references,
  * creation profiles, item rarity/appearance identities, skills, abilities, conditions, quests and
  * initial world definitions (P04.2), derived statistics, equipment slots, hands and stacking
  * conditions (P10.1), plus bounded expressions/effects, relation cycles, engine and
- * ruleset compatibility, module support, hash conflicts and the generation policy (P04.3).
+ * ruleset compatibility, module support, hash conflicts and the generation policy (P04.3), and the
+ * combat profile rule and encounter templates with their zone graphs, rosters, objectives and
+ * opening-action policy (P11.1).
  *
  * <p>Boundaries: this stage reads only the immutable parser output, a caller-supplied
  * {@link DependencyCatalog} and the {@link EngineContract}; it performs no I/O. Kinds whose
- * semantics belong to later tasks (encounter, anchor, progression) fail closed with
+ * semantics belong to later tasks (anchor, progression) fail closed with
  * UNSUPPORTED_KIND instead of being accepted unchecked. Path/archive protections and
  * registration are P04.4. Decisions are recorded in ADR 0017.
  *
@@ -128,6 +132,8 @@ public final class PackCompiler {
         private final Set<String> restPolicies = new HashSet<>();
         /** Derived statistic IDs; they share no namespace with attributes so a formula atom is never ambiguous. */
         private final Set<String> derivedStats = new HashSet<>();
+        /** The pack's resolved combat profile (P11.1), or null until its "combat" rule is validated. */
+        private CombatProfile combatProfile;
         /** Equipment slot ID to {capacity, accepted tags}; filled from the "equipment" rule definition. */
         private final Map<String, EquipmentSlot> equipmentSlots = new HashMap<>();
         /** Simultaneous hands this pack's actors have; used to check two-handed items and loadouts. */
@@ -400,7 +406,7 @@ public final class PackCompiler {
 
         /** Whether a rule definition refers to vocabularies that other rule definitions declare. */
         private static boolean readsVocabulary(Definition definition) {
-            return Set.of("derivedStats", "rest").contains(definition.data().get("ruleType"));
+            return Set.of("derivedStats", "rest", "combat").contains(definition.data().get("ruleType"));
         }
 
         /** Dispatch one definition to its kind-specific validator. */
@@ -418,6 +424,7 @@ public final class PackCompiler {
                 case "condition" -> condition(f, definition);
                 case "creation" -> creation(f);
                 case "quest" -> quest(f, definition);
+                case "encounter" -> encounter(f);
                 default -> throw new PackException("UNSUPPORTED_KIND", document.location(definition.pointer() + "/kind"),
                         "Kind " + definition.kind() + " has no semantic schema in this pack contract revision");
             }
@@ -427,7 +434,7 @@ public final class PackCompiler {
         /** Register the rule vocabularies; unknown rule types fail closed rather than being ignored. */
         private void rule(Fields f) {
             String type = f.choice("ruleType", Set.of("attributes", "resources", "rarityTiers",
-                    "derivedStats", "equipment", "rest"), null);
+                    "derivedStats", "equipment", "rest", "combat"), null);
             switch (type) {
                 case "attributes" -> {
                     for (Fields a : f.objects("attributes", 1, 16)) {
@@ -458,6 +465,7 @@ public final class PackCompiler {
                 case "derivedStats" -> derivedStats(f);
                 case "equipment" -> equipment(f);
                 case "rest" -> rest(f);
+                case "combat" -> combat(f);
                 default -> {
                     for (Fields t : f.objects("tiers", 1, 16)) {
                         String id = t.id("id", true);
@@ -471,6 +479,222 @@ public final class PackCompiler {
                     }
                 }
             }
+        }
+
+        /**
+         * The pack's combat profile around the AI RPG Skirmish default (P11.1, docs/11 section 17, ADR 0028).
+         * {@code scheduler} and {@code space} may only name the one kernel this engine provides; a different
+         * scheduler or spatial model is an engine extension, never pack data. {@code roles} maps the four ruleset
+         * roles to attributes of this pack, {@code health} (and optionally {@code focus}) to its resources, and
+         * {@code values} may override any provisional parameter inside its documented bound. The resolved profile
+         * must also satisfy the cross-parameter invariants (costs fit the action points, and so on), reported as
+         * {@code CONSTRAINT_CONFLICT}. A pack has at most one combat rule.
+         */
+        private void combat(Fields f) {
+            if (combatProfile != null) {
+                throw f.fail("DUPLICATE", "ruleType", "A pack may define one combat rule");
+            }
+            f.choice("scheduler", Set.of(CombatProfile.SCHEDULER), CombatProfile.SCHEDULER);
+            f.choice("space", Set.of(CombatProfile.SPACE), CombatProfile.SPACE);
+            Fields roleFields = f.object("roles", true);
+            var roles = new LinkedHashMap<String, String>();
+            for (String role : CombatProfile.ROLES) {
+                String attribute = roleFields.id(role, true);
+                if (!attributes.containsKey(attribute)) {
+                    throw roleFields.fail("REFERENCE_UNKNOWN", role, "Unknown attribute '" + attribute
+                            + "'; defined attributes: " + new TreeSet<>(attributes.keySet()));
+                }
+                roles.put(role, attribute);
+            }
+            roleFields.close();
+            String health = combatResource(f, "health", true);
+            String focus = combatResource(f, "focus", false);
+            if (health.equals(focus)) {
+                throw f.fail("DUPLICATE", "focus", "Health and Focus must be different resources");
+            }
+            var overrides = new LinkedHashMap<String, Integer>();
+            Fields values = f.object("values", false);
+            if (values != null) {
+                CombatProfile.PARAMETERS.forEach((name, bound) -> {
+                    if (values.has(name)) {
+                        overrides.put(name, values.integer(name, bound.min(), bound.max(), null));
+                    }
+                });
+                values.close();
+            }
+            try {
+                combatProfile = CombatProfile.resolve(pack.manifest().id(), roles, health, focus, overrides);
+            } catch (IllegalArgumentException conflict) {
+                throw f.fail("CONSTRAINT_CONFLICT", "values", conflict.getMessage());
+            }
+        }
+
+        /** A resource key of this pack named by the combat rule; null when optional and absent. */
+        private String combatResource(Fields f, String key, boolean required) {
+            String resource = f.id(key, required);
+            if (resource != null && !resources.containsKey(resource)) {
+                throw f.fail("REFERENCE_UNKNOWN", key, "Unknown resource '" + resource + "'; defined resources: "
+                        + new TreeSet<>(resources.keySet()));
+            }
+            return resource;
+        }
+
+        /**
+         * Encounter template (P11.1, docs/09 section 4, docs/11 sections 3-5 and 13): the location where the player
+         * can engage, a zone graph, the starting zones, participants with explicit statistics, objectives and the
+         * opening-action policy. Every mechanical value is bounded here, so the frozen encounter never depends on
+         * an unchecked number; structural feasibility (a connected space, reachable escape and objective zones,
+         * zone capacity, at least one hostile, at most party size plus two hostiles) is a
+         * {@code CONSTRAINT_CONFLICT}. The pack must declare a combat rule, whose profile bounds armor and
+         * the rounds of a survival objective.
+         */
+        private void encounter(Fields f) {
+            if (combatProfile == null) {
+                throw f.fail("CONSTRAINT_CONFLICT", null, "An encounter needs the pack's combat rule (ruleType combat)");
+            }
+            f.text("name", true);
+            f.text("description", false);
+            f.ref("location", LOCATION, true);
+            var zones = new LinkedHashMap<String, ZoneGraph.Zone>();
+            for (Fields zone : f.objects("zones", 1, ZoneGraph.MAX_ZONES)) {
+                String id = zone.id("id", true);
+                zone.text("name", true);
+                var tags = zone.ids("tags", 8);
+                var cover = ZoneGraph.Cover.valueOf(zone.choice("cover", Set.of("none", "partial", "full"), "none")
+                        .toUpperCase(java.util.Locale.ROOT));
+                boolean obscured = zone.choice("visibility", Set.of("clear", "obscured"), "clear").equals("obscured");
+                int capacity = zone.integer("capacity", 1, ZoneGraph.MAX_CAPACITY, 0);
+                zone.close();
+                if (zones.putIfAbsent(id, new ZoneGraph.Zone(id, new HashSet<>(tags), cover, obscured, capacity)) != null) {
+                    throw zone.fail("DUPLICATE", "id", "Zone ID already defined in this encounter");
+                }
+            }
+            var edges = new ArrayList<ZoneGraph.Edge>();
+            for (Fields edge : f.objects("edges", 0, ZoneGraph.MAX_EDGES)) {
+                String from = zoneRef(edge, "from", zones);
+                String to = zoneRef(edge, "to", zones);
+                if (from.equals(to)) {
+                    throw edge.fail("CONSTRAINT_CONFLICT", "to", "An edge must join two different zones");
+                }
+                boolean difficult = edge.bool("difficult", false);
+                boolean blocked = edge.bool("blocked", false);
+                boolean both = edge.bool("bidirectional", true);
+                edge.close();
+                edges.add(new ZoneGraph.Edge(from, to, difficult, blocked));
+                if (both) {
+                    edges.add(new ZoneGraph.Edge(to, from, difficult, blocked));
+                }
+            }
+            ZoneGraph graph;
+            try {
+                graph = new ZoneGraph(zones, edges);
+            } catch (IllegalArgumentException conflict) {
+                throw f.fail("CONSTRAINT_CONFLICT", "edges", conflict.getMessage());
+            }
+            String playerZone = zoneRef(f, "playerZone", zones);
+            var reachable = graph.reachable(playerZone);
+            List<String> escapes = f.ids("escapeZones", ZoneGraph.MAX_ZONES);
+            for (String escape : escapes) {
+                if (!zones.containsKey(escape)) {
+                    throw f.fail("REFERENCE_UNKNOWN", "escapeZones", "Unknown zone '" + escape + "'; declared zones: "
+                            + new TreeSet<>(zones.keySet()));
+                }
+                if (escape.equals(playerZone) || !reachable.contains(escape)) {
+                    throw f.fail("CONSTRAINT_CONFLICT", "escapeZones", "Escape zone '" + escape
+                            + "' must differ from the player zone and be reachable from it along unblocked edges");
+                }
+            }
+            var occupancy = new HashMap<String, Integer>(Map.of(playerZone, 1));
+            var participants = new HashMap<String, String>();
+            int hostiles = 0;
+            for (Fields participant : f.objects("participants", 1, 8)) {
+                String id = participant.id("id", true);
+                if (id.equals("player")) {
+                    throw participant.fail("id", "Participant ID 'player' is reserved for the protagonist");
+                }
+                participant.text("name", true);
+                String side = participant.choice("side", Set.of("ally", "hostile"), null);
+                String zone = zoneRef(participant, "zone", zones);
+                participant.ref("npc", Set.of("npc"), false);
+                participant.choice("threat", Set.of("minor", "standard", "elite", "anchor"), "standard");
+                Fields stats = participant.object("stats", true);
+                stats.integer("health", 1, 999, null);
+                stats.integer("focus", 0, 999, 0);
+                stats.integer("guard", 0, 40, null);
+                stats.integer("resistance", 0, 40, null);
+                stats.integer("armor", 0, combatProfile.value("armorMax"), 0);
+                for (String role : CombatProfile.ROLES) {
+                    stats.integer(role, 0, 6, 0);
+                }
+                stats.close();
+                participant.close();
+                if (participants.putIfAbsent(id, side) != null) {
+                    throw participant.fail("DUPLICATE", "id", "Participant ID already defined in this encounter");
+                }
+                if (side.equals("hostile")) {
+                    hostiles++;
+                }
+                int capacity = zones.get(zone).capacity();
+                if (occupancy.merge(zone, 1, Integer::sum) > capacity && capacity > 0) {
+                    throw participant.fail("CONSTRAINT_CONFLICT", "zone", "Zone '" + zone + "' holds at most "
+                            + capacity + " occupants at the start");
+                }
+            }
+            int party = 1 + participants.size() - hostiles;
+            if (hostiles == 0) {
+                throw f.fail("CONSTRAINT_CONFLICT", "participants", "An encounter needs at least one hostile participant");
+            }
+            if (hostiles > party + 2) {
+                throw f.fail("CONSTRAINT_CONFLICT", "participants", hostiles + " hostile participants exceed the party size "
+                        + party + " plus 2");
+            }
+            if (zones.get(playerZone).capacity() > 0 && occupancy.get(playerZone) > zones.get(playerZone).capacity()) {
+                throw f.fail("CONSTRAINT_CONFLICT", "playerZone", "Zone '" + playerZone + "' holds at most "
+                        + zones.get(playerZone).capacity() + " occupants at the start");
+            }
+            var objectives = new HashSet<String>();
+            for (Fields objective : f.objects("objectives", 1, 8)) {
+                String id = objective.id("id", true);
+                objective.text("name", false);
+                switch (objective.choice("kind", Set.of("defeatHostiles", "escape", "reachZone", "survive", "protect"), null)) {
+                    case "escape" -> {
+                        if (escapes.isEmpty()) {
+                            throw objective.fail("CONSTRAINT_CONFLICT", "kind", "An escape objective needs escapeZones");
+                        }
+                    }
+                    case "reachZone" -> {
+                        String zone = zoneRef(objective, "zone", zones);
+                        if (zone.equals(playerZone) || !reachable.contains(zone)) {
+                            throw objective.fail("CONSTRAINT_CONFLICT", "zone", "Objective zone '" + zone
+                                    + "' must differ from the player zone and be reachable from it along unblocked edges");
+                        }
+                    }
+                    case "survive" -> objective.integer("rounds", 1, combatProfile.roundCap(), null);
+                    case "protect" -> {
+                        String ally = objective.id("participant", true);
+                        if (!"ally".equals(participants.get(ally))) {
+                            throw objective.fail("REFERENCE_UNKNOWN", "participant", "'" + ally
+                                    + "' is not an allied participant of this encounter");
+                        }
+                    }
+                    default -> { }
+                }
+                objective.close();
+                if (!objectives.add(id)) {
+                    throw objective.fail("DUPLICATE", "id", "Objective ID already defined in this encounter");
+                }
+            }
+            f.choice("opening", Set.of("initiative", "first", "forbidden"), "initiative");
+        }
+
+        /** A required zone reference of an encounter; an undeclared zone is REFERENCE_UNKNOWN listing the zones. */
+        private static String zoneRef(Fields f, String key, Map<String, ZoneGraph.Zone> zones) {
+            String zone = f.id(key, true);
+            if (!zones.containsKey(zone)) {
+                throw f.fail("REFERENCE_UNKNOWN", key, "Unknown zone '" + zone + "'; declared zones: "
+                        + new TreeSet<>(zones.keySet()));
+            }
+            return zone;
         }
 
         /**

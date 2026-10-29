@@ -346,6 +346,20 @@ only through an `ItemPlan` that a canonical commit applies beside the events tha
   `ITEM_TRANSFERRED`, `ITEM_TRADED`, `ITEM_EQUIPPED`, `ITEM_UNEQUIPPED`; resource effects of a use reuse
   `EFFECT_RESOLVED`. Receipts list the player's own item lines.
 
+### Encounters (P11.1)
+
+`encounter` (V22) is the `Encounter` aggregate's frozen part and its lifecycle cursor
+([ADR 0028](adr/0028-encounter-lifecycle-frozen-profiles-and-zone-graph.md)). A row is written only by the
+`ENGAGE` commit, beside its `ENCOUNTER_STARTED` event, and starts at phase `ENTERING`, round 0. It pins the
+template, location, content revision and ruleset hash, the resolved combat profile and the frozen definition
+(zones, edges, escape zones, objectives, opening policy and target, defeat policy, roster) as canonical JSON with
+their SHA-256; none of these columns ever changes. Phase, round and opening-strike status move only along the
+docs/11 state machine (a trigger mirrors `EncounterPhase`), and a campaign has at most one active encounter.
+`encounter_participant` holds the roster: the player at ordinal 0 backed by its actor (Health and Focus stay in
+`actor_resource`) and each template participant with encounter-local Health and Focus, a side, a zone and a
+status (`ACTIVE`, `DEFEATED`, `ESCAPED`, `SURRENDERED`). Initiative, activations, action points, reactions and
+effect timers are added by P11.2 to P11.4; the V16 checkpoint still records `"encounter": null` until P11.6.
+
 ### World clock, travel and rest (P10.4)
 
 `campaign.world_time_seconds` is the in-world clock: whole seconds since the campaign began, copied onto every

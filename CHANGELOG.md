@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased — Encounter lifecycle, combat profiles, zones and opening policy (P11.1), 29 October 2026
+
+- Adventures can now define fights. A pack declares one combat profile (`ruleType: combat`) around the AI RPG
+  Skirmish default: it maps the four ruleset roles to its own attributes, names its Health (and optional Focus)
+  resource and may tune the provisional numbers (action points, round length, costs, caps, bonuses) inside
+  documented bounds. The scheduler, the zone space, the dice and the reaction depth cannot be changed by a pack;
+  naming another scheduler or space is a located pack error.
+- Packs can define encounter templates (`encounters` files): the location where the fight can start, a small zone
+  graph with cover, visibility, capacity and difficult or blocked edges, the player's starting zone and escape
+  zones, allies and opponents with explicit statistics and a threat tier, objectives (defeat the opposition,
+  escape, reach a zone, survive a number of rounds, protect an ally) and an opening policy. Import checks that the
+  space is connected, that escape and objective zones can be reached, that zones are not overfilled and that there
+  are at most two more opponents than the party has members.
+- The new `ENGAGE` command enters an encounter at the player's location, optionally declaring the opening strike.
+  Entry freezes the profile, zones, objectives, opening policy and every participant's statistics (the player's
+  defenses come from the same character that explores, with their current Health, worn items and conditions),
+  writes one public event and switches the playthrough to encounter mode. It takes no time, rolls no die and
+  changes no Health: the opening strike is recorded once and resolves later at the slot the policy allows
+  (the initiator's turn, or an opening slot before the first round). A refused entry changes nothing and answers
+  `COMMAND_ENCOUNTER_UNAVAILABLE`, with reviewed English and Italian wording (the Italian still needs
+  independent human review).
+- PostgreSQL stores the frozen encounter and its roster (migration V22: `encounter`, `encounter_participant`):
+  frozen facts never change, the lifecycle follows the combat state machine, an opening strike resolves at most
+  once and a playthrough has at most one active encounter. The backup tool covers schema version 22.
+- Not included yet: initiative, turns and every tactical action (P11.2), so an entered encounter cannot progress
+  or end; attack resolution (P11.3); a frontend control or panel for encounters (P12); hidden participants and
+  hazards; equipment Guard and armor values. See [ADR 0028](docs/adr/0028-encounter-lifecycle-frozen-profiles-and-zone-graph.md).
+
 ## Unreleased — Reliable state changes in panels and journal (P10.5), 29 October 2026
 
 - A playthrough now shows what its commits stored. The playthrough page reads one new snapshot,

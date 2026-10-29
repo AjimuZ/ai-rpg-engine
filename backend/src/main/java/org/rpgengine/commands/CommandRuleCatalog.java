@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.rpgengine.characters.CharacterRuleCatalog;
+import org.rpgengine.combat.CombatRules;
 import org.rpgengine.content.CampaignPackSnapshot;
 import org.rpgengine.content.CompiledPack;
 import org.rpgengine.content.Definition;
@@ -19,7 +20,8 @@ import org.rpgengine.rules.WorldClock;
 
 /**
  * Compact immutable projection of the pinned rule facts that command validation and local
- * resolution consult: location links with their travel minutes and tags, location disclosure, rest policies, actor-definition disclosure and
+ * resolution consult: location links with their travel minutes and tags, location disclosure, rest policies,
+ * combat profiles and encounter templates (P11.1), actor-definition disclosure and
  * declaring packs, and ability contracts including their compiled effect programs. It is
  * derived only from a sealed, recompiled {@link CampaignPackSnapshot}; no authored prose,
  * secret text, display name or localization is retained, so caching it costs little memory
@@ -49,15 +51,17 @@ import org.rpgengine.rules.WorldClock;
  *        item rewards (P10.3)
  * @param rests rest policies keyed by canonical ID: duration, location tag, interruption chance, restored
  *        resources and removed conditions (P10.4)
+ * @param combat resolved combat profile of each pack and the encounter templates of the closure (P11.1)
  */
 record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
         Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
         Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests,
-        Map<String, RestRules.Policy> rests) {
+        Map<String, RestRules.Policy> rests, CombatRules combat) {
     /** Freeze every index; null parts are construction bugs and fail immediately. */
     CommandRuleCatalog {
         Objects.requireNonNull(revisionId, "revisionId");
         Objects.requireNonNull(quests, "quests");
+        Objects.requireNonNull(combat, "combat");
         rests = Map.copyOf(rests);
         items = Map.copyOf(items);
         Objects.requireNonNull(characters, "characters");
@@ -66,6 +70,15 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         resourceVocabularies = Map.copyOf(resourceVocabularies);
         actorPacks = Map.copyOf(actorPacks);
         abilities = Map.copyOf(abilities);
+    }
+
+    /** Catalog without combat rules, the shape used before P11.1. */
+    CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
+            Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
+            Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests,
+            Map<String, RestRules.Policy> rests) {
+        this(revisionId, locations, actorDefinitions, resourceVocabularies, actorPacks, abilities, items, characters,
+                quests, rests, CombatRules.NONE);
     }
 
     /** Catalog without rest policies, the shape used before P10.4. */
@@ -159,7 +172,7 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
             }
         }
         return new CommandRuleCatalog(revisionId, locations, actors, vocabularies, origins, abilities, items,
-                CharacterRuleCatalog.from(snapshot), QuestRules.from(snapshot), rests);
+                CharacterRuleCatalog.from(snapshot), QuestRules.from(snapshot), rests, CombatRules.from(snapshot));
     }
 
     /**

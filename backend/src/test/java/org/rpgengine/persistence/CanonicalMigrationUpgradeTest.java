@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V21 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V22 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -470,6 +470,67 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(1, jdbc.update(tick, clock + 86_400, 1));
                     assertThrows(DataAccessException.class, () -> jdbc.update(tick, clock + 1, 1));
                     assertEquals(0, v21.migrate().migrationsExecuted);
+                    // V22 stores frozen encounters: the populated campaign is unchanged, an encounter starts at
+                    // ENTERING, at most one is active, frozen columns never change, the lifecycle follows the state
+                    // machine and an opening strike resolves once.
+                    String v21Campaign = jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class);
+                    Flyway v22 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("22").load();
+                    assertEquals(1, v22.migrate().migrationsExecuted);
+                    assertTrue(v22.validateWithResult().validationSuccessful);
+                    assertEquals(v21Campaign, jdbc.queryForObject("select to_jsonb(c)::text from campaign c", String.class));
+                    assertEquals(0L, jdbc.queryForObject("select count(*) from encounter", Long.class));
+                    String digest = "a".repeat(64);
+                    String encounter = "insert into encounter (id, campaign_id, template_id, location_id, phase, round, "
+                            + "content_revision_id, ruleset_hash, profile, profile_hash, definition, definition_hash, "
+                            + "opening_policy, opening_target, opening_status, started_operation_id, event_sequence, "
+                            + "started_revision, updated_revision, created_at) values (?, ?, 'ambush', 'trail', ?, 0, ?, ?, "
+                            + "'{}', ?, '{}', ?, ?, ?, ?, ?, 1, 7, 7, now())";
+                    UUID fight = UUID.randomUUID();
+                    assertThrows(DataAccessException.class, () -> jdbc.update(encounter, UUID.randomUUID(), campaign,
+                            "ROUND_OPEN", revision, digest, digest, digest, "initiative", null, "NONE", operation));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(encounter, UUID.randomUUID(), campaign,
+                            "ENTERING", revision, digest, digest, digest, "initiative", "raider", "RESOLVED", operation));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(encounter, UUID.randomUUID(), campaign,
+                            "ENTERING", revision, digest, digest, digest, "initiative", null, "PENDING", operation));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(encounter, UUID.randomUUID(), campaign,
+                            "ENTERING", revision, digest, digest, digest, "forbidden", "raider", "PENDING", operation));
+                    assertEquals(1, jdbc.update(encounter, fight, campaign, "ENTERING", revision, digest, digest, digest,
+                            "initiative", "raider", "PENDING", operation));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(encounter, UUID.randomUUID(), campaign,
+                            "ENTERING", revision, digest, digest, digest, "initiative", null, "NONE", operation));
+                    // The roster: the player is actor-backed at ordinal 0; a template participant keeps local pools.
+                    String member = "insert into encounter_participant (encounter_id, campaign_id, participant_id, ordinal, "
+                            + "actor_id, side, zone_id, health_current, focus_current, frozen) values (?, ?, ?, ?, ?, ?, "
+                            + "'entry', ?, ?, '{}')";
+                    assertEquals(1, jdbc.update(member, fight, campaign, "player", 0, wearer, "PLAYER", null, null));
+                    assertEquals(1, jdbc.update(member, fight, campaign, "raider", 1, null, "HOSTILE", 14, 0));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(member, fight, campaign, "brute", 2, null,
+                            "HOSTILE", null, null));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(member, fight, campaign, "player", 3, wearer,
+                            "ALLY", null, null));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(member, fight, campaign, "ghost", 4,
+                            UUID.randomUUID(), "ALLY", null, null));
+                    String step = "update encounter set phase = ?, round = ?, row_version = row_version + 1";
+                    assertThrows(DataAccessException.class, () -> jdbc.update(step, "SETTLED", 0));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(step, "ROUND_OPEN", 2));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(step, "ENTERING", 1));
+                    assertEquals(1, jdbc.update(step, "ROUND_OPEN", 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(step, "ENTERING", 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update encounter set "
+                            + "definition = '{\"x\": 1}', row_version = row_version + 1"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update encounter set "
+                            + "opening_status = 'NONE', row_version = row_version + 1"));
+                    assertEquals(1, jdbc.update("update encounter set opening_status = 'RESOLVED', row_version = row_version + 1"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update encounter set "
+                            + "opening_status = 'PENDING', row_version = row_version + 1"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("delete from encounter"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update encounter_participant set "
+                            + "side = 'ALLY', row_version = row_version + 1 where participant_id = 'raider'"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("delete from encounter_participant"));
+                    assertEquals(1, jdbc.update("update encounter_participant set zone_id = 'yard', "
+                            + "row_version = row_version + 1 where participant_id = 'player'"));
+                    assertEquals(0, v22.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

@@ -212,6 +212,8 @@ public final class PackLocalization {
                 case "rule" -> List.of("attributes", "resources", "tiers");
                 case "creation" -> List.of("archetypes");
                 case "quest" -> List.of("objectives", "outcomes");
+                // Encounter zone, participant and objective names are public text like quest objectives (P11.1).
+                case "encounter" -> List.of("zones", "participants", "objectives");
                 default -> List.of();
             };
             for (String group : groups) {
