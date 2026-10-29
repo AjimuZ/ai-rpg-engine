@@ -1223,3 +1223,23 @@ Tests:
 - `MemoryStartupReconciliationTest` (pure) and `MemoryStartupPassTest` (real context): the pass
   runs once per start before the web server and never aborts startup.
 - `CampaignInterfaceContractTest` records the card in the browser reload transcript.
+
+## Model catalog and hardware advisor (P21.1)
+
+`org.rpgengine.inference.catalog` is a pure package with no Spring wiring yet. It reads the
+bundled catalog `src/main/resources/inference/model-catalog.json` (`ModelCatalog.bundled()`) and
+a launcher profile (`HardwareProfile.parse`). Both are closed formats, parsed strictly; a
+violation is a `CatalogException` with a rule code and a JSON Pointer. `ModelAdvisor.advise` ranks
+every entry against the profile, explains it with notes, picks a recommended text and image
+entry and fills the local-only, hybrid and cloud-first presets. Formats, rules and the fixture
+results are in [docs/34 section 5](../docs/34-inference-backends-and-model-selection.md#5-catalog-and-hardware-advisor).
+
+- `ModelCatalogTest`: the bundled catalog's pins and every rejection rule.
+- `HardwareProfileTest`: the six fixtures under `src/test/resources/inference/hardware-profiles/`,
+  which `tools/container_packaging/test_hardware_profile.py` keeps byte-identical to the
+  launcher's output, and the rejection rules.
+- `ModelAdvisorTest`: the synthetic profiles (no GPU, 6, 8, 12 and 24 GB) with hand-derived
+  budgets, contexts and rankings.
+
+Memory figures are estimates until P21.2 and P21.5 record measured profiles. Nothing here
+downloads, starts a process or changes a setting.

@@ -1,0 +1,44 @@
+{
+  "schema": "rpg-engine.hardware-profile/1",
+  "generatedAt": "2026-10-28T12:00:00Z",
+  "platform": "windows",
+  "cpu": { "model": "AMD Ryzen 7 7700", "logicalCores": 16 },
+  "memory": {
+    "scope": "host",
+    "totalMiB": 32386,
+    "availableMiB": 20480,
+    "modules": [
+      { "capacityMiB": 16384, "speedMTs": 5200 },
+      { "capacityMiB": 16384, "speedMTs": 5200 }
+    ],
+    "moduleSlots": 2
+  },
+  "gpuSource": "nvidia-smi",
+  "gpus": [
+    {
+      "index": 0,
+      "name": "NVIDIA GeForce RTX 4060",
+      "memoryTotalMiB": 8188,
+      "memoryUsedMiB": 904,
+      "memoryFreeMiB": 7284,
+      "driverVersion": "617.42",
+      "computeCapability": "8.9"
+    }
+  ],
+  "disk": { "path": ".local", "freeMiB": 512000 },
+  "containerEngine": {
+    "available": true,
+    "osType": "linux",
+    "serverVersion": "29.9.2",
+    "operatingSystem": "Docker Desktop",
+    "memoryTotalMiB": 15792,
+    "cpus": 16
+  },
+  "containerGpu": {
+    "status": "visible",
+    "image": "ghcr.io/ggml-org/llama.cpp:server-cuda-b11960@sha256:4ccae195bf542f7844301ae06891baa32a7551cb16de8428af6e929403d4292c",
+    "devices": [
+      { "name": "CUDA0", "description": "NVIDIA GeForce RTX 4060", "memoryTotalMiB": 8187, "memoryFreeMiB": 7110 }
+    ]
+  }
+}

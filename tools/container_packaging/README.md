@@ -23,6 +23,13 @@ files or detect secrets embedded in otherwise admitted source files.
 `test_compose.py` checks rendered service boundaries without starting services.
 `test_launcher.py` checks the root `start.sh` contract (static rules, redaction,
 refusal paths and read-only `--check`) without starting or stopping services.
+`test_hardware_profile.py` (P21.1) runs `--models profile [--gpu-check]` with every
+host tool replaced by recorded output (driver tool, `/proc`, PowerShell, `df`,
+Docker), so it needs no GPU, daemon or Windows host. It checks the profile format,
+the container options of the GPU check, failure recording and the absence of
+identifiers, and keeps the six backend hardware-profile fixtures byte-identical
+to the launcher's output (`HARDWARE_PROFILE_UPDATE=1` rewrites them after an
+intended change).
 Command-surface cases inject strict Docker metadata through a test-only Bash
 startup file: they run without a daemon and do not assume the runner meets the
 launcher's Engine 29 / Compose 5 minimum. Unsupported Engine/Compose versions,

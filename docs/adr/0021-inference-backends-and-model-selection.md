@@ -76,6 +76,7 @@ The [specification, section 2](../34-inference-backends-and-model-selection.md#2
 
 ## Implementation status
 
+- P21.1 (28 October 2026, task open) implements the catalog and advisor parts of decisions 3 and 4 and the hardware profile. It adds `./start.sh --models profile [--gpu-check]`, the pinned llama.cpp image `server-cuda-b11960` by digest, catalog revision 1 with eight entries whose nine files were downloaded and hashed, strict parsers, the advisor and six launcher-generated profile fixtures. On the reference host profile, the advisor recommends the defaults of decision 10. Docker GPU passthrough on the reference host has not yet been run, so it is still unproven ([specification section 5](../34-inference-backends-and-model-selection.md#5-catalog-and-hardware-advisor)).
 - P08.4 (28 October 2026) implements decisions 2, 3 and 8 for the text slots against deterministic doubles: per-slot backend, preferred model and effort, the owner's allowlist, same-backend degradation alternatives and `fixedQuality`, resolved for every task ([resolution order](../06-codex-integration.md#p084-profile-resolution)). The `image` slot, class acknowledgements, the settings API and the other backends are not implemented.
 
 ## Verification

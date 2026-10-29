@@ -1,0 +1,41 @@
+{
+  "schema": "rpg-engine.hardware-profile/1",
+  "generatedAt": "2026-10-28T12:00:00Z",
+  "platform": "linux",
+  "cpu": { "model": "AMD Ryzen 9 7950X 16-Core Processor", "logicalCores": 32 },
+  "memory": {
+    "scope": "host",
+    "totalMiB": 64266,
+    "availableMiB": 57344,
+    "modules": null,
+    "moduleSlots": null
+  },
+  "gpuSource": "nvidia-smi",
+  "gpus": [
+    {
+      "index": 0,
+      "name": "NVIDIA GeForce RTX 4090",
+      "memoryTotalMiB": 24564,
+      "memoryUsedMiB": 412,
+      "memoryFreeMiB": 24152,
+      "driverVersion": "580.95.05",
+      "computeCapability": "8.9"
+    }
+  ],
+  "disk": { "path": ".local", "freeMiB": 1024000 },
+  "containerEngine": {
+    "available": true,
+    "osType": "linux",
+    "serverVersion": "29.9.2",
+    "operatingSystem": "Ubuntu 24.04.3 LTS",
+    "memoryTotalMiB": 64266,
+    "cpus": 32
+  },
+  "containerGpu": {
+    "status": "visible",
+    "image": "ghcr.io/ggml-org/llama.cpp:server-cuda-b11960@sha256:4ccae195bf542f7844301ae06891baa32a7551cb16de8428af6e929403d4292c",
+    "devices": [
+      { "name": "CUDA0", "description": "NVIDIA GeForce RTX 4090", "memoryTotalMiB": 24080, "memoryFreeMiB": 23640 }
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "schema": "rpg-engine.hardware-profile/1",
+  "generatedAt": "2026-10-28T12:00:00Z",
+  "platform": "linux",
+  "cpu": { "model": "Intel(R) Core(TM) i5-10400F CPU @ 2.90GHz", "logicalCores": 12 },
+  "memory": {
+    "scope": "host",
+    "totalMiB": 15932,
+    "availableMiB": 13312,
+    "modules": null,
+    "moduleSlots": null
+  },
+  "gpuSource": "nvidia-smi",
+  "gpus": [
+    {
+      "index": 0,
+      "name": "NVIDIA GeForce RTX 2060",
+      "memoryTotalMiB": 6144,
+      "memoryUsedMiB": 312,
+      "memoryFreeMiB": 5832,
+      "driverVersion": "580.95.05",
+      "computeCapability": "7.5"
+    }
+  ],
+  "disk": { "path": ".local", "freeMiB": 307200 },
+  "containerEngine": {
+    "available": true,
+    "osType": "linux",
+    "serverVersion": "29.9.2",
+    "operatingSystem": "Ubuntu 24.04.3 LTS",
+    "memoryTotalMiB": 15932,
+    "cpus": 12
+  },
+  "containerGpu": {
+    "status": "visible",
+    "image": "ghcr.io/ggml-org/llama.cpp:server-cuda-b11960@sha256:4ccae195bf542f7844301ae06891baa32a7551cb16de8428af6e929403d4292c",
+    "devices": [
+      { "name": "CUDA0", "description": "NVIDIA GeForce RTX 2060", "memoryTotalMiB": 5926, "memoryFreeMiB": 5800 }
+    ]
+  }
+}

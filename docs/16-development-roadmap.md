@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 58/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7 and P09.1–P09.5. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 58/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7 and P09.1–P09.5. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -2273,6 +2273,56 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 Scheduling: this package follows the memory work so that P10–P17 can be built and played with free local models, and it supplies the image capability that P17.6 requires. Codex stays the default narration runtime. Every speed, memory and quality figure in the specification is an estimate until P21 records measurements on the reference host.
 
 - [ ] P21.1 Qualify the reference host and define the catalog: a launcher-generated hardware profile (GPU memory read from the driver tool, not from the Windows adapter field), Docker GPU passthrough on WSL 2 with the pinned llama.cpp CUDA image, free-VRAM and WSL-memory measurements, the catalog schema (source, revision, files, SHA-256, license, requirements, languages, capabilities, slots, attribution), the advisor rules and synthetic-profile fixtures, and catalog entries for the reference host with verified hashes.
+  - Verified partial checkpoint (28 October 2026). The task stays open until the profile and the
+    container GPU check run on the reference host itself; this Linux toolchain container has no
+    GPU device, driver tool or Docker. On 29 October 2026 the drafted work was re-verified (the
+    full verification plan, including `./mvnw --batch-mode verify` with 746 backend tests, and the
+    nine catalog digests against the download records) and committed as this checkpoint; the
+    container still had no GPU tool or Docker.
+  - Package A — hardware profile (`start.sh`): `./start.sh --models profile [--gpu-check]` writes
+    `.local/hardware.json` (`rpg-engine.hardware-profile/1`). GPU name, total, used and free VRAM,
+    driver and compute capability come from `nvidia-smi` (on `PATH` or WSL's
+    `/usr/lib/wsl/lib/nvidia-smi`), never from the Windows adapter field. It also records the CPU
+    and memory from `/proc` (scope `vm` under WSL), the module layout through PowerShell CIM on
+    Windows, free disk under `.local`, and the container engine's memory (the WSL 2 VM under Docker
+    Desktop). A missing probe is recorded, never fatal. `--gpu-check` pulls the pinned image by
+    digest if absent and runs `--list-devices` with all GPUs, no network, a read-only root, no
+    capabilities and user 65534 (`visible`, `not-visible`, `failed`, `engine-unavailable`). There are
+    no identifiers.
+  - Package B — pinned image: `ghcr.io/ggml-org/llama.cpp:server-cuda-b11960` by its index digest
+    (CUDA 12.8.1, entrypoint `llama-server`, resolved through the registry API), mirrored in ADR 0009.
+    The repository `images` check now also covers launcher `*_IMAGE` constants.
+  - Package C — catalog (`backend/src/main/resources/inference/model-catalog.json`,
+    `org.rpgengine.inference.catalog.ModelCatalog`): the closed format
+    `rpg-engine.model-catalog/1` with source and revision, files with size, SHA-256 and verification
+    evidence, license class, URL, basis and confirmation, attribution, estimate inputs from GGUF
+    headers, languages, capabilities, slots, content notes and a measured profile slot. Revision 1
+    lists Gemma 4 26B-A4B, 12B, E4B and E2B (Google QAT Q4_0 GGUF), Qwen3.5-9B Q4_K_M (Unsloth GGUF),
+    WAI-illustrious-SDXL v17.0, SDXL base 1.0 and Pony Diffusion V6 XL with its VAE. All nine files
+    (56,749,024,108 bytes) were downloaded on 28 October 2026 and their SHA-256 recomputed; every one
+    matched the publisher's digest and size.
+  - Package D — advisor and fixtures (`HardwareProfile`, `ModelAdvisor`): strict profile parsing;
+    GPU and memory budgets, text fit with the largest fitting context and image fit, ranking,
+    default eligibility, notes and the local-only, hybrid and cloud-first presets. Six profile
+    fixtures (reference host, reference host with a container GPU, no GPU, 6, 8 and 24 GB) are
+    generated by the launcher from recorded tool output. On the reference-host profile the advisor
+    recommends Gemma 4 12B with a 32,768-token context and WAI-illustrious v17.0 (ADR 0021 decision
+    10). See [docs/34 section 5](34-inference-backends-and-model-selection.md#5-catalog-and-hardware-advisor).
+  - Exit checks:
+    - Done: 12 launcher profile tests with recorded tool output (format, the six fixtures
+      byte-identical, container options, pull by digest, visible, not-visible and failed outcomes,
+      missing and failing tools, placeholders, WSL scope, no identifiers, usage errors, escaping);
+      22 backend tests (bundled catalog pins, every catalog and profile rejection rule, the advisor
+      on the six profiles with hand-derived budgets, contexts and rankings, unverified digests,
+      measured and Italian evidence, settings); a real `--models profile` run in the development
+      container on the reference host's WSL 2 VM (i5-14600KF, 20 threads, 7,823 MiB total and
+      5,825 MiB available, no GPU tool, no Docker, all recorded as such); and the download-and-hash
+      verification of all nine catalog files.
+    - Open: `./start.sh --models profile --gpu-check` on the reference host (Windows 11, Git Bash,
+      Docker Desktop with WSL 2), which must show the RTX 4070's VRAM from the driver tool, the WSL
+      VM memory, the module layout, and a `visible` CUDA device inside the pinned image with its free
+      VRAM. Record that profile, sanitized, as evidence, and compare the container's free VRAM with
+      the driver tool's.
 - [ ] P21.2 Package and qualify the local text backend: a pinned model-server image in router mode with a read-only model volume and no network egress, hash-verified `./start.sh --models fetch` with license display and explicit confirmation, JSON-Schema readiness probes, an English and Italian narration probe set, and recorded measurements (load time, prefill and decode speed, peak VRAM and RAM, context limits, VRAM released by unload) for the default and alternate models.
 - [ ] P21.3 Implement slot assignment and the remaining backend adapters behind the runtime-neutral task port: independent `light`, `standard`, `deliberate` and `image` slots, readiness probes with visible results, billing and privacy class badges with acknowledgement on a class change, same-class fallback lists only when configured, per-slot session retirement, and the `gateway` service for owner-key hosted APIs and allowlisted custom endpoints (keys as runtime-only secrets, budgets, bounded redirects and sizes). Expose `GET /api/v1/models/status`, the owner-only settings API and the Settings → Models panel.
 - [ ] P21.4 Implement the shared GPU and RAM admission coordinator for text, image and speech: priorities, leases using the model server's documented load and unload endpoints and slot save and restore, batching, interruption between diffusion steps, unowned-contention handling and metrics. Prove no engine-caused out-of-memory on the reference host.

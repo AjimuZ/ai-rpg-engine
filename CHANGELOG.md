@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — Hardware profile, pinned model server and model catalog (P21.1 checkpoint), 29 October 2026
+
+- New `./start.sh --models profile [--gpu-check]` writes `.local/hardware.json`, a profile of the
+  machine for choosing local models: the NVIDIA GPU's name, total, used and free memory, driver and
+  compute capability as the NVIDIA driver tool reports them (never the Windows adapter field, which
+  shows about 4 GB on a 12 GB card), the CPU, the memory (the WSL 2 VM's under WSL, and the module
+  layout on Windows), free disk space and the container engine's memory. `--gpu-check` also runs
+  the pinned model-server image once with GPU access and no network, and records whether a CUDA
+  device is visible inside a container. A missing tool is recorded, never fatal, and the profile
+  contains no host, user, serial or address identifiers.
+- The local text model server is pinned to `ghcr.io/ggml-org/llama.cpp:server-cuda-b11960` by
+  digest (CUDA 12.8.1). The repository image check now also covers images named by the launcher.
+- A bundled model catalog lists Gemma 4 26B-A4B, 12B, E4B and E2B, Qwen3.5-9B,
+  WAI-illustrious-SDXL v17.0, SDXL base 1.0 and Pony Diffusion V6 XL with source revision, exact
+  file sizes and SHA-256 digests (all nine files downloaded and re-hashed on 28 October 2026),
+  license class, attribution, languages, capabilities and slots. A strict reader rejects any
+  malformed catalog or hardware profile.
+- A model advisor ranks the catalog for a hardware profile and proposes a default with a context
+  size. On the reference PC's recorded figures it proposes Gemma 4 12B with a 32,768-token context
+  and WAI-illustrious v17.0. All sizes are estimates until measured.
+- Not done yet: the profile and the container GPU check have not been run on the reference PC
+  (Windows 11 with Docker Desktop); no model is downloaded, served or selectable in the engine.
+
 ## Unreleased — Restart reconciliation, missing content and the resume card (P09.5), 28 October 2026
 
 - A playthrough whose adventure content is missing or damaged is paused instead of half-working:

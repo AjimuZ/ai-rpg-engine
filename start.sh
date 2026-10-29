@@ -6,7 +6,8 @@
 # health-based readiness, and offer sign-in, status, log and stop commands.
 #
 # Usage: ./start.sh [--check | --login | --status | --logs [SERVICE] [--no-follow]
-#                    | --stop | --help]      (no argument: validate, build, start)
+#                    | --stop | --models profile [--gpu-check] | --help]
+#                    (no argument: validate, build, start)
 #
 # Exit status: 0 success; 1 failure (prerequisite, configuration, build, start,
 # health timeout, or a command that could not run); 2 usage error; 3 only for
@@ -112,6 +113,11 @@ Usage: ./start.sh [COMMAND]
                 engine, postgres or codex.
   --stop        Stop and remove this installation's containers and networks.
                 Volumes (database, content, assets, runtime account) are kept.
+  --models profile [--gpu-check]
+                Write the hardware profile .local/hardware.json for the model
+                advisor (GPU memory from the NVIDIA driver tool, RAM, disk,
+                container memory). --gpu-check also runs the pinned model-server
+                image (about 2.6 GB, pulled once) to test container GPU access.
   --help        Show this text.
 
 Prerequisites: GNU Bash 4.4+, Docker Engine 29.0+ running Linux containers,
@@ -692,6 +698,329 @@ cmd_login() {
     info "run ./start.sh to start (or ./start.sh --status to check readiness)."
 }
 
+# --- Model hardware profile (P21.1) -------------------------------------------
+#
+# `./start.sh --models profile [--gpu-check]` writes .local/hardware.json, the
+# input of the model advisor (docs/34-inference-backends-and-model-selection.md
+# section 5). It reads hardware facts only: GPU model, VRAM, driver and compute
+# capability from the NVIDIA driver tool (never from the Windows adapter field,
+# a 32-bit value that reports about 4 GB on a 12 GB card); CPU model and thread
+# count; RAM and, on Windows, the memory module layout; free disk space for the
+# private model directory; the container engine's memory (the WSL 2 VM under
+# Docker Desktop); and, with --gpu-check, the CUDA devices that the pinned
+# model-server image sees through Docker GPU passthrough. It records no host or
+# user name, serial number, UUID, IP address or absolute path.
+#
+# Every probe is optional: a missing or failing tool is recorded as unavailable
+# or failed and never aborts the command. Only --gpu-check may download (the
+# pinned image, once) or start a container, which is removed on exit and runs
+# without network, capabilities, a writable root filesystem or root user.
+
+# Pinned llama.cpp server image (build b11960, CUDA 12.8.1) as a multi-platform
+# index digest, per the ADR 0009 image policy; mirrored in docs/adr/0009 and
+# docs/34. The image's entrypoint is llama-server, whose --list-devices option
+# prints every non-CPU device with total and free memory, then exits.
+readonly MODEL_SERVER_IMAGE="ghcr.io/ggml-org/llama.cpp:server-cuda-b11960@sha256:4ccae195bf542f7844301ae06891baa32a7551cb16de8428af6e929403d4292c"
+readonly HARDWARE_PROFILE="$STATE_DIR/hardware.json"
+readonly HARDWARE_SCHEMA="rpg-engine.hardware-profile/1"
+# Bytes per MiB and per KiB-to-MiB step, named so the conversions read clearly.
+readonly MIB=1048576
+readonly KIB_PER_MIB=1024
+
+# read_proc NAME - print /proc/NAME when readable, else nothing (macOS has no
+# /proc). Git Bash (MSYS2) and WSL both provide cpuinfo, meminfo and version.
+# A separate function so tests can replay another host's files.
+read_proc() {
+    if [ -r "/proc/$1" ]; then cat "/proc/$1"; fi
+}
+
+# json_string VALUE - print VALUE as a JSON string literal. Control characters
+# are dropped and backslash and double quote are escaped, which is complete
+# for the hardware names and versions written here.
+json_string() {
+    local value
+    value="$(printf '%s' "$1" | tr -d '\000-\037')"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    printf '"%s"' "$value"
+}
+
+# json_text VALUE - a JSON string, or null when VALUE is empty or a driver
+# placeholder such as "[N/A]".
+json_text() {
+    case "$1" in
+        '' | '[N/A]' | 'N/A' | '[Not Supported]') printf 'null' ;;
+        *) json_string "$1" ;;
+    esac
+}
+
+# json_count VALUE - VALUE as a JSON integer when it is all decimal digits,
+# otherwise null (missing, "[N/A]" or malformed driver output).
+json_count() {
+    case "$1" in
+        '' | *[!0-9]*) printf 'null' ;;
+        *) printf '%s' "$((10#$1))" ;;
+    esac
+}
+
+# trim VALUE - VALUE without leading and trailing blanks.
+trim() {
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+}
+
+# profile_platform - windows (Git Bash), wsl, linux, macos or other.
+profile_platform() {
+    case "$(uname -s)" in
+        MINGW* | MSYS* | CYGWIN*) printf 'windows' ;;
+        Darwin) printf 'macos' ;;
+        Linux)
+            if read_proc version | grep -qi microsoft; then printf 'wsl'; else printf 'linux'; fi ;;
+        *) printf 'other' ;;
+    esac
+}
+
+# gpu_tool - print the NVIDIA driver tool to run, or fail when there is none.
+# WSL exposes the Windows driver's tool under /usr/lib/wsl/lib, which is not
+# always on PATH.
+gpu_tool() {
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        printf 'nvidia-smi'
+    elif [ -x /usr/lib/wsl/lib/nvidia-smi ]; then
+        printf '/usr/lib/wsl/lib/nvidia-smi'
+    else
+        return 1
+    fi
+}
+
+# profile_gpus - set GPU_SOURCE (nvidia-smi, unavailable or failed) and
+# GPUS_JSON (a JSON array, possibly empty). The driver tool reports memory in
+# MiB with nounits; free memory is what remains after the desktop and other
+# applications at the moment of profiling.
+profile_gpus() {
+    GPU_SOURCE="unavailable"
+    GPUS_JSON="[]"
+    local tool output line index name total used free driver capability entries=""
+    tool="$(gpu_tool)" || return 0
+    if ! output="$("$tool" --query-gpu=index,name,memory.total,memory.used,memory.free,driver_version,compute_cap \
+        --format=csv,noheader,nounits 2>/dev/null)"; then
+        GPU_SOURCE="failed"
+        return 0
+    fi
+    GPU_SOURCE="nvidia-smi"
+    while IFS=',' read -r index name total used free driver capability; do
+        [ -n "$(trim "$index")" ] || continue
+        entries+="${entries:+,}
+    {
+      \"index\": $(json_count "$(trim "$index")"),
+      \"name\": $(json_text "$(trim "$name")"),
+      \"memoryTotalMiB\": $(json_count "$(trim "$total")"),
+      \"memoryUsedMiB\": $(json_count "$(trim "$used")"),
+      \"memoryFreeMiB\": $(json_count "$(trim "$free")"),
+      \"driverVersion\": $(json_text "$(trim "$driver")"),
+      \"computeCapability\": $(json_text "$(trim "$capability")")
+    }"
+    done < <(printf '%s\n' "$output" | tr -d '\r')
+    [ -z "$entries" ] || GPUS_JSON="[${entries}
+  ]"
+}
+
+# profile_memory_modules - set MODULES_JSON (array or null) and SLOTS_JSON
+# (integer or null). Only Windows exposes the module layout without elevation,
+# through PowerShell's CIM classes; elsewhere both stay null.
+profile_memory_modules() {
+    MODULES_JSON="null"
+    SLOTS_JSON="null"
+    [ "$1" = windows ] || return 0
+    command -v powershell.exe >/dev/null 2>&1 || return 0
+    local output kind first second entries="" slots=0 slots_seen=0
+    # Single quotes keep $_ for PowerShell; the MSYS path conversion is already
+    # disabled for this script, so the command reaches PowerShell unchanged.
+    output="$(powershell.exe -NoProfile -NonInteractive -Command \
+        'Get-CimInstance -ClassName Win32_PhysicalMemory | ForEach-Object { "module {0} {1}" -f $_.Capacity, $_.ConfiguredClockSpeed }; Get-CimInstance -ClassName Win32_PhysicalMemoryArray | ForEach-Object { "slots {0}" -f $_.MemoryDevices }' \
+        2>/dev/null)" || return 0
+    while read -r kind first second; do
+        case "$kind" in
+            module)
+                case "$first" in '' | *[!0-9]*) continue ;; esac
+                entries+="${entries:+,}
+      { \"capacityMiB\": $((first / MIB)), \"speedMTs\": $(json_count "$second") }"
+                ;;
+            slots)
+                case "$first" in '' | *[!0-9]*) continue ;; esac
+                slots=$((slots + first))
+                slots_seen=1
+                ;;
+        esac
+    done < <(printf '%s\n' "$output" | tr -d '\r')
+    [ -z "$entries" ] || MODULES_JSON="[${entries}
+    ]"
+    [ "$slots_seen" -eq 0 ] || SLOTS_JSON="$slots"
+}
+
+# profile_container_engine - set ENGINE_JSON: the container engine's version,
+# operating system label, memory and CPUs, or {"available": false}. Under
+# Docker Desktop on Windows the memory is the WSL 2 VM's, the real ceiling for
+# every container including a CPU-offloaded model.
+profile_container_engine() {
+    ENGINE_JSON='{ "available": false }'
+    ENGINE_READY=0
+    command -v docker >/dev/null 2>&1 || return 0
+    local info os version label memory cpus
+    info="$(docker info --format '{{.OSType}}|{{.ServerVersion}}|{{.OperatingSystem}}|{{.MemTotal}}|{{.NCPU}}' 2>/dev/null)" ||
+        return 0
+    IFS='|' read -r os version label memory cpus <<<"$(printf '%s' "$info" | tr -d '\r')"
+    case "$memory" in '' | *[!0-9]*) memory="" ;; *) memory="$((memory / MIB))" ;; esac
+    ENGINE_JSON="{
+    \"available\": true,
+    \"osType\": $(json_text "$os"),
+    \"serverVersion\": $(json_text "$version"),
+    \"operatingSystem\": $(json_text "$label"),
+    \"memoryTotalMiB\": $(json_count "$memory"),
+    \"cpus\": $(json_count "$cpus")
+  }"
+    [ "$os" = linux ] && ENGINE_READY=1
+    return 0
+}
+
+# profile_container_gpu CHECK - set CONTAINER_GPU_JSON. With CHECK=1 and a
+# Linux container engine, run the pinned model-server image with all GPUs and
+# parse its --list-devices output. Status values: visible (at least one CUDA
+# device), not-visible (the image ran and saw no CUDA device, or Docker could
+# not attach a GPU), failed (the image could not be pulled or run), not-checked
+# (no --gpu-check) and engine-unavailable.
+profile_container_gpu() {
+    local check="$1" status output line devices="" run_status=0
+    CONTAINER_GPU_STATUS="not-checked"
+    if [ "$check" -eq 1 ] && [ "$ENGINE_READY" -ne 1 ]; then
+        CONTAINER_GPU_STATUS="engine-unavailable"
+    elif [ "$check" -eq 1 ]; then
+        if ! docker image inspect "$MODEL_SERVER_IMAGE" >/dev/null 2>&1; then
+            info "pulling the pinned model-server image once (about 2.6 GB compressed)"
+            docker pull "$MODEL_SERVER_IMAGE" >/dev/null 2>&1 || CONTAINER_GPU_STATUS="failed"
+        fi
+        if [ "$CONTAINER_GPU_STATUS" != failed ]; then
+            output="$(docker run --rm --pull never --gpus all --network none --read-only \
+                --cap-drop ALL --security-opt no-new-privileges:true --user 65534:65534 \
+                "$MODEL_SERVER_IMAGE" --list-devices 2>&1)" || run_status=$?
+            local name description total free
+            while IFS= read -r line; do
+                # "  CUDA0: NVIDIA GeForce RTX 4070 (12281 MiB, 11043 MiB free)"
+                if [[ "$line" =~ ^[[:space:]]+([A-Za-z0-9_]+):[[:space:]](.+)[[:space:]]\(([0-9]+)[[:space:]]MiB,[[:space:]]([0-9]+)[[:space:]]MiB[[:space:]]free\)$ ]]; then
+                    name="${BASH_REMATCH[1]}"; description="${BASH_REMATCH[2]}"
+                    total="${BASH_REMATCH[3]}"; free="${BASH_REMATCH[4]}"
+                    devices+="${devices:+,}
+      { \"name\": $(json_string "$name"), \"description\": $(json_string "$description"), \"memoryTotalMiB\": $(json_count "$total"), \"memoryFreeMiB\": $(json_count "$free") }"
+                    [[ "$name" == CUDA* ]] && CONTAINER_GPU_STATUS="visible"
+                fi
+            done < <(printf '%s\n' "$output" | tr -d '\r')
+            if [ "$CONTAINER_GPU_STATUS" != visible ]; then
+                # A GPU request Docker cannot satisfy fails before the image
+                # runs; the daemon's message names the device or driver.
+                if [ "$run_status" -eq 0 ] || [[ "$output" == *"Available devices:"* ]] ||
+                   printf '%s' "$output" | grep -qiE 'gpu|device driver|nvidia'; then
+                    CONTAINER_GPU_STATUS="not-visible"
+                else
+                    CONTAINER_GPU_STATUS="failed"
+                fi
+            fi
+        fi
+    fi
+    if [ "$check" -eq 1 ]; then
+        CONTAINER_GPU_JSON="{
+    \"status\": $(json_string "$CONTAINER_GPU_STATUS"),
+    \"image\": $(json_string "$MODEL_SERVER_IMAGE"),
+    \"devices\": [${devices}${devices:+
+    }]
+  }"
+    else
+        CONTAINER_GPU_JSON="{
+    \"status\": $(json_string "$CONTAINER_GPU_STATUS"),
+    \"image\": $(json_string "$MODEL_SERVER_IMAGE"),
+    \"devices\": []
+  }"
+    fi
+}
+
+# profile_now - the profiling time as UTC ISO-8601 to the second.
+profile_now() { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
+
+# build_hardware_profile CHECK - set PROFILE_DOCUMENT to the complete profile
+# (schema rpg-engine.hardware-profile/1) and leave GPU_SOURCE and
+# CONTAINER_GPU_STATUS for the summary. It runs in the current shell, not in a
+# command substitution, so those results and the pull notice reach the owner.
+# Field order and layout are fixed so a profile can be compared byte for byte.
+build_hardware_profile() {
+    local check="$1" platform cpu_model cpu_threads total available scope disk now
+    platform="$(profile_platform)"
+    cpu_model="$(read_proc cpuinfo | grep -m 1 '^model name' | sed -E 's/^[^:]*:[[:space:]]*//; s/[[:space:]]+$//' || true)"
+    cpu_threads="$(read_proc cpuinfo | grep -c '^processor' || true)"
+    [ "$cpu_threads" != 0 ] || cpu_threads=""
+    total="$(read_proc meminfo | sed -n -E '/^MemTotal:/{s/^MemTotal:[[:space:]]+([0-9]+) kB$/\1/p;q}')"
+    available="$(read_proc meminfo | sed -n -E '/^MemAvailable:/{s/^MemAvailable:[[:space:]]+([0-9]+) kB$/\1/p;q}')"
+    [ -z "$total" ] || total="$((total / KIB_PER_MIB))"
+    [ -z "$available" ] || available="$((available / KIB_PER_MIB))"
+    # Under WSL the kernel reports the VM's memory, not the machine's.
+    case "$platform" in wsl) scope="vm" ;; *) scope="host" ;; esac
+    # POSIX df output: the fourth field of the second line is available KiB.
+    local _filesystem _blocks _used
+    read -r _filesystem _blocks _used disk _ <<<"$(df -Pk "$STATE_DIR" 2>/dev/null | sed -n '2p' || true)"
+    case "$disk" in '' | *[!0-9]*) disk="" ;; *) disk="$((disk / KIB_PER_MIB))" ;; esac
+    now="$(profile_now)"
+    profile_gpus
+    profile_memory_modules "$platform"
+    profile_container_engine
+    profile_container_gpu "$check"
+    PROFILE_DOCUMENT="$(cat <<EOF_PROFILE
+{
+  "schema": "$HARDWARE_SCHEMA",
+  "generatedAt": $(json_string "$now"),
+  "platform": "$platform",
+  "cpu": { "model": $(json_text "$cpu_model"), "logicalCores": $(json_count "$cpu_threads") },
+  "memory": {
+    "scope": "$scope",
+    "totalMiB": $(json_count "$total"),
+    "availableMiB": $(json_count "$available"),
+    "modules": $MODULES_JSON,
+    "moduleSlots": $SLOTS_JSON
+  },
+  "gpuSource": "$GPU_SOURCE",
+  "gpus": $GPUS_JSON,
+  "disk": { "path": "$STATE_DIR", "freeMiB": $(json_count "$disk") },
+  "containerEngine": $ENGINE_JSON,
+  "containerGpu": $CONTAINER_GPU_JSON
+}
+EOF_PROFILE
+)"
+}
+
+# cmd_models ARGS... - model-management commands. Only `profile [--gpu-check]`
+# exists today; fetch, verify, advise and remove are planned (P21.2-P21.3).
+cmd_models() {
+    local action="${1:-}" check=0
+    [ "$action" = profile ] || { echo "start.sh: unknown --models command '${action}'" >&2; usage >&2; exit 2; }
+    shift
+    case "$#:${1:-}" in
+        0:) ;;
+        1:--gpu-check) check=1 ;;
+        *) echo "start.sh: unknown --models profile argument '$1'" >&2; usage >&2; exit 2 ;;
+    esac
+    require_utilities
+    mkdir -p "$STATE_DIR"
+    build_hardware_profile "$check"
+    printf '%s\n' "$PROFILE_DOCUMENT" > "$HARDWARE_PROFILE" || die "could not write $HARDWARE_PROFILE."
+    info "hardware profile written to $HARDWARE_PROFILE"
+    info "gpu source: $GPU_SOURCE; container gpu: $CONTAINER_GPU_STATUS"
+    if [ "$GPU_SOURCE" != nvidia-smi ]; then
+        info "no NVIDIA driver tool answered: local models are advised for CPU only."
+    fi
+    if [ "$check" -eq 0 ]; then
+        info "run ./start.sh --models profile --gpu-check to test GPU access from a container."
+    fi
+}
+
 # --- Entry point -----------------------------------------------------------------
 
 # main ARGS... - dispatch exactly one command. Unknown input is a usage error
@@ -705,6 +1034,7 @@ main() {
         --status) [ "$#" -eq 1 ] || { usage >&2; exit 2; }; cmd_status ;;
         --logs) shift; cmd_logs "$@" ;;
         --stop) [ "$#" -eq 1 ] || { usage >&2; exit 2; }; cmd_stop ;;
+        --models) shift; cmd_models "$@" ;;
         --help | -h) usage ;;
         *) echo "start.sh: unknown argument '$command'" >&2; usage >&2; exit 2 ;;
     esac

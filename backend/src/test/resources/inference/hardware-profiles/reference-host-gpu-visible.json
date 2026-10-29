@@ -1,0 +1,43 @@
+{
+  "schema": "rpg-engine.hardware-profile/1",
+  "generatedAt": "2026-10-28T12:00:00Z",
+  "platform": "windows",
+  "cpu": { "model": "Intel(R) Core(TM) i5-14600KF", "logicalCores": 20 },
+  "memory": {
+    "scope": "host",
+    "totalMiB": 16179,
+    "availableMiB": 9216,
+    "modules": [
+      { "capacityMiB": 16384, "speedMTs": 5600 }
+    ],
+    "moduleSlots": 4
+  },
+  "gpuSource": "nvidia-smi",
+  "gpus": [
+    {
+      "index": 0,
+      "name": "NVIDIA GeForce RTX 4070",
+      "memoryTotalMiB": 12282,
+      "memoryUsedMiB": 1270,
+      "memoryFreeMiB": 11012,
+      "driverVersion": "617.42",
+      "computeCapability": "8.9"
+    }
+  ],
+  "disk": { "path": ".local", "freeMiB": 670720 },
+  "containerEngine": {
+    "available": true,
+    "osType": "linux",
+    "serverVersion": "29.9.2",
+    "operatingSystem": "Docker Desktop",
+    "memoryTotalMiB": 7823,
+    "cpus": 20
+  },
+  "containerGpu": {
+    "status": "visible",
+    "image": "ghcr.io/ggml-org/llama.cpp:server-cuda-b11960@sha256:4ccae195bf542f7844301ae06891baa32a7551cb16de8428af6e929403d4292c",
+    "devices": [
+      { "name": "CUDA0", "description": "NVIDIA GeForce RTX 4070", "memoryTotalMiB": 12281, "memoryFreeMiB": 10776 }
+    ]
+  }
+}

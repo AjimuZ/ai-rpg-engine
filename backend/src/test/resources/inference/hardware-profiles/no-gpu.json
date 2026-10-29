@@ -1,0 +1,29 @@
+{
+  "schema": "rpg-engine.hardware-profile/1",
+  "generatedAt": "2026-10-28T12:00:00Z",
+  "platform": "linux",
+  "cpu": { "model": "AMD Ryzen 5 5600G with Radeon Graphics", "logicalCores": 12 },
+  "memory": {
+    "scope": "host",
+    "totalMiB": 15932,
+    "availableMiB": 12288,
+    "modules": null,
+    "moduleSlots": null
+  },
+  "gpuSource": "unavailable",
+  "gpus": [],
+  "disk": { "path": ".local", "freeMiB": 204800 },
+  "containerEngine": {
+    "available": true,
+    "osType": "linux",
+    "serverVersion": "29.9.2",
+    "operatingSystem": "Ubuntu 24.04.3 LTS",
+    "memoryTotalMiB": 15932,
+    "cpus": 12
+  },
+  "containerGpu": {
+    "status": "not-visible",
+    "image": "ghcr.io/ggml-org/llama.cpp:server-cuda-b11960@sha256:4ccae195bf542f7844301ae06891baa32a7551cb16de8428af6e929403d4292c",
+    "devices": []
+  }
+}

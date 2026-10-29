@@ -438,8 +438,23 @@ def scan_compose(path: str, text: str) -> list[str]:
     return findings
 
 
+def scan_launcher(path: str, text: str) -> list[str]:
+    """Check image constants in the root launcher (``readonly NAME_IMAGE="..."``).
+
+    The launcher runs some images directly, such as the pinned model-server image
+    of ``--models profile --gpu-check`` (P21.1), so they follow the same rule as
+    Dockerfile and Compose references.
+    """
+    findings: list[str] = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        constant = re.match(r'^\s*readonly\s+[A-Z][A-Z0-9_]*_IMAGE="([^"]*)"', line)
+        if constant and not IMAGE_PIN.match(constant.group(1)):
+            findings.append(f"{path}:{number}: launcher image is not pinned by exact tag and digest")
+    return findings
+
+
 def check_images(root: Path = ROOT) -> list[str]:
-    """Apply the Dockerfile and Compose pin rules to every such project file."""
+    """Apply the Dockerfile, Compose and launcher pin rules to every such project file."""
     findings: list[str] = []
     for path in project_files(root):
         name = path.rsplit("/", 1)[-1]
@@ -447,6 +462,8 @@ def check_images(root: Path = ROOT) -> list[str]:
             findings.extend(scan_dockerfile(path, (root / path).read_text(encoding="utf-8")))
         elif name in {"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"}:
             findings.extend(scan_compose(path, (root / path).read_text(encoding="utf-8")))
+        elif path == "start.sh":
+            findings.extend(scan_launcher(path, (root / path).read_text(encoding="utf-8")))
     return findings
 
 

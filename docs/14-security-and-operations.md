@@ -85,6 +85,8 @@ Campaign authorization also resolves its owning adventure workspace. Specificati
 
 Pack imports use the containment, parser, size, alias, and archive limits in [the pack specification](09-adventure-packs.md). Reject unsupported executable types. Never render raw HTML from lore or model output without a strict sanitization policy; the default narrative format is plain text or a small safe Markdown subset.
 
+Model weights (ADR 0021, P21.1) are admitted only in open formats: the catalog accepts GGUF for text and safetensors for images and rejects any other extension, so pickle checkpoints cannot be listed. Each file is pinned to a source revision, an HTTPS URL on the source's own host, an exact size and a SHA-256 digest. The hardware profile `.local/hardware.json` holds hardware models, sizes and versions only, with no host or user name, serial number, GPU UUID, address or path, and stays in the ignored private directory. The launcher's GPU check runs the pinned model-server image by digest with no network, a read-only root, no capabilities, `no-new-privileges` and an unprivileged user, and removes it afterwards.
+
 P04.4 stages ZIP bytes entirely in memory, checks both ZIP views and bounded
 inflation, and admits only allowlisted media signatures and declared image sizes.
 Directory sources must be owner-controlled and quiescent: static links/reparse

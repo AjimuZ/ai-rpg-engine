@@ -307,6 +307,18 @@ class ImagePinTest(unittest.TestCase):
         other = "services:\n  a:\n    build: .\n  b:\n    image: redis:8\n"
         self.assertEqual(1, len(checks.scan_compose("compose.yaml", other)))
 
+    def test_launcher_image_constants(self) -> None:
+        """Launcher image constants need a tag and digest; other constants are ignored."""
+        good = ('readonly MODEL_SERVER_IMAGE="ghcr.io/ggml-org/llama.cpp:server-cuda-b11960' + self.DIGEST + '"\n'
+                'readonly STATE_DIR=".local"\n')
+        self.assertEqual([], checks.scan_launcher("start.sh", good))
+        for bad in ('readonly MODEL_SERVER_IMAGE="ghcr.io/ggml-org/llama.cpp:server-cuda"\n',
+                    'readonly MODEL_SERVER_IMAGE="ghcr.io/ggml-org/llama.cpp' + self.DIGEST + '"\n',
+                    '    readonly WORKER_IMAGE="worker:latest' + self.DIGEST + '"\n'):
+            with self.subTest(line=bad):
+                self.assertEqual(["start.sh:1: launcher image is not pinned by exact tag and digest"],
+                                 checks.scan_launcher("start.sh", bad))
+
 
 class LocalizationCodeTest(unittest.TestCase):
     """Campaign error codes must stay explained in the browser interface."""

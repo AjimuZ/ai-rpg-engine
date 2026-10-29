@@ -1,0 +1,472 @@
+{
+  "schema": "rpg-engine.model-catalog/1",
+  "revision": 1,
+  "reviewed": "2026-10-28",
+  "entries": [
+    {
+      "id": "gemma-4-26b-a4b-it-qat-q4_0",
+      "kind": "text",
+      "displayName": "Gemma 4 26B-A4B instruction-tuned, QAT Q4_0 (Google GGUF)",
+      "format": "gguf",
+      "source": {
+        "host": "huggingface",
+        "page": "https://huggingface.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf",
+        "repository": "google/gemma-4-26B-A4B-it-qat-q4_0-gguf",
+        "revision": "d1c082be9cf3c8a514acf63b8761f4b41935842e"
+      },
+      "files": [
+        {
+          "role": "weights",
+          "name": "gemma-4-26B_q4_0-it.gguf",
+          "url": "https://huggingface.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf/resolve/d1c082be9cf3c8a514acf63b8761f4b41935842e/gemma-4-26B_q4_0-it.gguf",
+          "bytes": 14439363584,
+          "sha256": "3eca3b8f6d7baf218a7dd6bba5fb59a56ee25fe2d567b6f5f589b4f697eca51d",
+          "verification": {
+            "method": "download",
+            "date": "2026-10-28"
+          }
+        }
+      ],
+      "license": {
+        "id": "apache-2.0",
+        "class": "permissive",
+        "url": "https://ai.google.dev/gemma/docs/gemma_4_license",
+        "basis": "model-card",
+        "confirmationRequired": false
+      },
+      "attribution": "Gemma 4 by Google DeepMind, Apache License 2.0. Quantized GGUF build published by Google.",
+      "requirements": {
+        "kvBytesPerToken": 20480,
+        "kvFixedBytes": 314572800,
+        "computeBytes": 805306368,
+        "contextMax": 262144,
+        "contextDefault": 32768,
+        "basis": "estimate"
+      },
+      "languages": {
+        "en": "unnamed",
+        "it": "unnamed"
+      },
+      "capabilities": [
+        "system-role",
+        "thinking",
+        "tool-use-format",
+        "schema-enforced-output"
+      ],
+      "slots": [
+        "text.light",
+        "text.standard",
+        "text.deliberate"
+      ],
+      "contentNotes": [],
+      "measured": null
+    },
+    {
+      "id": "gemma-4-12b-it-qat-q4_0",
+      "kind": "text",
+      "displayName": "Gemma 4 12B instruction-tuned, QAT Q4_0 (Google GGUF)",
+      "format": "gguf",
+      "source": {
+        "host": "huggingface",
+        "page": "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf",
+        "repository": "google/gemma-4-12B-it-qat-q4_0-gguf",
+        "revision": "29d097773436b69ff9feafd636ab4cf873786537"
+      },
+      "files": [
+        {
+          "role": "weights",
+          "name": "gemma-4-12b-it-qat-q4_0.gguf",
+          "url": "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf/resolve/29d097773436b69ff9feafd636ab4cf873786537/gemma-4-12b-it-qat-q4_0.gguf",
+          "bytes": 6975879296,
+          "sha256": "93567e57a8fe10b23569b9d9ec38cd005deedf71e29477c421a4b83f418a538b",
+          "verification": {
+            "method": "download",
+            "date": "2026-10-28"
+          }
+        }
+      ],
+      "license": {
+        "id": "apache-2.0",
+        "class": "permissive",
+        "url": "https://ai.google.dev/gemma/docs/gemma_4_license",
+        "basis": "model-card",
+        "confirmationRequired": false
+      },
+      "attribution": "Gemma 4 by Google DeepMind, Apache License 2.0. Quantized GGUF build published by Google.",
+      "requirements": {
+        "kvBytesPerToken": 16384,
+        "kvFixedBytes": 503316480,
+        "computeBytes": 805306368,
+        "contextMax": 262144,
+        "contextDefault": 32768,
+        "basis": "estimate"
+      },
+      "languages": {
+        "en": "unnamed",
+        "it": "unnamed"
+      },
+      "capabilities": [
+        "system-role",
+        "thinking",
+        "tool-use-format",
+        "schema-enforced-output"
+      ],
+      "slots": [
+        "text.light",
+        "text.standard",
+        "text.deliberate"
+      ],
+      "contentNotes": [],
+      "measured": null
+    },
+    {
+      "id": "qwen3.5-9b-q4_k_m",
+      "kind": "text",
+      "displayName": "Qwen3.5 9B, Q4_K_M (community GGUF by Unsloth)",
+      "format": "gguf",
+      "source": {
+        "host": "huggingface",
+        "page": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF",
+        "repository": "unsloth/Qwen3.5-9B-GGUF",
+        "revision": "3885219b6810b007914f3a7950a8d1b469d598a5"
+      },
+      "files": [
+        {
+          "role": "weights",
+          "name": "Qwen3.5-9B-Q4_K_M.gguf",
+          "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf",
+          "bytes": 5680522464,
+          "sha256": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8",
+          "verification": {
+            "method": "download",
+            "date": "2026-10-28"
+          }
+        }
+      ],
+      "license": {
+        "id": "apache-2.0",
+        "class": "permissive",
+        "url": "https://huggingface.co/Qwen/Qwen3.5-9B/blob/main/LICENSE",
+        "basis": "model-card",
+        "confirmationRequired": false
+      },
+      "attribution": "Qwen3.5 by the Qwen team (Alibaba Cloud), Apache License 2.0. GGUF quantization by Unsloth, a third party.",
+      "requirements": {
+        "kvBytesPerToken": 32768,
+        "kvFixedBytes": 52690944,
+        "computeBytes": 671088640,
+        "contextMax": 262144,
+        "contextDefault": 32768,
+        "basis": "estimate"
+      },
+      "languages": {
+        "en": "unnamed",
+        "it": "unnamed"
+      },
+      "capabilities": [
+        "system-role",
+        "thinking",
+        "tool-use-format",
+        "schema-enforced-output"
+      ],
+      "slots": [
+        "text.light",
+        "text.standard",
+        "text.deliberate"
+      ],
+      "contentNotes": [
+        "third-party-quantization"
+      ],
+      "measured": null
+    },
+    {
+      "id": "gemma-4-e4b-it-qat-q4_0",
+      "kind": "text",
+      "displayName": "Gemma 4 E4B instruction-tuned, QAT Q4_0 (Google GGUF)",
+      "format": "gguf",
+      "source": {
+        "host": "huggingface",
+        "page": "https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-gguf",
+        "repository": "google/gemma-4-E4B-it-qat-q4_0-gguf",
+        "revision": "4b4a2c1d584be7264f87aac328a1bc739ce81b6c"
+      },
+      "files": [
+        {
+          "role": "weights",
+          "name": "gemma-4-E4B_q4_0-it.gguf",
+          "url": "https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-gguf/resolve/4b4a2c1d584be7264f87aac328a1bc739ce81b6c/gemma-4-E4B_q4_0-it.gguf",
+          "bytes": 5154941280,
+          "sha256": "676c35070db6dbe52f93e9c864ee0fba4eddea94b9c875d9cb10daff453fbaee",
+          "verification": {
+            "method": "download",
+            "date": "2026-10-28"
+          }
+        }
+      ],
+      "license": {
+        "id": "apache-2.0",
+        "class": "permissive",
+        "url": "https://ai.google.dev/gemma/docs/gemma_4_license",
+        "basis": "model-card",
+        "confirmationRequired": false
+      },
+      "attribution": "Gemma 4 by Google DeepMind, Apache License 2.0. Quantized GGUF build published by Google.",
+      "requirements": {
+        "kvBytesPerToken": 16384,
+        "kvFixedBytes": 41943040,
+        "computeBytes": 671088640,
+        "contextMax": 131072,
+        "contextDefault": 32768,
+        "basis": "estimate"
+      },
+      "languages": {
+        "en": "unnamed",
+        "it": "unnamed"
+      },
+      "capabilities": [
+        "system-role",
+        "thinking",
+        "tool-use-format",
+        "schema-enforced-output"
+      ],
+      "slots": [
+        "text.light",
+        "text.standard",
+        "text.deliberate"
+      ],
+      "contentNotes": [],
+      "measured": null
+    },
+    {
+      "id": "gemma-4-e2b-it-qat-q4_0",
+      "kind": "text",
+      "displayName": "Gemma 4 E2B instruction-tuned, QAT Q4_0 (Google GGUF)",
+      "format": "gguf",
+      "source": {
+        "host": "huggingface",
+        "page": "https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf",
+        "repository": "google/gemma-4-E2B-it-qat-q4_0-gguf",
+        "revision": "675cff42a74c774d6cb76f76d8eacb49b48c9b93"
+      },
+      "files": [
+        {
+          "role": "weights",
+          "name": "gemma-4-E2B_q4_0-it.gguf",
+          "url": "https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf/resolve/675cff42a74c774d6cb76f76d8eacb49b48c9b93/gemma-4-E2B_q4_0-it.gguf",
+          "bytes": 3349516256,
+          "sha256": "fa401b55b07ee70a54c6dae3903c783a6e65064312529ea57175cb5f8dec6634",
+          "verification": {
+            "method": "download",
+            "date": "2026-10-28"
+          }
+        }
+      ],
+      "license": {
+        "id": "apache-2.0",
+        "class": "permissive",
+        "url": "https://ai.google.dev/gemma/docs/gemma_4_license",
+        "basis": "model-card",
+        "confirmationRequired": false
+      },
+      "attribution": "Gemma 4 by Google DeepMind, Apache License 2.0. Quantized GGUF build published by Google.",
+      "requirements": {
+        "kvBytesPerToken": 6144,
+        "kvFixedBytes": 12582912,
+        "computeBytes": 671088640,
+        "contextMax": 131072,
+        "contextDefault": 32768,
+        "basis": "estimate"
+      },
+      "languages": {
+        "en": "unnamed",
+        "it": "unnamed"
+      },
+      "capabilities": [
+        "system-role",
+        "thinking",
+        "tool-use-format",
+        "schema-enforced-output"
+      ],
+      "slots": [
+        "text.light",
+        "text.standard",
+        "text.deliberate"
+      ],
+      "contentNotes": [],
+      "measured": null
+    },
+    {
+      "id": "wai-illustrious-sdxl-v17",
+      "kind": "image",
+      "displayName": "WAI-illustrious-SDXL v17.0",
+      "format": "safetensors",
+      "source": {
+        "host": "civitai",
+        "page": "https://civitai.com/models/827184",
+        "repository": "827184",
+        "revision": "2883731"
+      },
+      "files": [
+        {
+          "role": "weights",
+          "name": "waiIllustriousSDXL_v170.safetensors",
+          "url": "https://civitai.com/api/download/models/2883731?fileId=2763986",
+          "bytes": 6938040682,
+          "sha256": "f116b0c78ff441467b0cdc8f1936e1ed18ea31e9997c7b132b1b8db533f0bd04",
+          "verification": {
+            "method": "download",
+            "date": "2026-10-28"
+          }
+        }
+      ],
+      "license": {
+        "id": "faipl-1.0-sd",
+        "class": "use-restricted",
+        "url": "https://freedevproject.org/faipl-1.0-sd/",
+        "basis": "base-model",
+        "confirmationRequired": true
+      },
+      "attribution": "WAI-illustrious-SDXL by WAI0731 on CivitAI, an Illustrious XL derivative. Illustrious XL v0.1 is published under the Fair AI Public License 1.0-SD.",
+      "requirements": {
+        "activationBytes": 2684354560,
+        "resolution": "1024x1024",
+        "basis": "estimate"
+      },
+      "languages": {
+        "en": "unnamed"
+      },
+      "capabilities": [
+        "sdxl",
+        "vae-integrated",
+        "negative-prompt",
+        "lora"
+      ],
+      "slots": [
+        "image"
+      ],
+      "contentNotes": [
+        "nsfw-capable",
+        "sign-in-may-be-required"
+      ],
+      "measured": null
+    },
+    {
+      "id": "sdxl-base-1.0",
+      "kind": "image",
+      "displayName": "Stable Diffusion XL base 1.0",
+      "format": "safetensors",
+      "source": {
+        "host": "huggingface",
+        "page": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0",
+        "repository": "stabilityai/stable-diffusion-xl-base-1.0",
+        "revision": "462165984030d82259a11f4367a4eed129e94a7b"
+      },
+      "files": [
+        {
+          "role": "weights",
+          "name": "sd_xl_base_1.0.safetensors",
+          "url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/462165984030d82259a11f4367a4eed129e94a7b/sd_xl_base_1.0.safetensors",
+          "bytes": 6938078334,
+          "sha256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b",
+          "verification": {
+            "method": "download",
+            "date": "2026-10-28"
+          }
+        }
+      ],
+      "license": {
+        "id": "openrail++",
+        "class": "use-restricted",
+        "url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md",
+        "basis": "model-card",
+        "confirmationRequired": true
+      },
+      "attribution": "Stable Diffusion XL base 1.0 by Stability AI, CreativeML Open RAIL++-M License.",
+      "requirements": {
+        "activationBytes": 2684354560,
+        "resolution": "1024x1024",
+        "basis": "estimate"
+      },
+      "languages": {
+        "en": "unnamed"
+      },
+      "capabilities": [
+        "sdxl",
+        "vae-integrated",
+        "negative-prompt",
+        "lora"
+      ],
+      "slots": [
+        "image"
+      ],
+      "contentNotes": [],
+      "measured": null
+    },
+    {
+      "id": "pony-diffusion-v6-xl",
+      "kind": "image",
+      "displayName": "Pony Diffusion V6 XL",
+      "format": "safetensors",
+      "source": {
+        "host": "civitai",
+        "page": "https://civitai.com/models/257749",
+        "repository": "257749",
+        "revision": "290640"
+      },
+      "files": [
+        {
+          "role": "weights",
+          "name": "ponyDiffusionV6XL_v6StartWithThisOne.safetensors",
+          "url": "https://civitai.com/api/download/models/290640?fileId=228616",
+          "bytes": 6938041050,
+          "sha256": "67ab2fd8ec439a89b3fedb15cc65f54336af163c7eb5e4f2acc98f090a29b0b3",
+          "verification": {
+            "method": "download",
+            "date": "2026-10-28"
+          }
+        },
+        {
+          "role": "vae",
+          "name": "sdxl_vae.safetensors",
+          "url": "https://civitai.com/api/download/models/290640?type=VAE&format=SafeTensor",
+          "bytes": 334641162,
+          "sha256": "235745af8d86bf4a4c1b5b4f529868b37019a10f7c0b2e79ad0abca3a22bc6e1",
+          "verification": {
+            "method": "download",
+            "date": "2026-10-28"
+          }
+        }
+      ],
+      "license": {
+        "id": "faipl-1.0-sd-modified",
+        "class": "restricted",
+        "url": "https://freedevproject.org/faipl-1.0-sd/",
+        "basis": "model-page",
+        "confirmationRequired": true
+      },
+      "attribution": "Pony Diffusion V6 XL by PurpleSmartAI on CivitAI, modified Fair AI Public License 1.0-SD; credit is required and inference in monetized websites or applications is forbidden.",
+      "requirements": {
+        "activationBytes": 2684354560,
+        "resolution": "1024x1024",
+        "basis": "estimate"
+      },
+      "languages": {
+        "en": "unnamed"
+      },
+      "capabilities": [
+        "sdxl",
+        "negative-prompt",
+        "lora"
+      ],
+      "slots": [
+        "image"
+      ],
+      "contentNotes": [
+        "nsfw-capable",
+        "sign-in-may-be-required",
+        "monetized-use-forbidden"
+      ],
+      "measured": null
+    }
+  ]
+}
