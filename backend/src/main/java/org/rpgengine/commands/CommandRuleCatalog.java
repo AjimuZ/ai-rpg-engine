@@ -19,7 +19,7 @@ import org.rpgengine.rules.WorldClock;
 
 /**
  * Compact immutable projection of the pinned rule facts that command validation and local
- * resolution consult: location links and disclosure, actor-definition disclosure and
+ * resolution consult: location links with their travel minutes and tags, location disclosure, rest policies, actor-definition disclosure and
  * declaring packs, and ability contracts including their compiled effect programs. It is
  * derived only from a sealed, recompiled {@link CampaignPackSnapshot}; no authored prose,
  * secret text, display name or localization is retained, so caching it costs little memory

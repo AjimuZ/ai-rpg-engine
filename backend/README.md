@@ -1012,7 +1012,7 @@ clamped recovery, condition removal, a recorded interruption and its replay, ref
 a wait and by a rest, a failed commit leaving the clock alone, attribution), `WorldClockQueriesTest` (every read
 endpoint repeated while real time passes: no row and no clock change), plus the link, rest and `worldTime`
 validation in `PackCompilerTest`, `TypedCommandTest`, `EventStatementsTest`, `ResolvedCommitTest`,
-`CampaignFoundationsTest` and the V21 step of `CanonicalMigrationUpgradeTest`. Limits: no panel or journal shows
+`CommandRulesTest` (a dependency pack's rest policy is refused), `CampaignFoundationsTest` and the V21 step of `CanonicalMigrationUpgradeTest`. Limits: no panel or journal shows
 the clock (P10.5); a rest is interrupted by a draw, not by an encounter (P11); condition durations are in rounds,
 so neither waiting nor rest ticks them; no faction or event clocks or bounded catch-up (P15.2); one link per move;
 no live V21 dump and restore rehearsal.

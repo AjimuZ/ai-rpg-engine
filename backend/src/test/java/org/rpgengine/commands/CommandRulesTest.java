@@ -115,6 +115,20 @@ class CommandRulesTest {
                 + "identity_owner_profile");
     }
 
+    /**
+     * A rest policy that restores resources must come from the player's own vocabulary: the dependency's
+     * "vigor" shares a key with the player's but belongs to another pack, so its policy is refused like its costed
+     * ability. The root pack's own policy is admitted.
+     */
+    @Test
+    void restRestoresOnlyTheVocabularyOfThePlayersPack() {
+        var before = snapshot();
+        assertFailure(OperationAdmissionFailure.Kind.REST_UNAVAILABLE, () -> submit(new TypedCommand.Rest("test:dep#dep-breath")));
+        assertFailure(OperationAdmissionFailure.Kind.REST_UNAVAILABLE, () -> submit(new TypedCommand.Rest("missing")));
+        assertEquals(before, snapshot());
+        admit(new TypedCommand.Rest("breath"));
+    }
+
     /** Only a disclosed destination behind an accessible authored link from the current location is reachable. */
     @Test
     void movementFollowsOnlyDisclosedAccessibleAuthoredLinks() {
@@ -478,7 +492,17 @@ class CommandRulesTest {
         var abilities = definitions(files, "abilities.json");
         abilities.add(ability("mend", "self", 1, Map.of(), List.of(), 1));
         put(files, "abilities.json", abilities);
+        var rules = definitions(files, "rules.json");
+        rules.add(restRule("dep-breath"));
+        put(files, "rules.json", rules);
         return files;
+    }
+
+    /** A rest rule restoring vigor; both packs declare their own, so the unqualified key means two different things. */
+    private static Map<String, Object> restRule(String policy) {
+        return Map.of("id", "rules.rest", "kind", "rule", "data", Map.of("ruleType", "rest", "policies", List.of(
+                Map.of("id", policy, "name", "Rest", "minutes", 10,
+                        "restores", List.of(Map.of("resource", "vigor", "amount", 2))))));
     }
 
     /**
@@ -504,6 +528,9 @@ class CommandRulesTest {
         abilities.add(ability("volley", "multiple", 2, Map.of(), List.of(), 9));
         abilities.add(ability("quake", "area", 1, Map.of(), List.of(), 0));
         put(files, "abilities.json", abilities);
+        var rules = definitions(files, "rules.json");
+        rules.add(restRule("breath"));
+        put(files, "rules.json", rules);
         var creationProfiles = definitions(files, "creation.json");
         @SuppressWarnings("unchecked")
         var data = (Map<String, Object>) creationProfiles.getFirst().get("data");
