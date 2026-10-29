@@ -51,6 +51,9 @@ class ZoneGraphTest {
         assertEquals(0, graph.distance("gate", "gate"));
         assertEquals(1, graph.distance("booth", "gate"));
         assertEquals(2, graph.distance("vault", "gate"));
+        // Both directions: a blocked edge borders its zones from either side.
+        assertEquals(1, graph.distance("gate", "booth"));
+        assertEquals(2, graph.distance("gate", "vault"));
         assertEquals(-1, graph.stepCost("gate", "booth", DEFAULT), "a blocked edge cannot be crossed");
         assertEquals(Set.of("gate"), graph.reachable("gate"));
         assertThrows(IllegalArgumentException.class, () -> graph.distance("gate", "moon"));

@@ -124,6 +124,18 @@ class CanonicalCommitServiceTest {
         assertEquals(1, count("ai_job"));
     }
 
+    /** A plan cannot put the campaign into encounter mode without storing the encounter that holds it (P11.1). */
+    @Test
+    void encounterModeNeedsAnEncounterEntry() {
+        var base = plan(fixture, fixture.operation());
+        var tactical = new ResolvedCommit(base.context(), new ResolvedCommit.WorldChange(true, 0, CampaignMode.ENCOUNTER,
+                null), base.resources(), base.events(), base.rewards(), base.receiptDetails(), false);
+        var before = snapshot();
+        assertThrows(IllegalStateException.class, () -> commits.commit(tactical));
+        assertEquals(before, snapshot());
+        assertEquals("EXPLORATION", jdbc.queryForObject("select mode from campaign", String.class));
+    }
+
     /** A critical outbox intent cannot commit while its origin is only VALIDATING. */
     @Test
     void criticalJobRequiresCommittedOriginAtTransactionEnd() {

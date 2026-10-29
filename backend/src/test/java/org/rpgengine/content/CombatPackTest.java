@@ -128,8 +128,10 @@ class CombatPackTest {
                 "\"side\":\"ally\",\"zone\":\"stones\"", false);
         String wolf = "{\"id\":\"wolf\",\"name\":\"Wolf\",\"side\":\"hostile\",\"zone\":\"stones\",\"threat\":\"minor\","
                 + "\"stats\":{\"health\":9,\"guard\":11,\"resistance\":9,\"force\":2,\"finesse\":2}}";
-        var pack = rejects("CONSTRAINT_CONFLICT", "encounters.json", wolf, wolf + "," + wolf.replace("wolf", "wolf2") + ","
-                + wolf.replace("wolf", "wolf3") + "," + wolf.replace("wolf", "wolf4"), false);
+        // The grove party is the player and the hound: four hostiles fit, a fifth does not.
+        String five = wolf + "," + wolf.replace("wolf", "wolf2") + "," + wolf.replace("wolf", "wolf3") + ","
+                + wolf.replace("wolf", "wolf4");
+        var pack = rejects("CONSTRAINT_CONFLICT", "encounters.json", wolf, five + "," + wolf.replace("wolf", "wolf5"), false);
         assertTrue(pack.getMessage().contains("party size"), pack.getMessage());
         rejects("SCHEMA", "encounters.json", "\"cover\":\"partial\",\"capacity\":4",
                 "\"cover\":\"partial\",\"capacity\":0", false);

@@ -176,6 +176,8 @@ class EncounterCommandsTest {
         execute(new TypedCommand.Move("grove"));
         rejects(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE, new TypedCommand.Engage("trail-ambush", null));
         rejects(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE, new TypedCommand.Engage("grove-watch", "nobody"));
+        // An opening strike may only target a hostile, even where the policy allows one.
+        rejects(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE, new TypedCommand.Engage("grove-watch", "hound"));
         execute(new TypedCommand.Move("trailhead"));
         rejects(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE, new TypedCommand.Engage("toll-parley", "keeper"));
         jdbc.update("update actor_resource set current_value = minimum_value, row_version = row_version + 1 "

@@ -74,6 +74,18 @@ class CombatRulesTest {
         assertEquals(12, player.guard(), "10 + finesse 2");
         assertEquals(12, player.resistance(), "10 + resolve 2");
         assertEquals(4, player.initiativeModifier(), "finesse 2 + insight 2");
+        // Distinct role values tell the formulas apart: each role reads only its own mapped attribute.
+        var mapped = CombatProfile.resolve("pack", Map.of("force", "f", "finesse", "a", "insight", "i", "resolve", "r"),
+                "vigor", null, Map.of());
+        var distinct = FrozenEncounter.freeze(ID, relabel(ambush, "pack"), mapped, new FrozenEncounter.PlayerFacts(PLAYER,
+                Map.of("f", 1L, "a", 2L, "i", 3L, "r", 4L), new FrozenEncounter.Pool(8, 8), null, List.of(), Set.of()),
+                null).player();
+        assertEquals(12, distinct.guard(), "10 + finesse 2");
+        assertEquals(14, distinct.resistance(), "10 + resolve 4");
+        assertEquals(5, distinct.initiativeModifier(), "finesse 2 + insight 3");
+        assertEquals(Map.of("force", 1L, "finesse", 2L, "insight", 3L, "resolve", 4L), distinct.roles());
+        assertEquals(Map.of("force", "might", "finesse", "awareness", "insight", "awareness", "resolve", "might"),
+                profile.roles());
         assertEquals(0, player.armor());
         assertEquals(6, player.health(), "entry refills nothing");
         assertEquals(8, player.healthMax());
@@ -111,6 +123,11 @@ class CombatRulesTest {
                 profile, full, "nobody"));
         var keeperless = FrozenEncounter.freeze(ID, rules.templates().get("toll-parley"), profile, full, null);
         assertEquals(EncounterTemplate.Side.ALLY, keeperless.participants().get(1).side());
+        var smuggler = keeperless.participants().get(2);
+        assertEquals(2, smuggler.initiativeModifier(), "finesse 2 + insight 0");
+        assertEquals(8, smuggler.health());
+        assertEquals(10, smuggler.guard());
+        assertEquals(9, smuggler.resistance());
         assertThrows(IllegalStateException.class, () -> FrozenEncounter.freeze(ID, rules.templates().get("toll-parley"),
                 profile, full, "keeper"));
     }
@@ -166,6 +183,11 @@ class CombatRulesTest {
             List<EncounterTemplate.Participant> participants) {
         return new EncounterTemplate(template.id(), template.pack(), template.location(), template.zones(), playerZone,
                 escapes, participants, template.objectives(), template.opening());
+    }
+
+    private static EncounterTemplate relabel(EncounterTemplate template, String pack) {
+        return new EncounterTemplate(template.id(), pack, template.location(), template.zones(), template.playerZone(),
+                template.escapeZones(), template.participants(), template.objectives(), template.opening());
     }
 
     private static EncounterTemplate.Participant rename(EncounterTemplate.Participant participant, String id) {

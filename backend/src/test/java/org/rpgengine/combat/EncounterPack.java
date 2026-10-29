@@ -25,8 +25,8 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>Templates: {@code trail-ambush} at the trailhead (zones entry, yard and escape-route as in docs/20; one hostile
  * raider; defeat and escape objectives; default {@code initiative} opening), {@code toll-parley} at the trailhead
  * (opening {@code forbidden}; an allied keeper portraying the warden NPC and a hostile smuggler behind a blocked
- * edge; survive and protect objectives) and {@code grove-watch} in the grove (opening {@code first}; a reach-zone
- * objective). {@link #tuned()} is the same pack under another ID with a customized profile.
+ * edge; survive and protect objectives) and {@code grove-watch} in the grove (opening {@code first}; a hostile wolf,
+ * an allied hound and a reach-zone objective). {@link #tuned()} is the same pack under another ID with a customized profile.
  */
 public final class EncounterPack {
     /** The default combat rule of the fixture. */
@@ -67,7 +67,9 @@ public final class EncounterPack {
               "zones":[{"id":"clearing","name":"Clearing"},{"id":"stones","name":"Stones"}],
               "edges":[{"from":"clearing","to":"stones"}],"playerZone":"clearing",
               "participants":[{"id":"wolf","name":"Wolf","side":"hostile","zone":"stones","threat":"minor",
-                "stats":{"health":9,"guard":11,"resistance":9,"force":2,"finesse":2}}],
+                "stats":{"health":9,"guard":11,"resistance":9,"force":2,"finesse":2}},
+                {"id":"hound","name":"Hound","side":"ally","zone":"clearing","threat":"minor",
+                "stats":{"health":7,"guard":11,"resistance":8,"finesse":2}}],
               "objectives":[{"id":"reach-stones","kind":"reachZone","zone":"stones"}]}}]}""";
 
     private EncounterPack() {
