@@ -57,6 +57,13 @@ cannot inject markup or URLs. Text-only story reading still omits story artwork.
 Runtime generation, entity artwork persistence and assistive-technology review
 remain their separate acceptance gates.
 
+P05.7-A adds the backend admission gate for typed public presentation events (scene,
+pose/expression and line-audio hook) in `org.rpgengine.presentation`. An event holds stable
+references only; a reference is accepted when it is plain (no URL, path, markup or script) and
+on the audience's allowlist of public scenes, lines and assets and visible actors' poses and
+expressions. Hidden and unknown actors are refused identically. Delivery, deduplication, the
+pack-catalog source of the allowlist and browser rendering are not implemented yet.
+
 P04.5 includes original MIT-licensed 48×32 woodland/station PNG schematics in the
 [neutral import fixtures](../backend/src/test/resources/packs/README.md), with
 per-pack license and credit inventories. Integration checks preserve their exact

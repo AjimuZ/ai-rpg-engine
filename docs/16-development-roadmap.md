@@ -1041,6 +1041,26 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
       needs the browser submit path (P05.7/P07 scope) and the owner action above. This box stays
       unchecked until P05.6-O.
 - [ ] P05.7 Define and render bounded typed public presentation events for scene, pose/expression and optional line audio hooks; reject executable/raw-URL directives, deduplicate delivery and preserve text-only/keyboard/reduced-motion behavior under QA-40.
+    - P05.7-A (30 October 2026, backend admission gate only; box stays unchecked): the existing
+      `org.rpgengine.presentation` package gained `PresentationEvent` (typed SCENE, POSE and
+      LINE_AUDIO events carrying plain references only), `PublicPresentationScope` (the allowlist
+      of one audience: public scenes, lines and assets, plus the visible actors with their poses
+      and expressions) and `PresentationEvents` (`accept` for one draft, `acceptAll` for one
+      operation, all or nothing, at most 16 events and distinct ordinals). References must match
+      `[A-Za-z0-9][A-Za-z0-9._-]{0,63}` (no `/`, `:`, markup or whitespace) and be on the
+      allowlist. Rejections carry a reason (`RAW_URL`, `EXECUTABLE`, `MALFORMED`,
+      `NOT_ALLOWLISTED`, `HIDDEN_ACTOR`, `BOUNDS`) and never echo the rejected value; a hidden and an
+      unknown actor give the same message. The caller builds the scope from the audience-filtered
+      projection and the admitted pack's declared references; nothing calls the gate yet, and no
+      second event path was added beside `PresentationJobService`, `NarrationPort` or the public
+      stream. Commands: `sh .agents/ralph/verify.sh backend -Dtest=PresentationEventsTest`
+      (11 tests, 0 failures, 0 errors, 0 skipped) and `sh .agents/ralph/verify.sh full` (all 17
+      steps passed; backend 1,112 tests, 0 failures, 0 errors, 0 skipped, against 1,101 before).
+      Not proven: the negative tests were not rerun against a deliberately weakened gate on an
+      exported copy; the gate is not wired to the pack catalog, the public stream or the
+      narration publisher, so no end-to-end event delivery exists; deduplicated delivery, the
+      browser rendering and the text-only, keyboard and reduced-motion behavior of QA-40 are
+      still to do. No migration, API or user-visible behavior changed.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.
 
