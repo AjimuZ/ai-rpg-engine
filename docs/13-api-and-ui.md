@@ -152,6 +152,10 @@ operation statuses and receipts from the status query and the resumable stream, 
 the scoped persistent draft. The view never submits; the saved stream cursor and
 operation identities are what the explicit language reload preserves
 ([integration status](29-localization.md#p056-campaign-integration-status-28-october-2026)).
+Both browser keys embed the adventure ID before the playthrough ID
+(`engine.story-draft.v1:["<adventureId>","<campaignId>"]`, `engine.campaign-sync.v1:[…]`), so two
+adventures with equal names never share a draft or a cursor; `campaign-isolation.spec.ts` (P06.5-B.2) proves this with
+Vitest, together with aborted reads and rejected late replies when switching.
 When an applied stream message or a reset names a newer `stateRevision` than the
 displayed state, the view re-reads the state before polling again; a reset's head
 replaces the stored cursor even if the stored value is larger.

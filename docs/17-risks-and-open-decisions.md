@@ -11,11 +11,13 @@ storage repair/retry. Roots must be private and quiescent; static-link rejection
 does not protect against a hostile local process swapping ancestors. Failed private
 staging folders require offline operator cleanup, never automatic deletion.
 The browser library is now bound read-only, and stale replies are aborted when
-switching adventures. However, packaged reload of `/saved/...` is not yet allowlisted.
+switching adventures. The packaged jar serves `/saved/<uuid>` for reload and direct links.
 Since P06.5-B.1 the backend has restart and real restore evidence for two same-name genres, covering
-inventories, memory, owner-wide job limits and authored folders. QA-33 remains open for browser
-switching, late media events, browser drafts and saved-campaign play, and generated-image isolation
-is P17.6 scope. The restore rehearsal runs in the Docker packaging suite (`verify.sh containers` and hosted
+inventories, memory, owner-wide job limits and authored folders. Since P06.5-B.2 Vitest also proves,
+for two same-name adventures, that browser drafts and stream cursors are keyed by adventure, that
+switching aborts the pending reads and that a late reply cannot reach the other adventure's view. QA-33
+remains open for late media events, open tabs and playing a saved campaign (the browser has no submit
+path), and generated-image isolation is P17.6 scope. The restore rehearsal runs in the Docker packaging suite (`verify.sh containers` and hosted
 CI's packaging job), so `verify.sh full` alone would not catch a regression in it. Later pages are fresh snapshots, so
 concurrent additions may require refreshing the library from its first page.
 

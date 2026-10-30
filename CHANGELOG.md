@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Browser drafts, cursors and switching proven separate for two same-name adventures (P06.5-B.2), 31 October 2026
+
+- Add Vitest cases with two adventures that share their title, playthrough title, NPC and item names. A draft typed in one
+  adventure never appears in the other, stream cursors and saved actions stay under their own adventure, switching aborts the
+  pending reads, and a late reply from the old adventure cannot change the other adventure's screen or draft.
+- Players see no change. A saved playthrough was already reachable at `/saved/<adventureId>?playthrough=<campaignId>`; no
+  route, backend change or submit path was added, and Send stays disabled.
+- QA-33 stays open for late media events, open tabs and playing a saved campaign. Generated-image isolation is P17.6 scope.
+
 ## Unreleased — Two same-name genres proven separate across restart and real restore (P06.5-B.1), 30 October 2026
 
 - Add a backend test with two equal-title adventures whose NPCs and items share names. Commands, reads, memory, job rows,

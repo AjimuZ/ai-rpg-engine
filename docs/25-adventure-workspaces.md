@@ -41,7 +41,11 @@ media, as described below; generated campaign media is still pending. The third
 checkpoint binds the browser library read-only: saved cards keyed by UUID and a
 `/saved/<adventureId>` view whose playthrough selection is limited to that
 adventure. Switching cancels earlier reads, so a late reply cannot fill another scope.
-Section 4 records the backend restart and restore evidence added by P06.5-B.1.
+Section 4 records the backend restart and restore evidence added by P06.5-B.1. The same
+`/saved/<adventureId>?playthrough=<campaignId>` view shows that playthrough read-only through the campaign view
+(no submit path). Its draft and stream-cursor storage keys embed the adventure ID before the playthrough ID, and
+`campaign-isolation.spec.ts` (P06.5-B.2) proves with two same-name adventures that drafts never cross, that
+switching aborts the pending reads and that a late reply cannot reach the other adventure's view.
 
 The owner requires personalized adventures in parallel, each with its own specifications, content and media folders. An **adventure workspace** is not a quick-save slot. It owns an authored world/configuration and can contain multiple **campaigns** (playthroughs); each campaign can have checkpoints/backups. A reusable imported **pack** is a versioned content source, not the active adventure or a saved campaign. P03.1 delivers the storage foundation only: `adventure_workspace`, adventure-owned `content_revision`, `campaign` rows pinned to a revision of the same adventure, and `campaign_checkpoint` rows. Subsequent checkpoints add library reads, database recovery and the optional folder projection below; read-only browser library binding follows; workspace commands and saved-campaign play remain pending.
 

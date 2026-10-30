@@ -47,6 +47,9 @@ situation with an explicit source-language note), operations and receipts re-que
 identity, a resumable stream follower with bounded backoff, localized error codes and a
 persistent scoped draft. Nothing is submitted; the saved cursor survives language reload.
 A newer `stateRevision` on an applied message or reset makes the view re-read the state.
+`campaign-isolation.spec.ts` (P06.5-B.2) serves two adventures with equal titles and names and checks that draft and
+stream-cursor keys embed the adventure ID, drafts never cross, switching aborts the pending reads and a late reply, even
+from a transport that ignores the abort, cannot reach the other adventure's view.
 `campaign-contract.spec.ts` replays real backend replies recorded by the backend test
 `CampaignInterfaceContractTest` (`contract/campaign-reload-transcript.json`, kept identical
 to the backend golden file by the repository `contracts` check) through the validators and an

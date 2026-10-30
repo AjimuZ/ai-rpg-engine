@@ -1481,7 +1481,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     All 22 repository policy tests pass and repository scans have zero findings.
     Browser API binding remains P05.6; full QA-33 and optional durable transcript
     history are not claimed. No schema/dependency/runtime-account changes.
-- [ ] P06.5 Implement separate adventure specifications/media folders and library switching; prove same-name entity, draft, memory, artwork and restart/restore isolation under QA-33.
+- [x] P06.5 Implement separate adventure specifications/media folders and library switching; prove same-name entity, draft, memory, artwork and restart/restore isolation under QA-33.
   **Requires tasks:** P05.7, P08.6, P09.3, P10.2.
   - Verified partial checkpoint (25 October 2026): locally admitted owner-scoped adventure listing/detail reads
     over persisted workspace IDs, including empty workspaces and equal titles.
@@ -1591,6 +1591,31 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     every recorded pass was on this Windows host's Docker through `containers`, and three passes give no flake rate. A host with no
     `docker` executable, where nothing requires Docker, still leaves it out under the shared policy. No deliberate weakening was run on an exported
     copy; `mixingAssertionRejectsForeignIdentitiesAndTexts` covers only the mixing assertion itself.
+  - Browser draft, cursor and switch isolation for two same-name adventures (31 October 2026, task P06.5-B.2; the box stays
+    unchecked). Correction to the P06.5-A entry: a route to the campaign view already exists. `SavedAdventureView`
+    (`/saved/:adventureId`, `app.routes.ts`) renders `app-campaign-playthrough` for the playthrough in `?playthrough=`, scoped
+    by `adventureId` and `campaignId`, and `campaign-view.spec.ts` already opens it that way. No route or backend change was
+    added: a separate path segment would need a wider `InterfaceRoutes` allowlist, which rejects extra segments today, and
+    the query form needs none. No submit path was added; Send stays disabled. New `campaign-isolation.spec.ts` (4 tests)
+    serves two genres whose adventure title (`The Lantern`), playthrough title (`Mara`), NPC (`Warden`) and fixture items are
+    equal, and fails on any request pairing one playthrough with the other adventure's ID. (1) A draft typed in one
+    adventure is absent after switching, and each comes back unchanged when revisited; the only draft keys are
+    `engine.story-draft.v1:["<adventureId>","<campaignId>"]`. (2) Seeded stream cursors `0:1` and `0:5` are sent as `after=`
+    only to their own scope, a saved operation shows only under its own adventure, and the only sync keys are
+    `engine.campaign-sync.v1:["<adventureId>","<campaignId>"]`. (3) Switching while the old state read is pending aborts exactly
+    that request, it is not retried, and nothing of the old adventure renders. (4) With a server that ignores the abort,
+    the old reply released after the switch changes neither the view nor the typed draft, and writes no draft under the old
+    key. Commands (31 October 2026): `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh frontend` passed all six
+    steps (install, typecheck, test with 131 tests across 17 files (127 before), i18n, build, locales; the first runs of the
+    new spec failed on its own helper code, which was fixed); `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh
+    backend -Dtest=PackagedInterfaceTest` passed (sources, database, focused). Not proven: `verify.sh full` and
+    `clean verify -Ppackaged-ui` were not run here, and no real browser, packaged-jar request or second tab was used, so
+    the route is shown by Vitest and by the existing `/saved/<uuid>` allowlist test, not by a browser against the jar. The
+    unmodified code passes the new tests, and no deliberate weakening was run on an exported copy, so their power to fail is
+    unmeasured. No source file changed. Late media events, open tabs, summary and memory display and send-and-reply play stay
+    open, as does the missing browser submit path.
+    This covers the browser part of QA-33 at MVP scope for drafts, cursors and switching only. Generated-image isolation stays
+    P17.6 scope.
 
 **Exit:** two independent campaigns survive restart and read-only use changes no game counters. **Checks:** creation budget/loadout validation, ownership isolation, restart, and no-AI consultations. **Suggested commit:** `Add persistent campaigns and local RPG consultations`.
 
