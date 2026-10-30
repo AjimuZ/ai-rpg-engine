@@ -74,6 +74,25 @@ describe('Campaign session reconciliation', /** Register reload-safety checks fo
     expect(session.cursor(SCOPE)).toBe('0:2');
   });
 
+  it('keeps applied cues in ordinal order per scope and never persists or replays them', /** Cues are display state, not durable state. */ async () => {
+    const cueFrame = (id: string, ordinal: number) => frame(id, 'presentation.event', { operationId: OP1, commandType: 'WAIT', status: 'ACCEPTED',
+      operationVersion: 0, deliveryId: `${id}:${OP1}:${ordinal}`, kind: 'SCENE', ordinal, sceneId: `scene-${ordinal}` });
+    server.operations.set(OP1, operation(OP1, 'ACCEPTED', 0));
+    server.streams = [[accepted('0:1', OP1), cueFrame('0:2', 1), cueFrame('0:3', 0)]];
+    let session = load(store, server);
+    expect(session.cues(SCOPE)).toEqual([]);
+    await session.reconcile(SCOPE, signal);
+    expect(session.cues(SCOPE).map((cue) => [cue.ordinal, cue.sceneId])).toEqual([[0, 'scene-0'], [1, 'scene-1']]);
+    expect(session.cues({ ...SCOPE, campaignId: OP2 })).toEqual([]);
+    expect([...store.values.values()].join('')).not.toContain('scene-');
+
+    // After a reload the replayed cue is a cursor duplicate and the earlier cues are not shown again.
+    server.streams = [[cueFrame('0:3', 0)]];
+    session = load(store, server);
+    expect(await session.reconcile(SCOPE, signal)).toMatchObject({ applied: 0, duplicates: 1 });
+    expect(session.cues(SCOPE)).toEqual([]);
+  });
+
   it('starts at the head on first contact and does not replay history', /** stream.ready positions a fresh cursor. */ async () => {
     server.streams = [[frame('0:7', 'stream.ready', {})]];
     const session = load(store, server);

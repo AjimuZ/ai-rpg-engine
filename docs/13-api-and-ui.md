@@ -357,9 +357,14 @@ Since P05.7-B.1.1 a stored presentation event is one more message of this log, w
 cues across connections or stream resets can drop a repeat by it. A cue is announced once: inserting
 the same campaign, operation and ordinal again adds no message, even after the message left
 the retained window. The browser protocol validates these frames and refuses a value that
-is not a plain reference, but no screen displays them. Since P05.7-B.1.2.3.2 the settlement of a
+is not a plain reference. Since P05.7-B.1.2.3.2 the settlement of a
 publication that carries cues announces them before its `narrative.ready`, with the journal status of
 that moment, but the grounded publisher produces none, so no turn produces events yet.
+Since P05.7-B.2.1 the playthrough screen keeps the cues it applied (at most 32 per scope, ordered by
+`ordinal` within each operation, a repeated `deliveryId` dropped, in memory only so a reload does not
+replay them) and shows them as a "Scene and voices" list of text lines: scene, pose with expression, and
+spoken line. A line cue with an `assetId` has a "Play line audio" button that requests
+`/api/v1/assets/<assetId>` only after it is activated; that route is documented above but not yet served.
 
 ### P08.5 narration presentation and retry
 
@@ -719,6 +724,16 @@ Implemented so far (P05.7-A, P05.7-B.1.1 and P05.7-B.1.2.3.2): the kinds `SCENE`
 [`presentation.event`](#p075-stream-and-cancellation) with a stable `deliveryId`, and a settlement
 path for cues that a narration publication carries. A refused list costs the cues, never the
 narration. The other fields and the kinds above remain proposed.
+
+Client behavior implemented in P05.7-B.2.1 (jsdom tests only; see the roadmap for what was not proven):
+every cue is a labelled text line, so the written account is complete with no cue, with a cue whose asset
+fails, and with audio never started. Audio is opt-in: a native button creates the player and plays on
+activation (Enter and Space activate a native button), one line plays at a time, nothing autoplays or
+replays on reconnect, and a load or playback failure shows "Audio is not available for this line" beside
+unchanged text. Cue entrance fades run only when `prefers-reduced-motion: reduce` is reported as not set; an
+unknown preference counts as reduced, and a stylesheet rule disables animation and transition under the query.
+No scene or pose image is drawn yet, and separate voice/music/effect controls, volume, captions and live
+speaker labels remain planned.
 
 The backend derives/validates cues from admitted public facts and accepted
 narration; a narrator suggestion is not a trusted frontend command. Events

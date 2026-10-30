@@ -4,7 +4,8 @@
  * who the player knows to be there, resources, the next decision, saved actions still awaiting
  * narration with their receipts, and a pause notice when adventure content is missing), the
  * panels and journal (P10.5: clock, character, conditions, inventory, quests, discoveries, promises, events), the
- * operations seen on the resumable stream with localized statuses and receipts, localized error
+ * operations seen on the resumable stream with localized statuses and receipts, the presentation
+ * cues of the stream as text with opt-in line audio (P05.7-B.2.1), localized error
  * and reconnect notices, and the scoped persistent draft (docs/13 section 4, docs/29 sections 3
  * and 6).
  *
@@ -17,6 +18,7 @@ import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, injec
 import { StoryInputState } from '../preview/story-input-state';
 import { CampaignProtocolError, CampaignView, isPending, JournalEntry, PlayPanels, ResumeCard } from './campaign-protocol';
 import { CampaignPanels } from './campaign-panels';
+import { CampaignCues } from './campaign-cues';
 import {
   awaitingMessage, campaignErrorMessage, commandTypeLabel, decisionMessage, dependencyIssueMessage, fallbackNotice, languageName,
   locationMessage, narrationReasonMessage, operationStatusMessage, presentMessage, receiptLines, resourceMessages, streamResetMessage,
@@ -40,7 +42,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 
 /** Show a playthrough's authorized public projection and follow its resumable stream while mounted. */
 @Component({
-  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CampaignPanels],
+  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CampaignPanels, CampaignCues],
   template: `
     <section class="panel campaign-playthrough" [attr.data-campaign-id]="campaignId()" aria-labelledby="campaign-title">
       @if (view(); as current) {
@@ -99,6 +101,8 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
         <app-campaign-panels [panels]="panels()" [older]="older()" [nextBefore]="cursor()" [loadingOlder]="loadingOlder()" (olderRequested)="loadOlder()" />
       } @else if (failure()) { <p class="notice" role="alert" data-error>{{ failure() }}</p>
       } @else { <p role="status" i18n="@@campaign.view.loading">Loading the playthrough…</p> }
+
+      <app-campaign-cues [cues]="cues()" />
 
       <h3 i18n="@@campaign.view.operations">Actions</h3>
       <p role="status" aria-live="polite" data-connection>{{ connectionMessage() }}</p>
@@ -159,6 +163,8 @@ export class CampaignPlaythrough {
   readonly state = signal<'connecting' | 'live' | 'disconnected'>('connecting');
   readonly scope = computed((): CampaignScope => ({ adventureId: this.adventureId(), campaignId: this.campaignId() }));
   readonly operations = computed(() => this.session.operations(this.scope()));
+  /** Presentation cues received on this page load, in display order; none is ever required to read the result. */
+  readonly cues = computed(() => this.session.cues(this.scope()));
   readonly connectionMessage = computed(() => {
     switch (this.state()) {
       case 'live': return this.operations().some((o) => isPending(o.status))

@@ -3738,5 +3738,104 @@
       <target>Ricompensa</target>
       </segment>
     </unit>
+    <unit id="campaign.cues.title">
+      <notes>
+        <note category="location">src/app/campaign/campaign-cues.ts:44</note>
+      </notes>
+      <segment>
+        <source>Scene and voices</source>
+      <target>Scena e voci</target>
+      </segment>
+    </unit>
+    <unit id="campaign.cues.help">
+      <notes>
+        <note category="location">src/app/campaign/campaign-cues.ts:45</note>
+      </notes>
+      <segment>
+        <source>These lines describe what the scene shows. The written account is complete without them, and audio plays only when you choose to start it.</source>
+      <target>Queste righe descrivono ciò che mostra la scena. Il racconto scritto è completo anche senza di esse e l'audio parte solo quando scegli di avviarlo.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.cues.scene">
+      <notes>
+        <note category="location">src/app/campaign/campaign-cues.ts:49</note>
+      </notes>
+      <segment>
+        <source>Scene</source>
+      <target>Scena</target>
+      </segment>
+    </unit>
+    <unit id="campaign.cues.pose">
+      <notes>
+        <note category="location">src/app/campaign/campaign-cues.ts:51</note>
+      </notes>
+      <segment>
+        <source>Pose</source>
+      <target>Posa</target>
+      </segment>
+    </unit>
+    <unit id="campaign.cues.expression">
+      <notes>
+        <note category="location">src/app/campaign/campaign-cues.ts:52</note>
+      </notes>
+      <segment>
+        <source>Expression</source>
+      <target>Espressione</target>
+      </segment>
+    </unit>
+    <unit id="campaign.cues.line">
+      <notes>
+        <note category="location">src/app/campaign/campaign-cues.ts:56</note>
+      </notes>
+      <segment>
+        <source>Spoken line</source>
+      <target>Battuta parlata</target>
+      </segment>
+    </unit>
+    <unit id="campaign.cues.unnamed">
+      <notes>
+        <note category="location">src/app/campaign/campaign-cues.ts:81</note>
+      </notes>
+      <segment>
+        <source>(not named)</source>
+      <target>(senza nome)</target>
+      </segment>
+    </unit>
+    <unit id="campaign.cues.play">
+      <notes>
+        <note category="location">src/app/campaign/campaign-cues.ts:82</note>
+      </notes>
+      <segment>
+        <source>Play line audio</source>
+      <target>Riproduci l'audio della battuta</target>
+      </segment>
+    </unit>
+    <unit id="campaign.cues.stop">
+      <notes>
+        <note category="location">src/app/campaign/campaign-cues.ts:83</note>
+      </notes>
+      <segment>
+        <source>Stop line audio</source>
+      <target>Ferma l'audio della battuta</target>
+      </segment>
+    </unit>
+    <unit id="campaign.cues.unavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-cues.ts:84</note>
+      </notes>
+      <segment>
+        <source>Audio is not available for this line. The text above is unchanged.</source>
+      <target>L'audio non è disponibile per questa battuta. Il testo qui sopra non cambia.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.cues.noAudio">
+      <notes>
+        <note category="location">src/app/campaign/campaign-cues.ts:85</note>
+      </notes>
+      <segment>
+        <source>No audio for this line.</source>
+      <target>Nessun audio per questa battuta.</target>
+      </segment>
+    </unit>
   </file>
 </xliff>

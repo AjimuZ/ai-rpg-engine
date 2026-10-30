@@ -229,8 +229,9 @@ export function parseOperation(value: unknown, campaignId: string): OperationVie
 }
 
 /**
- * One typed presentation cue. `deliveryId` stays the same on every delivery of the cue. The
- * interface does not display cues yet (P05.7); this only validates them and carries them along.
+ * One typed presentation cue. `deliveryId` stays the same on every delivery of the cue. This only
+ * validates and carries a cue; ordering and deduplication are in `presentation-cues.ts` and display
+ * is in `campaign-cues.ts`.
  */
 export interface PresentationCue {
   readonly deliveryId: string;

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Playthrough screen shows presentation cues as text with opt-in line audio (P05.7-B.2.1), 30 October 2026
+
+- A playthrough now lists the scene, pose and expression, and spoken-line cues the server announces in a "Scene and voices"
+  section, in order and without repeats. Nothing is added to the screen when there are none, and the written result and the
+  starting situation are the same with or without them.
+- A spoken line that has an audio asset gets a "Play line audio" button. Audio never starts by itself, one line plays at a
+  time, the button works with the keyboard, and a failed load shows a short notice while the text stays.
+- Cue fades are off when the browser asks for reduced motion or does not say. Italian text for the new labels is included.
+- Players see little change yet: no turn produces cues and the audio route is not served, so the section stays empty.
+
 ## Unreleased — Narration can carry checked presentation cues (P05.7-B.1.2.3.2), 30 October 2026
 
 - A narration result may now carry up to 16 presentation cues. They are checked against what the audience may see, stored with

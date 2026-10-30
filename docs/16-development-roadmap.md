@@ -1229,6 +1229,42 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
       concurrent workers are not exercised with cues (the existing lease tests cover settlement without them);
       `loadForCampaign` per publication with cues is not measured or cached; no deliberately weakened run on an
       exported copy; no browser display, reduced-motion behavior or QA-40 acceptance.
+    - P05.7-B.2.1 (30 October 2026, client cue state and display; the P05.7 box is not changed by this entry):
+      `presentation-cues.ts` adds `CueState`: per scope, cues of one operation in ascending ordinal order,
+      operations in arrival order, a repeated `deliveryId` refused (a memory of 256 identities), at most 32 cues
+      kept (oldest dropped, and a dropped cue's late repeat is still refused). `CampaignSession.applyEvent` feeds it
+      after the existing cursor check, so a cursor duplicate never reaches it; `cues(scope)` is read by the
+      playthrough view. Cues are in memory only: a reload does not replay them. The new `CampaignCues` component
+      (`campaign-cues.ts`) shows each cue as labelled text (Scene; Pose with Expression; Spoken line) and renders
+      nothing when there is none. A line cue with an `assetId` gets a native button, "Play line audio"/"Stop line
+      audio"; nothing is created or fetched before it is activated, one line plays at a time, an error or a refused
+      `play()` leaves a text notice and the text unchanged, and a destroyed view pauses the player. The asset path is
+      only `cueAssetPath(assetId)` = `/api/v1/assets/<id>`. Entrance animation applies only under
+      `data-motion='allowed'`, which the component sets after `matchMedia('(prefers-reduced-motion: reduce)')`
+      answered "no"; a missing `matchMedia` or a "yes" gives `reduced`, and a stylesheet rule also switches
+      `animation`/`transition` off under the media query. Eleven Italian messages were added to
+      `messages.it.xlf`; `italian-variant.spec.ts` expects 433 catalog entries (was 422).
+      Commands: `sh .agents/ralph/verify.sh frontend` passed all 6 steps (install, typecheck, test, i18n,
+      build, locales); `frontend-test`: 16 files, 126 tests, 0 failed. 24 are new: 7 in `presentation-cues.spec.ts`
+      (ordinal order, operation grouping, repeated `deliveryId`, size bound, memory bound, snapshots, asset path),
+      14 in `campaign-cues.spec.ts`, 1 in `campaign-session.spec.ts` and 2 in `campaign-view.spec.ts`.
+      `sh .agents/ralph/verify.sh repo` passed all 5 steps after the documentation edits.
+      `sh .agents/ralph/verify.sh full` was not run by this change (no backend file changed); the whole-plan
+      result is the orchestrator's.
+      Proven in jsdom: scene, pose/expression and line cues render in order through the routed view fed by a
+      scripted stream; a repeated frame is dropped; the result and starting situation text are the same with
+      and without cues, and the cue section is absent without cues; no player is created and no `/assets/`
+      request is made without activation; a click plays from the asset path and a second click stops it; a
+      load error, a rejected `play()` and a factory that throws each show the notice and leave the text; the
+      motion attribute follows a stubbed `matchMedia`, including a later change; the shipped styles contain the
+      allowed-motion rule and the reduced-motion override.
+      Not proven: `GET /api/v1/assets/{assetId}` does not exist in the backend, so no real audio was loaded or
+      heard; the Enter and Space keys were not pressed in a real browser (jsdom does not turn a key into a click;
+      the test checks only that the control is a native, enabled, focusable button); computed CSS and the actual
+      transition were not observed in a browser, and no screen reader, contrast or narrow-screen check was done;
+      `GroundedNarration` still produces no cues, so no real turn shows one; scene and pose cues show their
+      references as text and no image is drawn (no asset route, no art); the actor of a pose is carried as an
+      attribute, not named; no deliberately weakened run on an exported copy; QA-40 is not accepted.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.
 

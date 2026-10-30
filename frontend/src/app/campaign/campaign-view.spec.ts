@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { routes } from '../app.routes';
 import { LIBRARY_FETCH } from '../library/saved-library-client';
 import { STORY_DRAFT_STORAGE } from '../preview/story-input-state';
-import { ADVENTURE, CAMPAIGN, CampaignServer, MemoryStore, OP1, operation, resumeCard, state, syncProvider } from './fixtures';
+import { ADVENTURE, CAMPAIGN, CampaignServer, frame, MemoryStore, OP1, operation, resumeCard, state, syncProvider } from './fixtures';
 
 /** Wait until the routed screen satisfies a predicate. */
 async function settle(harness: RouterTestingHarness, ready: () => boolean): Promise<void> {
@@ -61,6 +61,50 @@ describe('Campaign playthrough view', /** Register integrated screen checks agai
     field.dispatchEvent(new Event('input'));
     expect(drafts.values.get(`engine.story-draft.v1:["${ADVENTURE}","${CAMPAIGN}"]`)).toContain('Raise the lantern');
     expect(sync.values.get(`engine.campaign-sync.v1:["${ADVENTURE}","${CAMPAIGN}"]`)).toContain(OP1);
+  });
+
+  /** Saved record: OP1 already known, cursor before the scripted cues. */
+  function saveOperation(): void {
+    sync.setItem(`engine.campaign-sync.v1:["${ADVENTURE}","${CAMPAIGN}"]`, JSON.stringify({ version: 1, cursor: '0:1',
+      operations: [{ operationId: OP1, commandType: 'USE_ABILITY', status: 'COMMITTED_NARRATION_PENDING', operationVersion: 5 }] }));
+  }
+  const cueFrame = (id: string, ordinal: number, fields: Record<string, unknown>) => frame(id, 'presentation.event', { operationId: OP1,
+    commandType: 'USE_ABILITY', status: 'COMMITTED_NARRATION_PENDING', operationVersion: 5, deliveryId: `${id}:${OP1}:${ordinal}`, ordinal, ...fields });
+
+  it('shows scene, pose and line cues as text beside the unchanged result, drops a repeat and never autoplays', /** P05.7-B.2.1. */ async () => {
+    saveOperation();
+    server.streams = [[cueFrame('0:2', 1, { kind: 'POSE', poseId: 'guarded', expressionId: 'wary', actorId: OP1 }),
+      cueFrame('0:3', 0, { kind: 'SCENE', sceneId: 'harbour' }),
+      cueFrame('0:3', 0, { kind: 'SCENE', sceneId: 'harbour' }),
+      cueFrame('0:4', 2, { kind: 'LINE_AUDIO', lineId: 'greeting', assetId: 'line-greeting' })]];
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl(`/saved/${ADVENTURE}?playthrough=${CAMPAIGN}`);
+    const root = harness.routeNativeElement as HTMLElement;
+    await settle(harness, () => root.querySelectorAll('[data-cues] li').length === 3);
+    expect([...root.querySelectorAll('[data-cues] li')].map((item) => item.getAttribute('data-cue-kind'))).toEqual(['SCENE', 'POSE', 'LINE_AUDIO']);
+    expect(root.querySelector('[data-scene]')!.textContent).toBe('harbour');
+    expect(root.querySelector('[data-expression]')!.textContent).toBe('wary');
+    expect(root.querySelector('[data-audio-toggle]')!.textContent).toContain('Play line audio');
+    // The written result and the starting situation are exactly what they are without any cue.
+    expect(root.querySelector('.starting-situation .passage')!.textContent).toBe('Una lanterna brilla.');
+    const result = root.querySelector('.operation-list')!;
+    expect(result.textContent).toContain('vigor: 12,000 → 11,000');
+    expect(result.textContent).toContain('Draw 0: 17 on a 20-sided die');
+    expect(result.querySelector('[data-cues]')).toBeNull();
+    // Audio was never requested: the screen only read state and the stream.
+    expect(server.calls.some((url) => url.includes('/assets/'))).toBe(false);
+    expect(root.querySelector('audio')).toBeNull();
+  });
+
+  it('shows the same result and no cue section when the stream carries no cue', /** Text-only baseline. */ async () => {
+    saveOperation();
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl(`/saved/${ADVENTURE}?playthrough=${CAMPAIGN}`);
+    const root = harness.routeNativeElement as HTMLElement;
+    await settle(harness, () => root.textContent!.includes('Draw 0: 17 on a 20-sided die'));
+    expect(root.querySelector('[data-cues]')).toBeNull();
+    expect(root.querySelector('.starting-situation .passage')!.textContent).toBe('Una lanterna brilla.');
+    expect(root.querySelector('.operation-list')!.textContent).toContain('vigor: 12,000 → 11,000');
   });
 
   it('hides the fallback notice for matching-language text and shows localized API errors', /** Disclosure only when a fallback happened. */ async () => {

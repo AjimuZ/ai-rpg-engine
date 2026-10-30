@@ -8,16 +8,18 @@
  * page reload — notably the explicit EN↔IT language reload — can resume exactly where it
  * stopped: pending operations are re-queried by identity and the stream resumes after the saved
  * cursor. Delivery is deduplicated by cursor and operation version, so replays after a reload
- * never apply a message twice, including presentation cues, which take the same path and are not
- * displayed yet. Nothing in this module submits a command or a draft.
+ * never apply a message twice, including presentation cues, which take the same path and are then kept
+ * in memory by {@link CueState} (ordered, deduplicated by delivery identity and never persisted, so a
+ * reload does not replay them). Nothing in this module submits a command or a draft.
  */
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { SavedLibraryClient, LIBRARY_FETCH } from '../library/saved-library-client';
 import {
   CampaignProtocolError, CampaignView, compareCursor, Cursor, FrameDecoder, isPending, OPERATION_STATUSES,
   OperationStatus, OperationView, parseCampaignView, parseCursor, parseOperation, parsePlayPanels, parseResumeCard, PlayPanels, PublicReceipt, ResumeCard,
-  StreamEvent,
+  PresentationCue, StreamEvent,
 } from './campaign-protocol';
+import { CueState } from './presentation-cues';
 
 /** Adventure and campaign identity; display names never address a record. */
 export interface CampaignScope { readonly adventureId: string; readonly campaignId: string }
@@ -170,6 +172,8 @@ export class CampaignSession {
   private readonly storage = inject(CAMPAIGN_SYNC_STORAGE);
   private readonly transport = inject(CampaignTransport);
   private readonly records = new Map<string, { cursor: string | null; operations: Map<string, TrackedOperation> }>();
+  /** Cues applied in this page load, per scope; never persisted. */
+  private readonly cueStates = new Map<string, CueState>();
   /** Bumps on every change so views recompute; carries no data. */
   readonly revision = signal(0);
   /** `saved` while the last write verified; `unavailable` when storage failed, which blocks language reload. */
@@ -285,6 +289,12 @@ export class CampaignSession {
     return this.record(scope).cursor;
   }
 
+  /** Presentation cues applied for a scope in display order (see {@link CueState}); empty before any cue. */
+  cues(scope: CampaignScope): readonly PresentationCue[] {
+    this.revision();
+    return this.cueStates.get(this.key(scope))?.cues() ?? [];
+  }
+
   /** Tracked operations, oldest first; pending ones are those {@link isPending} reports. */
   operations(scope: CampaignScope): readonly TrackedOperation[] {
     this.revision();
@@ -332,6 +342,12 @@ export class CampaignSession {
         operationId: event.operationId, commandType: event.commandType, status: event.status,
         operationVersion: event.operationVersion, receipt: event.receipt, reason: event.reason,
       });
+    }
+    if (event.presentation && event.operationId !== null) {
+      const key = this.key(scope);
+      let cues = this.cueStates.get(key);
+      if (!cues) { cues = new CueState(); this.cueStates.set(key, cues); }
+      cues.add(event.operationId, event.presentation);
     }
     current.cursor = event.id;
     this.persist(scope);
