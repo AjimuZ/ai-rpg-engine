@@ -2702,6 +2702,16 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     Not proven here: the 18 Docker-dependent probe cases, the `unzip` wrapper cases, a live V24 dump and restore, Brace in
     the worked fight, balance of the provisional numbers and independent review of the two new Italian messages.
 - [ ] P11.4 Implement predeclared reactions, stacking caps, effect phases, durations, cooldowns, and no-chain limits.
+  - Partial checkpoint (30 October 2026): `3a71b4a` implements Brace, declared reactions, the closed `combat` block on
+    conditions and abilities, eight effect phases, clocks and cooldowns, V25, backup schema 25 and
+    [ADR 0031](adr/0031-predeclared-reactions-effect-phases-and-cooldowns.md). It stays unchecked: its session stopped when
+    the deliberate weakenings began, so no weakening result exists and 19 further test lines are not yet committed.
+  - Verified on `3fae597` (JDK 21.0.12.1 and PostgreSQL 18.6 in the images pinned by ADR 0009, sources copied into a Docker
+    volume, on the Windows reference host): `./mvnw -B -ntp clean verify` ran 1,073 tests with 0 failures, 0 errors and 4
+    skipped (`PackagedInterfaceTest`); frontend typecheck, unit tests, localization tests, production and locale builds
+    passed; repository checks had 0 findings; repository, backup and runtime probe tests passed with 11, 1 and 18 skipped.
+    Not run: the `packaged-ui` profile, Docker-dependent probe cases, a live V25 dump and restore. Not reviewed
+    independently: the two new Italian messages.
 - [ ] P11.5 Implement defeat, escape, surrender/agreement predicates, refused/counteroffered/explicitly accepted negotiation, stalemate policy and idempotent settlement; prose alone cannot establish an outcome.
 - [ ] P11.6 Persist/recover every combat cursor, partial-round time boundary and combat-dialogue operation/transcript without duplicate social effects or settlement.
 
