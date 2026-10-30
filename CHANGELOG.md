@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Audience presentation scope builder (P05.7-B.1.2.2), 30 October 2026
+
+- The engine can now build the list of scenes, lines, assets, actors, poses and expressions one audience may be shown, from the
+  actors that audience can see and the pack's declared references. A hidden or undeclared actor is simply absent.
+- Players see no difference yet: nothing calls the builder during play.
+
 ## Unreleased — Packs can declare public presentation references (P05.7-B.1.2.1), 30 October 2026
 
 - An adventure pack may now list the scenes, lines and assets it can show and the poses and expressions each of its NPCs may

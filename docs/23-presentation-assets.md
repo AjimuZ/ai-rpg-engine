@@ -76,6 +76,12 @@ markup, over-long or over-bounded reference without echoing it, and a backdrop o
 an asset the file does not list. The compiled declaration is part of the compiled pack and the
 campaign snapshot; nothing reads it during play yet.
 
+P05.7-B.1.2.2 adds `PublicPresentationScopeBuilder`, a pure function that turns the actors the
+audience-filtered projection exposes plus that declaration into the audience's
+`PublicPresentationScope`. It adds no visibility model: an actor the caller does not pass, or whose
+definition is undeclared, is absent. More than 256 visible declared actors is rejected. Nothing calls
+it during a turn yet.
+
 P04.5 includes original MIT-licensed 48×32 woodland/station PNG schematics in the
 [neutral import fixtures](../backend/src/test/resources/packs/README.md), with
 per-pack license and credit inventories. Integration checks preserve their exact

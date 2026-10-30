@@ -1128,6 +1128,22 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
       presentation; nothing builds the audience `PublicPresentationScope` from the declaration or calls the
       event gate during a turn, so no played turn is affected; assets are not tied to `asset` files; the
       browser display and the QA-40 behaviors remain to do.
+    - P05.7-B.1.2.2 (30 October 2026, audience scope builder; box stays unchecked):
+      `PublicPresentationScopeBuilder.build(visibleActors, declared)` (package `content`, so `presentation`
+      does not depend on it) is a pure function. Input is the actors the audience-filtered projection
+      already exposes (`VisibleActor`: actor ID plus nullable pack NPC definition ID) and the pack's
+      `PackPresentation`. It copies scenes, lines and assets from the declaration and gives an actor
+      only the poses and expressions of its own definition; an actor not passed, without a definition ID,
+      or whose definition is not declared is absent, with no distinct error. It computes no visibility.
+      More than 256 declared visible actors throws `IllegalArgumentException` (rejected, not truncated).
+      Commands: `sh .agents/ralph/verify.sh backend -Dtest=PublicPresentationScopeBuilderTest,PackPresentationTest,PresentationEventsTest`
+      passed, and `sh .agents/ralph/verify.sh full` passed all 17 steps (test counts not read).
+      Proven by 7 new tests: exact declared looks, hidden actor absent, no-definition and undeclared
+      actors absent, undeclared scene/line/asset/pose/expression absent, `NONE` gives an empty scope,
+      duplicates collapse, 257 actors rejected and 256 accepted.
+      Not proven or not done: nothing calls the builder yet, so no caller supplies the visible actors from
+      the narration projection (no dedicated visible-actor projection type exists; narration derives them
+      inline from public events); no deliberately weakened run; no browser display or QA-40 behavior.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.
 
