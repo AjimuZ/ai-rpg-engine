@@ -401,13 +401,14 @@ class CombatSchedulerTest {
             list.add(u == null ? p : new EncounterState.Combatant(p.id(), p.ordinal(), p.actorId(), p.side(), u.zone(),
                     u.status(), p.finesse(), p.initiativeModifier(), u.initiative(), u.rank(), u.reactions(),
                     p.rowVersion() + 1, u.health() == null ? p.health() + plan.playerHealthDelta() : u.health(), p.healthMax(),
-                    u.guarding(), p.sheet()));
+                    u.guarding(), p.sheet(), u.focus() == null ? p.focus() + plan.playerFocusDelta() : u.focus(), p.focusMax(),
+                    u.effects(), u.policies(), u.uses()));
         }
         var last = plan.last();
         return new EncounterState(state.id(), state.rowVersion() + plan.steps().size(), last.phase(), last.round(),
                 last.cursor(), last.actionPoints(), last.speechUsed(), last.passages(), state.profile(),
                 state.frozenSpace(), state.escapeZones(), state.actions(), state.opening(), state.openingTarget(),
-                last.openingStatus(), list);
+                last.openingStatus(), list, List.of(), state.effects(), last.effectsApplied());
     }
 
     /** The same state under another profile. */

@@ -263,13 +263,16 @@ public class CommandExecutionService {
         var worn = jdbc.queryForList("select i.definition_id from equipment_assignment e join item_instance i "
                 + "on i.campaign_id = e.campaign_id and i.id = e.item_instance_id where e.campaign_id = ? "
                 + "and e.actor_id = ? order by i.definition_id", String.class, campaign, player);
+        // Learned abilities, whose combat forms an encounter entry freezes (P11.4).
+        var learned = new java.util.HashSet<>(jdbc.queryForList("select definition_id from learned_ability "
+                + "where campaign_id = ? and actor_id = ?", String.class, campaign, player));
         // The active encounter's tactical state, read only for a tactical intention (P11.2).
         var encounter = tactical ? EncounterWriter.state(jdbc, campaign).orElseThrow(
                 () -> new IllegalStateException("validated tactical intention has no active encounter")) : null;
         return new LocalActionResolver.Snapshot(player, actor.getKey().orElse(null), actor.getValue(),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[0]),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[1]), pools, vocabularies, operation, stacks,
-                stored, clock, conditions, worn, encounter);
+                stored, clock, conditions, worn, encounter, learned);
     }
 
     /**

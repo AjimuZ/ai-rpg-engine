@@ -264,7 +264,7 @@ operation status is stored progress, not evidence that a worker is currently ali
 | 422 | `COMMAND_DESTINATION_UNAVAILABLE` | Destination unknown, concealed, current, unlinked or blocked, or the player has no current location |
 | 422 | `COMMAND_ABILITY_UNAVAILABLE` | Ability not pinned or not learned by the acting player |
 | 422 | `COMMAND_PREREQUISITE_UNMET` | A prerequisite ability or skill rank is missing |
-| 422 | `COMMAND_TARGET_ILLEGAL` | Target count violates the ability's policy, or the policy needs encounter zones; since P11.2 also an encounter participant who cannot be addressed (missing, the player, of a side the declared action does not admit, not standing or beyond speaking range); since P11.3 also an attack target the attack cannot reach (not a standing opponent, out of range, no line of sight, full cover) and an item target who is not the player or a standing ally in the player's zone |
+| 422 | `COMMAND_TARGET_ILLEGAL` | Target count violates the ability's policy, or the policy needs encounter zones; since P11.2 also an encounter participant who cannot be addressed (missing, the player, of a side the declared action does not admit, not standing or beyond speaking range); since P11.3 also an attack target the attack cannot reach (not a standing opponent, out of range, no line of sight, full cover) and an item target who is not the player or a standing ally in the player's zone; since P11.4 also an ability's targets when they are not of its side, not standing, out of its range or sight, too many, or named by a self ability |
 | 422 | `COMMAND_RESOURCE_INSUFFICIENT` | A declared cost exceeds the player's current resource above its minimum, or belongs to another pack's vocabulary |
 | 422 | `COMMAND_CONTENT_UNAVAILABLE` | The pinned content closure cannot be loaded by this engine build for a rule that needs it |
 | 409 | `COMMAND_DEPENDENCIES_MISSING` | P09.5: the campaign's sealed pinned closure is missing, corrupt or unusable, so every fresh command is refused until the same content is restored or imported (checked right after replay; nothing journaled) |
@@ -284,6 +284,8 @@ operation status is stored progress, not evidence that a worker is currently ali
 | 422 | `COMMAND_INTERACTION_UNAVAILABLE` | P11.2: the encounter declares no such social or scene action, it cannot be used from the player's zone, or its passage already has the requested state |
 | 422 | `COMMAND_ATTACK_UNAVAILABLE` | P11.3: the player has no such frozen attack, or no ammunition left for it |
 | 422 | `COMMAND_GUARD_UNAVAILABLE` | P11.3: the Guard action was already taken in this activation |
+| 422 | `COMMAND_REACTION_UNAVAILABLE` | P11.4: the player's frozen profile has no such reaction |
+| 422 | `COMMAND_ACTION_PREVENTED` | P11.4: an active effect prevents this action, its movement or its Focus cost |
 | 429 | `COMMAND_ADMISSION_LIMIT` | Two live mutation permits already belong to this owner |
 | 503 | `COMMAND_STORAGE_UNAVAILABLE` | Required transaction/storage unavailable |
 

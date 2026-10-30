@@ -208,6 +208,89 @@ class CombatPackTest {
         rejects("DUPLICATE", "encounters.json", cudgel, twin, false);
     }
 
+    /**
+     * The combat form of a condition is closed and bounded (P11.4): stacking modes and caps, a declared clock, modifiers,
+     * prevention and ticks at a named phase.
+     */
+    @Test
+    void refusesBrokenConditionCombat() throws Exception {
+        var valid = compile(bytes(text(EncounterPack.tactics())));
+        org.junit.jupiter.api.Assertions.assertNotNull(valid);
+        String poison = "\"stacking\":\"additive\",\"cap\":3";
+        String clock = "\"duration\":{\"clock\":\"roundEnds\",\"count\":2}";
+        String tick = "\"ticks\":[{\"phase\":\"roundEnd\",\"damage\":1}]";
+        tactics("SCHEMA", "conditions.json", poison, poison.replace("\"additive\"", "\"sum\""));
+        tactics("SCHEMA", "conditions.json", poison, poison.replace("\"cap\":3", "\"cap\":9"));
+        tactics("CONSTRAINT_CONFLICT", "conditions.json", poison, poison.replace("\"additive\"", "\"strongest\""));
+        tactics("SCHEMA", "conditions.json", clock, clock.replace("\"roundEnds\"", "\"weeks\""));
+        tactics("SCHEMA", "conditions.json", clock, clock.replace(",\"count\":2", ""));
+        tactics("SCHEMA", "conditions.json", clock, clock.replace("\"count\":2", "\"count\":-1"));
+        tactics("SCHEMA", "conditions.json", tick, tick.replace("\"phase\":\"roundEnd\"", "\"phase\":\"midRound\""));
+        tactics("SCHEMA", "conditions.json", tick, tick.replace("\"damage\":1", "\"damage\":1,\"heal\":1"));
+        tactics("SCHEMA", "conditions.json", tick, tick.replace("\"damage\":1", "\"damage\":100"));
+        tactics("SCHEMA", "conditions.json", tick, tick.replace("\"damage\":1", "\"apply\":\"stunned\""));
+        tactics("SCHEMA", "conditions.json", "\"attack\":-2", "\"attack\":-5");
+        tactics("SCHEMA", "conditions.json", "\"prevents\":[\"actions\"]", "\"prevents\":[\"turns\"]");
+        tactics("DUPLICATE", "conditions.json", "\"prevents\":[\"actions\"]", "\"prevents\":[\"actions\",\"actions\"]");
+        tactics("SCHEMA", "conditions.json", "\"absorption\":3", "\"absorption\":3,\"bonus\":1");
+    }
+
+    /** A combat ability cannot be free without a limit, and a reaction's effect must fit its trigger (P11.4). */
+    @Test
+    void refusesBrokenAbilityAndReactionCombat() {
+        String steady = "\"cost\":1,\"focus\":1,\"cooldownRounds\":2";
+        tactics("CONSTRAINT_CONFLICT", "abilities.json", steady, steady.replace("\"cost\":1", "\"cost\":0"));
+        tactics("SCHEMA", "abilities.json", steady, steady.replace("\"cost\":1", "\"cost\":4"));
+        tactics("SCHEMA", "abilities.json", steady, steady.replace("\"cooldownRounds\":2", "\"cooldownRounds\":31"));
+        tactics("CONSTRAINT_CONFLICT", "abilities.json", steady, steady + ",\"maxTargets\":2");
+        tactics("SCHEMA", "abilities.json", "\"operations\":[{\"type\":\"heal\"", "\"operations\":[{\"type\":\"revive\"");
+        tactics("CONSTRAINT_CONFLICT", "abilities.json", "\"condition\":\"warded\"", "\"condition\":\"dazed\"");
+        tactics("REFERENCE_UNKNOWN", "abilities.json", "\"condition\":\"warded\"", "\"condition\":\"nowhere\"");
+        String dice = "\"operations\":[{\"type\":\"heal\",\"flat\":2,\"to\":\"self\"}]";
+        String many = "\"operations\":[" + "{\"type\":\"heal\",\"dice\":{\"count\":4,\"sides\":4}},".repeat(4)
+                + "{\"type\":\"heal\",\"dice\":{\"count\":1,\"sides\":4}}]";
+        tactics("SCHEMA", "abilities.json", dice, many);
+        String counter = "\"trigger\":\"hit\",\"effect\":{\"type\":\"counter\"}";
+        tactics("CONSTRAINT_CONFLICT", "abilities.json", counter, counter.replace("\"hit\"", "\"attacked\""));
+        tactics("CONSTRAINT_CONFLICT", "abilities.json", counter, "\"trigger\":\"hit\",\"effect\":{\"type\":\"guard\"}");
+        tactics("CONSTRAINT_CONFLICT", "abilities.json", counter, "\"trigger\":\"damaged\",\"effect\":{\"type\":\"absorb\",\"amount\":2}");
+        tactics("CONSTRAINT_CONFLICT", "abilities.json", counter, counter.replace("\"hit\"", "\"leavesZone\"") + ",\"protects\":\"ally\"");
+        tactics("SCHEMA", "abilities.json", counter, counter.replace("\"hit\"", "\"seen\""));
+        tactics("REFERENCE_UNKNOWN", "abilities.json", "\"type\":\"counter\"", "\"type\":\"counter\",\"attack\":\"sword\"");
+        tactics("SCHEMA", "abilities.json", counter, counter + ",\"priority\":11");
+
+        String snap = "\"effect\":{\"type\":\"counter\",\"attack\":\"fang\"}";
+        tactics("REFERENCE_UNKNOWN", "encounters.json", snap, snap.replace("\"fang\"", "\"tooth\""));
+        tactics("DUPLICATE", "encounters.json", "{\"id\":\"snap\"", "{\"id\":\"brace\"");
+        tactics("SCHEMA", "encounters.json", "\"zone\":\"pit\",\"brace\":{\"mode\":\"off\"}", "\"zone\":\"pit\",\"brace\":{\"mode\":\"sometimes\"}");
+        tactics("SCHEMA", "encounters.json", "\"zone\":\"pit\",\"brace\":{\"mode\":\"off\"}",
+                "\"zone\":\"pit\",\"brace\":{\"mode\":\"healthAtMost\",\"value\":101}");
+        tactics("CONSTRAINT_CONFLICT", "encounters.json", "\"condition\":\"poisoned\"", "\"condition\":\"dazed\"");
+        tactics("SCHEMA", "encounters.json", "\"phase\":\"postDamage\"", "\"phase\":\"preRoll\"");
+    }
+
+    /** A Focus cost or predicate needs the combat rule's Focus resource, which the default fixture does not name. */
+    @Test
+    void refusesFocusWithoutAFocusResource() throws Exception {
+        var files = text(EncounterPack.tactics());
+        files.put("rules.json", files.get("rules.json").replace(",\"focus\":\"grit\"", ""));
+        assertEquals("CONSTRAINT_CONFLICT", org.junit.jupiter.api.Assertions.assertThrows(PackException.class,
+                () -> compile(bytes(files))).code());
+    }
+
+    /** Apply a replacement to the {@link EncounterPack#tactics()} variant and expect one code. */
+    private static void tactics(String code, String file, String from, String to) {
+        try {
+            var files = text(EncounterPack.tactics());
+            org.junit.jupiter.api.Assertions.assertTrue(files.get(file).contains(from), from);
+            files.put(file, files.get(file).replace(from, to));
+            var failure = org.junit.jupiter.api.Assertions.assertThrows(PackException.class, () -> compile(bytes(files)), to);
+            assertEquals(code, failure.code(), failure.getMessage());
+        } catch (java.net.URISyntaxException broken) {
+            throw new IllegalStateException(broken);
+        }
+    }
+
     /** Item combat data needs an equippable item and a combat rule, and stays inside the profile's caps. */
     @Test
     void refusesBrokenItemCombat() throws Exception {

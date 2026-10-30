@@ -16,6 +16,10 @@
  * <p>Since P11.3 (ADR 0030) {@code CombatMath} is the pure attack, defense, damage and healing arithmetic,
  * {@code CombatAttack} a frozen attack, {@code EncounterGear} what an equippable item adds at entry, and the scheduler
  * resolves strikes, the Guard action, item use, the opening strike and a small non-player tactic. Dice come only from
- * the recorded draw source it is given. Reactions and settlement of later tasks complete the fight.
+ * the recorded draw source it is given.
+ *
+ * <p>Since P11.4 (ADR 0031) {@code CombatEffect} is a frozen timed effect, {@code CombatEffects} its pure stacking, order and
+ * clock rules, {@code CombatReaction} a predeclared reaction with its policy and {@code CombatAbility} a frozen ability, which
+ * the scheduler resolves with the same recorded draws. Settlement of a later task completes the fight.
  */
 package org.rpgengine.combat;

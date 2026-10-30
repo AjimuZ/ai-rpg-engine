@@ -39,7 +39,7 @@ public record EncounterTemplate(String id, String pack, String location, ZoneGra
     /** Participant ID reserved for the player in a frozen roster. */
     public static final String PLAYER = "player";
     /** Most non-player participants of one template. */
-    public static final int MAX_PARTICIPANTS = 8;
+    public static final int MAX_PARTICIPANTS = org.rpgengine.rules.CombatProfile.PARTICIPANTS_MAX;
     /** Most objectives of one template. */
     public static final int MAX_OBJECTIVES = 8;
     /** Hostile bodies allowed beyond the party size (docs/12 section 4, default roster limit). */
@@ -109,12 +109,23 @@ public record EncounterTemplate(String id, String pack, String location, ZoneGra
      * @param threat catalog threat tier
      * @param stats explicit statistics
      * @param attacks attacks the participant can make (P11.3); without any it passes its activations
+     * @param reactions reactions it declares beside Brace, each with its own policy (P11.4)
+     * @param policies predeclared reaction policies by reaction ID; Brace first by default (P11.4)
+     * @param conditions canonical conditions it enters the fight with (P11.4)
      */
     public record Participant(String id, Side side, String zone, String npc, Threat threat, Stats stats,
-            List<CombatAttack> attacks) {
+            List<CombatAttack> attacks, List<CombatReaction> reactions, Map<String, CombatReaction.Policy> policies,
+            List<String> conditions) {
         /** Participant that cannot attack, the shape used before P11.3. */
         public Participant(String id, Side side, String zone, String npc, Threat threat, Stats stats) {
             this(id, side, zone, npc, threat, stats, List.of());
+        }
+
+        /** Participant without reactions or conditions, the default Brace first; the shape used before P11.4. */
+        public Participant(String id, Side side, String zone, String npc, Threat threat, Stats stats,
+                List<CombatAttack> attacks) {
+            this(id, side, zone, npc, threat, stats, attacks, List.of(),
+                    Map.of(CombatReaction.BRACE_ID, CombatReaction.Policy.FIRST), List.of());
         }
 
         /** Require identities and a non-player side. */
@@ -124,6 +135,9 @@ public record EncounterTemplate(String id, String pack, String location, ZoneGra
             Objects.requireNonNull(threat, "threat");
             Objects.requireNonNull(stats, "stats");
             attacks = List.copyOf(attacks);
+            reactions = List.copyOf(reactions);
+            policies = Map.copyOf(policies);
+            conditions = List.copyOf(conditions);
             if (side == null || side == Side.PLAYER || PLAYER.equals(id)) {
                 throw new IllegalArgumentException("a template participant is an ally or a hostile and is not the player");
             }

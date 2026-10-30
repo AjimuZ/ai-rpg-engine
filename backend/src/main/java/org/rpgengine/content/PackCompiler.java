@@ -560,7 +560,204 @@ public final class PackCompiler {
             attack.integer("range", 0, combatProfile.value("maxRangeEdges"), 0);
             attack.choice("defense", Set.of("guard", "resistance"), "guard");
             attack.bool("strongHit", true);
+            // Effects a hit applies (P11.4): after any hit by default, or only after it took Health.
+            for (Fields effect : attack.objects("onHit", 0, CombatProfile.ON_HIT_MAX)) {
+                combatCondition(effect, "condition");
+                effect.choice("phase", Set.of("postHit", "postDamage"), "postHit");
+                effect.choice("to", Set.of("target", "self"), "target");
+                effect.close();
+            }
             attack.close();
+        }
+
+        /**
+         * A condition a combat rule applies or removes: one of this pack, with a combat form. Another pack's condition cannot
+         * be proved to have one when this pack is imported, and the fight must never meet an effect without a definition.
+         */
+        private void combatCondition(Fields f, String key) {
+            String reference = f.ref(key, CONDITION, true);
+            Definition condition = byId.get(reference);
+            if (condition == null || !(condition.data().get("combat") instanceof Map<?, ?>)) {
+                throw f.fail("CONSTRAINT_CONFLICT", key, "Condition '" + reference
+                        + "' must be defined in this pack with a combat block");
+            }
+        }
+
+        /**
+         * A condition's {@code combat} block (P11.4, docs/11 section 11): stacking, a declared clock, bounded modifiers,
+         * what it prevents and fixed-amount ticks at a declared phase. The closed grammar cannot apply another effect, so
+         * effect processing cannot cycle.
+         */
+        private void conditionCombat(Fields combat) {
+            combat.id("stackingKey", false);
+            String stacking = combat.choice("stacking", Set.of("replace", "refresh", "strongest", "independent", "additive"),
+                    "strongest");
+            boolean several = stacking.equals("independent") || stacking.equals("additive");
+            if (combat.has("cap") && !several) {
+                throw combat.fail("CONSTRAINT_CONFLICT", "cap", "Only independent or additive stacking has a cap");
+            }
+            combat.integer("cap", 1, CombatProfile.EFFECT_CAP_MAX, 3);
+            Fields duration = combat.object("duration", true);
+            String clock = duration.choice("clock", Set.of("instant", "nextActivation", "activations", "roundEnds",
+                    "worldSeconds", "persistent"), null);
+            boolean counted = clock.equals("activations") || clock.equals("roundEnds") || clock.equals("worldSeconds");
+            if (counted) {
+                duration.integer("count", 0, CombatProfile.EFFECT_COUNT_MAX, null);
+            }
+            if (clock.equals("nextActivation")) {
+                duration.choice("actor", Set.of("target", "source"), "target");
+            }
+            duration.close();
+            combat.integer("priority", -CombatProfile.PRIORITY_MAX, CombatProfile.PRIORITY_MAX, 0);
+            combat.integer("guard", -CombatProfile.EFFECT_MODIFIER_MAX, CombatProfile.EFFECT_MODIFIER_MAX, 0);
+            combat.integer("resistance", -CombatProfile.EFFECT_MODIFIER_MAX, CombatProfile.EFFECT_MODIFIER_MAX, 0);
+            combat.integer("attack", -CombatProfile.EFFECT_MODIFIER_MAX, CombatProfile.EFFECT_MODIFIER_MAX, 0);
+            combat.integer("absorption", 0, CombatProfile.EFFECT_AMOUNT_MAX, 0);
+            var prevented = new HashSet<String>();
+            for (String name : combat.ids("prevents", 4)) {
+                if (!Set.of("movement", "actions", "reactions", "resources").contains(name) || !prevented.add(name)) {
+                    throw combat.fail("prevents", "A condition prevents movement, actions, reactions or resources, each once");
+                }
+            }
+            for (Fields tick : combat.objects("ticks", 0, CombatProfile.EFFECT_TICKS_MAX)) {
+                tick.choice("phase", Set.of("roundOpen", "activationStart", "actionDeclared", "preRoll", "postHit",
+                        "postDamage", "activationEnd", "roundEnd"), null);
+                if (tick.has("damage") == tick.has("heal")) {
+                    throw tick.fail("damage", "A tick either deals damage or heals");
+                }
+                if (tick.has("damage")) {
+                    tick.integer("damage", 1, CombatProfile.EFFECT_AMOUNT_MAX, null);
+                } else {
+                    tick.integer("heal", 1, CombatProfile.EFFECT_AMOUNT_MAX, null);
+                }
+                tick.close();
+            }
+            combat.choice("sourceDefeated", Set.of("persist", "end"), "persist");
+            combat.close();
+        }
+
+        /**
+         * A reaction's fields (P11.4, docs/11 section 10): its trigger, priority, Focus cost, target constraints and one
+         * effect. Reaction depth is the kernel's, so nothing here can make one reaction provoke another. An impossible
+         * combination, such as a Guard bonus after the blow landed, is {@code CONSTRAINT_CONFLICT}. Closes the object.
+         *
+         * @param attacks the frozen attacks a counter may name, or null when a reaction cannot name one
+         */
+        private void reaction(Fields reaction, Set<String> attacks) {
+            String trigger = reaction.choice("trigger", Set.of("attacked", "hit", "damaged", "leavesZone"), null);
+            reaction.integer("priority", -CombatProfile.PRIORITY_MAX, CombatProfile.PRIORITY_MAX, 0);
+            int focus = reaction.integer("focus", 0, CombatProfile.FOCUS_COST_MAX, 0);
+            if (focus > 0 && combatProfile.focus() == null) {
+                throw reaction.fail("CONSTRAINT_CONFLICT", "focus", "A Focus cost needs the combat rule's focus resource");
+            }
+            String protects = reaction.choice("protects", Set.of("self", "ally"), "self");
+            String answers = reaction.choice("attacks", Set.of("any", "melee", "ranged"), "any");
+            Fields effect = reaction.object("effect", true);
+            String type = effect.choice("type", Set.of("guard", "absorb", "counter", "apply"), null);
+            switch (type) {
+                case "guard" -> effect.integer("amount", 1, combatProfile.value("situationalGuardCap"),
+                        combatProfile.value("guardBonus"));
+                case "absorb" -> effect.integer("amount", 1, CombatProfile.EFFECT_AMOUNT_MAX, null);
+                case "counter" -> {
+                    if (effect.has("attack")) {
+                        String named = effect.id("attack", true);
+                        if (attacks == null || !attacks.contains(named)) {
+                            throw effect.fail("REFERENCE_UNKNOWN", "attack", "A counter names one of the participant's own attacks");
+                        }
+                    }
+                }
+                default -> {
+                    combatCondition(effect, "condition");
+                    effect.choice("to", Set.of("self", "attacker"), "self");
+                }
+            }
+            effect.close();
+            boolean timed = type.equals("guard") && !trigger.equals("attacked")
+                    || type.equals("counter") && trigger.equals("attacked")
+                    || type.equals("absorb") && !trigger.equals("attacked") && !trigger.equals("hit")
+                    || trigger.equals("leavesZone") && (!protects.equals("self") || !answers.equals("any"));
+            if (timed) {
+                throw reaction.fail("CONSTRAINT_CONFLICT", "trigger", "This effect cannot answer the trigger '" + trigger + "'");
+            }
+            reaction.close();
+        }
+
+        /** A predeclared reaction policy: the mode and the value its predicate reads. Absent means first eligible. */
+        private void policy(Fields policy) {
+            if (policy == null) {
+                return;
+            }
+            switch (policy.choice("mode", Set.of("off", "first", "healthAtMost", "focusAtLeast"), null)) {
+                case "healthAtMost" -> policy.integer("value", 1, 100, null);
+                case "focusAtLeast" -> {
+                    if (combatProfile.focus() == null) {
+                        throw policy.fail("CONSTRAINT_CONFLICT", "mode", "A Focus predicate needs the combat rule's focus resource");
+                    }
+                    policy.integer("value", 1, CombatProfile.FOCUS_COST_MAX, null);
+                }
+                default -> { }
+            }
+            policy.close();
+        }
+
+        /**
+         * An ability's {@code combat} block (P11.4, docs/11 section 7): either a predeclared reaction or an active form
+         * with its costs, cooldown, targets and operations. A normal ability costs at least one point; a free one needs an
+         * explicit once-per-activation or once-per-encounter limit, and no operation restores availability.
+         */
+        private void abilityCombat(Fields combat) {
+            if (combatProfile == null) {
+                throw combat.fail("CONSTRAINT_CONFLICT", null, "An ability's combat form needs the pack's combat rule");
+            }
+            Fields reaction = combat.object("reaction", false);
+            if (reaction != null) {
+                reaction(reaction, null);
+                combat.close();
+                return;
+            }
+            int cost = combat.integer("cost", 0, combatProfile.actionPoints(), null);
+            String limit = combat.choice("limit", Set.of("none", "activation", "encounter"), "none");
+            if (cost == 0 && limit.equals("none")) {
+                throw combat.fail("CONSTRAINT_CONFLICT", "cost", "A free ability needs a once-per-activation or once-per-encounter limit");
+            }
+            combat.integer("cooldownRounds", 0, CombatProfile.ABILITY_COOLDOWN_MAX, 0);
+            int focus = combat.integer("focus", 0, CombatProfile.FOCUS_COST_MAX, 0);
+            if (focus > 0 && combatProfile.focus() == null) {
+                throw combat.fail("CONSTRAINT_CONFLICT", "focus", "A Focus cost needs the combat rule's focus resource");
+            }
+            String target = combat.choice("target", Set.of("self", "ally", "hostile"), "self");
+            if (combat.has("maxTargets") && target.equals("self")) {
+                throw combat.fail("CONSTRAINT_CONFLICT", "maxTargets", "A self ability names no target");
+            }
+            combat.integer("maxTargets", 1, CombatProfile.PARTICIPANTS_MAX + 1, 1);
+            combat.integer("range", 0, combatProfile.value("maxRangeEdges"), 0);
+            int dice = 0;
+            for (Fields operation : combat.objects("operations", 1, CombatProfile.ABILITY_OPERATIONS_MAX)) {
+                String type = operation.choice("type", Set.of("damage", "heal", "apply", "remove"), null);
+                if (type.equals("damage") || type.equals("heal")) {
+                    Fields declared = operation.object("dice", false);
+                    if (declared != null) {
+                        dice += declared.integer("count", 1, CombatProfile.ATTACK_DICE_MAX, 1);
+                        declared.integer("sides", 2, CombatProfile.ATTACK_SIDES_MAX, null);
+                        declared.close();
+                    }
+                    if (operation.has("attribute")) {
+                        operation.choice("attribute", new HashSet<>(CombatProfile.ROLES), null);
+                    }
+                    operation.integer("flat", CombatProfile.ATTACK_FLAT_MIN, CombatProfile.ATTACK_FLAT_MAX, 0);
+                    if (type.equals("damage")) {
+                        operation.integer("penetration", 0, CombatProfile.ATTACK_PENETRATION_MAX, 0);
+                    }
+                } else {
+                    combatCondition(operation, "condition");
+                }
+                operation.choice("to", Set.of("target", "self"), "target");
+                operation.close();
+            }
+            if (dice > CombatProfile.ABILITY_DICE_MAX) {
+                throw combat.fail("LIMIT", "operations", "An ability may draw at most " + CombatProfile.ABILITY_DICE_MAX + " dice");
+            }
+            combat.close();
         }
 
         /**
@@ -692,6 +889,25 @@ public final class PackCompiler {
                     }
                     attack.integer("skill", 0, CombatProfile.ATTACK_SKILL_MAX, 0);
                     attack(attack);
+                }
+                // Reactions and entry conditions (P11.4): Brace is every participant's, first by default.
+                policy(participant.object("brace", false));
+                var reactions = new HashSet<String>();
+                // The ID of the default reaction, which any participant has without declaring it.
+                reactions.add("brace");
+                for (Fields reaction : participant.objects("reactions", 0, CombatProfile.REACTIONS_MAX)) {
+                    if (!reactions.add(reaction.id("id", true))) {
+                        throw reaction.fail("DUPLICATE", "id", "Reaction ID already defined for this participant");
+                    }
+                    policy(reaction.object("policy", false));
+                    reaction(reaction, attacks);
+                }
+                for (String condition : participant.refs("conditions", CONDITION, CombatProfile.EFFECTS_ACTIVE_MAX)) {
+                    Definition defined = byId.get(condition);
+                    if (defined == null || !(defined.data().get("combat") instanceof Map<?, ?>)) {
+                        throw participant.fail("CONSTRAINT_CONFLICT", "conditions", "Condition '" + condition
+                                + "' must be defined in this pack with a combat block");
+                    }
                 }
                 participant.close();
                 if (participants.putIfAbsent(id, side) != null) {
@@ -1140,6 +1356,10 @@ public final class PackCompiler {
             conditionGraph.node(self.id());
             effectNodes = 0;
             effects(f, "tick", 0, null, 1, self.id());
+            Fields combat = f.object("combat", false);
+            if (combat != null) {
+                conditionCombat(combat);
+            }
         }
 
         /**
@@ -1196,6 +1416,10 @@ public final class PackCompiler {
             target.close();
             effectNodes = 0;
             effects(f, "effects", 1, null, 1, null);
+            Fields combat = f.object("combat", false);
+            if (combat != null) {
+                abilityCombat(combat);
+            }
         }
 
         /**

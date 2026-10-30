@@ -302,6 +302,8 @@ public class CampaignCreationController {
             case INTERACTION_UNAVAILABLE -> error(422, "COMMAND_INTERACTION_UNAVAILABLE");
             case ATTACK_UNAVAILABLE -> error(422, "COMMAND_ATTACK_UNAVAILABLE");
             case GUARD_UNAVAILABLE -> error(422, "COMMAND_GUARD_UNAVAILABLE");
+            case REACTION_UNAVAILABLE -> error(422, "COMMAND_REACTION_UNAVAILABLE");
+            case ACTION_PREVENTED -> error(422, "COMMAND_ACTION_PREVENTED");
         };
     }
 

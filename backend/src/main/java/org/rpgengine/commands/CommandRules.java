@@ -68,7 +68,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       one and it names a hostile participant. Every refusal shares {@code ENCOUNTER_UNAVAILABLE}.</li>
  *   <li><b>Tactical intentions (P11.2, P11.3)</b> — the campaign's active encounter must exist and its player participant
  *       must be the acting player; {@link TacticalRules} then decides turn, movement, addressing, speech allowance,
- *       declared-action eligibility, attack reach, the Guard action and action points over the stored tactical state ({@code TURN_UNAVAILABLE},
+ *       declared-action eligibility, attack reach, the Guard action, abilities, prevention, reaction policies and action points over the stored tactical state ({@code TURN_UNAVAILABLE},
  *       {@code ZONE_UNAVAILABLE}, {@code TARGET_ILLEGAL}, {@code SPEECH_LIMIT_REACHED}, {@code INTERACTION_UNAVAILABLE},
  *       {@code ACTION_POINTS_INSUFFICIENT}). The initiative roll and the end of an activation may close a round, so
  *       the clock must be able to take one round's seconds ({@code TIME_ILLEGAL}).</li>
@@ -494,6 +494,10 @@ final class CommandRules {
                     case ACTION -> OperationAdmissionFailure.Kind.INTERACTION_UNAVAILABLE;
                     case ATTACK -> OperationAdmissionFailure.Kind.ATTACK_UNAVAILABLE;
                     case GUARD -> OperationAdmissionFailure.Kind.GUARD_UNAVAILABLE;
+                    case ABILITY -> OperationAdmissionFailure.Kind.ABILITY_UNAVAILABLE;
+                    case RESOURCE -> OperationAdmissionFailure.Kind.RESOURCE_INSUFFICIENT;
+                    case REACTION -> OperationAdmissionFailure.Kind.REACTION_UNAVAILABLE;
+                    case PREVENTED -> OperationAdmissionFailure.Kind.ACTION_PREVENTED;
                 });
             }
             if (tactical instanceof TypedCommand.CombatUseItem use) {
@@ -511,7 +515,8 @@ final class CommandRules {
          * {@link TacticalRules} accepted, and a campaign-less ally can receive healing but not items, so an item that
          * creates units cannot target one. A contract may use at most {@link #MAX_COMBAT_ITEM_DRAWS} dice, so the
          * schedule that continues if the item fells the player still fits the operation's draw budget. Other target
-         * policies wait for effect targeting in combat (P11.4).
+         * policies stay refused: an item runs the exploration effect program, and a multi-target or hostile form belongs to
+         * an ability's frozen combat block (P11.4).
          */
         private void combatItem(TypedCommand.CombatUseItem use, org.rpgengine.combat.EncounterState state) {
             Held item = held(use.itemInstanceId(), player);

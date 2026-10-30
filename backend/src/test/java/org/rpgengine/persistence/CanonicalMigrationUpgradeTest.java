@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V24 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V25 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -599,6 +599,42 @@ class CanonicalMigrationUpgradeTest {
                     assertThrows(DataAccessException.class, () -> jdbc.update("update encounter_participant set "
                             + "status = 'ACTIVE', row_version = row_version + 1 where participant_id = 'rival'"));
                     assertEquals(0, v24.migrate().migrationsExecuted);
+                    // V25 adds effects, reaction policies and ability uses: the populated fight keeps its rows with none, so
+                    // no reaction fires in it, and the storage bounds, the counter and the uses hold from here on.
+                    String v24Roster = jdbc.queryForObject("select jsonb_agg(to_jsonb(p) order by p.participant_id)::text "
+                            + "from encounter_participant p", String.class);
+                    Flyway v25 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("25").load();
+                    assertEquals(1, v25.migrate().migrationsExecuted);
+                    assertTrue(v25.validateWithResult().validationSuccessful);
+                    assertEquals(v24Roster, jdbc.queryForObject("select jsonb_agg(to_jsonb(p) - 'effects' - 'reaction_policies' "
+                            + "- 'ability_uses' order by p.participant_id)::text from encounter_participant p", String.class));
+                    assertEquals(0L, jdbc.queryForObject("select count(*) from encounter_participant where effects <> '[]' "
+                            + "or reaction_policies <> '{}' or ability_uses <> '{}'", Long.class));
+                    assertEquals(0, jdbc.queryForObject("select effects_applied from encounter", Integer.class));
+                    String setEffects = "update encounter_participant set effects = ?::jsonb, row_version = row_version + 1 "
+                            + "where participant_id = 'raider'";
+                    assertThrows(DataAccessException.class, () -> jdbc.update(setEffects, "{}"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(setEffects, "[" + "{},".repeat(8) + "{}]"));
+                    assertEquals(1, jdbc.update(setEffects, "[{}]"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update encounter_participant set "
+                            + "guarding = false, status = 'DEFEATED', row_version = row_version + 1 where participant_id = 'raider'"),
+                            "effects end with their holder");
+                    assertEquals(1, jdbc.update(setEffects, "[]"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update encounter_participant set "
+                            + "reaction_policies = '[]', row_version = row_version + 1 where participant_id = 'raider'"));
+                    String setUses = "update encounter_participant set ability_uses = ?::jsonb, row_version = row_version + 1 "
+                            + "where participant_id = 'raider'";
+                    assertThrows(DataAccessException.class, () -> jdbc.update(setUses, "[]"));
+                    assertEquals(1, jdbc.update(setUses, "{\"steady\":{\"lastRound\":2,\"uses\":2}}"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(setUses, "{}"), "a use is never forgotten");
+                    assertThrows(DataAccessException.class, () -> jdbc.update(setUses, "{\"steady\":{\"lastRound\":1,\"uses\":2}}"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(setUses, "{\"steady\":{\"lastRound\":2,\"uses\":1}}"));
+                    assertEquals(1, jdbc.update(setUses, "{\"steady\":{\"lastRound\":3,\"uses\":3}}"));
+                    String bump = "update encounter set effects_applied = ?, row_version = row_version + 1";
+                    assertEquals(1, jdbc.update(bump, 2));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(bump, 1), "the counter never goes back");
+                    assertEquals(0, v25.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

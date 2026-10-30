@@ -106,7 +106,7 @@ public final class EncounterPack {
             {"id":"close-brawl","kind":"encounter","data":{"name":"Close Brawl","location":"trailhead",
               "zones":[{"id":"ring","name":"Ring"},{"id":"gallery","name":"Gallery"}],
               "edges":[{"from":"ring","to":"gallery"}],"playerZone":"ring",
-              "participants":[{"id":"dummy","name":"Dummy","side":"hostile","zone":"ring",
+              "participants":[{"id":"dummy","name":"Dummy","side":"hostile","zone":"ring","brace":{"mode":"off"},
                 "stats":{"health":999,"guard":0,"resistance":0}},
                 {"id":"wall","name":"Wall","side":"hostile","zone":"ring","stats":{"health":20,"guard":40,"resistance":40}},
                 {"id":"porter","name":"Porter","side":"ally","zone":"ring","stats":{"health":9,"guard":11,"resistance":8}},
@@ -114,7 +114,7 @@ public final class EncounterPack {
               "objectives":[{"id":"last","kind":"survive","rounds":3}]}},
             {"id":"close-rush","kind":"encounter","data":{"name":"Close Rush","location":"trailhead","opening":"first",
               "zones":[{"id":"ring","name":"Ring"}],"playerZone":"ring",
-              "participants":[{"id":"dummy","name":"Dummy","side":"hostile","zone":"ring",
+              "participants":[{"id":"dummy","name":"Dummy","side":"hostile","zone":"ring","brace":{"mode":"off"},
                 "stats":{"health":999,"guard":0,"resistance":0}}],
               "objectives":[{"id":"last","kind":"survive","rounds":3}]}}]}""";
 
@@ -146,6 +146,31 @@ public final class EncounterPack {
               "effects":[{"type":"createItem","item":"coin","target":"target"}]},
               "appearance":{"id":"pouch.gift","summary":"A small pouch."}}}""";
 
+    /** Conditions with combat forms, added by {@link #tactics()}. */
+    private static final String TACTIC_CONDITIONS = """
+            ,{"id":"poisoned","kind":"condition","data":{"name":"Poisoned","description":"Venom works.","durationRounds":2,
+              "combat":{"stacking":"additive","cap":3,"duration":{"clock":"roundEnds","count":2},
+                "ticks":[{"phase":"roundEnd","damage":1}]}}},
+            {"id":"warded","kind":"condition","data":{"name":"Warded","description":"Shielded.","durationRounds":1,
+              "combat":{"absorption":3,"duration":{"clock":"persistent"}}}},
+            {"id":"winded","kind":"condition","data":{"name":"Winded","description":"Short of breath.","durationRounds":1,
+              "combat":{"attack":-2,"duration":{"clock":"nextActivation"}}}},
+            {"id":"stunned","kind":"condition","data":{"name":"Stunned","description":"Cannot act.","durationRounds":1,
+              "combat":{"prevents":["actions"],"duration":{"clock":"activations","count":1}}}}""";
+
+    /** The duel added by {@link #tactics()}. */
+    private static final String TACTIC_ENCOUNTERS = """
+            ,{"id":"venom-pit","kind":"encounter","data":{"name":"Venom Pit","location":"trailhead",
+              "zones":[{"id":"pit","name":"Pit"},{"id":"ledge","name":"Ledge"}],"edges":[{"from":"pit","to":"ledge"}],
+              "playerZone":"pit",
+              "participants":[{"id":"adder","name":"Adder","side":"hostile","zone":"pit","brace":{"mode":"off"},
+                "stats":{"health":999,"focus":2,"guard":0,"resistance":0,"force":6,"finesse":6,"insight":6},
+                "attacks":[{"id":"fang","attribute":"force","skill":6,"strongHit":false,
+                  "damage":{"count":1,"sides":2,"attribute":"none","flat":3},
+                  "onHit":[{"condition":"poisoned","phase":"postDamage"}]}],
+                "reactions":[{"id":"snap","trigger":"leavesZone","effect":{"type":"counter","attack":"fang"}}]}],
+              "objectives":[{"id":"last","kind":"survive","rounds":3}]}}""";
+
     private EncounterPack() {
     }
 
@@ -175,6 +200,47 @@ public final class EncounterPack {
      */
     public static CombatRules rules(Map<String, byte[]> files) {
         return CombatRules.from(CampaignPackSnapshot.local(new PackCompiler().compile(new PackParser().parse(files))));
+    }
+
+    /**
+     * Build the P11.4 variant under the pack ID {@code sample:armory-tactics}: Focus on a {@code grit} resource (6 at most),
+     * combat forms of its conditions and abilities, and {@code venom-pit}, a duel against an {@code adder} in the player's
+     * own zone. Its fang scores at least 14, so it always hits a braced player, deals 3 or 4 past the cloak's armor and poisons;
+     * its {@code snap} answers a player who leaves the pit with a counter at no cost, and the adder cannot be missed because its
+     * Brace is off and its Guard 0.
+     *
+     * <p>Conditions: {@code poisoned} (additive up to 3, one damage per stack at each round end, two round ends),
+     * {@code warded} (absorption 3, persistent, strongest), {@code winded} (attack -2 until the holder's next activation) and
+     * {@code stunned} (prevents actions for one activation). Abilities: {@code steady} (1 point, 1 Focus, cooldown 2,
+     * heals 2), {@code riposte} as a reaction (a counter on a hit) and {@code ward} (free, once per encounter).
+     *
+     * @return file index ready for staging
+     */
+    public static Map<String, byte[]> tactics() throws URISyntaxException {
+        var files = new TreeMap<>(variant(COMBAT_RULE.replace("\"health\":\"vigor\"", "\"health\":\"vigor\",\"focus\":\"grit\""),
+                "sample:armory-tactics"));
+        String rules = new String(files.get("rules.json"), StandardCharsets.UTF_8);
+        files.put("rules.json", rules.replace("{\"id\":\"vigor\",\"name\":\"Vigor\",\"max\":8}",
+                "{\"id\":\"vigor\",\"name\":\"Vigor\",\"max\":8},{\"id\":\"grit\",\"name\":\"Grit\",\"max\":6}")
+                .getBytes(StandardCharsets.UTF_8));
+        String conditions = new String(files.get("conditions.json"), StandardCharsets.UTF_8);
+        int end = conditions.lastIndexOf("]}");
+        files.put("conditions.json", (conditions.substring(0, end) + TACTIC_CONDITIONS + conditions.substring(end))
+                .getBytes(StandardCharsets.UTF_8));
+        String abilities = new String(files.get("abilities.json"), StandardCharsets.UTF_8);
+        files.put("abilities.json", abilities
+                .replace("{\"id\":\"steady\",\"kind\":\"ability\",\"data\":{", "{\"id\":\"steady\",\"kind\":\"ability\",\"data\":{"
+                        + "\"combat\":{\"cost\":1,\"focus\":1,\"cooldownRounds\":2,\"operations\":[{\"type\":\"heal\",\"flat\":2,\"to\":\"self\"}]},")
+                .replace("{\"id\":\"riposte\",\"kind\":\"ability\",\"data\":{", "{\"id\":\"riposte\",\"kind\":\"ability\",\"data\":{"
+                        + "\"combat\":{\"reaction\":{\"trigger\":\"hit\",\"effect\":{\"type\":\"counter\"}}},")
+                .replace("{\"id\":\"chain-riposte\",\"kind\":\"ability\",\"data\":{", "{\"id\":\"chain-riposte\",\"kind\":\"ability\",\"data\":{"
+                        + "\"combat\":{\"cost\":0,\"limit\":\"encounter\",\"operations\":[{\"type\":\"apply\",\"condition\":\"warded\",\"to\":\"self\"}]},")
+                .getBytes(StandardCharsets.UTF_8));
+        String encounters = new String(files.get("encounters.json"), StandardCharsets.UTF_8);
+        end = encounters.lastIndexOf("]}");
+        files.put("encounters.json", (encounters.substring(0, end) + TACTIC_ENCOUNTERS + encounters.substring(end))
+                .getBytes(StandardCharsets.UTF_8));
+        return files;
     }
 
     /** Add a combat rule, the encounters file and its manifest entry; optionally rename the pack. */

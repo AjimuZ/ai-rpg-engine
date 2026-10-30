@@ -3,7 +3,7 @@ package org.rpgengine.combat;
 import java.util.Objects;
 
 /**
- * Closed vocabulary of the player's tactical intentions inside an encounter (P11.2 and P11.3, docs/11 sections 6-9).
+ * Closed vocabulary of the player's tactical intentions inside an encounter (P11.2 to P11.4, docs/11 sections 6-11).
  * Each value names only what the player decides: a destination zone, a recipient, a declared action, an attack and
  * its target. Costs, legality and every effect come from the frozen encounter through {@link TacticalRules} and
  * {@link CombatScheduler}; the commands layer decodes the wire payloads and hands these values over.
@@ -81,5 +81,34 @@ public sealed interface TacticalIntent {
      * @param target participant the item is used on, or null for the player's own use
      */
     record UseItem(String target) implements TacticalIntent {
+    }
+
+    /**
+     * Use one frozen ability (P11.4).
+     *
+     * @param ability frozen ability ID
+     * @param targets participants it is used on, distinct; empty for a self ability
+     */
+    record UseAbility(String ability, java.util.List<String> targets) implements TacticalIntent {
+        /** Require the ability; copy the targets. */
+        public UseAbility {
+            Objects.requireNonNull(ability, "ability");
+            targets = java.util.List.copyOf(targets);
+        }
+    }
+
+    /**
+     * Change one predeclared reaction policy (P11.4): a control command that costs nothing and can never answer a roll
+     * already seen, because it is accepted only before the first round or at the player's own decision.
+     *
+     * @param reaction reaction ID, {@code brace} included
+     * @param policy the new policy
+     */
+    record SetReactionPolicy(String reaction, CombatReaction.Policy policy) implements TacticalIntent {
+        /** Require both fields. */
+        public SetReactionPolicy {
+            Objects.requireNonNull(reaction, "reaction");
+            Objects.requireNonNull(policy, "policy");
+        }
     }
 }

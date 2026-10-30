@@ -261,7 +261,8 @@ class TacticalCommandsTest {
                 new TypedCommand.Strike("sword", "raider"), new TypedCommand.MoveZone("yard"),
                 new TypedCommand.MoveZone("yard"), new TypedCommand.Strike("sword", "player"),
                 new TypedCommand.Strike("sword", "ghost"), new TypedCommand.Strike("axe", "raider"),
-                new TypedCommand.Guard());
+                new TypedCommand.Guard(), new TypedCommand.SetReactionPolicy("brace", "off", 0),
+                new TypedCommand.SetReactionPolicy("brace", "first", 0), new TypedCommand.SetReactionPolicy("parry", "first", 0));
         var random = new java.util.Random(20261030L);
         var expired = new java.util.ArrayList<Integer>();
         var fight = new FightModel();
@@ -290,6 +291,8 @@ class TacticalCommandsTest {
             assertEquals(fight.speech, stored.speechUsed(), command.toString());
             assertEquals(fight.zone, stored.player().zone(), command.toString());
             assertEquals(fight.guarding, stored.player().guarding(), command.toString());
+            assertEquals(fight.raiderReaction ? 1 : 0, stored.participant("raider").reactions(), command.toString());
+            assertEquals(fight.braceOn ? "first" : "off", stored.player().policy("brace").mode().wire(), command.toString());
             assertEquals(fight.raiderHealth, number("raider", "health_current"), command.toString());
             assertEquals(fight.raiderHealth == 0 ? "DEFEATED" : "ACTIVE", participant("raider", "status"), command.toString());
             assertEquals(!fight.sealed, stored.space().stepCost("yard", "escape-route", stored.profile()) > 0, command.toString());
@@ -440,7 +443,8 @@ class TacticalCommandsTest {
      * sealed); the raider stays in the yard, within speaking range of every zone, and carries no attack. The player's
      * sword costs two points, needs the raider in its own zone and rolls {@code 2d10 + force 2 + rank 2} against Guard 12:
      * a hit deals {@code 1d6 + 2}, a margin of six adds {@code 1d4}, and armor 1 takes one off, out of 14 Health. The Guard
-     * action costs one point, once per activation.
+     * action costs one point, once per activation. The raider's default Brace adds 2 to its Guard against the first strike
+     * of each round, and only that one; changing the player's own policy costs nothing and moves nothing.
      */
     private static final class FightModel {
         int round = 1;
@@ -449,6 +453,8 @@ class TacticalCommandsTest {
         String zone = "entry";
         boolean sealed;
         boolean guarding;
+        boolean raiderReaction = true;
+        boolean braceOn = true;
         int raiderHealth = 14;
         int strikes;
         int draws;
@@ -492,6 +498,8 @@ class TacticalCommandsTest {
                 case TypedCommand.Interact interact -> OperationAdmissionFailure.Kind.INTERACTION_UNAVAILABLE;
                 case TypedCommand.RollInitiative roll -> OperationAdmissionFailure.Kind.TURN_UNAVAILABLE;
                 case TypedCommand.EndActivation end -> null;
+                case TypedCommand.SetReactionPolicy policy -> policy.reactionId().equals("brace") ? null
+                        : OperationAdmissionFailure.Kind.REACTION_UNAVAILABLE;
                 default -> throw new IllegalArgumentException(command.toString());
             };
         }
@@ -514,7 +522,10 @@ class TacticalCommandsTest {
                     points = 3;
                     speech = 0;
                     guarding = false;
+                    // The budget refreshes for a participant still standing when the round opens.
+                    raiderReaction = raiderHealth > 0 || raiderReaction;
                 }
+                case TypedCommand.SetReactionPolicy policy -> braceOn = policy.mode().equals("first");
                 case TypedCommand.Strike strike -> points -= 2;
                 case TypedCommand.Guard guard -> {
                     points--;
@@ -530,11 +541,13 @@ class TacticalCommandsTest {
             draws += recorded.size();
             int[] dice = recorded.stream().mapToInt(draw -> (Integer) ((Map<?, ?>) draw).get("value")).toArray();
             int total = dice[0] + dice[1] + 2 + 2;
-            if (total < 12) {
+            int defense = raiderReaction ? 14 : 12;
+            raiderReaction = false;
+            if (total < defense) {
                 assertEquals(2, dice.length, "a miss draws no damage");
                 return;
             }
-            boolean strong = total - 12 >= 6;
+            boolean strong = total - defense >= 6;
             assertEquals(strong ? 4 : 3, dice.length, "a hit draws its damage die and, when strong, the strong die");
             int raw = dice[2] + 2 + (strong ? dice[3] : 0);
             raiderHealth = Math.max(0, raiderHealth - Math.max(0, raw - 1));

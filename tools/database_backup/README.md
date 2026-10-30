@@ -200,3 +200,10 @@ V24 scope (P11.3) adds no table: `encounter_participant` gains `guarding`, with 
 holds a stance, and the `encounter_participant_vitals` trigger guards later updates (local Health within the frozen maximum,
 zero Health cannot stand, no return from defeat). A restore inserts rows, so only the check constraint applies to restored
 values. Offline checks cover the V24 manifest/catalog; no live V24 dump/restore rehearsal has been run.
+
+V25 scope (P11.4) adds no table: `encounter` gains `effects_applied`, and `encounter_participant` gains `effects`,
+`reaction_policies` and `ability_uses`, with checks on their shape, at most eight effects and none on a participant who does
+not stand. The `encounter_effects_applied` and `encounter_participant_timers` triggers guard later updates (a counter that never
+goes back, reactions and local Focus within their frozen limits, ability uses that never go back). A restore inserts rows, so
+only the check constraints apply to restored values. Offline checks cover the V25 manifest/catalog; no live V25 dump/restore
+rehearsal has been run.

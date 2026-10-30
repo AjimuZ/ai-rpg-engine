@@ -157,6 +157,10 @@ public final class OperationAdmissionFailure extends RuntimeException {
         /** The player has no such frozen attack, or no ammunition left for it (HTTP 422, P11.3). */
         ATTACK_UNAVAILABLE,
         /** The Guard action was already taken in this activation (HTTP 422, P11.3). */
-        GUARD_UNAVAILABLE
+        GUARD_UNAVAILABLE,
+        /** The player's frozen profile has no such reaction (HTTP 422, P11.4). */
+        REACTION_UNAVAILABLE,
+        /** An active effect prevents this action, its movement or its Focus cost (HTTP 422, P11.4). */
+        ACTION_PREVENTED
     }
 }

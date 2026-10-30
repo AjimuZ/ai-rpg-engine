@@ -339,6 +339,37 @@ public final class EventStatements {
                 yield it ? participant + " usa " + item + on + " (" + points(true, points) + ")" + restored + "."
                         : participant + " uses " + item + on + " for " + points(false, points) + restored + ".";
             }
+            case "REACTION_RESOLVED" -> {
+                // P11.4: which predeclared reaction fired; its Focus, budget and effect on a hidden defense stay unstated.
+                String participant = participant(payload, names);
+                String reaction = token(payload, "reactionId");
+                yield participant == null || reaction == null ? null
+                        : it ? participant + " reagisce con " + reaction + "." : participant + " reacts with " + reaction + ".";
+            }
+            case "REACTION_POLICY_SET" -> {
+                String participant = participant(payload, names);
+                String reaction = token(payload, "reactionId");
+                String mode = token(payload.path("policy"), "mode");
+                yield participant == null || reaction == null || mode == null ? null
+                        : it ? participant + " imposta la reazione " + reaction + " su " + mode + "."
+                        : participant + " sets the reaction " + reaction + " to " + mode + ".";
+            }
+            case "COMBAT_ABILITY_USED" -> {
+                String participant = participant(payload, names);
+                String ability = token(payload, "abilityId");
+                Long points = number(payload, "actionPoints");
+                yield participant == null || ability == null || points == null ? null
+                        : it ? participant + " usa " + ability + " (" + points(true, points) + ")."
+                        : participant + " uses " + ability + " for " + points(false, points) + ".";
+            }
+            case "STRIKE_LAPSED" -> {
+                String attacker = participant(payload, names);
+                String target = token(payload, "targetId");
+                yield attacker == null || target == null ? null
+                        : it ? "L'attacco di " + attacker + " contro " + target + " non ha effetto."
+                        : attacker + "'s attack on " + target + " comes to nothing.";
+            }
+            case "EFFECTS_RESOLVED" -> effects(payload.path("lines"), it);
             case "QUEST_OBJECTIVE_SATISFIED" -> {
                 String quest = token(payload, "questId");
                 String objective = token(payload, "objectiveId");
@@ -436,6 +467,66 @@ public final class EventStatements {
      *
      * @return the name, or null when the payload names an unknown actor or no participant
      */
+    /**
+     * State the lines of one {@code EFFECTS_RESOLVED} event in order (P11.4). Lines carry only public values: another
+     * participant's Health, defense and absorption stay in the internal record. An unknown kind or a missing field gives
+     * null, like every other statement, so the caller falls back to the receipt.
+     */
+    private static String effects(JsonNode lines, boolean it) {
+        if (!lines.isArray() || lines.isEmpty()) {
+            return null;
+        }
+        var parts = new ArrayList<String>();
+        for (JsonNode line : lines) {
+            String holder = token(line, "holderId");
+            String effect = token(line, "effectId");
+            String kind = token(line, "kind");
+            if (kind == null) {
+                return null;
+            }
+            String part = switch (kind) {
+                case "APPLIED" -> holder == null || effect == null || token(line, "outcome") == null ? null
+                        : it ? holder + " subisce " + effect + " (" + token(line, "outcome") + ")."
+                        : holder + " receives " + effect + " (" + token(line, "outcome") + ").";
+                case "ENDED" -> holder == null || effect == null ? null
+                        : it ? effect + " termina su " + holder + "." : effect + " ends on " + holder + ".";
+                case "TICK" -> {
+                    Long damage = number(line, "damage");
+                    Long healed = number(line, "healed");
+                    yield holder == null || effect == null || (damage == null) == (healed == null) ? null
+                            : damage != null ? (it ? holder + " perde " + damage + " Salute per " + effect + "."
+                                    : holder + " loses " + damage + " Health from " + effect + ".")
+                            : (it ? holder + " recupera " + healed + " Salute per " + effect + "."
+                                    : holder + " regains " + healed + " Health from " + effect + ".");
+                }
+                case "DAMAGE" -> {
+                    Long damage = number(line, "damage");
+                    yield holder == null || damage == null ? null
+                            : it ? holder + " perde " + damage + " Salute." : holder + " loses " + damage + " Health.";
+                }
+                case "HEAL" -> {
+                    Long healed = number(line, "healed");
+                    yield holder == null || healed == null ? null
+                            : it ? holder + " recupera " + healed + " Salute." : holder + " regains " + healed + " Health.";
+                }
+                case "REACTION_SKIPPED" -> {
+                    String reaction = token(line, "reactionId");
+                    yield holder == null || reaction == null ? null
+                            : it ? "La reazione " + reaction + " di " + holder + " non si attiva."
+                            : holder + "'s reaction " + reaction + " does not fire.";
+                }
+                case "BOUNDED" -> it ? "Altri effetti automatici restano senza esito in questo passaggio."
+                        : "Further automatic effects are skipped in this step.";
+                default -> null;
+            };
+            if (part == null) {
+                return null;
+            }
+            parts.add(part);
+        }
+        return String.join(" ", parts);
+    }
+
     private static String participant(JsonNode payload, Map<UUID, String> names) {
         if (payload.has("actorId")) {
             return name(payload, "actorId", names);

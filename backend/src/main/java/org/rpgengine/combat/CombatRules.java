@@ -17,8 +17,8 @@ import org.rpgengine.rules.ZoneGraph;
 
 /**
  * Prose-free combat projection of a pinned content closure (P11.1): each pack's resolved
- * {@link CombatProfile}, every {@link EncounterTemplate} and, since P11.3, every item's {@link EncounterGear}, keyed by
- * canonical ID. It is derived from a sealed,
+ * {@link CombatProfile}, every {@link EncounterTemplate}, since P11.3 every item's {@link EncounterGear} and since P11.4
+ * the combat forms of conditions and abilities, keyed by canonical ID. It is derived from a sealed,
  * recompiled {@link CampaignPackSnapshot}; the pack compiler has validated every field, so a failure here is a
  * broken guarantee and propagates as {@link IllegalArgumentException} (the caller treats the content as
  * unavailable rather than guessing a rule).
@@ -26,11 +26,21 @@ import org.rpgengine.rules.ZoneGraph;
  * @param profiles resolved combat profile of each pack that declares a {@code combat} rule, by pack ID
  * @param templates encounter templates by canonical ID (local ID in the root pack, {@code pack#id} otherwise)
  * @param gear combat data of equippable items that declare any, by canonical item ID
+ * @param effects combat forms of conditions that declare one, by canonical condition ID (P11.4)
+ * @param abilities active combat forms of abilities that declare one, by canonical ability ID (P11.4)
+ * @param reactions reaction forms of abilities that declare one, by canonical ability ID (P11.4)
  */
 public record CombatRules(Map<String, CombatProfile> profiles, Map<String, EncounterTemplate> templates,
-        Map<String, EncounterGear> gear) {
+        Map<String, EncounterGear> gear, Map<String, CombatEffect> effects, Map<String, CombatAbility> abilities,
+        Map<String, CombatReaction> reactions) {
     /** Content without combat rules or encounters. */
     public static final CombatRules NONE = new CombatRules(Map.of(), Map.of());
+
+    /** Rules without combat forms of conditions and abilities, the shape used before P11.4. */
+    public CombatRules(Map<String, CombatProfile> profiles, Map<String, EncounterTemplate> templates,
+            Map<String, EncounterGear> gear) {
+        this(profiles, templates, gear, Map.of(), Map.of(), Map.of());
+    }
 
     /** Rules without item combat data, the shape used before P11.3. */
     public CombatRules(Map<String, CombatProfile> profiles, Map<String, EncounterTemplate> templates) {
@@ -42,6 +52,9 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
         profiles = Map.copyOf(profiles);
         templates = Map.copyOf(templates);
         gear = Map.copyOf(gear);
+        effects = Map.copyOf(effects);
+        abilities = Map.copyOf(abilities);
+        reactions = Map.copyOf(reactions);
         for (EncounterTemplate template : templates.values()) {
             CombatProfile profile = profiles.get(template.pack());
             if (profile == null) {
@@ -63,6 +76,11 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
                 }
             }
         }
+    }
+
+    /** @return the combat forms the freeze step reads */
+    public FrozenEncounter.Library library() {
+        return new FrozenEncounter.Library(gear, effects, abilities, reactions);
     }
 
     /**
@@ -101,7 +119,87 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
                 }
             }
         }
-        return new CombatRules(profiles, templates, gear);
+        var effects = new HashMap<String, CombatEffect>();
+        var abilities = new HashMap<String, CombatAbility>();
+        var reactions = new HashMap<String, CombatReaction>();
+        for (CompiledPack pack : snapshot.packs().values()) {
+            String packId = pack.parsed().manifest().id();
+            for (Definition definition : pack.definitions()) {
+                String id = pack == snapshot.root() ? definition.id() : packId + "#" + definition.id();
+                if (definition.kind().equals("condition") && definition.data().get("combat") instanceof Map<?, ?> combat) {
+                    effects.put(id, effect(id, combat));
+                }
+                if (definition.kind().equals("ability") && definition.data().get("combat") instanceof Map<?, ?> combat) {
+                    if (combat.get("reaction") instanceof Map<?, ?> reaction) {
+                        reactions.put(id, reaction(snapshot, pack, id, reaction));
+                    } else {
+                        abilities.put(id, ability(snapshot, pack, id, combat));
+                    }
+                }
+            }
+        }
+        return new CombatRules(profiles, templates, gear, effects, abilities, reactions);
+    }
+
+    /** Project one validated condition {@code combat} object. */
+    private static CombatEffect effect(String id, Map<?, ?> combat) {
+        var duration = combat.get("duration") instanceof Map<?, ?> declared ? declared : Map.of();
+        var prevented = new TreeSet<CombatEffect.Prevents>();
+        strings(combat.get("prevents")).forEach(name ->
+                prevented.add(CombatEffect.Prevents.valueOf(name.toUpperCase(java.util.Locale.ROOT))));
+        var ticks = objects(combat.get("ticks")).stream().map(tick -> tick.get("heal") instanceof Number heal
+                ? new CombatEffect.Tick(CombatEffect.Phase.parse((String) tick.get("phase")), heal.intValue(), true)
+                : new CombatEffect.Tick(CombatEffect.Phase.parse((String) tick.get("phase")),
+                        number(tick.get("damage"), 0), false)).toList();
+        var stacking = CombatEffect.Stacking.valueOf(text(combat.get("stacking"), "strongest").toUpperCase(java.util.Locale.ROOT));
+        boolean several = stacking == CombatEffect.Stacking.INDEPENDENT || stacking == CombatEffect.Stacking.ADDITIVE;
+        return new CombatEffect(id, text(combat.get("stackingKey"), id), stacking, several ? number(combat.get("cap"), 3) : 1,
+                CombatEffect.Clock.parse(text(duration.get("clock"), "roundEnds")), number(duration.get("count"), 1),
+                "source".equals(duration.get("actor")), number(combat.get("priority"), 0), number(combat.get("guard"), 0),
+                number(combat.get("resistance"), 0), number(combat.get("attack"), 0), number(combat.get("absorption"), 0),
+                prevented, ticks, "end".equals(combat.get("sourceDefeated")));
+    }
+
+    /** Project one validated reaction object; the player's own form freezes under its ability's ID. */
+    private static CombatReaction reaction(CampaignPackSnapshot snapshot, CompiledPack pack, String id, Map<?, ?> reaction) {
+        var effect = (Map<?, ?>) reaction.get("effect");
+        var kind = CombatReaction.Kind.valueOf(((String) effect.get("type")).toUpperCase(java.util.Locale.ROOT));
+        String condition = effect.get("condition") instanceof String reference
+                ? snapshot.resolve(pack, reference, "condition").id() : null;
+        return new CombatReaction(id, CombatReaction.Trigger.parse((String) reaction.get("trigger")),
+                number(reaction.get("priority"), 0), number(reaction.get("focus"), 0),
+                "ally".equals(reaction.get("protects")),
+                CombatReaction.Attacks.valueOf(text(reaction.get("attacks"), "any").toUpperCase(java.util.Locale.ROOT)),
+                kind, number(effect.get("amount"), 0), (String) effect.get("attack"), condition,
+                "attacker".equals(effect.get("to")));
+    }
+
+    /** Project one validated active ability {@code combat} object. */
+    private static CombatAbility ability(CampaignPackSnapshot snapshot, CompiledPack pack, String id, Map<?, ?> combat) {
+        var operations = new ArrayList<CombatAbility.Operation>();
+        for (Map<?, ?> operation : objects(combat.get("operations"))) {
+            var kind = CombatAbility.Kind.valueOf(((String) operation.get("type")).toUpperCase(java.util.Locale.ROOT));
+            var dice = operation.get("dice") instanceof Map<?, ?> declared ? declared : Map.of();
+            String condition = operation.get("condition") instanceof String reference
+                    ? snapshot.resolve(pack, reference, "condition").id() : null;
+            operations.add(new CombatAbility.Operation(kind, number(dice.get("count"), 0), number(dice.get("sides"), 0),
+                    (String) operation.get("attribute"), number(operation.get("flat"), 0),
+                    number(operation.get("penetration"), 0), condition, "self".equals(operation.get("to"))));
+        }
+        return new CombatAbility(id, number(combat.get("cost"), 1),
+                CombatAbility.Limit.valueOf(text(combat.get("limit"), "none").toUpperCase(java.util.Locale.ROOT)),
+                number(combat.get("cooldownRounds"), 0), number(combat.get("focus"), 0),
+                CombatAbility.Targets.valueOf(text(combat.get("target"), "self").toUpperCase(java.util.Locale.ROOT)),
+                number(combat.get("maxTargets"), 1), number(combat.get("range"), 0), operations);
+    }
+
+    /** Project one validated policy object; an absent one is the default first eligible trigger. */
+    private static CombatReaction.Policy policy(Object declared) {
+        if (!(declared instanceof Map<?, ?> policy)) {
+            return CombatReaction.Policy.FIRST;
+        }
+        return new CombatReaction.Policy(CombatReaction.Policy.Mode.find((String) policy.get("mode")),
+                number(policy.get("value"), 0));
     }
 
     /** Project one validated item {@code combat} object; the attack's skill rank waits for its wearer. */
@@ -112,21 +210,25 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
             skill = weapon.get("skill") instanceof String reference ? snapshot.resolve(pack, reference, "skill").id() : null;
             String ammunition = weapon.get("ammunition") instanceof String reference
                     ? snapshot.resolve(pack, reference, "item").id() : null;
-            attack = attack(id, 0, ammunition, weapon);
+            attack = attack(snapshot, pack, id, 0, ammunition, weapon);
         }
         return new EncounterGear(number(combat.get("guard"), 0), number(combat.get("armor"), 0), skill, attack);
     }
 
     /** Project one validated attack object: a damage attribute of {@code none} adds nothing, an omitted one follows the attack. */
-    private static CombatAttack attack(String id, int skill, String ammunition, Map<?, ?> attack) {
+    private static CombatAttack attack(CampaignPackSnapshot snapshot, CompiledPack pack, String id, int skill,
+            String ammunition, Map<?, ?> attack) {
         var damage = (Map<?, ?>) attack.get("damage");
         String attribute = (String) attack.get("attribute");
         String contribution = text(damage.get("attribute"), attribute);
+        var onHit = objects(attack.get("onHit")).stream().map(effect -> new CombatAttack.OnHit(
+                snapshot.resolve(pack, (String) effect.get("condition"), "condition").id(),
+                CombatEffect.Phase.parse(text(effect.get("phase"), "postHit")), "self".equals(effect.get("to")))).toList();
         return new CombatAttack(id, attribute, skill, number(damage.get("count"), 1), number(damage.get("sides"), 0),
                 contribution.equals("none") ? null : contribution, number(damage.get("flat"), 0),
                 number(attack.get("penetration"), 0), number(attack.get("range"), 0),
                 CombatAttack.Defense.valueOf(text(attack.get("defense"), "guard").toUpperCase(java.util.Locale.ROOT)),
-                !Boolean.FALSE.equals(attack.get("strongHit")), ammunition);
+                !Boolean.FALSE.equals(attack.get("strongHit")), ammunition, onHit);
     }
 
     /**
@@ -179,6 +281,17 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
             }
             String npc = participant.get("npc") instanceof String reference
                     ? snapshot.resolve(pack, reference, "npc").id() : null;
+            // Reactions and their policies (P11.4): Brace is every participant's, first by default.
+            var declared = new ArrayList<CombatReaction>();
+            var policies = new TreeMap<String, CombatReaction.Policy>();
+            policies.put(CombatReaction.BRACE_ID, policy(participant.get("brace")));
+            for (Map<?, ?> reaction : objects(participant.get("reactions"))) {
+                String reactionId = (String) reaction.get("id");
+                declared.add(reaction(snapshot, pack, reactionId, reaction));
+                policies.put(reactionId, policy(reaction.get("policy")));
+            }
+            var conditions = strings(participant.get("conditions")).stream()
+                    .map(reference -> snapshot.resolve(pack, reference, "condition").id()).toList();
             participants.add(new EncounterTemplate.Participant((String) participant.get("id"),
                     EncounterTemplate.Side.valueOf(((String) participant.get("side")).toUpperCase(java.util.Locale.ROOT)),
                     (String) participant.get("zone"), npc,
@@ -187,8 +300,9 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
                     new EncounterTemplate.Stats(number(stats.get("health"), 0), number(stats.get("focus"), 0),
                             number(stats.get("guard"), 0), number(stats.get("resistance"), 0),
                             number(stats.get("armor"), 0), roles),
-                    objects(participant.get("attacks")).stream().map(attack -> attack((String) attack.get("id"),
-                            number(attack.get("skill"), 0), null, attack)).toList()));
+                    objects(participant.get("attacks")).stream().map(attack -> attack(snapshot, pack,
+                            (String) attack.get("id"), number(attack.get("skill"), 0), null, attack)).toList(),
+                    declared, policies, conditions));
         }
         var objectives = new ArrayList<EncounterObjective>();
         for (Map<?, ?> objective : objects(data.get("objectives"))) {

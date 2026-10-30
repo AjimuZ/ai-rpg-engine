@@ -1150,10 +1150,22 @@ fixture, whose sword, cloak, caster, salve and bandage and `yard-duel`, `close-b
 task), the extended long fight of `TacticalCommandsTest`, `CombatPackTest`, additions to `TypedCommandTest`,
 `EventStatementsTest` and `CampaignCommandHttpTest`, and the V24 step of `CanonicalMigrationUpgradeTest`.
 
-Limits: Brace, conditions' modifiers, absorption, abilities in a fight and multi-target items wait for P11.4; Ready, Assess
-and Withdraw for P11.4/P11.5; no terminal predicate runs, so a fight in which the player fell waits at a round end and a
+Limits at that task: Brace, conditions' modifiers, absorption and abilities in a fight arrived with P11.4, below; Withdraw waits for P11.5; no terminal predicate runs, so a fight in which the player fell waits at a round end and a
 won fight runs on until P11.5; the interim tactic pursues no objective (P12.3/P12.4); no frontend control or panel (P12);
 no live V24 dump and restore rehearsal.
+
+## Reactions, effects and abilities in a fight (P11.4)
+
+`org.rpgengine.combat` gains `CombatEffect` (a frozen effect definition), `CombatEffects` (pure stacking, order, modifiers and
+clocks), `CombatReaction` with its `Policy`, and `CombatAbility`. `CombatScheduler` runs reactions at depth one inside the
+provoking action, fires effect ticks at their phases and resolves abilities; `TacticalRules` adds prevention, ability legality and
+policy changes; `FrozenEncounter` freezes what the fight can reach. Commands `COMBAT_USE_ABILITY` and `SET_REACTION_POLICY` read
+only the frozen encounter. V25 stores the participant's `effects`, `reaction_policies` and `ability_uses` and the encounter's
+`effects_applied`. Pack data: a condition's or ability's `combat` block, a template participant's `brace`, `reactions` and
+`conditions`, an attack's `onHit` ([ADR 0031](../docs/adr/0031-predeclared-reactions-effect-phases-and-cooldowns.md)).
+
+Limits: items cannot apply or remove effects and stay single-target; no forced movement; other participants use no abilities until
+P12.3/P12.4; remaining effects are not converted at settlement yet (P11.5); no frontend control (P12).
 
 ## Interface reload contract (P05.6)
 

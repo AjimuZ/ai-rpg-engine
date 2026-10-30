@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased — Predeclared reactions, effect phases, durations and cooldowns (P11.4), 30 October 2026
+
+- Everyone in a fight now braces by default: against a visible attack, one reaction adds +2 Guard for that attack. It shares
+  its stacking key with the Guard action, so the two never add up, and a Brace that would not help is skipped and spends
+  nothing. The player can turn it off or make it depend on Health or Focus with `SET_REACTION_POLICY`, for free, before
+  the first round or on their own turn, never after seeing a roll. The worked fight of the documentation now plays exactly
+  as written.
+- Adventures can declare more reactions (a Guard bonus, absorption, a counter strike, applying an effect) on encounter
+  participants and learned abilities. A reaction never provokes another one, and a move provokes a blow only from someone who
+  declared that.
+- Conditions can now matter in a fight through a closed `combat` block: modifiers to Guard, Resistance and attacks, shields,
+  damage or healing at one of eight named phases, what they prevent, how they stack and how long they last. Attacks can apply
+  them on a hit, and conditions the player already has come along.
+- `COMBAT_USE_ABILITY` uses a learned ability that declares a combat form, with its action points, Focus, cooldown, targets
+  and operations. A free ability always has an explicit limit, and nothing can make one available again early.
+- New refusals `COMMAND_REACTION_UNAVAILABLE` and `COMMAND_ACTION_PREVENTED` have reviewed English and Italian wording (the
+  Italian still needs independent human review). Receipts list the player's abilities, reaction policies and reactions left,
+  and the effects each participant holds. Other participants' Health, armor and shields stay out of the public record.
+- PostgreSQL stores active effects, policies and ability uses (migration V25) and repeats their bounds. A fight already in
+  progress keeps its behaviour: nobody reacts until the player declares a policy. The backup tool covers schema version 25.
+- Not included yet: items that apply or remove effects, multi-target items, and forced movement; other participants using
+  abilities (P12); converting remaining effects when a fight ends (P11.5) and recovery from the checkpoint (P11.6); a frontend
+  control or panel (P12). Ready and Assess still have no combat form. Balance remains unproven. See
+  [ADR 0031](docs/adr/0031-predeclared-reactions-effect-phases-and-cooldowns.md).
+
 ## Unreleased — Attacks, defense, damage and healing with recorded draws (P11.3), 30 October 2026
 
 - Fights can now hurt. On the player's turn `STRIKE` makes one attack of a worn weapon against a participant within its

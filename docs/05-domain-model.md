@@ -358,7 +358,7 @@ docs/11 state machine (a trigger mirrors `EncounterPhase`), and a campaign has a
 `encounter_participant` holds the roster: the player at ordinal 0 backed by its actor (Health and Focus stay in
 `actor_resource`) and each template participant with encounter-local Health and Focus, a side, a zone and a
 status (`ACTIVE`, `DEFEATED`, `ESCAPED`, `SURRENDERED`). Initiative, activations, action points, reactions and
-effect timers are added by P11.2 to P11.4; the V16 checkpoint still records `"encounter": null` until P11.6.
+effect timers were added by P11.2 to P11.4; the V16 checkpoint still records `"encounter": null` until P11.6.
 
 Since P11.2 (V23, [ADR 0029](adr/0029-initiative-rounds-activations-and-bounded-combat-dialogue.md)) the
 encounter row also holds the tactical cursor: `actor_cursor` (initiative rank of the acting participant) and
@@ -373,6 +373,8 @@ Since P11.3 (V24, [ADR 0030](adr/0030-attacks-defense-damage-and-healing-with-re
 row also holds `guarding`, and `status` and `health_current` move with the fight: zero Health is `DEFEATED`, which
 never returns. The frozen profile holds armor, defenses and `attacks`. The player's Health stays in its
 `actor_resource` pool, read relative to the pool's minimum; ammunition stays ordinary item units.
+
+Since P11.4 (V25, [ADR 0031](adr/0031-predeclared-reactions-effect-phases-and-cooldowns.md)) a participant row also holds `effects` (its active instances: definition, source, application sequence, units left, stacks, absorption, the actor whose next activation ends it), `reaction_policies` and `ability_uses`, as canonical JSON, and the encounter row `effects_applied`, the application counter that orders simultaneous effects. The frozen definition holds the definitions those instances name. Every value stays bounded in storage, a stored use and the counter never go back, and only a standing participant can hold an effect.
 
 ### World clock, travel and rest (P10.4)
 

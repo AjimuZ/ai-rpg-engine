@@ -262,7 +262,7 @@ class TypedCommandTest {
     @Test
     void decodesTacticalIntentionsExactly() {
         for (String type : List.of("ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT", "STRIKE",
-                "GUARD", "COMBAT_USE_ITEM")) {
+                "GUARD", "COMBAT_USE_ITEM", "COMBAT_USE_ABILITY", "SET_REACTION_POLICY")) {
             assertTrue(TypedCommand.registered(type), type);
         }
         assertEquals(new TypedCommand.RollInitiative(), decode("ROLL_INITIATIVE", Map.of()));
@@ -313,6 +313,26 @@ class TypedCommandTest {
         assertInvalid("STRIKE", Map.of("attackId", "sword", "targetId", "x".repeat(129)));
         assertInvalid("STRIKE", Map.of("attackId", "sword", "targetId", "raider", "damage", 99));
         assertInvalid("GUARD", Map.of("bonus", 2));
+        assertEquals(new TypedCommand.CombatUseAbility("steady", List.of()),
+                decode("COMBAT_USE_ABILITY", Map.of("abilityId", "steady", "targetIds", List.of())));
+        assertEquals(new TypedCommand.CombatUseAbility("volley", List.of("a", "b")),
+                decode("COMBAT_USE_ABILITY", Map.of("abilityId", "volley", "targetIds", List.of("a", "b"))));
+        assertInvalid("COMBAT_USE_ABILITY", Map.of("abilityId", "steady"));
+        assertInvalid("COMBAT_USE_ABILITY", Map.of("abilityId", "steady", "targetIds", "a"));
+        assertInvalid("COMBAT_USE_ABILITY", Map.of("abilityId", "steady", "targetIds", List.of("a", "a")));
+        assertInvalid("COMBAT_USE_ABILITY", Map.of("abilityId", "steady", "targetIds", List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")));
+        assertInvalid("COMBAT_USE_ABILITY", Map.of("abilityId", "steady", "targetIds", List.of(), "cost", 0));
+        assertEquals(new TypedCommand.SetReactionPolicy("brace", "off", 0),
+                decode("SET_REACTION_POLICY", Map.of("reactionId", "brace", "mode", "off")));
+        assertEquals(new TypedCommand.SetReactionPolicy("brace", "healthAtMost", 50),
+                decode("SET_REACTION_POLICY", Map.of("reactionId", "brace", "mode", "healthAtMost", "value", 50)));
+        assertEquals(Map.of("reactionId", "brace", "mode", "focusAtLeast", "value", 2),
+                new TypedCommand.SetReactionPolicy("brace", "focusAtLeast", 2).payload());
+        assertInvalid("SET_REACTION_POLICY", Map.of("reactionId", "brace", "mode", "always"));
+        assertInvalid("SET_REACTION_POLICY", Map.of("reactionId", "brace", "mode", "healthAtMost"));
+        assertInvalid("SET_REACTION_POLICY", Map.of("reactionId", "brace", "mode", "healthAtMost", "value", 101));
+        assertInvalid("SET_REACTION_POLICY", Map.of("reactionId", "brace", "mode", "off", "value", 1));
+        assertInvalid("SET_REACTION_POLICY", Map.of("reactionId", "brace"));
         assertInvalid("COMBAT_USE_ITEM", Map.of());
         assertInvalid("COMBAT_USE_ITEM", Map.of("itemInstanceId", "not-a-uuid"));
         assertInvalid("COMBAT_USE_ITEM", Map.of("itemInstanceId", instance.toString(), "targetId", ""));

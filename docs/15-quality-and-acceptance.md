@@ -1649,6 +1649,13 @@ Health, and fifty seeded fights (seed 20261030) replaying identically with every
 held at each step. Brace stacking and reaction refresh spending wait for P11.4, terminal
 outcomes for P11.5, and observed balance for P18.3: these numbers remain provisional.
 
+P11.4 (30 October 2026) adds the Guard/Brace stacking of QA-11 and the effect clocks of QA-12, still not a full
+QA-09/QA-11–13 result, on `CombatEffectsTest`, `CombatReactionsTest` and `ReactionCommandsTest`: Brace meeting one attack per
+round under one stacking key, the situational cap and Resistance, every stacking mode, each of the eight phases firing once
+for its trigger with distinct trigger keys, each clock counting only its unit, a poisoned participant who falls at its
+activation start receiving no points, reactions that never chain, and sixty seeded fights keeping every bound. Effects through
+renewal and restore wait for P11.6, terminal outcomes for P11.5, and observed balance for P18.3.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

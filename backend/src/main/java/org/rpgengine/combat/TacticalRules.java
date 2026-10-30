@@ -1,6 +1,7 @@
 package org.rpgengine.combat;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -37,6 +38,12 @@ import org.rpgengine.rules.ZoneGraph;
  *       participant's next activation, so a stance still held means this activation already took it.</li>
  *   <li><b>Item use</b> (P11.3) — {@code useItemCost}, on the player or on a standing ally in the player's zone. The
  *       pinned use contract is checked by the commands layer, which has the catalog.</li>
+ *   <li><b>Abilities</b> (P11.4) — a frozen ability that its limit and cooldown allow, paid in action points and Focus,
+ *       on targets of the side it names within its range.</li>
+ *   <li><b>Prevention</b> (P11.4) — an active effect can prevent actions (everything that costs points), movement or
+ *       spending Focus. Speech and the end of the activation stay available, so a prevented player is never stuck.</li>
+ *   <li><b>Reaction policy</b> (P11.4) — a reaction of the player's frozen profile, set before the first round or at the
+ *       player's own decision, at no cost. It never answers a roll already seen.</li>
  * </ul>
  */
 public final class TacticalRules {
@@ -61,7 +68,15 @@ public final class TacticalRules {
         /** The attacker has no such frozen attack, or no ammunition for it. */
         ATTACK,
         /** The Guard action was already taken in this activation. */
-        GUARD
+        GUARD,
+        /** The player has no such frozen ability, or it waits for its limit or cooldown. */
+        ABILITY,
+        /** The ability costs more Focus than the player holds. */
+        RESOURCE,
+        /** The reaction is unknown to the player's frozen profile. */
+        REACTION,
+        /** An active effect prevents this intention. */
+        PREVENTED
     }
 
     /** Why one attack cannot reach one target right now; public, because every participant is observable. */
@@ -89,12 +104,25 @@ public final class TacticalRules {
         if (intent instanceof TacticalIntent.RollInitiative) {
             return state.phase() == EncounterPhase.ENTERING ? null : Refusal.TURN;
         }
+        if (intent instanceof TacticalIntent.SetReactionPolicy policy) {
+            // Before any roll, or at the player's own decision: never during another participant's action.
+            if (state.phase() != EncounterPhase.ENTERING && !state.playerDecision()) {
+                return Refusal.TURN;
+            }
+            return state.player().sheet().reaction(policy.reaction()) == null ? Refusal.REACTION : null;
+        }
         if (!state.playerDecision()) {
             return Refusal.TURN;
         }
         var player = state.player();
+        if (costsPoints(intent) && state.prevented(player, CombatEffect.Prevents.ACTIONS)
+                || intent instanceof TacticalIntent.MoveZone && state.prevented(player, CombatEffect.Prevents.MOVEMENT)) {
+            return Refusal.PREVENTED;
+        }
         return switch (intent) {
             case TacticalIntent.RollInitiative roll -> throw new IllegalStateException("handled above");
+            case TacticalIntent.SetReactionPolicy policy -> throw new IllegalStateException("handled above");
+            case TacticalIntent.UseAbility use -> ability(state, player, use);
             case TacticalIntent.EndActivation end -> null;
             case TacticalIntent.MoveZone move -> {
                 int cost = moveCost(state, move.zone());
@@ -157,6 +185,58 @@ public final class TacticalRules {
         };
     }
 
+    /** @return whether the intention is an action paid in points, which a prevented participant cannot take */
+    private static boolean costsPoints(TacticalIntent intent) {
+        return !(intent instanceof TacticalIntent.EndActivation || intent instanceof TacticalIntent.Speech);
+    }
+
+    /**
+     * Legality of an ability: a frozen ability, not waiting for its limit or cooldown, its Focus spendable and held, its
+     * targets admissible and its points available, in that order.
+     */
+    private static Refusal ability(EncounterState state, EncounterState.Combatant player, TacticalIntent.UseAbility use) {
+        var ability = player.sheet().ability(use.ability());
+        if (ability == null || ability.waiting(player.uses().get(ability.id()), state.round()) != null) {
+            return Refusal.ABILITY;
+        }
+        if (ability.focus() > 0 && state.prevented(player, CombatEffect.Prevents.RESOURCES)) {
+            return Refusal.PREVENTED;
+        }
+        if (ability.focus() > player.focus()) {
+            return Refusal.RESOURCE;
+        }
+        boolean self = ability.targets() == CombatAbility.Targets.SELF;
+        if (self != use.targets().isEmpty() || use.targets().size() > ability.maxTargets()
+                || new HashSet<>(use.targets()).size() != use.targets().size()) {
+            return Refusal.TARGET;
+        }
+        for (String id : use.targets()) {
+            var target = state.participant(id);
+            if (target == null || !canTarget(state.space(), player, ability, target)) {
+                return Refusal.TARGET;
+            }
+        }
+        return ability.cost() > state.actionPoints() ? Refusal.ACTION_POINTS : null;
+    }
+
+    /**
+     * Whether an ability can take one target now: the side it names, standing, within its range, and not hidden or behind
+     * full cover from another zone, the same space rules as an attack.
+     *
+     * @param space the current zone graph
+     * @param user the participant using it
+     * @param ability the ability
+     * @param target the participant considered
+     * @return whether it is an admissible target
+     */
+    public static boolean canTarget(ZoneGraph space, EncounterState.Combatant user, CombatAbility ability,
+            EncounterState.Combatant target) {
+        boolean side = ability.targets() == CombatAbility.Targets.ALLY ? !user.opposes(target)
+                : ability.targets() == CombatAbility.Targets.HOSTILE && user.opposes(target);
+        return side && target.status() == EncounterState.Status.ACTIVE
+                && reachBlock(space, user, target, ability.range()) == null;
+    }
+
     /**
      * Whether one attack can reach one target now, ignoring its cost.
      *
@@ -176,7 +256,13 @@ public final class TacticalRules {
         if (target.status() != EncounterState.Status.ACTIVE) {
             return AttackBlock.NOT_STANDING;
         }
-        if (space.distance(attacker.zone(), target.zone()) > attack.range()) {
+        return reachBlock(space, attacker, target, attack.range());
+    }
+
+    /** Range, then line of sight, then cover; the latter two only across zones, because nothing stands inside one. */
+    private static AttackBlock reachBlock(ZoneGraph space, EncounterState.Combatant attacker,
+            EncounterState.Combatant target, int range) {
+        if (space.distance(attacker.zone(), target.zone()) > range) {
             return AttackBlock.OUT_OF_RANGE;
         }
         if (!attacker.zone().equals(target.zone())) {
@@ -198,17 +284,36 @@ public final class TacticalRules {
      * @param attacker the participant attacking
      * @param attack the attack, already legal against the target
      * @param target the participant attacked
-     * @return Resistance as frozen for a resistance attack, otherwise Guard with the stance and any partial cover of the
-     *         target's zone against an attack from outside it, under the situational cap. Brace joins the stance in P11.4.
+     * @return Resistance with its active modifiers for a resistance attack, otherwise Guard with the stance, any partial
+     *         cover of the target's zone against an attack from outside it and active Guard modifiers, under the situational cap
      */
     public static int defense(EncounterState state, EncounterState.Combatant attacker, CombatAttack attack,
             EncounterState.Combatant target) {
-        if (attack.defense() == CombatAttack.Defense.RESISTANCE) {
-            return target.sheet().resistance();
-        }
+        return defense(state, attacker, attack, target, 0);
+    }
+
+    /**
+     * Effective defense of a target against one attack with a Guard bonus from a reaction.
+     *
+     * @param state the encounter
+     * @param attacker the participant attacking
+     * @param attack the attack, already legal against the target
+     * @param target the participant attacked
+     * @param reactionBonus the highest Guard bonus a reaction gave against this attack, zero without one
+     * @return the defense; the Guard action and the reaction share one stacking key, so the higher applies and never the
+     *         sum, and a resistance attack reads neither
+     */
+    public static int defense(EncounterState state, EncounterState.Combatant attacker, CombatAttack attack,
+            EncounterState.Combatant target, int reactionBonus) {
         var profile = state.profile();
-        return CombatMath.guard(target.sheet().guard(), target.guarding() ? profile.value("guardBonus") : 0,
-                coverBonus(state, attacker, target), profile.value("situationalGuardCap"));
+        int cap = profile.value("situationalGuardCap");
+        if (attack.defense() == CombatAttack.Defense.RESISTANCE) {
+            return CombatMath.resistance(target.sheet().resistance(),
+                    CombatEffects.resistance(target.effects(), state.effects()), cap);
+        }
+        int stance = Math.max(target.guarding() ? profile.value("guardBonus") : 0, reactionBonus);
+        return CombatMath.guard(target.sheet().guard(), stance, coverBonus(state, attacker, target),
+                CombatEffects.guard(target.effects(), state.effects()), cap);
     }
 
     /** Partial cover counts only against an attack from another zone; full cover already refused the attack. */
@@ -354,6 +459,30 @@ public final class TacticalRules {
         var items = new LinkedHashMap<String, Object>();
         items.put("cost", state.profile().value("useItemCost"));
         items.put("available", refusal(state, new TacticalIntent.UseItem(null)) == null);
+        var abilities = new ArrayList<Object>();
+        for (CombatAbility ability : player.sheet().abilities()) {
+            var targets = new ArrayList<Object>();
+            for (var participant : state.participants()) {
+                if (canTarget(space, player, ability, participant)) {
+                    targets.add(participant.id());
+                }
+            }
+            var line = new LinkedHashMap<String, Object>();
+            line.put("abilityId", ability.id());
+            line.put("cost", ability.cost());
+            line.put("focus", ability.focus());
+            line.put("targets", targets);
+            line.put("maxTargets", ability.maxTargets());
+            line.put("disabled", abilityDisabled(state, player, ability, targets.isEmpty()));
+            abilities.add(line);
+        }
+        var reactions = new ArrayList<Object>();
+        for (CombatReaction reaction : player.sheet().allReactions()) {
+            var line = new LinkedHashMap<String, Object>();
+            line.put("reactionId", reaction.id());
+            line.put("policy", player.policy(reaction.id()).canonicalForm());
+            reactions.add(line);
+        }
         var options = new LinkedHashMap<String, Object>();
         options.put("moves", moves);
         options.put("speech", speech);
@@ -361,7 +490,30 @@ public final class TacticalRules {
         options.put("strikes", strikes);
         options.put("guard", guard);
         options.put("useItem", items);
+        options.put("abilities", abilities);
+        options.put("reactions", reactions);
+        options.put("reactionsLeft", player.reactions());
         options.put("endActivation", true);
         return options;
+    }
+
+    /** The first stable public reason an ability cannot be used now, or null when it can. */
+    private static String abilityDisabled(EncounterState state, EncounterState.Combatant player, CombatAbility ability,
+            boolean noTargets) {
+        String waiting = ability.waiting(player.uses().get(ability.id()), state.round());
+        if (waiting != null) {
+            return waiting;
+        }
+        if (state.prevented(player, CombatEffect.Prevents.ACTIONS)
+                || ability.focus() > 0 && state.prevented(player, CombatEffect.Prevents.RESOURCES)) {
+            return "PREVENTED";
+        }
+        if (ability.focus() > player.focus()) {
+            return "FOCUS";
+        }
+        if (ability.targets() != CombatAbility.Targets.SELF && noTargets) {
+            return "NO_TARGET_IN_REACH";
+        }
+        return ability.cost() > state.actionPoints() ? "ACTION_POINTS" : null;
     }
 }

@@ -20,7 +20,7 @@ If the client loses the response and resends `example-heal-1` with the same payl
 
 ## 3. A complete two-round fight
 
-Since P11.3 ([ADR 0030](adr/0030-attacks-defense-damage-and-healing-with-recorded-draws.md)) `CombatStrikeTest` plays this fight from these recorded dice, except for Brace, which arrives with P11.4: without it the opponent's 13 meets the player's Guard 12 and hits. Settlement and advancement remain P11.5 and P13.
+Since P11.4 ([ADR 0031](adr/0031-predeclared-reactions-effect-phases-and-cooldowns.md)) `CombatStrikeTest` plays this fight from these recorded dice exactly as written, Brace included. Settlement and advancement remain P11.5 and P13.
 
 ### Starting state
 

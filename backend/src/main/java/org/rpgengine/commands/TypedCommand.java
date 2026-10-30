@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.rpgengine.combat.CombatReaction;
 import org.rpgengine.combat.TacticalIntent;
 import org.rpgengine.content.PackTextParser;
 
@@ -20,8 +21,8 @@ import org.rpgengine.content.PackTextParser;
  * rule data, never part of the intention. Since P11.1 the player can enter an authored encounter, optionally
  * declaring the attack that opens it. Since P11.2 the {@link Tactical} intentions are registered for encounter mode:
  * roll initiative, move to an adjacent zone, end the activation, one bounded speech-only utterance and a declared
- * social or scene action; since P11.3 also strike, the Guard action and using an item; reactions acquire their contract
- * with P11.4. Unknown types fail closed.
+ * social or scene action; since P11.3 also strike, the Guard action and using an item; since P11.4 also using a frozen
+ * ability and changing a predeclared reaction policy. Unknown types fail closed.
  * Structural decoding here
  * is followed by current-state rule validation in {@link CommandRules}; resolution
  * remains backend-owned (P07.4). Every value is immutable and can reproduce its exact
@@ -33,7 +34,7 @@ public sealed interface TypedCommand
         TypedCommand.TradeItems, TypedCommand.AcceptQuest, TypedCommand.SuspendQuest, TypedCommand.ResumeQuest,
         TypedCommand.Rest, TypedCommand.Engage, TypedCommand.RollInitiative, TypedCommand.MoveZone,
         TypedCommand.EndActivation, TypedCommand.CombatSpeak, TypedCommand.Interact, TypedCommand.Strike,
-        TypedCommand.Guard, TypedCommand.CombatUseItem {
+        TypedCommand.Guard, TypedCommand.CombatUseItem, TypedCommand.CombatUseAbility, TypedCommand.SetReactionPolicy {
     /** @return registered, case-sensitive wire identifier */
     String type();
 
@@ -185,6 +186,25 @@ public sealed interface TypedCommand
                     fields(payload, "itemInstanceId");
                     yield new CombatUseItem(CampaignCommandJson.uuid(payload.get("itemInstanceId")), null);
                 }
+                case "COMBAT_USE_ABILITY" -> {
+                    fields(payload, "abilityId", "targetIds");
+                    if (!(payload.get("targetIds") instanceof List<?> targets)
+                            || targets.size() > CombatUseAbility.MAX_TARGETS) {
+                        throw invalid();
+                    }
+                    yield new CombatUseAbility(text(payload.get("abilityId"), 256),
+                            targets.stream().map(target -> text(target, 128)).toList());
+                }
+                case "SET_REACTION_POLICY" -> {
+                    // The value is optional: only a predicate has one.
+                    if (payload.containsKey("value")) {
+                        fields(payload, "reactionId", "mode", "value");
+                        yield new SetReactionPolicy(text(payload.get("reactionId"), 256), text(payload.get("mode"), 32),
+                                quantity(payload.get("value")));
+                    }
+                    fields(payload, "reactionId", "mode");
+                    yield new SetReactionPolicy(text(payload.get("reactionId"), 256), text(payload.get("mode"), 32), 0);
+                }
                 default -> throw invalid();
             };
         } catch (IllegalArgumentException | ArithmeticException failure) {
@@ -198,7 +218,7 @@ public sealed interface TypedCommand
         return Set.of("MOVE", "WAIT", "SPEAK", "USE_ABILITY", "USE_ITEM", "EQUIP_ITEM", "UNEQUIP_ITEM",
                 "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST", "ENGAGE",
                 "ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT", "STRIKE", "GUARD",
-                "COMBAT_USE_ITEM").contains(type);
+                "COMBAT_USE_ITEM", "COMBAT_USE_ABILITY", "SET_REACTION_POLICY").contains(type);
     }
 
     /**
@@ -206,7 +226,7 @@ public sealed interface TypedCommand
      * checks, and resolved by the combat scheduler from the frozen encounter rather than from pinned definitions.
      */
     sealed interface Tactical permits RollInitiative, MoveZone, EndActivation, CombatSpeak, Interact, Strike, Guard,
-            CombatUseItem {
+            CombatUseItem, CombatUseAbility, SetReactionPolicy {
         /** @return the combat-layer value of this intention */
         TacticalIntent intent();
     }
@@ -678,5 +698,68 @@ public sealed interface TypedCommand
         }
         /** @return the combat-layer intention */
         public TacticalIntent intent() { return new TacticalIntent.UseItem(targetId); }
+    }
+
+    /**
+     * Use one frozen ability during the player's activation (P11.4). Costs, cooldown, targets and operations are the
+     * frozen rule data of the encounter; this intention names only the ability and its targets.
+     *
+     * @param abilityId canonical ability ID
+     * @param targetIds participants it is used on, distinct; empty for a self ability
+     */
+    record CombatUseAbility(String abilityId, List<String> targetIds) implements TypedCommand, Tactical {
+        /** Most targets an intention can name: the whole roster. */
+        static final int MAX_TARGETS = 9;
+
+        /** Require a bounded ability identity and distinct, bounded targets. */
+        public CombatUseAbility {
+            abilityId = text(abilityId, 256);
+            targetIds = targetIds.stream().map(target -> text(target, 128)).toList();
+            if (targetIds.size() > MAX_TARGETS || new java.util.HashSet<>(targetIds).size() != targetIds.size()) {
+                throw new IllegalArgumentException("targets are bounded and distinct");
+            }
+        }
+        /** @return the fixed combat ability identifier */
+        public String type() { return "COMBAT_USE_ABILITY"; }
+        /** @return the ability and its targets */
+        public Map<String, Object> payload() { return Map.of("abilityId", abilityId, "targetIds", targetIds); }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.UseAbility(abilityId, targetIds); }
+    }
+
+    /**
+     * Change one predeclared reaction policy (P11.4): a control command, free of cost, accepted before the first round and
+     * at the player's own decision. A mode and value that do not fit together are an invalid command, like any malformed
+     * field, because no rule state could make them meaningful.
+     *
+     * @param reactionId reaction ID, {@code brace} included
+     * @param mode {@code off}, {@code first}, {@code healthAtMost} or {@code focusAtLeast}
+     * @param value percent or points of a predicate; 0 otherwise
+     */
+    record SetReactionPolicy(String reactionId, String mode, int value) implements TypedCommand, Tactical {
+        /** Require a bounded identity and a policy that fits its mode. */
+        public SetReactionPolicy {
+            reactionId = text(reactionId, 256);
+            mode = text(mode, 32);
+            policy(mode, value);
+        }
+        /** @return the fixed policy identifier */
+        public String type() { return "SET_REACTION_POLICY"; }
+        /** @return the reaction, the mode and, only for a predicate, its value */
+        public Map<String, Object> payload() {
+            return value == 0 ? Map.of("reactionId", reactionId, "mode", mode)
+                    : Map.of("reactionId", reactionId, "mode", mode, "value", value);
+        }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.SetReactionPolicy(reactionId, policy(mode, value)); }
+
+        /** The policy of a mode and value. @throws IllegalArgumentException when they do not fit, which decodes as invalid */
+        private static CombatReaction.Policy policy(String mode, int value) {
+            var known = CombatReaction.Policy.Mode.find(mode);
+            if (known == null) {
+                throw new IllegalArgumentException("unknown reaction policy mode");
+            }
+            return new CombatReaction.Policy(known, value);
+        }
     }
 }

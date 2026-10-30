@@ -195,6 +195,33 @@ class EventStatementsTest {
         String ally = "{\"actorId\":\"" + PLAYER + "\",\"definitionId\":\"bandage\",\"actionPoints\":2,\"targetId\":\"porter\",\"healed\":4}";
         assertEquals("Mira uses bandage on porter for 2 action points: 4 Health restored.", state(SupportedLocale.EN, "COMBAT_ITEM_USED", ally));
         assertEquals("Mira usa bandage su porter (2 punti azione): recupera 4 Salute.", state(SupportedLocale.IT, "COMBAT_ITEM_USED", ally));
+        String braced = "{\"participantId\":\"raider\",\"reactionId\":\"brace\"}";
+        assertEquals("raider reacts with brace.", state(SupportedLocale.EN, "REACTION_RESOLVED", braced));
+        assertEquals("raider reagisce con brace.", state(SupportedLocale.IT, "REACTION_RESOLVED", braced));
+        String policy = "{\"actorId\":\"" + PLAYER + "\",\"reactionId\":\"brace\",\"policy\":{\"mode\":\"off\",\"value\":0}}";
+        assertEquals("Mira sets the reaction brace to off.", state(SupportedLocale.EN, "REACTION_POLICY_SET", policy));
+        assertEquals("Mira imposta la reazione brace su off.", state(SupportedLocale.IT, "REACTION_POLICY_SET", policy));
+        String used = "{\"actorId\":\"" + PLAYER + "\",\"abilityId\":\"steady\",\"actionPoints\":1}";
+        assertEquals("Mira uses steady for 1 action point.", state(SupportedLocale.EN, "COMBAT_ABILITY_USED", used));
+        assertEquals("Mira usa steady (1 punto azione).", state(SupportedLocale.IT, "COMBAT_ABILITY_USED", used));
+        String lapsed = "{\"participantId\":\"raider\",\"targetId\":\"porter\"}";
+        assertEquals("raider's attack on porter comes to nothing.", state(SupportedLocale.EN, "STRIKE_LAPSED", lapsed));
+        assertEquals("L'attacco di raider contro porter non ha effetto.", state(SupportedLocale.IT, "STRIKE_LAPSED", lapsed));
+        String lines = "{\"lines\":[{\"kind\":\"APPLIED\",\"holderId\":\"raider\",\"effectId\":\"poisoned\",\"outcome\":\"STACKED\"},"
+                + "{\"kind\":\"TICK\",\"holderId\":\"raider\",\"effectId\":\"poisoned\",\"damage\":2},"
+                + "{\"kind\":\"TICK\",\"holderId\":\"porter\",\"effectId\":\"mended\",\"healed\":1},"
+                + "{\"kind\":\"ENDED\",\"holderId\":\"raider\",\"effectId\":\"poisoned\"},"
+                + "{\"kind\":\"DAMAGE\",\"holderId\":\"raider\",\"damage\":3},{\"kind\":\"HEAL\",\"holderId\":\"porter\",\"healed\":4},"
+                + "{\"kind\":\"REACTION_SKIPPED\",\"holderId\":\"porter\",\"reactionId\":\"brace\"},{\"kind\":\"BOUNDED\"}]}";
+        assertEquals("raider receives poisoned (STACKED). raider loses 2 Health from poisoned. porter regains 1 Health from mended. "
+                + "poisoned ends on raider. raider loses 3 Health. porter regains 4 Health. porter's reaction brace does not fire. "
+                + "Further automatic effects are skipped in this step.", state(SupportedLocale.EN, "EFFECTS_RESOLVED", lines));
+        assertEquals("raider subisce poisoned (STACKED). raider perde 2 Salute per poisoned. porter recupera 1 Salute per mended. "
+                + "poisoned termina su raider. raider perde 3 Salute. porter recupera 4 Salute. La reazione brace di porter non si attiva. "
+                + "Altri effetti automatici restano senza esito in questo passaggio.", state(SupportedLocale.IT, "EFFECTS_RESOLVED", lines));
+        assertEquals(null, state(SupportedLocale.EN, "EFFECTS_RESOLVED", "{\"lines\":[]}"));
+        assertEquals(null, state(SupportedLocale.EN, "EFFECTS_RESOLVED", "{\"lines\":[{\"kind\":\"SECRET\"}]}"));
+        assertEquals(null, state(SupportedLocale.EN, "EFFECTS_RESOLVED", "{\"lines\":[{\"kind\":\"TICK\",\"holderId\":\"a\",\"effectId\":\"b\"}]}"));
         String kept = "{\"resourceKey\":\"vigor\",\"outcomes\":[{\"actorId\":\"" + PLAYER + "\",\"outcome\":\"NOT_REVIVED\",\"before\":0,\"after\":0}]}";
         assertEquals("Effect: Mira stays defeated (vigor 0).", state(SupportedLocale.EN, "EFFECT_RESOLVED", kept));
         assertEquals("Effetto: Mira resta fuori combattimento (vigor 0).", state(SupportedLocale.IT, "EFFECT_RESOLVED", kept));

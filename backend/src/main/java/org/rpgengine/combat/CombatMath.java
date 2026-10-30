@@ -85,6 +85,32 @@ public final class CombatMath {
     }
 
     /**
+     * Effective Guard with declared effects (P11.4).
+     *
+     * @param base frozen Guard, equipment included
+     * @param stance the stance bonus: the higher of Guard action and Brace, never both
+     * @param cover cover bonus that applies to this attack
+     * @param modifiers sum of active Guard modifiers, possibly negative
+     * @param cap the profile's {@code situationalGuardCap}, which bounds the situational part in both directions
+     * @return base plus the capped situational part, at least zero
+     */
+    public static int guard(int base, int stance, int cover, int modifiers, int cap) {
+        return Math.max(0, base + Math.max(-cap, Math.min(cap, stance + cover + modifiers)));
+    }
+
+    /**
+     * Effective Resistance with declared effects (P11.4). Neither stance nor cover applies.
+     *
+     * @param base frozen Resistance
+     * @param modifiers sum of active Resistance modifiers, possibly negative
+     * @param cap the profile's {@code situationalGuardCap}, which bounds them in both directions
+     * @return base plus the capped modifiers, at least zero
+     */
+    public static int resistance(int base, int modifiers, int cap) {
+        return Math.max(0, base + Math.max(-cap, Math.min(cap, modifiers)));
+    }
+
+    /**
      * Apply one damaging hit.
      *
      * @param dice sum of the attack's recorded damage dice

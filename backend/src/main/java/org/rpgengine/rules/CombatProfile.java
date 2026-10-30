@@ -76,6 +76,34 @@ public record CombatProfile(String pack, Map<String, String> roles, String healt
     public static final int ATTACK_SKILL_MAX = 10;
     /** Most attacks a template participant may declare. */
     public static final int ATTACKS_MAX = 4;
+    /** Most non-player participants of one encounter. */
+    public static final int PARTICIPANTS_MAX = 8;
+    /** Most effects one attack can apply (P11.4, kernel). */
+    public static final int ON_HIT_MAX = 2;
+    /**
+     * Bounds of one combat effect (P11.4, kernel): its modifiers, absorption and tick amounts, its ticks, its stacking cap,
+     * the count of its declared duration and its priority. With {@link #EFFECTS_ACTIVE_MAX} they bound a round's automatic
+     * work and every total a fight can reach, before the situational caps apply.
+     */
+    public static final int EFFECT_MODIFIER_MAX = 4;
+    public static final int EFFECT_AMOUNT_MAX = 99;
+    public static final int EFFECT_TICKS_MAX = 2;
+    public static final int EFFECT_CAP_MAX = 8;
+    public static final int EFFECT_COUNT_MAX = 10_000;
+    public static final int PRIORITY_MAX = 10;
+    /** Most active effects of one participant. */
+    public static final int EFFECTS_ACTIVE_MAX = 8;
+    /** Most reactions a participant may declare beside the default Brace. */
+    public static final int REACTIONS_MAX = 4;
+    /** Largest Focus cost of an ability or a reaction. */
+    public static final int FOCUS_COST_MAX = 99;
+    /**
+     * Bounds of one combat ability (P11.4, kernel): its operations, its dice (each one durable draw, which keeps its
+     * operation inside the draw budget) and its cooldown; a longer one is a once-per-encounter limit.
+     */
+    public static final int ABILITY_OPERATIONS_MAX = 4;
+    public static final int ABILITY_DICE_MAX = 16;
+    public static final int ABILITY_COOLDOWN_MAX = 30;
 
     /**
      * Inclusive bound and documented default of one parameter.

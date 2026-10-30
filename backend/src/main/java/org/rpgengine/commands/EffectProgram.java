@@ -21,9 +21,10 @@ import org.rpgengine.content.CompiledPack;
  * <p>Only effect types the resolver can execute are represented precisely
  * ({@code modifyResource}, {@code createItem} since P10.2, {@code heal} since P11.3, and {@code conditional}). Every
  * other compiled type ({@code damage}, {@code move}, condition changes, {@code reveal})
- * becomes {@link Unsupported}: those need effect targeting in combat, conditions, forced movement or knowledge records
- * that later tasks supply (P09.1, P10.4, P11), so {@link CommandRules} rejects such abilities
- * and item uses as {@code EFFECT_UNSUPPORTED} before any journal write instead of guessing a meaning.
+ * becomes {@link Unsupported}: this program runs in exploration and item uses, where those need effect targeting, conditions,
+ * forced movement or knowledge records it does not have, so {@link CommandRules} rejects such abilities and item uses as
+ * {@code EFFECT_UNSUPPORTED} before any journal write instead of guessing a meaning. An ability acts in a fight through its
+ * separate frozen combat form ({@code org.rpgengine.combat.CombatAbility}, P11.4), not through this program.
  */
 final class EffectProgram {
     /** Static compilation helpers only. */

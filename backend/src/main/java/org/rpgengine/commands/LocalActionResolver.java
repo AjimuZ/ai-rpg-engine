@@ -94,6 +94,11 @@ import tools.jackson.databind.node.ObjectNode;
  * the Health pool the pack's combat rule names, never above the maximum and never for a defeated participant.
  * Tactical commands skip the quest engine: possession facts they change are evaluated by the next exploration command.
  *
+ * <p>Reactions, effects and abilities (P11.4): {@code COMBAT_USE_ABILITY} and {@code SET_REACTION_POLICY} read only the
+ * frozen encounter, like the other tactical intentions. The plan's change of the player's Focus pool becomes a resource
+ * effect beside Health; a reaction or effect that moves the player's pools during another participant's action is part
+ * of the same plan.
+ *
  * <p>Rest (P10.4): the pinned policy restores its resources up to each pool's maximum and, when not
  * interrupted, ends the listed conditions the player has. An interruption is one recorded percentile
  * draw; it halves the time and the restoration and removes no condition ({@link RestRules}).
@@ -154,11 +159,21 @@ final class LocalActionResolver {
      * @param conditions canonical IDs of the conditions currently active on the player (P10.4)
      * @param worn canonical item definitions the player wears, recorded by an encounter entry (P11.1)
      * @param encounter tactical state of the active encounter, read for tactical intentions only (P11.2), or null
+     * @param learned canonical abilities the player has learned, recorded by an encounter entry (P11.4)
      */
     record Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
             Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
             UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored, long worldTimeSeconds,
-            Set<String> conditions, List<String> worn, EncounterState encounter) {
+            Set<String> conditions, List<String> worn, EncounterState encounter, Set<String> learned) {
+        /** Snapshot without learned abilities, the shape used before P11.4. */
+        Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
+                Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
+                UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored, long worldTimeSeconds,
+                Set<String> conditions, List<String> worn, EncounterState encounter) {
+            this(player, location, playerRowVersion, attributes, skills, pools, vocabularies, operationId, stacks,
+                    stored, worldTimeSeconds, conditions, worn, encounter, Set.of());
+        }
+
         /** Snapshot without tactical state, the shape used before P11.2. */
         Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
                 Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
@@ -216,6 +231,7 @@ final class LocalActionResolver {
             }
             conditions = Set.copyOf(conditions);
             worn = List.copyOf(worn);
+            learned = Set.copyOf(learned);
         }
     }
 
@@ -439,6 +455,15 @@ final class LocalActionResolver {
             if (pool != null) {
                 values.get(snapshot.player()).put(health, pool.current() + progress.playerHealthDelta());
             }
+            // Likewise Focus (P11.4). A delta needs the pool: the gate read the same rows when it allowed the cost.
+            if (progress.playerFocusDelta() != 0) {
+                String focus = state.profile().focus();
+                var focusPool = focus == null ? null : pool(snapshot.player(), focus);
+                if (focusPool == null) {
+                    throw new IllegalStateException("validated Focus cost has no pool");
+                }
+                values.get(snapshot.player()).put(focus, focusPool.current() + progress.playerFocusDelta());
+            }
             for (var use : progress.ammunition()) {
                 inventory.consume(use.instance(), use.quantity());
                 consumptions.add(new ItemPlan.Consumption(use.definition(), use.quantity()));
@@ -640,11 +665,11 @@ final class LocalActionResolver {
             var facts = new FrozenEncounter.PlayerFacts(snapshot.player(), snapshot.attributes(),
                     new FrozenEncounter.Pool(health.current(), health.maximum()),
                     focus == null ? null : new FrozenEncounter.Pool(focus.current(), focus.maximum()), snapshot.worn(),
-                    snapshot.conditions(), snapshot.skills());
+                    snapshot.conditions(), snapshot.skills(), snapshot.learned());
             // Deterministic identity: a retried resolution of this operation freezes the same encounter.
             UUID id = UUID.nameUUIDFromBytes((snapshot.operationId() + "/encounter").getBytes(StandardCharsets.UTF_8));
             var frozen = FrozenEncounter.freeze(id, template, profile, facts, engage.openingStrike(),
-                    catalog.combat().gear());
+                    catalog.combat().library());
             mode = CampaignMode.ENCOUNTER;
             var announced = payload().put("actorId", snapshot.player().toString()).put("encounterId", id.toString())
                     .put("templateId", template.id()).put("location", template.location())

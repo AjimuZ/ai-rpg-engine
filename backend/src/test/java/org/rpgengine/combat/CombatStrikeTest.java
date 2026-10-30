@@ -37,9 +37,9 @@ class CombatStrikeTest {
 
     /**
      * The fight of docs/20 section 3 from its recorded dice, through the real fixture and freeze: Guard 12 and armor 1
-     * from the worn items, 22 against Guard 12 (a strong hit), 8 raw and 7 taken, the opponent's Strike then Guard, the
-     * +2 still up in round two, 15 against Guard 14 (a normal hit), 7 more taken and a defeat without any death. Brace is
-     * P11.4, so the opponent's 13 here meets the player's unbraced Guard 12 where docs/20 has it miss Guard 14.
+     * from the worn items, the opponent's Brace raising Guard to 14, 22 against it (a strong hit), 8 raw and 7 taken, the
+     * opponent's Strike meeting the player's Brace and missing with 13, its Guard action, a redundant Brace skipped in
+     * round two, 15 against Guard 14 (a normal hit), 7 more taken and a defeat without any death.
      */
     @Test
     void playsTheWorkedFightFromItsRecordedDice() throws Exception {
@@ -77,8 +77,11 @@ class CombatStrikeTest {
         assertTrue(shown.byPlayer());
         var calculation = note(strike, "STRIKE_CALCULATED");
         assertTrue(calculation.internal(), "the opponent's defense and Health stay out of the public record");
-        assertEquals(12, calculation.payload().get("defense"));
-        assertEquals(10, calculation.payload().get("margin"));
+        assertEquals(14, calculation.payload().get("defense"), "the opponent's predeclared Brace");
+        assertEquals(8, calculation.payload().get("margin"));
+        assertEquals("bandit", note(strike, "REACTION_RESOLVED").payload().get("participantId"));
+        assertEquals("brace", note(strike, "REACTION_RESOLVED").payload().get("reactionId"));
+        assertEquals(0, state.participant("bandit").reactions(), "Brace spends the one reaction of the round");
         assertEquals(8, calculation.payload().get("rawDamage"));
         assertEquals(1, calculation.payload().get("effectiveArmor"));
         assertEquals(14, calculation.payload().get("healthBefore"));
@@ -88,26 +91,31 @@ class CombatStrikeTest {
             assertFalse(shown.payload().containsKey(hidden), hidden);
         }
 
-        // The opponent strikes (5 + 6 + 1 + 1 = 13, a hit on Guard 12; 3 + 1 - 1 = 3), then guards with its last point.
-        var ended = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script(5, 6, 3));
+        // The opponent strikes (5 + 6 + 1 + 1 = 13, a miss on the braced Guard 14), then guards with its last point.
+        var ended = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script(5, 6));
         state = after(state, ended);
-        assertEquals(21, state.player().health());
-        assertEquals(-3, ended.playerHealthDelta());
+        assertEquals(24, state.player().health());
+        assertEquals(0, ended.playerHealthDelta());
         assertEquals(8, ended.elapsedSeconds());
+        assertEquals(1, state.player().reactions(), "the budget refreshed once when round two opened");
         assertEquals(2, state.round());
         assertTrue(state.participant("bandit").guarding());
-        assertEquals(List.of("ACTIVATION_ENDED", "ACTIVATION_STARTED", "STRIKE_RESOLVED", "STRIKE_CALCULATED", "GUARD_RAISED",
-                "ACTIVATION_ENDED", "ROUND_ENDED", "ROUND_STARTED", "ACTIVATION_STARTED"),
+        assertEquals(List.of("ACTIVATION_ENDED", "ACTIVATION_STARTED", "REACTION_RESOLVED", "STRIKE_RESOLVED", "STRIKE_CALCULATED",
+                "GUARD_RAISED", "ACTIVATION_ENDED", "ROUND_ENDED", "ROUND_STARTED", "ACTIVATION_STARTED"),
                 ended.notes().stream().map(TacticalPlan.Note::type).toList());
         var opponent = note(ended, "STRIKE_RESOLVED");
-        assertEquals(12, opponent.payload().get("defense"), "the player may see its own defense");
-        assertEquals(21, opponent.payload().get("targetHealthAfter"));
+        assertEquals(14, opponent.payload().get("defense"), "the player may see its own defense");
+        assertEquals(false, opponent.payload().get("hit"));
+        assertEquals(24, opponent.payload().get("targetHealthAfter"));
         assertFalse(opponent.byPlayer());
 
         // Round 2: 6 + 5 + 2 + 2 = 15 against Guard 14 is a normal hit; 6 + 2 - 1 = 7 takes the last Health.
         var last = CombatScheduler.apply(state, new TacticalIntent.Strike("sword", "bandit"), script(6, 5, 6));
         state = after(state, last);
         assertEquals(14, note(last, "STRIKE_CALCULATED").payload().get("defense"));
+        assertTrue(last.notes().stream().noneMatch(n -> n.type().equals("REACTION_RESOLVED")),
+                "the Guard action already holds the stacking key, so Brace would add nothing and is skipped");
+        assertEquals(1, state.participant("bandit").reactions(), "a skipped Brace spends nothing");
         assertEquals(false, note(last, "STRIKE_RESOLVED").payload().get("strongHit"));
         assertEquals(0, state.participant("bandit").health());
         assertEquals(EncounterState.Status.DEFEATED, state.participant("bandit").status());
@@ -704,11 +712,13 @@ class CombatStrikeTest {
             list.add(new EncounterState.Combatant(participant.id(), ordinal++, participant.actorId(), participant.side(),
                     participant.zone(), EncounterState.Status.ACTIVE, Math.toIntExact(participant.roles().get("finesse")),
                     Math.toIntExact(participant.initiativeModifier()), null, null, 0, 0,
-                    Math.toIntExact(participant.health()), Math.toIntExact(participant.healthMax()), false, participant.sheet()));
+                    Math.toIntExact(participant.health()), Math.toIntExact(participant.healthMax()), false, participant.sheet(),
+                    Math.toIntExact(participant.focus()), Math.toIntExact(participant.focusMax()), List.of(),
+                    participant.policies(), Map.of()));
         }
         return new EncounterState(frozen.id(), 0, EncounterPhase.ENTERING, 0, null, null, 0, List.of(), frozen.profile(),
                 frozen.zones(), frozen.escapeZones(), frozen.actions(), frozen.opening(), openingTarget,
-                openingTarget == null ? "NONE" : "PENDING", list);
+                openingTarget == null ? "NONE" : "PENDING", list, List.of(), frozen.effects(), 0);
     }
 
     /** The fixture rules with one more template: the armed bandit next to the player, for a strike before the player's slot. */
@@ -738,7 +748,8 @@ class CombatStrikeTest {
             list.add(u == null ? p : new EncounterState.Combatant(p.id(), p.ordinal(), p.actorId(), p.side(), u.zone(),
                     u.status(), p.finesse(), p.initiativeModifier(), u.initiative(), u.rank(), u.reactions(),
                     p.rowVersion() + 1, u.health() == null ? p.health() + plan.playerHealthDelta() : u.health(), p.healthMax(),
-                    u.guarding(), p.sheet()));
+                    u.guarding(), p.sheet(), u.focus() == null ? p.focus() + plan.playerFocusDelta() : u.focus(), p.focusMax(),
+                    u.effects(), u.policies(), u.uses()));
         }
         var stacks = new ArrayList<EncounterState.Ammunition>();
         for (var stack : state.ammunition()) {
@@ -752,7 +763,7 @@ class CombatStrikeTest {
         return new EncounterState(state.id(), state.rowVersion() + plan.steps().size(), last.phase(), last.round(),
                 last.cursor(), last.actionPoints(), last.speechUsed(), last.passages(), state.profile(),
                 state.frozenSpace(), state.escapeZones(), state.actions(), state.opening(), state.openingTarget(),
-                last.openingStatus(), list, stacks);
+                last.openingStatus(), list, stacks, state.effects(), last.effectsApplied());
     }
 
     /** The opponent of {@link #duel}. */

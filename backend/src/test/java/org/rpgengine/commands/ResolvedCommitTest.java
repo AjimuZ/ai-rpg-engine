@@ -130,10 +130,10 @@ class ResolvedCommitTest {
         assertThrows(UnsupportedOperationException.class, () -> plan.events().clear());
         assertThrows(IllegalArgumentException.class,
                 () -> new ResolvedCommit(context, world, List.of(), List.of(), List.of(), "{}", false));
-        assertEquals(128, new ResolvedCommit(context, world, List.of(), Collections.nCopies(128, event),
-                List.of(), "{}", false).events().size());
+        assertEquals(ResolvedCommit.MAX_EVENTS, new ResolvedCommit(context, world, List.of(),
+                Collections.nCopies(ResolvedCommit.MAX_EVENTS, event), List.of(), "{}", false).events().size());
         assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit(context, world, List.of(),
-                Collections.nCopies(129, event), List.of(), "{}", false));
+                Collections.nCopies(ResolvedCommit.MAX_EVENTS + 1, event), List.of(), "{}", false));
         var cost = new ResolvedCommit.ResourceChange(UUID.randomUUID(), 0, -1);
         assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit(context, world, List.of(cost, cost),
                 List.of(event), List.of(), "{}", false));

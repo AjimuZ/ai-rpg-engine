@@ -445,6 +445,19 @@ before `ACTIVATION_ENDED`. The receipt's `combat` gains `participants` [{partici
 change appears in `resources` and spent ammunition in `items`. Tactical commands skip the quest engine: the next
 exploration command evaluates the possession facts they change.
 
+
+### P11.4 reactions, effects and abilities
+
+Two more tactical intentions follow the same gates ([ADR 0031](adr/0031-predeclared-reactions-effect-phases-and-cooldowns.md)):
+
+| Intention | Payload | Legal when | Refusal |
+| --- | --- | --- | --- |
+| `COMBAT_USE_ABILITY` | `abilityId` (1..256) and `targetIds` (0..9 distinct participants, 1..128 each) | The player's decision; not prevented; a frozen ability its limit and cooldown allow, its Focus spendable and held; targets of its side, standing, in range and sight, none for a self ability; its points left | `TURN_UNAVAILABLE`, `ACTION_PREVENTED`, `ABILITY_UNAVAILABLE`, `RESOURCE_INSUFFICIENT`, `TARGET_ILLEGAL`, `ACTION_POINTS_INSUFFICIENT` |
+| `SET_REACTION_POLICY` | `reactionId` (1..256), `mode` (`off`, `first`, `healthAtMost`, `focusAtLeast`) and, only for a predicate, `value` (1..100 percent or 1..99 Focus) | At `ENTERING` or the player's decision; a reaction of the player's frozen profile, `brace` included. A mode and value that do not fit are `INVALID_COMMAND` | `TURN_UNAVAILABLE`, `REACTION_UNAVAILABLE` |
+
+An active effect can also refuse the P11.2 and P11.3 actions: `MOVE_ZONE` while movement or actions are prevented, `STRIKE`, `GUARD`, `INTERACT` and `COMBAT_USE_ITEM` while actions are (`ACTION_PREVENTED`). Speech and `END_ACTIVATION` stay legal, so a prevented player is never stuck. An ability writes `COMBAT_ABILITY_USED` {…, abilityId, actionPoints, remainingActionPoints, focus, targets}. A policy writes `REACTION_POLICY_SET` {…, reactionId, policy}, costs nothing and passes through no other phase.
+
+A reaction writes `REACTION_RESOLVED` {…, reactionId, trigger, kind, provokedBy, targetId?}, and a counter's `STRIKE_RESOLVED` carries `reaction: true` and no remaining points. Effects write one public `EFFECTS_RESOLVED` {encounterId, round, phase, lines} per flush, whose lines are `APPLIED` {holderId, effectId, outcome, sourceId?, instanceId?, stacks?}, `TICK` {holderId, effectId, instanceId, phase, triggerKey, damage or healed, healthAfter for the player}, `ENDED` {holderId, effectId, instanceId, reason}, `DAMAGE` and `HEAL` of an ability {abilityId, sourceId, holderId, dice, drawOrdinals, damage or healed, healthAfter for the player}, `REACTION_SKIPPED` of the player's own reaction {holderId, reactionId, reason} and `BOUNDED` {phase}, and one internal `EFFECTS_CALCULATED` with absorption and Health before and after. `STRIKE_LAPSED` {…, targetId, attackId, reason} records a paid attempt whose target fell to a pre-roll tick. `OPENING_STRIKE_LAPSED` gains the reason `PREVENTED`. The player's Focus change appears in `resources`. The receipt's `combat.options` gains `abilities` [{abilityId, cost, focus, targets, maxTargets, disabled}], `reactions` [{reactionId, policy}] and `reactionsLeft`, and a participant holding effects lists `effects` [{effectId, stacks}]. Plans now allow 256 events.
 ### P10.3 quest intentions
 
 Three more exploration intentions name one quest by its stable identity and nothing else. Status,
@@ -861,7 +874,7 @@ operation and revision references. They neither publish data nor grant audience 
 No network client, callback or delivery listener participates in the transaction;
 the caller receives detached receipt data after COMMIT. Database contention is bounded
 by a 2-second lock timeout, a 5-second statement timeout and a 10-second transaction
-timeout. Plans allow at most 128 resources, 128 events (at least one), 128 settlements
+timeout. Plans allow at most 128 resources, 256 events (at least one), 128 settlements
 and 32 KiB receipt details; existing stored JSONB limits remain authoritative. P07.4
 adds at most 16 typed actor `Placement` effects (unique per actor) applied by a
 row-version-guarded update of `actor.location_id`; a stale version or foreign actor rolls

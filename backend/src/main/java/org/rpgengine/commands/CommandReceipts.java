@@ -162,7 +162,7 @@ public final class CommandReceipts {
 
     /**
      * Copy the allowlisted members of a tactical summary: scalar cursor facts, the initiative order, each participant's
-     * public standing, the operation's strikes (never a hidden defense, armor or Health value) and the legal options
+     * public standing with any effects it holds, the operation's strikes (never a hidden defense, armor or Health value) and the legal options
      * (moves, speech allowance and recipients, declared actions, attacks with costs, targets and disabled reasons, Guard
      * and item use).
      */
@@ -192,6 +192,17 @@ public final class CommandReceipts {
                 participant.put("side", line.path("side").asString());
                 participant.put("zone", line.path("zone").asString());
                 participant.put("status", line.path("status").asString());
+                // Since P11.4, only for a participant holding any: which effects it holds is public, their numbers are not.
+                if (line.path("effects").isArray()) {
+                    var held = new ArrayList<Map<String, Object>>();
+                    for (JsonNode effect : line.path("effects")) {
+                        var active = new LinkedHashMap<String, Object>();
+                        active.put("effectId", effect.path("effectId").asString());
+                        active.put("stacks", effect.path("stacks").asInt());
+                        held.add(active);
+                    }
+                    participant.put("effects", List.copyOf(held));
+                }
                 standing.add(participant);
             }
             entry.put("participants", List.copyOf(standing));
@@ -253,6 +264,33 @@ public final class CommandReceipts {
                     line.put("available", options.path(choice).path("available").asBoolean());
                     view.put(choice, java.util.Collections.unmodifiableMap(line));
                 }
+            }
+            // Since P11.4, and only in a receipt that has them, so older receipts replay byte-identical.
+            if (options.path("abilities").isArray()) {
+                var abilities = new ArrayList<Map<String, Object>>();
+                for (JsonNode ability : options.path("abilities")) {
+                    var line = new LinkedHashMap<String, Object>();
+                    line.put("abilityId", ability.path("abilityId").asString());
+                    line.put("cost", ability.path("cost").asInt());
+                    line.put("focus", ability.path("focus").asInt());
+                    line.put("targets", strings(ability.path("targets")));
+                    line.put("maxTargets", ability.path("maxTargets").asInt());
+                    line.put("disabled", ability.path("disabled").isString() ? ability.path("disabled").asString() : null);
+                    abilities.add(line);
+                }
+                view.put("abilities", List.copyOf(abilities));
+                var reactions = new ArrayList<Map<String, Object>>();
+                for (JsonNode reaction : options.path("reactions")) {
+                    var policy = new LinkedHashMap<String, Object>();
+                    policy.put("mode", reaction.path("policy").path("mode").asString());
+                    policy.put("value", reaction.path("policy").path("value").asInt());
+                    var line = new LinkedHashMap<String, Object>();
+                    line.put("reactionId", reaction.path("reactionId").asString());
+                    line.put("policy", java.util.Collections.unmodifiableMap(policy));
+                    reactions.add(line);
+                }
+                view.put("reactions", List.copyOf(reactions));
+                view.put("reactionsLeft", options.path("reactionsLeft").asInt());
             }
             view.put("endActivation", options.path("endActivation").asBoolean());
             entry.put("options", java.util.Collections.unmodifiableMap(view));

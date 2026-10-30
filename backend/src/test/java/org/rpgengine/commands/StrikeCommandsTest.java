@@ -216,12 +216,12 @@ class StrikeCommandsTest {
                 seen.add(strike);
                 assertEquals("bandit", strike.get("participantId").asString());
                 assertEquals("player", strike.get("targetId").asString());
-                // Bandit: force 1 + skill 1 against the player's Guard 12, its die + force 1 - armor 1.
+                // Bandit: force 1 + skill 1 against the player's Guard 12 and its default Brace, its die + force 1 - armor 1.
                 int[] attack = JSON.convertValue(strike.get("attackDice"), int[].class);
                 int total = attack[0] + attack[1] + 2;
                 assertEquals(total, strike.get("attackTotal").intValue());
-                assertEquals(12, strike.get("defense").intValue());
-                assertEquals(total >= 12, strike.get("hit").asBoolean());
+                assertEquals(14, strike.get("defense").intValue());
+                assertEquals(total >= 14, strike.get("hit").asBoolean());
                 long loss = 0;
                 assertFalse(strike.get("strongHit").asBoolean(), "the cudgel permits no strong hit");
                 if (strike.get("hit").asBoolean()) {
@@ -326,7 +326,8 @@ class StrikeCommandsTest {
         give("arrows", 2, 20);
         begin("trail-ambush");
         execute(new TypedCommand.Strike("bolt-caster", "raider"));
-        assertEquals(14, event("STRIKE_CALCULATED").get("defense").intValue(), "Guard 12 + 2 partial cover from outside the yard");
+        assertEquals(16, event("STRIKE_CALCULATED").get("defense").intValue(),
+                "Guard 12 + 2 partial cover from outside the yard + 2 from the raider's default Brace");
         assertEquals(1, arrows());
         execute(new TypedCommand.EndActivation());
         var line = (Map<?, ?>) ((List<?>) options(execute(new TypedCommand.CombatSpeak("raider", "Again."))).get("strikes")).getFirst();

@@ -40,11 +40,23 @@ import org.rpgengine.rules.ZoneGraph;
  * @param openingStatus {@code NONE}, {@code PENDING} or {@code RESOLVED}
  * @param participants every participant in roster order (the player first)
  * @param ammunition the player's unworn stacks of the items its frozen attacks consume, in identity order (P11.3)
+ * @param effects frozen effect definitions the fight can reach, by canonical ID (P11.4)
+ * @param effectsApplied the encounter's application counter: how many effect instances it has created (P11.4)
  */
 public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int round, Integer cursor,
         Integer actionPoints, int speechUsed, List<EncounterAction.Passage> passages, CombatProfile profile,
         ZoneGraph frozenSpace, Set<String> escapeZones, List<EncounterAction> actions, OpeningPolicy opening,
-        String openingTarget, String openingStatus, List<Combatant> participants, List<Ammunition> ammunition) {
+        String openingTarget, String openingStatus, List<Combatant> participants, List<Ammunition> ammunition,
+        Map<String, CombatEffect> effects, int effectsApplied) {
+    /** Tactical state without effects, the shape used before P11.4. */
+    public EncounterState(UUID id, long rowVersion, EncounterPhase phase, int round, Integer cursor,
+            Integer actionPoints, int speechUsed, List<EncounterAction.Passage> passages, CombatProfile profile,
+            ZoneGraph frozenSpace, Set<String> escapeZones, List<EncounterAction> actions, OpeningPolicy opening,
+            String openingTarget, String openingStatus, List<Combatant> participants, List<Ammunition> ammunition) {
+        this(id, rowVersion, phase, round, cursor, actionPoints, speechUsed, passages, profile, frozenSpace, escapeZones,
+                actions, opening, openingTarget, openingStatus, participants, ammunition, Map.of(), 0);
+    }
+
     /** Tactical state without stacks of ammunition, for fights whose attacks consume nothing. */
     public EncounterState(UUID id, long rowVersion, EncounterPhase phase, int round, Integer cursor,
             Integer actionPoints, int speechUsed, List<EncounterAction.Passage> passages, CombatProfile profile,
@@ -77,15 +89,46 @@ public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int
      * @param armor flat armor
      * @param roles role attribute values
      * @param attacks frozen attacks in stored order; empty when the participant cannot attack
+     * @param abilities frozen abilities usable in the fight (P11.4)
+     * @param reactions frozen reactions beside the default Brace, in stored order (P11.4)
+     * @param conditions canonical conditions the participant entered the fight with (P11.4 reads them at initiative)
      */
-    public record Sheet(int guard, int resistance, int armor, Map<String, Integer> roles, List<CombatAttack> attacks) {
+    public record Sheet(int guard, int resistance, int armor, Map<String, Integer> roles, List<CombatAttack> attacks,
+            List<CombatAbility> abilities, List<CombatReaction> reactions, List<String> conditions) {
         /** A participant with no fighting values, for scheduling that reads none of them. */
         public static final Sheet NONE = new Sheet(0, 0, 0, Map.of(), List.of());
+
+        /** Sheet without abilities, reactions or entry conditions, the shape used before P11.4. */
+        public Sheet(int guard, int resistance, int armor, Map<String, Integer> roles, List<CombatAttack> attacks) {
+            this(guard, resistance, armor, roles, attacks, List.of(), List.of(), List.of());
+        }
 
         /** Freeze the collections. */
         public Sheet {
             roles = Map.copyOf(roles);
             attacks = List.copyOf(attacks);
+            abilities = List.copyOf(abilities);
+            reactions = List.copyOf(reactions);
+            conditions = List.copyOf(conditions);
+        }
+
+        /** @return the frozen ability with this ID, or null */
+        public CombatAbility ability(String id) {
+            return abilities.stream().filter(ability -> ability.id().equals(id)).findFirst().orElse(null);
+        }
+
+        /** @return the reaction with this ID, Brace included, or null */
+        public CombatReaction reaction(String id) {
+            return CombatReaction.BRACE_ID.equals(id) ? CombatReaction.BRACE
+                    : reactions.stream().filter(reaction -> reaction.id().equals(id)).findFirst().orElse(null);
+        }
+
+        /** @return every reaction the participant can set a policy for: Brace first, then the declared ones */
+        public List<CombatReaction> allReactions() {
+            var all = new java.util.ArrayList<CombatReaction>();
+            all.add(CombatReaction.BRACE);
+            all.addAll(reactions);
+            return all;
         }
 
         /** @return the value of a role, zero when the sheet has none */
@@ -100,7 +143,8 @@ public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int
 
         /**
          * Read the fighting values from a stored frozen participant form. Encounters frozen before P11.3 have no
-         * {@code attacks} member: their participants simply cannot attack.
+         * {@code attacks} member, and those before P11.4 no {@code abilities} or {@code reactions}: their participants
+         * simply lack them.
          *
          * @param frozen parsed canonical participant
          * @return the sheet
@@ -114,8 +158,20 @@ public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int
             if (frozen.get("attacks") instanceof List<?> stored) {
                 stored.forEach(attack -> attacks.add(CombatAttack.fromCanonical((Map<?, ?>) attack)));
             }
+            var abilities = new java.util.ArrayList<CombatAbility>();
+            if (frozen.get("abilities") instanceof List<?> stored) {
+                stored.forEach(ability -> abilities.add(CombatAbility.fromCanonical((Map<?, ?>) ability)));
+            }
+            var reactions = new java.util.ArrayList<CombatReaction>();
+            if (frozen.get("reactions") instanceof List<?> stored) {
+                stored.forEach(reaction -> reactions.add(CombatReaction.fromCanonical((Map<?, ?>) reaction)));
+            }
+            var conditions = new java.util.ArrayList<String>();
+            if (frozen.get("conditions") instanceof List<?> stored) {
+                stored.forEach(condition -> conditions.add((String) condition));
+            }
             return new Sheet(((Number) frozen.get("guard")).intValue(), ((Number) frozen.get("resistance")).intValue(),
-                    ((Number) frozen.get("armor")).intValue(), roles, attacks);
+                    ((Number) frozen.get("armor")).intValue(), roles, attacks, abilities, reactions, conditions);
         }
     }
 
@@ -143,10 +199,25 @@ public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int
      * @param healthMax Health maximum above the pool's minimum
      * @param guarding whether its Guard action holds until the start of its next activation
      * @param sheet frozen fighting values
+     * @param focus current Focus above the pool's minimum, 0 without a Focus mechanic (P11.4)
+     * @param focusMax Focus maximum above the pool's minimum (P11.4)
+     * @param effects active effect instances in application order (P11.4)
+     * @param policies predeclared reaction policies by reaction ID; a reaction without one does not fire (P11.4)
+     * @param uses last use of each ability used in this encounter (P11.4)
      */
     public record Combatant(String id, int ordinal, UUID actorId, EncounterTemplate.Side side, String zone,
             Status status, int finesse, int initiativeModifier, Integer initiative, Integer rank, int reactions,
-            long rowVersion, int health, int healthMax, boolean guarding, Sheet sheet) {
+            long rowVersion, int health, int healthMax, boolean guarding, Sheet sheet, int focus, int focusMax,
+            List<CombatEffects.Active> effects, Map<String, CombatReaction.Policy> policies,
+            Map<String, CombatAbility.Use> uses) {
+        /** Participant without effects, reaction policies or ability uses, the shape used before P11.4. */
+        public Combatant(String id, int ordinal, UUID actorId, EncounterTemplate.Side side, String zone,
+                Status status, int finesse, int initiativeModifier, Integer initiative, Integer rank, int reactions,
+                long rowVersion, int health, int healthMax, boolean guarding, Sheet sheet) {
+            this(id, ordinal, actorId, side, zone, status, finesse, initiativeModifier, initiative, rank, reactions,
+                    rowVersion, health, healthMax, guarding, sheet, 0, 0, List.of(), Map.of(), Map.of());
+        }
+
         /** Participant for scheduling alone: unhurt at one Health, not guarding, no fighting values. */
         public Combatant(String id, int ordinal, UUID actorId, EncounterTemplate.Side side, String zone,
                 Status status, int finesse, int initiativeModifier, Integer initiative, Integer rank, int reactions,
@@ -168,6 +239,17 @@ public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int
             if (health < 0 || health > healthMax) {
                 throw new IllegalArgumentException("Health outside its bounds");
             }
+            if (focus < 0 || focus > focusMax) {
+                throw new IllegalArgumentException("Focus outside its bounds");
+            }
+            effects = List.copyOf(effects);
+            policies = Map.copyOf(policies);
+            uses = Map.copyOf(uses);
+        }
+
+        /** @return the participant's policy for a reaction; a reaction without a stored one never fires */
+        public CombatReaction.Policy policy(String reaction) {
+            return policies.getOrDefault(reaction, CombatReaction.Policy.OFF);
         }
 
         /** @return whether the two participants fight on opposing sides */
@@ -198,6 +280,7 @@ public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int
         actions = List.copyOf(actions);
         participants = List.copyOf(participants);
         ammunition = List.copyOf(ammunition);
+        effects = Map.copyOf(effects);
         if ((cursor == null) != (actionPoints == null)) {
             throw new IllegalArgumentException("cursor and action points are set together");
         }
@@ -213,6 +296,15 @@ public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int
             space = space.withPassage(passage.from(), passage.to(), passage.blocked());
         }
         return space;
+    }
+
+    /**
+     * @param participant a participant of this encounter
+     * @param what a capability
+     * @return whether one of its active effects prevents it
+     */
+    public boolean prevented(Combatant participant, CombatEffect.Prevents what) {
+        return CombatEffects.prevents(participant.effects(), effects, what);
     }
 
     /** @return the protagonist's participant */

@@ -3023,6 +3023,24 @@
       <target>Hai già assunto una posizione di guardia durante questo turno. Non è stato modificato nulla.</target>
       </segment>
     </unit>
+    <unit id="campaign.error.reactionUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:57</note>
+      </notes>
+      <segment>
+        <source>You do not have that reaction. Nothing was changed.</source>
+      <target>Non disponi di quella reazione. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.actionPrevented">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:58</note>
+      </notes>
+      <segment>
+        <source>An effect on you prevents that right now. Nothing was changed.</source>
+      <target>Un effetto che ti riguarda lo impedisce in questo momento. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
     <unit id="campaign.error.dependenciesMissing">
       <notes>
         <note category="location">src/app/campaign/campaign-messages.ts:39</note>

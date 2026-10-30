@@ -53,7 +53,7 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
         ItemPlan items, QuestChanges quests, List<ConditionRemoval> conditions, EncounterEntry encounter,
         TacticalPlan progress) {
     /** Most events one plan may carry; the quest engine budgets its steps against what the command already used. */
-    public static final int MAX_EVENTS = 128;
+    public static final int MAX_EVENTS = 256;
 
     /**
      * Copy bounded lists to freeze the plan; reject duplicate resource or placement effects,

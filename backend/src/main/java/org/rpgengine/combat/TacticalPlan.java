@@ -15,7 +15,8 @@ import java.util.UUID;
  * utterance is one step that keeps the phase. {@link #participants} are the final values of every participant
  * whose tactical facts changed, each guarded by the row version read. Since P11.3 a plan also carries what an attack
  * changes outside the encounter row: the player's Health, as a delta for the commit's resource effects, and the
- * ammunition consumed, as item effects.
+ * ammunition consumed, as item effects. Since P11.4 the player's Focus moves the same way, and each participant's update
+ * holds its active effects, reaction policies and ability uses.
  *
  * @param encounterId the active encounter
  * @param baseRowVersion encounter row version the plan was calculated from
@@ -26,10 +27,11 @@ import java.util.UUID;
  * @param summary owner-safe receipt summary (public facts only)
  * @param playerHealthDelta net change of the player's Health pool, which lives outside the encounter (P11.3)
  * @param ammunition units the operation's attacks consumed, per stack (P11.3)
+ * @param playerFocusDelta net change of the player's Focus pool, which lives outside the encounter (P11.4)
  */
 public record TacticalPlan(UUID encounterId, long baseRowVersion, List<Step> steps, List<ParticipantUpdate> participants,
         List<Note> notes, long elapsedSeconds, Map<String, Object> summary, int playerHealthDelta,
-        List<AmmunitionUse> ammunition) {
+        List<AmmunitionUse> ammunition, int playerFocusDelta) {
     /**
      * Most encounter row states one operation may write. One non-player activation writes at most nine (start, wait,
      * resolve and wait for a move, a strike and the Guard action, end), and an operation runs at most eight of them
@@ -40,7 +42,7 @@ public record TacticalPlan(UUID encounterId, long baseRowVersion, List<Step> ste
     /** Plan that changes nothing outside the encounter, the shape of an operation without attacks. */
     public TacticalPlan(UUID encounterId, long baseRowVersion, List<Step> steps, List<ParticipantUpdate> participants,
             List<Note> notes, long elapsedSeconds, Map<String, Object> summary) {
-        this(encounterId, baseRowVersion, steps, participants, notes, elapsedSeconds, summary, 0, List.of());
+        this(encounterId, baseRowVersion, steps, participants, notes, elapsedSeconds, summary, 0, List.of(), 0);
     }
 
     /**
@@ -71,9 +73,16 @@ public record TacticalPlan(UUID encounterId, long baseRowVersion, List<Step> ste
      * @param speechUsed speech-only utterances used in the activation
      * @param passages passage states after this step
      * @param openingStatus {@code NONE}, {@code PENDING} or {@code RESOLVED} after this step
+     * @param effectsApplied the encounter's application counter after this step
      */
     public record Step(EncounterPhase phase, int round, Integer cursor, Integer actionPoints, int speechUsed,
-            List<EncounterAction.Passage> passages, String openingStatus) {
+            List<EncounterAction.Passage> passages, String openingStatus, int effectsApplied) {
+        /** Encounter row state of a fight that has applied no effect, the shape used before P11.4. */
+        public Step(EncounterPhase phase, int round, Integer cursor, Integer actionPoints, int speechUsed,
+                List<EncounterAction.Passage> passages, String openingStatus) {
+            this(phase, round, cursor, actionPoints, speechUsed, passages, openingStatus, 0);
+        }
+
         /** Require the phase and the cursor invariant; copy the passages. */
         public Step {
             Objects.requireNonNull(phase, "phase");
@@ -97,14 +106,23 @@ public record TacticalPlan(UUID encounterId, long baseRowVersion, List<Step> ste
      * @param status tactical standing after the operation
      * @param health encounter-local Health after the operation, or null for the player, whose pool lives elsewhere
      * @param guarding whether its Guard action holds after the operation
+     * @param focus encounter-local Focus after the operation, or null for the player, whose pool lives elsewhere
+     * @param effects active effect instances after the operation
+     * @param policies reaction policies after the operation
+     * @param uses ability uses after the operation
      */
     public record ParticipantUpdate(String participantId, long expectedRowVersion, String zone, Integer initiative,
-            Integer rank, int reactions, EncounterState.Status status, Integer health, boolean guarding) {
-        /** Require identities. */
+            Integer rank, int reactions, EncounterState.Status status, Integer health, boolean guarding, Integer focus,
+            List<CombatEffects.Active> effects, Map<String, CombatReaction.Policy> policies,
+            Map<String, CombatAbility.Use> uses) {
+        /** Require identities; copy the collections. */
         public ParticipantUpdate {
             Objects.requireNonNull(participantId, "participantId");
             Objects.requireNonNull(zone, "zone");
             Objects.requireNonNull(status, "status");
+            effects = List.copyOf(effects);
+            policies = Map.copyOf(policies);
+            uses = Map.copyOf(uses);
         }
     }
 

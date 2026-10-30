@@ -218,6 +218,65 @@ class CombatRulesTest {
      * skill and ammunition resolve to canonical IDs; armor and Guard project from the item's combat object (P11.3).
      */
     @Test
+    void projectsEffectsReactionsAndAbilities() throws Exception {
+        var rules = EncounterPack.rules(EncounterPack.tactics());
+        var poison = rules.effects().get("poisoned");
+        assertEquals(CombatEffect.Stacking.ADDITIVE, poison.stacking());
+        assertEquals(3, poison.cap());
+        assertEquals(CombatEffect.Clock.ROUND_ENDS, poison.clock());
+        assertEquals(2, poison.count());
+        assertEquals(java.util.List.of(new CombatEffect.Tick(CombatEffect.Phase.ROUND_END, 1, false)), poison.ticks());
+        assertEquals("poisoned", poison.stackingKey(), "a key defaults to the condition");
+        assertEquals(3, rules.effects().get("warded").absorption());
+        assertEquals(CombatEffect.Stacking.STRONGEST, rules.effects().get("warded").stacking(), "the documented default");
+        assertEquals(-2, rules.effects().get("winded").attack());
+        assertEquals(java.util.Set.of(CombatEffect.Prevents.ACTIONS), rules.effects().get("stunned").prevents());
+        assertEquals(null, rules.effects().get("dazed"), "a condition without a combat block has no combat form");
+
+        var steady = rules.abilities().get("steady");
+        assertEquals(1, steady.cost());
+        assertEquals(1, steady.focus());
+        assertEquals(2, steady.cooldownRounds());
+        assertEquals(CombatAbility.Targets.SELF, steady.targets());
+        assertEquals(CombatAbility.Kind.HEAL, steady.operations().getFirst().kind());
+        assertEquals(CombatAbility.Limit.ENCOUNTER, rules.abilities().get("chain-riposte").limit());
+        assertEquals(CombatReaction.Kind.COUNTER, rules.reactions().get("riposte").kind());
+        assertEquals(null, rules.abilities().get("riposte"), "a reaction is not an action");
+        assertEquals(null, rules.abilities().get("master-riposte"), "no combat form: exploration only");
+
+        var adder = rules.templates().get("venom-pit").participants().getFirst();
+        assertEquals(CombatReaction.Policy.OFF, adder.policies().get("brace"));
+        assertEquals(CombatReaction.Policy.FIRST, adder.policies().get("snap"));
+        assertEquals("fang", adder.reactions().getFirst().attackId());
+        assertEquals(new CombatAttack.OnHit("poisoned", CombatEffect.Phase.POST_DAMAGE, false), adder.attacks().getFirst().onHit().getFirst());
+
+        // Freezing keeps only what the fight can reach and what the player has learned; the forms read back unchanged.
+        var profile = rules.profiles().get("sample:armory-tactics");
+        var facts = new FrozenEncounter.PlayerFacts(java.util.UUID.randomUUID(), java.util.Map.of("awareness", 2L, "might", 2L),
+                new FrozenEncounter.Pool(8, 8), new FrozenEncounter.Pool(6, 6), java.util.List.of(), java.util.Set.of("dazed"),
+                java.util.Map.of(), java.util.Set.of("steady", "riposte", "unrelated"));
+        var frozen = FrozenEncounter.freeze(java.util.UUID.randomUUID(), rules.templates().get("venom-pit"), profile, facts, null,
+                rules.library());
+        assertEquals(java.util.Set.of("poisoned"), frozen.effects().keySet(), "steady heals and the fang poisons: nothing else is reachable");
+        var player = frozen.player();
+        assertEquals(java.util.List.of("steady"), player.abilities().stream().map(CombatAbility::id).toList());
+        assertEquals(java.util.List.of("riposte"), player.reactions().stream().map(CombatReaction::id).toList());
+        assertEquals(CombatReaction.Policy.FIRST, player.policies().get("brace"));
+        var json = tools.jackson.databind.json.JsonMapper.builder().build();
+        var sheet = EncounterState.Sheet.fromCanonical(json.readValue(org.rpgengine.rules.CanonicalJson.write(player.canonicalForm()),
+                java.util.Map.class));
+        assertEquals(player.sheet(), sheet);
+        var definition = json.readValue(frozen.definition(), java.util.Map.class);
+        assertEquals(1, ((java.util.List<?>) definition.get("effects")).size());
+        var plain = FrozenEncounter.freeze(frozen.id(), EncounterPack.rules(EncounterPack.files()).templates().get("trail-ambush"),
+                EncounterPack.rules(EncounterPack.files()).profiles().get("sample:armory"), new FrozenEncounter.PlayerFacts(facts.actorId(),
+                        facts.attributes(), facts.health(), null, java.util.List.of(), java.util.Set.of()), null);
+        assertTrue(!plain.definition().contains("\"effects\"") && !plain.definition().contains("\"reactions\""),
+                "a fight without them keeps the frozen text it had");
+    }
+
+    /** Attacks and worn gear freeze into the participants that use them, and read back identically. */
+    @Test
     void projectsAttacksAndGear() throws Exception {
         var files = new java.util.TreeMap<>(EncounterPack.files());
         String encounters = new String(files.get("encounters.json"), java.nio.charset.StandardCharsets.UTF_8);
