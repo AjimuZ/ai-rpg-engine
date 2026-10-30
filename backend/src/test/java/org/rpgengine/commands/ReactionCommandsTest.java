@@ -2,6 +2,7 @@ package org.rpgengine.commands;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -42,9 +43,10 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Real PostgreSQL acceptance of P11.4 on campaigns created from the sealed tactics fixture: policies stored and read back,
  * Brace through a real commit, an ability's points, Focus and cooldown across commits, a learned reaction and a counter
- * with recorded draws, an attack's effect that ticks once per round on the player's own Health, a retry that replays
- * everything, refusals that write nothing and a fight frozen earlier that keeps its behaviour. Campaign dice are
- * unpredictable, so each case fixes the outcome through the fixture or recalculates it from what the receipt lists.
+ * with recorded draws, an attack's effect that ticks once per round on the player's own Health, Guard and Brace under one
+ * key, each clock and a cooldown running out across commits, a tick felling a holder once, a retry that replays everything,
+ * refusals that write nothing and a fight frozen earlier that keeps its behaviour. Campaign dice are unpredictable, so each
+ * case fixes the outcome through the fixture or recalculates it from what the receipt lists.
  */
 @SpringBootTest
 class ReactionCommandsTest {
@@ -297,13 +299,169 @@ class ReactionCommandsTest {
                 + "'STRIKE_CALCULATED' order by sequence desc limit 1", String.class, campaign));
     }
 
+    /**
+     * Guard and Brace share one stacking key through a commit: the stance alone meets the next blow and the Brace is skipped
+     * with its reason at no cost; once the stance has ended Brace fires again, and the defense is the same both times.
+     */
+    @Test
+    void guardAndBraceShareOneKeyThroughACommit() {
+        begin();
+        jdbc.update("update actor_resource set maximum_value = 99, current_value = 99, row_version = row_version + 1 "
+                + "where actor_id = ? and resource_key = 'vigor'", player);
+        int fired = events("REACTION_RESOLVED").size();
+        execute(new TypedCommand.Guard());
+        execute(new TypedCommand.EndActivation());
+        assertEquals(14, events("STRIKE_RESOLVED").getLast().get("defense").intValue(), "Guard 12 + the stance, never + Brace");
+        assertEquals(fired, events("REACTION_RESOLVED").size(), "a redundant Brace spends nothing");
+        assertEquals("REDUNDANT", lines("player", "REACTION_SKIPPED").getLast().get("reason").asString());
+
+        execute(new TypedCommand.EndActivation());
+        assertEquals(14, events("STRIKE_RESOLVED").getLast().get("defense").intValue(), "Brace alone gives the same bonus");
+        assertEquals(fired + 1, events("REACTION_RESOLVED").size());
+    }
+
+    /**
+     * Each clock of an entry effect runs through real commits and counts its own unit once: an effect lasting until the next
+     * activation and one lasting one activation end in the holder's first activation; two round ends mean exactly two ticks
+     * and one end. A holder felled by its first tick is defeated once and ticks no more. A retry of the last commit changes nothing.
+     */
+    @Test
+    void effectClocksCountOnceThroughCommits() {
+        begin("clock-pit");
+        execute(new TypedCommand.EndActivation());
+        var held = state().participant("idol").effects();
+        assertEquals(List.of("poisoned"), held.stream().map(CombatEffects.Active::effectId).toList(), "one round end has passed");
+        assertEquals(1, held.getFirst().remaining());
+        assertEquals(1, lines("idol", "TICK").size());
+        assertEquals(EncounterState.Status.DEFEATED, state().participant("reed").status());
+        assertEquals(0, state().participant("reed").health());
+
+        execute(new TypedCommand.EndActivation());
+        var request = envelope(new TypedCommand.EndActivation());
+        var last = executions.execute(owner, adventure, campaign, request);
+        revision = last.operation().committedRevision();
+        int recorded = events("EFFECTS_RESOLVED").size();
+        assertEquals(last.receipt(), executions.execute(owner, adventure, campaign, request).receipt());
+        assertEquals(recorded, events("EFFECTS_RESOLVED").size(), "a retry resolves nothing again");
+
+        var ticks = lines("idol", "TICK");
+        assertEquals(2, ticks.size(), "three round ends passed, and the poison lasts two");
+        assertEquals(2, ticks.stream().map(line -> line.get("triggerKey").asString()).distinct().count());
+        assertEquals(999 - 2, state().participant("idol").health());
+        assertEquals(Map.of("winded", 1L, "stunned", 1L, "poisoned", 1L), lines("idol", "ENDED").stream().collect(
+                java.util.stream.Collectors.groupingBy(line -> line.get("effectId").asString(), java.util.stream.Collectors.counting())));
+        lines("idol", "ENDED").forEach(line -> assertEquals("EXPIRED", line.get("reason").asString()));
+        assertEquals("[]", storedEffects("idol"));
+
+        assertEquals(1, lines("reed", "TICK").size(), "felled by the first");
+        assertEquals(List.of("HOLDER_DEFEATED"), lines("reed", "ENDED").stream().map(line -> line.get("reason").asString()).toList());
+        assertEquals(1, events("PARTICIPANT_DEFEATED").size());
+        assertEquals("[]", storedEffects("reed"));
+    }
+
+    /**
+     * An effect applied during its holder's own activation keeps that fact across commits: the activation in progress does not
+     * count, and the next one is felt whole, with no usable points and a prevented action, before it ends once.
+     */
+    @Test
+    void aFreshEffectWaitsForAWholeActivationAcrossCommits() {
+        begin("clock-pit");
+        int points = state().actionPoints();
+        hold("stunned", 1);
+        assertTrue(state().player().effects().getFirst().fresh(), "read back from its row");
+        execute(new TypedCommand.EndActivation());
+        var held = state().player().effects().getFirst();
+        assertEquals(1, held.remaining(), "the activation in progress did not count");
+        assertFalse(held.fresh());
+        assertEquals(0, state().actionPoints(), "prevented from its start");
+        rejects(OperationAdmissionFailure.Kind.ACTION_PREVENTED, new TypedCommand.Guard());
+        execute(new TypedCommand.EndActivation());
+        assertEquals("[]", storedEffects("player"));
+        assertEquals(1, lines("player", "ENDED").size());
+        assertEquals(points, state().actionPoints(), "the next activation is free");
+    }
+
+    /** A tick that takes the player's last Health reaches its pool, defeats once and ends the holder's effects, on a retry too. */
+    @Test
+    void aTickFellsThePlayerOnceThroughACommit() {
+        begin("clock-pit");
+        jdbc.update("update actor_resource set current_value = 1, row_version = row_version + 1 where actor_id = ? and resource_key = 'vigor'", player);
+        hold("poisoned", 2);
+        var request = envelope(new TypedCommand.EndActivation());
+        var ended = executions.execute(owner, adventure, campaign, request);
+        assertEquals(ended.receipt(), executions.execute(owner, adventure, campaign, request).receipt());
+        assertEquals(0, pool("vigor"));
+        assertEquals(EncounterState.Status.DEFEATED, state().player().status());
+        assertEquals(1, lines("player", "TICK").size());
+        assertEquals(List.of("HOLDER_DEFEATED"), lines("player", "ENDED").stream().map(line -> line.get("reason").asString()).toList());
+        assertEquals(1, events("PARTICIPANT_DEFEATED").stream().filter(event -> "player".equals(event.get("participantId").asString())).count());
+        assertEquals("[]", storedEffects("player"));
+    }
+
+    /**
+     * A cooldown of two rounds blocks the next round and ends on the second, across commits; the second use pays again and the
+     * stored use count and round follow it.
+     */
+    @Test
+    void aCooldownEndsAfterItsRounds() {
+        begin("clock-pit");
+        int round = state().round();
+        long focus = pool("grit");
+        jdbc.update("update actor_resource set current_value = 3, row_version = row_version + 1 where actor_id = ? and resource_key = 'vigor'", player);
+        execute(new TypedCommand.CombatUseAbility("steady", List.of()));
+        assertEquals(5, pool("vigor"));
+
+        var next = execute(new TypedCommand.EndActivation());
+        assertEquals(round + 1, state().round());
+        assertEquals("COOLDOWN", abilityOption(next, "steady").get("disabled"));
+        rejects(OperationAdmissionFailure.Kind.ABILITY_UNAVAILABLE, new TypedCommand.CombatUseAbility("steady", List.of()));
+
+        var cooled = execute(new TypedCommand.EndActivation());
+        assertEquals(round + 2, state().round());
+        assertNull(abilityOption(cooled, "steady").get("disabled"), "a usable ability has no reason");
+        execute(new TypedCommand.CombatUseAbility("steady", List.of()));
+        assertEquals(7, pool("vigor"));
+        assertEquals(focus - 2, pool("grit"));
+        assertEquals(new org.rpgengine.combat.CombatAbility.Use(round + 2, 2), state().player().uses().get("steady"));
+    }
+
     // ---- helpers ------------------------------------------------------------------------------------------------
 
     /** Enter the duel and roll initiative. */
     private void begin() {
-        execute(new TypedCommand.Engage("venom-pit", null));
+        begin("venom-pit");
+    }
+
+    /** Enter a template and roll initiative. */
+    private void begin(String template) {
+        execute(new TypedCommand.Engage(template, null));
         execute(new TypedCommand.RollInitiative());
         assertTrue(state().playerDecision());
+    }
+
+    /** Store one frozen effect on the player as applied during its activation in progress, the way the writer would. */
+    private void hold(String effect, int remaining) {
+        jdbc.update("update encounter_participant set effects = ?::jsonb, row_version = row_version + 1 where participant_id = 'player'",
+                "[{\"instanceId\":\"e90\",\"effectId\":\"" + effect + "\",\"sourceId\":null,\"sequence\":90,\"remaining\":" + remaining
+                        + ",\"stacks\":1,\"absorption\":0,\"untilId\":null,\"fresh\":true}]");
+    }
+
+    /** One participant's stored effects, as text. */
+    private String storedEffects(String participant) {
+        return jdbc.queryForObject("select effects::text from encounter_participant where participant_id = ?", String.class, participant);
+    }
+
+    /** Every public effect line of one holder and kind across the fight, in order. */
+    private List<JsonNode> lines(String holder, String kind) {
+        var lines = new ArrayList<JsonNode>();
+        for (JsonNode resolved : events("EFFECTS_RESOLVED")) {
+            for (JsonNode line : resolved.get("lines")) {
+                if (kind.equals(line.get("kind").asString()) && holder.equals(line.get("holderId").asString())) {
+                    lines.add(line);
+                }
+            }
+        }
+        return lines;
     }
 
     /** Give the player one more learned ability, as advancement would. */

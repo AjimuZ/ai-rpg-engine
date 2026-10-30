@@ -158,7 +158,7 @@ public final class EncounterPack {
             {"id":"stunned","kind":"condition","data":{"name":"Stunned","description":"Cannot act.","durationRounds":1,
               "combat":{"prevents":["actions"],"duration":{"clock":"activations","count":1}}}}""";
 
-    /** The duel added by {@link #tactics()}. */
+    /** The encounters added by {@link #tactics()}. */
     private static final String TACTIC_ENCOUNTERS = """
             ,{"id":"venom-pit","kind":"encounter","data":{"name":"Venom Pit","location":"trailhead",
               "zones":[{"id":"pit","name":"Pit"},{"id":"ledge","name":"Ledge"}],"edges":[{"from":"pit","to":"ledge"}],
@@ -169,6 +169,13 @@ public final class EncounterPack {
                   "damage":{"count":1,"sides":2,"attribute":"none","flat":3},
                   "onHit":[{"condition":"poisoned","phase":"postDamage"}]}],
                 "reactions":[{"id":"snap","trigger":"leavesZone","effect":{"type":"counter","attack":"fang"}}]}],
+              "objectives":[{"id":"last","kind":"survive","rounds":3}]}},
+            {"id":"clock-pit","kind":"encounter","data":{"name":"Clock Pit","location":"trailhead",
+              "zones":[{"id":"pit","name":"Pit"}],"playerZone":"pit",
+              "participants":[{"id":"idol","name":"Idol","side":"hostile","zone":"pit","brace":{"mode":"off"},
+                "conditions":["poisoned","winded","stunned"],"stats":{"health":999,"guard":0,"resistance":0}},
+                {"id":"reed","name":"Reed","side":"hostile","zone":"pit","brace":{"mode":"off"},
+                "conditions":["poisoned"],"stats":{"health":1,"guard":0,"resistance":0}}],
               "objectives":[{"id":"last","kind":"survive","rounds":3}]}}""";
 
     private EncounterPack() {
@@ -207,7 +214,8 @@ public final class EncounterPack {
      * combat forms of its conditions and abilities, and {@code venom-pit}, a duel against an {@code adder} in the player's
      * own zone. Its fang scores at least 14, so it always hits a braced player, deals 3 or 4 past the cloak's armor and poisons;
      * its {@code snap} answers a player who leaves the pit with a counter at no cost, and the adder cannot be missed because its
-     * Brace is off and its Guard 0.
+     * Brace is off and its Guard 0. {@code clock-pit} has no attacks, so only clocks act: an {@code idol} enters holding poison,
+     * {@code winded} and {@code stunned}, and a {@code reed} of 1 Health enters poisoned, so it falls to the first tick.
      *
      * <p>Conditions: {@code poisoned} (additive up to 3, one damage per stack at each round end, two round ends),
      * {@code warded} (absorption 3, persistent, strongest), {@code winded} (attack -2 until the holder's next activation) and

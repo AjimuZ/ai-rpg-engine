@@ -76,6 +76,30 @@ class CombatEffectsTest {
         assertEquals(List.of("e1"), taken.removed().stream().map(Active::instanceId).toList());
     }
 
+    /** An equal magnitude is no stronger: the instance standing stays with its identity and only its duration restarts. */
+    @Test
+    void strongestKeepsTheStandingInstanceOnATie() {
+        var first = effect("first", "k", Stacking.STRONGEST, 1, Clock.ROUND_ENDS, 5, 2, 0);
+        var second = effect("second", "k", Stacking.STRONGEST, 1, Clock.ROUND_ENDS, 2, 2, 0);
+        var kept = apply(List.of(new Active("e1", "first", "s", 1, 1, 1, 0, null, false)), second, library(first, second), 2);
+        assertEquals(Outcome.REFRESHED, kept.outcome());
+        assertEquals(new Active("e1", "first", "s", 1, 5, 1, 0, null, false), kept.held().getFirst());
+        assertEquals(List.of(), kept.removed());
+    }
+
+    /** Every modifier of an additive instance is multiplied by its stacks, and independent instances add up. */
+    @Test
+    void modifiersMultiplyByStacks() {
+        var both = new CombatEffect("both", "k", Stacking.ADDITIVE, 3, Clock.PERSISTENT, 0, false, 2, 1, 3, 2, 0, Set.of(), List.of(), false);
+        var library = library(both);
+        var stacked = List.of(new Active("e1", "both", null, 1, 0, 3, 0, null, false));
+        assertEquals(6, CombatEffects.attack(stacked, library));
+        assertEquals(3, CombatEffects.guard(stacked, library));
+        assertEquals(9, CombatEffects.resistance(stacked, library));
+        var two = List.of(stacked.getFirst(), new Active("e2", "both", null, 2, 0, 1, 0, null, false));
+        assertEquals(8, CombatEffects.attack(two, library));
+    }
+
     /** A weaker shield cannot refill a stronger one that is nearly spent. */
     @Test
     void aWeakerShieldDoesNotRefillAStrongerOne() {
@@ -204,6 +228,11 @@ class CombatEffectsTest {
                 new Active("e3", "low", null, 3, 0, 1, 0, null, false)));
         sorted.sort(CombatEffects.order(library));
         assertEquals(List.of("e9", "e1", "e3", "e4"), sorted.stream().map(Active::instanceId).toList());
+        // The sequence decides before the identity: read as text, e10 would come before e2.
+        var numeric = new ArrayList<>(List.of(new Active("e10", "low", null, 10, 0, 1, 0, null, false),
+                new Active("e2", "low", null, 2, 0, 1, 0, null, false)));
+        numeric.sort(CombatEffects.order(library));
+        assertEquals(List.of("e2", "e10"), numeric.stream().map(Active::instanceId).toList());
     }
 
     /** Absorption is consumed in effect order; a shield that runs out is gone, and one not touched stays. */
@@ -218,6 +247,37 @@ class CombatEffectsTest {
         assertEquals(List.of("e2"), after.stream().map(Active::instanceId).toList(), "the first ran out");
         assertEquals(2, after.getFirst().absorption());
         assertEquals(held, CombatEffects.consumeAbsorption(held, library, 0));
+    }
+
+    /** Absorption follows effect order, not the order instances were stored in: higher priority wears first. */
+    @Test
+    void absorptionFollowsPriorityOverStoredOrder() {
+        var low = new CombatEffect("low", "low", Stacking.STRONGEST, 1, Clock.PERSISTENT, 0, false, 0, 0, 0, 0, 3, Set.of(), List.of(), false);
+        var high = new CombatEffect("high", "high", Stacking.STRONGEST, 1, Clock.PERSISTENT, 0, false, 5, 0, 0, 0, 3, Set.of(), List.of(), false);
+        var held = List.of(new Active("e1", "low", null, 1, 0, 1, 3, null, false), new Active("e2", "high", null, 2, 0, 1, 3, null, false));
+        var after = CombatEffects.consumeAbsorption(held, library(low, high), 2);
+        assertEquals(List.of(3, 1), after.stream().map(Active::absorption).toList());
+    }
+
+    /** A refresh restores a shield's full absorption along with its duration. */
+    @Test
+    void aRefreshRestoresItsAbsorption() {
+        var shield = effect("shield", "k", Stacking.REFRESH, 1, Clock.ROUND_ENDS, 3, 0, 5);
+        var restarted = apply(List.of(new Active("e1", "shield", "s", 1, 1, 1, 2, null, false)), shield, library(shield), 2);
+        assertEquals(Outcome.REFRESHED, restarted.outcome());
+        assertEquals(new Active("e1", "shield", "s", 1, 3, 1, 5, null, false), restarted.held().getFirst());
+    }
+
+    /** Among several instances of a key, an incoming effect is measured against the strongest of them. */
+    @Test
+    void strongestMeetsTheStrongestOfSeveral() {
+        var small = effect("small", "k", Stacking.INDEPENDENT, 3, Clock.ROUND_ENDS, 5, 1, 0);
+        var big = effect("big", "k", Stacking.INDEPENDENT, 3, Clock.ROUND_ENDS, 5, 3, 0);
+        var middle = effect("middle", "k", Stacking.STRONGEST, 1, Clock.ROUND_ENDS, 2, 2, 0);
+        var held = List.of(new Active("e1", "small", "s", 1, 1, 1, 0, null, false), new Active("e2", "big", "s", 2, 1, 1, 0, null, false));
+        var kept = apply(held, middle, library(small, big, middle), 3);
+        assertEquals(Outcome.REFRESHED, kept.outcome());
+        assertEquals(List.of(1, 5), kept.held().stream().map(Active::remaining).toList(), "only the strongest restarted");
     }
 
     /** An activation counts only when the instance was there when it started; expiry reports the instance. */

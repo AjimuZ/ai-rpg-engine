@@ -1653,8 +1653,12 @@ P11.4 (30 October 2026) adds the Guard/Brace stacking of QA-11 and the effect cl
 QA-09/QA-11–13 result, on `CombatEffectsTest`, `CombatReactionsTest` and `ReactionCommandsTest`: Brace meeting one attack per
 round under one stacking key, the situational cap and Resistance, every stacking mode, each of the eight phases firing once
 for its trigger with distinct trigger keys, each clock counting only its unit, a poisoned participant who falls at its
-activation start receiving no points, reactions that never chain, and sixty seeded fights keeping every bound. Effects through
-renewal and restore wait for P11.6, terminal outcomes for P11.5, and observed balance for P18.3.
+activation start receiving no points, reactions that never chain, and sixty seeded fights keeping every bound. On real
+PostgreSQL through commits: Guard and Brace under one key, each clock of an entry effect ending once with exactly two poison
+ticks over three round ends, a holder felled by its first tick defeated once and ticking no more, the player's pool reaching
+exactly zero with a retry that changes nothing, an effect applied in the holder's own activation waiting for the next, and a
+cooldown of two rounds refusing, ending and paying again. Effects through renewal and restore wait for P11.6, terminal
+outcomes for P11.5, and observed balance for P18.3, so the renewal half of QA-12 and QA-09 stay open.
 
 ## 4. Long-campaign evaluation
 

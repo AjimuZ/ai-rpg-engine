@@ -243,6 +243,13 @@ class CombatReactionsTest {
         assertEquals(List.of("rex", "zed", "amy"), notes(plan, "REACTION_RESOLVED").stream()
                 .map(note -> note.payload().get("participantId")).toList(), "priority first, then rank, not the ID alone");
         assertEquals("mid", after(state, plan).player().zone(), "a mover who survives arrives");
+
+        var zed = new CombatReaction("zed", Trigger.ATTACKED, 0, 0, false, CombatReaction.Attacks.ANY, Kind.ABSORB, 1, null, null, false);
+        var amy = new CombatReaction("amy", Trigger.ATTACKED, 0, 0, false, CombatReaction.Attacks.ANY, Kind.ABSORB, 1, null, null, false);
+        var own = fight(values("reactionsPerRound", 2), player().guard(40).react(zed, Policy.FIRST).react(amy, Policy.FIRST), foe("foe").attacks(CLAW));
+        var answered = CombatScheduler.apply(own, new TacticalIntent.EndActivation(), script(1, 1));
+        assertEquals(List.of("amy", "zed"), notes(answered, "REACTION_RESOLVED").stream().map(note -> note.payload().get("reactionId")).toList(),
+                "one reactor's equal reactions run by their IDs, not as declared");
     }
 
     /** Leaving a zone provokes only a reaction that declares it: Brace and a plain opponent do nothing. */
@@ -306,6 +313,161 @@ class CombatReactionsTest {
         var after = after(state, plan);
         assertEquals(40, after.participant("foe").health());
         assertEquals(7, after.participant("foe").effects().getFirst().absorption(), "only what the reaction did not take");
+
+        var bare = fight(values(), player().attacks(BLADE), foe("foe").guard(0).health(40, 40).react(sidestep, Policy.FIRST));
+        var taken = after(bare, CombatScheduler.apply(bare, strike("blade", "foe"), script(5, 5, 2, 3)));
+        assertEquals(40 - 3, taken.participant("foe").health(), "the same 7 less the reaction's 4, with no shield to help");
+    }
+
+    /** A protective reaction answers only for an ally in the reactor's own zone, never for an opponent. */
+    @Test
+    void protectionStaysWithAlliesInTheZone() {
+        var cover = new CombatReaction("cover", Trigger.ATTACKED, 0, 0, true, CombatReaction.Attacks.ANY, Kind.ABSORB, 1, null, null, false);
+        var state = fight(values(), player().guard(40), foe("foe").attacks(CLAW), foe("brother").react(cover, Policy.FIRST),
+                ally("near").react(cover, Policy.FIRST), ally("distant").zone("mid").react(cover, Policy.FIRST));
+        var plan = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script(1, 1));
+        assertEquals(List.of("near"), notes(plan, "REACTION_RESOLVED").stream().map(note -> note.payload().get("participantId")).toList());
+    }
+
+    /** Leaving a zone provokes only an opponent standing in that zone, and an applied effect lands on the leaver. */
+    @Test
+    void aMoveProvokesOnlyOpponentsInTheZone() {
+        var hex = effect("hex", Clock.PERSISTENT, 0, e -> e.guard = -1);
+        var trip = new CombatReaction("trip", Trigger.LEAVES_ZONE, 0, 0, false, CombatReaction.Attacks.ANY, Kind.APPLY, 0, null, "hex", true);
+        var state = library(fight(values(), player().guard(40), foe("near").react(trip, Policy.FIRST),
+                foe("distant").zone("mid").react(trip, Policy.FIRST), ally("friend").react(trip, Policy.FIRST)), hex);
+        var plan = CombatScheduler.apply(state, new TacticalIntent.MoveZone("mid"), script());
+        assertEquals(List.of("near"), notes(plan, "REACTION_RESOLVED").stream().map(note -> note.payload().get("participantId")).toList());
+        assertEquals(List.of("hex"), after(state, plan).player().effects().stream().map(Active::effectId).toList());
+        assertTrue(after(state, plan).participant("near").effects().isEmpty());
+    }
+
+    /** A counter uses the attack it names, not the first declared one, and an attack without its ammunition makes no counter. */
+    @Test
+    void aCounterUsesItsNamedAttackAndItsAmmunition() {
+        var fang = new CombatAttack("fang", "force", 1, 1, 6, "force", 0, 0, 0, CombatAttack.Defense.GUARD, false, null);
+        var bite = new CombatReaction("bite", Trigger.HIT, 0, 0, false, CombatReaction.Attacks.ANY, Kind.COUNTER, 0, "fang", null, false);
+        var named = fight(values(), player().attacks(BLADE).guard(10), foe("foe").guard(10).attacks(CLAW, fang).react(bite, Policy.FIRST));
+        var answered = CombatScheduler.apply(named, strike("blade", "foe"), script(9, 9, 3, 2, 9, 9, 2));
+        assertEquals("fang", notes(answered, "STRIKE_RESOLVED").get(1).payload().get("attackId"));
+
+        var crossbow = new CombatAttack("crossbow", "force", 1, 1, 6, "force", 0, 0, 0, CombatAttack.Defense.GUARD, false, "arrows");
+        var unarmed = fight(values(), player().attacks(BLADE).guard(10), foe("foe").guard(10).attacks(crossbow).react(RIPOSTE, Policy.FIRST));
+        var quiet = CombatScheduler.apply(unarmed, strike("blade", "foe"), script(9, 9, 3, 2));
+        assertEquals(1, count(quiet, "STRIKE_RESOLVED"), "a non-player carries no ammunition of its own");
+        assertEquals(0, count(quiet, "REACTION_RESOLVED"));
+
+        var empty = fight(values(), player().guard(0).attacks(crossbow).react(RIPOSTE, Policy.FIRST), foe("foe").attacks(CLAW));
+        var skipped = CombatScheduler.apply(empty, new TacticalIntent.EndActivation(), script(9, 9, 1));
+        assertEquals("NO_ATTACK_IN_REACH", line(skipped, "REACTION_SKIPPED").get("reason"));
+        assertEquals(1, count(skipped, "STRIKE_RESOLVED"));
+    }
+
+    /** A counter needs a standing attacker: once one reaction has felled it, the next is skipped with no draw. */
+    @Test
+    void aCounterNeedsAStandingAttacker() {
+        var guardian = new CombatReaction("guardian", Trigger.HIT, 5, 0, true, CombatReaction.Attacks.ANY, Kind.COUNTER, 0, null, null, false);
+        var state = fight(values(), player().guard(0).attacks(BLADE).react(RIPOSTE, Policy.FIRST),
+                foe("foe").guard(0).health(1, 24).attacks(CLAW), ally("friend").attacks(CLAW).react(guardian, Policy.FIRST));
+        var plan = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script(9, 9, 1, 9, 9, 1));
+        assertEquals(EncounterState.Status.DEFEATED, after(state, plan).participant("foe").status());
+        assertEquals("UNAVAILABLE", line(plan, "REACTION_SKIPPED").get("reason"));
+        assertEquals(2, count(plan, "STRIKE_RESOLVED"));
+    }
+
+    /** However many reactions could answer, at most twelve fire in one operation. */
+    @Test
+    void reactionsStopAtTheOperationBound() {
+        var rivals = new ArrayList<Builder>();
+        for (int index = 0; index < EncounterTemplate.MAX_PARTICIPANTS; index++) {
+            var rival = foe("rival-" + index).guard(40);
+            for (String id : List.of("cover-a", "cover-b", "cover-c")) {
+                rival.react(new CombatReaction(id, Trigger.ATTACKED, 0, 0, true, CombatReaction.Attacks.ANY, Kind.ABSORB, 1, null, null, false),
+                        Policy.FIRST);
+            }
+            rivals.add(rival);
+        }
+        var state = fight(values("reactionsPerRound", 3), player().attacks(BLADE), rivals.toArray(new Builder[0]));
+        var plan = CombatScheduler.apply(state, strike("blade", "rival-0"), script(1, 1));
+        assertEquals(CombatScheduler.MAX_REACTIONS, count(plan, "REACTION_RESOLVED"), "budgets alone would allow 24");
+    }
+
+    /** Frozen reactions and policies keep their shape: a broken form is refused, not interpreted. */
+    @Test
+    void brokenReactionFormsAreRefused() {
+        assertThrows(IllegalArgumentException.class, () -> new CombatReaction("x", Trigger.HIT, 0, 0, false, CombatReaction.Attacks.ANY,
+                Kind.GUARD, 1, null, null, false), "a landed blow cannot be guarded against");
+        assertThrows(IllegalArgumentException.class, () -> new CombatReaction("x", Trigger.ATTACKED, 0, 0, false, CombatReaction.Attacks.ANY,
+                Kind.COUNTER, 0, null, null, false), "a counter answers what happened, not what is declared");
+        assertThrows(IllegalArgumentException.class, () -> new Policy(Policy.Mode.FOCUS_AT_LEAST, 0));
+        assertThrows(IllegalArgumentException.class, () -> new Policy(Policy.Mode.FOCUS_AT_LEAST, CombatReaction.FOCUS_MAX + 1));
+    }
+
+    /** A reaction answers only the attacks it declares: a melee one ignores a ranged attack, and the reverse. */
+    @Test
+    void aReactionAnswersOnlyItsAttacks() {
+        var melee = new CombatReaction("melee", Trigger.ATTACKED, 0, 0, false, CombatReaction.Attacks.MELEE, Kind.ABSORB, 1, null, null, false);
+        var ranged = new CombatReaction("ranged", Trigger.ATTACKED, 0, 0, false, CombatReaction.Attacks.RANGED, Kind.ABSORB, 1, null, null, false);
+        for (var pair : List.of(Map.entry(CLAW, "melee"), Map.entry(BOLT, "ranged"))) {
+            var state = fight(values(), player().guard(40).react(melee, Policy.FIRST).react(ranged, Policy.FIRST), foe("foe").attacks(pair.getKey()));
+            var plan = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script(1, 1));
+            assertEquals(List.of(pair.getValue()), notes(plan, "REACTION_RESOLVED").stream().map(note -> note.payload().get("reactionId")).toList());
+        }
+    }
+
+    /** A reaction to damage fires only when the attack took Health: a blow stopped by armor provokes nothing. */
+    @Test
+    void aDamagedReactionNeedsHealthTaken() {
+        var hex = effect("hex", Clock.PERSISTENT, 0, e -> e.guard = -1);
+        var sting = new CombatReaction("sting", Trigger.DAMAGED, 0, 0, false, CombatReaction.Attacks.ANY, Kind.APPLY, 0, null, "hex", true);
+        var open = library(fight(values(), player().guard(0).react(sting, Policy.FIRST), foe("foe").attacks(CLAW)), hex);
+        var hurt = CombatScheduler.apply(open, new TacticalIntent.EndActivation(), script(9, 9, 1));
+        assertEquals(1, count(hurt, "REACTION_RESOLVED"));
+        assertEquals(List.of("hex"), after(open, hurt).participant("foe").effects().stream().map(Active::effectId).toList());
+
+        var armored = library(fight(values(), player().guard(0).armor(9).react(sting, Policy.FIRST), foe("foe").attacks(CLAW)), hex);
+        assertEquals(0, count(CombatScheduler.apply(armored, new TacticalIntent.EndActivation(), script(9, 9, 1)), "REACTION_RESOLVED"));
+    }
+
+    /** Two reactions' Guard bonuses never add, under their one stacking key; two absorptions against one blow do. */
+    @Test
+    void reactionBonusesFollowTheirKind() {
+        var low = new CombatReaction("low", Trigger.ATTACKED, 5, 0, false, CombatReaction.Attacks.ANY, Kind.GUARD, 2, null, null, false);
+        var high = new CombatReaction("high", Trigger.ATTACKED, 0, 0, false, CombatReaction.Attacks.ANY, Kind.GUARD, 3, null, null, false);
+        var guarded = fight(values("reactionsPerRound", 2), player().guard(10).react(low, Policy.FIRST).react(high, Policy.FIRST), foe("foe").attacks(CLAW));
+        var braced = CombatScheduler.apply(guarded, new TacticalIntent.EndActivation(), script(1, 1));
+        assertEquals(2, count(braced, "REACTION_RESOLVED"));
+        assertEquals(13, note(braced, "STRIKE_RESOLVED").payload().get("defense"), "the higher of 2 and 3");
+
+        var heavy = new CombatAttack("heavy", "force", 1, 1, 6, "force", 20, 0, 0, CombatAttack.Defense.GUARD, false, null);
+        var two = new CombatReaction("two", Trigger.HIT, 0, 0, false, CombatReaction.Attacks.ANY, Kind.ABSORB, 2, null, null, false);
+        var three = new CombatReaction("three", Trigger.HIT, 0, 0, false, CombatReaction.Attacks.ANY, Kind.ABSORB, 3, null, null, false);
+        var absorbing = fight(values("reactionsPerRound", 2), player().guard(0).react(two, Policy.FIRST).react(three, Policy.FIRST), foe("foe").attacks(heavy));
+        var plan = CombatScheduler.apply(absorbing, new TacticalIntent.EndActivation(), script(9, 9, 1));
+        assertEquals(24 - (1 + 1 + 20 - 2 - 3), after(absorbing, plan).player().health());
+    }
+
+    /** An effect a reaction would put on an attacker that a counter has already felled is not applied. */
+    @Test
+    void aReactionAppliesNothingToAFallenAttacker() {
+        var hex = effect("hex", Clock.PERSISTENT, 0, e -> e.guard = -1);
+        var sting = new CombatReaction("sting", Trigger.DAMAGED, 0, 0, false, CombatReaction.Attacks.ANY, Kind.APPLY, 0, null, "hex", true);
+        var state = library(fight(values("reactionsPerRound", 2), player().guard(0).attacks(CLAW).react(RIPOSTE, Policy.FIRST).react(sting, Policy.FIRST),
+                foe("foe").guard(0).health(1, 24).attacks(CLAW)), hex);
+        var plan = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script(9, 9, 1, 9, 9, 1));
+        assertEquals(EncounterState.Status.DEFEATED, after(state, plan).participant("foe").status());
+        assertEquals(0, lines(plan, "APPLIED").size());
+        assertTrue(after(state, plan).participant("foe").effects().isEmpty());
+    }
+
+    /** A counter has to reach: a melee answer to a ranged attacker in another zone is skipped with its reason and no draw. */
+    @Test
+    void aCounterHasToReach() {
+        var state = fight(values(), player().guard(0).attacks(CLAW).react(RIPOSTE, Policy.FIRST), foe("archer").zone("mid").attacks(BOLT));
+        // The bolt may strike hard, so it draws a strong die after its damage die.
+        var plan = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script(9, 9, 1, 1));
+        assertEquals("NO_ATTACK_IN_REACH", line(plan, "REACTION_SKIPPED").get("reason"));
+        assertEquals(1, count(plan, "STRIKE_RESOLVED"));
     }
 
     // ---- phases, clocks and stacking -------------------------------------------------------------------------------
@@ -339,6 +501,20 @@ class CombatReactionsTest {
         assertEquals(keys.size(), new HashSet<>(keys).size(), "no effect resolves twice for one trigger key: " + keys);
         state = after(state, ended);
         assertEquals(99 - (8 - 0) - 4, state.player().health(), "eight ticks at 1 and the claw's 3 + 1");
+    }
+
+    /** A target felled by its own pre-roll tick leaves nothing to roll against: the attempt is paid and no die is drawn. */
+    @Test
+    void aTargetFellingBeforeTheRollEndsTheAttack() {
+        var burn = tick("burn", Phase.PRE_ROLL, 5, false);
+        var state = library(fight(values(), player().attacks(BLADE), foe("foe").guard(0).health(3, 9).holding(active(burn, 1, 0))), burn);
+        var plan = CombatScheduler.apply(state, strike("blade", "foe"), script());
+        var after = after(state, plan);
+        assertEquals(EncounterState.Status.DEFEATED, after.participant("foe").status());
+        assertEquals("TARGET_DOWN", note(plan, "STRIKE_LAPSED").payload().get("reason"));
+        assertEquals(0, count(plan, "STRIKE_RESOLVED"));
+        assertEquals(1, after.actionPoints(), "the attempt is paid");
+        assertEquals(EncounterPhase.AWAITING_ACTION, after.phase());
     }
 
     /** A second action in the same round is a new trigger, with its own key. */
@@ -452,6 +628,87 @@ class CombatReactionsTest {
         assertEquals(8, last.elapsedSeconds(), "the clock adds exactly the round's time");
     }
 
+    /** An effect lasting until its source's next activation ignores the holder's and ends at the source's, on another holder. */
+    @Test
+    void anEffectCanLastUntilItsSourcesNextActivation() {
+        var exposed = new CombatEffect("exposed", "exposed", Stacking.STRONGEST, 1, Clock.NEXT_ACTIVATION, 0, true, 0, -2, 0, 0, 0, Set.of(), List.of(), false);
+        var marking = new CombatAttack("mark", "force", 1, 1, 6, "force", 0, 0, 0, CombatAttack.Defense.GUARD, false, null,
+                List.of(new CombatAttack.OnHit("exposed", Phase.POST_HIT, false)));
+        var state = library(fight(values(), player().guard(0), foe("alpha").attacks(marking)), exposed);
+        state = after(state, CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script(9, 9, 1)));
+        assertEquals("alpha", state.player().effects().getFirst().untilId());
+        assertEquals("e1", state.player().effects().getFirst().instanceId(), "the player's own activation started and it stayed");
+        var next = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script(9, 9, 1));
+        assertEquals("e1", line(next, "ENDED").get("instanceId"));
+        assertEquals("player", line(next, "ENDED").get("holderId"));
+        assertEquals("EXPIRED", line(next, "ENDED").get("reason"));
+    }
+
+    /** Simultaneous ticks follow effect order across holders, not the roster. */
+    @Test
+    void simultaneousTicksFollowEffectOrder() {
+        var low = tick("low", Phase.ROUND_END, 1, false);
+        var high = new CombatEffect("high", "high", Stacking.STRONGEST, 1, Clock.PERSISTENT, 0, false, 5, 0, 0, 0, 0, Set.of(),
+                List.of(new CombatEffect.Tick(Phase.ROUND_END, 1, false)), false);
+        var state = library(fight(values(), player().holding(active(low, 1, 0)), foe("foe").holding(active(high, 2, 0))), low, high);
+        var plan = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script());
+        assertEquals(List.of("high", "low"), lines(plan, "TICK").stream().map(line -> line.get("effectId")).toList());
+    }
+
+    /** A tick states the player's own Health; another participant's Health and any absorption stay in the internal record. */
+    @Test
+    void ticksKeepHiddenValuesInternal() {
+        var sting = tick("sting", Phase.ROUND_END, 2, false);
+        var ward = effect("ward", Clock.PERSISTENT, 0, e -> e.absorption = 1);
+        var state = library(fight(values(), player().holding(active(sting, 1, 0)), foe("foe").holding(active(sting, 2, 0), active(ward, 3, 1))), sting, ward);
+        var plan = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script());
+        var ticks = lines(plan, "TICK");
+        assertEquals(22, ticks.get(0).get("healthAfter"));
+        assertEquals("foe", ticks.get(1).get("holderId"));
+        assertEquals(1L, ((Number) ticks.get(1).get("damage")).longValue());
+        assertFalse(ticks.get(1).containsKey("healthAfter"));
+        assertFalse(ticks.get(1).containsKey("absorbed"));
+        var hidden = note(plan, "EFFECTS_CALCULATED");
+        assertTrue(hidden.internal());
+        assertFalse(note(plan, "EFFECTS_RESOLVED").internal());
+        var foeLine = ((List<?>) hidden.payload().get("lines")).stream().map(line -> (Map<?, ?>) line)
+                .filter(line -> "foe".equals(line.get("holderId"))).findFirst().orElseThrow();
+        assertEquals(1, ((Number) foeLine.get("absorbed")).intValue());
+        assertEquals(23, foeLine.get("healthAfter"));
+    }
+
+    /** A tick meets absorption before Health, and an effect whose shield that spends fires no more in this phase. */
+    @Test
+    void ticksMeetAbsorptionAndEndWhatTheySpend() {
+        var sting = new CombatEffect("sting", "sting", Stacking.STRONGEST, 1, Clock.PERSISTENT, 0, false, 5, 0, 0, 0, 0, Set.of(),
+                List.of(new CombatEffect.Tick(Phase.ROUND_END, 1, false)), false);
+        var shell = new CombatEffect("shell", "shell", Stacking.STRONGEST, 1, Clock.PERSISTENT, 0, false, 0, 0, 0, 0, 1, Set.of(),
+                List.of(new CombatEffect.Tick(Phase.ROUND_END, 3, false)), false);
+        var state = library(fight(values(), player().holding(active(sting, 1, 0), active(shell, 2, 1)), foe("foe")), sting, shell);
+        var plan = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script());
+        var after = after(state, plan);
+        assertEquals(24, after.player().health(), "the shell took the sting");
+        assertEquals(1, lines(plan, "TICK").size(), "the shell was spent before its own tick");
+        assertEquals("DEPLETED", line(plan, "ENDED").get("reason"));
+        assertEquals(List.of("sting"), after.player().effects().stream().map(Active::effectId).toList());
+    }
+
+    /** An effect the player applies to itself in its own activation waits for the next, which is felt whole. */
+    @Test
+    void anEffectAppliedInTheOwnActivationWaitsForTheNext() {
+        var dazed = effect("dazed", Clock.ACTIVATIONS, 1, e -> e.attack = -1);
+        var daze = new CombatAbility("daze", 1, CombatAbility.Limit.NONE, 0, 0, CombatAbility.Targets.SELF, 1, 0,
+                List.of(new CombatAbility.Operation(CombatAbility.Kind.APPLY, 0, 0, null, 0, 0, "dazed", true)));
+        var state = library(fight(values(), player().abilities(daze), foe("foe")), dazed);
+        state = after(state, CombatScheduler.apply(state, new TacticalIntent.UseAbility("daze", List.of()), script()));
+        assertTrue(state.player().effects().getFirst().fresh());
+        state = after(state, CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script()));
+        assertEquals(1, state.player().effects().getFirst().remaining(), "the activation in progress did not count");
+        assertFalse(state.player().effects().getFirst().fresh());
+        state = after(state, CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script()));
+        assertTrue(state.player().effects().isEmpty());
+    }
+
     /** Modifiers reach the attack score and the defense, capped by the profile in both directions. */
     @Test
     void modifiersMeetTheirCaps() {
@@ -512,6 +769,13 @@ class CombatReactionsTest {
         var missed = CombatScheduler.apply(library(fight(values(), player().attacks(attack), foe("foe").guard(40)), mark, bleed),
                 strike("barb", "foe"), script(1, 1));
         assertEquals(0, count(missed, "EFFECTS_RESOLVED"), "a miss applies nothing");
+
+        var cost = new CombatAttack("cost", "force", 2, 1, 2, null, 0, 0, 0, CombatAttack.Defense.GUARD, false, null,
+                List.of(new CombatAttack.OnHit("mark", Phase.POST_HIT, true)));
+        var own = library(fight(values(), player().attacks(cost), foe("foe").guard(0).health(9, 9)), mark);
+        var paid = after(own, CombatScheduler.apply(own, strike("cost", "foe"), script(5, 5, 1)));
+        assertEquals(List.of("mark"), paid.player().effects().stream().map(Active::effectId).toList(), "an effect on the attacker itself");
+        assertTrue(paid.participant("foe").effects().isEmpty());
     }
 
     /** Conditions a participant came with become instances once, in the initiative operation. */
@@ -658,15 +922,19 @@ class CombatReactionsTest {
     void abilityTargetsAndDice() {
         var volley = new CombatAbility("volley", 2, CombatAbility.Limit.NONE, 0, 0, CombatAbility.Targets.HOSTILE, 2, 1,
                 List.of(new CombatAbility.Operation(CombatAbility.Kind.DAMAGE, 2, 4, "force", 1, 1, null, false)));
-        var state = fight(values(), player().abilities(volley), foe("near").armor(1).health(20, 20),
+        var single = new CombatAbility("single", 2, CombatAbility.Limit.NONE, 0, 0, CombatAbility.Targets.HOSTILE, 1, 1,
+                List.of(new CombatAbility.Operation(CombatAbility.Kind.DAMAGE, 2, 4, "force", 1, 1, null, false)));
+        var state = fight(values(), player().abilities(volley, single), foe("near").armor(1).health(20, 20),
                 foe("next").armor(3).zone("mid").health(20, 20), foe("away").zone("far"), foe("hidden").zone("murk"),
-                ally("friend"));
+                foe("fallen").health(0, 20).status(EncounterState.Status.DEFEATED), ally("friend"));
         assertEquals(List.of("near", "next"), ability(state, "volley").get("targets"), "range 1; the obscured zone is out of sight");
-        for (var illegal : List.of(List.of("away"), List.of("hidden"), List.of("friend"), List.of("player"), List.of("ghost"),
+        for (var illegal : List.of(List.of("away"), List.of("hidden"), List.of("fallen"), List.of("friend"), List.of("player"), List.of("ghost"),
                 List.<String>of(), List.of("near", "next", "near"), List.of("near", "near"))) {
             assertEquals(TacticalRules.Refusal.TARGET, TacticalRules.refusal(state, new TacticalIntent.UseAbility("volley", illegal)),
                     illegal.toString());
         }
+        assertEquals(TacticalRules.Refusal.TARGET, TacticalRules.refusal(state, new TacticalIntent.UseAbility("single", List.of("near", "next"))),
+                "more targets than it allows");
         var plan = CombatScheduler.apply(state, new TacticalIntent.UseAbility("volley", List.of("near", "next")), script(2, 3));
         var after = after(state, plan);
         // 2 + 3 + force 2 + flat 1 = 8; penetration 1 leaves armor 0 on near and armor 2 on next.
@@ -683,6 +951,21 @@ class CombatReactionsTest {
         var alone = fight(values(), player().abilities(self), foe("foe"));
         assertEquals(TacticalRules.Refusal.TARGET, TacticalRules.refusal(alone, new TacticalIntent.UseAbility("self", List.of("foe"))));
         assertEquals(TacticalRules.Refusal.ABILITY, TacticalRules.refusal(alone, new TacticalIntent.UseAbility("missing", List.of())));
+    }
+
+    /** A target felled by an earlier operation is skipped by the later ones: no second blow and no effect on the fallen. */
+    @Test
+    void laterOperationsSkipAFallenTarget() {
+        var hex = effect("hex", Clock.PERSISTENT, 0, e -> e.guard = -1);
+        var flurry = new CombatAbility("flurry", 1, CombatAbility.Limit.NONE, 0, 0, CombatAbility.Targets.HOSTILE, 1, 0, List.of(
+                new CombatAbility.Operation(CombatAbility.Kind.DAMAGE, 0, 0, null, 5, 0, null, false),
+                new CombatAbility.Operation(CombatAbility.Kind.DAMAGE, 0, 0, null, 5, 0, null, false),
+                new CombatAbility.Operation(CombatAbility.Kind.APPLY, 0, 0, null, 0, 0, "hex", false)));
+        var state = library(fight(values(), player().abilities(flurry), foe("foe").health(1, 24)), hex);
+        var plan = CombatScheduler.apply(state, new TacticalIntent.UseAbility("flurry", List.of("foe")), script());
+        assertEquals(1, lines(plan, "DAMAGE").size());
+        assertEquals(0, lines(plan, "APPLIED").size());
+        assertTrue(after(state, plan).participant("foe").effects().isEmpty());
     }
 
     /** Apply and remove reach the participants the ability names, and removal is what a persistent clock waits for. */
@@ -703,6 +986,13 @@ class CombatReactionsTest {
         assertEquals("REMOVED", line(cleansed, "ENDED").get("reason"));
         assertTrue(after(state, cleansed).player().effects().isEmpty());
         assertEquals(1, after(state, cleansed).participant("foe").effects().size());
+
+        var steel = new CombatAbility("steel", 1, CombatAbility.Limit.NONE, 0, 0, CombatAbility.Targets.HOSTILE, 1, 1,
+                List.of(new CombatAbility.Operation(CombatAbility.Kind.APPLY, 0, 0, null, 0, 0, "hex", true)));
+        var named = library(fight(values(), player().abilities(steel), foe("foe")), hex);
+        var steeled = after(named, CombatScheduler.apply(named, new TacticalIntent.UseAbility("steel", List.of("foe")), script()));
+        assertEquals(1, steeled.player().effects().size(), "an operation to self ignores the target it was aimed with");
+        assertTrue(steeled.participant("foe").effects().isEmpty());
     }
 
     // ---- bounds and determinism ------------------------------------------------------------------------------------

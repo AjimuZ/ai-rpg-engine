@@ -24,6 +24,9 @@
   abilities (P12); converting remaining effects when a fight ends (P11.5) and recovery from the checkpoint (P11.6); a frontend
   control or panel (P12). Ready and Assess still have no combat form. Balance remains unproven. See
   [ADR 0031](docs/adr/0031-predeclared-reactions-effect-phases-and-cooldowns.md).
+- Verified: 192 deliberate weakenings of these rules on exported copies led to new tests and no change in behaviour, and clocks,
+  cooldowns and Guard with Brace now also run through real commits on PostgreSQL. Effects across context renewal and restore
+  remain unproven until P11.6. The [roadmap entry](docs/16-development-roadmap.md#15-p11--deterministic-combat-foundation) has the results.
 
 ## Unreleased — Attacks, defense, damage and healing with recorded draws (P11.3), 30 October 2026
 

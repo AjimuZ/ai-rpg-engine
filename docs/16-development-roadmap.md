@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 66/130 tasks verified.** The owner withdrew the pending P98 review entry on 30 October 2026, so older records below that count 131 entries or mention a pending P98 follow-up describe the queue as it stood then. The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1, P11.2 and P11.3. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 67/130 tasks verified.** The owner withdrew the pending P98 review entry on 30 October 2026, so older records below that count 131 entries or mention a pending P98 follow-up describe the queue as it stood then. The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1, P11.2, P11.3 and P11.4. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -2701,17 +2701,49 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     compile error; those ten and two more on the receipt fix gained tests in `db33432` and all twelve then failed a test.
     Not proven here: the 18 Docker-dependent probe cases, the `unzip` wrapper cases, a live V24 dump and restore, Brace in
     the worked fight, balance of the provisional numbers and independent review of the two new Italian messages.
-- [ ] P11.4 Implement predeclared reactions, stacking caps, effect phases, durations, cooldowns, and no-chain limits.
-  - Partial checkpoint (30 October 2026): `3a71b4a` implements Brace, declared reactions, the closed `combat` block on
-    conditions and abilities, eight effect phases, clocks and cooldowns, V25, backup schema 25 and
-    [ADR 0031](adr/0031-predeclared-reactions-effect-phases-and-cooldowns.md). It stays unchecked: its session stopped when
-    the deliberate weakenings began, so no weakening result exists and 19 further test lines are not yet committed.
-  - Verified on `3fae597` (JDK 21.0.12.1 and PostgreSQL 18.6 in the images pinned by ADR 0009, sources copied into a Docker
-    volume, on the Windows reference host): `./mvnw -B -ntp clean verify` ran 1,073 tests with 0 failures, 0 errors and 4
-    skipped (`PackagedInterfaceTest`); frontend typecheck, unit tests, localization tests, production and locale builds
-    passed; repository checks had 0 findings; repository, backup and runtime probe tests passed with 11, 1 and 18 skipped.
-    Not run: the `packaged-ui` profile, Docker-dependent probe cases, a live V25 dump and restore. Not reviewed
-    independently: the two new Italian messages.
+- [x] P11.4 Implement predeclared reactions, stacking caps, effect phases, durations, cooldowns, and no-chain limits.
+  - Package A — frozen forms ([ADR 0031](adr/0031-predeclared-reactions-effect-phases-and-cooldowns.md), `3a71b4a`): the closed
+    `combat` block on conditions and abilities, template `reactions` and entry `conditions`, attack `onHit` effects, all
+    frozen at entry, so an effect never reads the pack during a fight.
+  - Package B — resolution: Brace on by default under the Guard action's stacking key; reactions at depth one inside the
+    provoking action; eight effect phases, six clocks and five stacking modes in pure `CombatEffects`; explicit prevention;
+    `COMBAT_USE_ABILITY` with points, Focus, cooldown, limit and up to four operations; `SET_REACTION_POLICY`.
+  - Package C — storage and record: V25 and backup schema 25; public `REACTION_RESOLVED`, `REACTION_POLICY_SET`,
+    `COMBAT_ABILITY_USED`, `STRIKE_LAPSED` and `EFFECTS_RESOLVED`, internal `EFFECTS_CALCULATED`; refusals
+    `COMMAND_REACTION_UNAVAILABLE` and `COMMAND_ACTION_PREVENTED`; receipt effects, abilities, policies and reactions left.
+  - Exit checks: the QA-11 Guard/Brace stacking and the QA-12 clocks on PostgreSQL, every phase, clock and stacking mode in pure
+    tests, reactions that never chain, the bounds of the largest fight, seeded fights, and weakening probes on an exported copy.
+  - Limits: bounds per operation are 12 reactions, 64 automatic ticks and a counter only up to draw 58; items cannot apply or
+    remove effects and multi-target items stay refused; non-player participants use no abilities (P12.3/P12.4); no forced
+    movement; Ready and Assess have no combat form and no later task names them, so P11.5 decides this with Withdraw; effects
+    are not converted when a fight ends and escape or surrender does not clear them (P11.5); the V16 checkpoint records no
+    encounter (P11.6); entry's receipt does not list reactions; no frontend control or panel (P12).
+  - Verification (30 October 2026, JDK 21.0.12.1 and PostgreSQL 18.6 in the images pinned by ADR 0009, on the Windows reference
+    host): `sh .agents/ralph/verify.sh full` passed on this tree. Backend `clean verify -Ppackaged-ui` ran 1,101 tests with 0
+    failures, 0 errors and 0 skipped (`PackagedInterfaceTest` included); frontend typecheck, 99 unit tests, localization
+    tests, production and locale builds passed; repository checks had 0 findings; repository tests 38 with 11 skipped, backup 9
+    with 1 skipped, runtime probe 116 with 18 skipped, Docker requirement 4, hardware profile 12 in a Linux container.
+    The 19 test lines saved from the stopped session are kept. New on PostgreSQL in `ReactionCommandsTest` (13 cases, on a new
+    `clock-pit` fixture encounter with no attacks): Guard and Brace under one key through commits, a next-activation, an
+    activations and a round-ends clock each ending once with exactly two ticks over three round ends, a holder felled by its
+    first tick defeated once, an effect applied in the holder's own activation waiting for the next, a tick felling the player
+    down to exactly zero in its pool with a retry that changes nothing, and a cooldown of two rounds refusing, then ending and
+    paying again. The own-activation case stores its instance directly in the row, because no fixture ability applies an
+    activation clock; the path that sets the flag is proven by the pure case and its weakening.
+    Weakenings: 192 on exported copies inside throw-away JDK containers, each with a fresh database (135 from the stopped
+    session's catalogue, all still applying, and 57 added for rules it left out); none failed by a compile error or a timeout.
+    On the first pass 146 failed a test and 46 survived. Those 46 led to 22 new test methods across `CombatEffectsTest` and
+    `CombatReactionsTest`, extended cases in `CombatPackTest` and the fixture above, and no production change, because each
+    showed a missing test rather than a wrong rule. Run again, 41 of them failed a test, which makes 187 in all: 164 in pure
+    tests and 23 only on PostgreSQL. The first 146 were not rerun on the final tests, which were only added to.
+    Five survive as equivalent, each for a recorded reason: `tick-down-holder` (a fallen holder's effects are already gone, so
+    the instance check stops it), `tactic-acts-stunned` (a prevented activation has zero points and every cost is at least 1),
+    `compile-tick` (the same bad tick is still refused as `SCHEMA` by the required or the unread field), `compile-dice` (four
+    operations of four dice cannot exceed the bound of 16, so the check only repeats the others) and `x-tie-participant`
+    (initiative ranks are unique once reactions can fire, so the ID never decides).
+    Not proven here: effects through renewal and restore (QA-09 and the renewal half of QA-12, P11.6); terminal outcomes
+    (P11.5); the Docker-dependent probe cases and `verify.sh containers`; a live V25 dump and restore; balance of the provisional
+    numbers (P18.3); independent review of the two new Italian messages. Frontend weakenings do not apply: no frontend logic changed.
 - [ ] P11.5 Implement defeat, escape, surrender/agreement predicates, refused/counteroffered/explicitly accepted negotiation, stalemate policy and idempotent settlement; prose alone cannot establish an outcome.
 - [ ] P11.6 Persist/recover every combat cursor, partial-round time boundary and combat-dialogue operation/transcript without duplicate social effects or settlement.
 

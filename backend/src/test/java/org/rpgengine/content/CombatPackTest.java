@@ -276,6 +276,17 @@ class CombatPackTest {
         files.put("rules.json", files.get("rules.json").replace(",\"focus\":\"grit\"", ""));
         assertEquals("CONSTRAINT_CONFLICT", org.junit.jupiter.api.Assertions.assertThrows(PackException.class,
                 () -> compile(bytes(files))).code());
+
+        // With the ability's own cost gone the pack compiles, so each case below is refused for the use it adds.
+        files.put("abilities.json", files.get("abilities.json").replace("\"focus\":1,", ""));
+        org.junit.jupiter.api.Assertions.assertNotNull(compile(bytes(files)));
+        for (var use : Map.of("{\"id\":\"snap\",", "{\"id\":\"snap\",\"focus\":1,",
+                "\"zone\":\"pit\",\"brace\":{\"mode\":\"off\"}", "\"zone\":\"pit\",\"brace\":{\"mode\":\"focusAtLeast\",\"value\":1}").entrySet()) {
+            var changed = new TreeMap<>(files);
+            changed.put("encounters.json", changed.get("encounters.json").replace(use.getKey(), use.getValue()));
+            assertEquals("CONSTRAINT_CONFLICT", org.junit.jupiter.api.Assertions.assertThrows(PackException.class,
+                    () -> compile(bytes(changed)), use.getValue()).code());
+        }
     }
 
     /** Apply a replacement to the {@link EncounterPack#tactics()} variant and expect one code. */
