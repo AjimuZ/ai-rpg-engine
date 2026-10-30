@@ -108,6 +108,8 @@ class CombatSchedulerTest {
                 "ROUND_STARTED", "ACTIVATION_STARTED"), types(plan));
         assertTrue(plan.notes().getFirst().byPlayer());
         assertEquals(3, plan.notes().getFirst().payload().get("unusedActionPoints"));
+        assertEquals(0, plan.steps().getFirst().actionPoints(), "unused points expire at the activation's end");
+        assertEquals(0, plan.steps().get(3).actionPoints(), "the raider's points expire too");
         assertEquals(8L, plan.elapsedSeconds(), "one completed round of the default eight seconds");
         assertEquals(Map.of("encounterId", ID.toString(), "round", 1, "seconds", 8), plan.notes().get(3).payload());
         assertEquals(2, plan.last().round());
@@ -275,6 +277,10 @@ class CombatSchedulerTest {
         assertEquals(TacticalRules.Refusal.TURN, TacticalRules.refusal(theirs, new TacticalIntent.EndActivation()));
         assertEquals(TacticalRules.Refusal.TURN, TacticalRules.refusal(theirs, new TacticalIntent.Speech("raider", "Hi.")));
         assertEquals(Map.of(), TacticalRules.options(theirs));
+        // A player who no longer stands cannot decide, even at the player's own cursor.
+        var downed = status(state, "player", EncounterState.Status.DEFEATED);
+        assertFalse(downed.playerDecision());
+        assertEquals(TacticalRules.Refusal.TURN, TacticalRules.refusal(downed, new TacticalIntent.EndActivation()));
         assertThrows(IllegalStateException.class, () -> CombatScheduler.apply(theirs, new TacticalIntent.EndActivation(),
                 dice()), "the scheduler re-checks legality");
     }

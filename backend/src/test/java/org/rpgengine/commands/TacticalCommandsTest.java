@@ -183,6 +183,24 @@ class TacticalCommandsTest {
         execute(new TypedCommand.CombatSpeak("raider", "Last warning."));
     }
 
+    /**
+     * The initiative roll and the end of an activation may close a round, so they need room for one round on the
+     * bounded clock; speech, which takes no time, still works at the end of the clock.
+     */
+    @Test
+    void roundTimeMustFitTheClock() {
+        begin("trail-ambush");
+        jdbc.execute("alter table campaign disable trigger campaign_world_time_step");
+        try {
+            jdbc.update("update campaign set world_time_seconds = ?, row_version = row_version + 1 where id = ?",
+                    org.rpgengine.rules.WorldClock.END_SECONDS - 7, campaign);
+        } finally {
+            jdbc.execute("alter table campaign enable trigger campaign_world_time_step");
+        }
+        rejects(OperationAdmissionFailure.Kind.TIME_ILLEGAL, new TypedCommand.EndActivation());
+        execute(new TypedCommand.CombatSpeak("raider", "Time is short."));
+    }
+
     /** Speech reaches only addressable participants; an unknown recipient and the player are refused. */
     @Test
     void speechNeedsAnAddressableRecipient() {
