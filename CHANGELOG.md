@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Hardware profile and GPU check run on the reference host (P21.1-A), 31 October 2026
+
+- Run `./start.sh --models profile --gpu-check` on the reference host. The driver tool reports the RTX 4070 with
+  12,282 MiB, the WSL 2 VM has 7,823 MiB, and the pinned llama.cpp CUDA image sees the device (`visible`, 12,281 MiB
+  total, 11,090 MiB free). The sanitized profile is recorded in the roadmap.
+- No product behavior changed. This run completes the P21.1 exit checks; loading and measuring a model belongs to P21.2.
+
 ## Unreleased — Browser drafts, cursors and switching proven separate for two same-name adventures (P06.5-B.2), 31 October 2026
 
 - Add Vitest cases with two adventures that share their title, playthrough title, NPC and item names. A draft typed in one

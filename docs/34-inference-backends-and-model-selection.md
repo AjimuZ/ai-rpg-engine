@@ -180,7 +180,7 @@ On the reference host the advisor therefore reproduces the ADR 0021 defaults. Th
 - **Candidate launch profile.** Router mode with `--models-dir`; `--models-max 1` on this host; all layers on the GPU; flash attention; quantized KV cache and a context cap taken from the measured profile; `--cache-reuse` and a slot-save path for prompt-cache reuse; `--api-key-file` for the engine-to-server hop; `--jinja` and per-request reasoning controls.
 - **Constrained output.** Structured tasks send a JSON Schema as `response_format`. Constrained decoding guarantees syntax, not meaning, so the engine's semantic validators still run.
 - **Thinking.** Off for `light` and `standard`, on with a token budget for `deliberate`. Recommended sampling for Gemma 4 is temperature 1.0, top-p 0.95 and top-k 64, adjustable per slot.
-- **Open points.** GPU passthrough through Docker Desktop and WSL 2 (P21.1: the check exists, the reference-host run is pending); whether unloading frees VRAM completely; loading Gemma 4 and Qwen3.5 in the pinned build (their architectures are in its source); structured output together with thinking (P21.2).
+- **Open points.** GPU passthrough through Docker Desktop and WSL 2 (observed `visible` in the pinned image on the reference host on 31 October 2026, P21.1-A; no model loaded yet, so behavior under load is open); whether unloading frees VRAM completely; loading Gemma 4 and Qwen3.5 in the pinned build (their architectures are in its source); structured output together with thinking (P21.2).
 
 ## 8. Local image worker profile
 
@@ -242,7 +242,7 @@ The Settings panel shows the class of every slot. Changing a slot's class needs 
 
 | Item | Content | Evidence |
 | --- | --- | --- |
-| P21.1 | Reference-host qualification, catalog schema, advisor | Hardware profile, GPU in container, verified catalog entries. Done: profile command and fixtures, catalog with downloaded-and-hashed files, advisor tests. Pending: the profile and GPU check run on the reference host |
+| P21.1 | Reference-host qualification, catalog schema, advisor | Hardware profile, GPU in container, verified catalog entries. Done: profile command and fixtures, catalog with downloaded-and-hashed files, advisor tests. Done (31 October 2026, P21.1-A): the profile and GPU check ran on the reference host; the record is in the [roadmap](16-development-roadmap.md) P21.1 entry |
 | P21.2 | Local text backend and measurements | Probes, bilingual probe set, recorded speed and memory |
 | P21.3 | Slots, adapters, gateway, settings API and panel | QA-43 |
 | P21.4 | Shared GPU and RAM admission | No engine-caused out-of-memory on the host |

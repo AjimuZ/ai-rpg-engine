@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 68/130 tasks verified.** The owner withdrew the pending P98 review entry on 30 October 2026, so older records below that count 131 entries or mention a pending P98 follow-up describe the queue as it stood then. The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P05.7, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1, P11.2, P11.3 and P11.4. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P05.7 is checked for its contract, rendering and fallback: no real turn produces presentation cues yet, the asset route is not served, no scene or pose image is drawn, and QA-40's persistent visual and voice identities stay with P17. P06.5 is in progress and its explicit prerequisites are all checked: P05.7 (within those limits), P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 69/130 tasks verified.** The owner withdrew the pending P98 review entry on 30 October 2026, so older records below that count 131 entries or mention a pending P98 follow-up describe the queue as it stood then. The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P05.7, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1, P11.2, P11.3, P11.4 and P21.1. P21.1 is verified: the hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles, and, since 31 October 2026 (P21.1-A), the profile and container GPU check on the reference host (no model was loaded; see the P21.1 entry). P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P05.7 is checked for its contract, rendering and fallback: no real turn produces presentation cues yet, the asset route is not served, no scene or pose image is drawn, and QA-40's persistent visual and voice identities stay with P17. P06.5 is in progress and its explicit prerequisites are all checked: P05.7 (within those limits), P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -2839,10 +2839,10 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
 
 Scheduling: this package follows the memory work so that P10–P17 can be built and played with free local models, and it supplies the image capability that P17.6 requires. Codex stays the default narration runtime. Every speed, memory and quality figure in the specification is an estimate until P21 records measurements on the reference host.
 
-- [ ] P21.1 Qualify the reference host and define the catalog: a launcher-generated hardware profile (GPU memory read from the driver tool, not from the Windows adapter field), Docker GPU passthrough on WSL 2 with the pinned llama.cpp CUDA image, free-VRAM and WSL-memory measurements, the catalog schema (source, revision, files, SHA-256, license, requirements, languages, capabilities, slots, attribution), the advisor rules and synthetic-profile fixtures, and catalog entries for the reference host with verified hashes.
-  - Verified partial checkpoint (28 October 2026). The task stays open until the profile and the
-    container GPU check run on the reference host itself; this Linux toolchain container has no
-    GPU device, driver tool or Docker. On 29 October 2026 the drafted work was re-verified (the
+- [x] P21.1 Qualify the reference host and define the catalog: a launcher-generated hardware profile (GPU memory read from the driver tool, not from the Windows adapter field), Docker GPU passthrough on WSL 2 with the pinned llama.cpp CUDA image, free-VRAM and WSL-memory measurements, the catalog schema (source, revision, files, SHA-256, license, requirements, languages, capabilities, slots, attribution), the advisor rules and synthetic-profile fixtures, and catalog entries for the reference host with verified hashes.
+  - Verified checkpoint (28 October 2026). The reference-host run was still open then, because the
+    Linux toolchain container had no GPU device, driver tool or Docker; it was done on 31 October
+    2026 (P21.1-A, below). On 29 October 2026 the drafted work was re-verified (the
     full verification plan, including `./mvnw --batch-mode verify` with 746 backend tests, and the
     nine catalog digests against the download records) and committed as this checkpoint; the
     container still had no GPU tool or Docker.
@@ -2885,11 +2885,33 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       container on the reference host's WSL 2 VM (i5-14600KF, 20 threads, 7,823 MiB total and
       5,825 MiB available, no GPU tool, no Docker, all recorded as such); and the download-and-hash
       verification of all nine catalog files.
-    - Open: `./start.sh --models profile --gpu-check` on the reference host (Windows 11, Git Bash,
-      Docker Desktop with WSL 2), which must show the RTX 4070's VRAM from the driver tool, the WSL
-      VM memory, the module layout, and a `visible` CUDA device inside the pinned image with its free
-      VRAM. Record that profile, sanitized, as evidence, and compare the container's free VRAM with
-      the driver tool's.
+    - Done (31 October 2026, P21.1-A): `./start.sh --models profile --gpu-check` on the reference
+      host (Windows 11, Git Bash, Docker Desktop with WSL 2) showed the RTX 4070's VRAM from the
+      driver tool, the WSL VM memory, the module layout and a `visible` CUDA device inside the
+      pinned image. The sanitized profile and the free-VRAM comparison are recorded below.
+  - Reference-host run (P21.1-A, 31 October 2026). Command, in Git Bash on the reference host
+    (Windows 11, Docker Desktop on WSL 2): `./start.sh --models profile --gpu-check`. Output:
+    `start.sh: pulling the pinned model-server image once (about 2.6 GB compressed)`,
+    `start.sh: hardware profile written to .local/hardware.json`,
+    `start.sh: gpu source: nvidia-smi; container gpu: visible`. Sanitized profile (no host name,
+    user name, path, UUID or serial; `.local/hardware.json` is not committed):
+    - CPU Intel Core i5-14600KF, 20 logical cores; host memory 16,153 MiB, one 16,384 MiB module at
+      5,600 MT/s in a 4-slot board; free disk under `.local` 721,590 MiB.
+    - GPU source `nvidia-smi`: NVIDIA GeForce RTX 4070, compute capability 8.9, driver 617.42,
+      total 12,282 MiB, used 1,287 MiB, free 10,724 MiB.
+    - Docker Desktop 29.9.2 (Linux engine), WSL 2 VM memory 7,823 MiB, 20 CPUs.
+    - Container GPU `visible` in the pinned image (`server-cuda-b11960`, digest
+      `sha256:4ccae195…d4292c`): device `CUDA0`, NVIDIA GeForce RTX 4070, total 12,281 MiB,
+      free 11,090 MiB.
+    - Comparison: the container sees 1 MiB less total than the driver tool (12,281 against 12,282)
+      and reports 366 MiB more free (11,090 against 10,724). The two were sampled seconds apart
+      while the desktop held about 1.3 GiB, so the free difference is consistent with usage
+      changing between samples; it was not isolated. Plan the budget on the lower driver-tool
+      free figure.
+    - Not proven: repeated or idle-desktop runs, a model actually loaded in the container, VRAM
+      behaviour under load, the advisor run against this exact profile (the committed fixtures
+      are unchanged), and a refreshed `availableMiB` (recorded `null` on Windows). Loading a model
+      and measuring it belong to P21.2. With this run every P21.1 exit check is done.
 - [ ] P21.2 Package and qualify the local text backend: a pinned model-server image in router mode with a read-only model volume and no network egress, hash-verified `./start.sh --models fetch` with license display and explicit confirmation, JSON-Schema readiness probes, an English and Italian narration probe set, and recorded measurements (load time, prefill and decode speed, peak VRAM and RAM, context limits, VRAM released by unload) for the default and alternate models.
 - [ ] P21.3 Implement slot assignment and the remaining backend adapters behind the runtime-neutral task port: independent `light`, `standard`, `deliberate` and `image` slots, readiness probes with visible results, billing and privacy class badges with acknowledgement on a class change, same-class fallback lists only when configured, per-slot session retirement, and the `gateway` service for owner-key hosted APIs and allowlisted custom endpoints (keys as runtime-only secrets, budgets, bounded redirects and sizes). Expose `GET /api/v1/models/status`, the owner-only settings API and the Settings → Models panel.
 - [ ] P21.4 Implement the shared GPU and RAM admission coordinator for text, image and speech: priorities, leases using the model server's documented load and unload endpoints and slot save and restore, batching, interruption between diffusion steps, unowned-contention handling and metrics. Prove no engine-caused out-of-memory on the reference host.
