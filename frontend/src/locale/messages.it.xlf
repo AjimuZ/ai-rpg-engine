@@ -3005,6 +3005,24 @@
       <target>Quell’azione non è possibile qui e ora. Non è stato modificato nulla.</target>
       </segment>
     </unit>
+    <unit id="campaign.error.attackUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:55</note>
+      </notes>
+      <segment>
+        <source>You cannot make that attack: the weapon is not ready or has no ammunition left. Nothing was changed.</source>
+      <target>Non puoi portare quell’attacco: l’arma non è pronta o ha finito le munizioni. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.guardUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:56</note>
+      </notes>
+      <segment>
+        <source>You have already taken a guarded stance during this turn. Nothing was changed.</source>
+      <target>Hai già assunto una posizione di guardia durante questo turno. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
     <unit id="campaign.error.dependenciesMissing">
       <notes>
         <note category="location">src/app/campaign/campaign-messages.ts:39</note>

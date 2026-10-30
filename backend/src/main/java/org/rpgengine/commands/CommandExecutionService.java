@@ -277,10 +277,12 @@ public class CommandExecutionService {
      * quest commands, rest, and movement (a new visit or its duration can satisfy a quest objective).
      * Waiting needs it too since P10.4, because a clock predicate can become true as time passes. Speech
      * changes no fact a quest predicate reads, and a tactical intention (P11.2) reads only the frozen
-     * encounter, so a fight in progress never depends on reloading the pinned pack.
+     * encounter, so a fight in progress never depends on reloading the pinned pack. The exception is using
+     * an item in a fight (P11.3): its use contract is pinned pack data, like outside a fight.
      */
     private static boolean needsCatalog(TypedCommand command) {
-        return !(command instanceof TypedCommand.Speak) && !(command instanceof TypedCommand.Tactical);
+        return command instanceof TypedCommand.CombatUseItem
+                || !(command instanceof TypedCommand.Speak) && !(command instanceof TypedCommand.Tactical);
     }
 
     /** Integral members of a stored JSON object; other values are omitted and so read as unknown. */

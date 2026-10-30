@@ -195,3 +195,8 @@ the activation phases; the `encounter_schedule` and `encounter_initiative_once` 
 (initiative before the first round and never re-rolled, points granted only at an activation start and within the
 frozen allowance, the speech allowance). A restore inserts rows, so only the check and unique constraints apply to
 restored values. Offline checks cover the V23 manifest/catalog; no live V23 dump/restore rehearsal has been run.
+
+V24 scope (P11.3) adds no table: `encounter_participant` gains `guarding`, with a check that only an active participant
+holds a stance, and the `encounter_participant_vitals` trigger guards later updates (local Health within the frozen maximum,
+zero Health cannot stand, no return from defeat). A restore inserts rows, so only the check constraint applies to restored
+values. Offline checks cover the V24 manifest/catalog; no live V24 dump/restore rehearsal has been run.

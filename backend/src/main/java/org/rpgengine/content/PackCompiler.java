@@ -536,6 +536,56 @@ public final class PackCompiler {
             }
         }
 
+        /**
+         * The fields a weapon and a template attack share (P11.3, docs/11 sections 8-9), every value bounded here so a
+         * frozen attack never depends on an unchecked number: the ruleset role added to the score, the damage dice with
+         * their attribute contribution ({@code none} for no attribute, the attack's own when omitted) and flat modifier,
+         * penetration, range up to the profile's {@code maxRangeEdges} (0 is melee), the defense it is compared against
+         * and whether it permits a strong hit. Closes the object.
+         */
+        private void attack(Fields attack) {
+            var roles = new HashSet<>(CombatProfile.ROLES);
+            attack.choice("attribute", roles, null);
+            Fields damage = attack.object("damage", true);
+            damage.integer("count", 1, CombatProfile.ATTACK_DICE_MAX, 1);
+            damage.integer("sides", 2, CombatProfile.ATTACK_SIDES_MAX, null);
+            var contributions = new HashSet<>(roles);
+            contributions.add("none");
+            if (damage.has("attribute")) {
+                damage.choice("attribute", contributions, null);
+            }
+            damage.integer("flat", CombatProfile.ATTACK_FLAT_MIN, CombatProfile.ATTACK_FLAT_MAX, 0);
+            damage.close();
+            attack.integer("penetration", 0, CombatProfile.ATTACK_PENETRATION_MAX, 0);
+            attack.integer("range", 0, combatProfile.value("maxRangeEdges"), 0);
+            attack.choice("defense", Set.of("guard", "resistance"), "guard");
+            attack.bool("strongHit", true);
+            attack.close();
+        }
+
+        /**
+         * An item's {@code combat} object (P11.3, docs/11 sections 4 and 9): what it adds while worn, so only an
+         * equippable item may have one and the pack must declare a combat rule. Guard and armor are bounded by the
+         * profile's caps, an optional weapon attack may train a skill and consume units of another item per attempt.
+         */
+        private void itemCombat(Fields combat, String slot) {
+            if (combatProfile == null) {
+                throw combat.fail("CONSTRAINT_CONFLICT", null, "Item combat data needs the pack's combat rule (ruleType combat)");
+            }
+            if (slot == null) {
+                throw combat.fail("CONSTRAINT_CONFLICT", null, "Only an equippable item can have combat data");
+            }
+            combat.integer("guard", 0, combatProfile.value("equipmentGuardCap"), 0);
+            combat.integer("armor", 0, combatProfile.value("armorMax"), 0);
+            Fields attack = combat.object("attack", false);
+            if (attack != null) {
+                attack.ref("skill", SKILL, false);
+                attack.ref("ammunition", ITEM, false);
+                attack(attack);
+            }
+            combat.close();
+        }
+
         /** A resource key of this pack named by the combat rule; null when optional and absent. */
         private String combatResource(Fields f, String key, boolean required) {
             String resource = f.id(key, required);
@@ -634,6 +684,15 @@ public final class PackCompiler {
                     stats.integer(role, CombatProfile.ROLE_MIN, CombatProfile.ROLE_MAX, 0);
                 }
                 stats.close();
+                // Declared attacks (P11.3): explicit like the statistics, a participant without any passes its turns.
+                var attacks = new HashSet<String>();
+                for (Fields attack : participant.objects("attacks", 0, CombatProfile.ATTACKS_MAX)) {
+                    if (!attacks.add(attack.id("id", true))) {
+                        throw attack.fail("DUPLICATE", "id", "Attack ID already defined for this participant");
+                    }
+                    attack.integer("skill", 0, CombatProfile.ATTACK_SKILL_MAX, 0);
+                    attack(attack);
+                }
                 participant.close();
                 if (participants.putIfAbsent(id, side) != null) {
                     throw participant.fail("DUPLICATE", "id", "Participant ID already defined in this encounter");
@@ -1006,6 +1065,10 @@ public final class PackCompiler {
             Fields use = f.object("use", false);
             if (use != null) {
                 useContract(use);
+            }
+            Fields combat = f.object("combat", false);
+            if (combat != null) {
+                itemCombat(combat, slot);
             }
             Fields appearance = f.object("appearance", true);
             String appearanceId = appearance.id("id", true);

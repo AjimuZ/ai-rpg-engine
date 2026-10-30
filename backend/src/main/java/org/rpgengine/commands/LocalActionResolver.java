@@ -16,6 +16,7 @@ import java.util.UUID;
 import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.campaign.CampaignMode;
 import org.rpgengine.campaign.EventVisibility;
+import org.rpgengine.combat.CombatMath;
 import org.rpgengine.combat.CombatScheduler;
 import org.rpgengine.combat.EncounterState;
 import org.rpgengine.combat.FrozenEncounter;
@@ -83,8 +84,15 @@ import tools.jackson.databind.node.ObjectNode;
  * {@link CombatScheduler} over the {@link EncounterState} read under the campaign lock, never over pinned
  * definitions. Its plan becomes the commit's tactical progress, its notes become events (the player's own decisions
  * attributed to the player, scheduler bookkeeping to nobody), its round time becomes the elapsed world time and its
- * public summary becomes the receipt's {@code combat} block. Only the initiative roll draws dice: two d10 per
- * participant, ordinals in roster order.
+ * public summary becomes the receipt's {@code combat} block. The initiative roll draws two d10 per participant,
+ * ordinals in roster order.
+ *
+ * <p>Attacks and healing (P11.3): the scheduler's plan also carries the change of the player's Health pool, which becomes
+ * this commit's resource effect, and the ammunition its attacks spent, which becomes item consumptions. Its strikes draw
+ * through the same recorded source; an attack's full calculation is an internal event. {@code COMBAT_USE_ITEM} is the one
+ * tactical intention that reads the pinned catalog: its contract runs like any item use. A {@code heal} effect restores
+ * the Health pool the pack's combat rule names, never above the maximum and never for a defeated participant.
+ * Tactical commands skip the quest engine: possession facts they change are evaluated by the next exploration command.
  *
  * <p>Rest (P10.4): the pinned policy restores its resources up to each pool's maximum and, when not
  * interrupted, ends the listed conditions the player has. An interruption is one recorded percentile
@@ -309,6 +317,10 @@ final class LocalActionResolver {
         private final InventoryModel inventory;
         private int nextOrdinal;
         private int nextInstance;
+        /** The allied participant an item is used on in a fight, who has no campaign actor (P11.3); null otherwise. */
+        private EncounterState.Combatant combatAlly;
+        /** That ally's encounter-local Health as the item's effects change it. */
+        private Integer allyHealth;
 
         /** Copy current pool values and item stacks into the running state. */
         Run(Snapshot snapshot, Draws draws) {
@@ -364,7 +376,7 @@ final class LocalActionResolver {
                 }
                 case TypedCommand.Rest rest -> rest(rest, Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.Engage engage -> engage(engage, Objects.requireNonNull(catalog, "catalog"));
-                case TypedCommand.Tactical tactical -> tactical(tactical);
+                case TypedCommand.Tactical tactical -> tactical(tactical, catalog);
                 case TypedCommand.UseAbility use -> ability(use, Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.UseItem use -> useItem(use, Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.EquipItem equip -> wear(equip.itemInstanceId(), true,
@@ -378,7 +390,10 @@ final class LocalActionResolver {
                 case TypedCommand.SuspendQuest suspend -> details.put("questId", suspend.questId());
                 case TypedCommand.ResumeQuest resume -> details.put("questId", resume.questId());
             }
-            quests(command, catalog);
+            // A fight changes quest facts only through items, and the next exploration command evaluates them.
+            if (!(command instanceof TypedCommand.Tactical)) {
+                quests(command, catalog);
+            }
             // Defence in depth: the rule gate bounded the step; the clock itself is bounded again at commit.
             elapsed = WorldClock.advance(snapshot.worldTimeSeconds(), elapsed) - snapshot.worldTimeSeconds();
             details.put("elapsedSeconds", elapsed);
@@ -408,20 +423,58 @@ final class LocalActionResolver {
          * accepted it on the same rows; a refusal here is a resolver failure. Events keep the scheduler's order; the
          * round time it reports is the elapsed world time and the campaign stays in encounter mode.
          */
-        private void tactical(TypedCommand.Tactical tactical) {
+        private void tactical(TypedCommand.Tactical tactical, CommandRuleCatalog catalog) {
             var state = snapshot.encounter();
             if (state == null) {
                 throw new IllegalStateException("validated tactical intention has no encounter state");
             }
-            progress = CombatScheduler.apply(state, tactical.intent(), draws::value);
+            progress = tactical instanceof TypedCommand.CombatUseItem use
+                    ? combatItem(use, state, Objects.requireNonNull(catalog, "catalog"))
+                    : CombatScheduler.apply(state, tactical.intent(), draws::value);
             mode = CampaignMode.ENCOUNTER;
             elapsed = progress.elapsedSeconds();
+            // The player's Health lives in its pool: the plan's net change becomes the commit's resource effect.
+            String health = state.profile().health();
+            var pool = pool(snapshot.player(), health);
+            if (pool != null) {
+                values.get(snapshot.player()).put(health, pool.current() + progress.playerHealthDelta());
+            }
+            for (var use : progress.ammunition()) {
+                inventory.consume(use.instance(), use.quantity());
+                consumptions.add(new ItemPlan.Consumption(use.definition(), use.quantity()));
+                line("CONSUMED", use.definition(), use.instance(), use.quantity());
+            }
             for (TacticalPlan.Note note : progress.notes()) {
                 events.add(new ResolvedCommit.Event(note.byPlayer() ? snapshot.player() : null, null,
-                        EventVisibility.PUBLIC, new CampaignEvent.Body(note.type(), EVENT_VERSION, EVENT_VERSION,
+                        note.internal() ? EventVisibility.INTERNAL : EventVisibility.PUBLIC,
+                        new CampaignEvent.Body(note.type(), EVENT_VERSION, EVENT_VERSION,
                                 CanonicalJson.write(note.payload()))));
             }
             details.set("combat", JSON.readTree(CanonicalJson.write(progress.summary())));
+        }
+
+        /**
+         * Use an item in a fight: its contract runs exactly as in exploration (its events and the unit consumed come
+         * first), with an allied target standing in for a campaign actor, then the scheduler pays the action and takes
+         * over the Health values the effects left. A target naming the player is the player's own actor.
+         */
+        private TacticalPlan combatItem(TypedCommand.CombatUseItem use, EncounterState state, CommandRuleCatalog catalog) {
+            boolean ally = use.targetId() != null && !use.targetId().equals(state.player().id());
+            combatAlly = ally ? state.participant(use.targetId()) : null;
+            allyHealth = ally ? combatAlly.health() : null;
+            useItem(new TypedCommand.UseItem(use.itemInstanceId(), use.targetId() == null || ally ? List.of()
+                    : List.of(snapshot.player())), catalog);
+            var pool = pool(snapshot.player(), state.profile().health());
+            if (pool == null) {
+                throw new IllegalStateException("validated item use has no Health pool");
+            }
+            var stack = snapshot.stacks().stream().filter(held -> held.id().equals(use.itemInstanceId())).findFirst()
+                    .orElseThrow(() -> new IllegalStateException("validated item instance is missing"));
+            int playerHealth = Math.toIntExact(value(snapshot.player(), state.profile().health()) - pool.minimum());
+            var outcome = new CombatScheduler.ItemOutcome(stack.definition(), playerHealth, allyHealth,
+                    ally ? allyHealth - combatAlly.health() : 0);
+            return CombatScheduler.useItem(state, (org.rpgengine.combat.TacticalIntent.UseItem) use.intent(), outcome,
+                    draws::value, nextOrdinal);
         }
 
         /**
@@ -587,10 +640,11 @@ final class LocalActionResolver {
             var facts = new FrozenEncounter.PlayerFacts(snapshot.player(), snapshot.attributes(),
                     new FrozenEncounter.Pool(health.current(), health.maximum()),
                     focus == null ? null : new FrozenEncounter.Pool(focus.current(), focus.maximum()), snapshot.worn(),
-                    snapshot.conditions());
+                    snapshot.conditions(), snapshot.skills());
             // Deterministic identity: a retried resolution of this operation freezes the same encounter.
             UUID id = UUID.nameUUIDFromBytes((snapshot.operationId() + "/encounter").getBytes(StandardCharsets.UTF_8));
-            var frozen = FrozenEncounter.freeze(id, template, profile, facts, engage.openingStrike());
+            var frozen = FrozenEncounter.freeze(id, template, profile, facts, engage.openingStrike(),
+                    catalog.combat().gear());
             mode = CampaignMode.ENCOUNTER;
             var announced = payload().put("actorId", snapshot.player().toString()).put("encounterId", id.toString())
                     .put("templateId", template.id()).put("location", template.location())
@@ -873,6 +927,7 @@ final class LocalActionResolver {
                     }
                 }
                 case EffectProgram.ModifyResource change -> modify(change, path, ability, targets);
+                case EffectProgram.Heal heal -> heal(heal, path, ability, targets, catalog);
                 case EffectProgram.CreateItem create -> create(create, path, targets, catalog);
                 case EffectProgram.Unsupported unsupported ->
                         throw new IllegalStateException("unsupported effect reached local resolution");
@@ -928,6 +983,12 @@ final class LocalActionResolver {
                     .put("resourceKey", change.resource()).put("amount", amount);
             payload.set("drawOrdinals", ordinals(ordinals));
             var outcomes = payload.putArray("outcomes");
+            if (combatAlly != null && !change.target().equals("self")) {
+                // A template ally has only encounter-local Health and Focus: only a heal reaches them (P11.3).
+                outcomes.addObject().put("participantId", combatAlly.id()).put("outcome", "NO_RESOURCE");
+                event("EFFECT_RESOLVED", EventVisibility.INTERNAL, payload);
+                return;
+            }
             boolean onlyPlayer = true;
             for (UUID actor : affected) {
                 onlyPlayer &= actor.equals(snapshot.player());
@@ -945,6 +1006,49 @@ final class LocalActionResolver {
                 outcome.put("before", before).put("after", after).put("applied", after - before);
             }
             // Values of other actors' pools are hidden information; keep them engine-internal.
+            event("EFFECT_RESOLVED", onlyPlayer ? EventVisibility.PUBLIC : EventVisibility.INTERNAL, payload);
+        }
+
+        /**
+         * Restore Health (P11.3, docs/11 section 9): the amount is evaluated once, each affected participant regains at
+         * most its missing Health, and a defeated one (at the pool's minimum) regains nothing and is recorded as
+         * {@code NOT_REVIVED}. The Health pool is the one the ability's pack names in its combat rule; an actor of another
+         * vocabulary is explicitly unaffected. An allied participant of a fight heals in its encounter-local Health.
+         */
+        private void heal(EffectProgram.Heal heal, String path, CommandRuleCatalog.Ability ability, List<UUID> targets,
+                CommandRuleCatalog catalog) {
+            var ordinals = new ArrayList<Integer>();
+            long amount = number(heal.amount(), ordinals);
+            calculation(path + "/amount", "amount", JSON.getNodeFactory().numberNode(amount), ordinals);
+            String resource = catalog.combat().profiles().get(ability.pack()).health();
+            var payload = payload().put("actorId", snapshot.player().toString()).put("path", path)
+                    .put("resourceKey", resource).put("amount", amount);
+            payload.set("drawOrdinals", ordinals(ordinals));
+            var outcomes = payload.putArray("outcomes");
+            if (combatAlly != null && !heal.target().equals("self")) {
+                long restored = CombatMath.healed(allyHealth, combatAlly.healthMax(), amount);
+                outcomes.addObject().put("participantId", combatAlly.id()).put("outcome", restored == amount ? "APPLIED"
+                        : "CLAMPED").put("before", allyHealth).put("after", allyHealth + restored).put("applied", restored);
+                allyHealth = Math.toIntExact(allyHealth + restored);
+                event("EFFECT_RESOLVED", EventVisibility.INTERNAL, payload);
+                return;
+            }
+            List<UUID> affected = heal.target().equals("self") || targets.isEmpty() ? List.of(snapshot.player()) : targets;
+            boolean onlyPlayer = true;
+            for (UUID actor : affected) {
+                onlyPlayer &= actor.equals(snapshot.player());
+                var outcome = outcomes.addObject().put("actorId", actor.toString());
+                Pool pool = ability.pack().equals(snapshot.vocabularies().get(actor)) ? pool(actor, resource) : null;
+                if (pool == null) {
+                    outcome.put("outcome", "NO_RESOURCE");
+                    continue;
+                }
+                long before = value(actor, resource);
+                long restored = CombatMath.healed(before - pool.minimum(), pool.maximum() - pool.minimum(), amount);
+                values.get(actor).put(resource, before + restored);
+                outcome.put("outcome", before == pool.minimum() ? "NOT_REVIVED" : restored == amount ? "APPLIED" : "CLAMPED");
+                outcome.put("before", before).put("after", before + restored).put("applied", restored);
+            }
             event("EFFECT_RESOLVED", onlyPlayer ? EventVisibility.PUBLIC : EventVisibility.INTERNAL, payload);
         }
 

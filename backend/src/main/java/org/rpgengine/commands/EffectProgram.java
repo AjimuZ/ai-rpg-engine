@@ -18,10 +18,10 @@ import org.rpgengine.content.CompiledPack;
  * (docs/09 section 7); this class only copies that validated data into closed Java values
  * that {@link LocalActionResolver} can evaluate without reparsing pack bytes.
  *
- * <p>Only effect types the exploration resolver can execute are represented precisely
- * ({@code modifyResource}, {@code createItem} since P10.2, and {@code conditional}). Every other
- * compiled type ({@code damage}, {@code heal}, {@code move}, condition changes, {@code reveal})
- * becomes {@link Unsupported}: those need armor, conditions, forced movement or knowledge records
+ * <p>Only effect types the resolver can execute are represented precisely
+ * ({@code modifyResource}, {@code createItem} since P10.2, {@code heal} since P11.3, and {@code conditional}). Every
+ * other compiled type ({@code damage}, {@code move}, condition changes, {@code reveal})
+ * becomes {@link Unsupported}: those need effect targeting in combat, conditions, forced movement or knowledge records
  * that later tasks supply (P09.1, P10.4, P11), so {@link CommandRules} rejects such abilities
  * and item uses as {@code EFFECT_UNSUPPORTED} before any journal write instead of guessing a meaning.
  */
@@ -55,6 +55,7 @@ final class EffectProgram {
                 case "conditional" -> new Conditional(timing, Formula.compile(node.get("when"), snapshot, pack),
                         compile(node.get("then"), snapshot, pack, timing),
                         compile(node.get("else"), snapshot, pack, timing));
+                case "heal" -> new Heal(timing, target(node), Formula.compile(node.get("amount"), snapshot, pack));
                 case "createItem" -> new CreateItem(timing, target(node),
                         snapshot.resolve(pack, (String) node.get("item"), "item").id(),
                         node.get("quantity") instanceof Number quantity ? quantity.intValue() : 1);
@@ -85,10 +86,31 @@ final class EffectProgram {
                     }
                 }
                 case ModifyResource ignored -> { }
+                case Heal ignored -> { }
                 case CreateItem ignored -> { }
             }
         }
         return true;
+    }
+
+    /**
+     * Whether any branch heals. Healing restores the Health the declaring pack's combat rule names (P11.3), so the
+     * rule gate refuses such a program for content without one instead of guessing which resource is Health.
+     */
+    static boolean heals(List<Effect> effects) {
+        for (Effect effect : effects) {
+            boolean heals = switch (effect) {
+                case Heal ignored -> true;
+                case Conditional branch -> heals(branch.then()) || heals(branch.otherwise());
+                case ModifyResource ignored -> false;
+                case CreateItem ignored -> false;
+                case Unsupported ignored -> false;
+            };
+            if (heals) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -103,6 +125,7 @@ final class EffectProgram {
                 case CreateItem create -> create.quantity();
                 case Conditional branch -> maxCreatedUnits(branch.then()) + maxCreatedUnits(branch.otherwise());
                 case ModifyResource ignored -> 0;
+                case Heal ignored -> 0;
                 case Unsupported ignored -> 0;
             };
         }
@@ -119,6 +142,7 @@ final class EffectProgram {
         for (Effect effect : effects) {
             total += switch (effect) {
                 case ModifyResource change -> change.amount().dice();
+                case Heal heal -> heal.amount().dice();
                 case Conditional branch -> branch.when().dice() + maxDraws(branch.then())
                         + maxDraws(branch.otherwise());
                 case CreateItem ignored -> 0;
@@ -139,6 +163,7 @@ final class EffectProgram {
         for (Effect effect : effects) {
             boolean reads = switch (effect) {
                 case ModifyResource change -> change.amount().readsActorValues();
+                case Heal heal -> heal.amount().readsActorValues();
                 case Conditional branch -> branch.when().readsActorValues() || readsActorValues(branch.then())
                         || readsActorValues(branch.otherwise());
                 case CreateItem ignored -> false;
@@ -152,9 +177,26 @@ final class EffectProgram {
     }
 
     /** One compiled effect node; timing is {@code pre} or {@code post}. */
-    sealed interface Effect permits ModifyResource, Conditional, CreateItem, Unsupported {
+    sealed interface Effect permits ModifyResource, Heal, Conditional, CreateItem, Unsupported {
         /** @return resolution phase of the node, inherited inside conditionals */
         String timing();
+    }
+
+    /**
+     * Restore Health to the affected participants (P11.3, docs/11 section 9): at most what is missing, and nothing to a
+     * defeated one, because revival needs its own declared effect.
+     *
+     * @param timing resolution phase
+     * @param target {@code self}, {@code target} or {@code targets}
+     * @param amount actor-scope numeric expression, at least zero, evaluated once per node
+     */
+    record Heal(String timing, String target, Formula amount) implements Effect {
+        /** Require every part; compiled content always supplies them. */
+        Heal {
+            Objects.requireNonNull(timing, "timing");
+            Objects.requireNonNull(target, "target");
+            Objects.requireNonNull(amount, "amount");
+        }
     }
 
     /**

@@ -13,7 +13,7 @@ import org.rpgengine.combat.EncounterPack;
 
 /**
  * P11.1 pack contract: the {@code combat} rule and {@code encounter} definitions, with the declared social and scene
- * actions of P11.2. Each case breaks one fact of the
+ * actions of P11.2 and the attacks and item combat data of P11.3. Each case breaks one fact of the
  * valid fixture, so a diagnostic cannot be explained by a second defect. Supported customization (parameter values
  * inside their bounds) compiles; a different scheduler or spatial model, an unknown parameter or an incoherent
  * encounter is a located error.
@@ -187,6 +187,44 @@ class CombatPackTest {
     }
 
     /** The default fixture with an extra attribute {@code nerve} of range {@code 0..max} and the given resolve mapping. */
+    /** Template attacks are closed and bounded: dice, sides, range against the profile, unique IDs. */
+    @Test
+    void refusesBrokenTemplateAttacks() {
+        String cudgel = "\"attacks\":[{\"id\":\"cudgel\",\"attribute\":\"force\",\"skill\":1,\"strongHit\":false,\"damage\":{\"count\":1,\"sides\":6}}]";
+        rejects("SCHEMA", "encounters.json", cudgel, cudgel.replace("\"count\":1", "\"count\":5"), false);
+        rejects("SCHEMA", "encounters.json", cudgel, cudgel.replace("\"sides\":6", "\"sides\":1"), false);
+        rejects("SCHEMA", "encounters.json", cudgel, cudgel.replace("\"sides\":6", "\"sides\":21"), false);
+        rejects("SCHEMA", "encounters.json", cudgel, cudgel.replace("\"sides\":6", "\"sides\":6,\"flat\":21"), false);
+        rejects("SCHEMA", "encounters.json", cudgel, cudgel.replace("\"sides\":6", "\"sides\":6,\"flat\":-6"), false);
+        rejects("SCHEMA", "encounters.json", cudgel, cudgel.replace("\"sides\":6", "\"sides\":6,\"attribute\":\"luck\""), false);
+        rejects("SCHEMA", "encounters.json", cudgel, cudgel.replace("\"attribute\":\"force\"", "\"attribute\":\"might\""), false);
+        rejects("SCHEMA", "encounters.json", cudgel, cudgel.replace("\"skill\":1", "\"skill\":11"), false);
+        rejects("SCHEMA", "encounters.json", cudgel, cudgel.replace("\"skill\":1", "\"skill\":1,\"range\":3"), false);
+        rejects("SCHEMA", "encounters.json", cudgel, cudgel.replace("\"skill\":1", "\"skill\":1,\"penetration\":11"), false);
+        rejects("SCHEMA", "encounters.json", cudgel, cudgel.replace("\"skill\":1", "\"skill\":1,\"defense\":\"luck\""), false);
+        rejects("SCHEMA", "encounters.json", cudgel, cudgel.replace("\"skill\":1", "\"skill\":1,\"ammunition\":\"arrows\""), false);
+        rejects("SCHEMA", "encounters.json", cudgel, cudgel.replace(",\"damage\":{\"count\":1,\"sides\":6}", ""), false);
+        String twin = cudgel.replace("]", "," + cudgel.substring(cudgel.indexOf('{'), cudgel.lastIndexOf(']')) + "]");
+        rejects("DUPLICATE", "encounters.json", cudgel, twin, false);
+    }
+
+    /** Item combat data needs an equippable item and a combat rule, and stays inside the profile's caps. */
+    @Test
+    void refusesBrokenItemCombat() throws Exception {
+        rejects("SCHEMA", "items.json", "\"combat\":{\"armor\":1}", "\"combat\":{\"armor\":5}", false);
+        rejects("SCHEMA", "items.json", "\"combat\":{\"armor\":1}", "\"combat\":{\"guard\":4}", false);
+        rejects("SCHEMA", "items.json", "\"combat\":{\"armor\":1}", "\"combat\":{\"bonus\":1}", false);
+        rejects("REFERENCE_UNKNOWN", "items.json", "\"skill\":\"bladework\"", "\"skill\":\"juggling\"", false);
+        rejects("REFERENCE_KIND", "items.json", "\"ammunition\":\"arrows\"", "\"ammunition\":\"bladework\"", false);
+        // A potion cannot be worn, so it has no combat data to add.
+        rejects("CONSTRAINT_CONFLICT", "items.json", "{\"name\":\"Potion\"", "{\"combat\":{\"armor\":1},\"name\":\"Potion\"", false);
+        var files = text(EncounterPack.files());
+        files.put("rules.json", files.get("rules.json").replace("," + EncounterPack.COMBAT_RULE, ""));
+        files.put("encounters.json", "{\"schemaVersion\":1,\"definitions\":[]}");
+        var missing = assertThrows(PackException.class, () -> compile(bytes(files)));
+        assertEquals("CONSTRAINT_CONFLICT", missing.code());
+    }
+
     private static Map<String, byte[]> withNerve(int max, String resolveMapping) throws Exception {
         var files = text(EncounterPack.files());
         String resolve = "{\"id\":\"resolve\",\"name\":\"Resolve\",\"min\":0,\"max\":4}";

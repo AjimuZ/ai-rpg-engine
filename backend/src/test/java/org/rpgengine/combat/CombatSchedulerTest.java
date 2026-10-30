@@ -378,7 +378,8 @@ class CombatSchedulerTest {
         for (var participant : frozen.participants()) {
             list.add(new EncounterState.Combatant(participant.id(), ordinal++, participant.actorId(), participant.side(),
                     participant.zone(), EncounterState.Status.ACTIVE, Math.toIntExact(participant.roles().get("finesse")),
-                    Math.toIntExact(participant.initiativeModifier()), null, null, 0, 0));
+                    Math.toIntExact(participant.initiativeModifier()), null, null, 0, 0,
+                    Math.toIntExact(participant.health()), Math.toIntExact(participant.healthMax()), false, participant.sheet()));
         }
         return new EncounterState(frozen.id(), 0, EncounterPhase.ENTERING, 0, null, null, 0, List.of(), frozen.profile(),
                 frozen.zones(), frozen.escapeZones(), frozen.actions(), frozen.opening(), null, "NONE", list);
@@ -398,14 +399,15 @@ class CombatSchedulerTest {
         for (var p : state.participants()) {
             var u = updates.get(p.id());
             list.add(u == null ? p : new EncounterState.Combatant(p.id(), p.ordinal(), p.actorId(), p.side(), u.zone(),
-                    p.status(), p.finesse(), p.initiativeModifier(), u.initiative(), u.rank(), u.reactions(),
-                    p.rowVersion() + 1));
+                    u.status(), p.finesse(), p.initiativeModifier(), u.initiative(), u.rank(), u.reactions(),
+                    p.rowVersion() + 1, u.health() == null ? p.health() + plan.playerHealthDelta() : u.health(), p.healthMax(),
+                    u.guarding(), p.sheet()));
         }
         var last = plan.last();
         return new EncounterState(state.id(), state.rowVersion() + plan.steps().size(), last.phase(), last.round(),
                 last.cursor(), last.actionPoints(), last.speechUsed(), last.passages(), state.profile(),
                 state.frozenSpace(), state.escapeZones(), state.actions(), state.opening(), state.openingTarget(),
-                state.openingStatus(), list);
+                last.openingStatus(), list);
     }
 
     /** The same state under another profile. */

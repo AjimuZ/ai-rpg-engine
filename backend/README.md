@@ -1121,6 +1121,40 @@ stays pending (P11.3); reactions refresh but are never spent (P11.4); no termina
 encounter waits at its round end (P11.5); social attempts get no response yet (P11.5); the V16 checkpoint still
 records no encounter (P11.6); no frontend control or panel (P12); no live V23 dump and restore rehearsal.
 
+## Attacks, defense, damage and healing (P11.3)
+
+Inside an encounter the player can now hurt and be hurt, with every roll recorded
+([ADR 0030](../docs/adr/0030-attacks-defense-damage-and-healing-with-recorded-draws.md),
+[turn protocol](../docs/07-turn-protocol.md#p113-attacks-guard-and-items)).
+
+- `org.rpgengine.combat`: `CombatMath` (pure attack, Guard, damage and healing arithmetic), `CombatAttack` (one frozen
+  attack), `EncounterGear` (what a worn item adds at entry) and `EncounterState.Sheet` (frozen fighting values read back
+  from the participant's frozen form). `TacticalRules.attackBlock` and `defense` decide reach, line of sight, cover and
+  the effective defense. `CombatScheduler` resolves `STRIKE`, `GUARD`, the opening strike at its slot and the interim
+  non-player tactic; `CombatScheduler.useItem` charges an item whose effects the commands layer resolved.
+- `TacticalPlan` carries `playerHealthDelta` and `ammunition`, which `LocalActionResolver` turns into the commit's resource
+  and item effects; `Step` carries `openingStatus` and `ParticipantUpdate` carries status, local Health and the stance.
+  `Note.internal` marks the calculation event. `MAX_STEPS` is now 128.
+- `TypedCommand` adds `STRIKE`, `GUARD` and `COMBAT_USE_ITEM`, the only tactical intention with `needsCatalog` true.
+  `EffectProgram.Heal` runs the `heal` effect in exploration and in a fight. `CommandRules.combatItem` checks the
+  contract, its target policy and its draw bound (at most 64 dice); new refusals are `ATTACK_UNAVAILABLE` and
+  `GUARD_UNAVAILABLE`. `CommandReceipts` allowlists standings, strikes and options, never another participant's defense,
+  armor or Health. `EventStatements` states the five new public event types in English and Italian.
+- `PackCompiler` validates item `combat` and participant `attacks`; `CombatRules.gear` projects item data, and
+  `FrozenEncounter.freeze` applies the caps. V24 adds `guarding` and the `encounter_participant_vitals` trigger; the backup
+  tool covers schema 24.
+
+Tests: `CombatMathTest` (exhaustive), `CombatStrikeTest` (pure: the worked fight of docs/20, draw order, targeting, Guard,
+opening slots, the tactic, seeded fights, the largest roster), `StrikeCommandsTest` (real PostgreSQL on the `EncounterPack`
+fixture, whose sword, cloak, caster, salve and bandage and `yard-duel`, `close-brawl` and `close-rush` templates serve this
+task), the extended long fight of `TacticalCommandsTest`, `CombatPackTest`, additions to `TypedCommandTest`,
+`EventStatementsTest` and `CampaignCommandHttpTest`, and the V24 step of `CanonicalMigrationUpgradeTest`.
+
+Limits: Brace, conditions' modifiers, absorption, abilities in a fight and multi-target items wait for P11.4; Ready, Assess
+and Withdraw for P11.4/P11.5; no terminal predicate runs, so a fight in which the player fell waits at a round end and a
+won fight runs on until P11.5; the interim tactic pursues no objective (P12.3/P12.4); no frontend control or panel (P12);
+no live V24 dump and restore rehearsal.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

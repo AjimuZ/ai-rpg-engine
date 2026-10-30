@@ -33,6 +33,15 @@ import tools.jackson.databind.json.JsonMapper;
  * player demand passage from a hostile (social, negotiate), ask the allied keeper for cover (social, request, 2 AP)
  * and unbar the blocked gate from the gate zone (scene). {@code grove-watch} declares none, so its frozen definition
  * keeps the P11.1 shape.
+ *
+ * <p>Attacks (P11.3): the sword is a {@code 1d6 + force} blade trained by {@code bladework} and the cloak gives armor 1, so
+ * the surveyor fights like the worked fight of docs/20. A {@code bolt-caster} (off hand, range 1, {@code 1d6 + finesse},
+ * one unit of {@code arrows} per attempt), a {@code salve} (heals its user 3), a {@code bandage} (heals a single target 4)
+ * and a {@code flare} whose damage effect stays unsupported complete the kit. {@code yard-duel} is the worked fight: an
+ * armed {@code bandit} with the statistics of docs/20, whose cudgel permits no strong hit, so no single blow can fell the
+ * surveyor's full Health of 8 before its first decision. {@code close-brawl} (opening {@code initiative}) and
+ * {@code close-rush} (opening {@code first}) put unarmed targets in the player's own zone: {@code dummy} is always struck
+ * hard (Guard 0, 999 Health), {@code wall} can never be hit (Guard 40) and {@code porter} is an ally who can be healed.
  */
 public final class EncounterPack {
     /** The default combat rule of the fixture. */
@@ -84,7 +93,49 @@ public final class EncounterPack {
                 "stats":{"health":9,"guard":11,"resistance":9,"force":2,"finesse":2}},
                 {"id":"hound","name":"Hound","side":"ally","zone":"clearing","threat":"minor",
                 "stats":{"health":7,"guard":11,"resistance":8,"finesse":2}}],
-              "objectives":[{"id":"reach-stones","kind":"reachZone","zone":"stones"}]}}]}""";
+              "objectives":[{"id":"reach-stones","kind":"reachZone","zone":"stones"}]}},
+            {"id":"yard-duel","kind":"encounter","data":{"name":"Yard Duel","location":"trailhead",
+              "zones":[{"id":"entry","name":"Entry"},{"id":"yard","name":"Yard"},{"id":"escape-route","name":"Escape Route"}],
+              "edges":[{"from":"entry","to":"yard"},{"from":"entry","to":"escape-route"},{"from":"yard","to":"escape-route"}],
+              "playerZone":"entry","escapeZones":["escape-route"],
+              "participants":[{"id":"bandit","name":"Bandit","side":"hostile","zone":"yard","threat":"standard",
+                "stats":{"health":14,"guard":12,"resistance":11,"armor":1,"force":1,"finesse":1,"insight":1,"resolve":1},
+                "attacks":[{"id":"cudgel","attribute":"force","skill":1,"strongHit":false,"damage":{"count":1,"sides":6}}]}],
+              "objectives":[{"id":"drive-off","kind":"defeatHostiles"}]}},
+            {"id":"close-brawl","kind":"encounter","data":{"name":"Close Brawl","location":"trailhead",
+              "zones":[{"id":"ring","name":"Ring"},{"id":"gallery","name":"Gallery"}],
+              "edges":[{"from":"ring","to":"gallery"}],"playerZone":"ring",
+              "participants":[{"id":"dummy","name":"Dummy","side":"hostile","zone":"ring",
+                "stats":{"health":999,"guard":0,"resistance":0}},
+                {"id":"wall","name":"Wall","side":"hostile","zone":"ring","stats":{"health":20,"guard":40,"resistance":40}},
+                {"id":"porter","name":"Porter","side":"ally","zone":"ring","stats":{"health":9,"guard":11,"resistance":8}},
+                {"id":"lookout","name":"Lookout","side":"ally","zone":"gallery","stats":{"health":9,"guard":11,"resistance":8}}],
+              "objectives":[{"id":"last","kind":"survive","rounds":3}]}},
+            {"id":"close-rush","kind":"encounter","data":{"name":"Close Rush","location":"trailhead","opening":"first",
+              "zones":[{"id":"ring","name":"Ring"}],"playerZone":"ring",
+              "participants":[{"id":"dummy","name":"Dummy","side":"hostile","zone":"ring",
+                "stats":{"health":999,"guard":0,"resistance":0}}],
+              "objectives":[{"id":"last","kind":"survive","rounds":3}]}}]}""";
+
+    /** Combat data of the fixture's armory items, added in memory by item ID. */
+    private static final Map<String, String> ITEM_COMBAT = Map.of(
+            "sword", """
+                    "combat":{"attack":{"attribute":"force","skill":"bladework","damage":{"count":1,"sides":6}}},""",
+            "cloak", """
+                    "combat":{"armor":1},""");
+
+    /** Items only the combat fixture needs. */
+    private static final String COMBAT_ITEMS = """
+            ,{"id":"bolt-caster","kind":"item","data":{"name":"Bolt Caster","description":"Throws bolts.","itemType":"tool",
+              "slot":"off-hand","hands":1,"tags":["light"],"rarity":"ordinary",
+              "combat":{"attack":{"attribute":"finesse","damage":{"count":1,"sides":6},"range":1,"ammunition":"arrows"}},
+              "appearance":{"id":"caster.brass","summary":"A brass caster."}}},
+            {"id":"salve","kind":"item","data":{"name":"Salve","description":"Closes wounds.","itemType":"consumable","maxStack":5,
+              "rarity":"ordinary","use":{"target":{"policy":"self"},"effects":[{"type":"heal","amount":3,"target":"self"}]},
+              "appearance":{"id":"salve.tin","summary":"A tin of salve."}}},
+            {"id":"bandage","kind":"item","data":{"name":"Bandage","description":"Binds a wound.","itemType":"consumable","maxStack":5,
+              "rarity":"ordinary","use":{"target":{"policy":"single"},"effects":[{"type":"heal","amount":4,"target":"target"}]},
+              "appearance":{"id":"bandage.linen","summary":"A linen strip."}}}""";
 
     private EncounterPack() {
     }
@@ -125,6 +176,14 @@ public final class EncounterPack {
         files.put("rules.json", (rules.substring(0, end) + "," + combatRule + rules.substring(end))
                 .getBytes(StandardCharsets.UTF_8));
         files.put("encounters.json", ENCOUNTERS.getBytes(StandardCharsets.UTF_8));
+        String items = new String(files.get("items.json"), StandardCharsets.UTF_8);
+        for (var combat : ITEM_COMBAT.entrySet()) {
+            String head = "{\"id\":\"" + combat.getKey() + "\",\"kind\":\"item\",\"data\":{";
+            items = items.replace(head, head + combat.getValue());
+        }
+        int last = items.lastIndexOf("]}");
+        files.put("items.json", (items.substring(0, last) + COMBAT_ITEMS + items.substring(last))
+                .getBytes(StandardCharsets.UTF_8));
         var json = JsonMapper.builder().build();
         @SuppressWarnings("unchecked")
         Map<String, Object> manifest = json.readValue(files.get("adventure.json"), Map.class);

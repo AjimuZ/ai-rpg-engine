@@ -17,22 +17,31 @@ import org.rpgengine.rules.ZoneGraph;
 
 /**
  * Prose-free combat projection of a pinned content closure (P11.1): each pack's resolved
- * {@link CombatProfile} and every {@link EncounterTemplate}, keyed by canonical ID. It is derived from a sealed,
+ * {@link CombatProfile}, every {@link EncounterTemplate} and, since P11.3, every item's {@link EncounterGear}, keyed by
+ * canonical ID. It is derived from a sealed,
  * recompiled {@link CampaignPackSnapshot}; the pack compiler has validated every field, so a failure here is a
  * broken guarantee and propagates as {@link IllegalArgumentException} (the caller treats the content as
  * unavailable rather than guessing a rule).
  *
  * @param profiles resolved combat profile of each pack that declares a {@code combat} rule, by pack ID
  * @param templates encounter templates by canonical ID (local ID in the root pack, {@code pack#id} otherwise)
+ * @param gear combat data of equippable items that declare any, by canonical item ID
  */
-public record CombatRules(Map<String, CombatProfile> profiles, Map<String, EncounterTemplate> templates) {
+public record CombatRules(Map<String, CombatProfile> profiles, Map<String, EncounterTemplate> templates,
+        Map<String, EncounterGear> gear) {
     /** Content without combat rules or encounters. */
     public static final CombatRules NONE = new CombatRules(Map.of(), Map.of());
 
-    /** Freeze both indexes and require every template's pack to have a profile whose armor bound it respects. */
+    /** Rules without item combat data, the shape used before P11.3. */
+    public CombatRules(Map<String, CombatProfile> profiles, Map<String, EncounterTemplate> templates) {
+        this(profiles, templates, Map.of());
+    }
+
+    /** Freeze the indexes and require every template's pack to have a profile whose bounds it respects. */
     public CombatRules {
         profiles = Map.copyOf(profiles);
         templates = Map.copyOf(templates);
+        gear = Map.copyOf(gear);
         for (EncounterTemplate template : templates.values()) {
             CombatProfile profile = profiles.get(template.pack());
             if (profile == null) {
@@ -41,6 +50,11 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
             for (EncounterTemplate.Participant participant : template.participants()) {
                 if (participant.stats().armor() > profile.value("armorMax")) {
                     throw new IllegalArgumentException("participant armor exceeds the profile's armorMax");
+                }
+                for (CombatAttack attack : participant.attacks()) {
+                    if (attack.range() > profile.value("maxRangeEdges")) {
+                        throw new IllegalArgumentException("participant attack range exceeds the profile's maxRangeEdges");
+                    }
                 }
             }
             for (EncounterAction action : template.actions()) {
@@ -77,7 +91,42 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
                 }
             }
         }
-        return new CombatRules(profiles, templates);
+        var gear = new HashMap<String, EncounterGear>();
+        for (CompiledPack pack : snapshot.packs().values()) {
+            String packId = pack.parsed().manifest().id();
+            for (Definition definition : pack.definitions()) {
+                if (definition.kind().equals("item") && definition.data().get("combat") instanceof Map<?, ?> combat) {
+                    String id = pack == snapshot.root() ? definition.id() : packId + "#" + definition.id();
+                    gear.put(id, gear(snapshot, pack, id, combat));
+                }
+            }
+        }
+        return new CombatRules(profiles, templates, gear);
+    }
+
+    /** Project one validated item {@code combat} object; the attack's skill rank waits for its wearer. */
+    private static EncounterGear gear(CampaignPackSnapshot snapshot, CompiledPack pack, String id, Map<?, ?> combat) {
+        CombatAttack attack = null;
+        String skill = null;
+        if (combat.get("attack") instanceof Map<?, ?> weapon) {
+            skill = weapon.get("skill") instanceof String reference ? snapshot.resolve(pack, reference, "skill").id() : null;
+            String ammunition = weapon.get("ammunition") instanceof String reference
+                    ? snapshot.resolve(pack, reference, "item").id() : null;
+            attack = attack(id, 0, ammunition, weapon);
+        }
+        return new EncounterGear(number(combat.get("guard"), 0), number(combat.get("armor"), 0), skill, attack);
+    }
+
+    /** Project one validated attack object: a damage attribute of {@code none} adds nothing, an omitted one follows the attack. */
+    private static CombatAttack attack(String id, int skill, String ammunition, Map<?, ?> attack) {
+        var damage = (Map<?, ?>) attack.get("damage");
+        String attribute = (String) attack.get("attribute");
+        String contribution = text(damage.get("attribute"), attribute);
+        return new CombatAttack(id, attribute, skill, number(damage.get("count"), 1), number(damage.get("sides"), 0),
+                contribution.equals("none") ? null : contribution, number(damage.get("flat"), 0),
+                number(attack.get("penetration"), 0), number(attack.get("range"), 0),
+                CombatAttack.Defense.valueOf(text(attack.get("defense"), "guard").toUpperCase(java.util.Locale.ROOT)),
+                !Boolean.FALSE.equals(attack.get("strongHit")), ammunition);
     }
 
     /**
@@ -137,7 +186,9 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
                             .toUpperCase(java.util.Locale.ROOT)),
                     new EncounterTemplate.Stats(number(stats.get("health"), 0), number(stats.get("focus"), 0),
                             number(stats.get("guard"), 0), number(stats.get("resistance"), 0),
-                            number(stats.get("armor"), 0), roles)));
+                            number(stats.get("armor"), 0), roles),
+                    objects(participant.get("attacks")).stream().map(attack -> attack((String) attack.get("id"),
+                            number(attack.get("skill"), 0), null, attack)).toList()));
         }
         var objectives = new ArrayList<EncounterObjective>();
         for (Map<?, ?> objective : objects(data.get("objectives"))) {

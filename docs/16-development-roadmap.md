@@ -2668,6 +2668,16 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     Not proven here: the 18 Docker-dependent probe cases, the `unzip` wrapper cases, a live V23 dump and
     restore, balance of the provisional numbers and independent review of the five new Italian messages.
 - [ ] P11.3 Implement attack/defense/strong-hit/armor/healing calculations with recorded draws.
+  - Package A — arithmetic and frozen data ([ADR 0030](adr/0030-attacks-defense-damage-and-healing-with-recorded-draws.md)):
+    pure `CombatMath`; `CombatAttack` and `EncounterGear` from pack `combat` on equippable items and template `attacks`;
+    worn Guard, armor and weapons frozen at entry under their caps.
+  - Package B — resolution: `STRIKE` with a fixed draw order, ammunition per attempt, a public `STRIKE_RESOLVED` and an
+    internal `STRIKE_CALCULATED`; reach, line of sight and cover in `TacticalRules`; `GUARD` until the next activation;
+    defeat at zero Health; the opening strike resolved once at its slot or lapsed with a reason; a small non-player tactic.
+  - Package C — healing and storage: the `heal` effect in exploration and in fights; `COMBAT_USE_ITEM`; V24 `guarding` and
+    Health guards; refusals `ATTACK_UNAVAILABLE` and `GUARD_UNAVAILABLE`; receipt standings, strikes and options.
+  - Exit checks: the worked fight's numbers from recorded dice, exhaustive arithmetic, every targeting rule, no redraw on
+    retry, seeded fights keeping their invariants, the V24 guards and all plan commands; weakening probes on an exported copy.
 - [ ] P11.4 Implement predeclared reactions, stacking caps, effect phases, durations, cooldowns, and no-chain limits.
 - [ ] P11.5 Implement defeat, escape, surrender/agreement predicates, refused/counteroffered/explicitly accepted negotiation, stalemate policy and idempotent settlement; prose alone cannot establish an outcome.
 - [ ] P11.6 Persist/recover every combat cursor, partial-round time boundary and combat-dialogue operation/transcript without duplicate social effects or settlement.

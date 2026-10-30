@@ -29,6 +29,14 @@ import org.rpgengine.rules.ZoneGraph;
  *       recipient its recipient policy admits; a scene action takes no recipient, is used from its zone when one is
  *       declared, and must change its passage (a passage already in the requested state is refused, not charged).
  *       Either costs its declared action points, which must be available.</li>
+ *   <li><b>Attacks</b> (P11.3, {@link #attackBlock}) — one frozen attack of the attacker against a standing participant
+ *       of the opposing side. Melee needs the same zone. A ranged attack reaches its {@code range} in zone distance;
+ *       across zones it also needs line of sight (an obscured zone hides its occupants from outside) and fails against
+ *       full cover. An attack that consumes ammunition needs a unit available. It costs {@code strikeCost}.</li>
+ *   <li><b>Guard</b> (P11.3) — once per activation for {@code guardCost}; the stance holds until the start of the
+ *       participant's next activation, so a stance still held means this activation already took it.</li>
+ *   <li><b>Item use</b> (P11.3) — {@code useItemCost}, on the player or on a standing ally in the player's zone. The
+ *       pinned use contract is checked by the commands layer, which has the catalog.</li>
  * </ul>
  */
 public final class TacticalRules {
@@ -49,7 +57,25 @@ public final class TacticalRules {
         /** The speech-only utterances of this activation are used up. */
         SPEECH_LIMIT,
         /** The declared action does not exist, cannot be used from here or would change nothing. */
-        ACTION
+        ACTION,
+        /** The attacker has no such frozen attack, or no ammunition for it. */
+        ATTACK,
+        /** The Guard action was already taken in this activation. */
+        GUARD
+    }
+
+    /** Why one attack cannot reach one target right now; public, because every participant is observable. */
+    public enum AttackBlock {
+        /** The target is on the attacker's own side, or is the attacker. */
+        NOT_OPPOSED,
+        /** The target is defeated, has escaped or has surrendered. */
+        NOT_STANDING,
+        /** The target is beyond the attack's range. */
+        OUT_OF_RANGE,
+        /** The target stands in an obscured zone the attacker is outside of. */
+        NO_LINE_OF_SIGHT,
+        /** The target stands in a zone with full cover the attacker is outside of. */
+        FULL_COVER
     }
 
     /**
@@ -105,7 +131,97 @@ public final class TacticalRules {
                 }
                 yield action.cost() > state.actionPoints() ? Refusal.ACTION_POINTS : null;
             }
+            case TacticalIntent.Strike strike -> {
+                var attack = player.sheet().attack(strike.attack());
+                if (attack == null || !armed(state, attack)) {
+                    yield Refusal.ATTACK;
+                }
+                var target = state.participant(strike.target());
+                if (target == null || attackBlock(state.space(), player, attack, target) != null) {
+                    yield Refusal.TARGET;
+                }
+                yield state.profile().value("strikeCost") > state.actionPoints() ? Refusal.ACTION_POINTS : null;
+            }
+            case TacticalIntent.Guard guard -> player.guarding() ? Refusal.GUARD
+                    : state.profile().value("guardCost") > state.actionPoints() ? Refusal.ACTION_POINTS : null;
+            case TacticalIntent.UseItem use -> {
+                if (use.target() != null) {
+                    var target = state.participant(use.target());
+                    if (target == null || target.opposes(player) || target.status() != EncounterState.Status.ACTIVE
+                            || !target.zone().equals(player.zone())) {
+                        yield Refusal.TARGET;
+                    }
+                }
+                yield state.profile().value("useItemCost") > state.actionPoints() ? Refusal.ACTION_POINTS : null;
+            }
         };
+    }
+
+    /**
+     * Whether one attack can reach one target now, ignoring its cost.
+     *
+     * @param space the current zone graph
+     * @param attacker the participant attacking
+     * @param attack one of its frozen attacks
+     * @param target the participant attacked
+     * @return null when the target can be attacked, otherwise the first rule that stops it: side, standing, range,
+     *         line of sight, cover. Cover and visibility only matter across zones: inside one zone nothing stands
+     *         between the two. A blocked edge does not stop a shot (range ignores blocking, see {@link ZoneGraph}).
+     */
+    public static AttackBlock attackBlock(ZoneGraph space, EncounterState.Combatant attacker, CombatAttack attack,
+            EncounterState.Combatant target) {
+        if (!attacker.opposes(target)) {
+            return AttackBlock.NOT_OPPOSED;
+        }
+        if (target.status() != EncounterState.Status.ACTIVE) {
+            return AttackBlock.NOT_STANDING;
+        }
+        if (space.distance(attacker.zone(), target.zone()) > attack.range()) {
+            return AttackBlock.OUT_OF_RANGE;
+        }
+        if (!attacker.zone().equals(target.zone())) {
+            var zone = space.zones().get(target.zone());
+            if (zone.obscured()) {
+                return AttackBlock.NO_LINE_OF_SIGHT;
+            }
+            if (zone.cover() == ZoneGraph.Cover.FULL) {
+                return AttackBlock.FULL_COVER;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Effective defense of a target against one attack.
+     *
+     * @param state the encounter
+     * @param attacker the participant attacking
+     * @param attack the attack, already legal against the target
+     * @param target the participant attacked
+     * @return Resistance as frozen for a resistance attack, otherwise Guard with the stance and any partial cover of the
+     *         target's zone against an attack from outside it, under the situational cap. Brace joins the stance in P11.4.
+     */
+    public static int defense(EncounterState state, EncounterState.Combatant attacker, CombatAttack attack,
+            EncounterState.Combatant target) {
+        if (attack.defense() == CombatAttack.Defense.RESISTANCE) {
+            return target.sheet().resistance();
+        }
+        var profile = state.profile();
+        return CombatMath.guard(target.sheet().guard(), target.guarding() ? profile.value("guardBonus") : 0,
+                coverBonus(state, attacker, target), profile.value("situationalGuardCap"));
+    }
+
+    /** Partial cover counts only against an attack from another zone; full cover already refused the attack. */
+    private static int coverBonus(EncounterState state, EncounterState.Combatant attacker,
+            EncounterState.Combatant target) {
+        boolean covered = !attacker.zone().equals(target.zone())
+                && state.space().zones().get(target.zone()).cover() == ZoneGraph.Cover.PARTIAL;
+        return covered ? state.profile().value("partialCoverBonus") : 0;
+    }
+
+    /** @return whether the attack needs no ammunition or the player holds a unit of it */
+    private static boolean armed(EncounterState state, CombatAttack attack) {
+        return attack.ammunition() == null || state.ammunitionOf(attack.ammunition()) > 0;
     }
 
     /**
@@ -134,8 +250,19 @@ public final class TacticalRules {
      *         unblocked edge, or a destination at its capacity)
      */
     public static int moveCost(EncounterState state, String zone) {
+        return moveCost(state, state.player().zone(), zone);
+    }
+
+    /**
+     * Action-point cost of any participant's move between two zones, ignoring the points available.
+     *
+     * @param state encounter state
+     * @param from the mover's zone
+     * @param zone destination zone ID
+     * @return the cost of the single edge, or -1 when the move is illegal
+     */
+    public static int moveCost(EncounterState state, String from, String zone) {
         var space = state.space();
-        String from = state.player().zone();
         if (!space.zones().containsKey(zone) || zone.equals(from)) {
             return -1;
         }
@@ -147,8 +274,10 @@ public final class TacticalRules {
 
     /**
      * Legal candidates of the player's current decision (docs/11 section 12), for the receipt: affordable moves
-     * with their cost, the speech allowance and addressable recipients, and each declared action that is legal now
-     * with its cost and admissible recipients. Everything listed is public: every participant is observable.
+     * with their cost, the speech allowance and addressable recipients, each declared action that is legal now
+     * with its cost and admissible recipients and, since P11.3, each frozen attack with its cost, its reachable targets
+     * and the reason it cannot be used now, the Guard action and the price of using an item. Everything listed is
+     * public: every participant is observable.
      *
      * @param state encounter state at the player's decision
      * @return ordered canonical values, or an empty map when the player has no decision now
@@ -200,10 +329,38 @@ public final class TacticalRules {
             line.put("targets", targets);
             actions.add(line);
         }
+        var strikes = new ArrayList<Object>();
+        int strikeCost = state.profile().value("strikeCost");
+        for (CombatAttack attack : player.sheet().attacks()) {
+            var targets = new ArrayList<Object>();
+            for (var participant : state.participants()) {
+                if (attackBlock(space, player, attack, participant) == null) {
+                    targets.add(participant.id());
+                }
+            }
+            var line = new LinkedHashMap<String, Object>();
+            line.put("attackId", attack.id());
+            line.put("cost", strikeCost);
+            line.put("targets", targets);
+            // Stable public reason of a disabled candidate; a usable one has none.
+            String disabled = !armed(state, attack) ? "NO_AMMUNITION" : targets.isEmpty() ? "NO_TARGET_IN_REACH"
+                    : strikeCost > state.actionPoints() ? "ACTION_POINTS" : null;
+            line.put("disabled", disabled);
+            strikes.add(line);
+        }
+        var guard = new LinkedHashMap<String, Object>();
+        guard.put("cost", state.profile().value("guardCost"));
+        guard.put("available", refusal(state, new TacticalIntent.Guard()) == null);
+        var items = new LinkedHashMap<String, Object>();
+        items.put("cost", state.profile().value("useItemCost"));
+        items.put("available", refusal(state, new TacticalIntent.UseItem(null)) == null);
         var options = new LinkedHashMap<String, Object>();
         options.put("moves", moves);
         options.put("speech", speech);
         options.put("actions", actions);
+        options.put("strikes", strikes);
+        options.put("guard", guard);
+        options.put("useItem", items);
         options.put("endActivation", true);
         return options;
     }

@@ -23,8 +23,10 @@ import org.rpgengine.rules.ZoneGraph;
  * attributes through the profile's role mapping, Guard {@code guardBase + finesse}, Resistance
  * {@code resistanceBase + resolve}, initiative modifier {@code finesse + insight}, and its actual Health and
  * Focus pools. Entry equips nothing, refills nothing and removes nothing; the worn items and active conditions
- * are recorded as they are. Pack items carry no Guard or armor modifier yet, so the player's equipment Guard
- * modifier and armor are zero until P11.3 defines them. Template participants use their explicit statistics.
+ * are recorded as they are. Since P11.3 the worn items' {@link EncounterGear} is read here, once: their Guard modifiers
+ * (capped together by {@code equipmentGuardCap}) join the Guard above, their armor (capped by {@code armorMax}) is the
+ * player's armor, and each weapon becomes a frozen {@link CombatAttack} with the player's rank in its skill. Template
+ * participants use their explicit statistics and declared attacks.
  *
  * @param id encounter identity, derived from the entering operation
  * @param templateId canonical template ID
@@ -65,11 +67,12 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
      * @param initiativeModifier {@code finesse + insight}, added to the initiative roll
      * @param equipment canonical item definitions worn at entry, sorted
      * @param conditions canonical conditions active at entry, sorted
+     * @param attacks frozen attacks (P11.3), in stable order; omitted from the canonical form when empty
      */
     public record Participant(String id, UUID actorId, EncounterTemplate.Side side, String zone, String npc,
             EncounterTemplate.Threat threat, long health, long healthMax, long focus, long focusMax, long guard,
             long resistance, long armor, Map<String, Long> roles, long initiativeModifier, List<String> equipment,
-            List<String> conditions) {
+            List<String> conditions, List<CombatAttack> attacks) {
         /** Require identities; freeze the collections in order. */
         public Participant {
             Objects.requireNonNull(id, "id");
@@ -81,6 +84,7 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
             roles = java.util.Collections.unmodifiableMap(new TreeMap<>(roles));
             equipment = equipment.stream().sorted().toList();
             conditions = conditions.stream().sorted().toList();
+            attacks = List.copyOf(attacks);
         }
 
         /** @return canonical frozen form, as stored in the participant row */
@@ -103,7 +107,19 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
             form.put("initiativeModifier", initiativeModifier);
             form.put("equipment", equipment);
             form.put("conditions", conditions);
+            // Omitted when empty, so a participant that cannot attack keeps the form it had before P11.3.
+            if (!attacks.isEmpty()) {
+                form.put("attacks", attacks.stream().map(attack -> (Object) attack.canonicalForm()).toList());
+            }
             return form;
+        }
+
+        /** @return the fighting values the tactical rules read, as {@link EncounterState.Sheet#fromCanonical} reads them */
+        public EncounterState.Sheet sheet() {
+            var values = new TreeMap<String, Integer>();
+            roles.forEach((role, value) -> values.put(role, Math.toIntExact(value)));
+            return new EncounterState.Sheet(Math.toIntExact(guard), Math.toIntExact(resistance), Math.toIntExact(armor),
+                    values, attacks);
         }
     }
 
@@ -131,9 +147,16 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
      * @param focus reading of the profile's Focus resource, or null when the profile or the player has none
      * @param worn canonical item definitions the player wears
      * @param conditions canonical conditions active on the player
+     * @param skills trained skill ranks by canonical skill ID, read for the player's weapons
      */
     public record PlayerFacts(UUID actorId, Map<String, Long> attributes, Pool health, Pool focus, List<String> worn,
-            Set<String> conditions) {
+            Set<String> conditions, Map<String, Long> skills) {
+        /** Facts without skill ranks, for a player whose weapons train none. */
+        public PlayerFacts(UUID actorId, Map<String, Long> attributes, Pool health, Pool focus, List<String> worn,
+                Set<String> conditions) {
+            this(actorId, attributes, health, focus, worn, conditions, Map.of());
+        }
+
         /** Require the actor and Health; copy the collections. */
         public PlayerFacts {
             Objects.requireNonNull(actorId, "actorId");
@@ -141,6 +164,7 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
             attributes = Map.copyOf(attributes);
             worn = List.copyOf(worn);
             conditions = Set.copyOf(conditions);
+            skills = Map.copyOf(skills);
         }
     }
 
@@ -176,6 +200,24 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
      */
     public static FrozenEncounter freeze(UUID id, EncounterTemplate template, CombatProfile profile, PlayerFacts player,
             String openingTarget) {
+        return freeze(id, template, profile, player, openingTarget, Map.of());
+    }
+
+    /**
+     * Freeze an encounter with the combat data of the items the player wears.
+     *
+     * @param id encounter identity
+     * @param template validated template
+     * @param profile the template pack's resolved combat profile
+     * @param player the player's committed facts
+     * @param openingTarget hostile participant attacked by the entering action, or null
+     * @param gear combat data of every item that has any, by canonical item ID; a worn item without an entry adds nothing
+     * @return the frozen encounter
+     * @throws IllegalStateException when a role attribute is missing from the player's sheet, the opening is not
+     *         allowed or the target is not a hostile participant
+     */
+    public static FrozenEncounter freeze(UUID id, EncounterTemplate template, CombatProfile profile, PlayerFacts player,
+            String openingTarget, Map<String, EncounterGear> gear) {
         if (!template.pack().equals(profile.pack())) {
             throw new IllegalStateException("the profile does not belong to the template's pack");
         }
@@ -200,12 +242,30 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
             roles.put(role, value);
         }
         var focus = profile.focus() == null || player.focus() == null ? new Pool(0, 0) : player.focus();
+        long guard = 0;
+        long armor = 0;
+        var attacks = new ArrayList<CombatAttack>();
+        // Sorted and distinct, so the frozen attacks and their order follow from what is worn, not from storage order.
+        for (String item : new java.util.TreeSet<>(player.worn())) {
+            EncounterGear worn = gear.get(item);
+            if (worn != null) {
+                guard += worn.guard() * java.util.Collections.frequency(player.worn(), item);
+                armor += worn.armor() * java.util.Collections.frequency(player.worn(), item);
+                if (worn.attack() != null) {
+                    long rank = worn.skill() == null ? 0 : player.skills().getOrDefault(worn.skill(), 0L);
+                    attacks.add(worn.attack().forWearer(item, Math.toIntExact(
+                            Math.min(rank, CombatProfile.ATTACK_SKILL_MAX))));
+                }
+            }
+        }
+        guard = Math.min(guard, profile.value("equipmentGuardCap"));
+        armor = Math.min(armor, profile.value("armorMax"));
         var participants = new ArrayList<Participant>();
         participants.add(new Participant(EncounterTemplate.PLAYER, player.actorId(), EncounterTemplate.Side.PLAYER,
                 template.playerZone(), null, null, player.health().current(), player.health().maximum(), focus.current(),
-                focus.maximum(), profile.value("guardBase") + roles.get("finesse"),
-                profile.value("resistanceBase") + roles.get("resolve"), 0, roles,
-                roles.get("finesse") + roles.get("insight"), player.worn(), List.copyOf(player.conditions())));
+                focus.maximum(), profile.value("guardBase") + roles.get("finesse") + guard,
+                profile.value("resistanceBase") + roles.get("resolve"), armor, roles,
+                roles.get("finesse") + roles.get("insight"), player.worn(), List.copyOf(player.conditions()), attacks));
         for (EncounterTemplate.Participant participant : template.participants()) {
             var stats = participant.stats();
             var values = new TreeMap<String, Long>();
@@ -213,7 +273,7 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
             participants.add(new Participant(participant.id(), null, participant.side(), participant.zone(),
                     participant.npc(), participant.threat(), stats.health(), stats.health(), stats.focus(),
                     stats.focus(), stats.guard(), stats.resistance(), stats.armor(), values,
-                    values.get("finesse") + values.get("insight"), List.of(), List.of()));
+                    values.get("finesse") + values.get("insight"), List.of(), List.of(), participant.attacks()));
         }
         return new FrozenEncounter(id, template.id(), template.location(), profile, template.zones(),
                 template.escapeZones(), template.objectives(), template.opening(), openingTarget, participants,

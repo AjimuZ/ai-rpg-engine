@@ -62,6 +62,20 @@ public record CombatProfile(String pack, Map<String, String> roles, String healt
      */
     public static final int ROLE_MIN = 0;
     public static final int ROLE_MAX = 6;
+    /** Dice of an attack roll: {@code 2d10} plus attribute, skill and modifier (kernel, not a parameter). */
+    public static final int ATTACK_SIDES = 10;
+    /**
+     * Bounds of one attack definition (P11.3, kernel). The dice bound keeps the largest roster inside one operation's
+     * durable draw budget: at most nine strikes of two attack dice, four damage dice and a strong-hit die.
+     */
+    public static final int ATTACK_DICE_MAX = 4;
+    public static final int ATTACK_SIDES_MAX = 20;
+    public static final int ATTACK_FLAT_MIN = -5;
+    public static final int ATTACK_FLAT_MAX = 20;
+    public static final int ATTACK_PENETRATION_MAX = 10;
+    public static final int ATTACK_SKILL_MAX = 10;
+    /** Most attacks a template participant may declare. */
+    public static final int ATTACKS_MAX = 4;
 
     /**
      * Inclusive bound and documented default of one parameter.

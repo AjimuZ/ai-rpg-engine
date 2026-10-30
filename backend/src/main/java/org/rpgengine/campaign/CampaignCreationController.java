@@ -300,6 +300,8 @@ public class CampaignCreationController {
             case ZONE_UNAVAILABLE -> error(422, "COMMAND_ZONE_UNAVAILABLE");
             case SPEECH_LIMIT_REACHED -> error(422, "COMMAND_SPEECH_LIMIT_REACHED");
             case INTERACTION_UNAVAILABLE -> error(422, "COMMAND_INTERACTION_UNAVAILABLE");
+            case ATTACK_UNAVAILABLE -> error(422, "COMMAND_ATTACK_UNAVAILABLE");
+            case GUARD_UNAVAILABLE -> error(422, "COMMAND_GUARD_UNAVAILABLE");
         };
     }
 

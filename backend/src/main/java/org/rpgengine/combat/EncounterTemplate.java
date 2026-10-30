@@ -108,14 +108,22 @@ public record EncounterTemplate(String id, String pack, String location, ZoneGra
      * @param npc canonical NPC definition this participant portrays, or null for a template-only creature
      * @param threat catalog threat tier
      * @param stats explicit statistics
+     * @param attacks attacks the participant can make (P11.3); without any it passes its activations
      */
-    public record Participant(String id, Side side, String zone, String npc, Threat threat, Stats stats) {
+    public record Participant(String id, Side side, String zone, String npc, Threat threat, Stats stats,
+            List<CombatAttack> attacks) {
+        /** Participant that cannot attack, the shape used before P11.3. */
+        public Participant(String id, Side side, String zone, String npc, Threat threat, Stats stats) {
+            this(id, side, zone, npc, threat, stats, List.of());
+        }
+
         /** Require identities and a non-player side. */
         public Participant {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(zone, "zone");
             Objects.requireNonNull(threat, "threat");
             Objects.requireNonNull(stats, "stats");
+            attacks = List.copyOf(attacks);
             if (side == null || side == Side.PLAYER || PLAYER.equals(id)) {
                 throw new IllegalArgumentException("a template participant is an ally or a hostile and is not the player");
             }

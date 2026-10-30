@@ -18,7 +18,7 @@ import org.rpgengine.content.PackTextParser;
  * identity; every other quest transition is derived by the engine from committed facts. Since P10.4 the
  * player can also rest under a pack-declared rest policy; its duration, interruption and recovery are
  * rule data, never part of the intention. Since P11.1 the player can enter an authored encounter, optionally
- * declaring the attack that opens it. Since P11.2 the {@link Tactical} intentions are registered for encounter mode:
+ * declaring the attack that opens it. Since P11.2 (and P11.3 for attacks) the {@link Tactical} intentions are registered for encounter mode:
  * roll initiative, move to an adjacent zone, end the activation, one bounded speech-only utterance and a declared
  * social or scene action; attacks and reactions acquire their contracts with P11.3/P11.4. Unknown types fail closed.
  * Structural decoding here
@@ -31,7 +31,8 @@ public sealed interface TypedCommand
         TypedCommand.UseItem, TypedCommand.EquipItem, TypedCommand.UnequipItem, TypedCommand.TransferItem,
         TypedCommand.TradeItems, TypedCommand.AcceptQuest, TypedCommand.SuspendQuest, TypedCommand.ResumeQuest,
         TypedCommand.Rest, TypedCommand.Engage, TypedCommand.RollInitiative, TypedCommand.MoveZone,
-        TypedCommand.EndActivation, TypedCommand.CombatSpeak, TypedCommand.Interact {
+        TypedCommand.EndActivation, TypedCommand.CombatSpeak, TypedCommand.Interact, TypedCommand.Strike,
+        TypedCommand.Guard, TypedCommand.CombatUseItem {
     /** @return registered, case-sensitive wire identifier */
     String type();
 
@@ -165,6 +166,24 @@ public sealed interface TypedCommand
                     fields(payload, "actionId");
                     yield new Interact(text(payload.get("actionId"), 128), null);
                 }
+                case "STRIKE" -> {
+                    fields(payload, "attackId", "targetId");
+                    yield new Strike(text(payload.get("attackId"), 256), text(payload.get("targetId"), 128));
+                }
+                case "GUARD" -> {
+                    fields(payload);
+                    yield new Guard();
+                }
+                case "COMBAT_USE_ITEM" -> {
+                    // The target is optional: an item used on oneself names none.
+                    if (payload.containsKey("targetId")) {
+                        fields(payload, "itemInstanceId", "targetId");
+                        yield new CombatUseItem(CampaignCommandJson.uuid(payload.get("itemInstanceId")),
+                                text(payload.get("targetId"), 128));
+                    }
+                    fields(payload, "itemInstanceId");
+                    yield new CombatUseItem(CampaignCommandJson.uuid(payload.get("itemInstanceId")), null);
+                }
                 default -> throw invalid();
             };
         } catch (IllegalArgumentException | ArithmeticException failure) {
@@ -177,14 +196,16 @@ public sealed interface TypedCommand
     static boolean registered(String type) {
         return Set.of("MOVE", "WAIT", "SPEAK", "USE_ABILITY", "USE_ITEM", "EQUIP_ITEM", "UNEQUIP_ITEM",
                 "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST", "ENGAGE",
-                "ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT").contains(type);
+                "ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT", "STRIKE", "GUARD",
+                "COMBAT_USE_ITEM").contains(type);
     }
 
     /**
      * Tactical intentions (P11.2): legal only in encounter mode, at the decision boundary {@code TacticalRules}
      * checks, and resolved by the combat scheduler from the frozen encounter rather than from pinned definitions.
      */
-    sealed interface Tactical permits RollInitiative, MoveZone, EndActivation, CombatSpeak, Interact {
+    sealed interface Tactical permits RollInitiative, MoveZone, EndActivation, CombatSpeak, Interact, Strike, Guard,
+            CombatUseItem {
         /** @return the combat-layer value of this intention */
         TacticalIntent intent();
     }
@@ -600,5 +621,61 @@ public sealed interface TypedCommand
         }
         /** @return the combat-layer intention */
         public TacticalIntent intent() { return new TacticalIntent.Interact(actionId, targetId); }
+    }
+
+    /**
+     * Make one frozen attack against an encounter participant (P11.3). Cost, dice, damage and legality are rule data;
+     * the intention names only the attack and its target.
+     *
+     * @param attackId frozen attack of the player: the canonical definition of a worn weapon
+     * @param targetId participant attacked
+     */
+    record Strike(String attackId, String targetId) implements TypedCommand, Tactical {
+        /** Require bounded identities. */
+        public Strike {
+            attackId = text(attackId, 256);
+            targetId = text(targetId, 128);
+        }
+        /** @return the fixed strike identifier */
+        public String type() { return "STRIKE"; }
+        /** @return the attack and the target */
+        public Map<String, Object> payload() { return Map.of("attackId", attackId, "targetId", targetId); }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.Strike(attackId, targetId); }
+    }
+
+    /** Take the Guard action until the start of the player's next activation (P11.3); no field to choose. */
+    record Guard() implements TypedCommand, Tactical {
+        /** @return the fixed Guard identifier */
+        public String type() { return "GUARD"; }
+        /** @return the empty payload */
+        public Map<String, Object> payload() { return Map.of(); }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.Guard(); }
+    }
+
+    /**
+     * Use one held item during the player's activation (P11.3). The pinned use contract decides the effects, like
+     * {@link UseItem} in exploration; this intention also pays the action and can name an allied participant, who has no
+     * campaign actor. It is the only tactical intention that reads the pinned catalog.
+     *
+     * @param itemInstanceId held instance
+     * @param targetId participant the item is used on, or null for an item used on oneself
+     */
+    record CombatUseItem(UUID itemInstanceId, String targetId) implements TypedCommand, Tactical {
+        /** Require the instance and, when present, a bounded participant identity. */
+        public CombatUseItem {
+            java.util.Objects.requireNonNull(itemInstanceId, "itemInstanceId");
+            targetId = targetId == null ? null : text(targetId, 128);
+        }
+        /** @return the fixed combat item-use identifier */
+        public String type() { return "COMBAT_USE_ITEM"; }
+        /** @return the instance and, only when declared, the target */
+        public Map<String, Object> payload() {
+            return targetId == null ? Map.of("itemInstanceId", itemInstanceId.toString())
+                    : Map.of("itemInstanceId", itemInstanceId.toString(), "targetId", targetId);
+        }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.UseItem(targetId); }
     }
 }

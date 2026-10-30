@@ -26,15 +26,33 @@ import org.rpgengine.rules.CombatProfile;
  * the player no longer stands (the stalemate and terminal policies of P11.5 decide those encounters).
  *
  * <p><b>Decision boundaries</b>: the scheduler advances until the player's own activation waits for an action, so
- * an operation never stops at another participant's turn and the player never decides out of turn. Other
- * participants' activations pass without an action in P11.2: tactics for non-player participants (the deterministic
- * fallback and constrained choices) arrive with attacks (P11.3) and P12.3/P12.4, and their unused points expire like
- * the player's. Because the player acts once per round, one operation crosses at most one round boundary.
+ * an operation never stops at another participant's turn and the player never decides out of turn. Because the player
+ * acts once per round, one operation crosses at most one round boundary.
  *
- * <p><b>Player actions</b> keep the activation open: a move or declared action passes through {@code RESOLVING}
- * and returns to {@code AWAITING_ACTION}, even at zero points, because only the explicit end of the activation
- * passes control (a speech-only utterance still costs nothing). A speech-only utterance changes only the speech
- * count. The opening strike stays {@code PENDING}: resolving it at its slot is part of attacks (P11.3).
+ * <p><b>Player actions</b> keep the activation open: a move, declared action, strike, Guard or item use passes through
+ * {@code RESOLVING} and returns to {@code AWAITING_ACTION}, even at zero points, because only the explicit end of the
+ * activation passes control (a speech-only utterance still costs nothing). A speech-only utterance changes only the
+ * speech count.
+ *
+ * <p><b>Attacks</b> (P11.3, docs/11 sections 8-9): a strike draws, in this order, the two attack dice, then on a hit
+ * each damage die, then on a strong hit the strong-hit die, so a miss reserves no damage draw. Costs and ammunition are
+ * paid by the attempt, hit or miss. {@link CombatMath} does the arithmetic. Each strike writes a public
+ * {@code STRIKE_RESOLVED} event (dice, score, outcome, damage taken) and an internal {@code STRIKE_CALCULATED} event
+ * with the complete calculation and draw ordinals, whose defense, armor and Health values are hidden from the player
+ * when they belong to another participant. Zero Health defeats a participant, which is never a death; the schedule
+ * then skips it. A defeated participant's activation never starts and its stance ends.
+ *
+ * <p><b>Non-player tactics</b> are deliberately small until constrained choices and the full fallback exist
+ * (P12.3/P12.4): a participant without an attack passes; an armed one first moves one edge toward the nearest opponent
+ * when none is in reach, makes at most one strike at the first opponent in reach (nearest, then roster order), and
+ * takes the Guard action with what is left. One strike per activation bounds the draws of an operation: nine strikes at
+ * seven draws each plus eighteen initiative dice stay well inside {@code DeterministicDraw.MAX_DRAWS}.
+ *
+ * <p><b>The opening strike</b> resolves once in the initiative operation: under {@code first} right after round one
+ * opens, paid by granting fewer points at the player's round-one activation, and under {@code initiative} when that
+ * activation starts. Its legality is judged at the slot, because the target may have moved or fallen by then. A strike
+ * that cannot be made at its slot lapses with its public reason, costing nothing; so does one whose attacker fell
+ * before its slot, when round one closes. Either way {@code opening_status} ends {@code RESOLVED}.
  */
 public final class CombatScheduler {
     /** Sides of each initiative die (kernel). */
@@ -62,7 +80,7 @@ public final class CombatScheduler {
      *
      * @param state the encounter as read under the campaign lock
      * @param intent an intention {@link TacticalRules#refusal} accepts for {@code state}
-     * @param dice recorded draws; only the initiative roll uses them
+     * @param dice recorded draws, used by the initiative roll and by attacks
      * @return the complete plan
      * @throws IllegalStateException when the intention is refused (the rule gate should have stopped it) or a draw
      *         lies outside its die
@@ -79,13 +97,57 @@ public final class CombatScheduler {
                 run.advance();
             }
             case TacticalIntent.EndActivation end -> {
+                run.draws(dice);
                 run.endActivation(true);
                 run.advance();
             }
             case TacticalIntent.MoveZone move -> run.move(move.zone());
             case TacticalIntent.Speech speech -> run.speak(speech);
             case TacticalIntent.Interact interact -> run.interact(interact);
+            case TacticalIntent.Strike strike -> run.playerStrike(strike, dice);
+            case TacticalIntent.Guard guard -> run.playerGuard();
+            case TacticalIntent.UseItem use -> throw new IllegalStateException("an item use needs its resolved outcome");
         }
+        return run.plan();
+    }
+
+    /**
+     * What a pinned item's use contract did, as the commands layer resolved it with the catalog. The scheduler only
+     * charges the action and takes over the resulting Health values; it reads no pack data.
+     *
+     * @param definition canonical item definition used
+     * @param playerHealth the player's Health after the effects, above the pool's minimum
+     * @param targetHealth the targeted ally's encounter-local Health after the effects, or null without such a target
+     * @param healed Health the effects restored to the targeted ally
+     */
+    public record ItemOutcome(String definition, int playerHealth, Integer targetHealth, long healed) {
+        /** Require the item. */
+        public ItemOutcome {
+            java.util.Objects.requireNonNull(definition, "definition");
+        }
+    }
+
+    /**
+     * Resolve the action of using an item whose effects the commands layer already calculated.
+     *
+     * @param state the encounter as read under the campaign lock
+     * @param intent an intention {@link TacticalRules#refusal} accepts for {@code state}
+     * @param outcome the item's resolved effects
+     * @param dice recorded draws, used only when the item leaves the player at zero and the schedule continues
+     * @param firstDraw the operation's first draw ordinal the item's own effects did not use
+     * @return the complete plan; a player the item itself left at zero Health is defeated and the schedule continues
+     * @throws IllegalStateException when the intention is refused
+     */
+    public static TacticalPlan useItem(EncounterState state, TacticalIntent.UseItem intent, ItemOutcome outcome,
+            Dice dice, int firstDraw) {
+        var refusal = TacticalRules.refusal(state, intent);
+        if (refusal != null) {
+            throw new IllegalStateException("validated tactical intention is refused: " + refusal);
+        }
+        var run = new Run(state);
+        run.draws(dice);
+        run.nextDraw = firstDraw;
+        run.playerItem(intent, outcome);
         return run.plan();
     }
 
@@ -93,6 +155,10 @@ public final class CombatScheduler {
     private static final class Run {
         private final EncounterState base;
         private final CombatProfile profile;
+        /** The operation's recorded draws; set by the intentions that can draw. */
+        private Dice dice = (ordinal, sides) -> {
+            throw new IllegalStateException("this intention draws no dice");
+        };
         private final Map<String, Working> participants = new LinkedHashMap<>();
         private final List<TacticalPlan.Step> steps = new ArrayList<>();
         private final List<TacticalPlan.Note> notes = new ArrayList<>();
@@ -103,6 +169,19 @@ public final class CombatScheduler {
         private int speech;
         private final List<EncounterAction.Passage> passages;
         private long elapsed;
+        private String openingStatus;
+        /** Points the {@code first} opening strike took from the player's round-one activation, until it starts. */
+        private int openingCharge;
+        /** Next durable draw ordinal of this operation. */
+        private int nextDraw;
+        private final List<EncounterState.Ammunition> ammunition;
+        private final Map<java.util.UUID, TacticalPlan.AmmunitionUse> spent = new LinkedHashMap<>();
+        private final List<Object> strikes = new ArrayList<>();
+
+        /** Give the run the operation's draws. */
+        void draws(Dice source) {
+            dice = source;
+        }
 
         /** Copy the state. */
         Run(EncounterState state) {
@@ -114,6 +193,8 @@ public final class CombatScheduler {
             points = state.actionPoints();
             speech = state.speechUsed();
             passages = new ArrayList<>(state.passages());
+            openingStatus = state.openingStatus();
+            ammunition = new ArrayList<>(state.ammunition());
             for (var participant : state.participants()) {
                 participants.put(participant.id(), new Working(participant));
             }
@@ -121,11 +202,11 @@ public final class CombatScheduler {
 
         /** Roll and store initiative, announce the order, and open round one. */
         void initiative(Dice dice) {
-            int ordinal = 0;
+            this.dice = dice;
             var rolled = new ArrayList<Working>();
             for (Working participant : participants.values()) {
-                int first = roll(dice, ordinal++);
-                int second = roll(dice, ordinal++);
+                int first = draw(INITIATIVE_SIDES);
+                int second = draw(INITIATIVE_SIDES);
                 participant.dice = List.of(first, second);
                 participant.initiative = first + second + participant.source.initiativeModifier();
                 rolled.add(participant);
@@ -147,6 +228,66 @@ public final class CombatScheduler {
             }
             note("INITIATIVE_ROLLED", Map.of("encounterId", base.id().toString(), "order", order), false);
             openRound();
+            if (pendingOpening() && base.opening() == OpeningPolicy.FIRST) {
+                // Before the first activation: the blow moves ahead, its price stays in the player's own activation.
+                if (openingStrike(false)) {
+                    openingCharge = profile.value("strikeCost");
+                }
+            }
+        }
+
+        /** @return whether a declared opening strike still waits for its slot */
+        private boolean pendingOpening() {
+            return "PENDING".equals(openingStatus);
+        }
+
+        /**
+         * Make the declared opening strike at its slot, or let it lapse with its public reason, paying nothing.
+         *
+         * @param charge whether to spend the strike's points from the activation in progress
+         * @return whether the strike was made
+         */
+        private boolean openingStrike(boolean charge) {
+            Working player = participants.get(EncounterTemplate.PLAYER);
+            Working target = participants.get(base.openingTarget());
+            var current = state();
+            var attacker = current.player();
+            var victim = current.participant(target.source.id());
+            CombatAttack chosen = null;
+            String reason = attacker.sheet().attacks().isEmpty() ? "NO_ATTACK" : null;
+            for (CombatAttack attack : attacker.sheet().attacks()) {
+                var block = TacticalRules.attackBlock(current.space(), attacker, attack, victim);
+                boolean armed = attack.ammunition() == null || current.ammunitionOf(attack.ammunition()) > 0;
+                if (block == null && armed) {
+                    chosen = attack;
+                    break;
+                }
+                reason = reason != null ? reason : block != null ? block.name() : "NO_AMMUNITION";
+            }
+            openingStatus = "RESOLVED";
+            if (chosen == null) {
+                lapse(reason);
+                if (charge) {
+                    step(phase);
+                }
+                return false;
+            }
+            int cost = profile.value("strikeCost");
+            if (charge) {
+                points -= cost;
+                step(EncounterPhase.RESOLVING);
+            }
+            strike(player, chosen, target, cost, true, true);
+            if (charge) {
+                step(EncounterPhase.AWAITING_ACTION);
+            }
+            return true;
+        }
+
+        /** Announce that the opening strike cannot be made; it spends and draws nothing. */
+        private void lapse(String reason) {
+            note("OPENING_STRIKE_LAPSED", activation(participants.get(EncounterTemplate.PLAYER))
+                    .put("targetId", base.openingTarget()).put("reason", reason).build(), true);
         }
 
         /** Continue the schedule until the player's decision, the round cap or a round without a standing player. */
@@ -158,12 +299,13 @@ public final class CombatScheduler {
                         if (acting().source.player()) {
                             return;
                         }
+                        tactic(acting());
                         endActivation(false);
                     }
                     case ACTOR_END -> next(cursor);
                     case ROUND_END -> {
                         if (round >= profile.roundCap()
-                                || participants.values().iterator().next().source.status() != EncounterState.Status.ACTIVE) {
+                                || participants.get(EncounterTemplate.PLAYER).status != EncounterState.Status.ACTIVE) {
                             return;
                         }
                         openRound();
@@ -177,7 +319,7 @@ public final class CombatScheduler {
         /** Start the next active participant after a rank, or end the round when none is left. */
         private void next(int after) {
             Working next = participants.values().stream()
-                    .filter(w -> w.rank != null && w.rank > after && w.source.status() == EncounterState.Status.ACTIVE)
+                    .filter(w -> w.rank != null && w.rank > after && w.status == EncounterState.Status.ACTIVE)
                     .min(Comparator.comparingInt(w -> w.rank)).orElse(null);
             if (next == null) {
                 endRound();
@@ -185,10 +327,19 @@ public final class CombatScheduler {
             }
             cursor = next.rank;
             points = profile.actionPoints();
+            if (next.source.player()) {
+                points -= openingCharge;
+                openingCharge = 0;
+            }
             speech = 0;
+            // Effects tied to the participant's next activation expire first (docs/11 section 6).
+            next.guarding = false;
             step(EncounterPhase.ACTOR_START);
             note("ACTIVATION_STARTED", activation(next).put("actionPoints", points).build(), next.source.player());
             step(EncounterPhase.AWAITING_ACTION);
+            if (next.source.player() && pendingOpening()) {
+                openingStrike(true);
+            }
         }
 
         /** End the acting participant's activation: unused points expire. */
@@ -202,6 +353,11 @@ public final class CombatScheduler {
 
         /** Close the round and add its world time. */
         private void endRound() {
+            if (pendingOpening()) {
+                // The player fell before its slot: the strike can never be made.
+                openingStatus = "RESOLVED";
+                lapse("ATTACKER_DOWN");
+            }
             cursor = null;
             points = null;
             speech = 0;
@@ -215,7 +371,7 @@ public final class CombatScheduler {
         private void openRound() {
             round++;
             for (Working participant : participants.values()) {
-                if (participant.source.status() == EncounterState.Status.ACTIVE) {
+                if (participant.status == EncounterState.Status.ACTIVE) {
                     participant.reactions = profile.reactionsPerRound();
                 }
             }
@@ -264,17 +420,278 @@ public final class CombatScheduler {
             step(EncounterPhase.AWAITING_ACTION);
         }
 
+        /** The player's strike: pay, resolve inside {@code RESOLVING}, and return to the decision. */
+        void playerStrike(TacticalIntent.Strike intent, Dice dice) {
+            this.dice = dice;
+            Working player = participants.get(EncounterTemplate.PLAYER);
+            int cost = profile.value("strikeCost");
+            points -= cost;
+            step(EncounterPhase.RESOLVING);
+            strike(player, player.source.sheet().attack(intent.attack()), participants.get(intent.target()), cost, true,
+                    false);
+            step(EncounterPhase.AWAITING_ACTION);
+        }
+
+        /** The player's Guard action. */
+        void playerGuard() {
+            guard(participants.get(EncounterTemplate.PLAYER), true);
+        }
+
+        /**
+         * Pay for an item whose effects are already resolved and take over the Health values they left. A player left
+         * at zero by its own item falls: the activation ends and the schedule continues without it.
+         */
+        void playerItem(TacticalIntent.UseItem intent, ItemOutcome outcome) {
+            Working player = participants.get(EncounterTemplate.PLAYER);
+            int cost = profile.value("useItemCost");
+            points -= cost;
+            step(EncounterPhase.RESOLVING);
+            var announced = activation(player).put("definitionId", outcome.definition()).put("actionPoints", cost)
+                    .put("remainingActionPoints", points);
+            player.health = outcome.playerHealth();
+            if (intent.target() != null) {
+                announced.put("targetId", intent.target()).put("healed", outcome.healed());
+                Working target = participants.get(intent.target());
+                if (outcome.targetHealth() != null) {
+                    target.health = outcome.targetHealth();
+                    defeatIfDown(target);
+                }
+            }
+            note("COMBAT_ITEM_USED", announced.build(), true);
+            defeatIfDown(player);
+            if (player.status != EncounterState.Status.ACTIVE) {
+                endActivation(true);
+                advance();
+                return;
+            }
+            step(EncounterPhase.AWAITING_ACTION);
+        }
+
+        /**
+         * The small deterministic tactic of a non-player participant (see the class comment). Every choice goes through
+         * the same legality as the player's, so a tactic can never do what the player could not.
+         */
+        private void tactic(Working actor) {
+            if (actor.source.sheet().attacks().isEmpty()) {
+                return;
+            }
+            int strikeCost = profile.value("strikeCost");
+            if (reach(actor) == null) {
+                approach(actor);
+            }
+            var reach = reach(actor);
+            if (reach != null && points >= strikeCost) {
+                points -= strikeCost;
+                step(EncounterPhase.RESOLVING);
+                strike(actor, reach.attack(), reach.target(), strikeCost, false, false);
+                step(EncounterPhase.AWAITING_ACTION);
+            }
+            if (points >= profile.value("guardCost") && !actor.guarding) {
+                guard(actor, false);
+            }
+        }
+
+        /** An attack and the target it reaches. */
+        private record Reach(CombatAttack attack, Working target) {
+        }
+
+        /** @return the first declared attack that reaches an opponent, at the nearest such opponent, then roster order */
+        private Reach reach(Working actor) {
+            var current = state();
+            var attacker = current.participant(actor.source.id());
+            var space = current.space();
+            for (CombatAttack attack : attacker.sheet().attacks()) {
+                var target = current.participants().stream()
+                        .filter(other -> TacticalRules.attackBlock(space, attacker, attack, other) == null)
+                        .min(Comparator.comparingInt((EncounterState.Combatant other) ->
+                                space.distance(attacker.zone(), other.zone())).thenComparingInt(EncounterState.Combatant::ordinal));
+                if (target.isPresent()) {
+                    return new Reach(attack, participants.get(target.get().id()));
+                }
+            }
+            return null;
+        }
+
+        /** Move one affordable edge that gets strictly closer to the nearest standing opponent, if there is one. */
+        private void approach(Working actor) {
+            var current = state();
+            var space = current.space();
+            var mover = current.participant(actor.source.id());
+            var opponents = current.participants().stream()
+                    .filter(other -> mover.opposes(other) && other.status() == EncounterState.Status.ACTIVE).toList();
+            int best = nearest(space, mover.zone(), opponents);
+            String destination = null;
+            for (String zone : space.zones().keySet()) {
+                int cost = TacticalRules.moveCost(current, mover.zone(), zone);
+                if (cost >= 0 && cost <= points && nearest(space, zone, opponents) < best) {
+                    best = nearest(space, zone, opponents);
+                    destination = zone;
+                }
+            }
+            if (destination != null) {
+                int cost = TacticalRules.moveCost(current, mover.zone(), destination);
+                String from = actor.zone;
+                points -= cost;
+                actor.zone = destination;
+                step(EncounterPhase.RESOLVING);
+                note("PARTICIPANT_MOVED", activation(actor).put("from", from).put("to", destination)
+                        .put("actionPoints", cost).put("remainingActionPoints", points).build(), false);
+                step(EncounterPhase.AWAITING_ACTION);
+            }
+        }
+
+        /** @return the fewest action points of walking from a zone to an opponent; a large value when none can be reached */
+        private int nearest(org.rpgengine.rules.ZoneGraph space, String zone, List<EncounterState.Combatant> opponents) {
+            int best = Integer.MAX_VALUE;
+            for (var opponent : opponents) {
+                int cost = space.travelCost(zone, opponent.zone(), profile);
+                if (cost >= 0) {
+                    best = Math.min(best, cost);
+                }
+            }
+            return best;
+        }
+
+        /** Take the Guard action; it holds until the start of the participant's next activation. */
+        private void guard(Working actor, boolean byPlayer) {
+            int cost = profile.value("guardCost");
+            points -= cost;
+            actor.guarding = true;
+            step(EncounterPhase.RESOLVING);
+            note("GUARD_RAISED", activation(actor).put("bonus", profile.value("guardBonus")).put("actionPoints", cost)
+                    .put("remainingActionPoints", points).build(), byPlayer);
+            step(EncounterPhase.AWAITING_ACTION);
+        }
+
+        /**
+         * Resolve one legal attack: spend its ammunition, draw the dice, calculate, apply the damage and record both
+         * events. The caller paid the action points and owns the surrounding phase steps.
+         *
+         * @param opening whether this is the opening strike, which also resolves at a slot where no points are in play
+         */
+        private void strike(Working attacker, CombatAttack attack, Working target, int cost, boolean byPlayer,
+                boolean opening) {
+            var current = state();
+            var attackerNow = current.participant(attacker.source.id());
+            int defense = TacticalRules.defense(current, attackerNow, attack, current.participant(target.source.id()));
+            if (attack.ammunition() != null) {
+                spend(attack.ammunition());
+            }
+            var ordinals = new ArrayList<Object>();
+            var sheet = attacker.source.sheet();
+            int first = recorded(INITIATIVE_SIDES, ordinals);
+            int second = recorded(INITIATIVE_SIDES, ordinals);
+            // Conditions and declared effects supply situational modifiers with P11.4; none exists yet.
+            int situational = 0;
+            var roll = CombatMath.attack(first, second, sheet.role(attack.attribute()), attack.skill(), situational,
+                    profile.value("situationalModifierCap"), defense, profile.value("strongHitMargin"), attack.strongHit());
+            var damageDice = new ArrayList<Object>();
+            int strongDie = 0;
+            int sum = 0;
+            CombatMath.Damage damage = null;
+            int before = target.health;
+            if (roll.hit()) {
+                for (int die = 0; die < attack.diceCount(); die++) {
+                    int value = recorded(attack.diceSides(), ordinals);
+                    damageDice.add(value);
+                    sum += value;
+                }
+                if (roll.strong()) {
+                    strongDie = recorded(profile.value("strongHitDieSides"), ordinals);
+                }
+                int contribution = attack.damageAttribute() == null ? 0 : sheet.role(attack.damageAttribute());
+                // Temporary absorption arrives with declared effects (P11.4); the formula already consumes it first.
+                damage = CombatMath.damage(sum, contribution, attack.flat(), strongDie, target.source.sheet().armor(),
+                        attack.penetration(), 0, target.health);
+                target.health = damage.healthAfter();
+            }
+            int taken = damage == null ? 0 : damage.healthLoss();
+            var shown = activation(attacker).put("targetId", target.source.id()).put("attackId", attack.id())
+                    .put("actionPoints", cost).put("attackDice", List.of(first, second)).put("attackTotal", roll.total())
+                    .put("hit", roll.hit()).put("strongHit", roll.strong()).put("damageDice", damageDice)
+                    .put("damage", taken).put("drawOrdinals", ordinals);
+            if (points != null) {
+                shown.put("remainingActionPoints", points);
+            }
+            if (strongDie > 0) {
+                shown.put("strongDie", strongDie);
+            }
+            if (opening) {
+                shown.put("opening", true);
+            }
+            if (target.source.player()) {
+                // The player may see its own defense and Health; another participant's stay in the internal record.
+                shown.put("defense", defense).put("targetHealthAfter", target.health);
+            }
+            if (attack.ammunition() != null) {
+                shown.put("ammunition", attack.ammunition());
+            }
+            note("STRIKE_RESOLVED", shown.build(), byPlayer);
+            var calculation = activation(attacker).put("targetId", target.source.id()).put("attackId", attack.id())
+                    .put("drawOrdinals", ordinals).put("attackDice", List.of(first, second))
+                    .put("attributeRole", attack.attribute()).put("attributeValue", sheet.role(attack.attribute()))
+                    .put("skill", attack.skill()).put("situational", situational).put("attackTotal", roll.total())
+                    .put("defenseKind", attack.defense().wire()).put("defense", defense).put("margin", roll.margin())
+                    .put("hit", roll.hit()).put("strongHit", roll.strong()).put("healthBefore", before)
+                    .put("healthAfter", target.health);
+            if (damage != null) {
+                calculation.put("damageDice", damageDice).put("strongDie", strongDie).put("flat", attack.flat())
+                        .put("rawDamage", damage.raw()).put("armor", target.source.sheet().armor())
+                        .put("penetration", attack.penetration()).put("effectiveArmor", damage.effectiveArmor())
+                        .put("absorbed", damage.absorbed()).put("healthLoss", damage.healthLoss());
+            }
+            notes.add(new TacticalPlan.Note("STRIKE_CALCULATED", calculation.build(), byPlayer, true));
+            var line = new TreeMap<String, Object>();
+            line.put("attackerId", attacker.source.id());
+            line.put("targetId", target.source.id());
+            line.put("attackId", attack.id());
+            line.put("attackTotal", roll.total());
+            line.put("hit", roll.hit());
+            line.put("strongHit", roll.strong());
+            line.put("damage", taken);
+            strikes.add(line);
+            defeatIfDown(target);
+        }
+
+        /** A participant at zero Health is defeated, not dead (docs/11 section 13); its stance ends with it. */
+        private void defeatIfDown(Working participant) {
+            if (participant.health == 0 && participant.status == EncounterState.Status.ACTIVE) {
+                participant.status = EncounterState.Status.DEFEATED;
+                participant.guarding = false;
+                note("PARTICIPANT_DEFEATED", activation(participant).build(), false);
+            }
+        }
+
+        /** Spend one unit from the player's first stack of this ammunition, in identity order. */
+        private void spend(String definition) {
+            for (int index = 0; index < ammunition.size(); index++) {
+                var stack = ammunition.get(index);
+                if (stack.definition().equals(definition) && stack.quantity() > 0) {
+                    ammunition.set(index, new EncounterState.Ammunition(stack.instance(), definition, stack.quantity() - 1));
+                    var used = spent.get(stack.instance());
+                    spent.put(stack.instance(), new TacticalPlan.AmmunitionUse(stack.instance(), definition,
+                            used == null ? 1 : used.quantity() + 1));
+                    return;
+                }
+            }
+            throw new IllegalStateException("validated attack has no ammunition");
+        }
+
         /** Assemble the plan from the working copy. */
         TacticalPlan plan() {
             var updates = new ArrayList<TacticalPlan.ParticipantUpdate>();
             for (Working participant : participants.values()) {
                 if (participant.changed()) {
+                    // The player's pool lives in actor_resource: its row keeps a null local Health.
                     updates.add(new TacticalPlan.ParticipantUpdate(participant.source.id(),
                             participant.source.rowVersion(), participant.zone, participant.initiative, participant.rank,
-                            participant.reactions));
+                            participant.reactions, participant.status,
+                            participant.source.player() ? null : (Integer) participant.health, participant.guarding));
                 }
             }
-            return new TacticalPlan(base.id(), base.rowVersion(), steps, updates, notes, elapsed, summary());
+            Working player = participants.get(EncounterTemplate.PLAYER);
+            return new TacticalPlan(base.id(), base.rowVersion(), steps, updates, notes, elapsed, summary(),
+                    player.health - player.source.health(), List.copyOf(spent.values()));
         }
 
         /** Public summary of the resulting state for the receipt, with the player's legal options. */
@@ -294,6 +711,15 @@ public final class CombatScheduler {
             participants.values().stream().filter(w -> w.rank != null).sorted(Comparator.comparingInt(w -> w.rank))
                     .forEach(w -> order.add(Map.of("participantId", w.source.id(), "initiative", w.initiative)));
             summary.put("initiative", order);
+            var standing = new ArrayList<Object>();
+            for (Working w : participants.values()) {
+                standing.add(Map.of("participantId", w.source.id(), "side", w.source.side().wire(), "zone", w.zone,
+                        "status", w.status.name()));
+            }
+            summary.put("participants", standing);
+            if (!strikes.isEmpty()) {
+                summary.put("strikes", strikes);
+            }
             var options = TacticalRules.options(after);
             if (!options.isEmpty()) {
                 summary.put("options", options);
@@ -306,12 +732,13 @@ public final class CombatScheduler {
             var list = new ArrayList<EncounterState.Combatant>();
             for (Working w : participants.values()) {
                 var s = w.source;
-                list.add(new EncounterState.Combatant(s.id(), s.ordinal(), s.actorId(), s.side(), w.zone, s.status(),
-                        s.finesse(), s.initiativeModifier(), w.initiative, w.rank, w.reactions, s.rowVersion()));
+                list.add(new EncounterState.Combatant(s.id(), s.ordinal(), s.actorId(), s.side(), w.zone, w.status,
+                        s.finesse(), s.initiativeModifier(), w.initiative, w.rank, w.reactions, s.rowVersion(), w.health,
+                        s.healthMax(), w.guarding, s.sheet()));
             }
             return new EncounterState(base.id(), base.rowVersion(), phase, round, cursor, points, speech, passages,
                     profile, base.frozenSpace(), base.escapeZones(), base.actions(), base.opening(),
-                    base.openingTarget(), base.openingStatus(), list);
+                    base.openingTarget(), openingStatus, list, ammunition);
         }
 
         /** Record the current encounter row state after checking its arrow. */
@@ -321,7 +748,7 @@ public final class CombatScheduler {
                 previous.require(next);
             }
             phase = next;
-            steps.add(new TacticalPlan.Step(phase, round, cursor, points, speech, passages));
+            steps.add(new TacticalPlan.Step(phase, round, cursor, points, speech, passages, openingStatus));
         }
 
         /** Append one event note. */
@@ -345,13 +772,19 @@ public final class CombatScheduler {
             return payload;
         }
 
-        /** Draw one initiative die and check its range. */
-        private static int roll(Dice dice, int ordinal) {
-            int value = dice.value(ordinal, INITIATIVE_SIDES);
-            if (value < 1 || value > INITIATIVE_SIDES) {
+        /** Draw one die at the next ordinal of this operation and check its range. */
+        private int draw(int sides) {
+            int value = dice.value(nextDraw++, sides);
+            if (value < 1 || value > sides) {
                 throw new IllegalStateException("draw outside its die");
             }
             return value;
+        }
+
+        /** Draw one die and record its ordinal in the calculation that consumed it. */
+        private int recorded(int sides, List<Object> ordinals) {
+            ordinals.add(nextDraw);
+            return draw(sides);
         }
     }
 
@@ -363,6 +796,9 @@ public final class CombatScheduler {
         private Integer rank;
         private int reactions;
         private List<Integer> dice;
+        private EncounterState.Status status;
+        private int health;
+        private boolean guarding;
 
         /** Start from the stored facts. */
         Working(EncounterState.Combatant source) {
@@ -371,12 +807,16 @@ public final class CombatScheduler {
             initiative = source.initiative();
             rank = source.rank();
             reactions = source.reactions();
+            status = source.status();
+            health = source.health();
+            guarding = source.guarding();
         }
 
         /** @return whether any stored fact differs */
         boolean changed() {
             return !zone.equals(source.zone()) || !java.util.Objects.equals(initiative, source.initiative())
-                    || !java.util.Objects.equals(rank, source.rank()) || reactions != source.reactions();
+                    || !java.util.Objects.equals(rank, source.rank()) || reactions != source.reactions()
+                    || status != source.status() || health != source.health() || guarding != source.guarding();
         }
     }
 

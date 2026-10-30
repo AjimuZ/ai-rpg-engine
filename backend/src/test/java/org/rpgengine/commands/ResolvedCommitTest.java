@@ -94,7 +94,7 @@ class ResolvedCommitTest {
                 new CampaignEvent.Body("ROUND_ENDED", 1, 1, "{}"));
         var progress = new org.rpgengine.combat.TacticalPlan(UUID.randomUUID(), 4,
                 List.of(new org.rpgengine.combat.TacticalPlan.Step(org.rpgengine.combat.EncounterPhase.ROUND_END, 1, null,
-                        null, 0, List.of())), List.of(),
+                        null, 0, List.of(), "NONE")), List.of(),
                 List.of(new org.rpgengine.combat.TacticalPlan.Note("ROUND_ENDED", java.util.Map.of("round", 1), false)), 8,
                 java.util.Map.of());
         var plan = new ResolvedCommit(context, new ResolvedCommit.WorldChange(true, 8, CampaignMode.ENCOUNTER, null),

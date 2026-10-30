@@ -369,6 +369,11 @@ round opens, and its `reactions` left this round. `EncounterWriter.state` reads 
 profile, zone graph and declared actions into an `EncounterState`; `CombatScheduler` turns a tactical intention
 into a `TacticalPlan` whose steps the commit writes one row version at a time.
 
+Since P11.3 (V24, [ADR 0030](adr/0030-attacks-defense-damage-and-healing-with-recorded-draws.md)) a participant
+row also holds `guarding`, and `status` and `health_current` move with the fight: zero Health is `DEFEATED`, which
+never returns. The frozen profile holds armor, defenses and `attacks`. The player's Health stays in its
+`actor_resource` pool, read relative to the pool's minimum; ammunition stays ordinary item units.
+
 ### World clock, travel and rest (P10.4)
 
 `campaign.world_time_seconds` is the in-world clock: whole seconds since the campaign began, copied onto every

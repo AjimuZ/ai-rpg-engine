@@ -161,6 +161,45 @@ class EventStatementsTest {
         assertEquals(null, state(SupportedLocale.EN, "INTERACTION_ATTEMPTED", scene.replace("false", "\"no\"")));
     }
 
+    /**
+     * Strikes state their public outcome and never another participant's defense or Health; Guard, defeat, a lapsed
+     * opening strike and an item used in a fight have their own statements (P11.3).
+     */
+    @Test
+    void statesAttacksAndHealing() {
+        String common = "{\"actorId\":\"" + PLAYER + "\",\"participantId\":\"player\",\"targetId\":\"raider\","
+                + "\"attackId\":\"sword\",\"attackTotal\":";
+        String hit = common + "22,\"hit\":true,\"strongHit\":true,\"damage\":7}";
+        assertEquals("Mira hits raider with sword (total 22), a strong hit: 7 damage.", state(SupportedLocale.EN, "STRIKE_RESOLVED", hit));
+        assertEquals("Mira colpisce raider con sword (totale 22), un colpo forte: 7 danni.", state(SupportedLocale.IT, "STRIKE_RESOLVED", hit));
+        String normal = common + "15,\"hit\":true,\"strongHit\":false,\"damage\":0}";
+        assertEquals("Mira hits raider with sword (total 15): 0 damage.", state(SupportedLocale.EN, "STRIKE_RESOLVED", normal));
+        String miss = common + "9,\"hit\":false,\"strongHit\":false,\"damage\":0}";
+        assertEquals("Mira attacks raider with sword (total 9) and misses.", state(SupportedLocale.EN, "STRIKE_RESOLVED", miss));
+        assertEquals("Mira attacca raider con sword (totale 9) e manca il bersaglio.", state(SupportedLocale.IT, "STRIKE_RESOLVED", miss));
+        String npc = "{\"participantId\":\"bandit\",\"targetId\":\"player\",\"attackId\":\"cudgel\",\"attackTotal\":13,"
+                + "\"hit\":false,\"strongHit\":false,\"damage\":0}";
+        assertEquals("bandit attacks player with cudgel (total 13) and misses.", state(SupportedLocale.EN, "STRIKE_RESOLVED", npc));
+        assertEquals(null, state(SupportedLocale.EN, "STRIKE_RESOLVED", miss.replace("\"hit\":false", "\"hit\":\"no\"")));
+        assertEquals(null, state(SupportedLocale.EN, "STRIKE_RESOLVED", hit.replace("\"damage\":7", "\"damage\":\"7\"")));
+        String guard = "{\"participantId\":\"bandit\",\"bonus\":2,\"actionPoints\":1}";
+        assertEquals("bandit takes a guarded stance: +2 Guard for 1 action point.", state(SupportedLocale.EN, "GUARD_RAISED", guard));
+        assertEquals("bandit si mette in guardia: +2 alla Guardia (1 punto azione).", state(SupportedLocale.IT, "GUARD_RAISED", guard));
+        assertEquals("raider is defeated.", state(SupportedLocale.EN, "PARTICIPANT_DEFEATED", "{\"participantId\":\"raider\"}"));
+        assertEquals("raider è fuori combattimento.", state(SupportedLocale.IT, "PARTICIPANT_DEFEATED", "{\"participantId\":\"raider\"}"));
+        String lapse = "{\"actorId\":\"" + PLAYER + "\",\"targetId\":\"raider\",\"reason\":\"OUT_OF_RANGE\"}";
+        assertEquals("Mira's opening strike against raider cannot be made.", state(SupportedLocale.EN, "OPENING_STRIKE_LAPSED", lapse));
+        assertEquals("L'attacco d'apertura di Mira contro raider non può essere portato.", state(SupportedLocale.IT, "OPENING_STRIKE_LAPSED", lapse));
+        String own = "{\"actorId\":\"" + PLAYER + "\",\"definitionId\":\"salve\",\"actionPoints\":2}";
+        assertEquals("Mira uses salve for 2 action points.", state(SupportedLocale.EN, "COMBAT_ITEM_USED", own));
+        String ally = "{\"actorId\":\"" + PLAYER + "\",\"definitionId\":\"bandage\",\"actionPoints\":2,\"targetId\":\"porter\",\"healed\":4}";
+        assertEquals("Mira uses bandage on porter for 2 action points: 4 Health restored.", state(SupportedLocale.EN, "COMBAT_ITEM_USED", ally));
+        assertEquals("Mira usa bandage su porter (2 punti azione): recupera 4 Salute.", state(SupportedLocale.IT, "COMBAT_ITEM_USED", ally));
+        String kept = "{\"resourceKey\":\"vigor\",\"outcomes\":[{\"actorId\":\"" + PLAYER + "\",\"outcome\":\"NOT_REVIVED\",\"before\":0,\"after\":0}]}";
+        assertEquals("Effect: Mira stays defeated (vigor 0).", state(SupportedLocale.EN, "EFFECT_RESOLVED", kept));
+        assertEquals("Effetto: Mira resta fuori combattimento (vigor 0).", state(SupportedLocale.IT, "EFFECT_RESOLVED", kept));
+    }
+
     /** Quest events state their transition in both locales, using the canonical quest and outcome identities. */
     @Test
     void statesQuestEvents() {

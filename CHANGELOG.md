@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased — Attacks, defense, damage and healing with recorded draws (P11.3), 30 October 2026
+
+- Fights can now hurt. On the player's turn `STRIKE` makes one attack of a worn weapon against a participant within its
+  reach: two ten-sided dice plus attribute and skill against the target's Guard or Resistance. Meeting the defense hits, a
+  margin of six or more adds a strong-hit die, armor reduces the damage (penetration reduces armor) and Health stops at
+  zero, which defeats a participant and never kills it. A miss still costs its points and ammunition.
+- Every roll is recorded. The receipt lists the dice, a public event states the outcome, and an internal event keeps the
+  complete calculation with its draw numbers; a retried request reuses the same dice. Another participant's defense, armor
+  and Health stay out of the public record.
+- `GUARD` takes a guarded stance for one point, once per turn: +2 Guard until that participant's next turn, together with
+  partial cover up to the adventure's cap. Cover, line of sight and weapon range decide who can be attacked from where.
+- `COMBAT_USE_ITEM` uses a held item for two points, on oneself or on an ally beside the player. A `heal` effect restores
+  at most the missing Health and never revives; it now works outside fights too.
+- Adventures can declare weapons, armor and Guard on equippable items and attacks on encounter participants. Worn items are
+  read once, when the fight starts. A weapon can consume an item per attempt, as ammunition or charges.
+- Other participants now act: armed ones walk toward the nearest opponent, strike and guard, by a small fixed rule until
+  smarter tactics arrive. A declared opening strike now resolves once, at the slot its encounter allows, and costs the
+  player's own points; if it cannot be made at that moment it lapses at no cost with a public reason.
+- New refusals `COMMAND_ATTACK_UNAVAILABLE` and `COMMAND_GUARD_UNAVAILABLE` have reviewed English and Italian wording (the
+  Italian still needs independent human review). Receipts show every participant's public standing, the operation's strikes
+  and the attack, Guard and item options with their costs and the reason an attack cannot be used now.
+- PostgreSQL stores the stance (migration V24) and refuses overhealing, standing at zero Health and returning from defeat.
+  The backup tool covers schema version 24.
+- Not included yet: Brace, condition modifiers, absorption and abilities in a fight (P11.4); escape, outcomes and settlement
+  (P11.5), so a fight whose player fell waits at a round end and a won fight runs on; recovery of a fight from the checkpoint
+  (P11.6); a frontend control or panel for encounters and smarter tactics (P12). Balance remains unproven. See
+  [ADR 0030](docs/adr/0030-attacks-defense-damage-and-healing-with-recorded-draws.md).
+
 ## Unreleased — Initiative, rounds, activations and bounded combat dialogue (P11.2), 30 October 2026
 
 - An entered encounter can now be played turn by turn. `ROLL_INITIATIVE` rolls two ten-sided dice for every

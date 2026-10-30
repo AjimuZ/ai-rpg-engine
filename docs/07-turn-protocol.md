@@ -407,7 +407,7 @@ blocked edges). Effects:
   schedule.
 
 Continuing the schedule: start the next active participant by rank (`ACTIVATION_STARTED` {…, actionPoints}),
-pass a non-player activation (`ACTIVATION_ENDED`; tactics arrive with P11.3/P12), end the round after the last
+run a non-player activation (below; `ACTIVATION_ENDED`), end the round after the last
 activation (`ROUND_ENDED` {encounterId, round, seconds}, adding `roundSeconds` of world time) and open the next
 one (`ROUND_STARTED` {encounterId, round}, refreshing reaction budgets), until the player's own activation waits
 for an action. The schedule stops instead at a round end when the round cap is reached or the player no longer
@@ -416,6 +416,34 @@ intention advances the game turn. The receipt gains `combat` {encounterId, phase
 actionPoints, initiative: [{participantId, initiative}], options?: {moves: [{zone, cost}], speech: {remaining,
 recipients}, actions: [{actionId, kind, cost, targets}], endActivation}}; `options` appears only at the player's
 decision.
+
+### P11.3 attacks, Guard and items
+
+Three more tactical intentions follow the same gates ([ADR 0030](adr/0030-attacks-defense-damage-and-healing-with-recorded-draws.md)):
+
+| Intention | Payload | Legal when | Refusal |
+| --- | --- | --- | --- |
+| `STRIKE` | `attackId` (1..256) and `targetId` (1..128) | The player's decision; a frozen attack of the player with ammunition if it needs any; a standing opponent it can reach; `strikeCost` points left | `TURN_UNAVAILABLE`, `ATTACK_UNAVAILABLE`, `TARGET_ILLEGAL`, `ACTION_POINTS_INSUFFICIENT` |
+| `GUARD` | none | The player's decision; not already taken this activation; `guardCost` points left | `TURN_UNAVAILABLE`, `GUARD_UNAVAILABLE`, `ACTION_POINTS_INSUFFICIENT` |
+| `COMBAT_USE_ITEM` | `itemInstanceId` (UUID) and, for a single-target item, `targetId` (1..128) | The player's decision; a held instance with a runnable use contract (unworn if consumed); `useItemCost` points left; the player or a standing ally in the player's zone. Self-policy items name no target; other policies are not usable in a fight yet | `TURN_UNAVAILABLE`, `TARGET_ILLEGAL`, `ACTION_POINTS_INSUFFICIENT`, `ITEM_UNAVAILABLE`, `EFFECT_UNSUPPORTED` |
+
+A strike pays its points and any ammunition, draws the two attack dice, then on a hit each damage die, then on a
+strong hit the strong-hit die, and writes the public `STRIKE_RESOLVED` {encounterId, round, participantId, actorId?,
+targetId, attackId, actionPoints, remainingActionPoints?, attackDice, attackTotal, hit, strongHit, damageDice, strongDie?,
+damage, drawOrdinals, opening?, ammunition?, and for a player target defense and targetHealthAfter} and the internal
+`STRIKE_CALCULATED` with the complete calculation. Zero Health adds `PARTICIPANT_DEFEATED`. `GUARD` writes `GUARD_RAISED`
+{…, bonus, actionPoints, remainingActionPoints}. An item writes its contract's events (`ITEM_USED`, `EFFECT_RESOLVED`),
+then `COMBAT_ITEM_USED` {…, definitionId, actionPoints, remainingActionPoints, targetId?, healed?}. Each passes through
+`RESOLVING` and returns to `AWAITING_ACTION`, so only `END_ACTIVATION` passes control; an item that fells its own user ends
+the activation and continues the schedule.
+
+The initiative roll now also resolves a declared opening strike at its slot, or writes `OPENING_STRIKE_LAPSED` {…,
+targetId, reason}. A non-player activation with an attack may write `PARTICIPANT_MOVED`, strike events and `GUARD_RAISED`
+before `ACTIVATION_ENDED`. The receipt's `combat` gains `participants` [{participantId, side, zone, status}] and
+`strikes` [{attackerId, targetId, attackId, attackTotal, hit, strongHit, damage}], and `options` gains `strikes`
+[{attackId, cost, targets, disabled}], `guard` {cost, available} and `useItem` {cost, available}. The player's Health
+change appears in `resources` and spent ammunition in `items`. Tactical commands skip the quest engine: the next
+exploration command evaluates the possession facts they change.
 
 ### P10.3 quest intentions
 

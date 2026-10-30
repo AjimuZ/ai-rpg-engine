@@ -52,6 +52,8 @@ const ERRORS: Readonly<Record<string, () => string>> = {
   COMMAND_ZONE_UNAVAILABLE: () => $localize`:@@campaign.error.zoneUnavailable:You cannot move to that zone from here. Nothing was changed.`,
   COMMAND_SPEECH_LIMIT_REACHED: () => $localize`:@@campaign.error.speechLimitReached:You have already spoken during this turn. Nothing was changed.`,
   COMMAND_INTERACTION_UNAVAILABLE: () => $localize`:@@campaign.error.interactionUnavailable:That action is not possible here and now. Nothing was changed.`,
+  COMMAND_ATTACK_UNAVAILABLE: () => $localize`:@@campaign.error.attackUnavailable:You cannot make that attack: the weapon is not ready or has no ammunition left. Nothing was changed.`,
+  COMMAND_GUARD_UNAVAILABLE: () => $localize`:@@campaign.error.guardUnavailable:You have already taken a guarded stance during this turn. Nothing was changed.`,
   COMMAND_DEPENDENCIES_MISSING: () => $localize`:@@campaign.error.dependenciesMissing:This playthrough is paused because adventure content it depends on is missing or damaged. Nothing was changed.`,
   COMMAND_STORAGE_UNAVAILABLE: () => $localize`:@@campaign.error.storageUnavailable:Storage is unavailable right now. Check the action status before retrying.`,
   CAMPAIGN_READ_STORAGE_UNAVAILABLE: () => $localize`:@@campaign.error.storageUnavailable:Storage is unavailable right now. Check the action status before retrying.`,

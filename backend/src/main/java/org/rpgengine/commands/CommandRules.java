@@ -66,9 +66,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       its minimum, no encounter of the campaign is active, and an opening strike is declared only when the template's
  *       policy allows
  *       one and it names a hostile participant. Every refusal shares {@code ENCOUNTER_UNAVAILABLE}.</li>
- *   <li><b>Tactical intentions (P11.2)</b> — the campaign's active encounter must exist and its player participant
+ *   <li><b>Tactical intentions (P11.2, P11.3)</b> — the campaign's active encounter must exist and its player participant
  *       must be the acting player; {@link TacticalRules} then decides turn, movement, addressing, speech allowance,
- *       declared-action eligibility and action points over the stored tactical state ({@code TURN_UNAVAILABLE},
+ *       declared-action eligibility, attack reach, the Guard action and action points over the stored tactical state ({@code TURN_UNAVAILABLE},
  *       {@code ZONE_UNAVAILABLE}, {@code TARGET_ILLEGAL}, {@code SPEECH_LIMIT_REACHED}, {@code INTERACTION_UNAVAILABLE},
  *       {@code ACTION_POINTS_INSUFFICIENT}). The initiative roll and the end of an activation may close a round, so
  *       the clock must be able to take one round's seconds ({@code TIME_ILLEGAL}).</li>
@@ -96,6 +96,12 @@ final class CommandRules {
 
     /** Static transaction participant with no lifecycle or external clients. */
     private CommandRules() { }
+
+    /**
+     * Most dice an item's use contract may draw in a fight. The schedule that continues when the item fells the player
+     * draws at most 56 more (eight strikes of seven dice), which stays under the operation's budget of 128.
+     */
+    private static final int MAX_COMBAT_ITEM_DRAWS = 64;
 
     /** One held instance as read under the campaign lock: definition, units and whether it is worn. */
     private record Held(String definition, int quantity, boolean worn) { }
@@ -486,11 +492,44 @@ final class CommandRules {
                     case TARGET -> OperationAdmissionFailure.Kind.TARGET_ILLEGAL;
                     case SPEECH_LIMIT -> OperationAdmissionFailure.Kind.SPEECH_LIMIT_REACHED;
                     case ACTION -> OperationAdmissionFailure.Kind.INTERACTION_UNAVAILABLE;
+                    case ATTACK -> OperationAdmissionFailure.Kind.ATTACK_UNAVAILABLE;
+                    case GUARD -> OperationAdmissionFailure.Kind.GUARD_UNAVAILABLE;
                 });
+            }
+            if (tactical instanceof TypedCommand.CombatUseItem use) {
+                combatItem(use, state);
             }
             if (tactical.intent() instanceof TacticalIntent.EndActivation
                     || tactical.intent() instanceof TacticalIntent.RollInitiative) {
                 timeFits(state.profile().roundSeconds());
+            }
+        }
+
+        /**
+         * Using an item in a fight: a held instance with a runnable use contract, as in exploration, whose target policy
+         * matches what the intention names. A self-policy item names nobody; a single-target item names a participant
+         * {@link TacticalRules} accepted, and a campaign-less ally can receive healing but not items, so an item that
+         * creates units cannot target one. A contract may use at most {@link #MAX_COMBAT_ITEM_DRAWS} dice, so the
+         * schedule that continues if the item fells the player still fits the operation's draw budget. Other target
+         * policies wait for effect targeting in combat (P11.4).
+         */
+        private void combatItem(TypedCommand.CombatUseItem use, org.rpgengine.combat.EncounterState state) {
+            Held item = held(use.itemInstanceId(), player);
+            var rule = catalog().items().get(item.definition());
+            if (rule == null || rule.use() == null || (rule.use().consumes() && item.worn())) {
+                throw fail(OperationAdmissionFailure.Kind.ITEM_UNAVAILABLE);
+            }
+            var contract = rule.use().contract();
+            boolean targeted = use.targetId() != null;
+            if (!(contract.targetPolicy().equals("self") && !targeted)
+                    && !(contract.targetPolicy().equals("single") && targeted)) {
+                throw fail(OperationAdmissionFailure.Kind.TARGET_ILLEGAL);
+            }
+            runnable(contract, targeted ? 1 : 0);
+            boolean ally = targeted && !use.targetId().equals(state.player().id());
+            if (EffectProgram.maxDraws(contract.effects()) > MAX_COMBAT_ITEM_DRAWS
+                    || (ally && EffectProgram.maxCreatedUnits(contract.effects()) > 0)) {
+                throw fail(OperationAdmissionFailure.Kind.EFFECT_UNSUPPORTED);
             }
         }
 
@@ -639,6 +678,9 @@ final class CommandRules {
             if (!EffectProgram.supported(effects)
                     || EffectProgram.maxDraws(effects) > org.rpgengine.rules.DeterministicDraw.MAX_DRAWS
                     || (EffectProgram.readsActorValues(effects) && !contract.pack().equals(vocabulary()))
+                    // Healing restores the Health the pack's combat rule names, so it needs that rule and vocabulary.
+                    || (EffectProgram.heals(effects) && (!contract.pack().equals(vocabulary())
+                            || !catalog().combat().profiles().containsKey(contract.pack())))
                     || (long) EffectProgram.maxCreatedUnits(effects) * Math.max(1, targetCount) > MAX_CREATED_UNITS) {
                 throw fail(OperationAdmissionFailure.Kind.EFFECT_UNSUPPORTED);
             }

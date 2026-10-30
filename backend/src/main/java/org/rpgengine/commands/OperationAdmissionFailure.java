@@ -64,8 +64,9 @@ public final class OperationAdmissionFailure extends RuntimeException {
         /** A required skill rank or prerequisite ability of the selected ability is missing (HTTP 422). */
         PREREQUISITE_UNMET,
         /**
-         * Target count violates the ability's target policy, or the policy needs encounter zones; since P11.2 also an
-         * encounter participant who cannot be addressed: missing, the player, of a side the declared action does not
+         * Target count violates the ability's target policy, or the policy needs encounter zones; since P11.3 also an
+         * attack target the attack cannot reach or an item target who is not a standing ally beside the player; since
+         * P11.2 also an encounter participant who cannot be addressed: missing, the player, of a side the declared action does not
          * admit, not standing or beyond speaking range (HTTP 422).
          */
         TARGET_ILLEGAL,
@@ -152,6 +153,10 @@ public final class OperationAdmissionFailure extends RuntimeException {
          * The encounter declares no such social or scene action, it cannot be used from the player's zone, or it
          * would change nothing because its passage already has the requested state (HTTP 422, P11.2).
          */
-        INTERACTION_UNAVAILABLE
+        INTERACTION_UNAVAILABLE,
+        /** The player has no such frozen attack, or no ammunition left for it (HTTP 422, P11.3). */
+        ATTACK_UNAVAILABLE,
+        /** The Guard action was already taken in this activation (HTTP 422, P11.3). */
+        GUARD_UNAVAILABLE
     }
 }

@@ -20,6 +20,8 @@ If the client loses the response and resends `example-heal-1` with the same payl
 
 ## 3. A complete two-round fight
 
+Since P11.3 ([ADR 0030](adr/0030-attacks-defense-damage-and-healing-with-recorded-draws.md)) `CombatStrikeTest` plays this fight from these recorded dice, except for Brace, which arrives with P11.4: without it the opponent's 13 meets the player's Guard 12 and hits. Settlement and advancement remain P11.5 and P13.
+
 ### Starting state
 
 The player actor is level 1 with Force 2, Finesse 2, Insight 2, Resolve 2, melee skill 2, Health 24/24, Focus 10/10, Armor 1, and no equipment Guard bonus. A light blade is already held and deals `1d6 + Force`. Player Guard is `10 + 2 = 12`. Their reaction policy is Brace on the first eligible attack.

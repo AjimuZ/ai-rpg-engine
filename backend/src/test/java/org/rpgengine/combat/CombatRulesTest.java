@@ -36,7 +36,7 @@ class CombatRulesTest {
         assertEquals(CombatProfile.defaults(), profile.values());
         assertEquals("vigor", profile.health());
         assertNull(profile.focus());
-        assertEquals(Set.of("trail-ambush", "toll-parley", "grove-watch"), rules.templates().keySet());
+        assertEquals(Set.of("trail-ambush", "toll-parley", "grove-watch", "yard-duel", "close-brawl", "close-rush"), rules.templates().keySet());
         var ambush = rules.templates().get("trail-ambush");
         assertEquals("trailhead", ambush.location());
         assertEquals("entry", ambush.playerZone());

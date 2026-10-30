@@ -41,7 +41,8 @@ import tools.jackson.databind.json.JsonMapper;
  * actions are legal only there and cost exactly their declared action points, ending the activation closes a round
  * once with its world time, every refusal writes nothing, retries replay, and the database refuses a re-roll, points
  * granted mid-activation, extra speech and a first round without initiative. A long seeded fight checks every
- * candidate intention at every decision against an independent model of the fixture.
+ * candidate intention at every decision against an independent model of the fixture, strikes and the Guard action
+ * included (P11.3); {@code StrikeCommandsTest} covers the rest of attacks.
  */
 @SpringBootTest
 class TacticalCommandsTest {
@@ -238,7 +239,9 @@ class TacticalCommandsTest {
      * allowances written out here, not read from the rules). Across every activation the verdict is exact, a refusal
      * writes nothing, points never carry over, the speech allowance returns only with a new activation, a sealed
      * passage stays sealed, each completed round adds its eight seconds once, no draw follows the initiative roll, the
-     * receipt's moves are the model's and the stored activations follow the initiative order round after round.
+     * receipt's moves are the model's and the stored activations follow the initiative order round after round. Each
+     * strike's outcome is recalculated from the dice in its receipt; when the raider falls it stops taking activations and
+     * stops being a legal recipient or target.
      */
     @Test
     void aLongFightKeepsEveryActivationLegal() {
@@ -252,12 +255,18 @@ class TacticalCommandsTest {
                 new TypedCommand.Interact("taunt", null), new TypedCommand.Interact("taunt", "player"),
                 new TypedCommand.Interact("seal-route", null), new TypedCommand.Interact("seal-route", "raider"),
                 new TypedCommand.Interact("missing", null), new TypedCommand.EndActivation(),
-                new TypedCommand.RollInitiative());
+                new TypedCommand.RollInitiative(), new TypedCommand.Strike("sword", "raider"),
+                new TypedCommand.Strike("sword", "raider"), new TypedCommand.Strike("sword", "raider"),
+                new TypedCommand.Strike("sword", "raider"), new TypedCommand.Strike("sword", "raider"),
+                new TypedCommand.Strike("sword", "raider"), new TypedCommand.MoveZone("yard"),
+                new TypedCommand.MoveZone("yard"), new TypedCommand.Strike("sword", "player"),
+                new TypedCommand.Strike("sword", "ghost"), new TypedCommand.Strike("axe", "raider"),
+                new TypedCommand.Guard());
         var random = new java.util.Random(20261030L);
         var expired = new java.util.ArrayList<Integer>();
         var fight = new FightModel();
         int committed = 0;
-        for (int step = 0; step < 240; step++) {
+        for (int step = 0; step < 720; step++) {
             TypedCommand command = candidates.get(random.nextInt(candidates.size()));
             var refusal = fight.refusal(command);
             if (refusal != null) {
@@ -270,6 +279,9 @@ class TacticalCommandsTest {
             fight.apply(command);
             var execution = execute(command);
             committed++;
+            if (command instanceof TypedCommand.Strike) {
+                fight.struck((List<?>) execution.receipt().get("randomDraws"));
+            }
             var stored = EncounterWriter.state(jdbc, campaign).orElseThrow();
             assertEquals(EncounterPhase.AWAITING_ACTION, stored.phase(), command.toString());
             assertTrue(stored.playerDecision(), command.toString());
@@ -277,6 +289,9 @@ class TacticalCommandsTest {
             assertEquals(fight.points, stored.actionPoints(), command.toString());
             assertEquals(fight.speech, stored.speechUsed(), command.toString());
             assertEquals(fight.zone, stored.player().zone(), command.toString());
+            assertEquals(fight.guarding, stored.player().guarding(), command.toString());
+            assertEquals(fight.raiderHealth, number("raider", "health_current"), command.toString());
+            assertEquals(fight.raiderHealth == 0 ? "DEFEATED" : "ACTIVE", participant("raider", "status"), command.toString());
             assertEquals(!fight.sealed, stored.space().stepCost("yard", "escape-route", stored.profile()) > 0, command.toString());
             assertEquals(8L * (fight.round - 1), state("world_time_seconds"), command.toString());
             assertEquals(fight.round, combat(execution).get("round"), command.toString());
@@ -287,13 +302,16 @@ class TacticalCommandsTest {
         }
         assertTrue(committed >= 30 && fight.round >= 6 && fight.sealed, "the walk must exercise the fight: " + committed
                 + " commits, round " + fight.round + ", sealed " + fight.sealed);
-        assertEquals(4, jdbc.queryForObject("select count(*) from operation_random_draw", Integer.class));
-        // Round after round the activations follow the stored order, up to the player's current one.
-        var activations = new java.util.ArrayList<String>();
-        for (int round = 1; round < fight.round; round++) {
-            activations.addAll(order);
+        assertTrue(fight.strikes >= 3, "the walk must strike: " + fight.strikes);
+        assertEquals(4 + fight.draws, jdbc.queryForObject("select count(*) from operation_random_draw", Integer.class));
+        // Round after round the activations follow the stored order, up to the player's current one, without a fallen raider.
+        var activations = new java.util.ArrayList<>(order.subList(0, order.indexOf("player") + 1));
+        for (boolean raiderUp : fight.raiderUpAtEachEnd) {
+            if (raiderUp) {
+                activations.add("raider");
+            }
+            activations.add("player");
         }
-        activations.addAll(order.subList(0, order.indexOf("player") + 1));
         assertEquals(activations, jdbc.queryForList("select payload ->> 'participantId' from campaign_event where "
                 + "campaign_id = ? and event_type = 'ACTIVATION_STARTED' order by sequence", String.class, campaign));
         assertEquals(expired, jdbc.queryForList("select (payload ->> 'unusedActionPoints')::integer from campaign_event "
@@ -418,7 +436,10 @@ class TacticalCommandsTest {
      * Independent model of the player's decisions in {@code trail-ambush} under the default profile, written from the
      * fixture and docs/11 rather than from {@code TacticalRules}: three points and one utterance per activation; the
      * edges entry-yard (1 point), entry-escape-route (difficult, 2 points) and yard-escape-route (1 point, until
-     * sealed); the raider stays in the yard, within speaking range of every zone.
+     * sealed); the raider stays in the yard, within speaking range of every zone, and carries no attack. The player's
+     * sword costs two points, needs the raider in its own zone and rolls {@code 2d10 + force 2 + rank 2} against Guard 12:
+     * a hit deals {@code 1d6 + 2}, a margin of six adds {@code 1d4}, and armor 1 takes one off, out of 14 Health. The Guard
+     * action costs one point, once per activation.
      */
     private static final class FightModel {
         int round = 1;
@@ -426,6 +447,11 @@ class TacticalCommandsTest {
         int speech;
         String zone = "entry";
         boolean sealed;
+        boolean guarding;
+        int raiderHealth = 14;
+        int strikes;
+        int draws;
+        final List<Boolean> raiderUpAtEachEnd = new java.util.ArrayList<>();
 
         /** Price of a legal edge from the current zone, or null when no legal edge leads there. */
         Integer price(String to) {
@@ -446,9 +472,17 @@ class TacticalCommandsTest {
                             : cost > points ? OperationAdmissionFailure.Kind.ACTION_POINTS_INSUFFICIENT : null;
                 }
                 case TypedCommand.CombatSpeak speak -> speech >= 1 ? OperationAdmissionFailure.Kind.SPEECH_LIMIT_REACHED
-                        : speak.recipientId().equals("raider") ? null : OperationAdmissionFailure.Kind.TARGET_ILLEGAL;
+                        : speak.recipientId().equals("raider") && raiderHealth > 0 ? null
+                        : OperationAdmissionFailure.Kind.TARGET_ILLEGAL;
+                case TypedCommand.Strike strike -> !strike.attackId().equals("sword")
+                        ? OperationAdmissionFailure.Kind.ATTACK_UNAVAILABLE
+                        : !strike.targetId().equals("raider") || raiderHealth == 0 || !zone.equals("yard")
+                        ? OperationAdmissionFailure.Kind.TARGET_ILLEGAL
+                        : points < 2 ? OperationAdmissionFailure.Kind.ACTION_POINTS_INSUFFICIENT : null;
+                case TypedCommand.Guard guard -> guarding ? OperationAdmissionFailure.Kind.GUARD_UNAVAILABLE
+                        : points < 1 ? OperationAdmissionFailure.Kind.ACTION_POINTS_INSUFFICIENT : null;
                 case TypedCommand.Interact interact when interact.actionId().equals("taunt") ->
-                        !"raider".equals(interact.targetId()) ? OperationAdmissionFailure.Kind.TARGET_ILLEGAL
+                        !"raider".equals(interact.targetId()) || raiderHealth == 0 ? OperationAdmissionFailure.Kind.TARGET_ILLEGAL
                                 : points < 1 ? OperationAdmissionFailure.Kind.ACTION_POINTS_INSUFFICIENT : null;
                 case TypedCommand.Interact interact when interact.actionId().equals("seal-route") ->
                         interact.targetId() != null ? OperationAdmissionFailure.Kind.TARGET_ILLEGAL
@@ -474,12 +508,35 @@ class TacticalCommandsTest {
                     sealed |= interact.actionId().equals("seal-route");
                 }
                 case TypedCommand.EndActivation end -> {
+                    raiderUpAtEachEnd.add(raiderHealth > 0);
                     round++;
                     points = 3;
                     speech = 0;
+                    guarding = false;
+                }
+                case TypedCommand.Strike strike -> points -= 2;
+                case TypedCommand.Guard guard -> {
+                    points--;
+                    guarding = true;
                 }
                 default -> throw new IllegalArgumentException(command.toString());
             }
+        }
+
+        /** Recalculate one strike from the dice its receipt lists, in their documented order. */
+        void struck(List<?> recorded) {
+            strikes++;
+            draws += recorded.size();
+            int[] dice = recorded.stream().mapToInt(draw -> (Integer) ((Map<?, ?>) draw).get("value")).toArray();
+            int total = dice[0] + dice[1] + 2 + 2;
+            if (total < 12) {
+                assertEquals(2, dice.length, "a miss draws no damage");
+                return;
+            }
+            boolean strong = total - 12 >= 6;
+            assertEquals(strong ? 4 : 3, dice.length, "a hit draws its damage die and, when strong, the strong die");
+            int raw = dice[2] + 2 + (strong ? dice[3] : 0);
+            raiderHealth = Math.max(0, raiderHealth - Math.max(0, raw - 1));
         }
 
         /** Zones the player can pay to reach now, in zone ID order. */

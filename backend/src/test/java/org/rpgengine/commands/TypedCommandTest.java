@@ -261,7 +261,8 @@ class TypedCommandTest {
      */
     @Test
     void decodesTacticalIntentionsExactly() {
-        for (String type : List.of("ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT")) {
+        for (String type : List.of("ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT", "STRIKE",
+                "GUARD", "COMBAT_USE_ITEM")) {
             assertTrue(TypedCommand.registered(type), type);
         }
         assertEquals(new TypedCommand.RollInitiative(), decode("ROLL_INITIATIVE", Map.of()));
@@ -292,6 +293,30 @@ class TypedCommandTest {
         assertInvalid("INTERACT", Map.of("targetId", "raider"));
         assertInvalid("INTERACT", Map.of("actionId", "taunt", "targetId", ""));
         assertInvalid("INTERACT", Map.of("actionId", "taunt", "outcome", "accepted"));
+        // P11.3: a strike names only an attack and a target, Guard nothing, an item use its instance and maybe a target.
+        assertEquals(new TypedCommand.Strike("sword", "raider"), decode("STRIKE", Map.of("attackId", "sword", "targetId", "raider")));
+        assertEquals(new org.rpgengine.combat.TacticalIntent.Strike("sword", "raider"),
+                new TypedCommand.Strike("sword", "raider").intent());
+        assertEquals(new TypedCommand.Guard(), decode("GUARD", Map.of()));
+        assertEquals(new org.rpgengine.combat.TacticalIntent.Guard(), new TypedCommand.Guard().intent());
+        UUID instance = UUID.randomUUID();
+        assertEquals(new TypedCommand.CombatUseItem(instance, null),
+                decode("COMBAT_USE_ITEM", Map.of("itemInstanceId", instance.toString())));
+        assertEquals(new TypedCommand.CombatUseItem(instance, "porter"),
+                decode("COMBAT_USE_ITEM", Map.of("itemInstanceId", instance.toString(), "targetId", "porter")));
+        assertEquals(new org.rpgengine.combat.TacticalIntent.UseItem("porter"),
+                new TypedCommand.CombatUseItem(instance, "porter").intent());
+        assertEquals(Map.of("itemInstanceId", instance.toString()), new TypedCommand.CombatUseItem(instance, null).payload());
+        assertInvalid("STRIKE", Map.of("attackId", "sword"));
+        assertInvalid("STRIKE", Map.of("targetId", "raider"));
+        assertInvalid("STRIKE", Map.of("attackId", "sword", "targetId", ""));
+        assertInvalid("STRIKE", Map.of("attackId", "sword", "targetId", "x".repeat(129)));
+        assertInvalid("STRIKE", Map.of("attackId", "sword", "targetId", "raider", "damage", 99));
+        assertInvalid("GUARD", Map.of("bonus", 2));
+        assertInvalid("COMBAT_USE_ITEM", Map.of());
+        assertInvalid("COMBAT_USE_ITEM", Map.of("itemInstanceId", "not-a-uuid"));
+        assertInvalid("COMBAT_USE_ITEM", Map.of("itemInstanceId", instance.toString(), "targetId", ""));
+        assertInvalid("COMBAT_USE_ITEM", Map.of("itemInstanceId", instance.toString(), "healed", 8));
         assertEquals(500, decodeSpeech("x".repeat(500)).text().length());
         assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.MoveZone(null));
         assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.Interact("taunt", " "));

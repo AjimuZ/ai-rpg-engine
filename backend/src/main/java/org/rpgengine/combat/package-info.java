@@ -11,8 +11,11 @@
  * player's tactical intentions, {@code EncounterState} the stored tactical state read back by {@code EncounterWriter},
  * {@code TacticalRules} their pure legality (turn, movement, addressing, speech allowance, declared actions, action
  * points) and {@code CombatScheduler} the pure initiative roll and initiative-round scheduler, whose
- * {@code TacticalPlan} the commit writes one row version per step. Nothing here reads natural language; only the
- * initiative roll draws dice, through the recorded draw source it is given. Attacks, reactions and settlement of
- * later tasks complete the fight.
+ * {@code TacticalPlan} the commit writes one row version per step. Nothing here reads natural language.
+ *
+ * <p>Since P11.3 (ADR 0030) {@code CombatMath} is the pure attack, defense, damage and healing arithmetic,
+ * {@code CombatAttack} a frozen attack, {@code EncounterGear} what an equippable item adds at entry, and the scheduler
+ * resolves strikes, the Guard action, item use, the opening strike and a small non-player tactic. Dice come only from
+ * the recorded draw source it is given. Reactions and settlement of later tasks complete the fight.
  */
 package org.rpgengine.combat;

@@ -24,7 +24,8 @@ import tools.jackson.databind.json.JsonMapper;
  * state in order, each guarded by the row version the plan was calculated from. The database repeats every
  * guarantee: frozen columns are immutable, the lifecycle follows the state machine one arrow per update, initiative
  * is written once and before the first round opens, action points only grow when an activation starts, the speech
- * allowance holds, and a second active encounter of the campaign violates a unique index, so a replayed, stale or
+ * allowance holds, encounter-local Health stays in its bounds and a defeated participant stays defeated (V24), and a
+ * second active encounter of the campaign violates a unique index, so a replayed, stale or
  * racing write rolls the whole commit back. {@link #active} reads the current encounter summary for rules and tests.
  */
 public final class EncounterWriter {
@@ -127,11 +128,16 @@ public final class EncounterWriter {
                 passages.add(new EncounterAction.Passage((String) form.get("from"), (String) form.get("to"),
                         Boolean.TRUE.equals(form.get("blocked"))));
             }
-            var participants = jdbc.query("select participant_id, ordinal, actor_id, side, zone_id, status, initiative, "
-                            + "initiative_rank, reactions, row_version, frozen::text from encounter_participant "
-                            + "where encounter_id = ? and campaign_id = ? order by ordinal",
+            var participants = jdbc.query("select p.participant_id, p.ordinal, p.actor_id, p.side, p.zone_id, p.status, "
+                            + "p.initiative, p.initiative_rank, p.reactions, p.row_version, p.frozen::text, "
+                            // The player's Health lives in its pool, read relative to the pool's minimum, the zero of combat.
+                            + "coalesce(p.health_current, r.current_value - r.minimum_value), "
+                            + "r.maximum_value - r.minimum_value, p.guarding from encounter_participant p "
+                            + "left join actor_resource r on r.campaign_id = p.campaign_id and r.actor_id = p.actor_id "
+                            + "and r.resource_key = ? where p.encounter_id = ? and p.campaign_id = ? order by p.ordinal",
                     (participant, index) -> {
                         Map<?, ?> frozen = JSON.readValue(participant.getString(11), Map.class);
+                        boolean local = participant.getObject(3, UUID.class) == null;
                         return new EncounterState.Combatant(participant.getString(1), participant.getInt(2),
                                 participant.getObject(3, UUID.class),
                                 EncounterTemplate.Side.valueOf(participant.getString(4)), participant.getString(5),
@@ -139,11 +145,26 @@ public final class EncounterWriter {
                                 ((Number) ((Map<?, ?>) frozen.get("roles")).get("finesse")).intValue(),
                                 ((Number) frozen.get("initiativeModifier")).intValue(),
                                 participant.getObject(7, Integer.class), participant.getObject(8, Integer.class),
-                                participant.getInt(9), participant.getLong(10));
-                    }, id, campaign);
+                                participant.getInt(9), participant.getLong(10), participant.getInt(12),
+                                local ? ((Number) frozen.get("healthMax")).intValue() : participant.getInt(13),
+                                participant.getBoolean(14), EncounterState.Sheet.fromCanonical(frozen));
+                    }, profile.health(), id, campaign);
+            // Only unworn stacks can be spent: a worn instance is bound to its slot.
+            var consumed = new java.util.TreeSet<String>();
+            participants.getFirst().sheet().attacks().forEach(attack -> {
+                if (attack.ammunition() != null) {
+                    consumed.add(attack.ammunition());
+                }
+            });
+            var ammunition = consumed.isEmpty() ? List.<EncounterState.Ammunition>of() : jdbc.query(
+                    "select i.id, i.definition_id, i.quantity from item_instance i where i.campaign_id = ? and i.actor_id = ? "
+                            + "and i.definition_id = any(?) and not exists (select 1 from equipment_assignment e "
+                            + "where e.campaign_id = i.campaign_id and e.item_instance_id = i.id) order by i.id",
+                    (stack, index) -> new EncounterState.Ammunition(stack.getObject(1, UUID.class), stack.getString(2),
+                            stack.getInt(3)), campaign, participants.getFirst().actorId(), consumed.toArray(new String[0]));
             return Optional.of(new EncounterState(id, (Long) row[1], EncounterPhase.valueOf((String) row[2]), (Integer) row[3],
                     (Integer) row[4], (Integer) row[5], (Integer) row[6], passages, profile, space, escapes, actions,
-                    OpeningPolicy.parse((String) row[10]), (String) row[11], (String) row[12], participants));
+                    OpeningPolicy.parse((String) row[10]), (String) row[11], (String) row[12], participants, ammunition));
         } catch (RuntimeException unreadable) {
             throw new IllegalStateException("stored encounter " + id + " cannot be read back", unreadable);
         }
@@ -164,9 +185,10 @@ public final class EncounterWriter {
     public static void progressWithin(JdbcTemplate jdbc, UUID campaign, long revision, TacticalPlan plan) {
         for (TacticalPlan.ParticipantUpdate update : plan.participants()) {
             if (jdbc.update("update encounter_participant set zone_id = ?, initiative = ?, initiative_rank = ?, "
-                            + "reactions = ?, row_version = row_version + 1 where encounter_id = ? and campaign_id = ? "
-                            + "and participant_id = ? and row_version = ?", update.zone(), update.initiative(),
-                    update.rank(), update.reactions(), plan.encounterId(), campaign, update.participantId(),
+                            + "reactions = ?, status = ?, health_current = ?, guarding = ?, row_version = row_version + 1 "
+                            + "where encounter_id = ? and campaign_id = ? and participant_id = ? and row_version = ?",
+                    update.zone(), update.initiative(), update.rank(), update.reactions(), update.status().name(),
+                    update.health(), update.guarding(), plan.encounterId(), campaign, update.participantId(),
                     update.expectedRowVersion()) != 1) {
                 throw new IllegalStateException("stale encounter participant");
             }
@@ -181,10 +203,11 @@ public final class EncounterWriter {
                 return (Object) form;
             }).toList();
             if (jdbc.update("update encounter set phase = ?, round = ?, actor_cursor = ?, action_points = ?, "
-                            + "speech_used = ?, passages = ?::jsonb, updated_revision = ?, row_version = row_version + 1 "
-                            + "where id = ? and campaign_id = ? and row_version = ?", step.phase().name(), step.round(),
-                    step.cursor(), step.actionPoints(), step.speechUsed(), CanonicalJson.write(passages), revision,
-                    plan.encounterId(), campaign, version) != 1) {
+                            + "speech_used = ?, passages = ?::jsonb, opening_status = ?, updated_revision = ?, "
+                            + "row_version = row_version + 1 where id = ? and campaign_id = ? and row_version = ?",
+                    step.phase().name(), step.round(), step.cursor(), step.actionPoints(), step.speechUsed(),
+                    CanonicalJson.write(passages), step.openingStatus(), revision, plan.encounterId(), campaign,
+                    version) != 1) {
                 throw new IllegalStateException("stale encounter");
             }
             version++;

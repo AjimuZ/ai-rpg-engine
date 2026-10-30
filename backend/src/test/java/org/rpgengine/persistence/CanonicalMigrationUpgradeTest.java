@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V23 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V24 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -569,6 +569,36 @@ class CanonicalMigrationUpgradeTest {
                     assertThrows(DataAccessException.class, () -> jdbc.update("update encounter set passages = '{}', "
                             + "row_version = row_version + 1"));
                     assertEquals(0, v23.migrate().migrationsExecuted);
+                    // V24 adds the Guard stance: the populated fight keeps its rows with no stance held, local Health stays
+                    // within the frozen maximum, zero Health cannot stand and a defeated participant stays defeated.
+                    String v23Roster = jdbc.queryForObject("select jsonb_agg(to_jsonb(p) order by p.participant_id)::text "
+                            + "from encounter_participant p", String.class);
+                    Flyway v24 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("24").load();
+                    assertEquals(1, v24.migrate().migrationsExecuted);
+                    assertTrue(v24.validateWithResult().validationSuccessful);
+                    assertEquals(v23Roster, jdbc.queryForObject("select jsonb_agg(to_jsonb(p) - 'guarding' order by "
+                            + "p.participant_id)::text from encounter_participant p", String.class));
+                    assertEquals(0L, jdbc.queryForObject("select count(*) from encounter_participant where guarding", Long.class));
+                    assertEquals(1, jdbc.update("update encounter_participant set guarding = true, row_version = "
+                            + "row_version + 1 where participant_id = 'raider'"));
+                    assertEquals(1, jdbc.update("insert into encounter_participant (encounter_id, campaign_id, participant_id, "
+                            + "ordinal, side, zone_id, health_current, focus_current, frozen) values (?, ?, 'rival', 2, 'HOSTILE', "
+                            + "'entry', 14, 0, '{\"healthMax\": 14}')", fight, campaign));
+                    String vitals = "update encounter_participant set health_current = ?, row_version = row_version + 1 "
+                            + "where participant_id = 'rival'";
+                    assertThrows(DataAccessException.class, () -> jdbc.update(vitals, 15));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(vitals, 0));
+                    assertEquals(1, jdbc.update(vitals, 13));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update encounter_participant set "
+                            + "status = 'DEFEATED', row_version = row_version + 1 where participant_id = 'raider'"),
+                            "a stance ends with its holder");
+                    assertEquals(1, jdbc.update("update encounter_participant set health_current = 0, status = 'DEFEATED', "
+                            + "row_version = row_version + 1 where participant_id = 'rival'"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(vitals, 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update encounter_participant set "
+                            + "status = 'ACTIVE', row_version = row_version + 1 where participant_id = 'rival'"));
+                    assertEquals(0, v24.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

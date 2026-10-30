@@ -161,8 +161,10 @@ public final class CommandReceipts {
     }
 
     /**
-     * Copy the allowlisted members of a tactical summary: scalar cursor facts, the initiative order and the legal
-     * options (moves, speech allowance and recipients, declared actions with costs and targets).
+     * Copy the allowlisted members of a tactical summary: scalar cursor facts, the initiative order, each participant's
+     * public standing, the operation's strikes (never a hidden defense, armor or Health value) and the legal options
+     * (moves, speech allowance and recipients, declared actions, attacks with costs, targets and disabled reasons, Guard
+     * and item use).
      */
     private static Map<String, Object> combat(JsonNode combat) {
         var entry = new LinkedHashMap<String, Object>();
@@ -180,6 +182,29 @@ public final class CommandReceipts {
             order.add(position);
         }
         entry.put("initiative", List.copyOf(order));
+        var standing = new ArrayList<Map<String, Object>>();
+        for (JsonNode line : combat.path("participants")) {
+            var participant = new LinkedHashMap<String, Object>();
+            participant.put("participantId", line.path("participantId").asString());
+            participant.put("side", line.path("side").asString());
+            participant.put("zone", line.path("zone").asString());
+            participant.put("status", line.path("status").asString());
+            standing.add(participant);
+        }
+        entry.put("participants", List.copyOf(standing));
+        var outcomes = new ArrayList<Map<String, Object>>();
+        for (JsonNode line : combat.path("strikes")) {
+            var strike = new LinkedHashMap<String, Object>();
+            strike.put("attackerId", line.path("attackerId").asString());
+            strike.put("targetId", line.path("targetId").asString());
+            strike.put("attackId", line.path("attackId").asString());
+            strike.put("attackTotal", line.path("attackTotal").asInt());
+            strike.put("hit", line.path("hit").asBoolean());
+            strike.put("strongHit", line.path("strongHit").asBoolean());
+            strike.put("damage", line.path("damage").asInt());
+            outcomes.add(strike);
+        }
+        entry.put("strikes", List.copyOf(outcomes));
         JsonNode options = combat.path("options");
         if (options.isObject()) {
             var view = new LinkedHashMap<String, Object>();
@@ -205,6 +230,22 @@ public final class CommandReceipts {
                 actions.add(line);
             }
             view.put("actions", List.copyOf(actions));
+            var strikes = new ArrayList<Map<String, Object>>();
+            for (JsonNode strike : options.path("strikes")) {
+                var line = new LinkedHashMap<String, Object>();
+                line.put("attackId", strike.path("attackId").asString());
+                line.put("cost", strike.path("cost").asInt());
+                line.put("targets", strings(strike.path("targets")));
+                line.put("disabled", strike.path("disabled").isString() ? strike.path("disabled").asString() : null);
+                strikes.add(line);
+            }
+            view.put("strikes", List.copyOf(strikes));
+            for (String choice : List.of("guard", "useItem")) {
+                var line = new LinkedHashMap<String, Object>();
+                line.put("cost", options.path(choice).path("cost").asInt());
+                line.put("available", options.path(choice).path("available").asBoolean());
+                view.put(choice, java.util.Collections.unmodifiableMap(line));
+            }
             view.put("endActivation", options.path("endActivation").asBoolean());
             entry.put("options", java.util.Collections.unmodifiableMap(view));
         }

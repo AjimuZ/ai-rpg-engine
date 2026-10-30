@@ -280,6 +280,65 @@ public final class EventStatements {
                         : participant + " uses " + action + ": the passage between " + from + " and " + to + " is now "
                                 + (blocked ? "closed" : "open") + " for " + points(false, points) + ".";
             }
+            case "STRIKE_RESOLVED" -> {
+                // P11.3: the public outcome of one attack; another participant's defense and Health are never stated.
+                String attacker = participant(payload, names);
+                String target = token(payload, "targetId");
+                String attack = token(payload, "attackId");
+                Long total = number(payload, "attackTotal");
+                Long damage = number(payload, "damage");
+                if (attacker == null || target == null || attack == null || total == null || damage == null
+                        || !payload.path("hit").isBoolean()) {
+                    yield null;
+                }
+                if (!payload.path("hit").asBoolean()) {
+                    yield it ? attacker + " attacca " + target + " con " + attack + " (totale " + total + ") e manca il bersaglio."
+                            : attacker + " attacks " + target + " with " + attack + " (total " + total + ") and misses.";
+                }
+                boolean strong = payload.path("strongHit").asBoolean();
+                yield it ? attacker + " colpisce " + target + " con " + attack + " (totale " + total + ")"
+                                + (strong ? ", un colpo forte" : "") + ": " + damage + " danni."
+                        : attacker + " hits " + target + " with " + attack + " (total " + total + ")"
+                                + (strong ? ", a strong hit" : "") + ": " + damage + " damage.";
+            }
+            case "OPENING_STRIKE_LAPSED" -> {
+                String attacker = participant(payload, names);
+                String target = token(payload, "targetId");
+                yield attacker == null || target == null ? null
+                        : it ? "L'attacco d'apertura di " + attacker + " contro " + target + " non può essere portato."
+                        : attacker + "'s opening strike against " + target + " cannot be made.";
+            }
+            case "GUARD_RAISED" -> {
+                String participant = participant(payload, names);
+                Long bonus = number(payload, "bonus");
+                Long points = number(payload, "actionPoints");
+                yield participant == null || bonus == null || points == null ? null
+                        : it ? participant + " si mette in guardia: +" + bonus + " alla Guardia ("
+                                + points(true, points) + ")."
+                        : participant + " takes a guarded stance: +" + bonus + " Guard for " + points(false, points) + ".";
+            }
+            case "PARTICIPANT_DEFEATED" -> {
+                String participant = participant(payload, names);
+                yield participant == null ? null
+                        : it ? participant + " è fuori combattimento." : participant + " is defeated.";
+            }
+            case "COMBAT_ITEM_USED" -> {
+                String participant = participant(payload, names);
+                String item = token(payload, "definitionId");
+                Long points = number(payload, "actionPoints");
+                if (participant == null || item == null || points == null) {
+                    yield null;
+                }
+                String target = payload.has("targetId") ? token(payload, "targetId") : "";
+                Long healed = payload.has("healed") ? number(payload, "healed") : Long.valueOf(0);
+                if (target == null || healed == null) {
+                    yield null;
+                }
+                String on = target.isEmpty() ? "" : (it ? " su " : " on ") + target;
+                String restored = healed <= 0 ? "" : it ? ": recupera " + healed + " Salute" : ": " + healed + " Health restored";
+                yield it ? participant + " usa " + item + on + " (" + points(true, points) + ")" + restored + "."
+                        : participant + " uses " + item + on + " for " + points(false, points) + restored + ".";
+            }
             case "QUEST_OBJECTIVE_SATISFIED" -> {
                 String quest = token(payload, "questId");
                 String objective = token(payload, "objectiveId");
@@ -322,6 +381,12 @@ public final class EventStatements {
             }
             Long before = number(outcome, "before");
             Long after = number(outcome, "after");
+            if (kind.equals("NOT_REVIVED") && before != null) {
+                // P11.3: ordinary healing leaves a defeated actor where it is.
+                parts.add(it ? actor + " resta fuori combattimento (" + resource + " " + before + ")"
+                        : actor + " stays defeated (" + resource + " " + before + ")");
+                continue;
+            }
             if (!(kind.equals("APPLIED") || kind.equals("CLAMPED")) || before == null || after == null) {
                 return null;
             }
