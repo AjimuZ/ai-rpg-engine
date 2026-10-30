@@ -93,7 +93,8 @@ public record EncounterTemplate(String id, String pack, String location, ZoneGra
             if (!roles.keySet().equals(new HashSet<>(org.rpgengine.rules.CombatProfile.ROLES))) {
                 throw new IllegalArgumentException("participant statistics give every role");
             }
-            roles.forEach((role, value) -> within(value, 0, 6, role));
+            roles.forEach((role, value) -> within(value, org.rpgengine.rules.CombatProfile.ROLE_MIN,
+                    org.rpgengine.rules.CombatProfile.ROLE_MAX, role));
             roles = Collections.unmodifiableMap(new java.util.TreeMap<>(roles));
         }
     }

@@ -167,7 +167,8 @@ class EncounterCommandsTest {
 
     /**
      * Entry is refused, with one category and no write, for an unknown template, a template of another location, an
-     * opening strike the policy forbids or that names an ally or nobody, a defeated player and a missing role attribute.
+     * opening strike the policy forbids or that names an ally or nobody, a defeated player and a role attribute that is
+     * missing, above the supported range, negative or a fraction (none of which could roll and store initiative).
      */
     @Test
     void entryIsRefusedWhereItDoesNotApply() {
@@ -187,6 +188,11 @@ class EncounterCommandsTest {
         rejects(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE, new TypedCommand.Engage("trail-ambush", null));
         jdbc.update("update actor_resource set current_value = maximum_value, row_version = row_version + 1 "
                 + "where actor_id = ? and resource_key = 'vigor'", player);
+        for (String unsupported : List.of("7", "-1", "2.5", "\"2\"")) {
+            jdbc.update("update character_state set attributes = attributes || jsonb_build_object('awareness', ?::jsonb), "
+                    + "row_version = row_version + 1 where actor_id = ?", unsupported, player);
+            rejects(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE, new TypedCommand.Engage("trail-ambush", null));
+        }
         jdbc.update("update character_state set attributes = attributes - 'awareness', row_version = row_version + 1 "
                 + "where actor_id = ?", player);
         rejects(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE, new TypedCommand.Engage("trail-ambush", null));

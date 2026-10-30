@@ -55,6 +55,13 @@ public record CombatProfile(String pack, Map<String, String> roles, String healt
     public static final int INITIATIVE_SIDES = 10;
     /** Most reactions any reaction may trigger (kernel: reactions never chain). */
     public static final int REACTION_DEPTH = 1;
+    /**
+     * Supported range of a role value (docs/11 section 4, kernel, not a parameter). Every frozen participant stays
+     * inside it, so an initiative total always fits its stored bound {@code 2..32} (V23): two d10 plus finesse and
+     * insight. A value outside it could enter a fight whose initiative can never be stored.
+     */
+    public static final int ROLE_MIN = 0;
+    public static final int ROLE_MAX = 6;
 
     /**
      * Inclusive bound and documented default of one parameter.
@@ -134,6 +141,14 @@ public record CombatProfile(String pack, Map<String, String> roles, String healt
         var values = new LinkedHashMap<String, Integer>();
         PARAMETERS.forEach((name, bound) -> values.put(name, overrides.getOrDefault(name, bound.fallback())));
         return new CombatProfile(pack, roles, health, focus, values);
+    }
+
+    /**
+     * @param value a participant's role value
+     * @return whether it lies in the supported range {@link #ROLE_MIN}..{@link #ROLE_MAX}
+     */
+    public static boolean roleInRange(long value) {
+        return value >= ROLE_MIN && value <= ROLE_MAX;
     }
 
     /** @return the documented default values of every parameter */

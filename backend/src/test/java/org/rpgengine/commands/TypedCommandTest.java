@@ -284,6 +284,11 @@ class TypedCommandTest {
         assertInvalid("COMBAT_SPEAK", Map.of("recipientId", "raider", "text", " "));
         assertInvalid("COMBAT_SPEAK", Map.of("recipientId", "raider", "text", "x".repeat(501)));
         assertInvalid("COMBAT_SPEAK", Map.of("recipientId", "raider", "text", "Yield.", "effect", "surrender"));
+        // PostgreSQL cannot store U+0000: refused here, for every text field, instead of failing at the commit.
+        assertInvalid("COMBAT_SPEAK", Map.of("recipientId", "raider", "text", "Stop\u0000now"));
+        assertInvalid("COMBAT_SPEAK", Map.of("recipientId", "rai\u0000der", "text", "Stop."));
+        assertInvalid("MOVE_ZONE", Map.of("zoneId", "ya\u0000rd"));
+        assertInvalid("INTERACT", Map.of("actionId", "\u0000"));
         assertInvalid("INTERACT", Map.of("targetId", "raider"));
         assertInvalid("INTERACT", Map.of("actionId", "taunt", "targetId", ""));
         assertInvalid("INTERACT", Map.of("actionId", "taunt", "outcome", "accepted"));

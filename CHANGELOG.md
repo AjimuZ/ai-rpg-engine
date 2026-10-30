@@ -21,6 +21,12 @@
 - PostgreSQL stores the turn cursor, the speech count, passage changes, initiative and reaction budgets (migration
   V23) and refuses a re-roll, points granted in the middle of a turn, points beyond the adventure's allowance and
   extra speech. The backup tool covers schema version 23.
+- A fight that has started can always roll initiative. An adventure can no longer map a combat role to an attribute
+  whose range goes beyond the supported 0–6 (a located pack error), and `ENGAGE` refuses a character whose stored role
+  value is outside that range or not a whole number (`COMMAND_ENCOUNTER_UNAVAILABLE`). Such a character could
+  previously enter and then fail every roll, leaving the playthrough stuck in encounter mode.
+- A command whose text contains a NUL character is now refused as invalid before anything is written, in exploration
+  and combat alike, instead of ending as a failed operation.
 - Not included yet: attacks and the opening strike (P11.3) — other participants therefore pass their turns —;
   reactions (P11.4); responses to social attempts, outcomes and settlement (P11.5); recovery of a fight from the
   checkpoint (P11.6); a frontend control or panel for encounters (P12). See

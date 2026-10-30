@@ -332,6 +332,44 @@ class CombatSchedulerTest {
                 null);
     }
 
+    /**
+     * The largest roster fits one operation: nine participants, with the rivals on the largest modifier 12 (two tens
+     * reach the highest stored total, 32) and a player acting last or first. Roll and end of activation stay within
+     * the plan's bound, every other participant's activation passes, and each participant's reactions refresh once.
+     */
+    @Test
+    void theLargestRosterFitsOneOperation() throws Exception {
+        for (boolean playerLast : List.of(true, false)) {
+            var entered = entering("trail-ambush");
+            var list = new ArrayList<>(entered.participants().subList(0, 1));
+            for (int ordinal = 1; ordinal < 9; ordinal++) {
+                list.add(new EncounterState.Combatant("rival-" + ordinal, ordinal, null, EncounterTemplate.Side.HOSTILE,
+                        "yard", EncounterState.Status.ACTIVE, 6, 12, null, null, 0, 0));
+            }
+            var state = new EncounterState(entered.id(), 0, EncounterPhase.ENTERING, 0, null, null, 0, List.of(),
+                    entered.profile(), entered.frozenSpace(), entered.escapeZones(), entered.actions(), entered.opening(),
+                    null, "NONE", list);
+            int[] values = new int[18];
+            java.util.Arrays.fill(values, playerLast ? 10 : 1);
+            values[0] = playerLast ? 1 : 10;
+            values[1] = values[0];
+            var roll = CombatScheduler.apply(state, new TacticalIntent.RollInitiative(), dice(values));
+            assertSteps(state, roll);
+            assertEquals(playerLast ? 32 : 14, update(roll, "rival-8").initiative());
+            assertEquals(playerLast ? 8 : 0, update(roll, "player").rank());
+            var rolled = after(state, roll);
+            assertTrue(rolled.playerDecision());
+            assertEquals(playerLast ? 9 : 1, types(roll).stream().filter("ACTIVATION_STARTED"::equals).count());
+            var ended = CombatScheduler.apply(rolled, new TacticalIntent.EndActivation(), dice());
+            assertSteps(rolled, ended);
+            assertTrue(ended.steps().size() <= TacticalPlan.MAX_STEPS, "steps: " + ended.steps().size());
+            assertEquals(9, types(ended).stream().filter("ACTIVATION_STARTED"::equals).count(), "one more activation each");
+            assertEquals(8L, ended.elapsedSeconds(), "one round boundary only");
+            assertTrue(after(rolled, ended).playerDecision());
+            assertEquals(9, after(rolled, ended).participants().stream().filter(p -> p.reactions() == 1).count());
+        }
+    }
+
     /** The stored state right after entry: phase ENTERING, round 0, every participant active and unranked. */
     private static EncounterState entering(String template) throws Exception {
         var frozen = frozen(template);

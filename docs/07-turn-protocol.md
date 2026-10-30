@@ -358,7 +358,7 @@ slot where the opening strike resolves are pinned rules, never payload fields.
 
 | Type | Exact payload | Rule (category `ENCOUNTER_UNAVAILABLE` on failure) |
 | --- | --- | --- |
-| `ENGAGE` | `encounterId` (1..256 characters) and optionally `openingStrike` (1..128 characters); no other field | The pinned template exists, its location is the player's current location and its pack is the player's vocabulary pack; the player has every role attribute the pack's combat profile maps and Health above its minimum; no encounter of the campaign is active; an opening strike needs a policy other than `forbidden` and names a hostile participant |
+| `ENGAGE` | `encounterId` (1..256 characters) and optionally `openingStrike` (1..128 characters); no other field | The pinned template exists, its location is the player's current location and its pack is the player's vocabulary pack; the player has every role attribute the pack's combat profile maps, each an integer in the supported role range 0..6, and Health above its minimum; no encounter of the campaign is active; an opening strike needs a policy other than `forbidden` and names a hostile participant |
 
 In encounter mode the common semantic gate refuses every exploration intention, `ENGAGE` included, with
 `MODE_ILLEGAL` before these rules run. The commit freezes the encounter (`FrozenEncounter`: canonical profile
@@ -383,8 +383,11 @@ resolver then runs the pure `CombatScheduler` over the same state. None of them 
 | `ROLL_INITIATIVE` | `{}` | Phase `ENTERING` (`TURN_UNAVAILABLE`); the clock can take one round (`TIME_ILLEGAL`) |
 | `MOVE_ZONE` | `zoneId` (1..128 characters) | The player's decision (`TURN_UNAVAILABLE`); a declared zone, not the current one, one unblocked directed edge away and below its capacity (`ZONE_UNAVAILABLE`); the edge's cost fits the remaining points (`ACTION_POINTS_INSUFFICIENT`) |
 | `END_ACTIVATION` | `{}` | The player's decision (`TURN_UNAVAILABLE`); the clock can take one round (`TIME_ILLEGAL`) |
-| `COMBAT_SPEAK` | `recipientId` (1..128) and `text` (1..500 characters) | The player's decision; fewer than `speechPerActivation` utterances in this activation (`SPEECH_LIMIT_REACHED`); an addressable participant (`TARGET_ILLEGAL`) |
+| `COMBAT_SPEAK` | `recipientId` (1..128) and `text` (1..500 UTF-16 units) | The player's decision; fewer than `speechPerActivation` utterances in this activation (`SPEECH_LIMIT_REACHED`); an addressable participant (`TARGET_ILLEGAL`) |
 | `INTERACT` | `actionId` (1..128) and, for a social action, `targetId` (1..128) | The player's decision; a declared action usable from the player's zone that would change something (`INTERACTION_UNAVAILABLE`); a social action names an addressable participant its recipient policy admits and a scene action names none (`TARGET_ILLEGAL`); its cost fits (`ACTION_POINTS_INSUFFICIENT`) |
+
+Every text field of a command (exploration ones too) refuses blank text and text PostgreSQL cannot store: an unpaired
+surrogate or U+0000 is `INVALID_COMMAND` before anything is written, not a failed operation.
 
 "The player's decision" is phase `AWAITING_ACTION` with the standing player at the cursor; at any other time,
 including while another participant acts, nothing is accepted or queued. "Addressable" means a different

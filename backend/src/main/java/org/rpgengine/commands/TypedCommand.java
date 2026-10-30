@@ -226,7 +226,8 @@ public sealed interface TypedCommand
         // Record constructors also serve direct Java callers, independently of JSON decoding.
         for (int index = 0; index < text.length(); index++) {
             char ch = text.charAt(index);
-            if (Character.isSurrogate(ch) && (!Character.isHighSurrogate(ch)
+            // U+0000 cannot be stored in a PostgreSQL text or jsonb value: refuse it here, not as a failed commit.
+            if (ch == 0 || Character.isSurrogate(ch) && (!Character.isHighSurrogate(ch)
                     || ++index >= text.length() || !Character.isLowSurrogate(text.charAt(index)))) {
                 throw invalid();
             }

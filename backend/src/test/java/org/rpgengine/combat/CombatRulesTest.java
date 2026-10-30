@@ -106,7 +106,10 @@ class CombatRulesTest {
         assertTrue(frozen.definition().contains("\"profileHash\":\"" + profile.hash() + "\""));
     }
 
-    /** A missing role attribute or an unlawful opening is a programming error, never a silent default. */
+    /**
+     * A missing role attribute, a role value outside the supported range or an unlawful opening is a programming
+     * error, never a silent default.
+     */
     @Test
     void freezingRefusesContradictions() throws Exception {
         var rules = rules(EncounterPack.files());
@@ -115,6 +118,16 @@ class CombatRulesTest {
                 null, List.of(), Set.of());
         assertThrows(IllegalStateException.class, () -> FrozenEncounter.freeze(ID, rules.templates().get("trail-ambush"),
                 profile, facts, null));
+        for (long outside : List.of(-1L, 7L)) {
+            var unsupported = new FrozenEncounter.PlayerFacts(PLAYER, Map.of("awareness", outside, "might", 2L),
+                    new FrozenEncounter.Pool(6, 8), null, List.of(), Set.of());
+            assertThrows(IllegalStateException.class, () -> FrozenEncounter.freeze(ID,
+                    rules.templates().get("trail-ambush"), profile, unsupported, null));
+        }
+        var strongest = new FrozenEncounter.PlayerFacts(PLAYER, Map.of("awareness", 6L, "might", 0L),
+                new FrozenEncounter.Pool(6, 8), null, List.of(), Set.of());
+        assertEquals(12, FrozenEncounter.freeze(ID, rules.templates().get("trail-ambush"), profile, strongest, null)
+                .player().initiativeModifier());
         var full = new FrozenEncounter.PlayerFacts(PLAYER, Map.of("awareness", 2L, "might", 2L),
                 new FrozenEncounter.Pool(6, 8), null, List.of(), Set.of());
         assertThrows(IllegalStateException.class, () -> FrozenEncounter.freeze(ID, rules.templates().get("toll-parley"),

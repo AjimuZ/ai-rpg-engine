@@ -68,6 +68,19 @@ class CombatPackTest {
                 EncounterPack.COMBAT_RULE + "," + EncounterPack.COMBAT_RULE.replace("rules.combat", "rules.combat2"), false);
     }
 
+    /**
+     * A role may only map an attribute whose whole declared range fits the supported role range, so a character at
+     * the attribute's maximum can still enter and roll initiative; an attribute no role maps keeps its own range.
+     */
+    @Test
+    void refusesARoleAttributeBeyondTheSupportedRange() throws Exception {
+        var beyond = assertThrows(PackException.class, () -> compile(withNerve(7, "\"resolve\":\"nerve\"")));
+        assertEquals("CONSTRAINT_CONFLICT", beyond.code(), beyond.getMessage());
+        assertTrue(beyond.location().pointer().endsWith("/roles/resolve"), beyond.location().pointer());
+        compile(withNerve(6, "\"resolve\":\"nerve\""));
+        compile(withNerve(20, "\"resolve\":\"might\""));
+    }
+
     /** An encounter needs its pack's combat rule. */
     @Test
     void refusesEncountersWithoutAProfile() throws Exception {
@@ -171,6 +184,17 @@ class CombatPackTest {
         files.put("encounters.json", files.get("encounters.json").replace("\"cost\":2}", "\"cost\":4}"));
         assertTrue(files.get("encounters.json").contains("\"cost\":4"));
         compile(bytes(files));
+    }
+
+    /** The default fixture with an extra attribute {@code nerve} of range {@code 0..max} and the given resolve mapping. */
+    private static Map<String, byte[]> withNerve(int max, String resolveMapping) throws Exception {
+        var files = text(EncounterPack.files());
+        String resolve = "{\"id\":\"resolve\",\"name\":\"Resolve\",\"min\":0,\"max\":4}";
+        String rules = files.get("rules.json");
+        assertTrue(rules.contains(resolve) && rules.contains("\"resolve\":\"might\""), "mutation target missing");
+        files.put("rules.json", rules.replace(resolve, resolve + ",{\"id\":\"nerve\",\"name\":\"Nerve\",\"min\":0,\"max\":"
+                + max + "}").replace("\"resolve\":\"might\"", resolveMapping));
+        return bytes(files);
     }
 
     /** Apply one textual mutation to a fixture variant and assert the first diagnostic code. */

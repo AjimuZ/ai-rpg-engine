@@ -1106,11 +1106,16 @@ Inside an encounter the player submits tactical intentions
   encounter. V23 adds the cursor columns and the scheduling triggers; the backup tool covers schema 23.
 - The pack compiler validates encounter `actions`; `EventStatements` states the eight new event types in English and
   Italian.
+- `CombatProfile.ROLE_MIN`/`ROLE_MAX` (0..6) bound every frozen role value, so an initiative total always fits V23's
+  2..32: `PackCompiler` refuses a role mapped to an attribute declared beyond them, `CommandRules.engage` and
+  `FrozenEncounter.freeze` refuse a stored value outside them, and `TypedCommand` refuses U+0000 in any text field.
 
 Tests: `CombatSchedulerTest` (pure scheduler and rules), `TacticalCommandsTest` (real PostgreSQL on the
 `EncounterPack` fixture, whose templates now declare social and scene actions), `CombatPackTest.refusesBrokenActions`,
 plus additions to `TypedCommandTest`, `EventStatementsTest`, `ResolvedCommitTest`, `CampaignCommandHttpTest`,
-`EncounterCommandsTest` (a first round needs initiative) and the V23 step of `CanonicalMigrationUpgradeTest`.
+`EncounterCommandsTest` (a first round needs initiative, role values out of range refuse entry) and the V23 step of
+`CanonicalMigrationUpgradeTest`. `TacticalCommandsTest.aLongFightKeepsEveryActivationLegal` plays a seeded fight
+against an independent model of the fixture.
 Limits: non-player participants pass their activations (attacks P11.3, tactics P12.3/P12.4); the opening strike
 stays pending (P11.3); reactions refresh but are never spent (P11.4); no terminal predicate runs and a capped
 encounter waits at its round end (P11.5); social attempts get no response yet (P11.5); the V16 checkpoint still

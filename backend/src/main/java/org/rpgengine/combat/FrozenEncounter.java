@@ -193,6 +193,10 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
                 // Never a silent zero: a save without the mapped attribute cannot enter this profile's combat.
                 throw new IllegalStateException("the player has no value for the " + role + " attribute");
             }
+            if (!CombatProfile.roleInRange(value)) {
+                // The rule gate refuses this first; a frozen value outside the range could never store its initiative.
+                throw new IllegalStateException("the player's " + role + " attribute is outside the supported range");
+            }
             roles.put(role, value);
         }
         var focus = profile.focus() == null || player.focus() == null ? new Pool(0, 0) : player.focus();

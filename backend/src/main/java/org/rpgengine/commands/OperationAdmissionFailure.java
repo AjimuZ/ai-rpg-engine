@@ -128,8 +128,9 @@ public final class OperationAdmissionFailure extends RuntimeException {
         REST_UNAVAILABLE,
         /**
          * The named encounter does not exist, cannot be entered at the player's location or with the player's
-         * vocabulary, the player is defeated or already in an encounter, or the declared opening strike is not
-         * allowed or names no hostile participant (HTTP 422, P11.1).
+         * vocabulary, the player is defeated or already in an encounter, a mapped role attribute is missing or outside
+         * the supported range, or the declared opening strike is not allowed or names no hostile participant
+         * (HTTP 422, P11.1).
          */
         ENCOUNTER_UNAVAILABLE,
         /**

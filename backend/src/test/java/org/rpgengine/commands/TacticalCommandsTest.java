@@ -21,6 +21,7 @@ import org.rpgengine.campaign.CharacterChoices;
 import org.rpgengine.characters.ArmoryPack;
 import org.rpgengine.combat.EncounterPack;
 import org.rpgengine.combat.EncounterPhase;
+import org.rpgengine.combat.EncounterState;
 import org.rpgengine.combat.EncounterWriter;
 import org.rpgengine.content.PackRegistry;
 import org.rpgengine.content.PackStaging;
@@ -39,7 +40,8 @@ import tools.jackson.databind.json.JsonMapper;
  * once with recorded draws, the schedule stops only at the player's own decision, movement, speech and declared
  * actions are legal only there and cost exactly their declared action points, ending the activation closes a round
  * once with its world time, every refusal writes nothing, retries replay, and the database refuses a re-roll, points
- * granted mid-activation, extra speech and a first round without initiative.
+ * granted mid-activation, extra speech and a first round without initiative. A long seeded fight checks every
+ * candidate intention at every decision against an independent model of the fixture.
  */
 @SpringBootTest
 class TacticalCommandsTest {
@@ -201,6 +203,106 @@ class TacticalCommandsTest {
         execute(new TypedCommand.CombatSpeak("raider", "Time is short."));
     }
 
+    /**
+     * The largest supported role values still roll and store initiative: finesse 6 and insight 6 give the largest
+     * modifier, 12, whose highest total is the stored bound 32.
+     */
+    @Test
+    void theStrongestSupportedRolesRollInitiative() {
+        jdbc.update("update character_state set attributes = attributes || '{\"awareness\": 6}'::jsonb, "
+                + "row_version = row_version + 1 where actor_id = ?", player);
+        execute(new TypedCommand.Engage("trail-ambush", null));
+        var rolled = execute(new TypedCommand.RollInitiative());
+        var draws = (List<?>) rolled.receipt().get("randomDraws");
+        int dice = (Integer) ((Map<?, ?>) draws.get(0)).get("value") + (Integer) ((Map<?, ?>) draws.get(1)).get("value");
+        assertEquals(dice + 12, number("player", "initiative"));
+        assertEquals(1, jdbc.queryForObject("select count(*) from encounter_participant where participant_id = 'player' "
+                + "and initiative <= 32", Integer.class));
+    }
+
+    /** Words PostgreSQL cannot store are an invalid command before anything is written, not a failed operation. */
+    @Test
+    void unstorableWordsWriteNothing() {
+        begin("trail-ambush");
+        var before = world();
+        var failure = assertThrows(OperationAdmissionFailure.class, () -> executions.execute(owner, adventure, campaign,
+                new OperationAdmissionService.Command(UUID.randomUUID().toString(), revision, "COMBAT_SPEAK",
+                        Map.of("recipientId", "raider", "text", "Stop\u0000now"))));
+        assertEquals(OperationAdmissionFailure.Kind.INVALID_COMMAND, failure.kind());
+        assertEquals(before, world());
+    }
+
+    /**
+     * A long seeded fight: at each decision one candidate intention, legal or not, is submitted and its verdict and
+     * effect are compared with an independent model of {@code trail-ambush} (edge prices, declared actions and
+     * allowances written out here, not read from the rules). Across every activation the verdict is exact, a refusal
+     * writes nothing, points never carry over, the speech allowance returns only with a new activation, a sealed
+     * passage stays sealed, each completed round adds its eight seconds once, no draw follows the initiative roll, the
+     * receipt's moves are the model's and the stored activations follow the initiative order round after round.
+     */
+    @Test
+    void aLongFightKeepsEveryActivationLegal() {
+        begin("trail-ambush");
+        var order = EncounterWriter.state(jdbc, campaign).orElseThrow().order().stream()
+                .map(EncounterState.Combatant::id).toList();
+        var candidates = List.<TypedCommand>of(new TypedCommand.MoveZone("entry"), new TypedCommand.MoveZone("yard"),
+                new TypedCommand.MoveZone("escape-route"), new TypedCommand.MoveZone("nowhere"),
+                new TypedCommand.CombatSpeak("raider", "Stand down."), new TypedCommand.CombatSpeak("player", "Steady."),
+                new TypedCommand.CombatSpeak("ghost", "Who goes there?"), new TypedCommand.Interact("taunt", "raider"),
+                new TypedCommand.Interact("taunt", null), new TypedCommand.Interact("taunt", "player"),
+                new TypedCommand.Interact("seal-route", null), new TypedCommand.Interact("seal-route", "raider"),
+                new TypedCommand.Interact("missing", null), new TypedCommand.EndActivation(),
+                new TypedCommand.RollInitiative());
+        var random = new java.util.Random(20261030L);
+        var expired = new java.util.ArrayList<Integer>();
+        var fight = new FightModel();
+        int committed = 0;
+        for (int step = 0; step < 240; step++) {
+            TypedCommand command = candidates.get(random.nextInt(candidates.size()));
+            var refusal = fight.refusal(command);
+            if (refusal != null) {
+                rejects(refusal, command);
+                continue;
+            }
+            if (command instanceof TypedCommand.EndActivation) {
+                expired.add(fight.points);
+            }
+            fight.apply(command);
+            var execution = execute(command);
+            committed++;
+            var stored = EncounterWriter.state(jdbc, campaign).orElseThrow();
+            assertEquals(EncounterPhase.AWAITING_ACTION, stored.phase(), command.toString());
+            assertTrue(stored.playerDecision(), command.toString());
+            assertEquals(fight.round, stored.round(), command.toString());
+            assertEquals(fight.points, stored.actionPoints(), command.toString());
+            assertEquals(fight.speech, stored.speechUsed(), command.toString());
+            assertEquals(fight.zone, stored.player().zone(), command.toString());
+            assertEquals(!fight.sealed, stored.space().stepCost("yard", "escape-route", stored.profile()) > 0, command.toString());
+            assertEquals(8L * (fight.round - 1), state("world_time_seconds"), command.toString());
+            assertEquals(fight.round, combat(execution).get("round"), command.toString());
+            assertEquals(fight.points, combat(execution).get("actionPoints"), command.toString());
+            var moves = ((List<?>) ((Map<?, ?>) combat(execution).get("options")).get("moves")).stream()
+                    .map(move -> (String) ((Map<?, ?>) move).get("zone")).toList();
+            assertEquals(fight.affordableMoves(), moves, command.toString());
+        }
+        assertTrue(committed >= 30 && fight.round >= 6 && fight.sealed, "the walk must exercise the fight: " + committed
+                + " commits, round " + fight.round + ", sealed " + fight.sealed);
+        assertEquals(4, jdbc.queryForObject("select count(*) from operation_random_draw", Integer.class));
+        // Round after round the activations follow the stored order, up to the player's current one.
+        var activations = new java.util.ArrayList<String>();
+        for (int round = 1; round < fight.round; round++) {
+            activations.addAll(order);
+        }
+        activations.addAll(order.subList(0, order.indexOf("player") + 1));
+        assertEquals(activations, jdbc.queryForList("select payload ->> 'participantId' from campaign_event where "
+                + "campaign_id = ? and event_type = 'ACTIVATION_STARTED' order by sequence", String.class, campaign));
+        assertEquals(expired, jdbc.queryForList("select (payload ->> 'unusedActionPoints')::integer from campaign_event "
+                + "where campaign_id = ? and event_type = 'ACTIVATION_ENDED' and payload ->> 'participantId' = 'player' "
+                + "order by sequence", Integer.class, campaign), "the points left at each end of activation expire");
+        assertEquals(fight.round - 1, jdbc.queryForObject("select count(*) from campaign_event where campaign_id = ? "
+                + "and event_type = 'ROUND_ENDED'", Integer.class, campaign));
+    }
+
     /** Speech reaches only addressable participants; an unknown recipient and the player are refused. */
     @Test
     void speechNeedsAnAddressableRecipient() {
@@ -311,6 +413,81 @@ class TacticalCommandsTest {
     }
 
     // ---- helpers ------------------------------------------------------------------------------------------------
+
+    /**
+     * Independent model of the player's decisions in {@code trail-ambush} under the default profile, written from the
+     * fixture and docs/11 rather than from {@code TacticalRules}: three points and one utterance per activation; the
+     * edges entry-yard (1 point), entry-escape-route (difficult, 2 points) and yard-escape-route (1 point, until
+     * sealed); the raider stays in the yard, within speaking range of every zone.
+     */
+    private static final class FightModel {
+        int round = 1;
+        int points = 3;
+        int speech;
+        String zone = "entry";
+        boolean sealed;
+
+        /** Price of a legal edge from the current zone, or null when no legal edge leads there. */
+        Integer price(String to) {
+            return switch (zone + ">" + to) {
+                case "entry>yard", "yard>entry" -> 1;
+                case "entry>escape-route", "escape-route>entry" -> 2;
+                case "yard>escape-route", "escape-route>yard" -> sealed ? null : 1;
+                default -> null;
+            };
+        }
+
+        /** The expected refusal of an intention, or null when it must commit. */
+        OperationAdmissionFailure.Kind refusal(TypedCommand command) {
+            return switch (command) {
+                case TypedCommand.MoveZone move -> {
+                    Integer cost = price(move.zoneId());
+                    yield cost == null ? OperationAdmissionFailure.Kind.ZONE_UNAVAILABLE
+                            : cost > points ? OperationAdmissionFailure.Kind.ACTION_POINTS_INSUFFICIENT : null;
+                }
+                case TypedCommand.CombatSpeak speak -> speech >= 1 ? OperationAdmissionFailure.Kind.SPEECH_LIMIT_REACHED
+                        : speak.recipientId().equals("raider") ? null : OperationAdmissionFailure.Kind.TARGET_ILLEGAL;
+                case TypedCommand.Interact interact when interact.actionId().equals("taunt") ->
+                        !"raider".equals(interact.targetId()) ? OperationAdmissionFailure.Kind.TARGET_ILLEGAL
+                                : points < 1 ? OperationAdmissionFailure.Kind.ACTION_POINTS_INSUFFICIENT : null;
+                case TypedCommand.Interact interact when interact.actionId().equals("seal-route") ->
+                        interact.targetId() != null ? OperationAdmissionFailure.Kind.TARGET_ILLEGAL
+                                : !zone.equals("yard") || sealed ? OperationAdmissionFailure.Kind.INTERACTION_UNAVAILABLE
+                                : points < 1 ? OperationAdmissionFailure.Kind.ACTION_POINTS_INSUFFICIENT : null;
+                case TypedCommand.Interact interact -> OperationAdmissionFailure.Kind.INTERACTION_UNAVAILABLE;
+                case TypedCommand.RollInitiative roll -> OperationAdmissionFailure.Kind.TURN_UNAVAILABLE;
+                case TypedCommand.EndActivation end -> null;
+                default -> throw new IllegalArgumentException(command.toString());
+            };
+        }
+
+        /** Apply a legal intention. */
+        void apply(TypedCommand command) {
+            switch (command) {
+                case TypedCommand.MoveZone move -> {
+                    points -= price(move.zoneId());
+                    zone = move.zoneId();
+                }
+                case TypedCommand.CombatSpeak speak -> speech++;
+                case TypedCommand.Interact interact -> {
+                    points--;
+                    sealed |= interact.actionId().equals("seal-route");
+                }
+                case TypedCommand.EndActivation end -> {
+                    round++;
+                    points = 3;
+                    speech = 0;
+                }
+                default -> throw new IllegalArgumentException(command.toString());
+            }
+        }
+
+        /** Zones the player can pay to reach now, in zone ID order. */
+        List<String> affordableMoves() {
+            return java.util.stream.Stream.of("entry", "escape-route", "yard")
+                    .filter(to -> price(to) != null && price(to) <= points).toList();
+        }
+    }
 
     /** Enter a template at the player's location (moving to the grove for grove-watch) and roll initiative. */
     private void begin(String template) {

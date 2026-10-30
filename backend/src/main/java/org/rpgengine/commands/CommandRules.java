@@ -18,6 +18,7 @@ import org.rpgengine.knowledge.KnowledgeLedger;
 import org.rpgengine.knowledge.KnowledgeRefs;
 import org.rpgengine.quests.QuestStatus;
 import org.rpgengine.quests.QuestStore;
+import org.rpgengine.rules.CombatProfile;
 import org.rpgengine.rules.RestRules;
 import org.rpgengine.rules.WorldClock;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -60,8 +61,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       is the player's, otherwise the one {@code REST_UNAVAILABLE} category applies.</li>
  *   <li><b>Encounter entry (P11.1)</b> — {@code ENGAGE} names a pinned encounter template whose location is the
  *       player's current location and whose pack is the player's vocabulary (its combat profile maps the player's own
- *       attributes and Health pool); the player has every mapped role attribute and Health above its minimum, no
- *       encounter of the campaign is active, and an opening strike is declared only when the template's policy allows
+ *       attributes and Health pool); the player has every mapped role attribute as an integer in the supported role
+ *       range (since P11.2, because a fight whose initiative total cannot be stored could never start) and Health above
+ *       its minimum, no encounter of the campaign is active, and an opening strike is declared only when the template's
+ *       policy allows
  *       one and it names a hostile participant. Every refusal shares {@code ENCOUNTER_UNAVAILABLE}.</li>
  *   <li><b>Tactical intentions (P11.2)</b> — the campaign's active encounter must exist and its player participant
  *       must be the acting player; {@link TacticalRules} then decides turn, movement, addressing, speech allowance,
@@ -438,11 +441,14 @@ final class CommandRules {
             if (health.isEmpty() || !health.getFirst()) {
                 throw fail(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE);
             }
-            // Every role attribute must be a stored number: the frozen profile never reads a silent zero.
+            // Every role attribute must be a stored integer in the supported range: the frozen profile never reads a
+            // silent zero, and a value outside the range could not store its initiative total (V23), which would leave
+            // the fight at ENTERING for good.
             for (String attribute : new java.util.TreeSet<>(profile.roles().values())) {
-                var kind = jdbc.query("select jsonb_typeof(attributes -> ?) from character_state where campaign_id = ? "
-                        + "and actor_id = ?", (row, index) -> row.getString(1), attribute, campaign, player);
-                if (kind.isEmpty() || !"number".equals(kind.getFirst())) {
+                var stored = jdbc.query("select attributes ->> ? from character_state where campaign_id = ? and actor_id = ? "
+                        + "and jsonb_typeof(attributes -> ?) = 'number'", (row, index) -> row.getString(1), attribute,
+                        campaign, player, attribute);
+                if (stored.isEmpty() || !roleValue(stored.getFirst())) {
                     throw fail(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE);
                 }
             }
@@ -485,6 +491,18 @@ final class CommandRules {
             if (tactical.intent() instanceof TacticalIntent.EndActivation
                     || tactical.intent() instanceof TacticalIntent.RollInitiative) {
                 timeFits(state.profile().roundSeconds());
+            }
+        }
+
+        /**
+         * Whether a stored attribute's text is an integer in the supported role range. A fraction is not a role value:
+         * the prepare step reads integers only, so it must not pass this gate and fail later.
+         */
+        private static boolean roleValue(String stored) {
+            try {
+                return CombatProfile.roleInRange(Long.parseLong(stored));
+            } catch (NumberFormatException notAnInteger) {
+                return false;
             }
         }
 

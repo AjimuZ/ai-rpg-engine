@@ -504,6 +504,13 @@ public final class PackCompiler {
                     throw roleFields.fail("REFERENCE_UNKNOWN", role, "Unknown attribute '" + attribute
                             + "'; defined attributes: " + new TreeSet<>(attributes.keySet()));
                 }
+                // A character at the attribute's maximum must still be able to enter and roll initiative.
+                int[] range = attributes.get(attribute);
+                if (!CombatProfile.roleInRange(range[0]) || !CombatProfile.roleInRange(range[1])) {
+                    throw roleFields.fail("CONSTRAINT_CONFLICT", role, "Attribute '" + attribute + "' ranges "
+                            + range[0] + ".." + range[1] + "; a combat role supports " + CombatProfile.ROLE_MIN + ".."
+                            + CombatProfile.ROLE_MAX);
+                }
                 roles.put(role, attribute);
             }
             roleFields.close();
@@ -624,7 +631,7 @@ public final class PackCompiler {
                 stats.integer("resistance", 0, 40, null);
                 stats.integer("armor", 0, combatProfile.value("armorMax"), 0);
                 for (String role : CombatProfile.ROLES) {
-                    stats.integer(role, 0, 6, 0);
+                    stats.integer(role, CombatProfile.ROLE_MIN, CombatProfile.ROLE_MAX, 0);
                 }
                 stats.close();
                 participant.close();
