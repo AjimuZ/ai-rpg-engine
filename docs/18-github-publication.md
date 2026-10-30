@@ -2,7 +2,7 @@
 
 ## 1. Publication intent
 
-The documentation repository exists at [AjimuZ/ai-rpg-engine](https://github.com/AjimuZ/ai-rpg-engine), initially with private visibility and a `main` branch. It contains English design documentation, repository setup, and neutral development shells, not a playable engine or a runtime release. Making the repository public remains a separate owner visibility decision.
+The repository exists at [AjimuZ/ai-rpg-engine](https://github.com/AjimuZ/ai-rpg-engine) with a single `main` branch. It started with private visibility and has been public since the owner changed it; on 30 October 2026 the owner confirmed this location and slug. Every push to `main` is therefore immediately public, so only verified work is pushed. The repository contains English documentation, repository setup and the engine under development, not a playable release: combat is unfinished and no release is published. Publishing a release remains a separate owner decision (P19.6).
 
 A documentation-only repository can be published honestly after the owner chooses its name, license, and public-content scope. A playable release must additionally satisfy runtime release gates. Do not describe a design repository as a working game engine.
 
