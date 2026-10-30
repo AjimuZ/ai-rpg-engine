@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 64/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5 and P11.1. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 65/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1 and P11.2. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -2613,7 +2613,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     an ally) and gained tests.
     Not proven here: the 18 Docker-dependent probe cases, the `unzip` wrapper cases, a live V22 dump and
     restore, balance of the provisional numbers and independent review of the new Italian message.
-- [ ] P11.2 Implement initiative, rounds, activations, AP, movement, legal targeting and explicit end activation; enforce bounded speech and declared social/scene-action eligibility/costs at player decision boundaries.
+- [x] P11.2 Implement initiative, rounds, activations, AP, movement, legal targeting and explicit end activation; enforce bounded speech and declared social/scene-action eligibility/costs at player decision boundaries.
   - Package A — scheduler (`org.rpgengine.combat`): `ROLL_INITIATIVE` (two recorded d10 per participant in
     roster order plus the frozen modifier; order by total, finesse, participant ID; stored once), `CombatScheduler`
     (round-open reaction refresh, activations over active participants in rank order, action points granted at
@@ -2638,6 +2638,25 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
   - Limits: non-player participants pass; the opening strike stays pending (P11.3); reactions refresh but are
     never spent (P11.4); no terminal predicate and no response to social attempts (P11.5); the V16 checkpoint
     records no encounter (P11.6); no frontend control or panel (P12).
+  - Verification (30 October 2026, PostgreSQL 18.6, JDK 21, the runner's environment): all 16 plan
+    commands passed on `bfffa7d` (backend suite 950 tests, 0 failures; `./mvnw --batch-mode verify` the
+    same count with 4 skipped `PackagedInterfaceTest` cases; frontend 99 tests, 418 reviewed EN/IT
+    messages; repository checks 0 findings) and again on the final commit. New cases: `CombatSchedulerTest`
+    (13, pure: initiative from recorded dice with both tie-breaks, one arrow per step, points granted and
+    expired, passing participants, one round end of 8 seconds per operation, the round cap, skipped and
+    non-standing participants, movement with difficult terrain, blocking and capacity, bounded speech,
+    addressing range, declared social and scene actions, no out-of-turn legality, receipt options, frozen
+    forms read back), `TacticalCommandsTest` (9 on PostgreSQL: recorded and replayed initiative, exact move,
+    speech and action costs without draws, one round closed per end of activation, refusals writing
+    nothing, mode and turn refusals, the clock bound, a customized profile, the V23 guards),
+    `CombatPackTest.refusesBrokenActions`, plus additions to `TypedCommandTest`, `EventStatementsTest`,
+    `ResolvedCommitTest`, `CampaignCommandHttpTest`, `EncounterCommandsTest` and the V23 step of
+    `CanonicalMigrationUpgradeTest`. Thirty-seven weakenings on an exported copy (29 in Java and the pack
+    compiler, 8 in V23 run against a fresh schema after a passing baseline) each failed a test except four;
+    three gained tests in `bfffa7d` (expired points, a non-standing player, the round clock bound) and the
+    fourth (the progress attribution check) is redundant with the writer's campaign-scoped update.
+    Not proven here: the 18 Docker-dependent probe cases, the `unzip` wrapper cases, a live V23 dump and
+    restore, balance of the provisional numbers and independent review of the five new Italian messages.
 - [ ] P11.3 Implement attack/defense/strong-hit/armor/healing calculations with recorded draws.
 - [ ] P11.4 Implement predeclared reactions, stacking caps, effect phases, durations, cooldowns, and no-chain limits.
 - [ ] P11.5 Implement defeat, escape, surrender/agreement predicates, refused/counteroffered/explicitly accepted negotiation, stalemate policy and idempotent settlement; prose alone cannot establish an outcome.
