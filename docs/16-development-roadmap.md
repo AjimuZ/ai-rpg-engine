@@ -964,6 +964,70 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     messages) and 436 packaged backend tests with zero failures/errors/skips. Still unchecked
     for the same reasons: no browser or screen-reader journey can run in the Linux container,
     and independent Italian and screen-reader review (QA-35) is a human gate.
+  - Eighth checkpoint (30 October 2026, P05.6-A, partial): host Chrome 156 ran the language
+    journey on the packaged origin, but **the campaign part used recorded API replies, not the
+    container's API**. Commands: `./start.sh` (image built from this tree),
+    `node .local/scratch/p056a/journey.mjs` (private, ignored script using the browser helpers),
+    `./start.sh --stop`. Result: 51 of 51 checks passed, plus 2 recorded observations.
+    - Live against the container: the root link `/saved/<uuid>?playthrough=<uuid>#kept` resolves to
+      `/en/saved/...` with query and hash kept and honours a saved Italian preference. Every
+      saved read answers 503 `LOCAL_OWNER_UNCONFIGURED`, shown in reviewed English and Italian.
+    - Recreation: `./start.sh --stop` then `./start.sh` gave a new engine container. All 25 hashed
+      resources stayed identical and answered 200: both locale indexes and `/saved/<uuid>` routes,
+      the root selector, bundles, notices and artwork.
+    - Campaign part: every interface byte came from the container, while Chrome answered
+      `/api/v1/**` from `campaign-reload-transcript.json`, which `CampaignInterfaceContractTest`
+      pins to the real servlet stack and PostgreSQL. Through the visible Settings control and a
+      real full-page load each way, EN→IT→EN kept the keyboard draft, its selection (10–17), both
+      operation identities and the cursor (`0:6`, then `0:7`). The in-flight action reconciled to
+      cancelled by identity, the stream resumed after the saved cursor, the interface sent only
+      GET requests, and every request matched the transcript. Draft, selection and cursor also
+      survived the recreation in the same browser profile. Axe reported no violation in English or
+      Italian, 390 px showed no horizontal overflow, and there were no console or page errors.
+    - Fixed: the playthrough list ran title and turn together ("Lantern walkTurn 0"), and a
+      reload's receipt re-read reordered the Actions list against its oldest-first contract. Both
+      were seen in Chrome, gained `saved-library.spec.ts` and `campaign-session.spec.ts` regression
+      assertions, and pass in the rebuilt image. The new assertions were not run against the old code.
+    - Recorded, not fixed: (1) `compose.yaml` forwards no owner setting and a packaged installation
+      has no owner-creation or pack-import path, so no packaged user can reach a saved playthrough
+      today; (2) the playthrough list stays "Turn 0, Decision pending" after a live commit, beside a
+      panel saying no decision is waiting, until the page reloads; (3) the language control exists
+      only in Settings, so changing language leaves the playthrough for `/it/settings`, and Back
+      opens `/en/settings` in English despite the Italian preference; (4) from code reading only,
+      an `APP_PORT` other than 8080 would fail API admission because Compose does not set
+      `ENGINE_HTTP_ORIGIN`.
+    - Not proven: draft, operations and cursor against the live API and database, which is the
+      unmet part of P05.6-A. It needs an owner, a sealed pack and a campaign in the container, and
+      this session could not set them up: `docker compose up` with an overlay was refused, as are
+      `docker run` and `docker exec`, and deployment configuration is off limits. Also unproven:
+      chunked delivery and held long polls (the replay answers whole responses), a campaign
+      surviving recreation in the database, and deliberate weakenings of the journey. No screen
+      reader was run and axe is not one; the Italian wording review and QA-35 sign-off remain
+      with the owner (P05.6-O). This box stays unchecked.
+    - Checks on the final tree: `sh .agents/ralph/verify.sh full` passed, with 100 frontend tests
+      in 14 files and 1,101 packaged backend tests with 0 failures, errors and skips.
+      `verify.sh containers` was not run: no packaging or backend code changed.
+    - Second session (30 October 2026, documentation only): nothing above was rerun, because this
+      session's `./start.sh` and `verify.sh full` commands were refused. It only read the first
+      session's outputs: `results.json` holds 53 entries with none failed, `hashes-before.json` and
+      `hashes-after.json` have the same SHA-256, and verification log `20261030T195311-77740`
+      began after the last code edit and reports 100 frontend and 1,101 backend tests passing. The
+      live journey stays blocked. `backend/README.md` already states that Compose forwards no
+      owner setting and that owners, workspaces and packs are internal setup. Owner action: either
+      allow a journey session to start the engine with `ENGINE_HTTP_OWNER_ID` and seed an owner,
+      workspace and sealed pack, or decide how a packaged installation provisions them.
+    - Third session (30 October 2026): the browser journey was rerun on the unchanged code.
+      Commands: `./start.sh`, `node .local/scratch/p056a/journey.mjs`, `./start.sh --stop`. Every
+      image layer came from cache, so the build confirmed the image matches this tree and did not
+      rerun the image's own tests. Result: 51 of 51 checks passed plus the same 2 observations,
+      including a new engine container on recreation. `cmp` found `hashes-before.json` and
+      `hashes-after.json` identical, with 25 entries. The campaign part again used recorded API
+      replies, and the live API replies were again 503 `LOCAL_OWNER_UNCONFIGURED`, so the live
+      journey stays unproven and blocked on the owner action above. This session's commands for
+      `verify.sh full` and for copying `frontend/` to scratch were refused, so the full check was
+      not rerun and the new regression assertions were still not run against the old code. The
+      last full pass stays log `20261030T195311-77740`, which began after the last frontend edit
+      (19:50 local time).
 - [ ] P05.7 Define and render bounded typed public presentation events for scene, pose/expression and optional line audio hooks; reject executable/raw-URL directives, deduplicate delivery and preserve text-only/keyboard/reduced-motion behavior under QA-40.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.

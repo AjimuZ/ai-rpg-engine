@@ -45,6 +45,19 @@ describe('Campaign session reconciliation', /** Register reload-safety checks fo
     expect(server.calls.every((url) => !url.includes('/commands'))).toBe(true);
   });
 
+  it('keeps operations oldest first when a reload re-reads only an earlier one', /** A receipt re-read must not reorder the Actions list. */ async () => {
+    store.setItem(`engine.campaign-sync.v1:${JSON.stringify([SCOPE.adventureId, SCOPE.campaignId])}`, JSON.stringify({ version: 1, cursor: '0:2', operations: [
+      { operationId: OP1, commandType: 'WAIT', status: 'DELIVERED', operationVersion: 4 },
+      { operationId: OP2, commandType: 'WAIT', status: 'CANCELLED', operationVersion: 3 }] }));
+    server.operations.set(OP1, operation(OP1, 'DELIVERED', 4, true));
+    server.streams = [[]];
+    const session = load(store, server);
+    await session.reconcile(SCOPE, signal);
+    expect(server.calls.some((url) => url.includes(`/operations/${OP2}?`))).toBe(false);
+    expect(session.operations(SCOPE)[0].receipt?.stateRevision).toBe(2);
+    expect(session.operations(SCOPE).map((o) => o.operationId)).toEqual([OP1, OP2]);
+  });
+
   it('starts at the head on first contact and does not replay history', /** stream.ready positions a fresh cursor. */ async () => {
     server.streams = [[frame('0:7', 'stream.ready', {})]];
     const session = load(store, server);

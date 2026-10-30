@@ -1272,6 +1272,13 @@ its reviewed pre-bootstrap title, asserted through the real server by
 frontend tests in 13 files, strict typecheck, five localization tool tests, parity build
 (317 messages), 436 packaged backend tests with zero failures, errors or skips. The same
 human and browser gates remain open; this is jsdom evidence, not a screen-reader review.
+The eighth P05.6 checkpoint (30 October 2026, Windows 11, Chrome 156) ran the EN→IT→EN journey on
+the packaged origin
+([details](29-localization.md#eighth-checkpoint-chrome-on-the-packaged-origin-30-october-2026)):
+51 of 51 checks passed and 25 resource hashes survived real container recreation. The campaign
+part replayed recorded real-server replies, because a packaged installation answers saved reads
+with 503 `LOCAL_OWNER_UNCONFIGURED`; the live API journey, the screen-reader review and the
+QA-35 sign-off stay open.
 The 24 October prerequisite audit is retained as history in the
 [P05.6 integration prerequisites](29-localization.md#p056-integration-prerequisites-24-october-2026-audit).
 These checks preserve the preview safety boundary and do not establish real

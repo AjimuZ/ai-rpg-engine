@@ -139,6 +139,8 @@ describe('Saved library', /** Register persisted-library isolation checks. */ ()
     await settle(harness, () => !!root.querySelector('.saved-heading'));
     expect(root.querySelector('.saved-heading')!.getAttribute('data-adventure-id')).toBe(FANTASY);
     expect(root.querySelector('.selected-playthrough')!.getAttribute('data-campaign-id')).toBe(FANTASY_RUN);
+    // Chrome showed the title and turn run together: the compiler drops line-break whitespace between elements.
+    expect(root.querySelector(`.saved-list [data-campaign-id="${FANTASY_RUN}"]`)!.textContent).toMatch(/\S Turn 3/);
     await harness.navigateByUrl(`/saved/${FANTASY}?playthrough=${CYBER_RUN}`);
     await settle(harness, () => !!root.querySelector('[role=alert]'));
     expect(root.querySelector('.selected-playthrough')!.getAttribute('data-campaign-id')).toBeNull();

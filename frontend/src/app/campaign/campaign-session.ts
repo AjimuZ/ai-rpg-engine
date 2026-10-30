@@ -236,7 +236,7 @@ export class CampaignSession {
     // An equal version is a duplicate, except that it may supply the receipt a reload dropped.
     const receiptOnly = known !== undefined && known.operationVersion === next.operationVersion && !!next.receipt && !known.receipt;
     if (known && known.operationVersion >= next.operationVersion && !receiptOnly) return false;
-    operations.delete(next.operationId);
+    // Updating a known key keeps its place: the list stays oldest first across a reload's re-reads.
     operations.set(next.operationId, { ...next, receipt: next.receipt ?? known?.receipt ?? null });
     while (operations.size > MAX_TRACKED) {
       const victim = [...operations.values()].find(/** Prefer evicting finished work over pending work. */ (entry) => !isPending(entry.status)) ??

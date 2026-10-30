@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Saved playthrough fixes from the packaged browser journey (P05.6-A), 30 October 2026
+
+- The playthrough list now separates a title from its turn and pending badge, which ran together on screen.
+- The Actions list keeps its oldest-first order after a reload; a re-read receipt used to move an action to the end.
+- Chrome ran the English-Italian-English journey on the packaged interface with recorded server replies. A packaged
+  installation still has no owner setting or pack import, so the same journey against its live API has not run; the
+  [roadmap entry](docs/16-development-roadmap.md) records the results and open findings.
+
 ## Unreleased — Packaging recreation check without a skipped backend test (P02.3-A), 30 October 2026
 
 - The packaging verification image now contains the one probe fixture the backend's drift check compares, and that check

@@ -145,8 +145,8 @@ interface SavedScope {
           @for (playthrough of current.playthroughs; track playthrough.campaignId) {
             <li [attr.data-campaign-id]="playthrough.campaignId">
               <a [routerLink]="[]" [queryParams]="{ playthrough: playthrough.campaignId }" [attr.aria-current]="playthrough.campaignId === selected()?.campaignId ? 'true' : null">{{ playthrough.title }}</a>
-              <span class="muted" i18n="@@saved.turn">Turn {{ playthrough.gameTurn }}</span>
-              @if (playthrough.pendingDecisionAvailable) { <span class="badge" i18n="@@saved.pending">Decision pending</span> }
+              &ngsp;<span class="muted" i18n="@@saved.turn">Turn {{ playthrough.gameTurn }}</span>
+              @if (playthrough.pendingDecisionAvailable) { &ngsp;<span class="badge" i18n="@@saved.pending">Decision pending</span> }
             </li>
           }
         </ul>

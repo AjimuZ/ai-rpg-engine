@@ -227,6 +227,7 @@ Research-revision risks and defaults are tracked in the focused contracts:
 
 | Risk | Safe initial decision | Gate / evidence |
 | --- | --- | --- |
+| A packaged installation cannot reach any saved adventure: Compose forwards no owner setting and there is no owner creation or pack import | Saved reads answer 503 with a localized explanation; nothing is invented. The owner decides how the single owner and first adventure are provisioned, which also unblocks the live browser journey | P05.6-A eighth checkpoint (observed in Chrome), P05.6, QA-35 |
 | Planning from stale or incomplete dependencies | Engine-recorded read/query sets, branch invalidation and a second fenced transactional check; baseline when precision fails | P03.6/P07.6, QA-36 |
 | Background work increases latency or consumes shared quota | One durable queue, default active1, interactive reservation, bounded cancellation/reconciliation and persisted usage; no pool/provider fallback. Implemented by P08.6 with deterministic evidence; live quota behavior is unmeasured | P01.7/P08.6, QA-37 |
 | Extra roles improve appearance of sophistication without quality gain | Planner/reviewer/director optional enablement; paired bilingual baseline comparison and actual waste/usage metrics | P14/P18.6, QA-39 |
