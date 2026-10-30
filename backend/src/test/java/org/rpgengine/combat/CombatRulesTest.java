@@ -212,4 +212,35 @@ class CombatRulesTest {
     private static CombatRules rules(Map<String, byte[]> files) {
         return EncounterPack.rules(files);
     }
+
+    /**
+     * Every attack field survives the projection, explicit or defaulted, for template attacks and for weapons, whose
+     * skill and ammunition resolve to canonical IDs; armor and Guard project from the item's combat object (P11.3).
+     */
+    @Test
+    void projectsAttacksAndGear() throws Exception {
+        var files = new java.util.TreeMap<>(EncounterPack.files());
+        String encounters = new String(files.get("encounters.json"), java.nio.charset.StandardCharsets.UTF_8);
+        String cudgel = "{\"id\":\"cudgel\",\"attribute\":\"force\",\"skill\":1,\"strongHit\":false,"
+                + "\"damage\":{\"count\":1,\"sides\":6}}";
+        assertTrue(encounters.contains(cudgel));
+        String hex = "{\"id\":\"hex\",\"attribute\":\"resolve\",\"skill\":3,\"range\":2,\"penetration\":4,"
+                + "\"defense\":\"resistance\",\"damage\":{\"count\":2,\"sides\":8,\"attribute\":\"none\",\"flat\":-1}}";
+        String talon = "{\"id\":\"talon\",\"attribute\":\"finesse\",\"damage\":{\"sides\":4,\"attribute\":\"force\"}}";
+        files.put("encounters.json", encounters.replace(cudgel, cudgel + "," + hex + "," + talon)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var rules = EncounterPack.rules(files);
+        assertEquals(List.of(
+                new CombatAttack("cudgel", "force", 1, 1, 6, "force", 0, 0, 0, CombatAttack.Defense.GUARD, false, null),
+                new CombatAttack("hex", "resolve", 3, 2, 8, null, -1, 4, 2, CombatAttack.Defense.RESISTANCE, true, null),
+                new CombatAttack("talon", "finesse", 0, 1, 4, "force", 0, 0, 0, CombatAttack.Defense.GUARD, true, null)),
+                rules.templates().get("yard-duel").participant("bandit").attacks());
+        assertEquals(new EncounterGear(0, 0, "bladework",
+                new CombatAttack("sword", "force", 0, 1, 6, "force", 0, 0, 0, CombatAttack.Defense.GUARD, true, null)),
+                rules.gear().get("sword"));
+        assertEquals(new EncounterGear(0, 1, null, null), rules.gear().get("cloak"));
+        assertEquals(new CombatAttack("bolt-caster", "finesse", 0, 1, 6, "finesse", 0, 0, 1, CombatAttack.Defense.GUARD, true,
+                "arrows"), rules.gear().get("bolt-caster").attack());
+        assertNull(rules.gear().get("potion"), "an item without combat data has no entry");
+    }
 }

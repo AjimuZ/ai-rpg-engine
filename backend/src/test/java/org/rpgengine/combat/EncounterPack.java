@@ -36,8 +36,9 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>Attacks (P11.3): the sword is a {@code 1d6 + force} blade trained by {@code bladework} and the cloak gives armor 1, so
  * the surveyor fights like the worked fight of docs/20. A {@code bolt-caster} (off hand, range 1, {@code 1d6 + finesse},
- * one unit of {@code arrows} per attempt), a {@code salve} (heals its user 3), a {@code bandage} (heals a single target 4)
- * and a {@code flare} whose damage effect stays unsupported complete the kit. {@code yard-duel} is the worked fight: an
+ * one unit of {@code arrows} per attempt), a {@code salve} (heals its user 3), a {@code bandage} (heals a single target 4),
+ * a {@code storm-tonic} with more dice than a fight allows, a {@code gift-pouch} that creates a coin for its target and a
+ * {@code flare} whose damage effect stays unsupported complete the kit. {@code yard-duel} is the worked fight: an
  * armed {@code bandit} with the statistics of docs/20, whose cudgel permits no strong hit, so no single blow can fell the
  * surveyor's full Health of 8 before its first decision. {@code close-brawl} (opening {@code initiative}) and
  * {@code close-rush} (opening {@code first}) put unarmed targets in the player's own zone: {@code dummy} is always struck
@@ -135,7 +136,15 @@ public final class EncounterPack {
               "appearance":{"id":"salve.tin","summary":"A tin of salve."}}},
             {"id":"bandage","kind":"item","data":{"name":"Bandage","description":"Binds a wound.","itemType":"consumable","maxStack":5,
               "rarity":"ordinary","use":{"target":{"policy":"single"},"effects":[{"type":"heal","amount":4,"target":"target"}]},
-              "appearance":{"id":"bandage.linen","summary":"A linen strip."}}}""";
+              "appearance":{"id":"bandage.linen","summary":"A linen strip."}}},
+            {"id":"storm-tonic","kind":"item","data":{"name":"Storm Tonic","description":"Too many dice.","itemType":"consumable",
+              "maxStack":5,"rarity":"ordinary","use":{"target":{"policy":"self"},"effects":[
+              {"type":"heal","target":"self","amount":{"add":[{"dice":{"count":20,"sides":2}},{"dice":{"count":20,"sides":2}}]}},
+              {"type":"heal","target":"self","amount":{"add":[{"dice":{"count":20,"sides":2}},{"dice":{"count":5,"sides":2}}]}}]},"appearance":{"id":"tonic.storm","summary":"A humming flask."}}},
+            {"id":"gift-pouch","kind":"item","data":{"name":"Gift Pouch","description":"Hands over a coin.","itemType":"consumable",
+              "maxStack":5,"rarity":"ordinary","use":{"target":{"policy":"single"},
+              "effects":[{"type":"createItem","item":"coin","target":"target"}]},
+              "appearance":{"id":"pouch.gift","summary":"A small pouch."}}}""";
 
     private EncounterPack() {
     }

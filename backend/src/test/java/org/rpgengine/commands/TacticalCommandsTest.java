@@ -302,7 +302,8 @@ class TacticalCommandsTest {
         }
         assertTrue(committed >= 30 && fight.round >= 6 && fight.sealed, "the walk must exercise the fight: " + committed
                 + " commits, round " + fight.round + ", sealed " + fight.sealed);
-        assertTrue(fight.strikes >= 3, "the walk must strike: " + fight.strikes);
+        // The dice decide when the raider falls, but not the first strike: the candidates before it are seeded.
+        assertTrue(fight.strikes >= 1, "the walk must strike: " + fight.strikes);
         assertEquals(4 + fight.draws, jdbc.queryForObject("select count(*) from operation_random_draw", Integer.class));
         // Round after round the activations follow the stored order, up to the player's current one, without a fallen raider.
         var activations = new java.util.ArrayList<>(order.subList(0, order.indexOf("player") + 1));

@@ -440,7 +440,7 @@ the activation and continues the schedule.
 The initiative roll now also resolves a declared opening strike at its slot, or writes `OPENING_STRIKE_LAPSED` {…,
 targetId, reason}. A non-player activation with an attack may write `PARTICIPANT_MOVED`, strike events and `GUARD_RAISED`
 before `ACTIVATION_ENDED`. The receipt's `combat` gains `participants` [{participantId, side, zone, status}] and
-`strikes` [{attackerId, targetId, attackId, attackTotal, hit, strongHit, damage}], and `options` gains `strikes`
+`strikes` [{attackerId, targetId, attackId, attackTotal, hit, strongHit, damage}] (only for an operation with any), and `options` gains `strikes`
 [{attackId, cost, targets, disabled}], `guard` {cost, available} and `useItem` {cost, available}. The player's Health
 change appears in `resources` and spent ammunition in `items`. Tactical commands skip the quest engine: the next
 exploration command evaluates the possession facts they change.

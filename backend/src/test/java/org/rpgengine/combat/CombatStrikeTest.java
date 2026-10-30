@@ -434,7 +434,11 @@ class CombatStrikeTest {
         var plan = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script(1, 1));
         assertEquals("player", note(plan, "STRIKE_RESOLVED").payload().get("targetId"), "same distance: roster order");
         var other = CombatScheduler.apply(at(state, "player", "mid"), new TacticalIntent.EndActivation(), script(1, 1));
-        assertEquals("ally", note(other, "STRIKE_RESOLVED").payload().get("targetId"), "the nearer one");
+        assertEquals("ally", note(other, "STRIKE_RESOLVED").payload().get("targetId"), "the only one in reach");
+        // A spear reaches both; the nearer ally comes before the player, who is first in the roster.
+        var spear = new CombatAttack("spear", "force", 0, 1, 6, "force", 0, 0, 2, CombatAttack.Defense.GUARD, false, null);
+        var both = CombatScheduler.apply(at(trio(spear), "player", "mid"), new TacticalIntent.EndActivation(), script(1, 1));
+        assertEquals("ally", note(both, "STRIKE_RESOLVED").payload().get("targetId"), "the nearest comes first");
     }
 
     /** An item's effects are the commands layer's; the scheduler charges the action and takes over the Health they left. */

@@ -405,12 +405,87 @@ class StrikeCommandsTest {
         assertEquals(5, pool("vigor"));
     }
 
-    /** A damaging item stays unsupported in a fight until effects can target participants. */
+    /**
+     * A damaging item stays unsupported in a fight until effects can target participants; a contract with more dice than
+     * the operation can spare is refused; an ally without a campaign actor cannot receive created units, though the player
+     * can. Nothing is written by a refusal.
+     */
     @Test
     void unsupportedEffectsAreRefused() {
         UUID flare = give("flare", 1, 3);
+        UUID tonic = give("storm-tonic", 1, 5);
+        UUID pouch = give("gift-pouch", 2, 5);
         begin("close-brawl");
         rejects(OperationAdmissionFailure.Kind.EFFECT_UNSUPPORTED, new TypedCommand.CombatUseItem(flare, "porter"));
+        rejects(OperationAdmissionFailure.Kind.EFFECT_UNSUPPORTED, new TypedCommand.CombatUseItem(tonic, null));
+        rejects(OperationAdmissionFailure.Kind.EFFECT_UNSUPPORTED, new TypedCommand.CombatUseItem(pouch, "porter"));
+        execute(new TypedCommand.CombatUseItem(pouch, "player"));
+        assertEquals(1, quantity(pouch));
+        assertEquals(1, jdbc.queryForObject("select coalesce(sum(quantity), 0) from item_instance where actor_id = ? "
+                + "and definition_id = 'coin'", Integer.class, player));
+    }
+
+    /**
+     * {@code modifyResource} has no meaning on an ally without a campaign actor: it is recorded as unaffected, and above
+     * all it does not fall through to the player who used the item.
+     */
+    @Test
+    void aResourceEffectDoesNotReachAnAllyOrFallBackOnThePlayer() {
+        UUID elixir = give("elixir", 1, 3);
+        begin("close-brawl");
+        setPool(2);
+        setLocalHealth("porter", 3);
+        execute(new TypedCommand.CombatUseItem(elixir, "porter"));
+        assertEquals(2, pool("vigor"), "the elixir targets the ally, never its user");
+        assertEquals(3, number("porter", "health_current"));
+        var effect = event("EFFECT_RESOLVED").path("outcomes").get(0);
+        assertEquals("porter", effect.get("participantId").asString());
+        assertEquals("NO_RESOURCE", effect.get("outcome").asString());
+    }
+
+    /** {@code heal} needs to know which resource is Health: content without a combat rule refuses it instead of guessing. */
+    @Test
+    void healingNeedsACombatRule() throws Exception {
+        var files = new java.util.TreeMap<>(ArmoryPack.files());
+        String items = new String(files.get("items.json"), java.nio.charset.StandardCharsets.UTF_8);
+        int end = items.lastIndexOf("]}");
+        files.put("items.json", (items.substring(0, end) + """
+                ,{"id":"salve","kind":"item","data":{"name":"Salve","description":"Closes wounds.","itemType":"consumable",
+                  "maxStack":5,"rarity":"ordinary","use":{"target":{"policy":"self"},"effects":[{"type":"heal","amount":3,"target":"self"}]},
+                  "appearance":{"id":"salve.tin","summary":"A tin of salve."}}}""" + items.substring(end))
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        // Under its own pack ID: the same ID with other bytes would be a hash conflict with the fixture registered above.
+        files.put("adventure.json", new String(files.get("adventure.json"), java.nio.charset.StandardCharsets.UTF_8)
+                .replace("\"sample:armory\"", "\"sample:armory-plain\"").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        UUID content = registry.register(adventure, new PackStaging(PackStaging.Limits.standard())
+                .archive(new ByteArrayInputStream(ArmoryPack.zip(files)))).revisionId();
+        var created = creation.create(owner, adventure, new CampaignCreationService.Request(UUID.randomUUID(), content,
+                "No combat", SupportedLocale.EN, new CharacterChoices("Player", "surveyor", Map.of(), Map.of(), null, null)));
+        campaign = created.campaignId();
+        player = created.actorId();
+        revision = 0;
+        UUID salve = give("salve", 1, 5);
+        rejects(OperationAdmissionFailure.Kind.EFFECT_UNSUPPORTED, new TypedCommand.UseItem(salve, List.of()));
+    }
+
+    /**
+     * A stored receipt from before these options existed replays exactly as it was: no empty standings, strikes or
+     * invented Guard and item prices appear in it.
+     */
+    @Test
+    void anEarlierReceiptKeepsItsShape() {
+        var view = CommandReceipts.project("""
+                {"stateRevision":3,"firstEventSequence":4,"lastEventSequence":4,"randomDraws":[],"details":{
+                "resolver":"local-v1","commandType":"END_ACTIVATION","elapsedSeconds":8,"turnAdvanced":true,"actorId":"a",
+                "combat":{"encounterId":"e","phase":"AWAITING_ACTION","round":2,"zone":"entry","acting":"player","actionPoints":3,
+                "initiative":[],"options":{"moves":[],"speech":{"remaining":1,"recipients":[]},"actions":[],"endActivation":true}}}}""");
+        var combat = (Map<?, ?>) view.get("combat");
+        assertFalse(combat.containsKey("participants"));
+        assertFalse(combat.containsKey("strikes"));
+        var options = (Map<?, ?>) combat.get("options");
+        for (String added : List.of("strikes", "guard", "useItem")) {
+            assertFalse(options.containsKey(added), added);
+        }
     }
 
     /** In exploration a {@code heal} effect restores the same Health, within the maximum, and never revives. */
@@ -441,6 +516,11 @@ class StrikeCommandsTest {
         assertThrows(DataAccessException.class, () -> jdbc.update(health, 5, "wall"), "ordinary healing does not revive");
         assertThrows(DataAccessException.class, () -> jdbc.update("update encounter_participant set status = 'ACTIVE', "
                 + "row_version = row_version + 1 where participant_id = 'wall'"), "a defeated participant does not return");
+        // A participant defeated with Health left (a later settlement policy may do so) does not return either.
+        assertEquals(1, jdbc.update("update encounter_participant set status = 'DEFEATED', row_version = row_version + 1 "
+                + "where participant_id = 'lookout'"));
+        assertThrows(DataAccessException.class, () -> jdbc.update("update encounter_participant set status = 'ACTIVE', "
+                + "row_version = row_version + 1 where participant_id = 'lookout'"), "with Health left too");
         assertEquals(1, jdbc.update(health, 5, "porter"));
         assertEquals(1, jdbc.update("update encounter_participant set guarding = true, row_version = row_version + 1 "
                 + "where participant_id = 'porter'"));

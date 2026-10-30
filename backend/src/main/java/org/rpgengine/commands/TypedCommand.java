@@ -18,9 +18,10 @@ import org.rpgengine.content.PackTextParser;
  * identity; every other quest transition is derived by the engine from committed facts. Since P10.4 the
  * player can also rest under a pack-declared rest policy; its duration, interruption and recovery are
  * rule data, never part of the intention. Since P11.1 the player can enter an authored encounter, optionally
- * declaring the attack that opens it. Since P11.2 (and P11.3 for attacks) the {@link Tactical} intentions are registered for encounter mode:
+ * declaring the attack that opens it. Since P11.2 the {@link Tactical} intentions are registered for encounter mode:
  * roll initiative, move to an adjacent zone, end the activation, one bounded speech-only utterance and a declared
- * social or scene action; attacks and reactions acquire their contracts with P11.3/P11.4. Unknown types fail closed.
+ * social or scene action; since P11.3 also strike, the Guard action and using an item; reactions acquire their contract
+ * with P11.4. Unknown types fail closed.
  * Structural decoding here
  * is followed by current-state rule validation in {@link CommandRules}; resolution
  * remains backend-owned (P07.4). Every value is immutable and can reproduce its exact

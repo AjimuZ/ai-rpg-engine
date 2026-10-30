@@ -182,16 +182,20 @@ public final class CommandReceipts {
             order.add(position);
         }
         entry.put("initiative", List.copyOf(order));
-        var standing = new ArrayList<Map<String, Object>>();
-        for (JsonNode line : combat.path("participants")) {
-            var participant = new LinkedHashMap<String, Object>();
-            participant.put("participantId", line.path("participantId").asString());
-            participant.put("side", line.path("side").asString());
-            participant.put("zone", line.path("zone").asString());
-            participant.put("status", line.path("status").asString());
-            standing.add(participant);
+        // Each member below is present only when the stored summary has it, so a replayed earlier receipt stays
+        // byte-identical (standings and option lines since P11.3, strikes only for an operation with any).
+        if (combat.path("participants").isArray()) {
+            var standing = new ArrayList<Map<String, Object>>();
+            for (JsonNode line : combat.path("participants")) {
+                var participant = new LinkedHashMap<String, Object>();
+                participant.put("participantId", line.path("participantId").asString());
+                participant.put("side", line.path("side").asString());
+                participant.put("zone", line.path("zone").asString());
+                participant.put("status", line.path("status").asString());
+                standing.add(participant);
+            }
+            entry.put("participants", List.copyOf(standing));
         }
-        entry.put("participants", List.copyOf(standing));
         var outcomes = new ArrayList<Map<String, Object>>();
         for (JsonNode line : combat.path("strikes")) {
             var strike = new LinkedHashMap<String, Object>();
@@ -204,7 +208,9 @@ public final class CommandReceipts {
             strike.put("damage", line.path("damage").asInt());
             outcomes.add(strike);
         }
-        entry.put("strikes", List.copyOf(outcomes));
+        if (!outcomes.isEmpty()) {
+            entry.put("strikes", List.copyOf(outcomes));
+        }
         JsonNode options = combat.path("options");
         if (options.isObject()) {
             var view = new LinkedHashMap<String, Object>();
@@ -230,21 +236,23 @@ public final class CommandReceipts {
                 actions.add(line);
             }
             view.put("actions", List.copyOf(actions));
-            var strikes = new ArrayList<Map<String, Object>>();
-            for (JsonNode strike : options.path("strikes")) {
-                var line = new LinkedHashMap<String, Object>();
-                line.put("attackId", strike.path("attackId").asString());
-                line.put("cost", strike.path("cost").asInt());
-                line.put("targets", strings(strike.path("targets")));
-                line.put("disabled", strike.path("disabled").isString() ? strike.path("disabled").asString() : null);
-                strikes.add(line);
-            }
-            view.put("strikes", List.copyOf(strikes));
-            for (String choice : List.of("guard", "useItem")) {
-                var line = new LinkedHashMap<String, Object>();
-                line.put("cost", options.path(choice).path("cost").asInt());
-                line.put("available", options.path(choice).path("available").asBoolean());
-                view.put(choice, java.util.Collections.unmodifiableMap(line));
+            if (options.path("strikes").isArray()) {
+                var strikes = new ArrayList<Map<String, Object>>();
+                for (JsonNode strike : options.path("strikes")) {
+                    var line = new LinkedHashMap<String, Object>();
+                    line.put("attackId", strike.path("attackId").asString());
+                    line.put("cost", strike.path("cost").asInt());
+                    line.put("targets", strings(strike.path("targets")));
+                    line.put("disabled", strike.path("disabled").isString() ? strike.path("disabled").asString() : null);
+                    strikes.add(line);
+                }
+                view.put("strikes", List.copyOf(strikes));
+                for (String choice : List.of("guard", "useItem")) {
+                    var line = new LinkedHashMap<String, Object>();
+                    line.put("cost", options.path(choice).path("cost").asInt());
+                    line.put("available", options.path(choice).path("available").asBoolean());
+                    view.put(choice, java.util.Collections.unmodifiableMap(line));
+                }
             }
             view.put("endActivation", options.path("endActivation").asBoolean());
             entry.put("options", java.util.Collections.unmodifiableMap(view));
