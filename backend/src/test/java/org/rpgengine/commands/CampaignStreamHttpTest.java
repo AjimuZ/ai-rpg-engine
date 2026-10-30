@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
@@ -15,6 +16,9 @@ import org.junit.jupiter.api.Test;
 import org.rpgengine.adventure.AdventureWorkspace;
 import org.rpgengine.campaign.Campaign;
 import org.rpgengine.content.ContentRevision;
+import org.rpgengine.presentation.PresentationEventStore;
+import org.rpgengine.presentation.PresentationEvents;
+import org.rpgengine.presentation.PublicPresentationScope;
 import org.rpgengine.presentation.SupportedLocale;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -48,6 +52,7 @@ class CampaignStreamHttpTest {
     @Autowired private EntityManager entities;
     @Autowired private PlatformTransactionManager manager;
     @Autowired private OperationAdmissionService admissions;
+    @Autowired private PresentationEventStore cues;
     private final JsonMapper json = JsonMapper.builder().build();
     private UUID adventure;
     private UUID campaign;
@@ -99,7 +104,7 @@ class CampaignStreamHttpTest {
     /** Delete disposable rows after each test; constraints remain installed. */
     @AfterEach
     void clear() {
-        jdbc.execute("truncate encounter_participant, encounter, quest_objective, quest_state, location_visit, item_creation, equipment_assignment, actor_condition, ai_session_record, memory_invalidation, memory_summary, memory_summary_job, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, "
+        jdbc.execute("truncate encounter_participant, encounter, quest_objective, quest_state, location_visit, item_creation, equipment_assignment, actor_condition, ai_session_record, memory_invalidation, memory_summary, memory_summary_job, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_event, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, "
                 + "campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, "
                 + "plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, ai_job, "
                 + "planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, campaign_random_seed, "
@@ -188,6 +193,39 @@ class CampaignStreamHttpTest {
         assertEquals(0, jdbc.queryForObject("select count(*) from campaign_mutation_lease where operation_id is not null",
                 Integer.class));
         assertEquals(1, jdbc.queryForObject("select state_revision from campaign where id = ?", Long.class, campaign));
+    }
+
+    /**
+     * A stored presentation event travels the ordinary stream: its frame id is a plain cursor, its
+     * data holds only the allowlisted fields, and a browser reconnecting after it never receives it again.
+     */
+    @Test
+    void streamsAPresentationEventOnceAcrossAReconnect() throws Exception {
+        var posted = exchange("POST", "/api/v1/campaigns/" + campaign + "/commands?adventureId=" + adventure,
+                "{\"requestId\":\"" + UUID.randomUUID() + "\",\"expectedRevision\":0,\"commandType\":\"WAIT\","
+                        + "\"payload\":{\"seconds\":5}}", headers());
+        assertEquals(202, posted.status(), posted.body());
+        JsonNode view = json.readTree(posted.body());
+        UUID operation = UUID.fromString(view.get("operationId").asText());
+        assertEquals(1, cues.record(campaign, List.of(new PresentationEvents.Draft("SCENE", operation,
+                view.get("committedRevision").asLong(), 0, "harbour", null, null, null, null, "bg-harbour")),
+                new PublicPresentationScope(Set.of("harbour"), Map.of(), Set.of(), Set.of("bg-harbour"))));
+        String path = view.get("stream").asText();
+
+        var frames = frames(exchange("GET", path + "&after=0:0", "", headers()).body());
+        var cue = frames.stream().filter(frame -> frame.event().equals(PublicStreamService.PRESENTATION)).toList();
+        assertEquals(1, cue.size(), frames.toString());
+        assertTrue(cue.getFirst().id().matches("0:[1-9][0-9]*"), cue.getFirst().id());
+        JsonNode data = json.readTree(cue.getFirst().data());
+        assertEquals(List.of("campaignId", "operationId", "commandType", "status", "operationVersion", "stateRevision",
+                "deliveryId", "kind", "ordinal", "sceneId", "assetId"), List.copyOf(data.propertyNames()));
+        assertEquals(cue.getFirst().id() + ":" + operation + ":0", data.get("deliveryId").asText());
+        assertEquals("SCENE|harbour|bg-harbour", data.get("kind").asText() + "|" + data.get("sceneId").asText() + "|"
+                + data.get("assetId").asText());
+
+        var resumed = frames(exchange("GET", path, "", headers() + "Last-Event-ID: " + cue.getFirst().id() + "\r\n").body());
+        assertTrue(resumed.stream().noneMatch(frame -> frame.event().equals(PublicStreamService.PRESENTATION)),
+                resumed.toString());
     }
 
     /** Malformed cursors, ambiguous resumption, foreign scopes and missing sessions fail before streaming. */

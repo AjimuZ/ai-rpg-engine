@@ -625,6 +625,14 @@ current revision; the client reloads its projection. A connection without a curs
 with `stream.ready`. Reconnect never submits anything. See the
 [HTTP contract](13-api-and-ui.md#p075-stream-and-cancellation).
 
+**Presentation messages (P05.7-B.1.1).** `PresentationEventStore.record` admits the drafts of one
+committed operation with `PresentationEvents.acceptAll`, all or nothing, and only then inserts them
+under the campaign lock with `on conflict do nothing`. The V26 trigger on `presentation_event`
+appends a `presentation.event` message for each row actually inserted, so a stored cue
+is in the log and a repeat allocates no sequence. Skip, reconnect and replay read this one log;
+the message `id` stays a plain cursor and `deliveryId` stays the same on every delivery. Nothing
+calls the store during a turn yet, so no real turn announces a cue.
+
 **Post-commit presentation jobs.** A commit that requires narration inserts exactly one
 `presentation_job` (`NARRATION`, `QUEUED`, three attempts) in the canonical transaction; a
 deferred foreign key proves the operation committed at that revision. The single

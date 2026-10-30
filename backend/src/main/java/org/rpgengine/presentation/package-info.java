@@ -10,8 +10,10 @@
  * action. Since P05.7-A it also defines the bounded typed public presentation events (scene,
  * pose/expression and line-audio hook): {@link org.rpgengine.presentation.PresentationEvents}
  * admits an untrusted draft only when every reference is on the audience's {@link
- * org.rpgengine.presentation.PublicPresentationScope} and its actors are visible. Delivery,
- * deduplication and rendering are not part of it yet. Nothing here may advance a canonical world counter, write world rows or call the
+ * org.rpgengine.presentation.PublicPresentationScope} and its actors are visible. Since
+ * P05.7-B.1.1 {@link org.rpgengine.presentation.PresentationEventStore} stores admitted events
+ * durably, which also announces them on the public stream; nothing produces events in a real turn
+ * yet, and the browser does not display them. Nothing here may advance a canonical world counter, write world rows or call the
  * canonical commit service, and nothing here depends on inference types.
  */
 package org.rpgengine.presentation;

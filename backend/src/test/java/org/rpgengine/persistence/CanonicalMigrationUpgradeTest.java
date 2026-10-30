@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V25 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V26 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -635,6 +635,31 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(1, jdbc.update(bump, 2));
                     assertThrows(DataAccessException.class, () -> jdbc.update(bump, 1), "the counter never goes back");
                     assertEquals(0, v25.migrate().migrationsExecuted);
+                    // V26 adds durable presentation events and one stream message type: existing messages name no
+                    // cue, and a cue is announced once by its trigger, through the same head and retention.
+                    String v25Messages = jdbc.queryForObject("select coalesce(jsonb_agg(to_jsonb(m) order by m.sequence), "
+                            + "'[]'::jsonb)::text from campaign_stream_message m", String.class);
+                    Flyway v26 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("26").load();
+                    assertEquals(1, v26.migrate().migrationsExecuted);
+                    assertTrue(v26.validateWithResult().validationSuccessful);
+                    assertEquals(v25Messages, jdbc.queryForObject("select coalesce(jsonb_agg(to_jsonb(m) - 'presentation_ordinal' "
+                            + "order by m.sequence), '[]'::jsonb)::text from campaign_stream_message m", String.class));
+                    assertEquals(0L, jdbc.queryForObject("select count(*) from campaign_stream_message "
+                            + "where presentation_ordinal is not null", Long.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from presentation_event", Integer.class));
+                    long messagesBefore = jdbc.queryForObject("select count(*) from campaign_stream_message", Long.class);
+                    assertEquals(1, jdbc.update("insert into presentation_event (campaign_id, operation_id, ordinal, "
+                            + "committed_revision, kind, scene_id, created_at) values (?, ?, 0, 7, 'SCENE', 'harbour', now())",
+                            campaign, operation));
+                    assertEquals("presentation.event|DELIVERED|7|0", jdbc.queryForObject("select message_type || '|' || status "
+                            + "|| '|' || state_revision || '|' || presentation_ordinal from campaign_stream_message "
+                            + "where presentation_ordinal is not null", String.class));
+                    assertEquals(messagesBefore + 1, jdbc.queryForObject("select count(*) from campaign_stream_message", Long.class));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("insert into presentation_event (campaign_id, "
+                            + "operation_id, ordinal, committed_revision, kind, scene_id, created_at) values (?, ?, 1, 6, "
+                            + "'SCENE', 'harbour', now())", campaign, operation), "the operation committed at another revision");
+                    assertEquals(0, v26.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

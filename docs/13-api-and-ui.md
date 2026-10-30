@@ -341,6 +341,7 @@ after streaming began only ends the response.
 | `operation.accepted`, `operation.progress`, `operation.clarification`, `operation.rejected`, `operation.cancelled`, `operation.failed`, `narrative.ready` | `operationId`, `commandType`, `status`, `operationVersion`, `stateRevision` |
 | `state.committed` | the same plus `receipt` (the player-safe projection above) |
 | `narrative.pending` | the same plus `reason`: `NARRATION_UNAVAILABLE`, `NARRATION_CANCELLED`, `NARRATION_FAILED`, `GENERATION_RETIRED` or `NARRATION_INTERRUPTED` (legacy recovery) |
+| `presentation.event` | the same plus `deliveryId`, `kind` (`SCENE`, `POSE` or `LINE_AUDIO`), `ordinal` and the references that kind holds: `sceneId`, `actorId`, `poseId`, `expressionId`, `lineId`, `assetId` |
 | `stream.ready` | `stateRevision`; first frame without a cursor, `id` is the current head |
 | `stream.reset` | `stateRevision`, `reason`: `CURSOR_EXPIRED`, `CURSOR_UNKNOWN` or `GENERATION_CHANGED`; `id` is the current head; reload the full projection |
 
@@ -349,6 +350,14 @@ identities, hashes and permits never appear. Delivery is at-least-once: clients
 deduplicate by `id`, ignore messages older than their projection's revision, and never
 resubmit an action on reconnect. `encounter.updated`, `media.ready` and
 `application.closing` remain proposed for P11/P17/P02 lifecycle work.
+
+Since P05.7-B.1.1 a stored presentation event is one more message of this log, with the same
+`id`, cursor, reset and retention rules. Its `deliveryId` is
+`<generation>:<sequence>:<operationId>:<ordinal>` and never changes, so a client that keeps
+cues across connections or stream resets can drop a repeat by it. A cue is announced once: inserting
+the same campaign, operation and ordinal again adds no message, even after the message left
+the retained window. The browser protocol validates these frames and refuses a value that
+is not a plain reference, but no screen displays them, and no turn produces events yet.
 
 ### P08.5 narration presentation and retry
 
@@ -702,6 +711,11 @@ and `speech.ready`. Actor/pose/asset references must exist in the authorized
 public projection. Expression/position uses admitted enums, normalized bounded
 slots and registered appearance variants, never arbitrary CSS/JavaScript, URLs,
 HTML, SSML, shell commands or instructions to fetch local files.
+
+Implemented so far (P05.7-A and P05.7-B.1.1): the kinds `SCENE`, `POSE` and `LINE_AUDIO`, with
+plain references checked against the audience's allowlist, and delivery as
+[`presentation.event`](#p075-stream-and-cancellation) with a stable `deliveryId`. The other fields
+and the kinds above remain proposed.
 
 The backend derives/validates cues from admitted public facts and accepted
 narration; a narrator suggestion is not a trusted frontend command. Events

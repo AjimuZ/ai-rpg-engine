@@ -219,6 +219,14 @@ sequence or resources. Cancellation, presentation settlement and recovery change
 journal statuses, permits, job rows and (through the trigger) stream messages. See the
 [delivery contract](07-turn-protocol.md#p075-public-stream-cancellation-and-presentation-jobs).
 
+V26 (P05.7-B.1.1) adds `presentation_event`: one immutable row per admitted cue, keyed by campaign,
+operation and ordinal (0..15), with a foreign key to the journal's committed revision, a kind
+(`SCENE`, `POSE`, `LINE_AUDIO`), the typed references of that kind and an actor of the same campaign.
+An `AFTER INSERT` trigger appends one `presentation.event` row to `campaign_stream_message`, whose new
+`presentation_ordinal` names the cue, through the same head and retention as the journal trigger. A
+partial unique index allows one message per cue. Retention removes messages only, so a cue stays
+recorded and is never announced again. These rows are not world state either.
+
 ### Plan admission gate and activation (P07.6)
 
 V12 adds, without backfilling history:

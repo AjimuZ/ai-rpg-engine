@@ -31,9 +31,14 @@ export function isPending(status: OperationStatus): boolean {
 export const STREAM_TYPES = [
   'stream.ready', 'stream.reset', 'operation.accepted', 'operation.progress', 'operation.clarification',
   'operation.rejected', 'operation.cancelled', 'operation.failed', 'state.committed', 'narrative.ready',
-  'narrative.pending',
+  'narrative.pending', 'presentation.event',
 ] as const;
 export type StreamType = (typeof STREAM_TYPES)[number];
+
+/** Presentation event kinds (docs/13 section 4); an unknown kind is refused, not displayed. */
+export const PRESENTATION_KINDS = ['SCENE', 'POSE', 'LINE_AUDIO'] as const;
+/** Same shape the backend admits: a plain reference cannot be a URL, a path, markup or a script. */
+const PRESENTATION_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 /** Reasons a stream reset or a pending narration can name; unknown values are rejected, not displayed. */
 export const RESET_REASONS = ['CURSOR_EXPIRED', 'CURSOR_UNKNOWN', 'GENERATION_CHANGED'] as const;
@@ -223,7 +228,43 @@ export function parseOperation(value: unknown, campaignId: string): OperationVie
   return view;
 }
 
-/** One validated stream message. `reason` appears on resets and pending narration only. */
+/**
+ * One typed presentation cue. `deliveryId` stays the same on every delivery of the cue. The
+ * interface does not display cues yet (P05.7); this only validates them and carries them along.
+ */
+export interface PresentationCue {
+  readonly deliveryId: string;
+  readonly kind: (typeof PRESENTATION_KINDS)[number];
+  readonly ordinal: number;
+  readonly sceneId: string | null;
+  readonly actorId: string | null;
+  readonly poseId: string | null;
+  readonly expressionId: string | null;
+  readonly lineId: string | null;
+  readonly assetId: string | null;
+}
+
+/** Read an optional plain content reference; anything but a plain reference is refused. */
+function reference(source: Record<string, unknown>, field: string): string | null {
+  const value = source[field];
+  if (value === undefined) return null;
+  return typeof value === 'string' && PRESENTATION_REFERENCE.test(value) ? value : invalid(field);
+}
+
+/** Validate a cue's allowlisted fields, binding its delivery identity to the frame that carried it. */
+function parseCue(source: Record<string, unknown>, id: string, operationId: string): PresentationCue {
+  const ordinal = count(source, 'ordinal');
+  if (source['deliveryId'] !== `${id}:${operationId}:${ordinal}`) invalid('deliveryId');
+  return {
+    deliveryId: source['deliveryId'] as string, kind: choice(source, 'kind', PRESENTATION_KINDS), ordinal,
+    sceneId: reference(source, 'sceneId'),
+    actorId: source['actorId'] === undefined ? null : uuid(source, 'actorId'),
+    poseId: reference(source, 'poseId'), expressionId: reference(source, 'expressionId'),
+    lineId: reference(source, 'lineId'), assetId: reference(source, 'assetId'),
+  };
+}
+
+/** One validated stream message. `reason` appears on resets and pending narration only; `presentation` on cues only. */
 export interface StreamEvent {
   readonly id: string;
   readonly cursor: Cursor;
@@ -236,6 +277,7 @@ export interface StreamEvent {
   readonly operationVersion: number | null;
   readonly receipt: PublicReceipt | null;
   readonly reason: string | null;
+  readonly presentation: PresentationCue | null;
 }
 
 /** Validate one SSE frame's identity, type and JSON data for the expected campaign. */
@@ -259,6 +301,7 @@ export function parseStreamEvent(id: string, type: string, data: string, campaig
     operationVersion: control ? null : count(source, 'operationVersion'),
     receipt: type === 'state.committed' ? parseReceipt(source['receipt']) : null,
     reason: (reason as string | undefined) ?? null,
+    presentation: type === 'presentation.event' ? parseCue(source, id, uuid(source, 'operationId')) : null,
   };
   if (event.campaignId !== campaignId) invalid('campaignId');
   return event;

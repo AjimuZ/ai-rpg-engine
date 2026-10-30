@@ -152,7 +152,7 @@ class PlanAdmissionGateTest {
     void clear() {
         jdbc.execute("drop trigger if exists p076_fault on plan_activation");
         jdbc.execute("drop function if exists p076_fail()");
-        jdbc.execute("truncate encounter_participant, encounter, quest_objective, quest_state, location_visit, item_creation, equipment_assignment, actor_condition, ai_session_record, memory_invalidation, memory_summary, memory_summary_job, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, "
+        jdbc.execute("truncate encounter_participant, encounter, quest_objective, quest_state, location_visit, item_creation, equipment_assignment, actor_condition, ai_session_record, memory_invalidation, memory_summary, memory_summary_job, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_event, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, "
                 + "campaign_known_quest, campaign_creation, character_state, item_instance, learned_ability, "
                 + "plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, "
                 + "ai_job_attempt, ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, "

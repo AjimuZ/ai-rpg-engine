@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Durable presentation events on the public stream (P05.7-B.1.1), 30 October 2026
+
+- The engine can now store admitted scene, pose and line-audio events (migration V26) and deliver them on the campaign
+  stream as `presentation.event` messages with only their allowlisted fields. A rejected draft is neither stored nor
+  delivered, and its whole batch stops.
+- Each event is announced once. A repeated insert adds nothing, and skip, reconnect, replay and resets follow the stream's
+  existing cursor rules, with a `deliveryId` that never changes.
+- Players see no difference yet: no turn produces these events, and the browser validates the new frames without displaying
+  them. Backups now include the new table and require schema 26.
+
 ## Unreleased — Saved playthrough fixes from the packaged browser journey (P05.6-A), 30 October 2026
 
 - The playthrough list now separates a title from its turn and pending badge, which ran together on screen.

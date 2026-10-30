@@ -1,5 +1,7 @@
 package org.rpgengine.presentation;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -18,8 +20,7 @@ import java.util.regex.Pattern;
  * @param kind event kind
  * @param operationId committed operation the event belongs to
  * @param committedRevision revision that operation produced
- * @param ordinal position within the operation's events, 0-based; with {@code operationId} it is the
- *        delivery identity later deduplication can use
+ * @param ordinal position within the operation's events, 0-based; part of {@link #deliveryId}
  * @param sceneId scene reference, present exactly for {@link Kind#SCENE}
  * @param actorId actor shown or speaking; required for {@link Kind#POSE}, optional speaker for
  *        {@link Kind#LINE_AUDIO}, absent for {@link Kind#SCENE}
@@ -67,6 +68,38 @@ public record PresentationEvent(Kind kind, UUID operationId, long committedRevis
             if (reference != null && !REFERENCE.matcher(reference).matches()) {
                 throw new IllegalArgumentException("presentation references must be stable content references");
             }
+        }
+    }
+
+    /**
+     * Identity a client deduplicates this cue by. It never changes for a stored cue, because the stream
+     * identity is fixed when the message is written, and operation and ordinal keep two timelines
+     * that reuse one stream position apart.
+     *
+     * @param streamId the message's {@code generation:sequence} identity
+     * @return {@code generation:sequence:operationId:ordinal}
+     */
+    public String deliveryId(String streamId) {
+        return streamId + ":" + operationId + ":" + ordinal;
+    }
+
+    /** @return the allowlisted public fields in a fixed order: kind, ordinal and the references this kind holds */
+    public Map<String, Object> publicFields() {
+        var fields = new LinkedHashMap<String, Object>();
+        fields.put("kind", kind.name());
+        fields.put("ordinal", ordinal);
+        putPresent(fields, "sceneId", sceneId);
+        putPresent(fields, "actorId", actorId == null ? null : actorId.toString());
+        putPresent(fields, "poseId", poseId);
+        putPresent(fields, "expressionId", expressionId);
+        putPresent(fields, "lineId", lineId);
+        putPresent(fields, "assetId", assetId);
+        return fields;
+    }
+
+    private static void putPresent(Map<String, Object> fields, String name, String value) {
+        if (value != null) {
+            fields.put(name, value);
         }
     }
 }

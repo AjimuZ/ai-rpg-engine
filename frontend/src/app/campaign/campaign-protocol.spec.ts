@@ -51,6 +51,19 @@ describe('Campaign protocol', /** Register validators that guard every rendered 
     expect(() => new FrameDecoder(CAMPAIGN).push(frame('0:3', 'narrative.pending', { operationId: OP2, commandType: 'WAIT', status: 'COMMITTED_NARRATION_PENDING', operationVersion: 4, reason: '<b>x</b>' }))).toThrow();
   });
 
+  it('validates presentation cues and refuses raw or foreign values', /** A cue can never carry a URL, markup or another identity. */ () => {
+    const cue = { operationId: OP1, commandType: 'WAIT', status: 'COMMITTED', operationVersion: 2, deliveryId: `0:4:${OP1}:0`, kind: 'SCENE', ordinal: 0, sceneId: 'harbour', assetId: 'bg-harbour' };
+    const [event] = new FrameDecoder(CAMPAIGN).push(frame('0:4', 'presentation.event', cue));
+    expect(event).toMatchObject({ id: '0:4', type: 'presentation.event', operationId: OP1, status: 'COMMITTED' });
+    expect(event.presentation).toEqual({ deliveryId: `0:4:${OP1}:0`, kind: 'SCENE', ordinal: 0, sceneId: 'harbour', actorId: null, poseId: null, expressionId: null, lineId: null, assetId: 'bg-harbour' });
+    // Other frames carry no cue, and any field outside the allowlist is simply not read.
+    expect(new FrameDecoder(CAMPAIGN).push(frame('0:1', 'operation.accepted', { operationId: OP1, commandType: 'WAIT', status: 'ACCEPTED', operationVersion: 0 }))[0].presentation).toBeNull();
+    expect(JSON.stringify(new FrameDecoder(CAMPAIGN).push(frame('0:4', 'presentation.event', { ...cue, script: 'alert(1)' }))[0])).not.toContain('alert');
+    for (const bad of [{ kind: 'SCRIPT' }, { sceneId: 'https://example.test/x' }, { assetId: '<img>' }, { lineId: 'a/b' }, { actorId: 'nobody' }, { ordinal: -1 }, { deliveryId: `0:5:${OP1}:0` }, { deliveryId: `0:4:${OP2}:0` }, { deliveryId: undefined }]) {
+      expect(() => new FrameDecoder(CAMPAIGN).push(frame('0:4', 'presentation.event', { ...cue, ...bad })), JSON.stringify(bad)).toThrow(CampaignProtocolError);
+    }
+  });
+
   it('validates the resume card against its scope and closed vocabularies', /** P09.5: unknown codes never render. */ () => {
     const card = parseResumeCard(resumeCard({ paused: true, awaiting: true }), ADVENTURE, CAMPAIGN);
     expect(card.mutationPaused).toBe(true);

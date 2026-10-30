@@ -207,3 +207,8 @@ not stand. The `encounter_effects_applied` and `encounter_participant_timers` tr
 goes back, reactions and local Focus within their frozen limits, ability uses that never go back). A restore inserts rows, so
 only the check constraints apply to restored values. Offline checks cover the V25 manifest/catalog; no live V25 dump/restore
 rehearsal has been run.
+
+V26 scope (P05.7-B.1.1) adds `presentation_event` (one immutable row per admitted presentation event) and gives
+`campaign_stream_message` a nullable `presentation_ordinal`, so a stored cue and its retained message survive a backup. A
+restore creates triggers after loading rows, so restored cues announce nothing again. Offline checks cover the V26
+manifest/catalog; no live V26 dump/restore rehearsal has been run.

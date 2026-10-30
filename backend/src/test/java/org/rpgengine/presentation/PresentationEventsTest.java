@@ -1,6 +1,7 @@
 package org.rpgengine.presentation;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -230,5 +231,39 @@ class PresentationEventsTest {
                 () -> PresentationEvents.acceptAll(tooMany, SCOPE)).reason());
         assertEquals(PresentationEvents.MAX_PER_OPERATION,
                 PresentationEvents.acceptAll(tooMany.subList(0, PresentationEvents.MAX_PER_OPERATION), SCOPE).size());
+
+        // The ordinal range bounds the operation across separate batches, as the V26 check does.
+        Rejection overrun = assertThrows(Rejection.class, () -> PresentationEvents.acceptAll(List.of(
+                new Draft("SCENE", OPERATION, 7, PresentationEvents.MAX_PER_OPERATION, "harbour-dusk", null, null, null,
+                        null, null)), SCOPE));
+        assertEquals(Reason.BOUNDS, overrun.reason());
+    }
+
+    /** Each kind renders exactly its allowlisted fields, in a fixed order, and absent references do not appear. */
+    @Test
+    void rendersOnlyTheAllowlistedFieldsOfEachKind() {
+        assertEquals(new LinkedHashMap<>(Map.of("kind", "SCENE", "ordinal", 0, "sceneId", "harbour-dusk",
+                "assetId", "bg-harbour")), PresentationEvents.accept(scene("harbour-dusk", "bg-harbour"), SCOPE).publicFields());
+        assertEquals(List.of("kind", "ordinal", "sceneId"),
+                List.copyOf(PresentationEvents.accept(scene("station-hall", null), SCOPE).publicFields().keySet()));
+        assertEquals(new LinkedHashMap<>(Map.of("kind", "POSE", "ordinal", 1, "actorId", VISIBLE.toString(),
+                "poseId", "leaning", "expressionId", "smile")),
+                PresentationEvents.accept(pose(VISIBLE.toString(), "leaning", "smile"), SCOPE).publicFields());
+        assertEquals(List.of("kind", "ordinal", "lineId", "assetId"), List.copyOf(PresentationEvents.accept(
+                audio(null, "line-001", "audio-line-001"), SCOPE).publicFields().keySet()));
+        // Operation and revision are carried by the message envelope, not by the cue's own fields.
+        assertFalse(PresentationEvents.accept(scene("station-hall", null), SCOPE).publicFields().toString()
+                .contains(OPERATION.toString()));
+    }
+
+    /** The delivery identity extends the stream identity with the operation and ordinal and depends on nothing else. */
+    @Test
+    void derivesTheDeliveryIdentityFromStreamOperationAndOrdinal() {
+        PresentationEvent first = PresentationEvents.accept(scene("harbour-dusk", null), SCOPE);
+        assertEquals("2:9:" + OPERATION + ":0", first.deliveryId("2:9"));
+        assertEquals(first.deliveryId("2:9"), PresentationEvents.accept(scene("station-hall", "bg-harbour"), SCOPE)
+                .deliveryId("2:9"));
+        assertEquals("2:9:" + OPERATION + ":1", PresentationEvents.accept(pose(VISIBLE.toString(), "leaning", "smile"),
+                SCOPE).deliveryId("2:9"));
     }
 }

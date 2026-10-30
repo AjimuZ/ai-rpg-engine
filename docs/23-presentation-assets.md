@@ -61,8 +61,13 @@ P05.7-A adds the backend admission gate for typed public presentation events (sc
 pose/expression and line-audio hook) in `org.rpgengine.presentation`. An event holds stable
 references only; a reference is accepted when it is plain (no URL, path, markup or script) and
 on the audience's allowlist of public scenes, lines and assets and visible actors' poses and
-expressions. Hidden and unknown actors are refused identically. Delivery, deduplication, the
-pack-catalog source of the allowlist and browser rendering are not implemented yet.
+expressions. Hidden and unknown actors are refused identically.
+
+P05.7-B.1.1 stores admitted events in `presentation_event` (V26) and delivers them as
+`presentation.event` messages of the [public stream](13-api-and-ui.md#p075-stream-and-cancellation),
+which render only the allowlisted typed fields and carry a stable `deliveryId`. Rejected drafts are
+neither stored nor delivered. Not implemented yet: a producer during a real turn, the pack-catalog
+source of the allowlist, and display in the browser, which only validates the frames.
 
 P04.5 includes original MIT-licensed 48×32 woodland/station PNG schematics in the
 [neutral import fixtures](../backend/src/test/resources/packs/README.md), with

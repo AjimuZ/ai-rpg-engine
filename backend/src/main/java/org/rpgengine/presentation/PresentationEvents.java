@@ -41,7 +41,7 @@ public final class PresentationEvents {
         NOT_ALLOWLISTED,
         /** The actor is not visible to the audience (hidden or unknown; not distinguished). */
         HIDDEN_ACTOR,
-        /** The operation would exceed {@link PresentationEvents#MAX_PER_OPERATION} events or repeat an ordinal. */
+        /** The operation would exceed {@link PresentationEvents#MAX_PER_OPERATION} events or repeat or overrun an ordinal. */
         BOUNDS
     }
 
@@ -125,8 +125,9 @@ public final class PresentationEvents {
      * @param drafts untrusted events, at most {@link #MAX_PER_OPERATION}
      * @param scope allowlist of the audience
      * @return accepted events in input order
-     * @throws Rejection when any draft is refused, the list is too long, or one operation, revision
-     *         or ordinal repeats or differs across drafts
+     * @throws Rejection when any draft is refused, the list is too long, an ordinal is not below
+     *         {@link #MAX_PER_OPERATION}, or one operation, revision or ordinal repeats or differs
+     *         across drafts
      */
     public static List<PresentationEvent> acceptAll(List<Draft> drafts, PublicPresentationScope scope) {
         Objects.requireNonNull(drafts, "drafts");
@@ -138,9 +139,11 @@ public final class PresentationEvents {
         for (Draft draft : drafts) {
             PresentationEvent event = accept(draft, scope);
             PresentationEvent first = accepted.isEmpty() ? event : accepted.get(0);
-            if (!ordinals.add(event.ordinal()) || !event.operationId().equals(first.operationId())
+            // The ordinal range bounds an operation across separate batches too; V26 repeats it.
+            if (event.ordinal() >= MAX_PER_OPERATION || !ordinals.add(event.ordinal())
+                    || !event.operationId().equals(first.operationId())
                     || event.committedRevision() != first.committedRevision()) {
-                throw new Rejection(Reason.BOUNDS, "events of one operation must share it and have distinct ordinals");
+                throw new Rejection(Reason.BOUNDS, "events of one operation must share it and have distinct bounded ordinals");
             }
             accepted.add(event);
         }

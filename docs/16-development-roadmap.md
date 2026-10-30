@@ -1061,6 +1061,42 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
       narration publisher, so no end-to-end event delivery exists; deduplicated delivery, the
       browser rendering and the text-only, keyboard and reduced-motion behavior of QA-40 are
       still to do. No migration, API or user-visible behavior changed.
+    - P05.7-B.1.1 (30 October 2026, durable storage and stream delivery; box stays unchecked): V26
+      adds `presentation_event` (immutable rows keyed by campaign, operation and ordinal 0..15, with
+      a foreign key to the journal's committed revision and checks repeating the event's shape) and
+      one `presentation.event` message type in `campaign_stream_message`, without editing V11.
+      `PresentationEventStore.record` runs `PresentationEvents.acceptAll` first, so a rejected draft
+      stops its batch before any SQL, then inserts under the campaign lock with `on conflict do
+      nothing`. An `AFTER INSERT` trigger appends the message through the V11 head allocation and
+      1000-message retention, and a partial unique index allows one message per cue.
+      `PublicStreamService` renders it through the existing read path with only the allowlisted fields
+      (`PresentationEvent.publicFields`). The frame `id` stays the plain `generation:sequence` cursor,
+      and `deliveryId` is `generation:sequence:operationId:ordinal`. `acceptAll` now also refuses an
+      ordinal of 16 or more, which bounds an operation across batches. The browser protocol accepts
+      the new type and refuses values outside the allowlist; the session deduplicates it by cursor.
+      The backup tool moved to schema 26 with the new table. Test fixtures that truncate the journal
+      list the new table, because its foreign key requires it.
+      Commands: `sh .agents/ralph/verify.sh backend
+      -Dtest=PresentationEventStreamTest,PresentationEventsTest,PublicStreamTest,CampaignStreamHttpTest,CanonicalMigrationUpgradeTest,EngineApplicationTest`
+      passed: 32 tests, 0 failures, 0 errors, 0 skipped (`PresentationEventStreamTest` 7 on real
+      PostgreSQL 18.6, `PresentationEventsTest` 13, `PublicStreamTest` 4, `CampaignStreamHttpTest` 4,
+      `CanonicalMigrationUpgradeTest` 1, `EngineApplicationTest` 3). `sh .agents/ralph/verify.sh full`
+      passed all 17 steps: backend 1,122 tests, 0 failures, 0 errors, 0 skipped (1,112 before),
+      frontend 102 tests in 14 files, backup tool 9 tests with 1 skipped. That run came before the last
+      edits to this entry and to `docs/13-api-and-ui.md`, which changed documentation only.
+      Proven by those tests: only admitted events are stored and delivered; a repeated or concurrent
+      insert adds no message and no sequence, including after the message expired and after a
+      generation change; skip, reconnect at the last identity and replay give the same identities and
+      content; unknown, generation-changed and expired cursors still reset; retention removes cue
+      messages while the rows stay; a failed batch rolls back whole; `Last-Event-ID` over real HTTP
+      does not resend a cue.
+      Not proven or not done: the negative tests were not rerun against deliberately weakened code on
+      an exported copy; no live V26 dump and restore was rehearsed; nothing calls the store during a
+      real turn, and the audience scope is not built from the pack catalog or projection, so no played
+      turn delivers a cue; no screen displays cues, so the browser's skip and reconnect behavior for a
+      visible cue and the text-only, keyboard and reduced-motion behavior of QA-40 are still to do.
+      Limit by design: a client that receives `stream.reset` adopts the head and does not get the cues
+      it missed, so it needs the current scene from a reloaded projection, which does not exist yet.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.
 

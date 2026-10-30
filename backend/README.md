@@ -740,6 +740,8 @@ presentation jobs described in the
 - The `operation_journal_stream` trigger appends `campaign_stream_message` rows;
   `PublicStreamService` and `CampaignStreamController` (`GET …/stream`) serve them as SSE
   long polls with `generation:sequence` identities, `Last-Event-ID` resumption and resets.
+- `PresentationEventStore` stores admitted presentation events (V26 `presentation_event`, P05.7-B.1.1);
+  its `presentation_event_stream` trigger adds one `presentation.event` message per stored cue to the same log.
 - `org.rpgengine.presentation`: `PresentationJobService` (claim, narrate, settle, retry,
   expiry and startup reconciliation), `PresentationWorker` (one daemon thread),
   `NarrationPort` with the default `UnavailableNarration` until P08.
@@ -757,8 +759,8 @@ drive `PresentationJobService` explicitly, and `CampaignStreamHttpTest` enables 
 in its own discarded context to prove automatic dispatch. New test suites:
 `CommandCancellationTest` (races held after admission, after a durable draw and inside the
 commit through an advisory-lock trigger; equivalent-attempt draw streams),
-`PublicStreamTest`, `PresentationJobTest` and `CampaignStreamHttpTest`. Test fixtures that
-truncate tables must include `presentation_job`, `campaign_stream_message` and
+`PublicStreamTest`, `PresentationEventStreamTest`, `PresentationJobTest` and `CampaignStreamHttpTest`. Test fixtures that
+truncate tables must include `presentation_event`, `presentation_job`, `campaign_stream_message` and
 `campaign_stream_head`.
 
 Verified on 28 October 2026 with the unchanged scoped JDK 21 toolchain and disposable

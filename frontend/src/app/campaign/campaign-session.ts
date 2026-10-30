@@ -8,7 +8,8 @@
  * page reload — notably the explicit EN↔IT language reload — can resume exactly where it
  * stopped: pending operations are re-queried by identity and the stream resumes after the saved
  * cursor. Delivery is deduplicated by cursor and operation version, so replays after a reload
- * never apply a message twice. Nothing in this module submits a command or a draft.
+ * never apply a message twice, including presentation cues, which take the same path and are not
+ * displayed yet. Nothing in this module submits a command or a draft.
  */
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { SavedLibraryClient, LIBRARY_FETCH } from '../library/saved-library-client';

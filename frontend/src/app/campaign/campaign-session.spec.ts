@@ -58,6 +58,22 @@ describe('Campaign session reconciliation', /** Register reload-safety checks fo
     expect(session.operations(SCOPE).map((o) => o.operationId)).toEqual([OP1, OP2]);
   });
 
+  it('applies a presentation cue once across a reload and keeps the operation status', /** A replayed cue is a duplicate, never a second delivery. */ async () => {
+    const cue = frame('0:2', 'presentation.event', { operationId: OP1, commandType: 'WAIT', status: 'ACCEPTED', operationVersion: 0, deliveryId: `0:2:${OP1}:0`, kind: 'SCENE', ordinal: 0, sceneId: 'harbour' });
+    server.operations.set(OP1, operation(OP1, 'ACCEPTED', 0));
+    server.streams = [[accepted('0:1', OP1), cue]];
+    let session = load(store, server);
+    expect(await session.reconcile(SCOPE, signal)).toMatchObject({ applied: 2, duplicates: 0 });
+    expect(session.cursor(SCOPE)).toBe('0:2');
+    expect(session.operations(SCOPE)).toHaveLength(1);
+    expect(session.operations(SCOPE)[0]).toMatchObject({ status: 'ACCEPTED', operationVersion: 0 });
+
+    server.streams = [[cue]];
+    session = load(store, server);
+    expect(await session.reconcile(SCOPE, signal)).toMatchObject({ applied: 0, duplicates: 1 });
+    expect(session.cursor(SCOPE)).toBe('0:2');
+  });
+
   it('starts at the head on first contact and does not replay history', /** stream.ready positions a fresh cursor. */ async () => {
     server.streams = [[frame('0:7', 'stream.ready', {})]];
     const session = load(store, server);
