@@ -1028,6 +1028,18 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
       not rerun and the new regression assertions were still not run against the old code. The
       last full pass stays log `20261030T195311-77740`, which began after the last frontend edit
       (19:50 local time).
+    - P05.6-B (30 October 2026, documentation only, remaining limit recorded): the goal was a
+      real-server test of a language reload with a draft and an admitted in-flight operation
+      through a real submit path. No browser submit path exists, so by the story's rule the limit
+      is recorded and nothing was simulated. Evidence: a search of `frontend/src` (non-spec files)
+      for `submit`, `.post(`, `POST` and `fetch(` found no command submission; the only matches
+      are the preview form's `type="submit"` button, comments stating that nothing is submitted
+      (`campaign-view.ts:11`, `campaign-session.ts:11`: Send stays disabled), and the recorded
+      `POST` entries in `contract/campaign-reload-transcript.json`, which the replay serves. No code
+      or test changed and no check was run (`verify.sh full` not needed for a documentation-only
+      change). Not proven: reload with a draft and an in-flight operation on a real server. It
+      needs the browser submit path (P05.7/P07 scope) and the owner action above. This box stays
+      unchecked until P05.6-O.
 - [ ] P05.7 Define and render bounded typed public presentation events for scene, pose/expression and optional line audio hooks; reject executable/raw-URL directives, deduplicate delivery and preserve text-only/keyboard/reduced-motion behavior under QA-40.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.
