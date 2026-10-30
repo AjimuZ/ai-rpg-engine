@@ -1539,6 +1539,20 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     switching and restore, and P18.1 reruns the complete QA-33 scenario. No
     requirement, task identity, title or checked status changed. The runner's own
     parser reported a cycle before this correction and accepts the corrected graph.
+  - Review of browser switching and direct links (30 October 2026, task P06.5-A; the box stays unchecked).
+    No code changed. Corrects the third checkpoint above: the packaged jar does map `/saved/<uuid>`
+    (and `/it/saved/<uuid>`); `InterfaceRoutes` allows only canonical lowercase UUIDs, and
+    `PackagedInterfaceTest` asserts both the accepted forms and rejected ones (`not-a-uuid`, uppercase UUID,
+    extra segment, trailing slash, `.js` suffix). Stale callbacks: `saved-library.spec.ts` holds a read pending,
+    switches adventures, releases the old reply late, and asserts the request was aborted and nothing from it
+    rendered. Commands run: `sh .agents/ralph/verify.sh frontend` passed all six steps (install, typecheck, test,
+    i18n, build, locales); `sh .agents/ralph/verify.sh backend -Dtest=PackagedInterfaceTest` passed
+    (sources, database, focused). Not proven: no `clean verify -Ppackaged-ui` full run and no real browser
+    request against the packaged jar were made in this entry; the direct-link claim rests on that one test class.
+    Not proven either: the campaign playthrough view has its own late-reply specs only through its session
+    cursor tests, none that switch between two adventures. Missing piece, not built: `app.routes.ts` has no
+    route to the campaign view, so saved campaigns are not playable from `/saved/:adventureId` (read-only
+    playthrough selection only), and there is no browser submit path.
 
 **Exit:** two independent campaigns survive restart and read-only use changes no game counters. **Checks:** creation budget/loadout validation, ownership isolation, restart, and no-AI consultations. **Suggested commit:** `Add persistent campaigns and local RPG consultations`.
 
