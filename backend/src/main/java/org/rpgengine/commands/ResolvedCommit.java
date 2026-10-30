@@ -9,6 +9,7 @@ import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.campaign.CampaignMode;
 import org.rpgengine.campaign.EventVisibility;
 import org.rpgengine.combat.FrozenEncounter;
+import org.rpgengine.combat.TacticalPlan;
 import org.rpgengine.inventory.ItemPlan;
 import org.rpgengine.knowledge.KnowledgeChange;
 import org.rpgengine.persistence.CanonicalValues;
@@ -40,14 +41,17 @@ import org.rpgengine.rules.WorldClock;
  * rest ends listed active conditions) and bounds the world clock: the plan's elapsed time may not exceed
  * {@link WorldClock#MAX_STEP_SECONDS}. P11.1 adds an optional {@link EncounterEntry}: the frozen encounter an
  * {@code ENGAGE} intention starts, citing the plan event that announces it; a plan carrying one must put the
- * campaign in encounter mode. Preparation intents
+ * campaign in encounter mode. P11.2 adds an optional {@link TacticalPlan} ({@code progress}): the scheduler steps,
+ * participant facts and world time of a tactical intention, which keeps the campaign in encounter mode and never
+ * accompanies an entry. Preparation intents
  * (query-scope epoch bumps, critical preparation jobs and cited plan branches) are data
  * too; they commit or roll back with the world change that caused them.
  */
 public record ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources,
         List<Event> events, List<Reward> rewards, String receiptDetails, boolean narrationRequired,
         Preparation preparation, CommandIntent intent, List<Placement> placements, List<KnowledgeChange> knowledge,
-        ItemPlan items, QuestChanges quests, List<ConditionRemoval> conditions, EncounterEntry encounter) {
+        ItemPlan items, QuestChanges quests, List<ConditionRemoval> conditions, EncounterEntry encounter,
+        TacticalPlan progress) {
     /** Most events one plan may carry; the quest engine budgets its steps against what the command already used. */
     public static final int MAX_EVENTS = 128;
 
@@ -127,7 +131,20 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
                 throw new IllegalArgumentException("encounter entry cites an event outside this plan");
             }
         }
+        if (progress != null && (encounter != null || world.mode() != CampaignMode.ENCOUNTER
+                || world.elapsedSeconds() != progress.elapsedSeconds())) {
+            throw new IllegalArgumentException("tactical progress keeps the campaign in encounter mode and carries its time");
+        }
         CanonicalValues.requireJsonObject(receiptDetails, "receiptDetails", 32_768);
+    }
+
+    /** Plan without tactical progress, the shape used before P11.2. */
+    public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
+            List<Reward> rewards, String receiptDetails, boolean narrationRequired, Preparation preparation,
+            CommandIntent intent, List<Placement> placements, List<KnowledgeChange> knowledge, ItemPlan items,
+            QuestChanges quests, List<ConditionRemoval> conditions, EncounterEntry encounter) {
+        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, preparation, intent,
+                placements, knowledge, items, quests, conditions, encounter, null);
     }
 
     /** Plan without an encounter entry, the shape used before P11.1. */

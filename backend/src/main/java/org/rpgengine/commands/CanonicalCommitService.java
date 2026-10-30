@@ -54,7 +54,9 @@ import tools.jackson.databind.json.JsonMapper;
  * removals of a rest (P10.4) are guarded by the row they delete; the clock itself moves only through the
  * plan's bounded elapsed time and the V21 trigger that ties world time to a revision step. An encounter entry
  * (P11.1) is stored beside the event that announces it; a plan may move the campaign from exploration into
- * encounter mode only together with that entry.
+ * encounter mode only together with that entry. Tactical progress (P11.2) is written after the events, as the
+ * participants' final facts and then each encounter row state in order, every write guarded by the row version
+ * the scheduler read, while the V22/V23 triggers check each step.
  * This internal service has no controller, network port or callback.
  * Any validation, persistence, timeout or commit failure rolls back all its writes.
  */
@@ -262,6 +264,10 @@ public class CanonicalCommitService {
             EncounterWriter.insertWithin(jdbc, campaign.getId(), operation.getId(), counters.stateRevision(),
                     firstSequence + plan.encounter().eventIndex(), content.getId(), content.getRuleset().rulesetHash(),
                     plan.encounter().frozen(), now);
+        }
+        if (plan.progress() != null) {
+            // A stale row version or a refused scheduling step throws and rolls back every effect, events included.
+            EncounterWriter.progressWithin(jdbc, campaign.getId(), counters.stateRevision(), plan.progress());
         }
         if (plan.narrationRequired()) {
             // The owed presentation is durable exactly when the world change is (P07.5): one

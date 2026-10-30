@@ -341,7 +341,7 @@ describe('Italian variant with the reviewed catalog', /** Register Italian rende
   afterEach(/** Destroying fixtures aborts long polls. */ () => TestBed.resetTestingModule());
 
   it('loads every reviewed message and detects English leftovers', /** The detector itself must have something to find. */ () => {
-    expect(CATALOG.size).toBe(413);
+    expect(CATALOG.size).toBe(418);
     expect(ENGLISH_MESSAGES.has('Send')).toBe(true);
     expect(ENGLISH_RUNS).toContain(message('campaign.view.composerHelp', {}, 'source'));
     // ICU branches are checked too: an untranslated plural would show "One passage".

@@ -43,6 +43,11 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
                     throw new IllegalArgumentException("participant armor exceeds the profile's armorMax");
                 }
             }
+            for (EncounterAction action : template.actions()) {
+                if (action.cost() > profile.actionPoints()) {
+                    throw new IllegalArgumentException("declared action cost exceeds one activation's action points");
+                }
+            }
         }
     }
 
@@ -68,7 +73,7 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
             for (Definition definition : pack.definitions()) {
                 if (definition.kind().equals("encounter")) {
                     String id = pack == snapshot.root() ? definition.id() : packId + "#" + definition.id();
-                    templates.put(id, template(snapshot, pack, id, packId, definition.data()));
+                    templates.put(id, template(snapshot, pack, id, packId, definition.data(), profiles.get(packId)));
                 }
             }
         }
@@ -94,7 +99,10 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
 
     /** Project one validated encounter definition. */
     private static EncounterTemplate template(CampaignPackSnapshot snapshot, CompiledPack pack, String id,
-            String packId, Map<String, Object> data) {
+            String packId, Map<String, Object> data, CombatProfile profile) {
+        if (profile == null) {
+            throw new IllegalArgumentException("encounter " + id + " has no combat profile");
+        }
         var zones = new TreeMap<String, ZoneGraph.Zone>();
         for (Map<?, ?> zone : objects(data.get("zones"))) {
             String zoneId = (String) zone.get("id");
@@ -137,10 +145,29 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
                     EncounterObjective.Kind.parse((String) objective.get("kind")), (String) objective.get("zone"),
                     (String) objective.get("participant"), number(objective.get("rounds"), 0)));
         }
+        // Declared social and scene actions (P11.2); an omitted cost is the profile's Interact cost.
+        int interact = profile.value("interactCost");
+        var actions = new ArrayList<EncounterAction>();
+        for (Map<?, ?> action : objects(data.get("actions"))) {
+            int cost = number(action.get("cost"), interact);
+            String actionId = (String) action.get("id");
+            if ("social".equals(action.get("kind"))) {
+                actions.add(new EncounterAction(actionId, EncounterAction.Kind.SOCIAL,
+                        EncounterAction.Intent.valueOf(((String) action.get("intent")).toUpperCase(java.util.Locale.ROOT)),
+                        EncounterAction.Recipients.valueOf(text(action.get("recipients"), "hostile")
+                                .toUpperCase(java.util.Locale.ROOT)), cost, null, null));
+            } else {
+                var passage = (Map<?, ?>) action.get("passage");
+                actions.add(new EncounterAction(actionId, EncounterAction.Kind.SCENE, null, null, cost,
+                        action.get("zone") instanceof String zone ? zone : null,
+                        new EncounterAction.Passage((String) passage.get("from"), (String) passage.get("to"),
+                                Boolean.TRUE.equals(passage.get("blocked")))));
+            }
+        }
         String location = snapshot.resolve(pack, (String) data.get("location"), "location").id();
         return new EncounterTemplate(id, packId, location, new ZoneGraph(zones, edges), (String) data.get("playerZone"),
                 new TreeSet<>(strings(data.get("escapeZones"))), participants, objectives,
-                OpeningPolicy.parse(text(data.get("opening"), "initiative")));
+                OpeningPolicy.parse(text(data.get("opening"), "initiative")), actions);
     }
 
     /** Object elements of an optional validated list; absent lists are empty. */

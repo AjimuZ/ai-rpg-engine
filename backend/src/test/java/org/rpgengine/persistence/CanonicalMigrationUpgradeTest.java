@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V22 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V23 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -531,6 +531,44 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(1, jdbc.update("update encounter_participant set zone_id = 'yard', "
                             + "row_version = row_version + 1 where participant_id = 'player'"));
                     assertEquals(0, v22.migrate().migrationsExecuted);
+                    // V23 adds the tactical cursor: the populated encounter keeps its row with no activation, no
+                    // speech and no changed passage; a cursor comes with points, initiative is written once with
+                    // distinct ranks, points grow only at an activation start and speech by one per update.
+                    String v22Fight = jdbc.queryForObject("select to_jsonb(e)::text from encounter e", String.class);
+                    Flyway v23 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("23").load();
+                    assertEquals(1, v23.migrate().migrationsExecuted);
+                    assertTrue(v23.validateWithResult().validationSuccessful);
+                    var upgraded = jdbc.queryForMap("select actor_cursor, action_points, speech_used, passages::text as p "
+                            + "from encounter");
+                    assertNull(upgraded.get("actor_cursor"));
+                    assertNull(upgraded.get("action_points"));
+                    assertEquals(0, upgraded.get("speech_used"));
+                    assertEquals("[]", upgraded.get("p"));
+                    assertEquals(v22Fight, jdbc.queryForObject("select (to_jsonb(e) - 'actor_cursor' - 'action_points' "
+                            + "- 'speech_used' - 'passages')::text from encounter e", String.class));
+                    assertEquals(2L, jdbc.queryForObject("select count(*) from encounter_participant "
+                            + "where initiative is null and reactions = 0", Long.class));
+                    String rank = "update encounter_participant set initiative = ?, initiative_rank = ?, "
+                            + "row_version = row_version + 1 where participant_id = ?";
+                    assertEquals(1, jdbc.update(rank, 12, 0, "player"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(rank, 9, 0, "raider"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(rank, 13, 0, "player"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(rank, 40, 1, "raider"));
+                    assertEquals(1, jdbc.update(rank, 9, 1, "raider"));
+                    String cursor = "update encounter set phase = ?, actor_cursor = ?, action_points = ?, speech_used = ?, "
+                            + "row_version = row_version + 1";
+                    assertThrows(DataAccessException.class, () -> jdbc.update(cursor, "ACTOR_START", null, null, 0));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(cursor, "ACTOR_START", 0, null, 0));
+                    assertEquals(1, jdbc.update(cursor, "ACTOR_START", 0, 3, 0));
+                    assertEquals(1, jdbc.update(cursor, "AWAITING_ACTION", 0, 2, 0));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(cursor, "AWAITING_ACTION", 0, 3, 0));
+                    assertEquals(1, jdbc.update(cursor, "AWAITING_ACTION", 0, 2, 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(cursor, "AWAITING_ACTION", 0, 2, 3));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(cursor, "AWAITING_ACTION", 0, 2, 0));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update encounter set passages = '{}', "
+                            + "row_version = row_version + 1"));
+                    assertEquals(0, v23.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

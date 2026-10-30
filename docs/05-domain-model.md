@@ -360,6 +360,15 @@ docs/11 state machine (a trigger mirrors `EncounterPhase`), and a campaign has a
 status (`ACTIVE`, `DEFEATED`, `ESCAPED`, `SURRENDERED`). Initiative, activations, action points, reactions and
 effect timers are added by P11.2 to P11.4; the V16 checkpoint still records `"encounter": null` until P11.6.
 
+Since P11.2 (V23, [ADR 0029](adr/0029-initiative-rounds-activations-and-bounded-combat-dialogue.md)) the
+encounter row also holds the tactical cursor: `actor_cursor` (initiative rank of the acting participant) and
+`action_points` (its remaining points), both set exactly while an activation is in progress, `speech_used`
+(speech-only utterances of the current activation) and `passages` (passage states set by declared scene
+actions). Each participant row holds its `initiative` total and `initiative_rank`, written once before the first
+round opens, and its `reactions` left this round. `EncounterWriter.state` reads these back with the frozen
+profile, zone graph and declared actions into an `EncounterState`; `CombatScheduler` turns a tactical intention
+into a `TacticalPlan` whose steps the commit writes one row version at a time.
+
 ### World clock, travel and rest (P10.4)
 
 `campaign.world_time_seconds` is the in-world clock: whole seconds since the campaign began, copied onto every

@@ -27,6 +27,12 @@ import tools.jackson.databind.json.JsonMapper;
  * (opening {@code forbidden}; an allied keeper portraying the warden NPC and a hostile smuggler behind a blocked
  * edge; survive and protect objectives) and {@code grove-watch} in the grove (opening {@code first}; a hostile wolf,
  * an allied hound and a reach-zone objective). {@link #tuned()} is the same pack under another ID with a customized profile.
+ *
+ * <p>Declared actions (P11.2): {@code trail-ambush} lets the player taunt a hostile (social, intimidate, the default
+ * Interact cost 1) and seal the yard's route to the escape zone from the yard (scene); {@code toll-parley} lets the
+ * player demand passage from a hostile (social, negotiate), ask the allied keeper for cover (social, request, 2 AP)
+ * and unbar the blocked gate from the gate zone (scene). {@code grove-watch} declares none, so its frozen definition
+ * keeps the P11.1 shape.
  */
 public final class EncounterPack {
     /** The default combat rule of the fixture. */
@@ -53,7 +59,10 @@ public final class EncounterPack {
               "participants":[{"id":"raider","name":"Raider","side":"hostile","zone":"yard","threat":"standard",
                 "stats":{"health":14,"guard":12,"resistance":11,"armor":1,"force":1,"finesse":1,"insight":1,"resolve":1}}],
               "objectives":[{"id":"drive-off","name":"Drive off the raider","kind":"defeatHostiles"},
-                {"id":"slip-away","name":"Slip away","kind":"escape"}]}},
+                {"id":"slip-away","name":"Slip away","kind":"escape"}],
+              "actions":[{"id":"taunt","name":"Taunt","kind":"social","intent":"intimidate"},
+                {"id":"seal-route","name":"Seal the route","kind":"scene","zone":"yard",
+                "passage":{"from":"yard","to":"escape-route","blocked":true}}]}},
             {"id":"toll-parley","kind":"encounter","data":{"name":"Toll Parley","location":"trailhead","opening":"forbidden",
               "zones":[{"id":"gate","name":"Gate"},{"id":"booth","name":"Booth","visibility":"obscured"}],
               "edges":[{"from":"gate","to":"booth","blocked":true}],
@@ -62,7 +71,12 @@ public final class EncounterPack {
                 "stats":{"health":10,"guard":11,"resistance":10}},
                 {"id":"smuggler","name":"Smuggler","side":"hostile","zone":"booth","threat":"minor",
                 "stats":{"health":8,"guard":10,"resistance":9,"finesse":2}}],
-              "objectives":[{"id":"hold","kind":"survive","rounds":3},{"id":"keep-keeper","kind":"protect","participant":"keeper"}]}},
+              "objectives":[{"id":"hold","kind":"survive","rounds":3},{"id":"keep-keeper","kind":"protect","participant":"keeper"}],
+              "actions":[{"id":"demand-passage","name":"Demand passage","kind":"social","intent":"negotiate"},
+                {"id":"ask-keeper","name":"Ask the keeper for cover","kind":"social","intent":"request","recipients":"ally",
+                "cost":2},
+                {"id":"unbar-gate","name":"Unbar the gate","kind":"scene","zone":"gate",
+                "passage":{"from":"booth","to":"gate","blocked":false}}]}},
             {"id":"grove-watch","kind":"encounter","data":{"name":"Grove Watch","location":"grove","opening":"first",
               "zones":[{"id":"clearing","name":"Clearing"},{"id":"stones","name":"Stones"}],
               "edges":[{"from":"clearing","to":"stones"}],"playerZone":"clearing",

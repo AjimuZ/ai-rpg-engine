@@ -1,6 +1,7 @@
 package org.rpgengine.rules;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -263,6 +264,64 @@ public record ZoneGraph(Map<String, Zone> zones, List<Edge> edges) {
         form.put("zones", zoneForms);
         form.put("edges", edgeForms);
         return form;
+    }
+
+    /**
+     * Read a frozen graph back from the canonical form {@link #canonicalForm()} wrote (P11.2).
+     *
+     * @param form parsed canonical object with {@code zones} and {@code edges}
+     * @return the graph, revalidated by the constructor
+     * @throws IllegalArgumentException or {@link ClassCastException} for a malformed form
+     */
+    public static ZoneGraph fromCanonical(Map<?, ?> form) {
+        var zones = new TreeMap<String, Zone>();
+        ((Map<?, ?>) form.get("zones")).forEach((id, value) -> {
+            var zone = (Map<?, ?>) value;
+            var tags = new TreeSet<String>();
+            ((List<?>) zone.get("tags")).forEach(tag -> tags.add((String) tag));
+            zones.put((String) id, new Zone((String) id, tags,
+                    Cover.valueOf(((String) zone.get("cover")).toUpperCase(java.util.Locale.ROOT)),
+                    Boolean.TRUE.equals(zone.get("obscured")), ((Number) zone.get("capacity")).intValue()));
+        });
+        var edges = new ArrayList<Edge>();
+        for (Object value : (List<?>) form.get("edges")) {
+            var edge = (Map<?, ?>) value;
+            edges.add(new Edge((String) edge.get("from"), (String) edge.get("to"), Boolean.TRUE.equals(edge.get("difficult")),
+                    Boolean.TRUE.equals(edge.get("blocked"))));
+        }
+        return new ZoneGraph(zones, edges);
+    }
+
+    /**
+     * The same space with every directed edge between two zones, in either direction, set to a blocked state
+     * (P11.2: a declared scene action closing or opening a passage). Range distance is unchanged, because it
+     * ignores blocking; only movement changes.
+     *
+     * @param a one zone of the passage
+     * @param b the other zone
+     * @param blocked the state to set
+     * @return a new graph; {@code this} when no edge joins the two zones
+     */
+    public ZoneGraph withPassage(String a, String b, boolean blocked) {
+        var changed = edges.stream().map(edge -> (edge.from().equals(a) && edge.to().equals(b))
+                || (edge.from().equals(b) && edge.to().equals(a))
+                ? new Edge(edge.from(), edge.to(), edge.difficult(), blocked) : edge).toList();
+        return new ZoneGraph(zones, changed);
+    }
+
+    /**
+     * Whether a passage between two zones already has a state: every directed edge joining them, in either
+     * direction, is blocked (or every one is open).
+     *
+     * @param a one zone
+     * @param b the other zone
+     * @param blocked the state asked about
+     * @return true when at least one edge joins the zones and all of them have that state
+     */
+    public boolean passageIs(String a, String b, boolean blocked) {
+        var joining = edges.stream().filter(edge -> (edge.from().equals(a) && edge.to().equals(b))
+                || (edge.from().equals(b) && edge.to().equals(a))).toList();
+        return !joining.isEmpty() && joining.stream().allMatch(edge -> edge.blocked() == blocked);
     }
 
     /** Cost of one unblocked edge under a profile. */

@@ -85,6 +85,36 @@ class ResolvedCommitTest {
         assertNull(new ResolvedCommit(context, exploring, List.of(), List.of(event), List.of(), "{}", false).encounter());
     }
 
+    /** Tactical progress keeps encounter mode, carries the scheduler's world time and never rides on an entry (P11.2). */
+    @Test
+    void tacticalProgressStaysInEncounterModeWithItsTime() {
+        var context = new ResolvedCommit.Context(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                UUID.randomUUID(), "a".repeat(64), 0, 2, new MutationLeaseService.Token(UUID.randomUUID(), 1));
+        var event = new ResolvedCommit.Event(null, null, EventVisibility.PUBLIC,
+                new CampaignEvent.Body("ROUND_ENDED", 1, 1, "{}"));
+        var progress = new org.rpgengine.combat.TacticalPlan(UUID.randomUUID(), 4,
+                List.of(new org.rpgengine.combat.TacticalPlan.Step(org.rpgengine.combat.EncounterPhase.ROUND_END, 1, null,
+                        null, 0, List.of())), List.of(),
+                List.of(new org.rpgengine.combat.TacticalPlan.Note("ROUND_ENDED", java.util.Map.of("round", 1), false)), 8,
+                java.util.Map.of());
+        var plan = new ResolvedCommit(context, new ResolvedCommit.WorldChange(true, 8, CampaignMode.ENCOUNTER, null),
+                List.of(), List.of(event), List.of(), "{}", false, ResolvedCommit.Preparation.NONE, null, List.of(),
+                List.of(), org.rpgengine.inventory.ItemPlan.NONE, org.rpgengine.quests.QuestChanges.NONE, List.of(), null,
+                progress);
+        assertEquals(progress, plan.progress());
+        for (var world : List.of(new ResolvedCommit.WorldChange(true, 8, CampaignMode.EXPLORATION, null),
+                new ResolvedCommit.WorldChange(true, 0, CampaignMode.ENCOUNTER, null))) {
+            assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit(context, world, List.of(),
+                    List.of(event), List.of(), "{}", false, ResolvedCommit.Preparation.NONE, null, List.of(), List.of(),
+                    org.rpgengine.inventory.ItemPlan.NONE, org.rpgengine.quests.QuestChanges.NONE, List.of(), null,
+                    progress), world.toString());
+        }
+        assertThrows(IllegalArgumentException.class, () -> new org.rpgengine.combat.TacticalPlan(UUID.randomUUID(), 0,
+                List.of(), List.of(), progress.notes(), 0, java.util.Map.of()), "a plan writes at least one state");
+        assertNull(new ResolvedCommit(context, new ResolvedCommit.WorldChange(true, 0, CampaignMode.EXPLORATION, null),
+                List.of(), List.of(event), List.of(), "{}", false).progress());
+    }
+
     /** Reject unbounded/ambiguous effects before acquiring locks, and isolate a plan from caller list mutation. */
     @Test
     void boundsAndFreezesResolvedEffects() {

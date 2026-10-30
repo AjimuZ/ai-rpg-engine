@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.rpgengine.combat.TacticalIntent;
 import org.rpgengine.content.PackTextParser;
 
 /**
@@ -17,8 +18,10 @@ import org.rpgengine.content.PackTextParser;
  * identity; every other quest transition is derived by the engine from committed facts. Since P10.4 the
  * player can also rest under a pack-declared rest policy; its duration, interruption and recovery are
  * rule data, never part of the intention. Since P11.1 the player can enter an authored encounter, optionally
- * declaring the attack that opens it; the tactical intentions inside an encounter must acquire explicit contracts
- * and validators before registration (P11.2); unknown types fail closed. Structural decoding here
+ * declaring the attack that opens it. Since P11.2 the {@link Tactical} intentions are registered for encounter mode:
+ * roll initiative, move to an adjacent zone, end the activation, one bounded speech-only utterance and a declared
+ * social or scene action; attacks and reactions acquire their contracts with P11.3/P11.4. Unknown types fail closed.
+ * Structural decoding here
  * is followed by current-state rule validation in {@link CommandRules}; resolution
  * remains backend-owned (P07.4). Every value is immutable and can reproduce its exact
  * version-1 hash input.
@@ -27,7 +30,8 @@ public sealed interface TypedCommand
         permits TypedCommand.Move, TypedCommand.Wait, TypedCommand.Speak, TypedCommand.UseAbility,
         TypedCommand.UseItem, TypedCommand.EquipItem, TypedCommand.UnequipItem, TypedCommand.TransferItem,
         TypedCommand.TradeItems, TypedCommand.AcceptQuest, TypedCommand.SuspendQuest, TypedCommand.ResumeQuest,
-        TypedCommand.Rest, TypedCommand.Engage {
+        TypedCommand.Rest, TypedCommand.Engage, TypedCommand.RollInitiative, TypedCommand.MoveZone,
+        TypedCommand.EndActivation, TypedCommand.CombatSpeak, TypedCommand.Interact {
     /** @return registered, case-sensitive wire identifier */
     String type();
 
@@ -135,6 +139,32 @@ public sealed interface TypedCommand
                     fields(payload, "encounterId");
                     yield new Engage(text(payload.get("encounterId"), 256), null);
                 }
+                case "ROLL_INITIATIVE" -> {
+                    fields(payload);
+                    yield new RollInitiative();
+                }
+                case "MOVE_ZONE" -> {
+                    fields(payload, "zoneId");
+                    yield new MoveZone(text(payload.get("zoneId"), 128));
+                }
+                case "END_ACTIVATION" -> {
+                    fields(payload);
+                    yield new EndActivation();
+                }
+                case "COMBAT_SPEAK" -> {
+                    fields(payload, "recipientId", "text");
+                    yield new CombatSpeak(text(payload.get("recipientId"), 128),
+                            text(payload.get("text"), CombatSpeak.MAX_TEXT));
+                }
+                case "INTERACT" -> {
+                    // The target is optional: a social action names one, a scene action none.
+                    if (payload.containsKey("targetId")) {
+                        fields(payload, "actionId", "targetId");
+                        yield new Interact(text(payload.get("actionId"), 128), text(payload.get("targetId"), 128));
+                    }
+                    fields(payload, "actionId");
+                    yield new Interact(text(payload.get("actionId"), 128), null);
+                }
                 default -> throw invalid();
             };
         } catch (IllegalArgumentException | ArithmeticException failure) {
@@ -146,7 +176,17 @@ public sealed interface TypedCommand
     /** Whether the journal type requires typed evidence at canonical commit. */
     static boolean registered(String type) {
         return Set.of("MOVE", "WAIT", "SPEAK", "USE_ABILITY", "USE_ITEM", "EQUIP_ITEM", "UNEQUIP_ITEM",
-                "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST", "ENGAGE").contains(type);
+                "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST", "ENGAGE",
+                "ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT").contains(type);
+    }
+
+    /**
+     * Tactical intentions (P11.2): legal only in encounter mode, at the decision boundary {@code TacticalRules}
+     * checks, and resolved by the combat scheduler from the frozen encounter rather than from pinned definitions.
+     */
+    sealed interface Tactical permits RollInitiative, MoveZone, EndActivation, CombatSpeak, Interact {
+        /** @return the combat-layer value of this intention */
+        TacticalIntent intent();
     }
 
     /** Require an exact integer quantity of 1..9999 without coercion from decimals or text. */
@@ -475,5 +515,89 @@ public sealed interface TypedCommand
             return openingStrike == null ? Map.of("encounterId", encounterId)
                     : Map.of("encounterId", encounterId, "openingStrike", openingStrike);
         }
+    }
+
+    /** Roll initiative once and open round one of the encounter just entered (P11.2); no field to choose. */
+    record RollInitiative() implements TypedCommand, Tactical {
+        /** @return the fixed initiative identifier */
+        public String type() { return "ROLL_INITIATIVE"; }
+        /** @return the empty payload */
+        public Map<String, Object> payload() { return Map.of(); }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.RollInitiative(); }
+    }
+
+    /**
+     * Move the acting player across one edge to an adjacent encounter zone (P11.2). The cost, the edge and the
+     * capacity are rule data; the intention names only the destination.
+     *
+     * @param zoneId destination zone of the frozen encounter
+     */
+    record MoveZone(String zoneId) implements TypedCommand, Tactical {
+        /** Require a bounded zone identity. */
+        public MoveZone { zoneId = text(zoneId, 128); }
+        /** @return the fixed zone-move identifier */
+        public String type() { return "MOVE_ZONE"; }
+        /** @return the single destination field */
+        public Map<String, Object> payload() { return Map.of("zoneId", zoneId); }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.MoveZone(zoneId); }
+    }
+
+    /** End the player's activation; unused action points expire (P11.2). */
+    record EndActivation() implements TypedCommand, Tactical {
+        /** @return the fixed end-of-activation identifier */
+        public String type() { return "END_ACTIVATION"; }
+        /** @return the empty payload */
+        public Map<String, Object> payload() { return Map.of(); }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.EndActivation(); }
+    }
+
+    /**
+     * One bounded speech-only utterance to an encounter participant (P11.2, docs/11 section 7.1): no action points,
+     * no mechanical benefit; the per-activation allowance is rule data.
+     *
+     * @param recipientId addressed participant ID
+     * @param text the player's exact words, 1..{@link #MAX_TEXT} UTF-16 units
+     */
+    record CombatSpeak(String recipientId, String text) implements TypedCommand, Tactical {
+        /** Longest utterance: brief speech, far shorter than exploration speech. */
+        static final int MAX_TEXT = 500;
+
+        /** Require a bounded recipient and bounded meaningful text. */
+        public CombatSpeak {
+            recipientId = TypedCommand.text(recipientId, 128);
+            text = TypedCommand.text(text, MAX_TEXT);
+        }
+        /** @return the fixed combat-speech identifier */
+        public String type() { return "COMBAT_SPEAK"; }
+        /** @return recipient and exact words */
+        public Map<String, Object> payload() { return Map.of("recipientId", recipientId, "text", text); }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.Speech(recipientId, text); }
+    }
+
+    /**
+     * Attempt one declared social or scene action of the frozen encounter (P11.2). Its cost and effect are rule
+     * data; the intention names the action and, for a social action, the participant addressed.
+     *
+     * @param actionId declared action ID
+     * @param targetId addressed participant, or null for a scene action
+     */
+    record Interact(String actionId, String targetId) implements TypedCommand, Tactical {
+        /** Require a bounded action identity and, when present, a bounded participant identity. */
+        public Interact {
+            actionId = text(actionId, 128);
+            targetId = targetId == null ? null : text(targetId, 128);
+        }
+        /** @return the fixed interaction identifier */
+        public String type() { return "INTERACT"; }
+        /** @return the action and, only when declared, the target */
+        public Map<String, Object> payload() {
+            return targetId == null ? Map.of("actionId", actionId) : Map.of("actionId", actionId, "targetId", targetId);
+        }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.Interact(actionId, targetId); }
     }
 }

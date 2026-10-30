@@ -187,3 +187,11 @@ campaign rows. `pg_restore` creates triggers after loading data, so a restored e
 the lifecycle, frozen-column and one-active-encounter guards apply to later writes, and the partial unique
 index is built over the restored rows. Offline checks cover the V22 manifest/catalog; no live V22 dump/restore
 rehearsal has been run.
+
+V23 scope (P11.2) adds no table: `encounter` gains the tactical cursor (`actor_cursor`, `action_points`,
+`speech_used`) and the `passages` changed by scene actions, and `encounter_participant` gains `initiative`,
+`initiative_rank` (unique per encounter) and `reactions`. Check constraints tie the cursor to its points and to
+the activation phases; the `encounter_schedule` and `encounter_initiative_once` triggers guard later updates
+(initiative before the first round and never re-rolled, points granted only at an activation start and within the
+frozen allowance, the speech allowance). A restore inserts rows, so only the check and unique constraints apply to
+restored values. Offline checks cover the V23 manifest/catalog; no live V23 dump/restore rehearsal has been run.

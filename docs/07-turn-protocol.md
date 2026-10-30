@@ -366,8 +366,53 @@ and definition with their SHA-256, one row per participant), moves the campaign 
 the game turn and writes one public `ENCOUNTER_STARTED` event {actorId, encounterId, templateId, location, zone,
 openingPolicy, openingStrike?, participants: [{id, side, zone}]}. It takes no world time, reserves no draw and
 changes no pool or item. The receipt gains `encounter` {encounterId, templateId, phase, zone, openingPolicy,
-openingStrike} only for an entry. The opening strike is stored as `PENDING` and resolved once by P11.2/P11.3.
+openingStrike} only for an entry. The opening strike is stored as `PENDING` and resolved once by P11.3.
 A plan that enters encounter mode without an encounter, or a second active encounter, rolls the commit back.
+
+### P11.2 tactical intentions
+
+Inside an encounter the player submits tactical intentions
+([ADR 0029](adr/0029-initiative-rounds-activations-and-bounded-combat-dialogue.md),
+[combat](11-combat-system.md#6-initiative-and-round-order)). The common semantic gate admits them only in
+`ENCOUNTER` mode (exploration intentions only in `EXPLORATION` mode); otherwise `MODE_ILLEGAL`. The rule gate
+reads the active encounter's stored tactical state under the campaign lock and applies `TacticalRules`; the
+resolver then runs the pure `CombatScheduler` over the same state. None of them reads the pinned pack.
+
+| Type | Exact payload | Rule (first failing category) |
+| --- | --- | --- |
+| `ROLL_INITIATIVE` | `{}` | Phase `ENTERING` (`TURN_UNAVAILABLE`); the clock can take one round (`TIME_ILLEGAL`) |
+| `MOVE_ZONE` | `zoneId` (1..128 characters) | The player's decision (`TURN_UNAVAILABLE`); a declared zone, not the current one, one unblocked directed edge away and below its capacity (`ZONE_UNAVAILABLE`); the edge's cost fits the remaining points (`ACTION_POINTS_INSUFFICIENT`) |
+| `END_ACTIVATION` | `{}` | The player's decision (`TURN_UNAVAILABLE`); the clock can take one round (`TIME_ILLEGAL`) |
+| `COMBAT_SPEAK` | `recipientId` (1..128) and `text` (1..500 characters) | The player's decision; fewer than `speechPerActivation` utterances in this activation (`SPEECH_LIMIT_REACHED`); an addressable participant (`TARGET_ILLEGAL`) |
+| `INTERACT` | `actionId` (1..128) and, for a social action, `targetId` (1..128) | The player's decision; a declared action usable from the player's zone that would change something (`INTERACTION_UNAVAILABLE`); a social action names an addressable participant its recipient policy admits and a scene action names none (`TARGET_ILLEGAL`); its cost fits (`ACTION_POINTS_INSUFFICIENT`) |
+
+"The player's decision" is phase `AWAITING_ACTION` with the standing player at the cursor; at any other time,
+including while another participant acts, nothing is accepted or queued. "Addressable" means a different
+participant who is active or has surrendered within `maxRangeEdges` range bands of the player (range ignores
+blocked edges). Effects:
+
+- `ROLL_INITIATIVE` reserves two d10 per participant (ordinals in roster order), stores totals and ranks once,
+  writes `INITIATIVE_ROLLED` {encounterId, order: [{participantId, dice, modifier, total}]} and continues the
+  schedule (below).
+- `MOVE_ZONE` and `INTERACT` pass through `RESOLVING` back to `AWAITING_ACTION`, spending their cost, and write
+  `PARTICIPANT_MOVED` {encounterId, round, participantId, actorId, from, to, actionPoints, remainingActionPoints}
+  or `INTERACTION_ATTEMPTED` {…, actionId, kind, actionPoints, remainingActionPoints, intent and targetId | passage
+  {from, to, blocked}}. A scene action stores its passage state; a social attempt establishes no outcome (P11.5).
+- `COMBAT_SPEAK` only counts the utterance and writes `COMBAT_SPEECH` {encounterId, round, participantId, actorId,
+  recipientId, text}: no point, draw, world time or cursor change.
+- `END_ACTIVATION` expires the remaining points (`ACTIVATION_ENDED` {…, unusedActionPoints}) and continues the
+  schedule.
+
+Continuing the schedule: start the next active participant by rank (`ACTIVATION_STARTED` {…, actionPoints}),
+pass a non-player activation (`ACTIVATION_ENDED`; tactics arrive with P11.3/P12), end the round after the last
+activation (`ROUND_ENDED` {encounterId, round, seconds}, adding `roundSeconds` of world time) and open the next
+one (`ROUND_STARTED` {encounterId, round}, refreshing reaction budgets), until the player's own activation waits
+for an action. The schedule stops instead at a round end when the round cap is reached or the player no longer
+stands. Each phase step is its own row version, so an operation adds at most one round's seconds. Every tactical
+intention advances the game turn. The receipt gains `combat` {encounterId, phase, round, zone, acting,
+actionPoints, initiative: [{participantId, initiative}], options?: {moves: [{zone, cost}], speech: {remaining,
+recipients}, actions: [{actionId, kind, cost, targets}], endActivation}}; `options` appears only at the player's
+decision.
 
 ### P10.3 quest intentions
 

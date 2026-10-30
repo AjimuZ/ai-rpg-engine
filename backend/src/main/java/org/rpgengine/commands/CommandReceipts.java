@@ -25,7 +25,10 @@ import tools.jackson.databind.json.JsonMapper;
  *       completed or failed, and (since P10.4) the rest summary: policy, whether it was interrupted, the
  *       seconds it took and the conditions it ended, and (since P11.1) the encounter an entry started: its
  *       identity, template, phase, the player's starting zone, the opening policy and the declared opening
- *       strike target (the frozen roster and profile stay in the engine).</li>
+ *       strike target (the frozen roster and profile stay in the engine), and (since P11.2) the {@code combat}
+ *       summary of a tactical intention: encounter, phase, round, the player's zone, the acting participant and its
+ *       remaining action points, the public initiative order and the player's legal options at a decision. Every
+ *       participant of an encounter is observable, so none of these values is another actor's private state.</li>
  * </ul>
  * Other actors' values, causal participants, request identities and unknown detail fields
  * are never copied, so a new internal field cannot leak by default. Public since P09.5, because
@@ -122,6 +125,10 @@ public final class CommandReceipts {
                         ? encounter.path("openingStrike").asString() : null);
                 view.put("encounter", java.util.Collections.unmodifiableMap(entry));
             }
+            if (details.path("combat").isObject()) {
+                // Present only for a tactical intention (P11.2), so earlier receipt shapes stay byte-identical.
+                view.put("combat", combat(details.path("combat")));
+            }
             if (details.path("quests").isArray() && !details.path("quests").isEmpty()) {
                 // Present only when a public quest transition happened, so earlier receipt shapes stay
                 // byte-identical. Steps of hidden background quests are never written to the receipt.
@@ -151,6 +158,64 @@ public final class CommandReceipts {
         }
         view.put("randomDraws", List.copyOf(draws));
         return view;
+    }
+
+    /**
+     * Copy the allowlisted members of a tactical summary: scalar cursor facts, the initiative order and the legal
+     * options (moves, speech allowance and recipients, declared actions with costs and targets).
+     */
+    private static Map<String, Object> combat(JsonNode combat) {
+        var entry = new LinkedHashMap<String, Object>();
+        entry.put("encounterId", combat.path("encounterId").asString());
+        entry.put("phase", combat.path("phase").asString());
+        entry.put("round", combat.path("round").asInt());
+        entry.put("zone", combat.path("zone").asString());
+        entry.put("acting", combat.path("acting").isString() ? combat.path("acting").asString() : null);
+        entry.put("actionPoints", combat.path("actionPoints").isInt() ? combat.path("actionPoints").asInt() : null);
+        var order = new ArrayList<Map<String, Object>>();
+        for (JsonNode line : combat.path("initiative")) {
+            var position = new LinkedHashMap<String, Object>();
+            position.put("participantId", line.path("participantId").asString());
+            position.put("initiative", line.path("initiative").asInt());
+            order.add(position);
+        }
+        entry.put("initiative", List.copyOf(order));
+        JsonNode options = combat.path("options");
+        if (options.isObject()) {
+            var view = new LinkedHashMap<String, Object>();
+            var moves = new ArrayList<Map<String, Object>>();
+            for (JsonNode move : options.path("moves")) {
+                var line = new LinkedHashMap<String, Object>();
+                line.put("zone", move.path("zone").asString());
+                line.put("cost", move.path("cost").asInt());
+                moves.add(line);
+            }
+            view.put("moves", List.copyOf(moves));
+            var speech = new LinkedHashMap<String, Object>();
+            speech.put("remaining", options.path("speech").path("remaining").asInt());
+            speech.put("recipients", strings(options.path("speech").path("recipients")));
+            view.put("speech", java.util.Collections.unmodifiableMap(speech));
+            var actions = new ArrayList<Map<String, Object>>();
+            for (JsonNode action : options.path("actions")) {
+                var line = new LinkedHashMap<String, Object>();
+                line.put("actionId", action.path("actionId").asString());
+                line.put("kind", action.path("kind").asString());
+                line.put("cost", action.path("cost").asInt());
+                line.put("targets", strings(action.path("targets")));
+                actions.add(line);
+            }
+            view.put("actions", List.copyOf(actions));
+            view.put("endActivation", options.path("endActivation").asBoolean());
+            entry.put("options", java.util.Collections.unmodifiableMap(view));
+        }
+        return java.util.Collections.unmodifiableMap(entry);
+    }
+
+    /** Copy a string array. */
+    private static List<String> strings(JsonNode array) {
+        var values = new ArrayList<String>();
+        array.forEach(value -> values.add(value.asString()));
+        return List.copyOf(values);
     }
 
     /** Copy an integer array. */

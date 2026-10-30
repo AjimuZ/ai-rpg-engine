@@ -195,6 +195,91 @@ public final class EventStatements {
                         : "Combat " + encounter + " begins: " + actor + " stands in zone " + zone + "."
                                 + (strike.isEmpty() ? "" : " Opening strike declared against " + strike + ".");
             }
+            case "INITIATIVE_ROLLED" -> {
+                // P11.2: the stored order, highest first; participant IDs stand for template participants.
+                var parts = new ArrayList<String>();
+                for (JsonNode line : payload.path("order")) {
+                    String participant = token(line, "participantId");
+                    Long total = number(line, "total");
+                    if (participant == null || total == null) {
+                        parts = null;
+                        break;
+                    }
+                    parts.add(participant + " " + total);
+                }
+                yield parts == null || parts.isEmpty() ? null
+                        : (it ? "Iniziativa tirata: " : "Initiative is rolled: ") + String.join(", ", parts) + ".";
+            }
+            case "ROUND_STARTED" -> {
+                Long round = number(payload, "round");
+                yield round == null ? null : it ? "Inizia il round " + round + "." : "Round " + round + " begins.";
+            }
+            case "ROUND_ENDED" -> {
+                Long round = number(payload, "round");
+                Long seconds = number(payload, "seconds");
+                yield round == null || seconds == null ? null
+                        : it ? "Il round " + round + " termina: trascorrono " + seconds + " secondi."
+                        : "Round " + round + " ends: " + seconds + " seconds pass.";
+            }
+            case "ACTIVATION_STARTED", "ACTIVATION_ENDED" -> {
+                String participant = participant(payload, names);
+                boolean start = type.equals("ACTIVATION_STARTED");
+                Long points = number(payload, start ? "actionPoints" : "unusedActionPoints");
+                yield participant == null || points == null ? null
+                        : start ? it ? "Turno di " + participant + ": " + points(true, points) + "."
+                                : participant + " acts with " + points(false, points) + "."
+                        : it ? "Fine del turno di " + participant + ": " + (points == 1 ? "scade " : "scadono ")
+                                + points(true, points) + "."
+                                : participant + " ends the turn; " + points(false, points)
+                                + (points == 1 ? " expires." : " expire.");
+            }
+            case "PARTICIPANT_MOVED" -> {
+                String participant = participant(payload, names);
+                String from = token(payload, "from");
+                String to = token(payload, "to");
+                Long points = number(payload, "actionPoints");
+                yield participant == null || from == null || to == null || points == null ? null
+                        : it ? "Spostamento di " + participant + ": dalla zona " + from + " alla zona " + to + " ("
+                                + points(true, points) + ")."
+                        : participant + " moves from zone " + from + " to zone " + to + " for "
+                                + points(false, points) + ".";
+            }
+            case "COMBAT_SPEECH" -> {
+                String speaker = participant(payload, names);
+                String recipient = token(payload, "recipientId");
+                String words = payload.path("text").isString() ? payload.path("text").asString() : null;
+                yield speaker == null || recipient == null || words == null || words.isBlank() ? null
+                        : it ? speaker + " dice a " + recipient + ": \"" + words + "\""
+                        : speaker + " says to " + recipient + ": \"" + words + "\"";
+            }
+            case "INTERACTION_ATTEMPTED" -> {
+                String participant = participant(payload, names);
+                String action = token(payload, "actionId");
+                Long points = number(payload, "actionPoints");
+                if (participant == null || action == null || points == null) {
+                    yield null;
+                }
+                if ("social".equals(token(payload, "kind"))) {
+                    String intent = token(payload, "intent");
+                    String target = token(payload, "targetId");
+                    yield intent == null || target == null ? null
+                            : it ? participant + " tenta " + action + " (" + intent + ") con " + target + " ("
+                                    + points(true, points) + ")."
+                            : participant + " attempts " + action + " (" + intent + ") with " + target + " for "
+                                    + points(false, points) + ".";
+                }
+                JsonNode passage = payload.path("passage");
+                String from = token(passage, "from");
+                String to = token(passage, "to");
+                if (from == null || to == null || !passage.path("blocked").isBoolean()) {
+                    yield null;
+                }
+                boolean blocked = passage.path("blocked").asBoolean();
+                yield it ? participant + " usa " + action + ": il passaggio tra " + from + " e " + to + " ora è "
+                        + (blocked ? "chiuso" : "aperto") + " (" + points(true, points) + ")."
+                        : participant + " uses " + action + ": the passage between " + from + " and " + to + " is now "
+                                + (blocked ? "closed" : "open") + " for " + points(false, points) + ".";
+            }
             case "QUEST_OBJECTIVE_SATISFIED" -> {
                 String quest = token(payload, "questId");
                 String objective = token(payload, "objectiveId");
@@ -278,6 +363,24 @@ public final class EventStatements {
             resolved.add(name);
         }
         return resolved;
+    }
+
+    /**
+     * Name of an encounter participant (P11.2): the display name of the campaign actor behind it when the payload
+     * names one, otherwise its participant ID, as template participants have no campaign actor.
+     *
+     * @return the name, or null when the payload names an unknown actor or no participant
+     */
+    private static String participant(JsonNode payload, Map<UUID, String> names) {
+        if (payload.has("actorId")) {
+            return name(payload, "actorId", names);
+        }
+        return token(payload, "participantId");
+    }
+
+    /** @return a count of action points with the singular or plural noun of the locale (P11.2) */
+    private static String points(boolean it, long count) {
+        return count + (it ? count == 1 ? " punto azione" : " punti azione" : count == 1 ? " action point" : " action points");
     }
 
     /** @return the display name of the actor whose UUID text is {@code reference}, or null */

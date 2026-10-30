@@ -295,6 +295,11 @@ public class CampaignCreationController {
             case TIME_ILLEGAL -> error(422, "COMMAND_TIME_ILLEGAL");
             case REST_UNAVAILABLE -> error(422, "COMMAND_REST_UNAVAILABLE");
             case ENCOUNTER_UNAVAILABLE -> error(422, "COMMAND_ENCOUNTER_UNAVAILABLE");
+            case TURN_UNAVAILABLE -> error(422, "COMMAND_TURN_UNAVAILABLE");
+            case ACTION_POINTS_INSUFFICIENT -> error(422, "COMMAND_ACTION_POINTS_INSUFFICIENT");
+            case ZONE_UNAVAILABLE -> error(422, "COMMAND_ZONE_UNAVAILABLE");
+            case SPEECH_LIMIT_REACHED -> error(422, "COMMAND_SPEECH_LIMIT_REACHED");
+            case INTERACTION_UNAVAILABLE -> error(422, "COMMAND_INTERACTION_UNAVAILABLE");
         };
     }
 

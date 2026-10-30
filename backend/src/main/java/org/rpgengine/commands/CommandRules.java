@@ -9,7 +9,10 @@ import java.util.UUID;
 import org.rpgengine.characters.CharacterRuleViolation;
 import org.rpgengine.characters.CharacterService;
 import org.rpgengine.combat.EncounterTemplate;
+import org.rpgengine.combat.EncounterWriter;
 import org.rpgengine.combat.OpeningPolicy;
+import org.rpgengine.combat.TacticalIntent;
+import org.rpgengine.combat.TacticalRules;
 import org.rpgengine.inventory.ItemChange;
 import org.rpgengine.knowledge.KnowledgeLedger;
 import org.rpgengine.knowledge.KnowledgeRefs;
@@ -60,6 +63,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       attributes and Health pool); the player has every mapped role attribute and Health above its minimum, no
  *       encounter of the campaign is active, and an opening strike is declared only when the template's policy allows
  *       one and it names a hostile participant. Every refusal shares {@code ENCOUNTER_UNAVAILABLE}.</li>
+ *   <li><b>Tactical intentions (P11.2)</b> — the campaign's active encounter must exist and its player participant
+ *       must be the acting player; {@link TacticalRules} then decides turn, movement, addressing, speech allowance,
+ *       declared-action eligibility and action points over the stored tactical state ({@code TURN_UNAVAILABLE},
+ *       {@code ZONE_UNAVAILABLE}, {@code TARGET_ILLEGAL}, {@code SPEECH_LIMIT_REACHED}, {@code INTERACTION_UNAVAILABLE},
+ *       {@code ACTION_POINTS_INSUFFICIENT}). The initiative roll and the end of an activation may close a round, so
+ *       the clock must be able to take one round's seconds ({@code TIME_ILLEGAL}).</li>
  *   <li><b>Causal attribution</b> — at commit, resolved effects may only touch the participants
  *       this intention lawfully involves ({@link #requireAttributed}).</li>
  * </ul>
@@ -109,6 +118,7 @@ final class CommandRules {
             case TypedCommand.Wait wait -> check.waitable(wait.seconds());
             case TypedCommand.Rest rest -> check.rest(rest.restId());
             case TypedCommand.Engage engage -> check.engage(engage);
+            case TypedCommand.Tactical tactical -> check.tactical(tactical);
             case TypedCommand.Speak speech -> {
                 if (speech.recipientActorId().equals(player)) {
                     throw fail(OperationAdmissionFailure.Kind.ACTOR_UNAVAILABLE);
@@ -208,6 +218,11 @@ final class CommandRules {
                     throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
                 }
             }
+        }
+        // Tactical progress may only advance the campaign's own active encounter (P11.2).
+        if (plan.progress() != null && !EncounterWriter.active(jdbc, campaign)
+                .map(active -> active.id().equals(plan.progress().encounterId())).orElse(false)) {
+            throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
         }
         for (var visit : plan.quests().visits()) {
             if (!participants.contains(visit.actorId())) {
@@ -442,6 +457,34 @@ final class CommandRules {
                         || target.side() != EncounterTemplate.Side.HOSTILE) {
                     throw fail(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE);
                 }
+            }
+        }
+
+        /**
+         * A tactical intention needs the campaign's active encounter, played by this player, and the
+         * {@link TacticalRules} verdict over its stored tactical state. A missing encounter is a turn refusal: there is
+         * no decision to take.
+         */
+        void tactical(TypedCommand.Tactical tactical) {
+            var state = EncounterWriter.state(jdbc, campaign)
+                    .orElseThrow(() -> fail(OperationAdmissionFailure.Kind.TURN_UNAVAILABLE));
+            if (!player.equals(state.player().actorId())) {
+                throw fail(OperationAdmissionFailure.Kind.ACTOR_UNAVAILABLE);
+            }
+            var refusal = TacticalRules.refusal(state, tactical.intent());
+            if (refusal != null) {
+                throw fail(switch (refusal) {
+                    case TURN -> OperationAdmissionFailure.Kind.TURN_UNAVAILABLE;
+                    case ACTION_POINTS -> OperationAdmissionFailure.Kind.ACTION_POINTS_INSUFFICIENT;
+                    case ZONE -> OperationAdmissionFailure.Kind.ZONE_UNAVAILABLE;
+                    case TARGET -> OperationAdmissionFailure.Kind.TARGET_ILLEGAL;
+                    case SPEECH_LIMIT -> OperationAdmissionFailure.Kind.SPEECH_LIMIT_REACHED;
+                    case ACTION -> OperationAdmissionFailure.Kind.INTERACTION_UNAVAILABLE;
+                });
+            }
+            if (tactical.intent() instanceof TacticalIntent.EndActivation
+                    || tactical.intent() instanceof TacticalIntent.RollInitiative) {
+                timeFits(state.profile().roundSeconds());
             }
         }
 

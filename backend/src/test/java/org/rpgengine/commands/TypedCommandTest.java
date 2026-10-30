@@ -255,6 +255,53 @@ class TypedCommandTest {
                 new TypedCommand.Engage("ambush", "raider").payload());
     }
 
+    /**
+     * Tactical intentions (P11.2) carry only the player's choice: nothing for the initiative roll and the end of an
+     * activation, a zone, a recipient with at most 500 characters of speech, a declared action with an optional target.
+     */
+    @Test
+    void decodesTacticalIntentionsExactly() {
+        for (String type : List.of("ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT")) {
+            assertTrue(TypedCommand.registered(type), type);
+        }
+        assertEquals(new TypedCommand.RollInitiative(), decode("ROLL_INITIATIVE", Map.of()));
+        assertEquals(new TypedCommand.EndActivation(), decode("END_ACTIVATION", Map.of()));
+        assertEquals(new TypedCommand.MoveZone("yard"), decode("MOVE_ZONE", Map.of("zoneId", "yard")));
+        assertEquals(new TypedCommand.CombatSpeak("raider", "Stop."), decode("COMBAT_SPEAK",
+                Map.of("recipientId", "raider", "text", "Stop.")));
+        assertEquals(new TypedCommand.Interact("taunt", "raider"), decode("INTERACT",
+                Map.of("actionId", "taunt", "targetId", "raider")));
+        assertEquals(new TypedCommand.Interact("seal-route", null), decode("INTERACT", Map.of("actionId", "seal-route")));
+        assertEquals(new org.rpgengine.combat.TacticalIntent.Interact("taunt", "raider"),
+                new TypedCommand.Interact("taunt", "raider").intent());
+        assertInvalid("ROLL_INITIATIVE", Map.of("dice", List.of(10, 10)));
+        assertInvalid("END_ACTIVATION", Map.of("actionPoints", 3));
+        assertInvalid("MOVE_ZONE", Map.of());
+        assertInvalid("MOVE_ZONE", Map.of("zoneId", ""));
+        assertInvalid("MOVE_ZONE", Map.of("zoneId", "x".repeat(129)));
+        assertInvalid("MOVE_ZONE", Map.of("zoneId", "yard", "cost", 0));
+        assertInvalid("COMBAT_SPEAK", Map.of("recipientId", "raider"));
+        assertInvalid("COMBAT_SPEAK", Map.of("recipientId", "raider", "text", " "));
+        assertInvalid("COMBAT_SPEAK", Map.of("recipientId", "raider", "text", "x".repeat(501)));
+        assertInvalid("COMBAT_SPEAK", Map.of("recipientId", "raider", "text", "Yield.", "effect", "surrender"));
+        assertInvalid("INTERACT", Map.of("targetId", "raider"));
+        assertInvalid("INTERACT", Map.of("actionId", "taunt", "targetId", ""));
+        assertInvalid("INTERACT", Map.of("actionId", "taunt", "outcome", "accepted"));
+        assertEquals(500, decodeSpeech("x".repeat(500)).text().length());
+        assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.MoveZone(null));
+        assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.Interact("taunt", " "));
+        assertEquals(Map.of(), new TypedCommand.EndActivation().payload());
+        assertEquals(Map.of("actionId", "seal-route"), new TypedCommand.Interact("seal-route", null).payload());
+    }
+
+    private static TypedCommand decode(String type, Map<String, Object> payload) {
+        return TypedCommand.decode(CommandCanonicalForm.encode(type, 0, payload, 32_768));
+    }
+
+    private static TypedCommand.CombatSpeak decodeSpeech(String text) {
+        return (TypedCommand.CombatSpeak) decode("COMBAT_SPEAK", Map.of("recipientId", "raider", "text", text));
+    }
+
     private static void assertInvalid(String type, Map<String, Object> payload) {
         var failure = assertThrows(OperationAdmissionFailure.class,
                 () -> TypedCommand.decode(CommandCanonicalForm.encode(type, 0, payload, 32_768)));

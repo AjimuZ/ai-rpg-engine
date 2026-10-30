@@ -187,6 +187,13 @@ class CampaignCommandHttpTest {
         var mode = post(commandsPath(), valid);
         assertEquals(422, mode.status());
         assertEquals("{\"code\":\"COMMAND_MODE_ILLEGAL\"}", mode.body());
+        // P11.2: a tactical intention in encounter mode needs a decision boundary; without one it is a turn refusal.
+        String tactical = envelope(UUID.randomUUID().toString(), 0, "{}").replace("\"MOVE\"", "\"END_ACTIVATION\"");
+        var turn = post(commandsPath(), tactical);
+        assertEquals(422, turn.status());
+        assertEquals("{\"code\":\"COMMAND_TURN_UNAVAILABLE\"}", turn.body());
+        jdbc.update("update campaign set mode = 'EXPLORATION', row_version = row_version + 1 where id = ?", campaign);
+        assertEquals("{\"code\":\"COMMAND_MODE_ILLEGAL\"}", post(commandsPath(), tactical).body());
         jdbc.update("update campaign set mode = 'EXPLORATION', pending_decision = '{}'::jsonb, "
                 + "row_version = row_version + 1 where id = ?", campaign);
         var decision = post(commandsPath(), valid);

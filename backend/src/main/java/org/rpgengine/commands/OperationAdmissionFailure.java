@@ -63,7 +63,11 @@ public final class OperationAdmissionFailure extends RuntimeException {
         ABILITY_UNAVAILABLE,
         /** A required skill rank or prerequisite ability of the selected ability is missing (HTTP 422). */
         PREREQUISITE_UNMET,
-        /** Target count violates the ability's target policy, or the policy needs encounter zones (HTTP 422). */
+        /**
+         * Target count violates the ability's target policy, or the policy needs encounter zones; since P11.2 also an
+         * encounter participant who cannot be addressed: missing, the player, of a side the declared action does not
+         * admit, not standing or beyond speaking range (HTTP 422).
+         */
         TARGET_ILLEGAL,
         /** A declared cost exceeds the acting player's current resource above its minimum (HTTP 422). */
         RESOURCE_INSUFFICIENT,
@@ -127,6 +131,26 @@ public final class OperationAdmissionFailure extends RuntimeException {
          * vocabulary, the player is defeated or already in an encounter, or the declared opening strike is not
          * allowed or names no hostile participant (HTTP 422, P11.1).
          */
-        ENCOUNTER_UNAVAILABLE
+        ENCOUNTER_UNAVAILABLE,
+        /**
+         * The tactical intention is not legal at this point of the encounter: initiative is already rolled, or it is
+         * not the player's own decision boundary (another participant acts, an action is resolving, the round has
+         * closed). Nothing is queued for a later turn (HTTP 422, P11.2).
+         */
+        TURN_UNAVAILABLE,
+        /** The action costs more action points than remain in the player's activation (HTTP 422, P11.2). */
+        ACTION_POINTS_INSUFFICIENT,
+        /**
+         * The destination zone is unknown, the current zone, not one unblocked edge away from it or at its capacity
+         * (HTTP 422, P11.2).
+         */
+        ZONE_UNAVAILABLE,
+        /** The speech-only utterances of the current activation are used up (HTTP 422, P11.2). */
+        SPEECH_LIMIT_REACHED,
+        /**
+         * The encounter declares no such social or scene action, it cannot be used from the player's zone, or it
+         * would change nothing because its passage already has the requested state (HTTP 422, P11.2).
+         */
+        INTERACTION_UNAVAILABLE
     }
 }

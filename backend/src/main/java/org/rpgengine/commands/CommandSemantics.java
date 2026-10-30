@@ -11,8 +11,11 @@ import tools.jackson.databind.json.JsonMapper;
  * caller holds the campaign lock in its bounded transaction. No validation stamp from
  * an earlier snapshot grants permission: mode, pending decision and player binding are
  * read again at use. {@link CommandRules} then applies the P07.3 reachability, perception,
- * ownership, prerequisite and resource rules in the same transaction; encounter commands
- * remain unavailable until their scheduler exists.
+ * ownership, prerequisite and resource rules in the same transaction. Since P11.2 the mode
+ * decides the vocabulary: exploration intentions need {@code EXPLORATION}, the
+ * {@link TypedCommand.Tactical tactical} intentions need {@code ENCOUNTER}; any other pairing is
+ * {@code MODE_ILLEGAL}, so no exploration action can bypass the combat scheduler and no tactical
+ * action exists outside a fight.
  */
 final class CommandSemantics {
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -37,7 +40,8 @@ final class CommandSemantics {
                         row.getString(4)), campaign, adventure, owner);
         if (states.isEmpty()) { fail(OperationAdmissionFailure.Kind.SCOPE_UNAVAILABLE); }
         State state = states.getFirst();
-        if (!"EXPLORATION".equals(state.mode())) { fail(OperationAdmissionFailure.Kind.MODE_ILLEGAL); }
+        String mode = command instanceof TypedCommand.Tactical ? "ENCOUNTER" : "EXPLORATION";
+        if (!mode.equals(state.mode())) { fail(OperationAdmissionFailure.Kind.MODE_ILLEGAL); }
         if (state.decision() != null && !StartingDecision.supports(JSON.readTree(state.decision()))) {
             fail(OperationAdmissionFailure.Kind.DECISION_UNAVAILABLE);
         }

@@ -36,10 +36,11 @@ import org.rpgengine.rules.ZoneGraph;
  * @param opening opening-action policy
  * @param openingTarget hostile participant the player opens against, or null when entry carries no attack
  * @param participants the player first, then template participants in authored order
+ * @param actions declared social and scene actions (P11.2), possibly none
  */
 public record FrozenEncounter(UUID id, String templateId, String location, CombatProfile profile, ZoneGraph zones,
         Set<String> escapeZones, List<EncounterObjective> objectives, OpeningPolicy opening, String openingTarget,
-        List<Participant> participants) {
+        List<Participant> participants, List<EncounterAction> actions) {
     /** The only defeat policy of the default ruleset: zero Health incapacitates, it never kills (docs/11 section 13). */
     public static final String DEFEAT_POLICY = "incapacitated";
 
@@ -153,6 +154,7 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
         escapeZones = java.util.Collections.unmodifiableSet(new java.util.TreeSet<>(escapeZones));
         objectives = List.copyOf(objectives);
         participants = List.copyOf(participants);
+        actions = List.copyOf(actions);
         if (openingTarget != null && opening == OpeningPolicy.FORBIDDEN) {
             throw new IllegalArgumentException("this encounter cannot be opened by an attack");
         }
@@ -210,7 +212,8 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
                     values.get("finesse") + values.get("insight"), List.of(), List.of()));
         }
         return new FrozenEncounter(id, template.id(), template.location(), profile, template.zones(),
-                template.escapeZones(), template.objectives(), template.opening(), openingTarget, participants);
+                template.escapeZones(), template.objectives(), template.opening(), openingTarget, participants,
+                template.actions());
     }
 
     /** @return the player's frozen participant */
@@ -220,7 +223,10 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
 
     /**
      * Frozen definition as canonical JSON: template, location, kernel, profile hash, zones, escape zones,
-     * objectives, opening, defeat policy and roster. This text and its hash are stored at entry and never change.
+     * objectives, opening, defeat policy, roster and, only when the template declares any, its social and scene
+     * actions (P11.2; omitting an empty list keeps definitions of action-free templates byte-identical to P11.1).
+     * This text and its hash are stored at entry and never change; the tactical scheduler reads its zones, escape
+     * zones and actions back from it.
      *
      * @return canonical JSON object text
      */
@@ -241,6 +247,9 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
         form.put("opening", opening);
         form.put("defeatPolicy", DEFEAT_POLICY);
         form.put("participants", participants.stream().map(p -> (Object) p.canonicalForm()).toList());
+        if (!actions.isEmpty()) {
+            form.put("actions", actions.stream().map(action -> (Object) action.canonicalForm()).toList());
+        }
         return CanonicalJson.write(form);
     }
 

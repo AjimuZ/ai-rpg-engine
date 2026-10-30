@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased — Initiative, rounds, activations and bounded combat dialogue (P11.2), 30 October 2026
+
+- An entered encounter can now be played turn by turn. `ROLL_INITIATIVE` rolls two ten-sided dice for every
+  participant once, adds their initiative modifiers and fixes the order (higher total first, then higher finesse,
+  then participant identity); the dice appear in the receipt and a retried request reuses them. Rounds then run in
+  that order: each active participant's turn grants the adventure's action points (3 by default), unused points
+  expire when the turn ends, and every completed round adds its in-world seconds (8 by default) to the clock.
+- On the player's turn the player can move to an adjacent zone (`MOVE_ZONE`, one point per edge, two across
+  difficult terrain, never through a blocked edge or into a full zone), say one short thing to a participant in
+  speaking range (`COMBAT_SPEAK`, at most 500 characters, free and limited to one utterance per turn by default),
+  attempt one of the encounter's declared social or scene actions (`INTERACT`, for example demanding passage or
+  unbarring a gate, at the declared cost) and end the turn explicitly (`END_ACTIVATION`). Points left at zero do
+  not end the turn by themselves. Encounter templates gain optional `actions` for these social and scene actions.
+- Nothing can be submitted or queued out of turn: other participants' turns run until the player's next decision.
+  Refusals change nothing and answer new codes (`COMMAND_TURN_UNAVAILABLE`, `COMMAND_ACTION_POINTS_INSUFFICIENT`,
+  `COMMAND_ZONE_UNAVAILABLE`, `COMMAND_SPEECH_LIMIT_REACHED`, `COMMAND_INTERACTION_UNAVAILABLE`) with reviewed English
+  and Italian wording (the Italian still needs independent human review). Every tactical receipt shows the round,
+  whose turn it is, the remaining points, the initiative order and the player's legal options.
+- PostgreSQL stores the turn cursor, the speech count, passage changes, initiative and reaction budgets (migration
+  V23) and refuses a re-roll, points granted in the middle of a turn, points beyond the adventure's allowance and
+  extra speech. The backup tool covers schema version 23.
+- Not included yet: attacks and the opening strike (P11.3) — other participants therefore pass their turns —;
+  reactions (P11.4); responses to social attempts, outcomes and settlement (P11.5); recovery of a fight from the
+  checkpoint (P11.6); a frontend control or panel for encounters (P12). See
+  [ADR 0029](docs/adr/0029-initiative-rounds-activations-and-bounded-combat-dialogue.md).
+
 ## Unreleased — Encounter lifecycle, combat profiles, zones and opening policy (P11.1), 29 October 2026
 
 - Adventures can now define fights. A pack declares one combat profile (`ruleType: combat`) around the AI RPG

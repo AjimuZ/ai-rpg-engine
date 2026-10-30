@@ -114,6 +114,53 @@ class EventStatementsTest {
         assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_STARTED", plain.replace("\"zone\"", "\"area\"")));
     }
 
+    /**
+     * Tactical events (P11.2) state the initiative order, round boundaries, activations, zone moves, combat speech and
+     * declared actions in both locales; the player is named through the actor, other participants by roster ID.
+     */
+    @Test
+    void statesTacticalEvents() {
+        String order = "{\"order\":[{\"participantId\":\"player\",\"total\":17},{\"participantId\":\"raider\",\"total\":13}]}";
+        assertEquals("Initiative is rolled: player 17, raider 13.", state(SupportedLocale.EN, "INITIATIVE_ROLLED", order));
+        assertEquals("Iniziativa tirata: player 17, raider 13.", state(SupportedLocale.IT, "INITIATIVE_ROLLED", order));
+        assertEquals(null, state(SupportedLocale.EN, "INITIATIVE_ROLLED", "{\"order\":[{\"participantId\":\"player\"}]}"));
+        assertEquals("Round 2 begins.", state(SupportedLocale.EN, "ROUND_STARTED", "{\"round\":2}"));
+        assertEquals("Inizia il round 2.", state(SupportedLocale.IT, "ROUND_STARTED", "{\"round\":2}"));
+        assertEquals("Round 1 ends: 8 seconds pass.", state(SupportedLocale.EN, "ROUND_ENDED", "{\"round\":1,\"seconds\":8}"));
+        assertEquals("Il round 1 termina: trascorrono 8 secondi.",
+                state(SupportedLocale.IT, "ROUND_ENDED", "{\"round\":1,\"seconds\":8}"));
+        String mine = "{\"actorId\":\"" + PLAYER + "\",\"participantId\":\"player\",\"actionPoints\":3,\"unusedActionPoints\":2}";
+        assertEquals("Mira acts with 3 action points.", state(SupportedLocale.EN, "ACTIVATION_STARTED", mine));
+        assertEquals("Turno di Mira: 3 punti azione.", state(SupportedLocale.IT, "ACTIVATION_STARTED", mine));
+        String theirs = "{\"participantId\":\"raider\",\"unusedActionPoints\":3}";
+        assertEquals("raider ends the turn; 3 action points expire.", state(SupportedLocale.EN, "ACTIVATION_ENDED", theirs));
+        assertEquals("Fine del turno di raider: scadono 3 punti azione.",
+                state(SupportedLocale.IT, "ACTIVATION_ENDED", theirs));
+        String moved = "{\"actorId\":\"" + PLAYER + "\",\"participantId\":\"player\",\"from\":\"entry\",\"to\":\"yard\",\"actionPoints\":1}";
+        assertEquals("Mira moves from zone entry to zone yard for 1 action point.",
+                state(SupportedLocale.EN, "PARTICIPANT_MOVED", moved));
+        assertEquals("Spostamento di Mira: dalla zona entry alla zona yard (1 punto azione).",
+                state(SupportedLocale.IT, "PARTICIPANT_MOVED", moved));
+        String words = "{\"actorId\":\"" + PLAYER + "\",\"participantId\":\"player\",\"recipientId\":\"raider\",\"text\":\"Why?\"}";
+        assertEquals("Mira says to raider: \"Why?\"", state(SupportedLocale.EN, "COMBAT_SPEECH", words));
+        assertEquals("Mira dice a raider: \"Why?\"", state(SupportedLocale.IT, "COMBAT_SPEECH", words));
+        String social = "{\"actorId\":\"" + PLAYER + "\",\"participantId\":\"player\",\"actionId\":\"demand-passage\","
+                + "\"kind\":\"social\",\"intent\":\"negotiate\",\"targetId\":\"smuggler\",\"actionPoints\":1}";
+        assertEquals("Mira attempts demand-passage (negotiate) with smuggler for 1 action point.",
+                state(SupportedLocale.EN, "INTERACTION_ATTEMPTED", social));
+        assertEquals("Mira tenta demand-passage (negotiate) con smuggler (1 punto azione).",
+                state(SupportedLocale.IT, "INTERACTION_ATTEMPTED", social));
+        String scene = "{\"actorId\":\"" + PLAYER + "\",\"participantId\":\"player\",\"actionId\":\"unbar-gate\","
+                + "\"kind\":\"scene\",\"passage\":{\"from\":\"booth\",\"to\":\"gate\",\"blocked\":false},\"actionPoints\":1}";
+        assertEquals("Mira uses unbar-gate: the passage between booth and gate is now open for 1 action point.",
+                state(SupportedLocale.EN, "INTERACTION_ATTEMPTED", scene));
+        assertEquals("Mira usa unbar-gate: il passaggio tra booth e gate ora è aperto (1 punto azione).",
+                state(SupportedLocale.IT, "INTERACTION_ATTEMPTED", scene));
+        // An unknown actor or a malformed passage falls back to the receipt.
+        assertEquals(null, state(SupportedLocale.EN, "COMBAT_SPEECH", words.replace(PLAYER.toString(), UUID.randomUUID().toString())));
+        assertEquals(null, state(SupportedLocale.EN, "INTERACTION_ATTEMPTED", scene.replace("false", "\"no\"")));
+    }
+
     /** Quest events state their transition in both locales, using the canonical quest and outcome identities. */
     @Test
     void statesQuestEvents() {

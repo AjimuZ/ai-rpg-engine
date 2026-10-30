@@ -264,7 +264,7 @@ operation status is stored progress, not evidence that a worker is currently ali
 | 422 | `COMMAND_DESTINATION_UNAVAILABLE` | Destination unknown, concealed, current, unlinked or blocked, or the player has no current location |
 | 422 | `COMMAND_ABILITY_UNAVAILABLE` | Ability not pinned or not learned by the acting player |
 | 422 | `COMMAND_PREREQUISITE_UNMET` | A prerequisite ability or skill rank is missing |
-| 422 | `COMMAND_TARGET_ILLEGAL` | Target count violates the ability's policy, or the policy needs encounter zones |
+| 422 | `COMMAND_TARGET_ILLEGAL` | Target count violates the ability's policy, or the policy needs encounter zones; since P11.2 also an encounter participant who cannot be addressed (missing, the player, of a side the declared action does not admit, not standing or beyond speaking range) |
 | 422 | `COMMAND_RESOURCE_INSUFFICIENT` | A declared cost exceeds the player's current resource above its minimum, or belongs to another pack's vocabulary |
 | 422 | `COMMAND_CONTENT_UNAVAILABLE` | The pinned content closure cannot be loaded by this engine build for a rule that needs it |
 | 409 | `COMMAND_DEPENDENCIES_MISSING` | P09.5: the campaign's sealed pinned closure is missing, corrupt or unusable, so every fresh command is refused until the same content is restored or imported (checked right after replay; nothing journaled) |
@@ -277,6 +277,11 @@ operation status is stored progress, not evidence that a worker is currently ali
 | 422 | `COMMAND_TIME_ILLEGAL` | P10.4: a wait longer than four hours, or a duration (waiting, travel or rest) that would carry the bounded world clock past its end |
 | 422 | `COMMAND_REST_UNAVAILABLE` | P10.4: the rest policy is unknown, the location lacks its required tag, or it restores resources of another vocabulary than the player's |
 | 422 | `COMMAND_ENCOUNTER_UNAVAILABLE` | P11.1: the encounter is unknown, belongs to another location or vocabulary, the player is defeated (Health at its minimum) or lacks a mapped role attribute, an encounter is already active, or the declared opening strike is forbidden by the template or names no hostile participant |
+| 422 | `COMMAND_TURN_UNAVAILABLE` | P11.2: the tactical intention is not legal now: initiative is already rolled, there is no active encounter, or it is not the player's own decision (another participant acts or the round has closed); nothing is queued |
+| 422 | `COMMAND_ACTION_POINTS_INSUFFICIENT` | P11.2: the move or declared action costs more action points than remain in the player's activation |
+| 422 | `COMMAND_ZONE_UNAVAILABLE` | P11.2: the destination zone is unknown, the current zone, not one unblocked edge away or at its capacity |
+| 422 | `COMMAND_SPEECH_LIMIT_REACHED` | P11.2: the speech-only utterances of the current activation are used up |
+| 422 | `COMMAND_INTERACTION_UNAVAILABLE` | P11.2: the encounter declares no such social or scene action, it cannot be used from the player's zone, or its passage already has the requested state |
 | 429 | `COMMAND_ADMISSION_LIMIT` | Two live mutation permits already belong to this owner |
 | 503 | `COMMAND_STORAGE_UNAVAILABLE` | Required transaction/storage unavailable |
 
@@ -559,6 +564,13 @@ cancel. It cannot change turn eligibility, auto-submit next turn or force an NPC
 agreement. See section 13 for the proposed input boundary.
 
 This is a planned P11/P12 contract. The P05.1 preview shells do not implement playable combat chat.
+
+Since P11.2 the backend side of this boundary exists ([ADR 0029](adr/0029-initiative-rounds-activations-and-bounded-combat-dialogue.md),
+[turn protocol](07-turn-protocol.md#p112-tactical-intentions)): `COMBAT_SPEAK` stores one bounded speech-only
+utterance per activation at no cost, `INTERACT` attempts a declared social or scene action at its declared cost,
+both only at the player's own decision, and every tactical receipt lists the legal options (moves with costs,
+speech allowance and recipients, declared actions with costs and targets). Generated replies, negotiation
+responses, the panel and the composer remain P11.5 and P12.
 
 ## 8. Loading, empty, error, and recovery states
 

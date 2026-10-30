@@ -2614,6 +2614,30 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     Not proven here: the 18 Docker-dependent probe cases, the `unzip` wrapper cases, a live V22 dump and
     restore, balance of the provisional numbers and independent review of the new Italian message.
 - [ ] P11.2 Implement initiative, rounds, activations, AP, movement, legal targeting and explicit end activation; enforce bounded speech and declared social/scene-action eligibility/costs at player decision boundaries.
+  - Package A — scheduler (`org.rpgengine.combat`): `ROLL_INITIATIVE` (two recorded d10 per participant in
+    roster order plus the frozen modifier; order by total, finesse, participant ID; stored once), `CombatScheduler`
+    (round-open reaction refresh, activations over active participants in rank order, action points granted at
+    activation start and expired at its end, `roundSeconds` per completed round, stop only at the player's own
+    decision, round cap, no standing player), other participants passing until P11.3/P12 give them tactics.
+  - Package B — player actions and legality: `TacticalRules` (turn, one-edge `MOVE_ZONE` with difficult terrain and
+    capacity, addressing within `maxRangeEdges`, speech allowance, declared actions, action points) and the
+    explicit `END_ACTIVATION`; refusals `TURN_UNAVAILABLE`, `ACTION_POINTS_INSUFFICIENT`, `ZONE_UNAVAILABLE`,
+    `SPEECH_LIMIT_REACHED`, `INTERACTION_UNAVAILABLE` and `TARGET_ILLEGAL`; tactical intentions only in encounter
+    mode, exploration intentions only in exploration mode.
+  - Package C — bounded dialogue and declared actions: `COMBAT_SPEAK` (one free utterance per activation by
+    default, at most 500 characters, no draw, time or cursor change) and `INTERACT` over the encounter's declared
+    `social` (intent, recipient policy) and `scene` (zone, passage to block or open) actions at their declared
+    cost; a social attempt establishes no outcome (P11.5).
+  - Package D — storage and interface: V23 cursor, speech, passages, initiative and reactions with scheduling
+    triggers; `TacticalPlan` written one row version per phase step; receipt `combat` block with the legal options;
+    eight EN/IT event statements; five reviewed EN/IT refusal messages (catalog 418); backup schema 23; ADR 0029,
+    docs 05/07/09/10/11/13/15, backend README, backup README, CHANGELOG.
+  - Exit checks: the full verification plan passes; pure scheduler cases and real PostgreSQL cases prove recorded
+    initiative, legal transitions across activations, exact costs, one round of time per operation, refusals
+    without writes, no out-of-turn submission and the V23 guards; weakening probes on an exported copy fail tests.
+  - Limits: non-player participants pass; the opening strike stays pending (P11.3); reactions refresh but are
+    never spent (P11.4); no terminal predicate and no response to social attempts (P11.5); the V16 checkpoint
+    records no encounter (P11.6); no frontend control or panel (P12).
 - [ ] P11.3 Implement attack/defense/strong-hit/armor/healing calculations with recorded draws.
 - [ ] P11.4 Implement predeclared reactions, stacking caps, effect phases, durations, cooldowns, and no-chain limits.
 - [ ] P11.5 Implement defeat, escape, surrender/agreement predicates, refused/counteroffered/explicitly accepted negotiation, stalemate policy and idempotent settlement; prose alone cannot establish an outcome.

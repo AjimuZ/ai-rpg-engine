@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
+import org.rpgengine.combat.EncounterWriter;
 import org.rpgengine.inventory.InventoryModel;
 import org.rpgengine.quests.QuestStore;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -31,7 +32,8 @@ import tools.jackson.databind.json.JsonMapper;
  * commit writes quest rows and one-time reward settlements beside the events that announce them.
  *
  * <p>Since P11.1 the prepare step also reads the player's worn items, and an {@code ENGAGE} commit stores the frozen
- * encounter beside the event that announces it.
+ * encounter beside the event that announces it. Since P11.2 a tactical intention reads the active encounter's
+ * tactical state in the same prepare transaction, and its commit writes the scheduler's progress.
  *
  * <p>Since P10.2 the same pipeline executes the item commands: the prepare step also reads every
  * participant's item stacks, and the commit applies the resolved {@link org.rpgengine.inventory.ItemPlan}.
@@ -138,7 +140,7 @@ public class CommandExecutionService {
                         resolution.events(), resolution.rewards(), resolution.receiptDetails(), true,
                         new ResolvedCommit.Preparation(resolution.queryScopes(), List.of()), intent,
                         resolution.placements(), List.of(), resolution.items(), resolution.quests(),
-                        resolution.conditions(), resolution.encounter()));
+                        resolution.conditions(), resolution.encounter(), resolution.progress()));
             }
         } catch (OperationAdmissionFailure rejected) {
             // Current state changed after admission in a way the rules refuse; nothing was applied.
@@ -201,7 +203,8 @@ public class CommandExecutionService {
             var catalog = !needsCatalog(intent.command()) ? null
                     : intent.command() instanceof TypedCommand.Wait ? content.optional(pinned.getValue())
                     : content.require(pinned.getValue());
-            return new Prepared(context, catalog, snapshot(campaign, player, participants, catalog, operation));
+            return new Prepared(context, catalog, snapshot(campaign, player, participants, catalog, operation,
+                    intent.command() instanceof TypedCommand.Tactical));
         } catch (OperationAdmissionFailure rejected) {
             journal.transitionTo(OperationStatus.REJECTED, now);
             MutationLeaseService.releaseHeld(jdbc, campaign, operation, token);
@@ -216,7 +219,7 @@ public class CommandExecutionService {
      * attribute fails closed during calculation instead of reading zero.
      */
     private LocalActionResolver.Snapshot snapshot(UUID campaign, UUID player, Set<UUID> participants,
-            CommandRuleCatalog catalog, UUID operation) {
+            CommandRuleCatalog catalog, UUID operation, boolean tactical) {
         var actor = jdbc.queryForObject("select location_id, row_version from actor where campaign_id = ? and id = ?",
                 (row, index) -> Map.entry(java.util.Optional.ofNullable(row.getString(1)), row.getLong(2)),
                 campaign, player);
@@ -260,20 +263,24 @@ public class CommandExecutionService {
         var worn = jdbc.queryForList("select i.definition_id from equipment_assignment e join item_instance i "
                 + "on i.campaign_id = e.campaign_id and i.id = e.item_instance_id where e.campaign_id = ? "
                 + "and e.actor_id = ? order by i.definition_id", String.class, campaign, player);
+        // The active encounter's tactical state, read only for a tactical intention (P11.2).
+        var encounter = tactical ? EncounterWriter.state(jdbc, campaign).orElseThrow(
+                () -> new IllegalStateException("validated tactical intention has no active encounter")) : null;
         return new LocalActionResolver.Snapshot(player, actor.getKey().orElse(null), actor.getValue(),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[0]),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[1]), pools, vocabularies, operation, stacks,
-                stored, clock, conditions, worn);
+                stored, clock, conditions, worn, encounter);
     }
 
     /**
      * Whether resolving the intention consults pinned definitions: abilities, every item command, the
      * quest commands, rest, and movement (a new visit or its duration can satisfy a quest objective).
-     * Waiting needs it too since P10.4, because a clock predicate can become true as time passes. Only
-     * speech changes no fact a quest predicate reads.
+     * Waiting needs it too since P10.4, because a clock predicate can become true as time passes. Speech
+     * changes no fact a quest predicate reads, and a tactical intention (P11.2) reads only the frozen
+     * encounter, so a fight in progress never depends on reloading the pinned pack.
      */
     private static boolean needsCatalog(TypedCommand command) {
-        return !(command instanceof TypedCommand.Speak);
+        return !(command instanceof TypedCommand.Speak) && !(command instanceof TypedCommand.Tactical);
     }
 
     /** Integral members of a stored JSON object; other values are omitted and so read as unknown. */

@@ -1082,6 +1082,40 @@ end; the opening strike is stored, not resolved (P11.2/P11.3); items carry no Gu
 participants or hazards; the V16 checkpoint still records no encounter (P11.6); no frontend control sends `ENGAGE`
 and no panel shows an encounter (P12.1); no live V22 dump and restore rehearsal.
 
+## Initiative, rounds, activations and bounded combat dialogue (P11.2)
+
+Inside an encounter the player submits tactical intentions
+([ADR 0029](../docs/adr/0029-initiative-rounds-activations-and-bounded-combat-dialogue.md),
+[turn protocol](../docs/07-turn-protocol.md#p112-tactical-intentions)).
+
+- `TypedCommand.Tactical` marks `ROLL_INITIATIVE`, `MOVE_ZONE`, `END_ACTIVATION`, `COMBAT_SPEAK` (text at most 500
+  characters) and `INTERACT`; `CommandSemantics` admits them only in `ENCOUNTER` mode and exploration intentions only
+  in `EXPLORATION` mode. They read only the frozen encounter (`needsCatalog` is false).
+- `org.rpgengine.combat`: `TacticalIntent` (the combat-layer values), `EncounterState` (stored tactical state with the
+  frozen profile, zone graph and declared actions read back from canonical text by `EncounterWriter.state`),
+  `TacticalRules` (pure legality: turn, movement, addressing, speech allowance, declared actions, action points, and
+  the receipt's legal options), `CombatScheduler` (pure initiative roll and initiative-round scheduler that stops at
+  the player's decision) and `TacticalPlan` (steps, participant facts, events, round time and receipt summary),
+  written by `EncounterWriter.progressWithin` one row version per step. `EncounterAction` is a declared social or
+  scene action; `CombatProfile.fromCanonical` and `ZoneGraph.fromCanonical`/`withPassage`/`passageIs` support them.
+- `CommandRules.tactical` maps `TacticalRules` refusals to `TURN_UNAVAILABLE`, `ACTION_POINTS_INSUFFICIENT`,
+  `ZONE_UNAVAILABLE`, `TARGET_ILLEGAL`, `SPEECH_LIMIT_REACHED` and `INTERACTION_UNAVAILABLE`, and requires the clock to
+  take one round for the roll and the end of an activation. `LocalActionResolver` turns the plan into events (the
+  player's decisions attributed to the player), elapsed time and the receipt's `combat` block; `ResolvedCommit`
+  carries it as `progress` (encounter mode, its own time); `requireAttributed` binds it to the campaign's active
+  encounter. V23 adds the cursor columns and the scheduling triggers; the backup tool covers schema 23.
+- The pack compiler validates encounter `actions`; `EventStatements` states the eight new event types in English and
+  Italian.
+
+Tests: `CombatSchedulerTest` (pure scheduler and rules), `TacticalCommandsTest` (real PostgreSQL on the
+`EncounterPack` fixture, whose templates now declare social and scene actions), `CombatPackTest.refusesBrokenActions`,
+plus additions to `TypedCommandTest`, `EventStatementsTest`, `ResolvedCommitTest`, `CampaignCommandHttpTest`,
+`EncounterCommandsTest` (a first round needs initiative) and the V23 step of `CanonicalMigrationUpgradeTest`.
+Limits: non-player participants pass their activations (attacks P11.3, tactics P12.3/P12.4); the opening strike
+stays pending (P11.3); reactions refresh but are never spent (P11.4); no terminal predicate runs and a capped
+encounter waits at its round end (P11.5); social attempts get no response yet (P11.5); the V16 checkpoint still
+records no encounter (P11.6); no frontend control or panel (P12); no live V23 dump and restore rehearsal.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

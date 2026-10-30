@@ -16,7 +16,10 @@ import java.util.UUID;
 import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.campaign.CampaignMode;
 import org.rpgengine.campaign.EventVisibility;
+import org.rpgengine.combat.CombatScheduler;
+import org.rpgengine.combat.EncounterState;
 import org.rpgengine.combat.FrozenEncounter;
+import org.rpgengine.combat.TacticalPlan;
 import org.rpgengine.inventory.InventoryModel;
 import org.rpgengine.inventory.InventoryWriter;
 import org.rpgengine.inventory.ItemPlan;
@@ -24,6 +27,7 @@ import org.rpgengine.quests.QuestChanges;
 import org.rpgengine.quests.QuestPlan;
 import org.rpgengine.quests.QuestRules;
 import org.rpgengine.quests.QuestStore;
+import org.rpgengine.rules.CanonicalJson;
 import org.rpgengine.rules.DeterministicDraw;
 import org.rpgengine.rules.RestRules;
 import org.rpgengine.rules.WorldClock;
@@ -73,7 +77,14 @@ import tools.jackson.databind.node.ObjectNode;
  * player's committed facts into a {@link FrozenEncounter} whose identity derives from the operation, announces it
  * with one public {@code ENCOUNTER_STARTED} event and moves the campaign into encounter mode. Entry takes no world
  * time, draws no die and changes no pool: a declared opening strike is only recorded, to be resolved once at the
- * slot the template's opening policy allows (P11.2/P11.3).
+ * slot the template's opening policy allows (P11.3).
+ *
+ * <p>Tactical intentions (P11.2): the {@link TypedCommand.Tactical} commands are resolved by the pure
+ * {@link CombatScheduler} over the {@link EncounterState} read under the campaign lock, never over pinned
+ * definitions. Its plan becomes the commit's tactical progress, its notes become events (the player's own decisions
+ * attributed to the player, scheduler bookkeeping to nobody), its round time becomes the elapsed world time and its
+ * public summary becomes the receipt's {@code combat} block. Only the initiative roll draws dice: two d10 per
+ * participant, ordinals in roster order.
  *
  * <p>Rest (P10.4): the pinned policy restores its resources up to each pool's maximum and, when not
  * interrupted, ends the listed conditions the player has. An interruption is one recorded percentile
@@ -134,18 +145,28 @@ final class LocalActionResolver {
      * @param worldTimeSeconds the committed world clock before this command (P10.4)
      * @param conditions canonical IDs of the conditions currently active on the player (P10.4)
      * @param worn canonical item definitions the player wears, recorded by an encounter entry (P11.1)
+     * @param encounter tactical state of the active encounter, read for tactical intentions only (P11.2), or null
      */
     record Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
             Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
             UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored, long worldTimeSeconds,
-            Set<String> conditions, List<String> worn) {
+            Set<String> conditions, List<String> worn, EncounterState encounter) {
+        /** Snapshot without tactical state, the shape used before P11.2. */
+        Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
+                Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
+                UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored, long worldTimeSeconds,
+                Set<String> conditions, List<String> worn) {
+            this(player, location, playerRowVersion, attributes, skills, pools, vocabularies, operationId, stacks,
+                    stored, worldTimeSeconds, conditions, worn, null);
+        }
+
         /** Snapshot without worn items, the shape used before P11.1. */
         Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
                 Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
                 UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored, long worldTimeSeconds,
                 Set<String> conditions) {
             this(player, location, playerRowVersion, attributes, skills, pools, vocabularies, operationId, stacks,
-                    stored, worldTimeSeconds, conditions, List.of());
+                    stored, worldTimeSeconds, conditions, List.of(), null);
         }
 
         /** Snapshot without clock and condition facts, the shape used before P10.4. */
@@ -204,11 +225,22 @@ final class LocalActionResolver {
      * @param quests quest status, objective and visit writes (P10.3)
      * @param conditions conditions a rest ends (P10.4)
      * @param encounter the encounter an {@code ENGAGE} starts, or null (P11.1)
+     * @param progress the tactical plan of a tactical intention, or null (P11.2)
      */
     record Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
             List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
             List<String> queryScopes, ItemPlan items, List<ResolvedCommit.Reward> rewards, QuestChanges quests,
-            List<ResolvedCommit.ConditionRemoval> conditions, ResolvedCommit.EncounterEntry encounter) {
+            List<ResolvedCommit.ConditionRemoval> conditions, ResolvedCommit.EncounterEntry encounter,
+            TacticalPlan progress) {
+        /** Resolution without tactical progress, the shape used before P11.2. */
+        Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
+                List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
+                List<String> queryScopes, ItemPlan items, List<ResolvedCommit.Reward> rewards, QuestChanges quests,
+                List<ResolvedCommit.ConditionRemoval> conditions, ResolvedCommit.EncounterEntry encounter) {
+            this(world, resources, placements, events, receiptDetails, queryScopes, items, rewards, quests, conditions,
+                    encounter, null);
+        }
+
         /** Resolution without an encounter entry, the shape used before P11.1. */
         Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
                 List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
@@ -273,6 +305,7 @@ final class LocalActionResolver {
         /** Mode the commit leaves the campaign in; only an encounter entry changes it. */
         private CampaignMode mode = CampaignMode.EXPLORATION;
         private ResolvedCommit.EncounterEntry encounter;
+        private TacticalPlan progress;
         private final InventoryModel inventory;
         private int nextOrdinal;
         private int nextInstance;
@@ -331,6 +364,7 @@ final class LocalActionResolver {
                 }
                 case TypedCommand.Rest rest -> rest(rest, Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.Engage engage -> engage(engage, Objects.requireNonNull(catalog, "catalog"));
+                case TypedCommand.Tactical tactical -> tactical(tactical);
                 case TypedCommand.UseAbility use -> ability(use, Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.UseItem use -> useItem(use, Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.EquipItem equip -> wear(equip.itemInstanceId(), true,
@@ -365,7 +399,29 @@ final class LocalActionResolver {
             scopes.addAll(InventoryWriter.scopes(items));
             return new Resolution(new ResolvedCommit.WorldChange(true, elapsed, mode, null),
                     resources, List.copyOf(placements), List.copyOf(events), JSON.writeValueAsString(details),
-                    List.copyOf(scopes), items, List.copyOf(rewards), questChanges, List.copyOf(removals), encounter);
+                    List.copyOf(scopes), items, List.copyOf(rewards), questChanges, List.copyOf(removals), encounter,
+                    progress);
+        }
+
+        /**
+         * Resolve a tactical intention with the combat scheduler over the stored encounter state. The rule gate
+         * accepted it on the same rows; a refusal here is a resolver failure. Events keep the scheduler's order; the
+         * round time it reports is the elapsed world time and the campaign stays in encounter mode.
+         */
+        private void tactical(TypedCommand.Tactical tactical) {
+            var state = snapshot.encounter();
+            if (state == null) {
+                throw new IllegalStateException("validated tactical intention has no encounter state");
+            }
+            progress = CombatScheduler.apply(state, tactical.intent(), draws::value);
+            mode = CampaignMode.ENCOUNTER;
+            elapsed = progress.elapsedSeconds();
+            for (TacticalPlan.Note note : progress.notes()) {
+                events.add(new ResolvedCommit.Event(note.byPlayer() ? snapshot.player() : null, null,
+                        EventVisibility.PUBLIC, new CampaignEvent.Body(note.type(), EVENT_VERSION, EVENT_VERSION,
+                                CanonicalJson.write(note.payload()))));
+            }
+            details.set("combat", JSON.readTree(CanonicalJson.write(progress.summary())));
         }
 
         /**

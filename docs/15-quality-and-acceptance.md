@@ -1620,6 +1620,22 @@ blocks exploration in encounter mode, keeps the V22 guards and freezes a customi
 profile through the same kernel. Initiative, arithmetic, effects, outcomes and
 mid-round recovery remain P11.2–P11.6.
 
+P11.2 (30 October 2026) adds scheduler evidence, still not a full QA-09/QA-11–13
+result: pure `CombatSchedulerTest` cases (initiative from recorded dice with the
+finesse and identity tie-breaks, one arrow per stored step, points granted at
+activation start and expired at its end, other participants passing, one round end
+with eight seconds per operation, the round cap, skipped defeated participants, one
+edge per move with difficult terrain and capacity, bounded speech, addressing range,
+declared social and scene actions, no out-of-turn legality, the receipt options)
+and real PostgreSQL `TacticalCommandsTest` cases (the roll's recorded draws match the
+stored order and replay on retry; moves, speech and declared actions spend exactly
+their costs and no draw; ending the activation closes the round once; every refusal
+writes nothing; tactical intentions are refused out of mode and out of turn; a
+customized profile drives the same scheduler; the V23 guards). The QA-09/QA-13
+cases for "no out-of-turn submission" and "bounded no-benefit speech" now have
+backend evidence; attacks, reactions, outcomes, negotiation responses, transcript
+recovery and the browser path remain P11.3–P12.5.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

@@ -2,22 +2,34 @@ package org.rpgengine.combat;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.rpgengine.rules.CanonicalJson;
+import org.rpgengine.rules.CombatProfile;
+import org.rpgengine.rules.ZoneGraph;
 import org.springframework.jdbc.core.JdbcTemplate;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Storage of frozen encounters (P11.1, V22). {@link #insertWithin} runs inside the canonical commit's transaction,
- * after the events it cites are flushed; it writes the encounter at {@link EncounterPhase#ENTERING} and one row per
- * roster entry. The database repeats every guarantee: frozen columns are immutable, the lifecycle follows the state
- * machine, and a second active encounter of the campaign violates a unique index, so a replayed or racing entry
- * rolls the whole commit back. {@link #active} reads the current encounter for rules and tests.
+ * Storage of frozen encounters (P11.1, V22) and of their tactical progress (P11.2, V23). {@link #insertWithin} runs
+ * inside the canonical commit's transaction, after the events it cites are flushed; it writes the encounter at
+ * {@link EncounterPhase#ENTERING} and one row per roster entry. {@link #state} reads the active encounter's tactical
+ * state back, with the frozen profile, space and declared actions taken from the stored canonical text, and
+ * {@link #progressWithin} writes a {@link TacticalPlan}: each participant's final facts and every encounter row
+ * state in order, each guarded by the row version the plan was calculated from. The database repeats every
+ * guarantee: frozen columns are immutable, the lifecycle follows the state machine one arrow per update, initiative
+ * is written once and before the first round opens, action points only grow when an activation starts, the speech
+ * allowance holds, and a second active encounter of the campaign violates a unique index, so a replayed, stale or
+ * racing write rolls the whole commit back. {@link #active} reads the current encounter summary for rules and tests.
  */
 public final class EncounterWriter {
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
     /** Static transaction participant only. */
     private EncounterWriter() {
     }
@@ -75,6 +87,107 @@ public final class EncounterWriter {
                     participant.zone(), local ? (Object) Math.toIntExact(participant.health()) : null,
                     local ? (Object) Math.toIntExact(participant.focus()) : null,
                     CanonicalJson.write(participant.canonicalForm()));
+        }
+    }
+
+    /**
+     * Read the active encounter's tactical state under the caller's campaign lock.
+     *
+     * @param jdbc JDBC access joined to the caller's transaction
+     * @param campaign campaign whose row the caller has locked
+     * @return the state, or empty when no encounter is active
+     * @throws IllegalStateException when a stored frozen form cannot be read back (a broken storage guarantee)
+     */
+    public static Optional<EncounterState> state(JdbcTemplate jdbc, UUID campaign) {
+        var rows = jdbc.query("select id, row_version, phase, round, actor_cursor, action_points, speech_used, "
+                        + "passages::text, profile::text, definition::text, opening_policy, opening_target, opening_status "
+                        + "from encounter where campaign_id = ? and phase not in ('SETTLED', 'NARRATIVE_RESUME')",
+                (row, index) -> new Object[] {row.getObject(1, UUID.class), row.getLong(2), row.getString(3),
+                        row.getInt(4), row.getObject(5, Integer.class), row.getObject(6, Integer.class), row.getInt(7),
+                        row.getString(8), row.getString(9), row.getString(10), row.getString(11), row.getString(12),
+                        row.getString(13)}, campaign);
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        Object[] row = rows.getFirst();
+        UUID id = (UUID) row[0];
+        try {
+            var profile = CombatProfile.fromCanonical(JSON.readValue((String) row[8], Map.class));
+            Map<?, ?> definition = JSON.readValue((String) row[9], Map.class);
+            var space = ZoneGraph.fromCanonical((Map<?, ?>) definition.get("space"));
+            var escapes = new java.util.TreeSet<String>();
+            ((List<?>) definition.get("escapeZones")).forEach(zone -> escapes.add((String) zone));
+            var actions = new ArrayList<EncounterAction>();
+            if (definition.get("actions") instanceof List<?> declared) {
+                declared.forEach(action -> actions.add(EncounterAction.fromCanonical((Map<?, ?>) action)));
+            }
+            var passages = new ArrayList<EncounterAction.Passage>();
+            for (Object passage : JSON.readValue((String) row[7], List.class)) {
+                var form = (Map<?, ?>) passage;
+                passages.add(new EncounterAction.Passage((String) form.get("from"), (String) form.get("to"),
+                        Boolean.TRUE.equals(form.get("blocked"))));
+            }
+            var participants = jdbc.query("select participant_id, ordinal, actor_id, side, zone_id, status, initiative, "
+                            + "initiative_rank, reactions, row_version, frozen::text from encounter_participant "
+                            + "where encounter_id = ? and campaign_id = ? order by ordinal",
+                    (participant, index) -> {
+                        Map<?, ?> frozen = JSON.readValue(participant.getString(11), Map.class);
+                        return new EncounterState.Combatant(participant.getString(1), participant.getInt(2),
+                                participant.getObject(3, UUID.class),
+                                EncounterTemplate.Side.valueOf(participant.getString(4)), participant.getString(5),
+                                EncounterState.Status.valueOf(participant.getString(6)),
+                                ((Number) ((Map<?, ?>) frozen.get("roles")).get("finesse")).intValue(),
+                                ((Number) frozen.get("initiativeModifier")).intValue(),
+                                participant.getObject(7, Integer.class), participant.getObject(8, Integer.class),
+                                participant.getInt(9), participant.getLong(10));
+                    }, id, campaign);
+            return Optional.of(new EncounterState(id, (Long) row[1], EncounterPhase.valueOf((String) row[2]), (Integer) row[3],
+                    (Integer) row[4], (Integer) row[5], (Integer) row[6], passages, profile, space, escapes, actions,
+                    OpeningPolicy.parse((String) row[10]), (String) row[11], (String) row[12], participants));
+        } catch (RuntimeException unreadable) {
+            throw new IllegalStateException("stored encounter " + id + " cannot be read back", unreadable);
+        }
+    }
+
+    /**
+     * Apply a tactical plan: participant facts first (initiative must exist before the first round opens), then each
+     * encounter row state as the next row version. Every update names the exact row version it expects.
+     *
+     * @param jdbc JDBC access joined to the commit transaction
+     * @param campaign campaign whose row the caller has locked
+     * @param revision state revision the commit produces
+     * @param plan resolved tactical plan
+     * @throws IllegalStateException when a row changed since the plan was calculated
+     * @throws org.springframework.dao.DataAccessException when a database guard rejects a step; the caller's
+     *         transaction then rolls back every effect
+     */
+    public static void progressWithin(JdbcTemplate jdbc, UUID campaign, long revision, TacticalPlan plan) {
+        for (TacticalPlan.ParticipantUpdate update : plan.participants()) {
+            if (jdbc.update("update encounter_participant set zone_id = ?, initiative = ?, initiative_rank = ?, "
+                            + "reactions = ?, row_version = row_version + 1 where encounter_id = ? and campaign_id = ? "
+                            + "and participant_id = ? and row_version = ?", update.zone(), update.initiative(),
+                    update.rank(), update.reactions(), plan.encounterId(), campaign, update.participantId(),
+                    update.expectedRowVersion()) != 1) {
+                throw new IllegalStateException("stale encounter participant");
+            }
+        }
+        long version = plan.baseRowVersion();
+        for (TacticalPlan.Step step : plan.steps()) {
+            var passages = step.passages().stream().map(passage -> {
+                var form = new java.util.LinkedHashMap<String, Object>();
+                form.put("from", passage.from());
+                form.put("to", passage.to());
+                form.put("blocked", passage.blocked());
+                return (Object) form;
+            }).toList();
+            if (jdbc.update("update encounter set phase = ?, round = ?, actor_cursor = ?, action_points = ?, "
+                            + "speech_used = ?, passages = ?::jsonb, updated_revision = ?, row_version = row_version + 1 "
+                            + "where id = ? and campaign_id = ? and row_version = ?", step.phase().name(), step.round(),
+                    step.cursor(), step.actionPoints(), step.speechUsed(), CanonicalJson.write(passages), revision,
+                    plan.encounterId(), campaign, version) != 1) {
+                throw new IllegalStateException("stale encounter");
+            }
+            version++;
         }
     }
 

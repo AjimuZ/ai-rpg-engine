@@ -685,6 +685,41 @@ public final class PackCompiler {
                 }
             }
             f.choice("opening", Set.of("initiative", "first", "forbidden"), "initiative");
+            // Declared social and scene actions (P11.2, docs/11 section 7.1): words change a fight only through these.
+            var actions = new HashSet<String>();
+            for (Fields action : f.objects("actions", 0, 8)) {
+                String id = action.id("id", true);
+                action.text("name", true);
+                action.text("description", false);
+                String kind = action.choice("kind", Set.of("social", "scene"), null);
+                // A normal action costs at least one point and fits one activation (docs/11 section 7).
+                action.integer("cost", 1, combatProfile.actionPoints(), combatProfile.value("interactCost"));
+                if (kind.equals("social")) {
+                    action.choice("intent", Set.of("persuade", "intimidate", "negotiate", "distract", "request"), null);
+                    action.choice("recipients", Set.of("hostile", "ally", "any"), "hostile");
+                } else {
+                    if (action.has("zone")) {
+                        zoneRef(action, "zone", zones);
+                    }
+                    Fields passage = action.object("passage", true);
+                    String from = zoneRef(passage, "from", zones);
+                    String to = zoneRef(passage, "to", zones);
+                    if (!passage.has("blocked")) {
+                        throw passage.fail("blocked", "A passage states whether the action blocks or opens it");
+                    }
+                    passage.bool("blocked", false);
+                    passage.close();
+                    if (edges.stream().noneMatch(edge -> edge.from().equals(from) && edge.to().equals(to)
+                            || edge.from().equals(to) && edge.to().equals(from))) {
+                        throw action.fail("REFERENCE_UNKNOWN", "passage", "No declared edge joins zones '" + from
+                                + "' and '" + to + "'");
+                    }
+                }
+                action.close();
+                if (!actions.add(id)) {
+                    throw action.fail("DUPLICATE", "id", "Action ID already defined in this encounter");
+                }
+            }
         }
 
         /** A required zone reference of an encounter; an undeclared zone is REFERENCE_UNKNOWN listing the zones. */

@@ -197,6 +197,27 @@ public record CombatProfile(String pack, Map<String, String> roles, String healt
         return CanonicalJson.write(form);
     }
 
+    /**
+     * Read a frozen profile back from the canonical form {@link #canonical()} wrote (P11.2): the scheduler of an
+     * active encounter uses exactly the stored values, never today's defaults or the current pack revision.
+     *
+     * @param form parsed canonical object
+     * @return the profile, revalidated by the constructor
+     * @throws IllegalArgumentException when the form names another kernel or breaks a bound or invariant
+     * @throws ClassCastException for a structurally malformed form
+     */
+    public static CombatProfile fromCanonical(Map<?, ?> form) {
+        if (!KERNEL.equals(form.get("kernel"))) {
+            throw new IllegalArgumentException("the frozen profile was made for another scheduler kernel");
+        }
+        var roles = new TreeMap<String, String>();
+        ((Map<?, ?>) form.get("roles")).forEach((role, attribute) -> roles.put((String) role, (String) attribute));
+        var values = new TreeMap<String, Integer>();
+        ((Map<?, ?>) form.get("values")).forEach((name, value) -> values.put((String) name, ((Number) value).intValue()));
+        return new CombatProfile((String) form.get("pack"), roles, (String) form.get("health"),
+                (String) form.get("focus"), values);
+    }
+
     /** @return SHA-256 of {@link #canonical()}, the frozen profile's identity */
     public String hash() {
         return CanonicalJson.sha256(canonical());

@@ -43,7 +43,9 @@ import tools.jackson.databind.json.JsonMapper;
  * freezes the profile, zones, objectives, opening policy and roster beside one public event and moves the campaign
  * into encounter mode, without drawing a die, spending a resource or passing world time; a declared opening strike
  * is recorded once and not resolved; a retry replays; every refusal changes nothing; the database keeps the frozen
- * facts and the lifecycle; and a customized adventure profile is frozen through the same kernel.
+ * facts and the lifecycle; and a customized adventure profile is frozen through the same kernel. Since P11.2 the
+ * initiative roll that follows entry is its own operation ({@link TacticalCommandsTest}), so entry itself still draws
+ * nothing.
  */
 @SpringBootTest
 class EncounterCommandsTest {
@@ -239,7 +241,11 @@ class EncounterCommandsTest {
         assertThrows(DataAccessException.class, () -> jdbc.update("update encounter_participant set frozen = '{}'::jsonb, "
                 + "row_version = row_version + 1 where participant_id = 'raider'"));
         assertThrows(DataAccessException.class, () -> jdbc.update("delete from encounter_participant"));
-        // The next legal step (P11.2) is accepted: the first round opens.
+        // The next arrow opens the first round, but only once every participant has an initiative rank (P11.2, V23).
+        assertThrows(DataAccessException.class, () -> jdbc.update("update encounter set phase = 'ROUND_OPEN', round = 1, "
+                + "row_version = row_version + 1 where id = ?", id));
+        jdbc.update("update encounter_participant set initiative = 10, initiative_rank = ordinal, "
+                + "row_version = row_version + 1");
         assertEquals(1, jdbc.update("update encounter set phase = 'ROUND_OPEN', round = 1, row_version = row_version + 1 "
                 + "where id = ?", id));
     }

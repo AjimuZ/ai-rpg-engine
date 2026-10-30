@@ -31,10 +31,11 @@ import org.rpgengine.rules.ZoneGraph;
  * @param participants non-player participants in authored order
  * @param objectives objectives in authored order, at least one
  * @param opening opening-action policy
+ * @param actions declared social and scene actions in authored order (P11.2), possibly none
  */
 public record EncounterTemplate(String id, String pack, String location, ZoneGraph zones, String playerZone,
         Set<String> escapeZones, List<Participant> participants, List<EncounterObjective> objectives,
-        OpeningPolicy opening) {
+        OpeningPolicy opening, List<EncounterAction> actions) {
     /** Participant ID reserved for the player in a frozen roster. */
     public static final String PLAYER = "player";
     /** Most non-player participants of one template. */
@@ -120,6 +121,13 @@ public record EncounterTemplate(String id, String pack, String location, ZoneGra
         }
     }
 
+    /** Template without declared actions, the shape used before P11.2. */
+    public EncounterTemplate(String id, String pack, String location, ZoneGraph zones, String playerZone,
+            Set<String> escapeZones, List<Participant> participants, List<EncounterObjective> objectives,
+            OpeningPolicy opening) {
+        this(id, pack, location, zones, playerZone, escapeZones, participants, objectives, opening, List.of());
+    }
+
     /** Check the structural invariants and freeze the collections. */
     public EncounterTemplate {
         Objects.requireNonNull(id, "id");
@@ -200,6 +208,27 @@ public record EncounterTemplate(String id, String pack, String location, ZoneGra
                     }
                 }
                 default -> { }
+            }
+        }
+        actions = List.copyOf(actions);
+        if (actions.size() > EncounterAction.MAX_ACTIONS) {
+            throw new IllegalArgumentException("an encounter declares at most " + EncounterAction.MAX_ACTIONS + " actions");
+        }
+        var actionIds = new HashSet<String>();
+        for (EncounterAction action : actions) {
+            if (!actionIds.add(action.id())) {
+                throw new IllegalArgumentException("duplicate action " + action.id());
+            }
+            if (action.kind() == EncounterAction.Kind.SCENE) {
+                if (action.zone() != null) {
+                    zone(zones, action.zone(), "action zone");
+                }
+                var passage = action.passage();
+                zone(zones, passage.from(), "passage zone");
+                zone(zones, passage.to(), "passage zone");
+                if (zones.edges().stream().noneMatch(edge -> passage.covers(edge.from(), edge.to()))) {
+                    throw new IllegalArgumentException("action " + action.id() + " names no declared passage");
+                }
             }
         }
     }

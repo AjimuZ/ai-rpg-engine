@@ -2960,6 +2960,51 @@
       <target>Questo scontro non può iniziare qui e ora. Non è stato modificato nulla.</target>
       </segment>
     </unit>
+    <unit id="campaign.error.turnUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:50</note>
+      </notes>
+      <segment>
+        <source>It is not your turn to act. Nothing was changed.</source>
+      <target>Non è il tuo turno di agire. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.actionPointsInsufficient">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:51</note>
+      </notes>
+      <segment>
+        <source>You do not have enough action points left. Nothing was changed.</source>
+      <target>Non ti restano abbastanza punti azione. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.zoneUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:52</note>
+      </notes>
+      <segment>
+        <source>You cannot move to that zone from here. Nothing was changed.</source>
+      <target>Da qui non puoi spostarti in quella zona. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.speechLimitReached">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:53</note>
+      </notes>
+      <segment>
+        <source>You have already spoken during this turn. Nothing was changed.</source>
+      <target>Hai già parlato durante questo turno. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.error.interactionUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-messages.ts:54</note>
+      </notes>
+      <segment>
+        <source>That action is not possible here and now. Nothing was changed.</source>
+      <target>Quell’azione non è possibile qui e ora. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
     <unit id="campaign.error.dependenciesMissing">
       <notes>
         <note category="location">src/app/campaign/campaign-messages.ts:39</note>
