@@ -1040,7 +1040,7 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
       change). Not proven: reload with a draft and an in-flight operation on a real server. It
       needs the browser submit path (P05.7/P07 scope) and the owner action above. This box stays
       unchecked until P05.6-O.
-- [ ] P05.7 Define and render bounded typed public presentation events for scene, pose/expression and optional line audio hooks; reject executable/raw-URL directives, deduplicate delivery and preserve text-only/keyboard/reduced-motion behavior under QA-40.
+- [x] P05.7 Define and render bounded typed public presentation events for scene, pose/expression and optional line audio hooks; reject executable/raw-URL directives, deduplicate delivery and preserve text-only/keyboard/reduced-motion behavior under QA-40.
     - P05.7-A (30 October 2026, backend admission gate only; box stays unchecked): the existing
       `org.rpgengine.presentation` package gained `PresentationEvent` (typed SCENE, POSE and
       LINE_AUDIO events carrying plain references only), `PublicPresentationScope` (the allowlist
@@ -1179,6 +1179,56 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
       call) is not optimized or measured and nothing caches it; no deliberately weakened run on an
       exported copy; the journal and events are inserted by SQL, not produced by a played command, so no
       real turn was resolved; no event path, producer, browser display or QA-40 behavior exists.
+    - P05.7-B.1.2.3.2 (30 October 2026, cues on the post-commit narration path; box stays unchecked):
+      `NarrationPort.Publication` gains `cues`, at most `PresentationEvents.MAX_PER_OPERATION` (16) untrusted
+      drafts, with a 10-argument constructor that keeps the earlier call sites and means no cues.
+      `PresentationJobService` resolves the scope between narrate and settle, because the resolver refuses an
+      ambient transaction, through the new `PresentationScopePort` that `PresentationScopeResolver` implements,
+      so `presentation` does not import `narration`. A publication without cues costs no pack load. `deliver`
+      calls `PresentationEventStore.record` once, after inserting the publication and before the job and
+      journal move, so cue messages precede `narrative.ready`.
+      Drop policy: `PresentationEvents.Rejection` (thrown before any SQL, so the transaction stays clean), cues
+      naming another operation or revision (`FOREIGN_OPERATION`) and an absent or failed scope
+      (`SCOPE_UNAVAILABLE`) drop the whole list with one WARNING that names the operation and the reason, never
+      the value, and the narration is published. The trace is a log line only: no durable record of a drop
+      exists. A `DataAccessException` is not caught and rolls back the whole settlement, publication included;
+      the lease then decides the next attempt. No second event path: the store holds the only
+      `insert into presentation_event` in `backend/src/main`, the job service holds the only production call to
+      `record`, and the store the only production call to `acceptAll` (repository search).
+      The scope is read before the settle locks. This is accepted because its inputs for a committed operation
+      do not change (journal revision, the operation's events, the pinned pack) and settle re-checks lease,
+      generation, cancellation and locale; a later change to an actor row's `definition_id` is not re-read.
+      Commands: `sh .agents/ralph/verify.sh backend -Dtest=PresentationCuePublicationTest,PresentationJobTest,GroundedNarrationTest,PresentationEventStreamTest,PresentationScopeResolverTest,MemoryContinuityTest`
+      passed: 52 tests, 0 failures, 0 errors, 0 skipped, including 12 in the new
+      `PresentationCuePublicationTest` (run before the logging assertion below changed).
+      `sh .agents/ralph/verify.sh backend -Dtest=PackagedSecretsTest,PresentationCuePublicationTest` passed after
+      that change. `sh .agents/ralph/verify.sh full` passed all 17 steps: backend 1,164 tests, 0 failures, 0
+      errors, 0 skipped (1,152 at P05.7-B.1.2.3.1 plus these 12). An earlier `full` run failed 2 of the new tests:
+      they read the warning from the console, and `PackagedSecretsTest` starts an application in the same JVM with
+      `logging.level.root=OFF`. They now attach a handler to the job service's logger. No production code changed
+      for this. The documentation edits after that run were followed by `sh .agents/ralph/verify.sh repo`; the
+      frontend and backup step counts were not read.
+      Proven on PostgreSQL, with played WAIT commands, a registered pack, the real resolver, store, V26 trigger and
+      public stream and a stub `NarrationPort`: one delivered round makes exactly one `acceptAll` call (static spy)
+      and one `record` call, and a later pass adds none; no cues means no scope call, no `record` and no `acceptAll`;
+      three cues give three rows and three messages before `narrative.ready` with the admitted references, stable
+      across a replayed read, with the world tables and receipts unchanged. Against the real scope, internal-only,
+      unreferenced, undeclared-definition, no-definition and unknown actors, undeclared scene, backdrop, pose,
+      expression, line and audio references, and URL, script, markup and handler values each drop the list: no row,
+      no message, the good cue beside them dropped too, the value absent from the stream and from the warnings, the
+      publication stored and job and journal DELIVERED. Foreign operation, wrong revision, out-of-range and repeated
+      ordinals, a malformed kind and an absent or failed scope (stubbed port) behave the same. On a retry round a
+      refused list keeps the publication and the terminal journal status, and the operation view reads NARRATED.
+      A stale locale generation, a lost lease and a cancellation during narration record no cue. A settlement that
+      fails after `record` rolls back cues, messages and publication together. The replacement attempt or retry
+      round then delivers each cue once, a repeated retry reports `ALREADY_NARRATED`, and cues stored earlier are not
+      announced again and keep their first content. A publication refuses a 17th cue.
+      Not proven or not done: `GroundedNarration` produces no cues, so no real turn announces one and no model
+      output reaches this path; the extra `PUBLIC` and `INTERNAL` events in the tests are inserted by SQL because a
+      WAIT names no NPC; a real storage failure is simulated by a store spy that throws after a real `record`; two
+      concurrent workers are not exercised with cues (the existing lease tests cover settlement without them);
+      `loadForCampaign` per publication with cues is not measured or cached; no deliberately weakened run on an
+      exported copy; no browser display, reduced-motion behavior or QA-40 acceptance.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.
 

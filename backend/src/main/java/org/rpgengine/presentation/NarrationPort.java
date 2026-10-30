@@ -26,6 +26,9 @@ import java.util.regex.Pattern;
  *       transaction, which stores it only when the lease is still held, no cancellation was
  *       requested and the campaign's locale and glossary generation still equal the
  *       publication's; otherwise it is discarded and never shown.</li>
+ *   <li>{@link Publication#cues()} are untrusted: the settling transaction admits them through
+ *       {@link PresentationEventStore#record} together with a stored publication, and a refused
+ *       list costs the cues, never the narration.</li>
  *   <li>Throwing is equivalent to {@link Outcome#FAILED}; nothing is retried inside the call.</li>
  * </ul>
  */
@@ -121,10 +124,12 @@ public interface NarrationPort {
      * @param runtime runtime name of the accepted attempt, null when unknown
      * @param model effective model of the accepted attempt, null when unknown
      * @param effort effective effort of the accepted attempt, null when unknown
+     * @param cues zero to {@link PresentationEvents#MAX_PER_OPERATION} untrusted presentation event
+     *        drafts of this operation (P05.7-B.1.2.3.2)
      */
     record Publication(SupportedLocale locale, long localeRevision, long glossaryRevision, String templateHash,
             boolean repaired, List<Passage> passages, List<Suggestion> suggestions, String runtime, String model,
-            String effort) {
+            String effort, List<PresentationEvents.Draft> cues) {
         /** Most passages, equal to the narration contract's bound. */
         public static final int MAX_PASSAGES = 8;
         /** Most suggestions, equal to the narration contract's bound. */
@@ -137,10 +142,20 @@ public interface NarrationPort {
             Objects.requireNonNull(templateHash, "templateHash");
             passages = List.copyOf(passages);
             suggestions = List.copyOf(suggestions);
+            cues = List.copyOf(cues);
             if (localeRevision < 0 || glossaryRevision < 0 || !HASH.matcher(templateHash).matches()
-                    || passages.isEmpty() || passages.size() > MAX_PASSAGES || suggestions.size() > MAX_SUGGESTIONS) {
+                    || passages.isEmpty() || passages.size() > MAX_PASSAGES || suggestions.size() > MAX_SUGGESTIONS
+                    || cues.size() > PresentationEvents.MAX_PER_OPERATION) {
                 throw new IllegalArgumentException("publication outside the narration contract bounds");
             }
+        }
+
+        /** A publication without presentation cues; same bounds and failures as the canonical constructor. */
+        public Publication(SupportedLocale locale, long localeRevision, long glossaryRevision, String templateHash,
+                boolean repaired, List<Passage> passages, List<Suggestion> suggestions, String runtime, String model,
+                String effort) {
+            this(locale, localeRevision, glossaryRevision, templateHash, repaired, passages, suggestions, runtime, model,
+                    effort, List.of());
         }
     }
 

@@ -43,7 +43,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>A cue (P05.7-B.1.1) is one more message of the same log: the V26 trigger appends it when
  * {@link org.rpgengine.presentation.PresentationEventStore} stores the event, so it shares the
  * sequence, retention, cursor and reset rules. Its {@code id} stays a plain cursor, and clients
- * that keep cues across connections deduplicate by {@code deliveryId}.
+ * that keep cues across connections deduplicate by {@code deliveryId}. Since P05.7-B.1.2.3.2 the
+ * settlement of a publication that carries cues writes them through that store, ahead of its
+ * {@code narrative.ready} message.
  */
 @Service
 public class PublicStreamService {

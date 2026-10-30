@@ -630,8 +630,16 @@ committed operation with `PresentationEvents.acceptAll`, all or nothing, and onl
 under the campaign lock with `on conflict do nothing`. The V26 trigger on `presentation_event`
 appends a `presentation.event` message for each row actually inserted, so a stored cue
 is in the log and a repeat allocates no sequence. Skip, reconnect and replay read this one log;
-the message `id` stays a plain cursor and `deliveryId` stays the same on every delivery. Nothing
-calls the store during a turn yet, so no real turn announces a cue.
+the message `id` stays a plain cursor and `deliveryId` stays the same on every delivery.
+
+**Cues of a publication (P05.7-B.1.2.3.2).** The settling transaction of a delivered round calls the
+store once, after inserting the publication and before the job and journal move, so the operation's
+cue messages precede `narrative.ready` and copy the journal status of that moment (`NARRATING`, or
+`COMMITTED_NARRATION_PENDING` on a retry round). The audience scope is read between narrate and settle,
+because the resolver needs its own snapshot. Admission refuses before any SQL runs, so a refused list
+leaves the transaction clean: the cues are dropped and logged by reason, and the narration is
+published. A publication that is discarded records nothing, and a rolled-back settlement removes its
+cues with it. The grounded publisher produces no cues yet, so no real turn announces one.
 
 **Post-commit presentation jobs.** A commit that requires narration inserts exactly one
 `presentation_job` (`NARRATION`, `QUEUED`, three attempts) in the canonical transaction; a

@@ -15,7 +15,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * entry point takes untrusted drafts and stores only what {@link PresentationEvents#acceptAll}
  * returns, so a rejected draft can reach neither storage nor the stream. The V26 trigger appends
  * the {@code presentation.event} stream message in the same transaction; nothing here writes the
- * stream, and {@code PublicStreamService} remains the only delivery path.
+ * stream, and {@code PublicStreamService} remains the only delivery path. Since P05.7-B.1.2.3.2 the
+ * settling transaction of {@link PresentationJobService} calls it for the cues of a publication.
  *
  * <p>Always holds: a campaign, operation and ordinal is stored and announced at most once, whatever
  * the retries, and the first stored content wins. Nothing here touches world rows or advances a

@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
@@ -35,7 +36,8 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li><em>Narrate</em> outside any transaction through {@link NarrationPort}.</li>
  *   <li><em>Settle</em> (one transaction, same locks): only the exact live lease holder may
  *       finish. DELIVERED stores the validated narration, provided the campaign's locale and
- *       glossary generation still equal the narration's, and ends the job and journal DELIVERED;
+ *       glossary generation still equal the narration's, records the publication's presentation
+ *       cues and ends the job and journal DELIVERED;
  *       stale narration is discarded and the attempt counts as failed. UNAVAILABLE, REJECTED
  *       (invalid after the single repair, or declined), a cancellation request or exhausted
  *       attempts end the job PENDING and the journal COMMITTED_NARRATION_PENDING: the stored
@@ -56,6 +58,14 @@ import tools.jackson.databind.json.JsonMapper;
  * restored save) is retired PENDING. Journal status changes emit stream messages through the V11
  * trigger, so each presentation outcome of round 1 is announced exactly once; retry rounds are
  * observed through the operation view.
+ *
+ * <p>Presentation cues (P05.7-B.1.2.3.2) are optional and follow their publication: the audience scope
+ * is resolved between narrate and settle, because the resolver needs its own snapshot, and {@link
+ * PresentationEventStore#record} runs once inside the settling transaction that stores the publication,
+ * so their messages precede {@code narrative.ready} and a rollback removes both. A discarded publication
+ * records no cues. Cues that are refused, name another operation or have no scope are dropped and logged
+ * by reason, and the narration is still published. A storage failure is not a refusal: it rolls the whole
+ * settlement back like any other, and the lease then decides the next attempt.
  */
 @Service
 public class PresentationJobService {
@@ -73,10 +83,13 @@ public class PresentationJobService {
     static final int MAX_BACKOFF_SECONDS = 30;
     private static final int PAGE = 100;
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final System.Logger LOG = System.getLogger(PresentationJobService.class.getName());
 
     private final EntityManager entities;
     private final JdbcTemplate jdbc;
     private final NarrationPort narration;
+    private final PresentationEventStore events;
+    private final PresentationScopePort scopes;
     private final TransactionTemplate transaction;
     private final TransactionTemplate reader;
 
@@ -87,12 +100,16 @@ public class PresentationJobService {
      * @param jdbc JDBC access joined to the bounded transactions
      * @param manager shared transaction manager
      * @param narration narration boundary called outside transactions
+     * @param events store that admits and records a publication's cues inside the settling transaction
+     * @param scopes audience allowlist of an operation, resolved outside transactions
      */
     public PresentationJobService(EntityManager entities, JdbcTemplate jdbc, PlatformTransactionManager manager,
-            NarrationPort narration) {
+            NarrationPort narration, PresentationEventStore events, PresentationScopePort scopes) {
         this.entities = Objects.requireNonNull(entities, "entities");
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
         this.narration = Objects.requireNonNull(narration, "narration");
+        this.events = Objects.requireNonNull(events, "events");
+        this.scopes = Objects.requireNonNull(scopes, "scopes");
         transaction = new TransactionTemplate(Objects.requireNonNull(manager, "manager"));
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         transaction.setTimeout(10);
@@ -296,8 +313,31 @@ public class PresentationJobService {
             outcome = NarrationPort.Result.of(NarrationPort.Outcome.FAILED);
         }
         NarrationPort.Result result = outcome;
-        transaction.executeWithoutResult(status -> settle(claim, result));
+        Optional<PublicPresentationScope> scope = cueScope(claim, result);
+        transaction.executeWithoutResult(status -> settle(claim, result, scope));
         return true;
+    }
+
+    /**
+     * Resolve the scope for a publication's cues; a publication without cues costs no pack load. The operation's
+     * scope inputs are immutable once committed, and settle still re-checks lease, generation and cancellation.
+     *
+     * @return the scope, or empty when there are no cues or it cannot be resolved; never throws, because
+     *         a scope failure may cost the cues but never the narration
+     */
+    private Optional<PublicPresentationScope> cueScope(Claim claim, NarrationPort.Result result) {
+        if (result.publication() == null || result.publication().cues().isEmpty()) {
+            return Optional.empty();
+        }
+        NarrationPort.Request request = claim.request();
+        try {
+            return scopes.resolve(request.adventureId(), request.campaignId(), request.operationId(),
+                    request.committedRevision());
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "Presentation scope of operation {0} failed: {1}",
+                    request.operationId(), failure.getClass().getSimpleName());
+            return Optional.empty();
+        }
     }
 
     /**
@@ -425,7 +465,7 @@ public class PresentationJobService {
      * Settle one attempt if this worker still holds the exact live lease; otherwise discard the
      * result without writing anything.
      */
-    private void settle(Claim claim, NarrationPort.Result result) {
+    private void settle(Claim claim, NarrationPort.Result result, Optional<PublicPresentationScope> scope) {
         var c = claim.candidate();
         MutationLeaseService.lockScope(jdbc, c.adventure(), c.campaign(), c.operation());
         Job job = job(claim.job());
@@ -439,7 +479,7 @@ public class PresentationJobService {
             finish(job, "PENDING", "NARRATION_CANCELLED", OperationStatus.COMMITTED_NARRATION_PENDING);
         } else {
             switch (result.outcome()) {
-                case DELIVERED -> deliver(job, result.publication());
+                case DELIVERED -> deliver(job, result.publication(), scope);
                 case UNAVAILABLE -> finish(job, "PENDING", "NARRATION_UNAVAILABLE",
                         OperationStatus.COMMITTED_NARRATION_PENDING);
                 // The single repair already happened inside the attempt: show the receipt instead.
@@ -455,9 +495,10 @@ public class PresentationJobService {
      * while the port ran: narration bound to an older generation must never be shown (docs/29
      * section 5), so it is discarded and the attempt counts as a failure, which lets a later
      * attempt narrate in the current locale. Round 1 moves the journal to DELIVERED; a retry round
-     * leaves the terminal COMMITTED_NARRATION_PENDING journal unchanged.
+     * leaves the terminal COMMITTED_NARRATION_PENDING journal unchanged. Cues are recorded before the
+     * journal moves, so a client that stops at {@code narrative.ready} has already seen them.
      */
-    private void deliver(Job job, NarrationPort.Publication publication) {
+    private void deliver(Job job, NarrationPort.Publication publication, Optional<PublicPresentationScope> scope) {
         var settings = jdbc.queryForObject("select narrative_locale, locale_revision, glossary_revision "
                         + "from presentation_campaign_settings where campaign_id = ? for share",
                 (row, index) -> new Object[] {row.getString(1), row.getLong(2), row.getLong(3)}, job.campaign());
@@ -478,9 +519,45 @@ public class PresentationJobService {
                 publication.templateHash(), publication.repaired(), JSON.writeValueAsString(passages(publication)),
                 JSON.writeValueAsString(suggestions(publication)), publication.runtime(), publication.model(),
                 publication.effort(), job.id());
+        recordCues(job, publication.cues(), scope);
         CampaignOperation journal = entities.find(CampaignOperation.class, job.operation());
         finish(job, "DELIVERED", "NARRATION_DELIVERED",
                 journal.getStatus() == OperationStatus.NARRATING ? OperationStatus.DELIVERED : null);
+    }
+
+    /**
+     * Record the cues of a publication being stored, or drop them and log why by reason only. Runs at most
+     * once per operation because an operation has at most one publication.
+     *
+     * @throws org.springframework.dao.DataAccessException for a storage failure, which must roll the
+     *         settlement back: the joined transaction is already marked rollback-only
+     */
+    private void recordCues(Job job, List<PresentationEvents.Draft> cues, Optional<PublicPresentationScope> scope) {
+        if (cues.isEmpty()) {
+            return;
+        }
+        if (scope.isEmpty()) {
+            droppedCues(job, "SCOPE_UNAVAILABLE");
+            return;
+        }
+        // Admission cannot see the job: another committed operation of this campaign would be stored
+        // under that operation, and any other identity would fail the V26 key and lose the narration.
+        if (!cues.stream().allMatch(cue -> job.operation().equals(cue.operationId())
+                && cue.committedRevision() == job.revision())) {
+            droppedCues(job, "FOREIGN_OPERATION");
+            return;
+        }
+        try {
+            events.record(job.campaign(), cues, scope.get());
+        } catch (PresentationEvents.Rejection rejected) {
+            // Admission refuses before any SQL runs, so the settling transaction is still clean.
+            droppedCues(job, rejected.reason().name());
+        }
+    }
+
+    /** Leave the trace of dropped cues; a reason never carries a rejected value. */
+    private static void droppedCues(Job job, String reason) {
+        LOG.log(System.Logger.Level.WARNING, "Presentation cues of operation {0} dropped: {1}", job.operation(), reason);
     }
 
     /** Stored passage array: kind, speaker identity and name from the trusted context, text, references. */

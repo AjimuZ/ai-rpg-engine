@@ -43,6 +43,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 class PresentationJobTest {
     @Autowired private PresentationJobService defaults;
+    @Autowired private PresentationEventStore events;
+    @Autowired private PresentationScopePort scopes;
     @Autowired private CommandExecutionService executions;
     @Autowired private OperationCancellationService cancellations;
     @Autowired private JournalRecoveryService journalRecovery;
@@ -347,7 +349,7 @@ class PresentationJobTest {
 
     /** Job service with a scripted narration port. */
     private PresentationJobService service(NarrationPort port) {
-        return new PresentationJobService(entities, jdbc, manager, port);
+        return new PresentationJobService(entities, jdbc, manager, port, events, scopes);
     }
 
     /** Make a requeued job due now, as its backoff would eventually. */

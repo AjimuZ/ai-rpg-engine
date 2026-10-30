@@ -266,7 +266,7 @@ class PresentationScopeResolverTest {
     }
 
     /** The reference pack with a guard NPC the declaration does not mention, plus the declaration file. */
-    private static Map<String, byte[]> declaring() {
+    static Map<String, byte[]> declaring() {
         var sources = base();
         String manifest = sources.get("adventure.json")
                 .replace(GENERATION_FILE + "]", GENERATION_FILE + "," + PRESENTATION_FILE + "]")
@@ -296,7 +296,7 @@ class PresentationScopeResolverTest {
     }
 
     /** Stage files through the archive path, exactly as an uploaded ZIP would be. */
-    private static PackStaging.StagedPack staged(Map<String, byte[]> files) {
+    static PackStaging.StagedPack staged(Map<String, byte[]> files) {
         var out = new ByteArrayOutputStream();
         try (var zip = new ZipOutputStream(out)) {
             for (var file : files.entrySet()) {

@@ -30,7 +30,9 @@ import org.rpgengine.inference.scheduling.InferenceScheduler;
 import org.rpgengine.inference.scheduling.SchedulerSettings;
 import org.rpgengine.inference.scheduling.TaskLedger;
 import org.rpgengine.inference.session.ScopedSessions;
+import org.rpgengine.presentation.PresentationEventStore;
 import org.rpgengine.presentation.PresentationJobService;
+import org.rpgengine.presentation.PresentationScopePort;
 import org.rpgengine.presentation.SupportedLocale;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -61,6 +63,8 @@ class GroundedNarrationTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager manager;
     @Autowired private TaskLedger ledger;
+    @Autowired private PresentationEventStore events;
+    @Autowired private PresentationScopePort scopes;
     private NarratorTaskPort port;
     private PresentationJobService jobs;
     private UUID owner;
@@ -113,7 +117,7 @@ class GroundedNarrationTest {
         scheduler.recover();
         var narration = new GroundedNarration(port, assembler, new ContractRunner(scheduler, Clock.systemUTC()),
                 new NarrationContract(), Duration.ofSeconds(20));
-        jobs = new PresentationJobService(entities, jdbc, manager, narration);
+        jobs = new PresentationJobService(entities, jdbc, manager, narration, events, scopes);
     }
 
     /** Remove disposable rows; constraints and triggers remain installed. */

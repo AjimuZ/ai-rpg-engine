@@ -10,6 +10,7 @@ import org.rpgengine.content.PackRegistry;
 import org.rpgengine.content.PublicPresentationScopeBuilder;
 import org.rpgengine.content.PublicPresentationScopeBuilder.VisibleActor;
 import org.rpgengine.inference.contract.NarrationContext;
+import org.rpgengine.presentation.PresentationScopePort;
 import org.rpgengine.presentation.PublicPresentationScope;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -22,7 +23,8 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Resolves the audience {@link PublicPresentationScope} of one committed operation from stored data
  * (P05.7-B.1.2.3.1), in one read-only repeatable-read snapshot so the pinned pack, the journal and the
- * actors describe the same commit. Read-only: it writes nothing, and no event path consumes it yet.
+ * actors describe the same commit. Read-only: it writes nothing. Since P05.7-B.1.2.3.2 a settling
+ * presentation job consumes it through {@link PresentationScopePort} to check the cues of a publication.
  *
  * <p>Visibility is narration's rule, not a second model (ADR 0007, docs/06 section 7): an actor is
  * visible when it is the campaign's creation-bound player or is referenced by one of the operation's
@@ -37,7 +39,7 @@ import tools.jackson.databind.json.JsonMapper;
  * every call, and no result is cached.
  */
 @Component
-public class PresentationScopeResolver {
+public class PresentationScopeResolver implements PresentationScopePort {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private final JdbcTemplate jdbc;
     private final PackRegistry packs;
@@ -76,6 +78,7 @@ public class PresentationScopeResolver {
      *         actors are visible; the scope is never truncated
      * @throws org.springframework.dao.DataAccessException for storage failures (a transient failure)
      */
+    @Override
     public Optional<PublicPresentationScope> resolve(UUID adventureId, UUID campaignId, UUID operationId,
             long committedRevision) {
         Objects.requireNonNull(adventureId, "adventureId");

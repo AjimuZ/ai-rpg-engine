@@ -90,8 +90,18 @@ It passes each actor with its `actor.definition_id`, so hidden, unknown and unde
 absent and a pack without the declaration gives an empty scope. An unknown or foreign campaign or
 operation, an uncommitted operation, a revision mismatch or more than 32 public events returns no
 scope at all, which a caller treats as "show nothing" and which differs from an empty scope. The pack
-closure is recompiled on every call and not cached. Nothing consumes the resolver yet and no event
-path was added.
+closure is recompiled on every call and not cached.
+
+P05.7-B.1.2.3.2 connects the narration path to that gate and adds no second event path. A
+`NarrationPort.Publication` may carry at most 16 untrusted cue drafts, empty by default. A worker
+resolves the scope between narrating and settling, and only for a publication with cues; the settling
+transaction that stores the publication then calls `PresentationEventStore.record` once. Cues are
+therefore announced before `narrative.ready`, roll back with the publication, and are never recorded
+for a publication discarded as stale, cancelled or late. A refused list, cues naming another operation
+or revision, and a missing or failed scope all drop the whole list with a warning that names the
+operation and the reason, never the value, and the narration is still published. A storage failure is
+not a refusal: it rolls back the settlement, and the lease decides the next attempt. The grounded
+publisher produces no cues yet, so no real turn announces one, and the browser displays none.
 
 P04.5 includes original MIT-licensed 48×32 woodland/station PNG schematics in the
 [neutral import fixtures](../backend/src/test/resources/packs/README.md), with

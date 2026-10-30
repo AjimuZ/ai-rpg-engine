@@ -237,8 +237,9 @@ Every key but `schemaVersion` is optional, and unknown keys are errors.
 `CompiledPack.presentation()` returns the immutable declaration and so reaches `CampaignPackSnapshot`.
 It is internal content like the rest of the compiled pack. `PresentationScopeResolver` (P05.7-B.1.2.3.1)
 builds the per-audience `PublicPresentationScope` of a committed operation from it: an actor appears only
-when the operation's public events reference it and its `definition_id` is a declared `actor`. Checking
-events against that scope during a turn is later work; nothing consumes the declaration during play yet.
+when the operation's public events reference it and its `definition_id` is a declared `actor`. Since
+P05.7-B.1.2.3.2 a settling presentation job checks a publication's cues against that scope, but the
+grounded narration publisher produces no cues yet, so no real turn reads the declaration during play.
 
 ## 4. Definition model
 

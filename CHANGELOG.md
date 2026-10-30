@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Narration can carry checked presentation cues (P05.7-B.1.2.3.2), 30 October 2026
+
+- A narration result may now carry up to 16 presentation cues. They are checked against what the audience may see, stored with
+  the narration and announced once on the public stream, however many times the job is retried.
+- A list with a hidden character, an undeclared reference, a URL or executable content is dropped whole and logged by reason,
+  and the narration is still published.
+- Players see no difference yet: the narration publisher produces no cues, and the browser displays none.
+
 ## Unreleased — Audience presentation scope of a committed operation (P05.7-B.1.2.3.1), 30 October 2026
 
 - The engine can now work out, for one committed turn, which scenes, lines, assets, actors, poses and expressions the audience

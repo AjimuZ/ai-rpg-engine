@@ -377,11 +377,12 @@ An optional `presentation` file declares the public scene, line and asset refere
 and expressions each NPC may take. It compiles into `CompiledPack.presentation()` (an empty
 `PackPresentation.NONE` when absent) and so into the campaign snapshot. Admission refuses a URL,
 markup, over-long or over-bounded reference and an undeclared asset, without echoing the value; see
-[pack format 3.3](../docs/09-adventure-packs.md#33-presentation-declaration). Nothing reads it during
-play yet, except `org.rpgengine.narration.PresentationScopeResolver`: a read-only service that resolves
-the `PublicPresentationScope` of one committed operation from the pinned declaration and the actors its
+[pack format 3.3](../docs/09-adventure-packs.md#33-presentation-declaration). Its one reader is
+`org.rpgengine.narration.PresentationScopeResolver`: a read-only service that resolves the
+`PublicPresentationScope` of one committed operation from the pinned declaration and the actors its
 public events reference (the narration visibility rule). It returns an empty `Optional` for a stale or
-unknown request, and nothing calls it yet.
+unknown request. `PresentationJobService` calls it through `PresentationScopePort`, only for a
+publication that carries cues; the grounded publisher produces none yet, so it is not called during play.
 
 Run `./mvnw -B -ntp -Dtest=PackLocalizationTest,NeutralGenreImportTest test`
 against disposable PostgreSQL. The corpus covers both reviewed bilingual fixtures,
@@ -753,6 +754,8 @@ presentation jobs described in the
   long polls with `generation:sequence` identities, `Last-Event-ID` resumption and resets.
 - `PresentationEventStore` stores admitted presentation events (V26 `presentation_event`, P05.7-B.1.1);
   its `presentation_event_stream` trigger adds one `presentation.event` message per stored cue to the same log.
+  The settling transaction of `PresentationJobService` is its production caller (P05.7-B.1.2.3.2): it records
+  the cues of a publication being stored, and a refused list is dropped and logged without losing the narration.
 - `org.rpgengine.presentation`: `PresentationJobService` (claim, narrate, settle, retry,
   expiry and startup reconciliation), `PresentationWorker` (one daemon thread),
   `NarrationPort` with the default `UnavailableNarration` until P08.

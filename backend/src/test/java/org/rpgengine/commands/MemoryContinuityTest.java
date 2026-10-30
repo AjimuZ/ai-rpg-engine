@@ -88,7 +88,9 @@ import org.rpgengine.memory.ResumeCards;
 import org.rpgengine.memory.SessionRehydration;
 import org.rpgengine.memory.SessionRenewalService;
 import org.rpgengine.presentation.NarrationPort;
+import org.rpgengine.presentation.PresentationEventStore;
 import org.rpgengine.presentation.PresentationJobService;
+import org.rpgengine.presentation.PresentationScopePort;
 import org.rpgengine.presentation.SupportedLocale;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -148,6 +150,8 @@ class MemoryContinuityTest {
     @Autowired private CampaignDependencies dependencies;
     @Autowired private PackGlossaries glossaries;
     @Autowired private PresentationJobService presentations;
+    @Autowired private PresentationEventStore presentationEvents;
+    @Autowired private PresentationScopePort presentationScopes;
     @Autowired private JournalRecoveryService journalRecovery;
     private UUID owner;
     private UUID adventure;
@@ -980,7 +984,7 @@ class MemoryContinuityTest {
             return NarrationPort.Result.delivered(new NarrationPort.Publication(SupportedLocale.EN, 0, 0, "c".repeat(64),
                     false, List.of(new NarrationPort.Passage(NarrationPort.PassageKind.NARRATION, null, null,
                             "Time passes quietly.", List.of("event.1"))), List.of(), null, null, null));
-        });
+        }, presentationEvents, presentationScopes);
         // The requeued attempt's backoff elapses.
         jdbc.update("update presentation_job set due_at = clock_timestamp(), row_version = row_version + 1 where "
                 + "operation_id = ?", operation);
@@ -996,7 +1000,8 @@ class MemoryContinuityTest {
         // Narration that ends pending keeps the receipt as the presentation and its retries.
         execute(new TypedCommand.Wait(30));
         assertEquals(1, new PresentationJobService(entities, jdbc, manager,
-                request -> NarrationPort.Result.of(NarrationPort.Outcome.UNAVAILABLE)).drain(4));
+                request -> NarrationPort.Result.of(NarrationPort.Outcome.UNAVAILABLE), presentationEvents,
+                presentationScopes).drain(4));
         var pending = cards.read(owner, adventure, campaign).awaitingNarration().getFirst();
         assertEquals("COMMITTED_NARRATION_PENDING", pending.status());
         assertEquals(new ResumeCards.Narration("RECEIPT", "NARRATION_UNAVAILABLE", 3), pending.narration());

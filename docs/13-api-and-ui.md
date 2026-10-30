@@ -357,7 +357,9 @@ Since P05.7-B.1.1 a stored presentation event is one more message of this log, w
 cues across connections or stream resets can drop a repeat by it. A cue is announced once: inserting
 the same campaign, operation and ordinal again adds no message, even after the message left
 the retained window. The browser protocol validates these frames and refuses a value that
-is not a plain reference, but no screen displays them, and no turn produces events yet.
+is not a plain reference, but no screen displays them. Since P05.7-B.1.2.3.2 the settlement of a
+publication that carries cues announces them before its `narrative.ready`, with the journal status of
+that moment, but the grounded publisher produces none, so no turn produces events yet.
 
 ### P08.5 narration presentation and retry
 
@@ -712,10 +714,11 @@ public projection. Expression/position uses admitted enums, normalized bounded
 slots and registered appearance variants, never arbitrary CSS/JavaScript, URLs,
 HTML, SSML, shell commands or instructions to fetch local files.
 
-Implemented so far (P05.7-A and P05.7-B.1.1): the kinds `SCENE`, `POSE` and `LINE_AUDIO`, with
-plain references checked against the audience's allowlist, and delivery as
-[`presentation.event`](#p075-stream-and-cancellation) with a stable `deliveryId`. The other fields
-and the kinds above remain proposed.
+Implemented so far (P05.7-A, P05.7-B.1.1 and P05.7-B.1.2.3.2): the kinds `SCENE`, `POSE` and
+`LINE_AUDIO`, with plain references checked against the audience's allowlist, delivery as
+[`presentation.event`](#p075-stream-and-cancellation) with a stable `deliveryId`, and a settlement
+path for cues that a narration publication carries. A refused list costs the cues, never the
+narration. The other fields and the kinds above remain proposed.
 
 The backend derives/validates cues from admitted public facts and accepted
 narration; a narrator suggestion is not a trusted frontend command. Events

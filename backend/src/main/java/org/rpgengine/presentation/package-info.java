@@ -12,8 +12,12 @@
  * admits an untrusted draft only when every reference is on the audience's {@link
  * org.rpgengine.presentation.PublicPresentationScope} and its actors are visible. Since
  * P05.7-B.1.1 {@link org.rpgengine.presentation.PresentationEventStore} stores admitted events
- * durably, which also announces them on the public stream; nothing produces events in a real turn
- * yet, and the browser does not display them. Nothing here may advance a canonical world counter, write world rows or call the
- * canonical commit service, and nothing here depends on inference types.
+ * durably, which also announces them on the public stream. Since P05.7-B.1.2.3.2 a delivered
+ * publication may carry cues, which the settling transaction records through that store against the
+ * scope from {@link org.rpgengine.presentation.PresentationScopePort}; a refused list is dropped and
+ * logged while the narration is still published. The grounded publisher produces no cues yet, so
+ * nothing produces events in a real turn, and the browser does not display them. Nothing here may
+ * advance a canonical world counter, write world rows or call the canonical commit service, and
+ * nothing here depends on inference types.
  */
 package org.rpgengine.presentation;
