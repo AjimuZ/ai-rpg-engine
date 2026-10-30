@@ -304,7 +304,7 @@ This checkpoint connects no gameplay executor or browser Send action. Admission
 stores a hash and fenced permit only; uncompleted work eventually fails through
 expiry/recovery. It cannot apply arbitrary payload fields to canonical state.
 Typed semantic resolution and public receipts arrived with P07.2–P07.4, delivery and
-cancellation with P07.5 below; browser Send binding remains P05.6/P05.7.
+cancellation with P07.5 below; browser Send binding is still not connected, and P05.7 did not add it.
 
 ### P07.5 stream and cancellation
 
@@ -725,13 +725,16 @@ Implemented so far (P05.7-A, P05.7-B.1.1 and P05.7-B.1.2.3.2): the kinds `SCENE`
 path for cues that a narration publication carries. A refused list costs the cues, never the
 narration. The other fields and the kinds above remain proposed.
 
-Client behavior implemented in P05.7-B.2.1 (jsdom tests only; see the roadmap for what was not proven):
+Client behavior implemented in P05.7-B.2.1 and checked in headless Chrome by P05.7-B.2.2 against the packaged
+interface with a scripted API and stream (no real turn produces cues; see the roadmap for what was not proven):
 every cue is a labelled text line, so the written account is complete with no cue, with a cue whose asset
 fails, and with audio never started. Audio is opt-in: a native button creates the player and plays on
 activation (Enter and Space activate a native button), one line plays at a time, nothing autoplays or
 replays on reconnect, and a load or playback failure shows "Audio is not available for this line" beside
 unchanged text. Cue entrance fades run only when `prefers-reduced-motion: reduce` is reported as not set; an
 unknown preference counts as reduced, and a stylesheet rule disables animation and transition under the query.
+A frame the protocol refuses is never shown and stops the stream follower until "Check for updates", which resumes
+after the last accepted frame. References appear as sent, because packs declare no localized names for them.
 No scene or pose image is drawn yet, and separate voice/music/effect controls, volume, captions and live
 speaker labels remain planned.
 

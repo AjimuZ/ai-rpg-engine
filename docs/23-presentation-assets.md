@@ -66,8 +66,9 @@ expressions. Hidden and unknown actors are refused identically.
 P05.7-B.1.1 stores admitted events in `presentation_event` (V26) and delivers them as
 `presentation.event` messages of the [public stream](13-api-and-ui.md#p075-stream-and-cancellation),
 which render only the allowlisted typed fields and carry a stable `deliveryId`. Rejected drafts are
-neither stored nor delivered. Not implemented yet: a producer during a real turn, the
-construction of the audience's allowlist from the pack, and display in the browser, which only validates the frames.
+neither stored nor delivered. That step had no producer during a real turn, did not build the
+audience's allowlist from the pack, and did not display cues: the browser only validated the frames. The
+paragraphs below add the allowlist and the display; a producer during a real turn is still missing.
 
 P05.7-B.1.2.1 lets a pack declare the public references that allowlist draws on: scenes, lines,
 assets and the poses and expressions each NPC definition may take, in one optional `presentation`
@@ -101,7 +102,19 @@ for a publication discarded as stale, cancelled or late. A refused list, cues na
 or revision, and a missing or failed scope all drop the whole list with a warning that names the
 operation and the reason, never the value, and the narration is still published. A storage failure is
 not a refusal: it rolls back the settlement, and the lease decides the next attempt. The grounded
-publisher produces no cues yet, so no real turn announces one, and the browser displays none.
+publisher produces no cues yet, so no real turn announces one.
+
+P05.7-B.2.1 shows the cues a playthrough receives as labelled text lines in a "Scene and voices" list,
+kept in memory only, so a reload forgets them. Line audio is opt-in: a native button requests
+`/api/v1/assets/<assetId>` only after it is activated, and a failure leaves a text notice beside the
+unchanged text. Scene and pose cues show their references as text, and no image is drawn.
+
+P05.7-B.2.2 checked this in headless Chrome, in English and in Italian, on the packaged interface with a
+scripted API and stream: duplicate and reconnect delivery, refused hostile frames, text-only reading,
+Tab, Enter and Space, and reduced motion. The [roadmap](16-development-roadmap.md) entry of that name maps
+each QA-40 point to its evidence. No real turn produces cues, so no frame from the real backend reached a
+browser. The asset route is not served, so a stub supplied the audio and nobody heard it. Persistent
+visual and voice identities remain P17 work.
 
 P04.5 includes original MIT-licensed 48×32 woodland/station PNG schematics in the
 [neutral import fixtures](../backend/src/test/resources/packs/README.md), with

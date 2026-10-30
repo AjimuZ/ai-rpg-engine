@@ -76,8 +76,9 @@ folders project sealed specifications/authored media and rebuild from PostgreSQL
 on restart. The browser library lists saved adventures read-only and scopes
 playthrough selection to one adventure. Saved-campaign play, generated media and
 complete QA-33 remain unfinished; see [workspace storage](docs/25-adventure-workspaces.md#2-separate-managed-folders).
-The roadmap now schedules the rest of P06.5 after presentation events (P05.7),
-owner-wide jobs (P08.6/P09.3), memory and purchase/equip (P10.2); P07 starts
+The roadmap schedules the rest of P06.5 after presentation events (P05.7),
+owner-wide jobs (P08.6/P09.3), memory and purchase/equip (P10.2), which are all
+checked now, although no real turn produces presentation cues yet; P07 started
 from the completed P06.1–P06.4 foundations.
 
 P06.4 adds admitted exact `status`/`stato` and `inventory`/`inventario`

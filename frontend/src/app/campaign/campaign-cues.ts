@@ -38,6 +38,8 @@ type AudioState = 'idle' | 'playing' | 'unavailable';
   styles: `
     .cue-list li { margin-block: .5rem; }
     .cue-list [data-audio-status]:empty { display: none; }
+    /* Keeps the focus ring of the button clear of the text on either side of it. */
+    .cue-list [data-audio-toggle], .cue-list [data-audio-status] { margin-inline-start: .5rem; }
     /* Entrance fades run only when the script confirmed that motion is allowed. */
     [data-motion='allowed'] .cue-list li { animation: cue-in 250ms ease-out; }
     @keyframes cue-in { from { opacity: 0; } to { opacity: 1; } }
@@ -60,9 +62,10 @@ type AudioState = 'idle' | 'playing' | 'unavailable';
                   @if (cue.expressionId) { · <strong i18n="@@campaign.cues.expression">Expression</strong>: <span data-expression>{{ cue.expressionId }}</span> }
                 }
                 @default {
-                  <strong i18n="@@campaign.cues.line">Spoken line</strong>: <span data-line>{{ cue.lineId ?? unnamed }}</span>
+                  <!-- Collapsed template whitespace would join the reference to the next text, so the spaces are explicit. -->
+                  <strong i18n="@@campaign.cues.line">Spoken line</strong>: <span data-line>{{ cue.lineId ?? unnamed }}</span>&ngsp;
                   @if (cue.assetId) {
-                    <button type="button" data-audio-toggle (click)="toggle(cue)">{{ state(cue) === 'playing' ? stopLabel : playLabel }}</button>
+                    <button type="button" data-audio-toggle (click)="toggle(cue)">{{ state(cue) === 'playing' ? stopLabel : playLabel }}</button>&ngsp;
                     <span class="muted" role="status" data-audio-status>{{ state(cue) === 'unavailable' ? unavailable : '' }}</span>
                   } @else { <span class="muted" data-audio-none>{{ noAudio }}</span> }
                 }

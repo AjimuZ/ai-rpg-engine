@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Presentation cues checked in a real browser (P05.7-B.2.2), 30 October 2026
+
+- A spoken-line cue no longer runs its words together ("asideNo audio for this line."), and the audio button now stands
+  clear of the text beside it, so its focus ring covers nothing.
+- The QA-40 points now have recorded evidence, including a headless Chrome check of duplicate and reconnect delivery,
+  text-only reading, Tab, Enter and Space on the audio buttons, and reduced motion, run once in English and once in Italian.
+- That check used the real packaged interface with a scripted API and stream. No real turn produces cues and the audio
+  route is not served, so players still see no cues. Persistent visual and voice identities remain P17 work.
+
 ## Unreleased — Playthrough screen shows presentation cues as text with opt-in line audio (P05.7-B.2.1), 30 October 2026
 
 - A playthrough now lists the scene, pose and expression, and spoken-line cues the server announces in a "Scene and voices"

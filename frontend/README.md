@@ -86,7 +86,8 @@ failures retain the in-memory view with a Settings notice and block language rel
 Separate review variants cover English and Italian with safe persisted language
 reload in both the review harness and packaged locale variants. These samples have no operation or
 stream cursor; real campaign contexts reload only after their operation/cursor record verifies.
-Safe presentation events remain P05.7. No submitted player dialogue is fabricated.
+These samples carry no presentation cues; a saved playthrough shows the cues it receives as text with opt-in
+line audio (P05.7, [docs/13](../docs/13-api-and-ui.md)). No submitted player dialogue is fabricated.
 
 P05.3 adds a Settings layout choice: default scene-led visual novel or a narrow
 text-focused column with a live scene description and no artwork requests.

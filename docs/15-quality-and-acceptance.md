@@ -1605,6 +1605,18 @@ render before checking its unchanged disabled assertion. These checks do not
 establish runtime campaign artwork persistence, Italian review, assistive-
 technology acceptance or the remaining QA-29/31/33/35 gates.
 
+P05.7-B.2.2 records QA-40 evidence for presentation cues; the point-by-point map to
+backend tests, frontend tests and the browser check is in the
+[roadmap](16-development-roadmap.md) entry of that name. The browser check ran the
+packaged interface in headless Chrome with a scripted API and stream, the same
+journeys once in the English and once in the Italian tree. It covers duplicate,
+reconnect, reset and skip delivery, refused hostile frames, text-only reading, real
+Tab/Enter/Space and reduced motion. QA-40
+stays open for persistent visual and voice identities (P17), and no real turn
+produces cues, so no frame from the real backend reached a browser. Audio came from
+a stub because the asset route is not served; nobody heard it, and no screen-reader
+review ran.
+
 Combat-chat acceptance for P11/P12 also includes a real-browser English/Italian
 path with visible speaker/recipient, editable suggestions and explicit Send;
 desktop/mobile keyboard access to both chat and tactics; draft preservation while

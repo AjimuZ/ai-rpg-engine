@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 67/130 tasks verified.** The owner withdrew the pending P98 review entry on 30 October 2026, so older records below that count 131 entries or mention a pending P98 follow-up describe the queue as it stood then. The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1, P11.2, P11.3 and P11.4. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 68/130 tasks verified.** The owner withdrew the pending P98 review entry on 30 October 2026, so older records below that count 131 entries or mention a pending P98 follow-up describe the queue as it stood then. The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P05.7, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1, P11.2, P11.3 and P11.4. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P05.7 is checked for its contract, rendering and fallback: no real turn produces presentation cues yet, the asset route is not served, no scene or pose image is drawn, and QA-40's persistent visual and voice identities stay with P17. P06.5 is in progress and its explicit prerequisites are all checked: P05.7 (within those limits), P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -1265,6 +1265,111 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
       `GroundedNarration` still produces no cues, so no real turn shows one; scene and pose cues show their
       references as text and no image is drawn (no asset route, no art); the actor of a pose is carried as an
       attribute, not named; no deliberately weakened run on an exported copy; QA-40 is not accepted.
+    - P05.7-B.2.2 (30 October 2026, QA-40 evidence with a browser check; the P05.7 box is not changed by this entry):
+      Box state: the `[x]` above came in `d44a303` (the P05.7-B.1.2.3.2 commit), before any browser evidence existed,
+      although that entry and the later one say the box stays unchecked. The points below now give it evidence within
+      the stated limits, so it stays ticked: P05.7 covers contract, rendering and fallback, and no real turn produces cues.
+      The status line at the top of this document had not counted it; it now says 68/130, which matches the 68 `- [x] P`
+      and 62 `- [ ] P` lines of this file, and P06.5 no longer waits for P05.7. P05.7 added no browser submit path and no
+      Retry control: Send stays disabled, and no file in `frontend/src/app/campaign` mentions Retry. Dated records above
+      and below still name P05.6/P05.7 for them, and P05.6 is now the only open task those records name, although its own
+      title does not include them. They are not done, and a task should own them.
+      How the browser check ran: `./start.sh` served the real packaged interface at `http://127.0.0.1:8080`, and headless
+      Chrome ran it through `withPage` from `.agents/ralph/browser/browser.mjs`. Every `/api/v1/**` reply was stubbed with
+      `context.route`: session, adventure, playthrough list, state, resume and panels are the bodies recorded from a real
+      server in `contract/campaign-reload-transcript.json`; stream frames are scripted with the backend's field set
+      (`PublicStreamService` plus `PresentationEvent.publicFields`); assets are generated WAV tones. The scripts are
+      scratch files in the ignored `.local/scratch/p057b22/`, not part of the repository, so this entry is the lasting
+      record of what they did. Every journey below ran separately in the `/en/` and the `/it/` tree, with its expected
+      text read from `messages.it.xlf` (the source for English, the target for Italian), so "the browser" below means both.
+      Commands and results: `node .local/scratch/p057b22/journey.mjs` ran seven times. Run 1: 96 checks, 4 failed. Two
+      entrance checks counted each row twice (script fault); one read the Space label before the view rendered (script
+      fault); one axe check failed once and its report was lost because the script ran axe again for the detail. Run 2,
+      script corrected: 98 checks, 0 failed. Run 3, after the fix below and a rebuilt image: 100 checks, 0 failed, 13
+      observations; most journeys ran only in English then. Run 4, the same image (every layer of the `./start.sh` build
+      cached) and the script extended to both trees: 197 checks, 0 failed, 21 observations; 97 checks in `/en/`, and in
+      `/it/` the same 97 plus 3 only there (no English label, no English notice, references unchanged).
+      Run 5, a later repeat with the same image and script: 197 checks, 2 failed, one per tree, both `audio: starting a
+      second line stops the first`, which read the pause and the rendered label in one check. The script split it: the
+      pause is read at once, the label is recorded, and then the script waits up to 20 s for the play label. Runs 6 and 7,
+      same image, Run 7 right after a fresh `./start.sh`: 199 checks each, 0 failed, 23 observations. In Run 7's Italian
+      tree the first line's label was still "Ferma l'audio della battuta" right after the second line started, with the
+      first player already paused, and then returned to the play label. So the pause precedes the render and a stale label
+      lasts a moment. That race fits Run 5, but Run 5 did not record which half failed, so it is the likely cause, not a
+      proven one. The new label check allows 20 s, so it does not bound how long a label can stay stale.
+      `node .local/scratch/p057b22/axe-probe.mjs`, English and Italian, 3 runs each per state, same result before and
+      after Run 4: entrance fade frozen at opacity 0.36, `color-contrast` in 6 of 6; fade finished, none in 6 of 6; reduced
+      motion, none in 6 of 6.
+      An earlier version of that probe, 36 runs with no violation, never met a running fade and proves nothing about it.
+      So the contrast report fits a state lasting 250 ms, but the lost report itself cannot be confirmed as that one.
+      `./start.sh --stop` ended each run, and `docker ps` then listed no container of this project.
+      `sh .agents/ralph/verify.sh frontend` passed all 6 steps: 16 files, 127 tests, 0 failed (126 before plus 1 new).
+      `sh .agents/ralph/verify.sh full` passed all 17 steps: backend 1,164 tests, 0 failures, 0 errors, 0 skipped.
+      Fix found by reading the screenshots, which no check had caught: template whitespace was collapsed, so a line read
+      "asideNo audio for this line." and the focus ring covered the first letter of the failure notice. `campaign-cues.ts`
+      now has explicit spaces and a margin; a new `campaign-cues.spec.ts` test and two journey checks cover it.
+      QA-40 map, point by point:
+      (1) Allowlisted public references only. Backend: `PresentationEventsTest` (`acceptsAllowlistedPublicReferences`,
+      `refusesReferencesOutsideTheAllowlist`, `rendersOnlyTheAllowlistedFieldsOfEachKind`),
+      `PresentationEventStreamTest.admittedEventsReachTheStreamWithOnlyAllowlistedFields`,
+      `PresentationCuePublicationTest.refusedValuesNeverReachTheStream`. Frontend: `campaign-protocol.spec.ts`
+      (`validates presentation cues and refuses raw or foreign values`). Browser: unknown `script`, `url`, `html` and `text`
+      fields are not read; the only asset requests are the same-origin `/api/v1/assets/<id>` of the activated line.
+      (2) No executable or raw-URL cues. Backend: `PresentationEventsTest` (`refusesRawUrls`, `refusesExecutableDirectives`,
+      `eventRecordRefusesUrlsAndWrongShapes`), `PresentationEventStreamTest.storageRefusesAnythingTheEventModelForbids`.
+      Frontend: the same protocol test. Browser: six hostile frames (raw URL, protocol-relative and traversal assets, a
+      `javascript:` scene, a markup line with a handler, an unknown kind) are each absent from the page; nothing ran, no
+      request left the origin, the cursor stayed on the last accepted frame and the written result stayed.
+      (3) No hidden-actor leak. Backend only, because the browser cannot know who is hidden:
+      `PresentationEventsTest.refusesHiddenAndUnknownActorsIndistinguishably`, `PublicPresentationScopeBuilderTest`,
+      `PresentationScopeResolverTest`, `PresentationCuePublicationTest.refusedValuesNeverReachTheStream`. Browser: only
+      that an actor identity is an attribute and never visible text.
+      (4) No language leak. Backend: `rendersOnlyTheAllowlistedFieldsOfEachKind` and
+      `refusesWhitespaceAndOversizedReferences` (a cue cannot carry prose),
+      `PresentationCuePublicationTest.staleGenerationDiscardsCuesAndTheRetryDeliversThemOnce`. Browser, `/it/` tree: document
+      language `it`; all 11 cue messages equal the catalog target exactly where they appear (title, help, scene, pose,
+      expression, line, unnamed, play, stop, no audio, and the failure notice); no English cue label or failure notice
+      remains; an unknown `text` field with Italian words is not read. Limit: references appear as sent, so "Scena: harbour"
+      shows a pack author's identifier to an Italian reader. Packs declare no localized names for them, so this is open, not
+      solved.
+      (5) Deduplicated skip and reconnect. Backend: `PresentationEventStreamTest` (`skipReconnectAndReplayNeverDeliverACueTwice`,
+      `repeatedInsertsAddNoMessageAndKeepTheHead`, `concurrentRepeatsAnnounceEachCueOnce`, `resetsAndRetentionWorkWithCues`),
+      `PresentationCuePublicationTest.retryRoundAndRepeatedCuesDeliverEachCueOnce`. Frontend: `presentation-cues.spec.ts`,
+      `campaign-session.spec.ts`, `campaign-view.spec.ts`. Browser: the whole stream repeated in one response adds only the one
+      new cue; after a failed poll the next poll asks after the saved cursor and a replay adds only the one new cue, with no
+      audio; ordinal 0 sorts before ordinal 1 of one operation; after a reset to an earlier head a repeat passes the cursor
+      check and its `deliveryId` refuses it (the first time this second guard ran through the real view); a client resuming
+      after the second cue shows only the later ones; a reload shows no cue from a repeated stream.
+      (6) Persistent visual and voice identities. Not applicable here and not proven anywhere: they belong to P17.1, P17.6
+      and P17.7.
+      (7) Fallback without world changes. Backend: `PresentationCuePublicationTest.admittedCuesReachTheStreamThroughOneAdmission`
+      (world rows unchanged) and `refusedValuesNeverReachTheStream` (narration still published). Frontend:
+      `campaign-cues.spec.ts`, `campaign-view.spec.ts`. Browser: all text outside the cue section equals a cue-free control
+      run; a 404 asset gives a `role="status"` notice with every cue line unchanged; every API call was a GET.
+      Text-only, keyboard and reduced motion, in the browser: no cue section, player or asset request without cues, and none
+      requested before activation. With ten cues shown, real Tab reaches the first audio button, then one press each reaches
+      the other three in reading order (`farewell`, `lost`, `quay`), each `:focus-visible` with a computed outline, and
+      Shift+Tab walks back; this was checked by computed style, and only the screenshots show how the outline looks. Real
+      Enter and Space each start and stop a line with focus kept (on `greeting`; Enter alone starts `farewell` and `lost`); a
+      second line stops the first; a short clip ends and the label
+      returns; leaving the screen silences a line and coming back starts nothing. Under `reducedMotion: reduce`: no row
+      animates at insertion, computed `animation-name` and `transition-property` are `none`, opacity is 1, and keys still work.
+      With motion allowed each row runs the entrance animation, which stops when the preference changes live. axe found no
+      violation on the settled English and Italian pages, and 390 px has no horizontal overflow in either language.
+      Not proven: no real turn produces cues (`GroundedNarration` produces none), so no frame from the real backend reached a
+      browser, and the packaged API without an owner answers 503 for the session. The real asset route answers 404, so the
+      WAV came from the stub; with cookies, `Content-Type` and range requests of a real route untested, playback is shown
+      by `currentTime` advancing in headless Chrome and nobody heard it. A fulfilled reply arrives whole, so frames split
+      across network chunks are covered only by the frontend tests. Only Chrome ran. axe and the accessibility tree are not
+      a screen-reader review. The Italian text was compared with the catalog string by string and two screenshots were read;
+      this is not a new translation review. The console logged the two expected failures (the scripted failed poll and the
+      404 asset), which were observed and not judged. The `quay` button was focused and never pressed. No scene or pose image
+      is drawn. No build was deliberately weakened, and the new spacing test
+      was not run against the old template (the old defect was seen in the browser). The browser check does not separate
+      the `data-motion` attribute from the reduced-motion stylesheet rule; from reading the stylesheet, that rule has lower
+      specificity than the allowed-motion rule, so the attribute is what stops the animation.
+      Limits observed: one refused frame stops the follower until "Check for updates", which resumes after the last accepted
+      frame and would stop again if the server repeated it; a reload forgets cues, because they are in memory only.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.
 

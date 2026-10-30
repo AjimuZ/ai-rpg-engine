@@ -73,6 +73,13 @@ describe('Campaign cues', /** Register the display, audio and motion checks. */ 
     expect(root.querySelector('[data-audio-none]')!.textContent).toContain('No audio for this line.');
   });
 
+  it('keeps the words of a line apart, because template whitespace alone would be collapsed', () => {
+    const { root } = mount([cue(0, 'LINE_AUDIO', { lineId: 'quiet' }), cue(1, 'LINE_AUDIO', { lineId: 'greeting', assetId: 'line-greeting' })]);
+    const [silent, voiced] = [...root.querySelectorAll('li')].map((item) => item.textContent!.replace(/\s+/g, ' ').trim());
+    expect(silent).toBe('Spoken line: quiet No audio for this line.');
+    expect(voiced).toBe('Spoken line: greeting Play line audio');
+  });
+
   it('never creates a player, fetches or plays before the player asks', () => {
     const { root, created } = mount([LINE]);
     expect(created).toHaveLength(0);
