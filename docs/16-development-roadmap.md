@@ -1097,6 +1097,37 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
       visible cue and the text-only, keyboard and reduced-motion behavior of QA-40 are still to do.
       Limit by design: a client that receives `stream.reset` adopts the head and does not get the cues
       it missed, so it needs the current scene from a reloaded projection, which does not exist yet.
+    - P05.7-B.1.2.1 (30 October 2026, pack declaration of public presentation references; box stays
+      unchecked): a pack may name one `presentation` file (new file category and optional manifest field)
+      declaring `scenes` (id, optional `backdrop`), `lines` (id, optional `audio`), `assets` and `actors`
+      (a local NPC ID with its `poses` and `expressions`). `PackPresentation.compile` reads it with the
+      existing located `Fields` reader and `CompiledPack` gained a `presentation` component
+      (`PackPresentation.NONE` without the file), which reaches `CampaignPackSnapshot` because the
+      registry recompiles packs. Every reference must match `PresentationEvent.REFERENCE`, every list
+      stays within `PublicPresentationScope.MAX_ENTRIES` (256), and a backdrop or audio must name a listed
+      asset ("undeclared asset" is read this way; assets stay opaque names, not bound to `asset` files).
+      A diagnostic carries file, line, column and an index pointer and never repeats the value. A
+      `presentation` file the manifest does not name, or a second one, is `FILE_REFERENCE`. No migration,
+      API or screen changed; the format is in `docs/09-adventure-packs.md` section 3.3.
+      Commands: `sh .agents/ralph/verify.sh backend -Dtest=PackPresentationTest,PackCompilerTest,PackLocalizationTest,NeutralGenreImportTest,PackParserTest`
+      passed (84 tests in the four classes that ran, 0 failures, 0 errors, 0 skipped, including 18 in
+      `PackPresentationTest`; no `PackParserTest` class was among them), and
+      `sh .agents/ralph/verify.sh full` passed all 17 steps: backend 1,140 tests, 0 failures, 0 errors,
+      0 skipped (1,122 before). The frontend and backup steps passed; their counts were not read.
+      Proven by the new tests: the valid declaration is parsed and compiled into the pack and the
+      snapshot and fits a `PublicPresentationScope`; URL, script, path, scheme, markup, leading-dash and empty
+      values are refused in all seven reference positions at the expected pointer without appearing in the
+      message; 64 characters pass and 65 fail; 256 entries pass and 257 fail for assets, scenes, lines,
+      actors, poses and expressions; undeclared backdrop and audio, duplicates, unknown, non-NPC and
+      external actors, unknown fields and a wrong version fail; a pack without the declaration compiles
+      to `NONE` with every other file hash unchanged, and the existing compiler, localization and
+      neutral-import tests still pass.
+      Not proven or not done: the negative tests were not rerun against deliberately weakened code on an
+      exported copy; no pack with the declaration was registered through `PackRegistry` on a real database,
+      so the snapshot path is shown with `CampaignPackSnapshot.local`; no fixture pack declares
+      presentation; nothing builds the audience `PublicPresentationScope` from the declaration or calls the
+      event gate during a turn, so no played turn is affected; assets are not tied to `asset` files; the
+      browser display and the QA-40 behaviors remain to do.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.
 

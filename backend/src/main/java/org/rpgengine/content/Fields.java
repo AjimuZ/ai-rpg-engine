@@ -191,6 +191,40 @@ final class Fields {
         return values;
     }
 
+    /**
+     * Required or optional string that must match a caller-owned pattern. The diagnostic states the
+     * expectation and never repeats the value, so a rejected URL or markup is not echoed back.
+     */
+    String matching(String key, Pattern pattern, boolean required, String expectation) {
+        Object value = raw(key, required);
+        if (value == null) {
+            return null;
+        }
+        if (!(value instanceof String text) || !pattern.matcher(text).matches()) {
+            throw fail(key, expectation);
+        }
+        return text;
+    }
+
+    /**
+     * Array of unique strings that each match a caller-owned pattern, with a size bound; absent yields an
+     * empty list. Diagnostics point at the element and never repeat its value.
+     */
+    List<String> matchingAll(String key, Pattern pattern, int max, String expectation) {
+        List<?> list = list(key, 0, max);
+        List<String> result = new ArrayList<>();
+        for (int index = 0; index < list.size(); index++) {
+            if (!(list.get(index) instanceof String text) || !pattern.matcher(text).matches()) {
+                throw new PackException("SCHEMA", document.location(element(key, index)), expectation);
+            }
+            if (result.contains(text)) {
+                throw new PackException("DUPLICATE", document.location(element(key, index)), "Duplicate entry");
+            }
+            result.add(text);
+        }
+        return result;
+    }
+
     /** Single reference resolved against the pack index; null when optional and absent. */
     String ref(String key, Set<String> kinds, boolean required) {
         Object value = raw(key, required);

@@ -14,15 +14,19 @@ import java.util.Map;
  * @param byId definitions keyed by local ID
  * @param generationPolicy compiled generation modes, budgets and fixed author constraints
  * @param localization immutable text catalog with source fallback, policies and locale coverage
+ * @param presentation public scene, line and asset references and per-actor poses and expressions the
+ *        pack declares; {@link PackPresentation#NONE} when it declares none
  * @param warnings non-blocking findings, kept distinct from guaranteed checks
  */
 public record CompiledPack(ParsedPack parsed, List<Definition> definitions, Map<String, Definition> byId,
-        GenerationPolicy generationPolicy, PackLocalization localization, List<PackWarning> warnings) {
+        GenerationPolicy generationPolicy, PackLocalization localization, PackPresentation presentation,
+        List<PackWarning> warnings) {
     /** Copy the indexes so callers cannot mutate the validated result. */
     public CompiledPack {
         java.util.Objects.requireNonNull(parsed, "parsed");
         java.util.Objects.requireNonNull(generationPolicy, "generationPolicy");
         java.util.Objects.requireNonNull(localization, "localization");
+        java.util.Objects.requireNonNull(presentation, "presentation");
         definitions = List.copyOf(definitions);
         byId = Map.copyOf(byId);
         warnings = List.copyOf(warnings);

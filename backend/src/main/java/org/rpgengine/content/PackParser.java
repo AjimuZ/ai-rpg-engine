@@ -78,6 +78,8 @@ public final class PackParser {
         categoryReference(document, categories, "generationPolicy", "generationPolicy");
         categoryReference(document, categories, "presentationProfile", "theme");
         categoryReference(document, categories, "textResources", "textResources");
+        categoryReference(document, categories, "presentation", "presentation");
+        presentationFile(document, categories);
         moduleReferences(document, categories);
         PackHashes.Inventory hashes = PackHashes.calculate(files);
         return new ParsedPack(manifest, documents, prose, hashes.contentHash(), hashes.fileHashes());
@@ -116,6 +118,21 @@ public final class PackParser {
         Map<String, Object> values = (Map<String, Object>) document.value();
         if (values.containsKey(field) && !category.equals(categories.get(values.get(field)))) {
             throw new PackException("FILE_REFERENCE", document.location("/" + field), "Reference requires category " + category);
+        }
+    }
+
+    /**
+     * Require that a file categorized {@code presentation} is the one the manifest names, so a second or
+     * unreferenced declaration cannot sit in the pack unread while appearing admitted.
+     */
+    @SuppressWarnings("unchecked")
+    private static void presentationFile(PackDocument document, Map<String, String> categories) {
+        Object named = ((Map<String, Object>) document.value()).get("presentation");
+        for (var entry : categories.entrySet()) {
+            if (entry.getValue().equals("presentation") && !entry.getKey().equals(named)) {
+                throw new PackException("FILE_REFERENCE", document.location("/files"),
+                        "A presentation file must be the single file named by the manifest's presentation field");
+            }
         }
     }
 

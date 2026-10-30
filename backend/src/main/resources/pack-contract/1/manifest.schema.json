@@ -39,6 +39,7 @@
       }
     },
     "textResources": {"$ref": "#/$defs/path"},
+    "presentation": {"$ref": "#/$defs/path"},
     "contentGuidance": {
       "type": "object", "additionalProperties": false,
       "properties": {"tone": {"$ref": "#/$defs/text"}, "themes": {"$ref": "#/$defs/texts"}, "exclusions": {"$ref": "#/$defs/texts"}, "audience": {"$ref": "#/$defs/text"}}
@@ -57,7 +58,7 @@
       "type": "object", "additionalProperties": false, "required": ["path", "category"],
       "properties": {
         "path": {"$ref": "#/$defs/path"},
-        "category": {"type": "string", "enum": ["lore", "locations", "factions", "timeline", "secrets", "creation", "npcs", "items", "skills", "abilities", "conditions", "progression", "encounters", "quests", "rules", "narrativeStyle", "generationPolicy", "anchors", "theme", "assetCatalog", "audio", "guide", "creativeAbilities", "asset", "license", "credits", "localization", "textResources"]}
+        "category": {"type": "string", "enum": ["lore", "locations", "factions", "timeline", "secrets", "creation", "npcs", "items", "skills", "abilities", "conditions", "progression", "encounters", "quests", "rules", "narrativeStyle", "generationPolicy", "anchors", "theme", "assetCatalog", "audio", "guide", "creativeAbilities", "asset", "license", "credits", "localization", "textResources", "presentation"]}
       }
     },
     "module": {

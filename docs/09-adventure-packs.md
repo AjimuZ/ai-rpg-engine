@@ -97,6 +97,7 @@ Only `adventure.yaml` and the files it requires are mandatory. Files can be spli
 | `modules` | Yes | Enabled supported modules and configuration references |
 | `generationPolicy` | Yes | Allowed content categories, budgets, canon constraints |
 | `presentationProfile` | No | Theme, panels, scene/map/audio behavior |
+| `presentation` | No | One listed `presentation` file declaring public scene, line and asset references and per-actor poses and expressions ([section 3.3](#33-presentation-declaration)) |
 | `contentGuidance` | No | Tone, themes, exclusions, audience guidance |
 | `dependencies` | No | Locally installed, explicitly versioned content packages |
 | `provenance` | No | Source/authoring information and inherited material |
@@ -154,7 +155,8 @@ Categories `lore`, `narrativeStyle`, `license`, `credits` require `.md`;
 `locations`, `factions`, `timeline`, `secrets`, `creation`, `npcs`, `items`,
 `skills`, `abilities`, `conditions`, `progression`, `encounters`, `quests`,
 `rules`, `generationPolicy`, `anchors`, `theme`, `assetCatalog`, `audio`, `guide`,
-`creativeAbilities`. Category never comes from a filename guess.
+`creativeAbilities`, and the optional `presentation` ([3.3](#33-presentation-declaration)).
+Category never comes from a filename guess.
 `generationPolicy` names a listed file of that category; optional
 `presentationProfile` names a listed `theme`. Modules are `{id, configuration?}`
 records with unique IDs and optional listed structured-file paths. Dependencies
@@ -166,6 +168,8 @@ P04.6 adds structured `localization` and `textResources` categories. Optional
 `textResources: path` binds one listed source-resource file. Unbound text files,
 unsupported locales and reused overlay paths fail. See the exact
 [localization contract](29-localization.md#4-pack-localization-contract).
+P05.7-B.1.2.1 adds the structured `presentation` category and the optional manifest field
+`presentation: path` (see [3.3](#33-presentation-declaration)).
 
 The [definition-envelope schema](../backend/src/main/resources/pack-contract/1/definitions.schema.json)
 publishes `{schemaVersion: 1, definitions: [{id, kind, data}]}`. It checks only
@@ -195,6 +199,45 @@ identical hashes regardless of caller map order or host root; renamed files,
 changed comments, assets, LF/CRLF or YAML/JSON source representations change them.
 The immutable output does not expose caller-owned byte arrays. Future revisions
 must preserve this framing or introduce an explicit new digest protocol.
+
+### 3.3 Presentation declaration
+
+Implemented in P05.7-B.1.2.1. A pack may name one listed file of category `presentation` with the
+manifest field `presentation: path`. The category is new and additive: a pack without the field and
+file compiles to the same definitions, policies and file hashes as before and receives an empty
+declaration (`PackPresentation.NONE`). A `presentation` file that the manifest does not name, or a
+second one, is a `FILE_REFERENCE` error.
+
+```json
+{
+  "schemaVersion": 1,
+  "assets": ["harbor-backdrop", "greeting-voice"],
+  "scenes": [{"id": "harbor-dawn", "backdrop": "harbor-backdrop"}, {"id": "market-day"}],
+  "lines": [{"id": "greeting.01", "audio": "greeting-voice"}, {"id": "farewell"}],
+  "actors": [{"actor": "keeper", "poses": ["idle", "wave"], "expressions": ["calm", "smile"]}]
+}
+```
+
+Every key but `schemaVersion` is optional, and unknown keys are errors.
+
+- A reference (`assets` entries, scene and line `id`, `backdrop`, `audio`, poses, expressions) must
+  match `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`, the same pattern as a runtime presentation event. A URL, path,
+  markup, whitespace, an empty value or more than 64 characters is a `SCHEMA` error.
+- Each of `assets`, `scenes`, `lines`, `actors`, and each actor's `poses` and `expressions`, holds at most
+  256 entries (`PublicPresentationScope.MAX_ENTRIES`). References are unique within their list
+  (`DUPLICATE`).
+- `backdrop` and `audio` are optional and must name an entry of `assets`; any other value is an
+  undeclared asset and is `REFERENCE_UNKNOWN`. Asset references are opaque names: this stage does not
+  bind them to `asset` files or check that a file exists.
+- `actor` must be the ID of an `npc` definition of this pack, at most once (`REFERENCE_UNKNOWN`,
+  `DUPLICATE`). Dependency packs declare their own actors.
+- A diagnostic carries the file, line, column and pointer (an array index, never the value) and a fixed
+  message; it never repeats the rejected value.
+
+`CompiledPack.presentation()` returns the immutable declaration and so reaches `CampaignPackSnapshot`.
+It is internal content like the rest of the compiled pack. Building a per-audience
+`PublicPresentationScope` from it, and checking events against it, is later work; nothing consumes the
+declaration during play yet.
 
 ## 4. Definition model
 

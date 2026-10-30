@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Packs can declare public presentation references (P05.7-B.1.2.1), 30 October 2026
+
+- An adventure pack may now list the scenes, lines and assets it can show and the poses and expressions each of its NPCs may
+  take, in one optional `presentation` file named by the manifest. The declaration compiles into the pack and the campaign
+  snapshot.
+- A pack that declares a URL, markup, an over-long reference, more than 256 entries in a list, or a backdrop or audio asset
+  it did not list is refused when it is imported, with a diagnostic that points at the field and does not repeat the value.
+- Packs without the declaration compile exactly as before. Players see no difference yet: nothing uses the declaration
+  during play. The [pack format](docs/09-adventure-packs.md#33-presentation-declaration) describes the file.
+
 ## Unreleased — Durable presentation events on the public stream (P05.7-B.1.1), 30 October 2026
 
 - The engine can now store admitted scene, pose and line-audio events (migration V26) and deliver them on the campaign

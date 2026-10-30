@@ -66,8 +66,15 @@ expressions. Hidden and unknown actors are refused identically.
 P05.7-B.1.1 stores admitted events in `presentation_event` (V26) and delivers them as
 `presentation.event` messages of the [public stream](13-api-and-ui.md#p075-stream-and-cancellation),
 which render only the allowlisted typed fields and carry a stable `deliveryId`. Rejected drafts are
-neither stored nor delivered. Not implemented yet: a producer during a real turn, the pack-catalog
-source of the allowlist, and display in the browser, which only validates the frames.
+neither stored nor delivered. Not implemented yet: a producer during a real turn, the
+construction of the audience's allowlist from the pack, and display in the browser, which only validates the frames.
+
+P05.7-B.1.2.1 lets a pack declare the public references that allowlist draws on: scenes, lines,
+assets and the poses and expressions each NPC definition may take, in one optional `presentation`
+file ([format](09-adventure-packs.md#33-presentation-declaration)). Admission refuses a URL,
+markup, over-long or over-bounded reference without echoing it, and a backdrop or audio that names
+an asset the file does not list. The compiled declaration is part of the compiled pack and the
+campaign snapshot; nothing reads it during play yet.
 
 P04.5 includes original MIT-licensed 48×32 woodland/station PNG schematics in the
 [neutral import fixtures](../backend/src/test/resources/packs/README.md), with

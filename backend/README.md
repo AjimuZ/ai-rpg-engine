@@ -360,6 +360,7 @@ The [localization contract](../docs/29-localization.md#4-pack-localization-contr
 defines closed schemas, stable child-ID paths, owner/visibility inheritance,
 proper-name/quote policies, named-placeholder parity and bounds. Partial or absent
 overlays fall back to exact source text; a verbatim quote retains source language.
+
 The immutable result includes actual locale, fallback, source owner/visibility,
 kind and quote policy. Missing text is an explicit diagnostic.
 
@@ -371,6 +372,13 @@ permits versions 1 and 2 while preserving old seals. Identical re-imports keep t
 original report; new inspection may supply current coverage. No dependency change
 is needed. Markdown and prose arrays without stable child IDs stay source-only.
 This implements pack validation, not localized UI, ICU, rendering or narrative quality.
+
+An optional `presentation` file declares the public scene, line and asset references and the poses
+and expressions each NPC may take. It compiles into `CompiledPack.presentation()` (an empty
+`PackPresentation.NONE` when absent) and so into the campaign snapshot. Admission refuses a URL,
+markup, over-long or over-bounded reference and an undeclared asset, without echoing the value; see
+[pack format 3.3](../docs/09-adventure-packs.md#33-presentation-declaration). Nothing reads it during
+play yet.
 
 Run `./mvnw -B -ntp -Dtest=PackLocalizationTest,NeutralGenreImportTest test`
 against disposable PostgreSQL. The corpus covers both reviewed bilingual fixtures,
