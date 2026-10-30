@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Packaging recreation check without a skipped backend test (P02.3-A), 30 October 2026
+
+- The packaging verification image now contains the one probe fixture the backend's drift check compares, and that check
+  fails rather than skips when the file is missing. The zero-skip rule of the recreation check is unchanged, and the final
+  engine image still receives only the jar.
+- A timing race in a scheduler test double could fail the backend suite at random; it now waits for a submission to finish.
+- Eight deliberate weakenings on exported copies fail as intended, including skips added elsewhere in the backend suite, and
+  the containers check passes on the final code. An interrupted weakening run had left the retained fixture database in a
+  recovery that outlasted the check's wait; it was repaired outside the check, which is unchanged. The
+  [roadmap entry](docs/16-development-roadmap.md#5-p02--establish-repository-and-quality-infrastructure) records the results.
+
 ## Unreleased — Predeclared reactions, effect phases, durations and cooldowns (P11.4), 30 October 2026
 
 - Everyone in a fight now braces by default: against a visible attack, one reaction adds +2 Guard for that attack. It shares

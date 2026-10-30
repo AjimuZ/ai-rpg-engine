@@ -15,8 +15,9 @@ py -B -m unittest discover -s tools/container_packaging -v
 
 Two context checks copy only the ignore policies into neutral fixture trees
 under `.local/scratch/`, then export actual BuildKit contexts and compare exact
-file sets. The root policy admits frontend/backend inputs and the engine
-Dockerfile. The independent runtime policy admits its Dockerfile and five
+file sets. The root policy admits frontend/backend inputs, the engine
+Dockerfile and one probe file, `tools/runtime_probe/fixtures/0.164.0/neutral-session.json`,
+which the backend's drift check needs. The independent runtime policy admits its Dockerfile and five
 reviewed managed-profile files. Both exclude nested private paths. New inputs
 must update the relevant policy and fixtures. These checks do not inspect account
 files or detect secrets embedded in otherwise admitted source files.
@@ -81,7 +82,13 @@ device-language/default/unsupported/denied-storage paths and direct locale links
 preserve opaque query/hash and draft bytes. Ordinary CI leaves this flag unset.
 
 The opt-in check uses only `engine-packaged-shell-check` and refuses existing
-containers. It builds the pinned images, starts all three services with a random
+containers, including stopped ones that a killed run could not clean up: inspect
+their Compose labels and remove them by name before rerunning. A killed run can also
+leave the retained fixture database interrupted. Its recovery can outlast the health
+wait, and then `compose up --wait` fails on every run until the recovery has finished
+once with the service left running, or the fixture volume is replaced.
+
+The check builds the pinned images, starts all three services with a random
 loopback port, and checks actual identity, networks, mounts, socket permissions,
 authenticated database TCP and rejection of passwordless access. HTTP checks
 cover the root selector, both `/en/` and `/it/` preview indexes, hashed JS/CSS,
@@ -92,9 +99,10 @@ packaged classpath resources. A WebSocket
 upgrade through the read-only shared socket proves engine-to-runtime IPC without
 an account or inference request. A missing packaged secret must fail startup.
 
-The engine Dockerfile's `verification` target retains source and an offline Maven
-cache solely for checks. The full backend suite runs in that target against a separate
-fixture database on the internal data network. The final JRE image contains only
+The engine Dockerfile's `verification` target retains source, the probe fixture and an
+offline Maven cache solely for checks. The full backend suite runs in that target against a
+separate fixture database on the internal data network, and the check fails on any failure,
+error or skipped test: no skip is declared or allowed. The final JRE image contains only
 the packaged jar, and builds also run frontend type checks, tests and compilation.
 Neutral markers in the fixture database schema, runtime home/workspace and
 content/assets storage must survive recreation. Cleanup removes owned containers,

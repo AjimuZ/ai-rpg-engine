@@ -290,6 +290,91 @@ RPC integration, pack/asset pipelines, canonical campaign recovery or full
 QA-28 (P02.5–P02.7/P08 and later acceptance). Native Linux secret UID permissions
 and the release Java refresh remain explicit qualification gates.
 
+P02.3-A checkpoint (30 October 2026), **implemented; `verify.sh containers` passes on the final code**: with
+`PACKAGING_DOCKER=1`, `InfrastructureTest` requires zero skipped backend tests, while
+`CodexFixtureReplayTest` skipped its drift check in the packaging image because the probe
+fixture was outside that build context. The chosen repair makes the skip impossible and
+declares no allowed skip: the root `.dockerignore` admits exactly
+`tools/runtime_probe/fixtures/0.164.0/neutral-session.json`, the Dockerfile's `verification`
+stage copies it to its checkout-relative path, the test's assumption is removed so a missing
+source fails, and `test_build_context.py` lists the file as allowed and its neighbours as
+denied. The zero-skip assertion itself is unchanged.
+
+Results. The first `sh .agents/ralph/verify.sh containers` on this repair failed with exit 1: the check's
+backend run reported 1,101 tests, 0 failures, 1 error, 0 skipped, against 1 skipped and no error on the
+old tree. The error was `InferenceSchedulerTest.campaignsTakeTurnsAndBackgroundWorkWaitsForInteractiveWork`,
+a `NullPointerException` in `ControlledPort.complete`: `submit` adds to `requests` before journaling and
+adding to `running`, so a test can see a task that `running` does not hold yet. The double now takes
+`submit`'s monitor to fetch the future and completes it outside that monitor. On exported copies that hold
+`submit` open for one second after the request becomes visible, that test passes with the monitor and fails
+with the same `NullPointerException` without it (one run each, focused on PostgreSQL). The original random
+failure was seen once and is not otherwise reproduced.
+
+With that fix, `verify.sh containers` printed `VERIFY PASSED (containers)`: `container-packaging` ran 27 tests,
+OK, skipped=1, and `runtime-probe-docker` ran 116 tests, OK. The one skip is the lifecycle check's opt-in flag,
+`PACKAGING_LIFECYCLE`, which belongs to the Python suite and is not a backend test. None of the changed code,
+check or fixture files has changed since that run; only this entry, `CHANGELOG.md` and the packaging README have.
+
+A later run on the live tree was refused by the check's guard, "Fixture project already has containers", raised
+before any build: an interrupted weakening run had left three stopped containers of
+`engine-packaged-shell-check`, whose Compose labels named the exported copy
+`.local/scratch/p023a/original-defect`. They were removed outside the session, and the guard, unchanged, no longer
+stops the check.
+
+Three further `verify.sh containers` runs on the live tree failed, for a second host reason: each time
+`container-packaging` ran 27 tests with failures=1, skipped=1 (124, 131 and 122 seconds) and `runtime-probe-docker`
+passed (79, 77 and 78 seconds). The one failure is `compose up --wait`, because
+`engine-packaged-shell-check-postgres-1` does not become healthy, so these runs never reach the backend suite or
+its zero-skip assertion. The database's log, recorded during the third run, reports
+`database system was interrupted; last known up at 2026-10-30 16:58:43 UTC`, then only
+`syncing data directory (fsync)` progress, still running at 100 seconds, while `pg_isready` rejects connections.
+The check gave up after 80 seconds and its cleanup asks the service to stop during that sync. The first two runs
+failed with the same step but kept no database log. Inferred, not proven: recovery never completes, so each run
+starts it again, and a backend run killed before its final `DROP DATABASE packaging_backend_checks` left the many
+files being synced. The volume's size was not measured, because a read-only mount was refused in the session, as
+was starting the service alone for longer. The check, the health settings and the volume were not changed.
+
+The database was then repaired outside the session; whether by a finished recovery or a replaced volume is not
+recorded. On the next run its log reports `database system was shut down at 2026-10-30 18:03:14 UTC` and it is
+healthy within 10 seconds. Two `verify.sh containers` runs on the final code then printed
+`VERIFY PASSED (containers)`, the second after the weakened copy below had overwritten the shared image tags:
+`container-packaging` ran 27 tests, OK, skipped=1 (163 and 168 seconds), and `runtime-probe-docker` ran 116 tests,
+OK (77 seconds each). The check discards Maven's output when it passes, so these runs prove the zero-skip assertion
+held and do not print a count; the database log of the first run shows the backend suite running.
+
+The runner's own run of this profile, which followed, reported `runtime-probe-docker` as failed after 14 seconds,
+with `container-packaging` passing in 167 seconds. That step's log holds 33 progress dots and nothing else: no
+failure, traceback or `unittest` summary, so the process ended before reporting any result. A new runner session
+started about a minute later. This points to an interrupted run rather than a failing test; what ended it is not
+recorded. The next `verify.sh containers`, on the same code, printed `VERIFY PASSED (containers)`:
+`container-packaging` ran 27 tests, OK, skipped=1 (179 seconds), and `runtime-probe-docker` ran 116 tests, OK
+(79 seconds).
+
+Weakenings, all on exported copies of these same file contents. The original-defect case and the control used
+the separate Compose project `p023a-shell-check`, so those containers stayed untouched; the two skips added
+elsewhere ran earlier under the fixed project name. An earlier original-defect result is discarded, because it
+only hit the guard above. The `assumeTrue(false)` case was repeated on the final code under the separate project,
+with the same result (exit 1 in 143 seconds, the assertion at `verify_backend`); the other seven were not repeated.
+
+| Weakening | Check | Result |
+| --- | --- | --- |
+| `assumeTrue(false)` in one `StdioFrameWireTest` method | `InfrastructureTest` | fails, `('0', '0', '1')` |
+| `@Disabled` on `UnixSocketFrameWireTest` | `InfrastructureTest` | fails, `('0', '0', '5')` |
+| Original defect: no `COPY`, assumption restored | `InfrastructureTest` | fails, `('0', '0', '1')` |
+| `COPY` of the fixture removed | focused `CodexFixtureReplayTest` in the image | error, `NoSuchFile` |
+| Fixture changed by one byte | focused `CodexFixtureReplayTest` in the image | 1 failure |
+| `.dockerignore` admits all probe fixtures | `BuildContextTest` | fails, two neighbours leak |
+| `.dockerignore` admits the whole probe tree | `BuildContextTest` | fails, `probe.py` leaks |
+| `.dockerignore` omits the fixture | `BuildContextTest` | fails, fixture missing |
+| Control: project name and a printed summary only | `InfrastructureTest` | passes, 1,101 tests, 0 failures, 0 errors, 0 skipped |
+
+`sh .agents/ralph/verify.sh full` passed on the final code, just before this paragraph was written: backend 1,101
+tests, 0 failures, 0 errors, 0 skipped with the packaged profile.
+Not proven: the cause of the database's stalled recovery, what interrupted the runner's run above, and that the
+`ControlledPort` fix removes the original random failure, beyond the forced-window runs above. The original failure
+did not recur in the later full backend runs, which is weak evidence for a race seen once. The separate-project runs leave their named volumes behind,
+as the check does for its own project, because deleting Docker volumes is reserved to the owner.
+
 Final review also passes the two context tests after expanding the runtime
 allowlist fixture to all six reviewed inputs, Dockerfile build checks with no
 warnings, Compose rendering, 191 local documentation links/fences, and all 19

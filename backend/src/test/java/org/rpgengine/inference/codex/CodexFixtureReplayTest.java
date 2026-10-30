@@ -13,7 +13,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.rpgengine.inference.EffectiveSettings;
 import tools.jackson.core.StreamReadFeature;
@@ -51,10 +50,9 @@ class CodexFixtureReplayTest {
 
     @Test
     void backendCopyIsByteIdenticalToTheRetainedProbeFixture() throws IOException {
-        // The verification image builds from backend/ only, so the backend keeps a copy; in a
-        // full checkout (every developer and CI run) it must not drift from the probe's retained
-        // fixture. Only the backend-only image reports this case as skipped.
-        Assumptions.assumeTrue(Files.isRegularFile(SOURCE), "probe fixture not in this build context");
+        // Tests load the backend's classpath copy, which must not drift from the probe's retained
+        // fixture. Every run has the source: a checkout, or the verification image, which admits
+        // exactly this file. A missing source fails here, because the packaging check allows no skip.
         try (InputStream in = getClass().getResourceAsStream(RESOURCE)) {
             assertThat(in.readAllBytes()).isEqualTo(Files.readAllBytes(SOURCE));
         }

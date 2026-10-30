@@ -75,13 +75,22 @@ final class ControlledPort implements NarrationTaskPort {
 
     /** Complete a running task with a turn (provenance present). */
     void complete(UUID taskId, TaskResult.Status status, String code) {
-        running.get(taskId).complete(new TaskResult(taskId, status, status == TaskResult.Status.COMPLETED ? "{}" : null,
+        started(taskId).complete(new TaskResult(taskId, status, status == TaskResult.Status.COMPLETED ? "{}" : null,
                 status == TaskResult.Status.COMPLETED ? null : code, PROVENANCE, false));
+    }
+
+    /**
+     * The running future of a task already in {@link #requests}. A test can see the request while {@link #submit} is
+     * still journaling it, so this waits for that call to end. The future completes outside this monitor, because its
+     * callbacks take the scheduler's lock while the scheduler may be waiting here in {@link #submit}.
+     */
+    private synchronized CompletableFuture<TaskResult> started(UUID taskId) {
+        return running.get(taskId);
     }
 
     /** Complete a running task as one that never started a runtime turn (no provenance). */
     void completeWithoutTurn(UUID taskId, TaskResult.Status status, String code) {
-        running.get(taskId).complete(TaskResult.withoutTurn(taskId, status, code));
+        started(taskId).complete(TaskResult.withoutTurn(taskId, status, code));
     }
 
     @Override

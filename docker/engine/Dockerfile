@@ -20,6 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends unzip \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /build/backend
 COPY backend/ ./
+# The backend's drift check reads this at its checkout-relative path. It stays in
+# this stage: the final image copies only the jar.
+COPY tools/runtime_probe/fixtures/0.164.0/neutral-session.json /build/tools/runtime_probe/fixtures/0.164.0/neutral-session.json
 COPY --from=frontend /build/frontend/dist/ /build/frontend/dist/
 RUN chmod 0555 mvnw
 # Package with the account-free configuration tests. This also retains Maven,

@@ -33,6 +33,16 @@ backend/.mvn/wrapper/**
 !backend/.mvn/wrapper/maven-wrapper.properties
 !backend/src/
 !backend/src/**
+# The one probe file the backend's drift check compares with its own copy.
+!tools/
+tools/**
+!tools/runtime_probe/
+tools/runtime_probe/**
+!tools/runtime_probe/fixtures/
+tools/runtime_probe/fixtures/**
+!tools/runtime_probe/fixtures/0.164.0/
+tools/runtime_probe/fixtures/0.164.0/**
+!tools/runtime_probe/fixtures/0.164.0/neutral-session.json
 !docker/
 docker/**
 !docker/engine/

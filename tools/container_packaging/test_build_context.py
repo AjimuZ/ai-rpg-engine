@@ -74,8 +74,12 @@ class BuildContextTest(unittest.TestCase):
             "backend/src/test/java/org/rpgengine/EngineApplicationTest.java",
             "backend/src/packaged-ui/resources/static/index.html",
             "docker/engine/Dockerfile",
+            "tools/runtime_probe/fixtures/0.164.0/neutral-session.json",
         }
         denied = {"README.md", "docs/private.md", "tools/private.py", "unknown/future.txt",
+                  "tools/runtime_probe/probe.py", "tools/runtime_probe/fixtures/private.json",
+                  "tools/runtime_probe/fixtures/0.164.0/private.json",
+                  "tools/runtime_probe/fixtures/0.165.0/neutral-session.json",
                   ".env.example", "backend/target/engine.jar", "frontend/dist/index.html",
                   "frontend/node_modules/example/index.js", "frontend/.angular/cache/data",
                   "docker/codex-runtime/private.txt", "docker/engine/private.txt",

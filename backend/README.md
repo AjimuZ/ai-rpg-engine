@@ -832,8 +832,8 @@ events, shared daemon state across connections; never selectable), its child-pro
 `ScriptedAppServerMain`, and an in-test Unix-socket WebSocket server. Suites:
 `CodexTaskAdapterTest`, `RpcGenerationTest`, `CodexFixtureReplayTest` (replays
 `src/test/resources/contracts/codex/0.164.0/neutral-session.json`, a byte-identical copy of
-the probe fixture; the drift check is skipped only where `../tools` is absent, i.e. in the
-backend-only verification image), `StdioFrameWireTest`, `UnixSocketFrameWireTest`,
+the probe fixture; the drift check fails if `../tools/runtime_probe/fixtures/0.164.0/neutral-session.json`
+is absent, so the verification image admits exactly that file), `StdioFrameWireTest`, `UnixSocketFrameWireTest`,
 `InferenceBoundaryTest` and `TaskPortSelectionTest`. No database is needed by these suites.
 
 Verified on 28 October 2026 with the unchanged scoped JDK 21 toolchain and disposable
