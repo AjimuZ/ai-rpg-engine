@@ -565,7 +565,7 @@ class CombatStrikeTest {
 
     /**
      * Fifty seeded fights over the fixture with armed participants on both sides, each intention chosen by a seeded
-     * random walk over the legal options (seed 20261030, about 2,000 operations). At every step Health stays in bounds,
+     * random walk over the legal options (seed 20261030). At every step Health stays in bounds,
      * points stay within the allowance, a defeated participant stays defeated and never starts an activation, every draw
      * lies on its die and every plan respects its bounds; replaying a whole fight from its recorded seed gives the same
      * plans. A fight ends when the player can no longer decide or at the round cap.

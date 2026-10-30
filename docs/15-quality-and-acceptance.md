@@ -1640,6 +1640,15 @@ cases for "no out-of-turn submission" and "bounded no-benefit speech" now have
 backend evidence; attacks, reactions, outcomes, negotiation responses, transcript
 recovery and the browser path remain P11.3–P12.5.
 
+P11.3 (30 October 2026) adds the arithmetic of QA-11, still not a full QA-09/QA-11–13
+result, on `CombatMathTest`, `CombatStrikeTest` and `StrikeCommandsTest`: every 2d10
+outcome against every stored defense, damage and healing bounds enumerated without
+sampling, strong hits, armor absorbing a hit, penetration, cover, the Guard stance under
+its cap, what a miss spends, ammunition, no redraw on retry, defeat stopping at zero
+Health, and fifty seeded fights (seed 20261030) replaying identically with every invariant
+held at each step. Brace stacking and reaction refresh spending wait for P11.4, terminal
+outcomes for P11.5, and observed balance for P18.3: these numbers remain provisional.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

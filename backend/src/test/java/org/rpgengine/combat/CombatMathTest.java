@@ -154,7 +154,7 @@ class CombatMathTest {
     }
 
     /**
-     * Every damage combination inside the bounds (about 2.1 million): armor 0..10, penetration 0..10, absorption 0..8,
+     * Every damage combination inside the bounds (about 1.25 million): armor 0..10, penetration 0..10, absorption 0..8,
      * Health 0..24 and raw parts from -5 to 40. Health and every derived value stay in bounds, and the parts add up.
      */
     @Test

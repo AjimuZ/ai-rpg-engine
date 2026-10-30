@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 65/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1 and P11.2. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 66/131 tasks verified** (130 imported tasks plus one pending P98 owner request). The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1, P11.2 and P11.3. P21.1 has a verified partial checkpoint (hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles) but remains unchecked until the profile and container GPU check run on the reference host. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P06.5 is in progress and now waits for explicit prerequisites P05.7, P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -2667,7 +2667,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     long fight caught by itself.
     Not proven here: the 18 Docker-dependent probe cases, the `unzip` wrapper cases, a live V23 dump and
     restore, balance of the provisional numbers and independent review of the five new Italian messages.
-- [ ] P11.3 Implement attack/defense/strong-hit/armor/healing calculations with recorded draws.
+- [x] P11.3 Implement attack/defense/strong-hit/armor/healing calculations with recorded draws.
   - Package A — arithmetic and frozen data ([ADR 0030](adr/0030-attacks-defense-damage-and-healing-with-recorded-draws.md)):
     pure `CombatMath`; `CombatAttack` and `EncounterGear` from pack `combat` on equippable items and template `attacks`;
     worn Guard, armor and weapons frozen at entry under their caps.
@@ -2678,6 +2678,29 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     Health guards; refusals `ATTACK_UNAVAILABLE` and `GUARD_UNAVAILABLE`; receipt standings, strikes and options.
   - Exit checks: the worked fight's numbers from recorded dice, exhaustive arithmetic, every targeting rule, no redraw on
     retry, seeded fights keeping their invariants, the V24 guards and all plan commands; weakening probes on an exported copy.
+  - Limits: Brace, condition modifiers, absorption, abilities in a fight and multi-target items wait for P11.4; Ready,
+    Assess and Withdraw for P11.4/P11.5; no terminal predicate, so a fight whose player fell waits at a round end and a won
+    fight runs on until P11.5; the non-player tactic is a small fixed rule without objectives (P12.3/P12.4); the V16
+    checkpoint records no encounter (P11.6); no frontend control or panel (P12).
+  - Verification (30 October 2026, PostgreSQL 18.6, JDK 21, the runner's environment): all 16 plan commands passed on
+    `db33432` (backend suite 1,010 tests, 0 failures; `./mvnw --batch-mode verify` the same count with 4 skipped
+    `PackagedInterfaceTest` cases; frontend 99 tests, 420 reviewed EN/IT messages; repository checks 0 findings; backup 9;
+    repository tests 38 with 2 skipped; runtime probe 116 with 18 skipped, no Docker). New cases: `CombatMathTest` (the
+    worked numbers and exhaustive sweeps: all 100 two-die outcomes against defenses 0..40, about 1.25 million damage
+    combinations, every healing combination up to 40), `CombatStrikeTest` (pure: the worked fight of docs/20 from its
+    recorded dice without Brace, draw order, attack definitions, every targeting rule, ammunition, options, Guard, both
+    opening slots and each lapse, the tactic, item outcomes, gear caps, determinism, the largest armed roster at 18 + 4 +
+    56 draws, 50 seeded fights replayed), `StrikeCommandsTest` (19 on PostgreSQL: recorded and replayed strikes, refusals
+    writing nothing, an opponent felling the player down to exactly zero, the stance met by the next strike, opening
+    strikes, cover and ammunition, healing the player and an ally within the maximum, `NOT_REVIVED`, unsupported effects,
+    the V24 guards, older frozen forms and receipts), `CombatRulesTest.projectsAttacksAndGear`,
+    `CombatPackTest.refusesBrokenTemplateAttacks` and `refusesBrokenItemCombat`, the long fight of `TacticalCommandsTest`
+    with strikes and Guard in its independent model (720 seeded candidates), plus additions to `TypedCommandTest`,
+    `EventStatementsTest` and the V24 step of `CanonicalMigrationUpgradeTest`. Seventy-four weakenings on an exported copy of
+    `16fc8ce` (5 of them in V24 against a fresh schema after a passing baseline) each failed a test except ten, none by a
+    compile error; those ten and two more on the receipt fix gained tests in `db33432` and all twelve then failed a test.
+    Not proven here: the 18 Docker-dependent probe cases, the `unzip` wrapper cases, a live V24 dump and restore, Brace in
+    the worked fight, balance of the provisional numbers and independent review of the two new Italian messages.
 - [ ] P11.4 Implement predeclared reactions, stacking caps, effect phases, durations, cooldowns, and no-chain limits.
 - [ ] P11.5 Implement defeat, escape, surrender/agreement predicates, refused/counteroffered/explicitly accepted negotiation, stalemate policy and idempotent settlement; prose alone cannot establish an outcome.
 - [ ] P11.6 Persist/recover every combat cursor, partial-round time boundary and combat-dialogue operation/transcript without duplicate social effects or settlement.
