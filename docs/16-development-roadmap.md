@@ -2639,22 +2639,32 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     never spent (P11.4); no terminal predicate and no response to social attempts (P11.5); the V16 checkpoint
     records no encounter (P11.6); no frontend control or panel (P12).
   - Verification (30 October 2026, PostgreSQL 18.6, JDK 21, the runner's environment): all 16 plan
-    commands passed on `bfffa7d` (backend suite 950 tests, 0 failures; `./mvnw --batch-mode verify` the
+    commands passed on `bfffa7d` (backend suite 950 tests). A second review of that work then found
+    two defects, fixed in `6f8dd50`: a role attribute above the supported 0..6 range could enter a fight
+    whose `ROLL_INITIATIVE` then failed its V23 bound on every attempt, leaving the campaign at `ENTERING`,
+    and U+0000 in command text ended as a failed operation instead of `INVALID_COMMAND`. All 16 plan
+    commands then passed on `6f8dd50` (backend suite 955 tests, 0 failures; `./mvnw --batch-mode verify` the
     same count with 4 skipped `PackagedInterfaceTest` cases; frontend 99 tests, 418 reviewed EN/IT
     messages; repository checks 0 findings) and again on the final commit. New cases: `CombatSchedulerTest`
-    (13, pure: initiative from recorded dice with both tie-breaks, one arrow per step, points granted and
+    (14, pure: initiative from recorded dice with both tie-breaks, one arrow per step, points granted and
     expired, passing participants, one round end of 8 seconds per operation, the round cap, skipped and
     non-standing participants, movement with difficult terrain, blocking and capacity, bounded speech,
     addressing range, declared social and scene actions, no out-of-turn legality, receipt options, frozen
-    forms read back), `TacticalCommandsTest` (9 on PostgreSQL: recorded and replayed initiative, exact move,
-    speech and action costs without draws, one round closed per end of activation, refusals writing
-    nothing, mode and turn refusals, the clock bound, a customized profile, the V23 guards),
-    `CombatPackTest.refusesBrokenActions`, plus additions to `TypedCommandTest`, `EventStatementsTest`,
-    `ResolvedCommitTest`, `CampaignCommandHttpTest`, `EncounterCommandsTest` and the V23 step of
-    `CanonicalMigrationUpgradeTest`. Thirty-seven weakenings on an exported copy (29 in Java and the pack
-    compiler, 8 in V23 run against a fresh schema after a passing baseline) each failed a test except four;
-    three gained tests in `bfffa7d` (expired points, a non-standing player, the round clock bound) and the
-    fourth (the progress attribution check) is redundant with the writer's campaign-scoped update.
+    forms read back, the largest roster inside one operation's bound), `TacticalCommandsTest` (12 on
+    PostgreSQL: recorded and replayed initiative, exact move, speech and action costs without draws, one
+    round closed per end of activation, refusals writing nothing, mode and turn refusals, the clock bound,
+    a customized profile, the V23 guards, the largest supported role values rolling, unstorable words
+    writing nothing, and a seeded 240-step fight comparing every verdict and effect with an independent
+    model of the fixture across activations and round boundaries), `CombatPackTest.refusesBrokenActions`
+    and `refusesARoleAttributeBeyondTheSupportedRange`, plus additions to `TypedCommandTest`,
+    `EventStatementsTest`, `ResolvedCommitTest`, `CampaignCommandHttpTest`, `EncounterCommandsTest`,
+    `CombatRulesTest` and the V23 step of `CanonicalMigrationUpgradeTest`. Thirty-seven weakenings on an
+    exported copy of `fd0a477` (29 in Java and the pack compiler, 8 in V23 run against a fresh schema after a
+    passing baseline) each failed a test except four; three gained tests in `bfffa7d` (expired points, a
+    non-standing player, the round clock bound) and the fourth (the progress attribution check) is
+    redundant with the writer's campaign-scoped update. Eighteen more on an export of `6f8dd50` each failed
+    a test: nine on the two fixes and the step bound, and nine scheduling and legality weakenings that the
+    long fight caught by itself.
     Not proven here: the 18 Docker-dependent probe cases, the `unzip` wrapper cases, a live V23 dump and
     restore, balance of the provisional numbers and independent review of the five new Italian messages.
 - [ ] P11.3 Implement attack/defense/strong-hit/armor/healing calculations with recorded draws.
