@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Two same-name genres proven separate across restart and real restore (P06.5-B.1), 30 October 2026
+
+- Add a backend test with two equal-title adventures whose NPCs and items share names. Commands, reads, memory, job rows,
+  owner-wide limits and authored folders stay separate, also after a restart in a separate process.
+- Add a rehearsal that runs the shipped backup and restore tool on that world and proves every scope again from a new
+  database and an empty folder root. It needs Docker and runs in the packaging suite, including hosted CI's packaging job.
+- Players see no change, and QA-33 stays open: no browser took part, and generated-image isolation is P17.6 scope.
+
 ## Unreleased — Presentation cues checked in a real browser (P05.7-B.2.2), 30 October 2026
 
 - A spoken-line cue no longer runs its words together ("asideNo audio for this line."), and the audio button now stands

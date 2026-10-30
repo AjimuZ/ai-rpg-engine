@@ -1553,6 +1553,44 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
     cursor tests, none that switch between two adventures. Missing piece, not built: `app.routes.ts` has no
     route to the campaign view, so saved campaigns are not playable from `/saved/:adventureId` (read-only
     playthrough selection only), and there is no browser submit path.
+  - Backend scopes, restart and real restore for two same-name genres (30 October 2026, task P06.5-B.1; the box stays
+    unchecked). `AdventureIsolationFixture` seeds one owner, two equal-title adventures and pack variants of the fantasy and
+    science-fiction fixtures that share the `warden` NPC and the `kit`, `lantern`, `coin`, `tonic` and `purse` items with genre-specific
+    texts. Inventory state comes from P10.2 commands (use, give, trade as a purchase, equip), memory from P09 knowledge
+    through the canonical commit and summaries through the real summarizer and scheduler with a scripted runtime answer, job
+    rows and limits from the P08.6 ledger and the P09.3 job queue. `AdventureIsolationTest` (3 tests) asserts that purchase and
+    equip in one world leave the other's rows unchanged, foreign identities are refused, HTTP reads and assembled memory never
+    mix, one rolling usage limit, one backoff and the unfinished-job bound apply across both adventures, and a separate JVM
+    serves byte-identical reads and rebuilds identical folders from an empty root. A restart changes two derived tables:
+    queued `inference_task` rows end `ABANDONED` and each campaign gains its first `campaign_checkpoint`. No other row changes.
+    `tools/container_packaging/test_restore_isolation.py` then runs the shipped `backup.py` on that world and compares every row
+    of every table, excepting only the retirement step's columns, before a new JVM (`AdventureRestoreCheck`) starts on the
+    restored database with an empty root and asserts the same scopes. Restored summaries turn `STALE`, queued summary jobs end
+    `CANCELLED`/`GENERATION_RETIRED`, queued tasks end `ABANDONED`, and owed narration becomes receipt-only with
+    `GENERATION_RETIRED`, as the backup README documents; usage, backoff and the job bound survive; the source is unchanged.
+    Commands and results on the final code (31 October 2026): `sh .agents/ralph/verify.sh backend -Dtest=AdventureIsolationTest` passed
+    during development; `sh .agents/ralph/verify.sh containers` passed both steps, with `container-packaging` at 28 tests `OK (skipped=1)`,
+    the same single skip as earlier runs of that suite, and `runtime-probe-docker` passing; `sh .agents/ralph/verify.sh full` passed all 17
+    steps, with backend 1,167 tests, 0 failures, 0 errors, 0 skipped (3 in `AdventureIsolationTest`) and frontend 127 tests. The rehearsal
+    printed: schema 26, 56 tables, 227 rows, 365,367 dump bytes, 30 rebuilt files; `adventure_workspace`=2, `content_revision`=2,
+    `content_revision_file`=28, `campaign`=2, `actor`=4, `item_instance`=9, `item_creation`=4, `equipment_assignment`=1, `campaign_event`=18,
+    `operation_journal`=11, `knowledge_claim`=4, `knowledge_belief`=4, `actor_commitment`=2, `memory_summary`=2, `memory_summary_job`=4,
+    `inference_task`=6, `inference_scheduler_state`=1. An earlier `containers` run failed on the restored resume card, which
+    legitimately retires owed narration; the check now states that change and compares the rest of the card exactly. The rehearsal
+    no longer needs an opt-in flag and now follows the shared `docker_requirement.py` policy, so hosted CI's packaging job includes it.
+    With that gate in place (31 October 2026), `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh containers` passed both
+    steps (`container-packaging`: `Ran 28 tests in 285.368s`, `OK (skipped=1)`; the rehearsal printed the same counts as above with 365,331 dump bytes), and
+    `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full` passed all 17 steps, with backend 1,167 tests, 0 failures, 0 errors,
+    0 skipped (3 in `AdventureIsolationTest`) and frontend 127 tests. `AdventureRestoreCheck` and the rehearsal ran only through `containers`.
+    Not proven: no browser ran, so switching with pending replies, open tabs, late media events, browser drafts and
+    saved-campaign play remain open, and the missing campaign route and submit path recorded above still stand. Generated-image
+    isolation stays P17.6 scope, and the world holds no presentation cue (asserted), because no real turn produces them. Summary answers
+    are scripted and no real narration ran; knowledge comes from trusted internal commits, since no play writer exists for all
+    of it. There is one owner, so "owner-wide" was exercised as the installation-wide ledger, not against a second owner. Folders are
+    rebuilt from PostgreSQL, not archived. Identity-remapped restore stays P16. `verify.sh full` does not run the rehearsal, and it has not yet run on hosted CI's native Linux:
+    every recorded pass was on this Windows host's Docker through `containers`, and three passes give no flake rate. A host with no
+    `docker` executable, where nothing requires Docker, still leaves it out under the shared policy. No deliberate weakening was run on an exported
+    copy; `mixingAssertionRejectsForeignIdentitiesAndTexts` covers only the mixing assertion itself.
 
 **Exit:** two independent campaigns survive restart and read-only use changes no game counters. **Checks:** creation budget/loadout validation, ownership isolation, restart, and no-AI consultations. **Suggested commit:** `Add persistent campaigns and local RPG consultations`.
 

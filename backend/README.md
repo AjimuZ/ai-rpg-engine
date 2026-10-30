@@ -634,6 +634,16 @@ projection root. No generated-art storage, file-serving route, browser switching
 identity-remapped restore or full QA-33 acceptance is claimed. See the
 [workspace contract](../docs/25-adventure-workspaces.md#2-separate-managed-folders).
 
+`AdventureIsolationTest` (P06.5-B.1) proves the backend side of QA-33 at MVP scope in every
+backend run: two equal-title genres with same-name NPCs and items keep separate commands, HTTP
+reads, memory, job rows, limits and folders, also across a restart in a separate JVM.
+`AdventureRestoreCheck` holds the same world for the real restore rehearsal. Its name keeps it out of
+backend runs, because it needs a database the backup tool can reach: run it through
+[`test_restore_isolation.py`](../tools/container_packaging/README.md#real-backup-and-restore-of-two-genres),
+not on its own. A restart legitimately changes two derived tables (queued `inference_task` rows end
+`ABANDONED`, and memory reconciliation captures the first `campaign_checkpoint` of each campaign), and so the
+resume card's continuity codes change. No canonical, inventory or memory row does.
+
 ## Typed intentions and atomic common semantics (P07.2)
 
 New command admission accepts only the closed immutable `MOVE`, `WAIT` and `SPEAK`

@@ -154,7 +154,9 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.15.1"
-      # Exports real BuildKit contexts and renders Compose; starts no service. The
+      # Exports real BuildKit contexts and renders Compose; starts no Compose service.
+      # test_restore_isolation.py builds the verification image and runs the shipped
+      # backup tool against its own disposable database containers. The
       # opt-in PACKAGING_DOCKER service-recreation check stays out of ordinary CI
       # until native Linux secret-mount ownership is qualified (docs/16 P02.3).
       # PACKAGING_REQUIRE_DOCKER makes a missing docker executable fail here

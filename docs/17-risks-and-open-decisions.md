@@ -12,9 +12,11 @@ does not protect against a hostile local process swapping ancestors. Failed priv
 staging folders require offline operator cleanup, never automatic deletion.
 The browser library is now bound read-only, and stale replies are aborted when
 switching adventures. However, packaged reload of `/saved/...` is not yet allowlisted.
-QA-33 remains open for memory, artwork, owner-wide job limits and combined
-restart/restore evidence, which come from packages that already depend on P06.
-The roadmap therefore needs an owner decision to split this evidence into a later task. Later pages are fresh snapshots, so
+Since P06.5-B.1 the backend has restart and real restore evidence for two same-name genres, covering
+inventories, memory, owner-wide job limits and authored folders. QA-33 remains open for browser
+switching, late media events, browser drafts and saved-campaign play, and generated-image isolation
+is P17.6 scope. The restore rehearsal runs in the Docker packaging suite (`verify.sh containers` and hosted
+CI's packaging job), so `verify.sh full` alone would not catch a regression in it. Later pages are fresh snapshots, so
 concurrent additions may require refreshing the library from its first page.
 
 P06.2 introduces explicit public DTOs and player-audience fact/quest storage;

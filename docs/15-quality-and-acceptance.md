@@ -1158,6 +1158,14 @@ startup preserves all 32 canonical tables and reconstructs 34 byte-identical fil
 and manifests for two same-title authored-content fixtures into an empty private root.
 Browser switching, generated artwork,
 draft/memory/job recovery and complete QA-33 remain unfinished.
+P06.5-B.1 (30 October 2026) adds the backend part of QA-33 at MVP scope: `AdventureIsolationTest` keeps two
+equal-title genres with same-name NPCs and items separate in commands, HTTP reads, memory, job rows, owner-wide
+limits and folders across a separate-JVM restart, and `tools/container_packaging/test_restore_isolation.py` runs the
+shipped backup tool on that world and proves all of those scopes again from a restored V26 database and an empty root.
+The backend part is therefore evidenced, but QA-33 stays open: no browser ran, so switching with pending replies, open
+tabs, late media, browser drafts and saved-campaign play are unproven. Generated-image isolation is P17.6 scope. The
+restore rehearsal belongs to the Docker packaging suite, which `verify.sh containers` and hosted CI's packaging job run;
+`verify.sh full` does not include that suite.
 
 
 P06.1 delivers a creation acceptance corpus: pure allocation/minimum/budget/

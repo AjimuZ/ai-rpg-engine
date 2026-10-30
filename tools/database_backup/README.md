@@ -14,6 +14,7 @@ py -B tools/database_backup/backup.py backup --container <db-container> --role e
 py -B tools/database_backup/backup.py restore --container <db-container> --role engine \
     --database engine --directory backups/2026-10-24 --new-database engine_restored
 py -B -m unittest discover -s tools/database_backup -v   # offline unit tests
+sh .agents/ralph/verify.sh containers                    # includes the live two-genre rehearsal
 ```
 
 ## What it does
@@ -211,4 +212,28 @@ rehearsal has been run.
 V26 scope (P05.7-B.1.1) adds `presentation_event` (one immutable row per admitted presentation event) and gives
 `campaign_stream_message` a nullable `presentation_ordinal`, so a stored cue and its retained message survive a backup. A
 restore creates triggers after loading rows, so restored cues announce nothing again. Offline checks cover the V26
-manifest/catalog; no live V26 dump/restore rehearsal has been run.
+manifest/catalog. The rehearsal below ran on V26 but held no cue rows, because no real turn produces cues yet, so
+restoring a stored cue remains unrehearsed.
+
+## Live two-genre rehearsal (P06.5-B.1, V26)
+
+`tools/container_packaging/test_restore_isolation.py` runs this tool as an operator would on a populated world, then
+checks the result. It needs Docker but no opt-in flag, so `verify.sh containers` and hosted CI's packaging job run it;
+offline unit tests and `verify.sh full` do not. The run recorded on 31 October 2026 (schema 26, 56 tables, 227 rows, a 365,367-byte dump):
+
+- The source is two equal-title adventures with same-name NPCs and items, seeded by `AdventureRestoreCheck` through
+  production paths: item commands, knowledge through the canonical commit, summaries and fair-queue tasks.
+- A backup changes no source row. Before any engine starts, the restored database matches the source in every row of
+  every table, except the columns the retirement step above changes (`campaign.recovery_generation` and `row_version`;
+  the lease `fence`, `operation_id`, `holder_id` and `expires_at`).
+- A new JVM on the restored database and an empty managed root then serves byte-identical reads for both adventures,
+  and rebuilds 30 byte-identical files. Inventories and memory records are unchanged and do not mix.
+- Rolling usage and the account backoff survive and still refuse background work of both adventures. The bound on
+  unfinished summary jobs still holds for new work.
+- Startup retires what belonged to the restored generation, as documented above: restored summaries turn `STALE`, queued
+  summary jobs end `CANCELLED`/`GENERATION_RETIRED`, queued inference tasks end `ABANDONED`, and narration still owed
+  becomes receipt-only with `GENERATION_RETIRED`. Neither the restore nor that startup changes the source.
+
+This is not a browser or generated-media check. See the [roadmap entry](../../docs/16-development-roadmap.md) for what
+it does not prove. Its containers carry a unique suffix and are always removed, and it creates no Docker volume. A killed
+run can leave them behind without blocking a later run.

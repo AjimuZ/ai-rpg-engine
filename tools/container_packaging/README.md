@@ -65,6 +65,18 @@ proves nothing about build-context filtering or Compose boundaries. Report it as
 run there and rely on the hosted packaging job, or run the suite on a Docker host.
 The launcher fixture cases and the static checks need no Docker and always run.
 
+## Real backup and restore of two genres
+
+`test_restore_isolation.py` belongs to the default suite and follows the [Docker policy above](#hosts-without-docker): it
+needs no opt-in flag, hosted CI's packaging job runs it, and a host with no `docker` executable reports it as not run.
+Because it starts containers, it is the slowest default case. `verify.sh containers` runs it, while `verify.sh full` does
+not include this suite. It builds the same `verification` image, starts the composed PostgreSQL pin on tmpfs and an
+internal network, runs the backend's `AdventureRestoreCheck` against a source database, runs the shipped
+`tools/database_backup/backup.py`, compares every table row by row, and runs the same check in a new JVM against the
+restored database with an empty managed-folder root. Unlike the recreation check below, it never reuses names and leaves
+no volume or password file. The [backup tool notes](../database_backup/README.md#live-two-genre-rehearsal-p065-b1-v26)
+record what it covers.
+
 ## Real packaged-shell recreation
 
 ```powershell
