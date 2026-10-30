@@ -1144,6 +1144,41 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
       Not proven or not done: nothing calls the builder yet, so no caller supplies the visible actors from
       the narration projection (no dedicated visible-actor projection type exists; narration derives them
       inline from public events); no deliberately weakened run; no browser display or QA-40 behavior.
+    - P05.7-B.1.2.3.1 (30 October 2026, audience scope resolver; box stays unchecked, nothing consumes it):
+      `PresentationScopeResolver.resolve(adventureId, campaignId, operationId, committedRevision)` (package
+      `narration`, a Spring component) returns `Optional<PublicPresentationScope>` in one read-only
+      repeatable-read snapshot of its own; an ambient transaction throws `IllegalStateException`. It reads
+      the campaign's pinned `content_revision_id`, checks the journal row is committed at the given
+      revision, then applies narration's visibility rule and no second model: the creation-bound player
+      plus the actors named by the operation's `PUBLIC` events through `EventStatements.referencedActors`
+      (`INTERNAL` events are never read). It reads `actor.definition_id` for those IDs, takes the
+      declaration from `PackRegistry.loadForCampaign(...).root().presentation()` and calls
+      `PublicPresentationScopeBuilder.build`. Hidden, unknown, definition-less and undeclared actors are
+      absent; a pack without the declaration gives an empty scope. Fail-closed choice: an unknown or foreign
+      adventure, campaign or operation, an uncommitted operation, a revision other than the committed one,
+      or more than `NarrationContext.MAX_EVENTS` (32) public events returns `Optional.empty()`, which is
+      distinct from an empty scope. More than 256 declared visible actors still throws
+      `IllegalArgumentException` and an unloadable pinned pack closure propagates `IllegalStateException`.
+      Recovery generation is not part of the request (narration checks it; this resolver does not).
+      Commands: `sh .agents/ralph/verify.sh backend -Dtest=PresentationScopeResolverTest,PublicPresentationScopeBuilderTest`
+      passed: 5 tests in `PresentationScopeResolverTest` and 7 in `PublicPresentationScopeBuilderTest`, 12
+      in total, 0 failures, 0 errors, 0 skipped, read from the step log. `sh .agents/ralph/verify.sh full`
+      passed all 17 steps: backend 1,152 tests, 0 failures, 0 errors, 0 skipped (1,140 recorded at P05.7-B.1.2.1;
+      the builder's 7 and this resolver's 5 tests account for the 12 more). The frontend and backup step counts were not read.
+      Proven on PostgreSQL by the new tests: a pack with a declaration registered through `PackRegistry` and
+      a campaign pinned to it give exactly the declared scenes, lines, assets and the visible `keeper`'s
+      poses and expressions; the internal-only actor, an unreferenced actor, an actor named only by another
+      operation's public event, an unknown ID, an actor with a null definition and an actor whose definition
+      (`guard`) the pack does not declare are absent; a plain pack (`PackPresentation.NONE`) gives an empty
+      scope; the stale cases above give `Optional.empty()`; an ambient transaction is refused; 257 declared
+      visible actors throw rather than truncate; resolving leaves the row counts of journal, events,
+      presentation events, stream messages and actors unchanged.
+      Caller check: a search of the repository for `PresentationScopeResolver` finds only the class and
+      its test, so no other code path uses it.
+      Not proven or not done: the cost of `loadForCampaign` (it recompiles the whole pack closure on every
+      call) is not optimized or measured and nothing caches it; no deliberately weakened run on an
+      exported copy; the journal and events are inserted by SQL, not produced by a played command, so no
+      real turn was resolved; no event path, producer, browser display or QA-40 behavior exists.
 
 **Design clarification (23 October 2026):** The owner selected visual-novel play as the principal experience. [Interface specification](13-api-and-ui.md), [primary mockup](mockups/visual-novel-ui-v1.png), [asset pipeline](23-presentation-assets.md) and [ADR 0011](adr/0011-visual-novel-and-persistent-artwork.md) define attributed dynamic passages, editable quick responses, persistent player input and complete graphics. QA-29–30 are implementation checks; this documentation and concept image do not complete P05. Runtime portrait/item generation and saved visual identities belong to P17 and QA-31.
 

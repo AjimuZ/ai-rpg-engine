@@ -378,7 +378,10 @@ and expressions each NPC may take. It compiles into `CompiledPack.presentation()
 `PackPresentation.NONE` when absent) and so into the campaign snapshot. Admission refuses a URL,
 markup, over-long or over-bounded reference and an undeclared asset, without echoing the value; see
 [pack format 3.3](../docs/09-adventure-packs.md#33-presentation-declaration). Nothing reads it during
-play yet.
+play yet, except `org.rpgengine.narration.PresentationScopeResolver`: a read-only service that resolves
+the `PublicPresentationScope` of one committed operation from the pinned declaration and the actors its
+public events reference (the narration visibility rule). It returns an empty `Optional` for a stale or
+unknown request, and nothing calls it yet.
 
 Run `./mvnw -B -ntp -Dtest=PackLocalizationTest,NeutralGenreImportTest test`
 against disposable PostgreSQL. The corpus covers both reviewed bilingual fixtures,

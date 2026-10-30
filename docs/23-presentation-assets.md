@@ -82,6 +82,17 @@ audience-filtered projection exposes plus that declaration into the audience's
 definition is undeclared, is absent. More than 256 visible declared actors is rejected. Nothing calls
 it during a turn yet.
 
+P05.7-B.1.2.3.1 adds `PresentationScopeResolver`, the read-only caller of that builder for one
+committed operation. In its own repeatable-read snapshot it reads the campaign's pinned pack
+declaration through the pack registry and the actors narration may let speak: the creation-bound
+player plus the actors the operation's `PUBLIC` events reference (`INTERNAL` events are never read).
+It passes each actor with its `actor.definition_id`, so hidden, unknown and undeclared actors are
+absent and a pack without the declaration gives an empty scope. An unknown or foreign campaign or
+operation, an uncommitted operation, a revision mismatch or more than 32 public events returns no
+scope at all, which a caller treats as "show nothing" and which differs from an empty scope. The pack
+closure is recompiled on every call and not cached. Nothing consumes the resolver yet and no event
+path was added.
+
 P04.5 includes original MIT-licensed 48×32 woodland/station PNG schematics in the
 [neutral import fixtures](../backend/src/test/resources/packs/README.md), with
 per-pack license and credit inventories. Integration checks preserve their exact

@@ -235,9 +235,10 @@ Every key but `schemaVersion` is optional, and unknown keys are errors.
   message; it never repeats the rejected value.
 
 `CompiledPack.presentation()` returns the immutable declaration and so reaches `CampaignPackSnapshot`.
-It is internal content like the rest of the compiled pack. Building a per-audience
-`PublicPresentationScope` from it, and checking events against it, is later work; nothing consumes the
-declaration during play yet.
+It is internal content like the rest of the compiled pack. `PresentationScopeResolver` (P05.7-B.1.2.3.1)
+builds the per-audience `PublicPresentationScope` of a committed operation from it: an actor appears only
+when the operation's public events reference it and its `definition_id` is a declared `actor`. Checking
+events against that scope during a turn is later work; nothing consumes the declaration during play yet.
 
 ## 4. Definition model
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Audience presentation scope of a committed operation (P05.7-B.1.2.3.1), 30 October 2026
+
+- The engine can now work out, for one committed turn, which scenes, lines, assets, actors, poses and expressions the audience
+  may be shown. It reads the campaign's pinned pack and shows only characters the turn's public events mention and the pack
+  declares. Hidden, unknown and undeclared characters are left out, and a pack that declares nothing gives an empty list.
+- Players see no difference yet: nothing calls this during play.
+
 ## Unreleased — Audience presentation scope builder (P05.7-B.1.2.2), 30 October 2026
 
 - The engine can now build the list of scenes, lines, assets, actors, poses and expressions one audience may be shown, from the
