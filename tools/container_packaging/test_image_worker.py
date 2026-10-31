@@ -24,6 +24,7 @@ import threading
 import types
 import unittest
 from unittest import mock
+import zlib
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -86,16 +87,44 @@ CHECKPOINT_BYTES = safetensors_bytes({worker.SDXL_CHECKPOINT_PREFIX + "ln_final.
 LORA_BYTES = safetensors_bytes({"lora_unet_a.lora_down.weight": 4})
 
 
+def png_chunk(kind: bytes, body: bytes, checksum: int | None = None) -> bytes:
+    """Return one PNG chunk; `checksum` replaces the correct CRC to build a damaged file."""
+    crc = zlib.crc32(kind + body) if checksum is None else checksum
+    return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", crc)
+
+
+def png_bytes(width: int, height: int, color: int = 2, depth: int = 8, interlace: int = 0, filter_byte: int = 0,
+              rows: int | None = None) -> bytes:
+    """Return a PNG whose pixels are all zero; `rows` can differ from `height` to build a short or long stream."""
+    channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[color]
+    stride = 1 + (width * channels * depth + 7) // 8
+    raw = (bytes([filter_byte]) + b"\0" * (stride - 1)) * (height if rows is None else rows)
+    return (worker.PNG_SIGNATURE
+            + png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, depth, color, 0, 0, interlace))
+            + (png_chunk(b"PLTE", b"\0\0\0") if color == 3 else b"")
+            + png_chunk(b"IDAT", zlib.compress(raw)) + png_chunk(b"IEND", b""))
+
+
 class ScriptedBackend:
-    """Record what the worker asks of the GPU; `gate` can hold a job open to test exclusion."""
+    """Record what the worker asks of the GPU and run a stand-in step loop.
+
+    `gate` can hold a job open to test exclusion. `step_hook` runs after each step, as a pipeline's
+    step-end callback would, and the loop then checks the cancellation as a real backend must.
+    `output` replaces the image, and `ignore_cancel` makes a backend that never checks.
+    """
 
     def __init__(self) -> None:
         self.loads: list[tuple[Path, Path | None]] = []
         self.unloads = 0
+        self.trims = 0
         self.jobs: list[tuple] = []
+        self.steps_run = 0
         self.first, self.second = tokenizer_pair()
         self.gate: threading.Event | None = None
         self.started = threading.Event()
+        self.step_hook = None
+        self.output: bytes | None = None
+        self.ignore_cancel = False
 
     def load(self, checkpoint: Path, vae: Path | None) -> None:
         self.loads.append((checkpoint, vae))
@@ -103,15 +132,29 @@ class ScriptedBackend:
     def unload(self) -> None:
         self.unloads += 1
 
+    def trim(self) -> None:
+        self.trims += 1
+
+    def versions(self) -> dict[str, str]:
+        return {"torch": "0-test"}
+
     def tokenizers(self) -> tuple[WordTokenizer, WordTokenizer]:
         return self.first, self.second
 
-    def generate(self, rows, settings, loras) -> bytes:
+    def generate(self, rows, settings, loras, cancel) -> bytes:
         self.jobs.append((rows, settings, loras))
         self.started.set()
         if self.gate is not None:
             self.gate.wait(30)
-        return b"\x89PNG scripted"
+        if not self.ignore_cancel:
+            cancel.raise_if_requested()
+        for step in range(settings.steps):
+            self.steps_run += 1
+            if self.step_hook is not None:
+                self.step_hook(step)
+            if not self.ignore_cancel:
+                cancel.raise_if_requested()
+        return png_bytes(settings.width, settings.height) if self.output is None else self.output
 
 
 class ChunkingTest(unittest.TestCase):
@@ -426,7 +469,12 @@ class WorkerFixture(unittest.TestCase):
         (self.models / "loras").mkdir()
         self.backend = ScriptedBackend()
         self.log = io.StringIO()
-        self.server = worker.WorkerServer(("127.0.0.1", 0), worker.ImageWorker(self.models, self.backend, self.policy, self.log), self.log)
+        pins = tempfile.TemporaryDirectory()
+        self.addCleanup(pins.cleanup)
+        self.pin_file = Path(pins.name) / "requirements.lock"
+        self.pin_file.write_bytes(b"torch==0-test\n")
+        self.server = worker.WorkerServer(
+            ("127.0.0.1", 0), worker.ImageWorker(self.models, self.backend, self.policy, self.log, str(self.pin_file)), self.log)
         thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         thread.start()
         self.addCleanup(thread.join, 10)
@@ -610,7 +658,7 @@ class GenerateTest(WorkerFixture):
         self.load_recommended()
         status, document = self.call("POST", "/v1/generate", {"prompt": "castle", "seed": 42})
         self.assertEqual(200, status)
-        self.assertEqual(b"\x89PNG scripted", base64.b64decode(document["imagePngBase64"]))
+        self.assertEqual(png_bytes(832, 1216), base64.b64decode(document["imagePngBase64"]))
         self.assertEqual("wai-illustrious-sdxl-v17", document["catalogId"])
         self.assertEqual("safe", document["contentPolicy"])
         self.assertEqual((42, 832, 1216, 24, 6.0, 1), (document["seed"], document["width"], document["height"],
@@ -773,6 +821,310 @@ class OwnerPrivateWorkerTest(WorkerFixture):
         self.assertNotIn(self.backend.first.ids("nsfw")[0], negative)
 
 
+class CancellationTest(WorkerFixture):
+    """A cancel stops a job at a step boundary and frees the worker; nothing partial is ever returned."""
+
+    def run_job(self, results: list, **extra: object) -> threading.Thread:
+        """Start a generate request in its own thread, because it holds the connection until it ends."""
+        job = threading.Thread(target=lambda: results.append(self.call("POST", "/v1/generate", {"prompt": "castle", **extra})))
+        job.start()
+        self.addCleanup(job.join, 30)
+        return job
+
+    def pause_at_step(self, step: int) -> tuple[threading.Event, threading.Event]:
+        """Hold the stand-in loop after `step`; return the event that says it got there and the one that resumes it."""
+        reached, resume = threading.Event(), threading.Event()
+        self.addCleanup(resume.set)
+
+        def hook(index: int) -> None:
+            if index == step:
+                reached.set()
+                resume.wait(30)
+        self.backend.step_hook = hook
+        return reached, resume
+
+    def test_cancel_at_a_step_boundary_reports_cancelled_and_returns_no_image(self) -> None:
+        """The request arrives during step 3 and the job ends at that step's boundary, 20 steps early."""
+        self.load_recommended()
+        reached, resume = self.pause_at_step(2)
+        results: list = []
+        job = self.run_job(results)
+        self.assertTrue(reached.wait(30))
+        self.assertEqual((200, {"cancelling": True}), self.call("POST", "/v1/cancel", {}))
+        resume.set()
+        job.join(30)
+        self.assertEqual([(409, {"error": "cancelled"})], results)
+        self.assertEqual(3, self.backend.steps_run)
+        self.assertIn("cancelled", self.log.getvalue())
+
+    def test_a_cancelled_job_releases_its_resources(self) -> None:
+        """The slot is free, the cache is trimmed, the model stays resident, and the next job runs whole."""
+        self.load_recommended()
+        reached, resume = self.pause_at_step(0)
+        results: list = []
+        job = self.run_job(results)
+        self.assertTrue(reached.wait(30))
+        self.call("POST", "/v1/cancel", {})
+        resume.set()
+        job.join(30)
+        self.assertEqual(1, self.backend.trims)
+        self.assertEqual(worker.RECOMMENDED.file_name, self.call("GET", "/v1/models")[1]["loaded"])
+        self.backend.step_hook = None
+        self.backend.steps_run = 0
+        status, document = self.call("POST", "/v1/generate", {"prompt": "castle", "steps": 5})
+        self.assertEqual(200, status)
+        self.assertEqual(5, self.backend.steps_run, "a cancel must not leak into the next job")
+        self.assertEqual(png_bytes(832, 1216), base64.b64decode(document["imagePngBase64"]))
+        self.assert_refused(409, "no-job", "POST", "/v1/cancel", {})
+
+    def test_cancel_during_the_wait_before_the_first_step_runs_no_step(self) -> None:
+        """The check before step one stops a job that was asked to stop while it was still being prepared."""
+        self.load_recommended()
+        self.backend.gate = threading.Event()
+        self.addCleanup(self.backend.gate.set)
+        results: list = []
+        job = self.run_job(results)
+        self.assertTrue(self.backend.started.wait(30))
+        self.assertEqual(200, self.call("POST", "/v1/cancel", {})[0])
+        self.backend.gate.set()
+        job.join(30)
+        self.assertEqual([(409, {"error": "cancelled"})], results)
+        self.assertEqual(0, self.backend.steps_run)
+
+    def test_an_image_finished_after_the_request_is_discarded(self) -> None:
+        """A backend that never checks still cannot hand over an image the caller asked to cancel."""
+        self.load_recommended()
+        self.backend.ignore_cancel = True
+        reached, resume = self.pause_at_step(worker.DEFAULT_STEPS - 1)
+        results: list = []
+        job = self.run_job(results)
+        self.assertTrue(reached.wait(30))
+        self.assertEqual(200, self.call("POST", "/v1/cancel", {})[0])
+        resume.set()
+        job.join(30)
+        self.assertEqual([(409, {"error": "cancelled"})], results)
+        self.assertEqual(worker.DEFAULT_STEPS, self.backend.steps_run)
+        self.assertEqual(1, self.backend.trims)
+
+    def test_cancel_without_a_running_job_is_refused(self) -> None:
+        """Idle, loading and unloading all answer the same, and nothing is remembered for a later job."""
+        self.assert_refused(409, "no-job", "POST", "/v1/cancel", {})
+        self.load_recommended()
+        self.assert_refused(409, "no-job", "POST", "/v1/cancel")
+        status, _ = self.call("POST", "/v1/generate", {"prompt": "castle"})
+        self.assertEqual(200, status)
+        self.assertEqual(0, self.backend.trims)
+
+    def test_cancel_takes_no_fields(self) -> None:
+        """The route has no option to grow: an unknown field is refused as everywhere else."""
+        self.assert_refused(400, "unknown-field", "POST", "/v1/cancel", {"jobId": "x"})
+
+    def test_a_failed_backend_job_leaves_no_cancel_target(self) -> None:
+        """After a job fails with a fixed code, a late cancel finds nothing to stop."""
+        self.load_recommended()
+        with mock.patch.object(self.backend, "generate", side_effect=worker.WorkerError(507, "gpu-out-of-memory")):
+            self.assert_refused(507, "gpu-out-of-memory", "POST", "/v1/generate", {"prompt": "castle"})
+        self.assert_refused(409, "no-job", "POST", "/v1/cancel", {})
+
+
+class OutputValidationTest(WorkerFixture):
+    """`validate_png` accepts a sound PNG of the requested size and refuses everything else."""
+
+    SIDE = 512
+
+    def refused(self, data: bytes, width: int = SIDE, height: int = SIDE) -> None:
+        with self.assertRaises(worker.WorkerError) as raised:
+            worker.validate_png(data, width, height)
+        self.assertEqual((500, "invalid-output"), (raised.exception.status, raised.exception.code))
+
+    def test_sound_pngs_pass(self) -> None:
+        """Every legal color type and depth the format has passes, not only the RGB the pipeline writes."""
+        for color, depth in ((2, 8), (2, 16), (6, 8), (0, 8), (0, 1), (0, 16), (3, 8), (3, 2), (4, 8)):
+            worker.validate_png(png_bytes(self.SIDE, self.SIDE, color=color, depth=depth), self.SIDE, self.SIDE)
+        worker.validate_png(png_bytes(832, 1216), 832, 1216)
+
+    def test_what_is_not_a_png_is_refused(self) -> None:
+        """Text, a bare signature, a truncated file and any added byte all fail."""
+        good = png_bytes(self.SIDE, self.SIDE)
+        for label, data in {
+            "empty": b"", "text": b"not a png at all", "signature": worker.PNG_SIGNATURE,
+            "scripted": b"\x89PNG scripted", "truncated": good[:-5], "no end": good[:-12],
+            "trailing byte": good + b"x", "after the end": good + png_chunk(b"tEXt", b"a"),
+            "end first": worker.PNG_SIGNATURE + png_chunk(b"IEND", b"") + good[8:],
+            "header not first": worker.PNG_SIGNATURE + png_chunk(b"tEXt", b"a") + good[8:],
+            "short header": worker.PNG_SIGNATURE + png_chunk(b"IHDR", b"\0" * 12) + png_chunk(b"IEND", b""),
+            "end with data": good[:-12] + png_chunk(b"IEND", b"x"),
+            "no data": good.replace(good[good.index(b"IDAT") - 4:good.index(b"IEND") - 4], b""),
+        }.items():
+            with self.subTest(label):
+                self.refused(data)
+
+    def test_damaged_bytes_are_refused(self) -> None:
+        """A changed checksum, a cut compressed stream and garbage with a correct checksum all fail."""
+        good = png_bytes(self.SIDE, self.SIDE)
+        crc = good.index(b"IHDR") + 4 + 13
+        header = good[8:crc + 4]
+        end = png_chunk(b"IEND", b"")
+        stream = zlib.compress((b"\0" + b"\0" * (self.SIDE * 3)) * self.SIDE)
+        for label, data in {
+            "header checksum": good[:crc] + bytes([good[crc] ^ 1]) + good[crc + 1:],
+            "data checksum": good[:-17] + bytes([good[-17] ^ 1]) + good[-16:],
+            "cut stream": worker.PNG_SIGNATURE + header + png_chunk(b"IDAT", stream[:-6]) + end,
+            "garbage stream": worker.PNG_SIGNATURE + header + png_chunk(b"IDAT", b"garbage") + end,
+            "second stream": worker.PNG_SIGNATURE + header + png_chunk(b"IDAT", stream + stream) + end,
+        }.items():
+            with self.subTest(label):
+                self.refused(data)
+
+    def test_wrong_dimensions_are_refused(self) -> None:
+        """The size must equal the request, in both directions, and stay inside the bounds."""
+        self.refused(png_bytes(self.SIDE + 8, self.SIDE))
+        self.refused(png_bytes(self.SIDE, self.SIDE + 8))
+        self.refused(png_bytes(self.SIDE, self.SIDE), self.SIDE + 8, self.SIDE)
+        too_wide = worker.MAX_SIDE + worker.SIDE_STEP
+        self.refused(png_bytes(too_wide, self.SIDE), too_wide, self.SIDE)
+        too_small = worker.MIN_SIDE - worker.SIDE_STEP
+        self.refused(png_bytes(too_small, too_small), too_small, too_small)
+
+    def test_inconsistent_headers_and_streams_are_refused(self) -> None:
+        """Interlacing, impossible depths, a stream of the wrong length and a bad filter byte all fail."""
+        for label, data in {
+            "interlaced": png_bytes(self.SIDE, self.SIDE, interlace=1),
+            "bad depth": png_bytes(self.SIDE, self.SIDE, color=2, depth=4),
+            "short stream": png_bytes(self.SIDE, self.SIDE, rows=self.SIDE - 1),
+            "long stream": png_bytes(self.SIDE, self.SIDE, rows=self.SIDE + 1),
+            "bad filter": png_bytes(self.SIDE, self.SIDE, filter_byte=5),
+            "palette missing": png_bytes(self.SIDE, self.SIDE, color=3).replace(png_chunk(b"PLTE", b"\0\0\0"), b""),
+        }.items():
+            with self.subTest(label):
+                self.refused(data)
+
+    def test_a_stream_that_inflates_far_past_its_size_is_refused_early(self) -> None:
+        """A small file must not make the worker allocate what its header never promised."""
+        bomb = png_bytes(self.SIDE, self.SIDE, rows=40000)
+        self.assertLess(len(bomb), worker.MAX_IMAGE_BYTES)
+        self.refused(bomb)
+
+    def test_the_byte_limit_is_enforced(self) -> None:
+        """A PNG that is otherwise sound still fails when it is larger than the limit."""
+        good = png_bytes(self.SIDE, self.SIDE)
+        worker.validate_png(good, self.SIDE, self.SIDE)
+        with mock.patch.object(worker, "MAX_IMAGE_BYTES", len(good) - 1):
+            self.refused(good)
+
+    def test_an_invalid_image_is_never_returned(self) -> None:
+        """Whatever the backend hands over, the caller gets the fixed code, the slot frees and the cache is trimmed."""
+        self.load_recommended()
+        for output in (b"\x89PNG scripted", png_bytes(1024, 1216), b"", png_bytes(832, 1216)[:-1]):
+            self.backend.output = output
+            trims = self.backend.trims
+            self.assert_refused(500, "invalid-output", "POST", "/v1/generate", {"prompt": "castle"})
+            self.assertEqual(trims + 1, self.backend.trims)
+        self.assertIn("output-refused", self.log.getvalue())
+        self.backend.output = None
+        self.assertEqual(200, self.call("POST", "/v1/generate", {"prompt": "castle"})[0])
+
+    def test_the_requested_size_not_the_default_is_what_must_match(self) -> None:
+        """A backend answering the default size for a custom request is refused."""
+        self.load_recommended()
+        self.backend.output = png_bytes(832, 1216)
+        self.assert_refused(500, "invalid-output", "POST", "/v1/generate", {"prompt": "castle", "width": 1024, "height": 1024})
+        self.backend.output = png_bytes(1024, 1024)
+        self.assertEqual(200, self.call("POST", "/v1/generate", {"prompt": "castle", "width": 1024, "height": 1024})[0])
+
+
+class ProvenanceTest(WorkerFixture):
+    """Each result says which files, settings and prompts made it, by name and hash and never by prompt text."""
+
+    def generate(self, **body: object) -> dict:
+        status, document = self.call("POST", "/v1/generate", {"prompt": "castle", **body})
+        self.assertEqual(200, status, document)
+        return document
+
+    def test_provenance_content(self) -> None:
+        """The record holds the checkpoint, LoRA, seed, steps, sampler, prompt hashes and versions."""
+        self.load_recommended()
+        self.install("style.safetensors", LORA_BYTES, "loras")
+        document = self.generate(seed=42, negativePrompt="blurry", steps=12,
+                                 loras=[{"name": "style.safetensors", "weight": 0.7}])
+        record = document["provenance"]
+        positive, negative = worker.compose_prompts(worker.WAI_ILLUSTRIOUS, "castle", "blurry", worker.POLICY_SAFE)
+        image = base64.b64decode(document["imagePngBase64"])
+        self.assertEqual({"name": worker.RECOMMENDED.file_name, "sha256": hashlib.sha256(CHECKPOINT_BYTES).hexdigest(),
+                          "catalogId": "wai-illustrious-sdxl-v17"}, record["checkpoint"])
+        self.assertIsNone(record["vae"])
+        self.assertEqual([{"name": "style.safetensors", "sha256": hashlib.sha256(LORA_BYTES).hexdigest(), "weight": 0.7}],
+                         record["loras"])
+        self.assertEqual((42, 12, 6.0, "euler-ancestral", 832, 1216, "safe"),
+                         (record["seed"], record["steps"], record["guidanceScale"], record["sampler"],
+                          record["width"], record["height"], record["contentPolicy"]))
+        self.assertEqual({"promptSha256": hashlib.sha256(b"castle").hexdigest(),
+                          "negativePromptSha256": hashlib.sha256(b"blurry").hexdigest(),
+                          "composedPromptSha256": hashlib.sha256(positive.encode()).hexdigest(),
+                          "composedNegativeSha256": hashlib.sha256(negative.encode()).hexdigest()}, record["prompts"])
+        self.assertEqual((hashlib.sha256(image).hexdigest(), len(image)), (record["outputSha256"], record["outputBytes"]))
+        self.assertEqual(worker.WORKER_VERSION, record["workerVersion"])
+        self.assertEqual(hashlib.sha256(SOURCE.read_bytes()).hexdigest(), record["workerSourceSha256"])
+        self.assertEqual(hashlib.sha256(self.pin_file.read_bytes()).hexdigest(), record["lockSha256"])
+        self.assertEqual({"torch": "0-test"}, record["libraries"])
+
+    def test_provenance_holds_no_prompt_text(self) -> None:
+        """Prompts can quote private adventure text, and a hash is the most the record may say about them."""
+        self.load_recommended()
+        sentinel = "sentinel" + hashlib.sha256(b"provenance").hexdigest()[:12]
+        record = self.generate(prompt=sentinel, negativePrompt=sentinel)["provenance"]
+        self.assertNotIn(sentinel, json.dumps(record))
+        self.assertEqual(hashlib.sha256(sentinel.encode()).hexdigest(), record["prompts"]["promptSha256"])
+
+    def test_the_seed_the_worker_chose_is_in_the_record(self) -> None:
+        """Without a seed in the request the record still allows a repeat."""
+        self.load_recommended()
+        document = self.generate()
+        self.assertEqual(document["seed"], document["provenance"]["seed"])
+
+    def test_a_separate_vae_is_recorded_with_its_hash(self) -> None:
+        """Pony's output depends on its VAE file as much as on the checkpoint."""
+        self.install(worker.PONY_V6.file_name)
+        vae = safetensors_bytes({"decoder.a": 4})
+        self.install(worker.PONY_V6.vae_file, vae)
+        self.assertEqual(200, self.call("POST", "/v1/load", {"checkpoint": "pony-diffusion-v6-xl"})[0])
+        record = self.generate()["provenance"]
+        self.assertEqual({"name": worker.PONY_V6.vae_file, "sha256": hashlib.sha256(vae).hexdigest()}, record["vae"])
+        self.assertEqual("pony-diffusion-v6-xl", record["checkpoint"]["catalogId"])
+
+    def test_another_checkpoint_gives_another_hash_and_unload_forgets_it(self) -> None:
+        """The record follows the resident file, never the one loaded before."""
+        self.load_recommended()
+        first = self.generate()["provenance"]["checkpoint"]["sha256"]
+        other = safetensors_bytes({worker.SDXL_CHECKPOINT_PREFIX + "ln_final.weight": 8})
+        self.install(worker.SDXL_BASE.file_name, other)
+        self.assertEqual(200, self.call("POST", "/v1/load", {"checkpoint": "sdxl-base-1.0"})[0])
+        second = self.generate()["provenance"]["checkpoint"]
+        self.assertNotEqual(first, second["sha256"])
+        self.assertEqual((hashlib.sha256(other).hexdigest(), "sdxl-base-1.0"), (second["sha256"], second["catalogId"]))
+        self.call("POST", "/v1/unload", {})
+        self.assert_refused(409, "not-loaded", "POST", "/v1/generate", {"prompt": "castle"})
+
+    def test_a_changed_lora_file_gets_a_new_hash(self) -> None:
+        """The hash is cached by size and time, so replacing the file must not return the old one."""
+        self.load_recommended()
+        self.install("style.safetensors", LORA_BYTES, "loras")
+        loras = [{"name": "style.safetensors"}]
+        first = self.generate(loras=loras)["provenance"]["loras"][0]["sha256"]
+        again = self.generate(loras=loras)["provenance"]["loras"][0]["sha256"]
+        replacement = safetensors_bytes({"lora_unet_a.lora_down.weight": 12})
+        self.install("style.safetensors", replacement, "loras")
+        changed = self.generate(loras=loras)["provenance"]["loras"][0]["sha256"]
+        self.assertEqual(first, again)
+        self.assertEqual(hashlib.sha256(replacement).hexdigest(), changed)
+        self.assertNotEqual(first, changed)
+
+    def test_without_the_lock_file_the_pin_digest_is_null(self) -> None:
+        """Outside the image there is no lock to hash, and the record says so instead of inventing one."""
+        absent = worker.ImageWorker(self.models, self.backend, worker.POLICY_SAFE, self.log, str(self.pin_file) + ".absent")
+        self.assertIsNone(absent._build["lockSha256"])
+
+
 class HealthTest(WorkerFixture):
     """The health command used by Compose reports only that the listener answers."""
 
@@ -920,7 +1272,7 @@ class SdxlBackendCallTest(unittest.TestCase):
     def test_generate_passes_chunked_embeddings_of_matching_shapes(self) -> None:
         """Chunks join on the sequence axis, and the pooled vector is the first chunk's only."""
         self.backend.load(Path("/models/w.safetensors"), None)
-        image = self.backend.generate(self.rows, self.settings, [])
+        image = self.backend.generate(self.rows, self.settings, [], worker.Cancellation())
         self.assertEqual(b"PNG:PNG", image)
         call = self.pipeline.call_args.kwargs
         chunks = len(self.rows.positive_first)
@@ -937,7 +1289,7 @@ class SdxlBackendCallTest(unittest.TestCase):
         """A LoRA can change the text encoders, and none may outlive its job."""
         self.backend.load(Path("/models/w.safetensors"), None)
         loras = [worker.LoraChoice(Path("/models/loras/a.safetensors"), 0.5), worker.LoraChoice(Path("/models/loras/b.safetensors"), 1.0)]
-        self.backend.generate(self.rows, self.settings, loras)
+        self.backend.generate(self.rows, self.settings, loras, worker.Cancellation())
         calls = self.pipeline.method_calls
         names = [call[0] for call in calls]
         self.assertLess(names.index("set_adapters"), names.index("delete_adapters"))
@@ -953,9 +1305,77 @@ class SdxlBackendCallTest(unittest.TestCase):
         self.pipeline.side_effect = ValueError("/models/private")
         loras = [worker.LoraChoice(Path("/models/loras/a.safetensors"), 0.5)]
         with self.assertRaises(worker.WorkerError) as refused:
-            self.backend.generate(self.rows, self.settings, loras)
+            self.backend.generate(self.rows, self.settings, loras, worker.Cancellation())
         self.assertEqual("generation-failed", refused.exception.code)
         self.pipeline.delete_adapters.assert_called_once_with(["job-lora-0"])
+
+    def pipeline_running(self, steps: int, hook=None) -> None:
+        """Make the stand-in pipeline call its step-end callback `steps` times, as diffusers does."""
+        def run(**kwargs):
+            for step in range(steps):
+                self.steps_seen = step + 1
+                if hook is not None:
+                    hook(step)
+                returned = kwargs["callback_on_step_end"](self.pipeline, step, 999 - step, {})
+                assert returned == {}, "the callback must hand its tensors back"
+            return self.pipeline.return_value
+        self.steps_seen = 0
+        self.pipeline.side_effect = run
+
+    def test_the_pipeline_gets_a_step_end_callback_without_tensors(self) -> None:
+        """Handing no tensors to the callback keeps the latents out of its hands."""
+        self.backend.load(Path("/models/w.safetensors"), None)
+        self.pipeline_running(3)
+        self.assertEqual(b"PNG:PNG", self.backend.generate(self.rows, self.settings, [], worker.Cancellation()))
+        self.assertEqual(3, self.steps_seen)
+        self.assertEqual([], self.pipeline.call_args.kwargs["callback_on_step_end_tensor_inputs"])
+
+    def test_cancel_stops_at_the_step_boundary_and_returns_no_image(self) -> None:
+        """The callback raises after the step that was running, so later steps and the decode never happen."""
+        self.backend.load(Path("/models/w.safetensors"), None)
+        cancel = worker.Cancellation()
+        self.pipeline_running(10, lambda step: cancel.request() if step == 3 else None)
+        with self.assertRaises(worker.JobCancelled):
+            self.backend.generate(self.rows, self.settings, [], cancel)
+        self.assertEqual(4, self.steps_seen)
+
+    def test_a_cancel_before_the_first_step_never_calls_the_pipeline(self) -> None:
+        """A request that arrives while the prompts are encoded stops the job before any denoising."""
+        self.backend.load(Path("/models/w.safetensors"), None)
+        cancel = worker.Cancellation()
+        cancel.request()
+        with self.assertRaises(worker.JobCancelled):
+            self.backend.generate(self.rows, self.settings, [], cancel)
+        self.pipeline.assert_not_called()
+
+    def test_a_cancelled_job_still_removes_its_loras_and_is_no_failure(self) -> None:
+        """A cancel is reported as a cancel, not as `generation-failed`, and no style outlives the job."""
+        self.backend.load(Path("/models/w.safetensors"), None)
+        cancel = worker.Cancellation()
+        self.pipeline_running(5, lambda step: cancel.request() if step == 1 else None)
+        loras = [worker.LoraChoice(Path("/models/loras/a.safetensors"), 0.5)]
+        with self.assertRaises(worker.JobCancelled):
+            self.backend.generate(self.rows, self.settings, loras, cancel)
+        self.pipeline.delete_adapters.assert_called_once_with(["job-lora-0"])
+
+    def test_trim_returns_cached_memory_and_keeps_the_pipeline(self) -> None:
+        """What a stopped job left cached goes back to the card while the model stays resident."""
+        self.backend.trim()
+        self.torch.cuda.empty_cache.assert_not_called()
+        self.backend.load(Path("/models/w.safetensors"), None)
+        self.backend.trim()
+        self.torch.cuda.empty_cache.assert_called_once_with()
+        self.assertIs(self.pipeline.tokenizer, self.backend.tokenizers()[0])
+
+    def test_versions_name_only_installed_libraries(self) -> None:
+        """A library that is absent is left out instead of being reported as unknown."""
+        def lookup(name: str) -> str:
+            if name == "peft":
+                raise worker.importlib.metadata.PackageNotFoundError(name)
+            return f"{name}-1"
+        with mock.patch.object(worker.importlib.metadata, "version", side_effect=lookup):
+            found = self.backend.versions()
+        self.assertEqual({name: f"{name}-1" for name in worker.PINNED_LIBRARIES if name != "peft"}, found)
 
     def test_unload_returns_cached_memory_and_is_safe_twice(self) -> None:
         """Whether this really frees the card is unproven until a GPU run measures it."""

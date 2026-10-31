@@ -9,7 +9,18 @@
   than cut. Safe-content tags are added to every job. Only the owner's `IMAGE_CONTENT_POLICY=owner-private` setting changes them, never a request.
 - `./start.sh --stop` also stops this service, and the engine joins one more empty internal network. A plain start builds and starts nothing new.
 - Nothing calls the worker yet, so players see no change. Its image has not been built: no checkpoint has been loaded, no image
-  generated, and memory and speed are unmeasured. Cancellation, output validation and provenance are still to come.
+  generated, and memory and speed are unmeasured.
+
+## Unreleased — Image worker cancellation, output checks and provenance (P21.5-B.1), 31 October 2026
+
+- The local image worker can now cancel a running job: `POST /v1/cancel` stops it at the next denoising step, answers the job's own
+  request with `cancelled` and no image, and frees the worker and its cached memory for the next job. A client that merely disconnects
+  does not cancel.
+- An image is returned only after it passes a check: a well-formed PNG within the size limits whose dimensions equal the request.
+  Anything else answers `invalid-output` and is dropped.
+- Every result carries a provenance record: checkpoint, VAE and LoRA names and SHA-256, seed, steps, sampler, prompt hashes (never the
+  prompt), the output hash, and the worker and library versions.
+- Nothing calls the worker yet, so players see no change. The tests use stand-ins: no real model, GPU or library was run.
 
 ## Unreleased — Lease executor over the model server (P21.4-B), 31 October 2026
 

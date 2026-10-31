@@ -9,6 +9,7 @@ section 8). The engine is its only peer, over an internal network:
     POST /v1/unload     {}
     POST /v1/generate   {"prompt", "negativePrompt", "width", "height", "steps", "guidanceScale",
                          "seed", "loras": [{"name", "weight"}]}; only "prompt" is required
+    POST /v1/cancel     {}; asks the running generate job to stop at its next step boundary
 
 Guarantees:
 
@@ -25,12 +26,24 @@ Guarantees:
   defaults forbid is refused rather than overridden;
 - one job runs at a time. Load, unload and generate answer 409 `busy` during another job, while
   `/healthz` and `/v1/models` keep answering;
+- a generate job can be cancelled. `POST /v1/cancel` is served by its own thread without the job
+  slot, and the backend checks the request before the first step and after every step. A
+  cancelled job answers 409 `cancelled`, frees the slot and the job's cached memory, and its
+  image is never returned, even when the last step had already finished;
+- an image is returned only after `validate_png` accepted it: a decodable PNG within the size
+  bounds whose dimensions equal the requested ones. Anything else answers 500 `invalid-output`;
+- a result carries a `provenance` record: checkpoint, optional VAE and LoRA names with their
+  SHA-256, seed, steps, guidance, sampler, prompt hashes, the output hash, and the worker and
+  library versions;
 - every refusal carries one fixed code. Log lines hold fixed codes and counts, never a prompt.
 
 Limits: the check on prompt tags compares whole comma-separated tags, so it is no content filter;
 that stays engine-side (docs/34 section 6). Weight syntax such as `(tag:1.2)` is not interpreted:
-its characters reach the encoders as text. Cancellation, output validation and provenance are
-P21.5-B: a started job runs to its end.
+its characters reach the encoders as text. A cancel takes effect at the next step boundary, so a
+step in progress, the text encoding and the final decode are not interrupted, and a client that
+merely disconnects does not cancel its job. `validate_png` checks structure, checksums and the
+compressed stream, not that the picture shows anything. A hash proves which file bytes were read at
+load time, and a prompt hash does not hide a guessable prompt.
 
 Exit status: 0 stopped by SIGTERM or a passing `--health`; 1 a failing `--health`; 78 a refused
 configuration.
@@ -46,8 +59,10 @@ from collections.abc import Callable, Iterator, Mapping
 import contextlib
 from dataclasses import dataclass
 import gc
+import hashlib
 import http.client
 import http.server
+import importlib.metadata
 import io
 import json
 import os
@@ -55,11 +70,18 @@ from pathlib import Path
 import re
 import secrets
 import signal
+import struct
 import sys
 import threading
 from typing import NoReturn, Protocol, TextIO
+import zlib
 
 
+WORKER_VERSION = "0.2.0"
+# The hash lock that the Dockerfile installs from; its digest identifies the library pins.
+PIN_FILE = "/opt/image-worker/requirements.lock"
+PINNED_LIBRARIES = ("torch", "diffusers", "transformers", "peft", "safetensors", "pillow")
+SAMPLER = "euler-ancestral"
 MODELS_DIRECTORY = "/models"
 # Configurations and tokenizers of SDXL base 1.0, baked into the image by checksum.
 CONFIG_DIRECTORY = "/opt/image-worker/sdxl-config"
@@ -104,6 +126,14 @@ MAX_HEADER_BYTES = 64 * 1024 * 1024
 HEADER_LENGTH_BYTES = 8
 # Every single-file SDXL checkpoint holds its second text encoder under this prefix.
 SDXL_CHECKPOINT_PREFIX = "conditioner.embedders.1.model."
+
+# A generated PNG of the largest accepted size is far below this; a larger answer is a fault.
+MAX_IMAGE_BYTES = 32 * 1024 * 1024
+HASH_BLOCK_BYTES = 1024 * 1024
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+# Valid bit depths by PNG color type; the channel count of each type follows in `PNG_CHANNELS`.
+PNG_DEPTHS = {0: (1, 2, 4, 8, 16), 2: (8, 16), 3: (1, 2, 4, 8), 4: (8, 16), 6: (8, 16)}
+PNG_CHANNELS = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
 
 GENERATE_FIELDS = {"prompt", "negativePrompt", "width", "height", "steps", "guidanceScale", "seed", "loras"}
 
@@ -362,6 +392,113 @@ class LoraChoice:
     weight: float
 
 
+class JobCancelled(Exception):
+    """Raised by a backend at a step boundary once the job's cancellation was requested."""
+
+
+class Cancellation:
+    """One job's cancel request; set from the cancel route's thread, read by the backend's thread."""
+
+    def __init__(self) -> None:
+        self._event = threading.Event()
+
+    def request(self) -> None:
+        """Ask the job to stop at its next step boundary; repeating it changes nothing."""
+        self._event.set()
+
+    @property
+    def requested(self) -> bool:
+        return self._event.is_set()
+
+    def raise_if_requested(self) -> None:
+        """Raise `JobCancelled` when a cancel was requested; a backend calls this at every boundary."""
+        if self._event.is_set():
+            raise JobCancelled()
+
+
+def file_sha256(path: Path) -> str:
+    """Return the lowercase hex SHA-256 of a file, read in blocks so a checkpoint never sits in memory."""
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        while block := file.read(HASH_BLOCK_BYTES):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def text_sha256(text: str) -> str:
+    """Return the lowercase hex SHA-256 of a text's UTF-8 bytes."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def validate_png(data: bytes, width: int, height: int) -> None:
+    """Raise `WorkerError` 500 `invalid-output` unless `data` is a sound PNG of exactly `width` x `height`.
+
+    Checked: at most `MAX_IMAGE_BYTES`; the signature; IHDR first with dimensions inside
+    `MIN_SIDE`..`MAX_SIDE` that equal the request; a valid color type and depth, no interlacing;
+    every chunk's length and CRC; IDAT, then IEND last with nothing after it; and the IDAT
+    stream, which must inflate to exactly the size the header implies, with a legal filter byte on
+    every row. Not checked: that the pixels show anything.
+    """
+    invalid = WorkerError(500, "invalid-output")
+    if len(data) > MAX_IMAGE_BYTES or not data.startswith(PNG_SIGNATURE):
+        raise invalid
+    position = len(PNG_SIGNATURE)
+    expected = None
+    stride = 0
+    palette = needs_palette = ended = False
+    inflater = zlib.decompressobj()
+    inflated = bytearray()
+    first = True
+    try:
+        while position < len(data):
+            if ended or len(data) - position < 12:
+                raise invalid
+            length, kind = struct.unpack(">I4s", data[position:position + 8])
+            end = position + 8 + length
+            if end + 4 > len(data) or not kind.isalpha():
+                raise invalid
+            body = data[position + 8:end]
+            if struct.unpack(">I", data[end:end + 4])[0] != zlib.crc32(kind + body):
+                raise invalid
+            if first != (kind == b"IHDR") or (first and length != 13):
+                raise invalid
+            if kind == b"IHDR":
+                found_width, found_height, depth, color, method, filtering, interlace = struct.unpack(">IIBBBBB", body)
+                if (found_width, found_height) != (width, height) or method or filtering or interlace:
+                    raise invalid
+                if not (MIN_SIDE <= width <= MAX_SIDE and MIN_SIDE <= height <= MAX_SIDE):
+                    raise invalid
+                if depth not in PNG_DEPTHS.get(color, ()):
+                    raise invalid
+                stride = 1 + (width * PNG_CHANNELS[color] * depth + 7) // 8
+                expected = stride * height
+                needs_palette = color == 3
+            elif kind == b"PLTE":
+                palette = True
+            elif kind == b"IDAT":
+                if needs_palette and not palette:
+                    raise invalid
+                pending = body
+                while pending:
+                    # A bounded read: a stream that inflates past its implied size is refused early.
+                    inflated += inflater.decompress(pending, expected - len(inflated) + 1)
+                    if len(inflated) > expected:
+                        raise invalid
+                    pending = inflater.unconsumed_tail
+            elif kind == b"IEND":
+                if length:
+                    raise invalid
+                ended = True
+            first = False
+            position = end + 4
+    except (struct.error, zlib.error):
+        raise invalid from None
+    if not ended or expected is None or not inflater.eof or inflater.unused_data or len(inflated) != expected:
+        raise invalid
+    if max(inflated[::stride]) > 4:
+        raise invalid
+
+
 class Backend(Protocol):
     """The GPU boundary of the worker; `SdxlBackend` is the real one."""
 
@@ -371,7 +508,18 @@ class Backend(Protocol):
 
     def tokenizers(self) -> tuple[Tokenizer, Tokenizer]: ...
 
-    def generate(self, rows: TokenRows, settings: GenerationSettings, loras: list[LoraChoice]) -> bytes: ...
+    def generate(self, rows: TokenRows, settings: GenerationSettings, loras: list[LoraChoice],
+                 cancel: Cancellation) -> bytes:
+        """Return one PNG, or raise `JobCancelled`; a backend must never return a partial image.
+
+        `cancel.raise_if_requested()` runs before the first step and after every step.
+        """
+
+    def trim(self) -> None:
+        """Return the memory that a stopped or discarded job left cached; the model stays resident."""
+
+    def versions(self) -> dict[str, str]:
+        """Return the installed versions of the libraries that produce an image, by name."""
 
 
 class SdxlBackend:
@@ -429,15 +577,40 @@ class SdxlBackend:
         """Return the two tokenizers of the loaded pipeline; the caller ensures one is loaded."""
         return self._pipeline.tokenizer, self._pipeline.tokenizer_2
 
-    def generate(self, rows: TokenRows, settings: GenerationSettings, loras: list[LoraChoice]) -> bytes:
-        """Return one PNG. The job's LoRAs are removed afterwards, even after a failure.
+    def trim(self) -> None:
+        """Collect garbage and return cached GPU memory, keeping the pipeline resident."""
+        gc.collect()
+        if self._torch is not None and self._device == "cuda":
+            self._torch.cuda.empty_cache()
 
-        LoRAs are loaded before encoding, because a LoRA can change the text encoders too.
+    def versions(self) -> dict[str, str]:
+        """Return the installed version of each library in `PINNED_LIBRARIES` that is present."""
+        found = {}
+        for name in PINNED_LIBRARIES:
+            try:
+                found[name] = importlib.metadata.version(name)
+            except importlib.metadata.PackageNotFoundError:
+                continue
+        return found
+
+    def generate(self, rows: TokenRows, settings: GenerationSettings, loras: list[LoraChoice],
+                 cancel: Cancellation) -> bytes:
+        """Return one PNG, or raise `JobCancelled` at the first step boundary after a cancel request.
+
+        The job's LoRAs are removed afterwards, even after a failure or a cancel. LoRAs are loaded
+        before encoding, because a LoRA can change the text encoders too. Cancelling raises out of
+        the pipeline's step-end callback, so the image is never decoded and nothing partial leaves.
         """
         torch = self._torch
         pipeline = self._pipeline
         adapters = []
+
+        def at_step_end(_pipeline: object, _step: int, _timestep: object, tensors: dict) -> dict:
+            cancel.raise_if_requested()
+            return tensors
+
         try:
+            cancel.raise_if_requested()
             for index, lora in enumerate(loras):
                 adapter = f"job-lora-{index}"
                 pipeline.load_lora_weights(str(lora.path.parent), weight_name=lora.path.name, adapter_name=adapter,
@@ -450,16 +623,20 @@ class SdxlBackend:
                                                        rows.positive_first, rows.positive_second, self._device)
                 negative, negative_pooled = embed_rows(torch, pipeline.text_encoder, pipeline.text_encoder_2,
                                                        rows.negative_first, rows.negative_second, self._device)
+            cancel.raise_if_requested()
             image = pipeline(
                 prompt_embeds=positive, pooled_prompt_embeds=positive_pooled,
                 negative_prompt_embeds=negative, negative_pooled_prompt_embeds=negative_pooled,
                 width=settings.width, height=settings.height, num_inference_steps=settings.steps,
                 guidance_scale=settings.guidance_scale,
                 generator=torch.Generator(device=self._device).manual_seed(settings.seed),
+                callback_on_step_end=at_step_end, callback_on_step_end_tensor_inputs=[],
             ).images[0]
             encoded = io.BytesIO()
             image.save(encoded, format="PNG")
             return encoded.getvalue()
+        except JobCancelled:
+            raise
         except torch.cuda.OutOfMemoryError:
             raise WorkerError(507, "gpu-out-of-memory") from None
         except Exception:
@@ -519,14 +696,32 @@ def event(stream: TextIO, name: str, **fields: object) -> None:
 class ImageWorker:
     """The worker's rules, behind the HTTP surface and in front of one `Backend`."""
 
-    def __init__(self, models_directory: Path, backend: Backend, policy: str, log: TextIO = sys.stderr) -> None:
+    def __init__(self, models_directory: Path, backend: Backend, policy: str, log: TextIO = sys.stderr,
+                 pin_file: str = PIN_FILE) -> None:
         self._models = models_directory
         self._backend = backend
         self._policy = policy
         self._log = log
         self._job = threading.Lock()
+        # Guards `_running` only: the cancel route must not wait for the job slot.
+        self._state = threading.Lock()
+        self._running: Cancellation | None = None
         self._loaded: CheckpointProfile | None = None
         self._loaded_file: str | None = None
+        self._loaded_hashes: dict[str, str] = {}
+        self._vae_name: str | None = None
+        self._lora_hashes: dict[tuple[Path, int, int], str] = {}
+        self._build = self._build_identity(pin_file)
+
+    @staticmethod
+    def _build_identity(pin_file: str) -> dict:
+        """Return the worker's own identity: its version, its source digest and the library lock digest.
+
+        The lock digest is `None` outside the image, where the lock file is not installed.
+        """
+        lock = Path(pin_file)
+        return {"workerVersion": WORKER_VERSION, "workerSourceSha256": file_sha256(Path(__file__)),
+                "lockSha256": file_sha256(lock) if lock.is_file() else None}
 
     @contextlib.contextmanager
     def _exclusive(self) -> Iterator[None]:
@@ -602,10 +797,18 @@ class ImageWorker:
                 raise WorkerError(422, "not-sdxl-checkpoint")
             vae = self._model_file(self._models, profile.vae_file, "vae-missing") if profile.vae_file else None
             if self._loaded_file != name:
+                # Hashed before the unload, so that an unreadable file leaves the resident model alone.
+                hashes = {"checkpoint": file_sha256(path)}
+                if vae is not None:
+                    hashes["vae"] = file_sha256(vae)
                 self._backend.unload()
                 self._loaded = self._loaded_file = None
+                self._loaded_hashes = {}
+                self._vae_name = None
                 self._backend.load(path, vae)
                 self._loaded, self._loaded_file = profile, name
+                self._loaded_hashes = hashes
+                self._vae_name = profile.vae_file
             event(self._log, "loaded", catalog=profile.catalog_id is not None, separate_vae=vae is not None)
             return {"loaded": name, "catalogId": profile.catalog_id, "contentPolicy": self._policy}
 
@@ -615,8 +818,58 @@ class ImageWorker:
         with self._exclusive():
             self._backend.unload()
             self._loaded = self._loaded_file = None
+            self._loaded_hashes = {}
+            self._vae_name = None
             event(self._log, "unloaded")
             return {"loaded": None}
+
+    def cancel(self, body: dict) -> dict:
+        """Ask the running generate job to stop at its next step boundary.
+
+        Answers 409 `no-job` when none runs, including during a load or unload, which cannot be
+        cancelled. It never takes the job slot, so it works while a job holds it. The job
+        reports the outcome itself: its own request answers 409 `cancelled`.
+        """
+        require_fields(body, set())
+        with self._state:
+            running = self._running
+        if running is None:
+            raise WorkerError(409, "no-job")
+        running.request()
+        event(self._log, "cancel-requested")
+        return {"cancelling": True}
+
+    def _lora_hash(self, lora: LoraChoice) -> str:
+        """Return a LoRA file's SHA-256, reusing the last one while its size and time are unchanged."""
+        stat = lora.path.stat()
+        key = (lora.path, stat.st_size, stat.st_mtime_ns)
+        if key not in self._lora_hashes:
+            self._lora_hashes[key] = file_sha256(lora.path)
+        return self._lora_hashes[key]
+
+    def _provenance(self, prompts: dict[str, str], settings: GenerationSettings, loras: list[LoraChoice],
+                    lora_hashes: list[str], image: bytes) -> dict:
+        """Return the record of how `image` was made; every value is a name, a number or a hash."""
+        vae = None if self._vae_name is None else {"name": self._vae_name, "sha256": self._loaded_hashes["vae"]}
+        return {
+            **self._build,
+            "libraries": self._backend.versions(),
+            "checkpoint": {"name": self._loaded_file, "sha256": self._loaded_hashes["checkpoint"],
+                           "catalogId": self._loaded.catalog_id},
+            "vae": vae,
+            "loras": [{"name": lora.path.name, "sha256": digest, "weight": lora.weight}
+                      for lora, digest in zip(loras, lora_hashes)],
+            "seed": settings.seed,
+            "steps": settings.steps,
+            "guidanceScale": settings.guidance_scale,
+            "sampler": SAMPLER,
+            "width": settings.width,
+            "height": settings.height,
+            "contentPolicy": self._policy,
+            "prompts": prompts,
+            "outputSha256": hashlib.sha256(image).hexdigest(),
+            "outputBytes": len(image),
+        }
 
     def _loras(self, requested: object) -> list[LoraChoice]:
         """Validate the job's LoRA list against the files of the LoRA subdirectory."""
@@ -633,7 +886,13 @@ class ImageWorker:
         return choices
 
     def generate(self, body: dict) -> dict:
-        """Run one job on the resident checkpoint and return its PNG, base64-encoded, with its facts."""
+        """Run one job on the resident checkpoint and return its PNG, base64-encoded, with its facts.
+
+        Raises 409 `cancelled` after a cancel request, whether the backend stopped at a step
+        boundary or had already finished, and 500 `invalid-output` for an image that
+        `validate_png` refuses. In both cases the image is dropped, never returned, and the
+        backend is asked to `trim` the memory the job left cached.
+        """
         require_fields(body, GENERATE_FIELDS)
         prompt = prompt_text(body, "prompt")
         if not prompt.strip():
@@ -643,24 +902,60 @@ class ImageWorker:
         with self._exclusive():
             if self._loaded is None:
                 raise WorkerError(409, "not-loaded")
-            positive_text, negative_text = compose_prompts(self._loaded, prompt, negative, self._policy)
-            loras = self._loras(body.get("loras"))
-            first, second = self._backend.tokenizers()
-            rows = token_rows(first, second, positive_text, negative_text)
-            image = self._backend.generate(rows, settings, loras)
-            event(self._log, "generated", chunks=len(rows.positive_first), loras=len(loras), steps=settings.steps)
-            return {
-                "imagePngBase64": base64.b64encode(image).decode("ascii"),
-                "checkpoint": self._loaded_file,
-                "catalogId": self._loaded.catalog_id,
-                "contentPolicy": self._policy,
-                "seed": settings.seed,
-                "width": settings.width,
-                "height": settings.height,
-                "steps": settings.steps,
-                "guidanceScale": settings.guidance_scale,
-                "chunks": len(rows.positive_first),
-            }
+            cancel = Cancellation()
+            with self._state:
+                self._running = cancel
+            try:
+                return self._run(cancel, prompt, negative, settings, body.get("loras"))
+            finally:
+                with self._state:
+                    self._running = None
+
+    def _run(self, cancel: Cancellation, prompt: str, negative: str, settings: GenerationSettings,
+             requested_loras: object) -> dict:
+        """Compose, generate, check and describe one job; the caller holds the job slot."""
+        positive_text, negative_text = compose_prompts(self._loaded, prompt, negative, self._policy)
+        loras = self._loras(requested_loras)
+        lora_hashes = [self._lora_hash(lora) for lora in loras]
+        first, second = self._backend.tokenizers()
+        rows = token_rows(first, second, positive_text, negative_text)
+        cancelled = False
+        image = None
+        try:
+            cancel.raise_if_requested()
+            image = self._backend.generate(rows, settings, loras, cancel)
+        except JobCancelled:
+            cancelled = True
+        cancelled = cancelled or cancel.requested
+        refused = None
+        if not cancelled:
+            try:
+                validate_png(image, settings.width, settings.height)
+            except WorkerError as invalid:
+                refused = invalid
+        if cancelled or refused:
+            # Outside the `except` blocks, so that the failed job's tensors are no longer referenced.
+            image = rows = None
+            self._backend.trim()
+            event(self._log, "cancelled" if cancelled else "output-refused", steps=settings.steps)
+            raise WorkerError(409, "cancelled") if cancelled else refused
+        prompts = {"promptSha256": text_sha256(prompt), "negativePromptSha256": text_sha256(negative),
+                   "composedPromptSha256": text_sha256(positive_text), "composedNegativeSha256": text_sha256(negative_text)}
+        chunks = len(rows.positive_first)
+        event(self._log, "generated", chunks=chunks, loras=len(loras), steps=settings.steps)
+        return {
+            "imagePngBase64": base64.b64encode(image).decode("ascii"),
+            "checkpoint": self._loaded_file,
+            "catalogId": self._loaded.catalog_id,
+            "contentPolicy": self._policy,
+            "seed": settings.seed,
+            "width": settings.width,
+            "height": settings.height,
+            "steps": settings.steps,
+            "guidanceScale": settings.guidance_scale,
+            "chunks": chunks,
+            "provenance": self._provenance(prompts, settings, loras, lora_hashes, image),
+        }
 
 
 def require_fields(body: object, allowed: set[str]) -> None:
@@ -739,9 +1034,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.answer(404, {"error": "unknown-route"})
 
     def do_POST(self) -> None:
-        """Serve the job routes; each one takes the single job slot."""
+        """Serve the job routes, which take the single job slot, and the cancel route, which does not."""
         routes = {"/v1/load": self.server.worker.load, "/v1/unload": self.server.worker.unload,
-                  "/v1/generate": self.server.worker.generate}
+                  "/v1/generate": self.server.worker.generate, "/v1/cancel": self.server.worker.cancel}
         route = routes.get(self.path)
         if route is None:
             self.answer(404, {"error": "unknown-route"})
