@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Readiness probes and bilingual narration probe set (P21.2-C), 31 October 2026
+
+- Add `tools/container_packaging/model_probe.py`, a developer tool that checks a local text server's `/health` and sends eight
+  JSON-Schema probes, four tasks in English and Italian, printing a `PASS` or `FAIL` line for each. It exits non-zero on any failure.
+- Define the model measurement record format (load time, prefill and decode speed, peak VRAM and RAM, context limit, VRAM released by
+  unload) with a validator and a sample that carries no values.
+- Tested against a scripted fixture server only. No real model has been probed, no measurement is recorded, and no engine
+  feature runs the probes yet.
+
 ## Unreleased — Hash-verified model fetch with license confirmation (P21.2-B), 31 October 2026
 
 - Add `./start.sh --models fetch [--accept-license ID[,ID...]] ID...`. It prints each named catalog model's license, source and

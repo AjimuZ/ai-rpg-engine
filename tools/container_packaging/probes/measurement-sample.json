@@ -1,0 +1,21 @@
+{
+  "format": "rpg-engine.model-measurement/1",
+  "kind": "format-sample",
+  "notice": "Shape only. This file is not a measurement: every metric is null and no host, date or model hash is claimed. A real record uses kind host-measurement, with a non-negative number in every metric.",
+  "model": {"id": "example-model", "sha256": null},
+  "date": null,
+  "host": null,
+  "metrics": {
+    "loadTimeMs": null,
+    "prefillTokensPerSecond": null,
+    "decodeTokensPerSecond": null,
+    "peakVramBytes": null,
+    "peakRamBytes": null,
+    "contextTokensMax": null,
+    "vramReleasedByUnloadBytes": null
+  },
+  "probes": [
+    {"id": "narration-beat-en", "language": "en", "status": "pass", "latencyMs": null, "detail": "shape example only"},
+    {"id": "narration-beat-it", "language": "it", "status": "fail", "latencyMs": null, "detail": "shape example only"}
+  ]
+}

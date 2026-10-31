@@ -1,0 +1,148 @@
+{
+  "format": "rpg-engine.narration-probes/1",
+  "notice": "Output-contract probes only. A pass means the reply parsed and matched its schema; it says nothing about narration quality, and the `language` field a model fills in is its own claim, not a detection.",
+  "probes": [
+    {
+      "id": "narration-beat-en",
+      "language": "en",
+      "purpose": "Short scene narration with a mood label",
+      "system": "You are the narrator of a fantasy adventure. Reply only with JSON matching the schema.",
+      "user": "The player pushes open the cellar door of the abandoned mill. Narrate what they see in two or three sentences, in English.",
+      "maxTokens": 300,
+      "schema": {
+        "type": "object",
+        "required": ["narration", "language", "mood"],
+        "additionalProperties": false,
+        "properties": {
+          "narration": {"type": "string", "minLength": 20, "maxLength": 800},
+          "language": {"type": "string", "enum": ["en"]},
+          "mood": {"type": "string", "enum": ["calm", "tense", "eerie", "warm"]}
+        }
+      }
+    },
+    {
+      "id": "narration-beat-it",
+      "language": "it",
+      "purpose": "Short scene narration with a mood label",
+      "system": "Sei il narratore di un'avventura fantasy. Rispondi solo con JSON conforme allo schema.",
+      "user": "Il giocatore spinge la porta della cantina del mulino abbandonato. Narra in due o tre frasi, in italiano, ciò che vede.",
+      "maxTokens": 300,
+      "schema": {
+        "type": "object",
+        "required": ["narration", "language", "mood"],
+        "additionalProperties": false,
+        "properties": {
+          "narration": {"type": "string", "minLength": 20, "maxLength": 800},
+          "language": {"type": "string", "enum": ["it"]},
+          "mood": {"type": "string", "enum": ["calm", "tense", "eerie", "warm"]}
+        }
+      }
+    },
+    {
+      "id": "intent-parse-en",
+      "language": "en",
+      "purpose": "Classify a free-text player action into a fixed action set",
+      "system": "Classify the player's action. Reply only with JSON matching the schema.",
+      "user": "I try to break the rusty gate with my shoulder.",
+      "maxTokens": 120,
+      "schema": {
+        "type": "object",
+        "required": ["action", "target", "confident"],
+        "additionalProperties": false,
+        "properties": {
+          "action": {"type": "string", "enum": ["move", "attack", "talk", "examine", "use", "other"]},
+          "target": {"type": "string", "minLength": 1, "maxLength": 80},
+          "confident": {"type": "boolean"}
+        }
+      }
+    },
+    {
+      "id": "intent-parse-it",
+      "language": "it",
+      "purpose": "Classify a free-text player action into a fixed action set",
+      "system": "Classifica l'azione del giocatore. Rispondi solo con JSON conforme allo schema.",
+      "user": "Provo a sfondare il cancello arrugginito con la spalla.",
+      "maxTokens": 120,
+      "schema": {
+        "type": "object",
+        "required": ["action", "target", "confident"],
+        "additionalProperties": false,
+        "properties": {
+          "action": {"type": "string", "enum": ["move", "attack", "talk", "examine", "use", "other"]},
+          "target": {"type": "string", "minLength": 1, "maxLength": 80},
+          "confident": {"type": "boolean"}
+        }
+      }
+    },
+    {
+      "id": "dialogue-line-en",
+      "language": "en",
+      "purpose": "One line of non-player dialogue with a speaker and tone",
+      "system": "You voice non-player characters. Reply only with JSON matching the schema.",
+      "user": "The ferryman, who distrusts strangers, answers a traveller asking to cross the river at night. Write his reply in English.",
+      "maxTokens": 200,
+      "schema": {
+        "type": "object",
+        "required": ["speaker", "line", "tone"],
+        "additionalProperties": false,
+        "properties": {
+          "speaker": {"type": "string", "minLength": 1, "maxLength": 60},
+          "line": {"type": "string", "minLength": 5, "maxLength": 400},
+          "tone": {"type": "string", "enum": ["gruff", "friendly", "fearful", "neutral"]}
+        }
+      }
+    },
+    {
+      "id": "dialogue-line-it",
+      "language": "it",
+      "purpose": "One line of non-player dialogue with a speaker and tone",
+      "system": "Dai voce ai personaggi non giocanti. Rispondi solo con JSON conforme allo schema.",
+      "user": "Il traghettatore, diffidente verso gli stranieri, risponde a un viandante che chiede di attraversare il fiume di notte. Scrivi la sua risposta in italiano.",
+      "maxTokens": 200,
+      "schema": {
+        "type": "object",
+        "required": ["speaker", "line", "tone"],
+        "additionalProperties": false,
+        "properties": {
+          "speaker": {"type": "string", "minLength": 1, "maxLength": 60},
+          "line": {"type": "string", "minLength": 5, "maxLength": 400},
+          "tone": {"type": "string", "enum": ["gruff", "friendly", "fearful", "neutral"]}
+        }
+      }
+    },
+    {
+      "id": "turn-summary-en",
+      "language": "en",
+      "purpose": "Summarise a turn into a bounded list of state changes",
+      "system": "Summarise what changed this turn. Reply only with JSON matching the schema.",
+      "user": "Turn log: the player picked the lock of the chest, found a silver key and 12 coins, and was noticed by the guard. Summarise in English.",
+      "maxTokens": 250,
+      "schema": {
+        "type": "object",
+        "required": ["summary", "changes"],
+        "additionalProperties": false,
+        "properties": {
+          "summary": {"type": "string", "minLength": 10, "maxLength": 300},
+          "changes": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"type": "string", "minLength": 3, "maxLength": 120}}
+        }
+      }
+    },
+    {
+      "id": "turn-summary-it",
+      "language": "it",
+      "purpose": "Summarise a turn into a bounded list of state changes",
+      "system": "Riassumi che cosa è cambiato in questo turno. Rispondi solo con JSON conforme allo schema.",
+      "user": "Registro del turno: il giocatore ha scassinato la serratura del baule, ha trovato una chiave d'argento e 12 monete ed è stato notato dalla guardia. Riassumi in italiano.",
+      "maxTokens": 250,
+      "schema": {
+        "type": "object",
+        "required": ["summary", "changes"],
+        "additionalProperties": false,
+        "properties": {
+          "summary": {"type": "string", "minLength": 10, "maxLength": 300},
+          "changes": {"type": "array", "minItems": 1, "maxItems": 5, "items": {"type": "string", "minLength": 3, "maxLength": 120}}
+        }
+      }
+    }
+  ]
+}

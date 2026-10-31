@@ -37,6 +37,24 @@ control, an immediate refusal of an outbound connection, read-only mounts and, w
 `nvidia-smi` it drops the GPU request through an override and reports the device case
 as skipped. It loads no model. Its route-parser cases need no Docker and always run.
 Without the image it follows the table under [Hosts without Docker](#hosts-without-docker).
+`model_probe.py` (P21.2-C) is the readiness and narration probe harness: `py -B
+tools/container_packaging/model_probe.py --base-url URL --model ID [--probes FILE]`. It calls `GET /health`, then
+sends each probe of `probes/narration-probes.json` (four tasks, each in English and Italian) to
+`/v1/chat/completions` with a strict `json_schema` response format, checks the reply against the probe's schema with
+its own checker for a keyword subset (an unsupported keyword raises instead of passing), and prints one `PASS` or `FAIL`
+line per probe with its latency. It exits 0 only when every probe passed, 1 otherwise (including a server that is
+not ready, which yields one `readiness` failure and sends no probe) and 2 for an unreadable probe set. A pass means
+the reply parsed and matched its schema; it never certifies narration quality. It sends no API key, so a server
+started with `--api-key-file` is not yet reachable by it.
+`probes/measurement-sample.json` fixes the measurement record format `rpg-engine.model-measurement/1` (model id and hash,
+date, host, the seven metrics load time, prefill and decode speed, peak VRAM and RAM, maximum context and VRAM released
+by unload, and the probe results). `kind: format-sample` carries only null metrics and is not a measurement;
+`kind: host-measurement` needs a date, a host, the model's SHA-256 and a non-negative number in every metric.
+`measurement_problems` validates both. No measurement exists yet.
+`test_model_probe.py` runs all of this against a scripted loopback HTTP server that replays canned replies. The fixture
+is not a model: its passes show that the probes tell conforming replies from a schema violation, a malformed reply, an
+HTTP error, a server that is not ready and an unreachable server, and nothing about any real model. It needs no Docker,
+so hosted CI runs it, and its name is matched by the `test_[!h]*.py` pattern of `verify.sh containers`.
 `test_launcher.py` checks the root `start.sh` contract (static rules, redaction,
 refusal paths and read-only `--check`) without starting or stopping services.
 `test_model_fetch.py` (P21.2-B) drives `docker/model-fetch/model_fetch.py` through its

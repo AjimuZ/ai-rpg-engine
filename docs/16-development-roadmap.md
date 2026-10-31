@@ -3137,8 +3137,43 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       so its outcome on such a host is unproven, as is `ComposeServiceTest` on Compose 2.x, which `verify.sh probe`
       does not run (`test_compose.py` does run there, in `compose-v2`). `docker buildx imagetools inspect` was refused in this session, so that the pinned Python digest is a
       multi-platform index is not confirmed; ADR 0009 says so.
-    - Remaining for P21.2: launcher selection of the service, a real fetch of the default model, schema readiness
+    - Remaining for P21.2 at that date: launcher selection of the service, a real fetch of the default model, schema readiness
       probes, the bilingual narration probe set, and the measurements. The box stays unchecked.
+    - Partial progress (31 October 2026, P21.2-C): readiness probes, the bilingual probe set and the measurement format exist
+      and are tested against a scripted fixture. No measurement is claimed and the P21.2 box stays unchecked.
+      - Added `tools/container_packaging/model_probe.py` (standard library only): `GET /health`, then each probe of
+        `probes/narration-probes.json` (`rpg-engine.narration-probes/1`: narration beat, intent parse, dialogue line and
+        turn summary, each in English and Italian, 8 probes) sent to `/v1/chat/completions` at temperature 0 with a strict
+        `json_schema` response format. The reply is checked by an in-tree checker for a keyword subset; an unsupported
+        keyword raises, so a probe cannot pass on a rule that is silently ignored. The command prints `PASS` or `FAIL` per
+        probe with its latency and exits 0, 1 (a failed probe or a server not ready, which sends no probe) or 2
+        (unreadable probe set). The measurement record `rpg-engine.model-measurement/1` (model id and hash, date, host,
+        load time, prefill and decode speed, peak VRAM and RAM, maximum context, VRAM released by unload, probe results)
+        has a validator and `probes/measurement-sample.json`, a `format-sample` whose seven metrics are null.
+        A `host-measurement` needs a date, a host, a model SHA-256 and a non-negative number in each metric.
+      - Added `tools/container_packaging/test_model_probe.py`: 21 tests against a scripted loopback HTTP server, which
+        is a fixture and not a model. It shows a passing probe for every probe in both languages, and failing probes for a
+        schema violation (only that probe fails), non-JSON content, a body that is not a chat completion, an HTTP 500, a
+        server answering 503 (one `readiness` failure, no completion request) and an unreachable port. It also checks the
+        request shape, the command line's `PASS`/`FAIL` lines and exit codes, that the probe set loads with both languages in
+        id pairs and is refused when malformed, and that the sample validates, cannot be relabelled a measurement, and that
+        incomplete or invalid records are rejected.
+      - Commands and results on the reference host (Python 3.15.1): `py -B -X dev -m unittest discover -s
+        tools/container_packaging -p test_model_probe.py`: `Ran 21 tests in 7.876s`, `OK`, no warning. `sh
+        .agents/ralph/verify.sh repo`: 5 of 5 steps passed, `VERIFY PASSED (repo)`. `sh .agents/ralph/verify.sh containers`:
+        `PASS container-packaging` (343 s, `Ran 128 tests in 341.487s`, `OK (skipped=1)`, the new module included by the
+        `test_[!h]*.py` pattern) and `PASS runtime-probe-docker` (87 s), `VERIFY PASSED (containers)`. `verify.sh full` was
+        not run by this session.
+      - Not proven: any probe against a real model server or a real model, so whether the pinned llama.cpp build accepts
+        this `response_format` and `/health` contract, how it answers while a router-mode model loads, and whether any model
+        satisfies these schemas or answers in Italian are all open. The in-tree schema checker was tested only on the
+        keywords the probes use. The context-length sample of the readiness probe in
+        `docs/34-inference-backends-and-model-selection.md` section 6 is not a probe yet. The tool sends no API key, so
+        `--api-key-file` servers are unreachable by it. No weakened-copy run was made: the failing cases are asserted
+        directly rather than shown by removing a check. The hosted packaging job has not run this change. The measurements
+        themselves are not taken: no metric of any model exists, and the catalog's `measured` stays `null`.
+    - Remaining for P21.2: launcher selection of the service, a real fetch of the default model, running these probes against
+      a loaded model, and the measurements. The box stays unchecked.
 - [ ] P21.3 Implement slot assignment and the remaining backend adapters behind the runtime-neutral task port: independent `light`, `standard`, `deliberate` and `image` slots, readiness probes with visible results, billing and privacy class badges with acknowledgement on a class change, same-class fallback lists only when configured, per-slot session retirement, and the `gateway` service for owner-key hosted APIs and allowlisted custom endpoints (keys as runtime-only secrets, budgets, bounded redirects and sizes). Expose `GET /api/v1/models/status`, the owner-only settings API and the Settings → Models panel.
 - [ ] P21.4 Implement the shared GPU and RAM admission coordinator for text, image and speech: priorities, leases using the model server's documented load and unload endpoints and slot save and restore, batching, interruption between diffusion steps, unowned-contention handling and metrics. Prove no engine-caused out-of-memory on the reference host.
 - [ ] P21.5 Implement the local image backend: a pinned image-worker container loading single-file safetensors checkpoints and LoRAs, with WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as catalog alternatives; prompt chunking beyond 77 tokens; default safe-content tags; step-boundary cancellation; output validation and provenance; and the `a1111-http` adapter for an owner-run Forge or A1111 server. Integrate with the P17 asset-job contract without changing authority rules.
