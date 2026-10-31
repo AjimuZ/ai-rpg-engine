@@ -224,6 +224,12 @@ V28 scope (P21.3-B) adds no table: `ai_session_record` accepts `SLOT_CHANGED` as
 row changes. Offline checks cover the V28 manifest/catalog. The live rehearsal below passed on V28 on 31 October 2026 (58 tables, 229
 rows, a 371,216-byte dump), but it held no `ai_session_record` row, so restoring that value remains unrehearsed.
 
+V29 scope (P21.4-A) adds `resource_lease`, the admission coordinator's record of GPU and RAM leases (a model identifier, byte counts,
+times and the owning process; no prompt, output, key or endpoint). It is installation-wide operating state, so a restore brings back
+the open leases with the database, and the next start takes them over as reconciling holds that reserve their capacity until a caller
+confirms the model is gone. Offline checks cover the V29 manifest/catalog; no live V29 dump/restore rehearsal has been run, and the
+rehearsal below ran on V28 before this table existed.
+
 ## Live two-genre rehearsal (P06.5-B.1, V26)
 
 `tools/container_packaging/test_restore_isolation.py` runs this tool as an operator would on a populated world, then

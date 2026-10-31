@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V28 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V29 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -715,6 +715,29 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(1, jdbc.update(sessionInsert, UUID.randomUUID(), "a".repeat(64), "b".repeat(64), record,
                             "SLOT_CHANGED", "SLOT_CHANGED"));
                     assertEquals(0, v28.migrate().migrationsExecuted);
+                    // V29 adds the admission coordinator's lease record. An upgraded save has none, the applied
+                    // migrations keep their checksums, and the table's checks and guard refuse malformed rows.
+                    String appliedChecksums = "select string_agg(version || ':' || checksum, ',' order by installed_rank) "
+                            + "from flyway_schema_history where version::int <= 28";
+                    String checksumsBefore = jdbc.queryForObject(appliedChecksums, String.class);
+                    Flyway v29 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("29").load();
+                    assertEquals(1, v29.migrate().migrationsExecuted);
+                    assertTrue(v29.validateWithResult().validationSuccessful);
+                    assertEquals(checksumsBefore, jdbc.queryForObject(appliedChecksums, String.class));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from resource_lease", Integer.class));
+                    UUID lease = UUID.randomUUID();
+                    String leaseInsert = "insert into resource_lease (id, instance_id, modality, model, gpu_bytes, ram_bytes, "
+                            + "batch_size, status, granted_at, expires_at) values (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', now(), "
+                            + "now() + interval '1 minute')";
+                    assertEquals(1, jdbc.update(leaseInsert, lease, UUID.randomUUID(), "TEXT", "model-a", 100L, 10L, 1));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(leaseInsert, UUID.randomUUID(), UUID.randomUUID(),
+                            "VIDEO", "model-a", 100L, 10L, 1), "the modalities stay closed");
+                    assertThrows(DataAccessException.class, () -> jdbc.update(leaseInsert, UUID.randomUUID(), UUID.randomUUID(),
+                            "TEXT", "model-a", 0L, 0L, 1), "a lease reserves some capacity");
+                    assertThrows(DataAccessException.class, () -> jdbc.update("delete from resource_lease where id = ?", lease),
+                            "lease rows are never deleted");
+                    assertEquals(0, v29.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

@@ -3423,6 +3423,37 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       `repository-tests` and `backup-tests` all `PASS`, `VERIFY PASSED (repo)`). `verify.sh containers` was not run, because no container
       file changed.
 - [ ] P21.4 Implement the shared GPU and RAM admission coordinator for text, image and speech: priorities, leases using the model server's documented load and unload endpoints and slot save and restore, batching, interruption between diffusion steps, unowned-contention handling and metrics. Prove no engine-caused out-of-memory on the reference host.
+  - P21.4-A (31 October 2026, story done, task open): the coordinator's policy, batching and durable lease record, with no model server involved.
+    - Built: `org.rpgengine.inference.admission` with the pure `AdmissionPolicy` (interactive before background; background aging by the
+      scheduler's work classes, never over interactive work; rotation across modalities then owners among equal ranks; one lease per
+      resident model shared by compatible requests up to a per-modality limit; no overtaking of a blocked first request; background-only
+      leases named newest first for a blocked interactive request, and none when revoking all would not make room; holds for unconfirmed
+      leases), `AdmissionCoordinator` (injected clock, grant written before it is returned, refused write takes the grant back, expiry,
+      renewal, revoke, restart recovery), `LeaseStore` and the PostgreSQL `JdbcLeaseStore` over the new migration
+      `V29__resource_leases.sql` (table `resource_lease` with checks, a lifecycle guard trigger, write-once and frozen columns, row
+      versions and no delete). The backup tool now expects schema 29 and the new table (`backup.py`, its README). Specification:
+      `docs/34` section 10 "P21.4-A admission coordinator core"; `docs/adr/0021` records the decision.
+    - Tests: `AdmissionPolicyTest` (25: priority and aging, lease grant, renewal, expiry and release, batching and batch limit, joining a
+      resident lease, no overtaking, no starvation of a large request, fairness across modalities and owners, taking back, holds,
+      refusals, undo), `AdmissionCoordinatorTest` (10, in-memory store and stepped clock, including a refused write and an expiry that
+      cannot be recorded) and `JdbcLeaseStoreTest` (8 on PostgreSQL: round trip, fencing by owner, takeover after a simulated restart,
+      the table's refusals and the coordinator across a restart over real storage). `CanonicalMigrationUpgradeTest` now applies V29 on
+      top of V28, compares the checksums of V1 to V28 before and after, and checks the new table's constraints. `EngineApplicationTest`
+      lists the new table and `TaskPortSelectionTest` leaves the PostgreSQL lease store out of its context scan.
+    - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=AdmissionPolicyTest,AdmissionCoordinatorTest,JdbcLeaseStoreTest,CanonicalMigrationUpgradeTest,EngineApplicationTest`:
+      `VERIFY PASSED`, 47 tests, 0 failures. `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full`: the first run failed
+      `backend-verify` (1310 tests, 5 failures and 4 errors, all in `TaskPortSelectionTest`, because its context scan picked up the new
+      PostgreSQL store without a data source); after adding the store to that scan's exclusions the run passed, 18 steps all `PASS`,
+      `VERIFY PASSED (full)`, `backend-verify` 1310 tests, 0 failures, 0 errors, 0 skipped, `backup-tests` `Ran 9 tests`, `OK
+      (skipped=1)`. `verify.sh containers` was not run, so the restore rehearsal still ran on V28 and no V29 dump and restore has been
+      rehearsed.
+    - Not proven or not built: any real model server, load or unload call, slot save and restore, diffusion interruption, unowned
+      contention, metrics, measured model profiles and the out-of-memory proof on the reference host. Nothing calls the coordinator, and
+      it has no Spring configuration or settings. A lease that expires frees its capacity in the accounting whether or not the model is
+      still resident. The capacity total is enforced in the process, not by the database, so two engines sharing one database are not
+      supported. The memory a batch member adds is not modelled. The modality order of `docs/34` section 10 (image before speech) is not
+      encoded. No weakened-copy run was made, so the tests were not shown to fail on a removed rule; the policy tests were checked against
+      the expected orders by hand before the first run.
 - [ ] P21.5 Implement the local image backend: a pinned image-worker container loading single-file safetensors checkpoints and LoRAs, with WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as catalog alternatives; prompt chunking beyond 77 tokens; default safe-content tags; step-boundary cancellation; output validation and provenance; and the `a1111-http` adapter for an owner-run Forge or A1111 server. Integrate with the P17 asset-job contract without changing authority rules.
 - [ ] P21.6 Verify and document: QA-43 and QA-44 on deterministic fixtures and on the reference host, synthetic-hardware advisor tests, custom-endpoint and secret-handling tests, the bilingual narration evaluation of the default and alternate models, license and attribution records, and the supported-defaults table for the reference host with honest limits.
 

@@ -8,6 +8,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.rpgengine.health.GameplayHealthIndicator;
+import org.rpgengine.inference.admission.JdbcLeaseStore;
 import org.rpgengine.inference.scheduling.InferenceScheduler;
 import org.rpgengine.inference.scheduling.JdbcTaskLedger;
 import org.rpgengine.inference.scheduling.MemoryTaskLedger;
@@ -37,7 +38,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
  * component scanning of the inference package, so the adapter is reached only through the neutral
  * interface; the scan replaces the PostgreSQL ledger and the PostgreSQL slot-settings store with
  * in-memory ones and leaves out the PostgreSQL session journal (the registry then records nothing)
- * because this context has no data source.
+ * and the PostgreSQL lease store, because this context has no data source.
  */
 class TaskPortSelectionTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
@@ -47,7 +48,8 @@ class TaskPortSelectionTest {
     @org.springframework.context.annotation.ComponentScan(value = "org.rpgengine.inference",
             excludeFilters = @org.springframework.context.annotation.ComponentScan.Filter(
                     type = org.springframework.context.annotation.FilterType.ASSIGNABLE_TYPE,
-                    classes = {JdbcTaskLedger.class, JdbcSessionJournal.class, JdbcSlotSettingsStore.class}))
+                    classes = {JdbcTaskLedger.class, JdbcSessionJournal.class, JdbcSlotSettingsStore.class,
+                            JdbcLeaseStore.class}))
     static class Scan {
         @org.springframework.context.annotation.Bean
         TaskLedger ledger() {

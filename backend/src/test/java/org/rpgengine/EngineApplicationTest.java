@@ -32,7 +32,7 @@ class EngineApplicationTest {
     @Autowired
     private Flyway flyway;
 
-    /** Tables created by V1–V27, sorted by name; identifiers are constants, never user input. */
+    /** Tables created by V1–V29, sorted by name; identifiers are constants, never user input. */
     private static final List<String> CANONICAL_TABLES = List.of(
             "actor", "actor_commitment", "actor_condition", "actor_resource", "actor_sighting", "adventure_workspace", "ai_job", "ai_job_attempt", "ai_session_record", "campaign", "campaign_checkpoint", "campaign_creation", "campaign_event",
             "campaign_known_fact", "campaign_known_quest", "campaign_mutation_lease", "campaign_random_seed",
@@ -40,7 +40,7 @@ class EngineApplicationTest {
             "operation_random_draw",
             "plan_activation", "plan_admission", "plan_dependency", "plan_disposition", "planning_snapshot",
             "presentation_campaign_settings", "presentation_event", "presentation_job", "query_epoch", "quest_objective", "quest_plan_artifact", "quest_state",
-            "reward_settlement");
+            "resource_lease", "reward_settlement");
 
     /** Construct the framework-managed test fixture; injection failures fail setup. */
     EngineApplicationTest() {

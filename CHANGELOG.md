@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — GPU and RAM admission coordinator core (P21.4-A), 31 October 2026
+
+- The engine has a coordinator that decides which local text, image or speech model may be resident next within a fixed GPU and RAM
+  budget: interactive work first, background work ageing but never overtaking it, equal work rotating across modalities and
+  campaigns, compatible requests sharing one resident model, and background leases named for taking back when interactive work waits.
+- Leases expire unless renewed and are recorded in the new `resource_lease` table (migration V29). After a restart the leases of the
+  earlier process stay reserved until a caller confirms their model is gone. The backup tool now expects schema version 29 and the
+  new table.
+- Nothing calls the coordinator yet: it loads and unloads no model, interrupts no image run, measures nothing and is not tied to the
+  text scheduler or the adapters. No out-of-memory protection is claimed.
+
 ## Unreleased — Settings → Models panel (P21.3-D), 31 October 2026
 
 - Settings now has a Models section for the installation owner. For each of the four slots (light, standard and deliberate text, and
