@@ -60,7 +60,10 @@ error codes (a closed table; unknown codes use one generic sentence), operation
 statuses, receipt lines with named placeholders (`path`, `kind`, `resource`, `before`,
 `after`, ...), narration and stream-reset reasons, command labels and the source-language
 fallback notice. Numbers are formatted for the compiled locale only; resource keys and
-destinations stay literal identifiers. `npm run check:i18n` now reports 433 messages. The [review kit](../../../docs/36-italian-and-screen-reader-review-kit.md)
+destinations stay literal identifiers. The Settings → Models panel (`src/app/models/`, P21.3-D) adds 82 `models.*` messages, so
+`npm run check:i18n` now reports 515 messages; backend and model names stay literal and the refusal table in `models-messages.ts`
+is checked against the backend codes by `python tools/repository_checks/checks.py localization`. Those 82 targets had one author pass
+and no independent review, and they are not yet in the review kit table. The [review kit](../../../docs/36-italian-and-screen-reader-review-kit.md)
 lists every Italian target with its English source for the independent review and holds the screen-reader script; its
 first-pass fixes are by the same author line and are not independent.
 The Italian targets of those 77 messages (plus the

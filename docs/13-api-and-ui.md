@@ -193,7 +193,7 @@ schema versions for persisted/imported data.
 | `GET /api/v1/campaigns/{id}/resume` | Short factual resume card (P09.5) | No advancement or write; shows missing pinned content and the mutation pause |
 | `GET /api/v1/runtime/status` | Selected narration runtime (Codex or Claude), version, account and model readiness | No credentials or raw RPC identifiers; read-only, the runtime is changed through the launcher (ADR 0020) |
 | `GET /api/v1/models/status` | Slots, assigned backends and models, billing and privacy classes, probe results, hardware profile and admission state | No keys or endpoint credentials; read-only. Implemented (P21.3-A) for the four slots, their class badges, fallbacks, acknowledgements and last probe; the hardware profile and admission state are not part of it yet |
-| `PUT /api/v1/settings/models` | Owner-only slot assignment and same-class fallback lists | Validates; a class change needs acknowledgement; keys are never accepted here (ADR 0021). Implemented (P21.3-A) without an audit trail; saving a changed assignment clears its probe result and retires the AI sessions bound to that slot, leaving other slots' sessions open (P21.3-B) |
+| `PUT /api/v1/settings/models` | Owner-only slot assignment and same-class fallback lists | Validates; a class change needs acknowledgement; keys are never accepted here (ADR 0021). Implemented (P21.3-A) without an audit trail; saving a changed assignment clears its probe result and retires the AI sessions bound to that slot, leaving other slots' sessions open (P21.3-B). A 409 `CLASS_ACKNOWLEDGEMENT_REQUIRED` carries `from` and `to`; the Settings → Models panel (P21.3-D) holds the request and repeats it with `acknowledgeClass` after the owner confirms |
 | `POST /api/v1/models/probe` | Run the readiness probe of one stored slot assignment and record the result (P21.3-A) | Owner-only; sends no task content; 404 `MODEL_SLOT_NOT_ASSIGNED` for a slot with no saved assignment |
 | `PUT /api/v1/preferences` | Reading, sound, routing, renewal preferences | No game effects |
 | `POST /api/v1/campaigns/{id}/exports` | Create full-owner or player-facing export | Explicit audience selection |
@@ -514,7 +514,7 @@ remains P06, catalog locale resolution and bilingual UI remain P05.6.
 | Journal/world | Known quests, discoveries, map knowledge, promises, event history |
 | Combat | Initiative, active actor, AP/reactions, zones, legal actions, targets, consequences and persistent dialogue/action chat |
 | Advancement | Pending entitlements, legal purchases, cost/effect preview |
-| Settings | Reading, theme, sound, narration-runtime readiness (the selected runtime is shown; it is changed through the launcher), the Models panel (advisor presets, per-slot backend and model, probe results, class badges, budgets), routing, context renewal |
+| Settings | Reading, theme, sound, narration-runtime readiness (the selected runtime is shown; it is changed through the launcher), the Models panel (implemented in P21.3-D: per-slot backend, model, effort and fallbacks, probe results, class badges and the class-change acknowledgement; advisor presets and budgets are not part of it yet), routing, context renewal |
 | Author/owner tools | Validation, export, restore/correction previews, credits and diagnostics |
 
 ## 6. Interface direction

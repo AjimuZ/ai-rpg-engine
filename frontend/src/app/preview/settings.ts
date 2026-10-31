@@ -1,12 +1,13 @@
 /** Local reading and language controls; compiled variants reload only after preview persistence checks pass. */
 import { afterNextRender, ChangeDetectionStrategy, Component, ElementRef, inject } from '@angular/core';
+import { ModelsPanel } from '../models/models-panel';
 import { PreviewState } from './preview-state';
 import { RouterLink } from '@angular/router';
 import { UiLanguage } from './ui-language';
 
 /** Apply validated reading/language preferences; invalid events are ignored and persistence failures remain visible. */
 @Component({
-  selector: 'app-settings', imports: [RouterLink], changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-settings', imports: [ModelsPanel, RouterLink], changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<section class="panel narrow"><h1 i18n="@@settings.title">Settings</h1><h2 i18n="@@settings.reading">Reading</h2>
     <label for="text-size" i18n="@@settings.textSize">Story text size</label>
     <select id="text-size" (change)="changeSize($event)">
@@ -28,6 +29,7 @@ import { UiLanguage } from './ui-language';
     } @else { <p i18n="@@settings.languagePending">Language selection is available in the English and Italian review variants. Packaged language delivery is still pending.</p> }
     <p id="language-status" role="status">{{ languageMessages[language.notice()] }}</p>
     <h2 i18n="@@settings.sound">Sound and appearance</h2><p i18n="@@settings.noAudio">No audio is loaded. Motion is disabled in this preview.</p>
+    <app-models-panel />
     <h2 i18n="@@settings.runtime">Runtime</h2><p i18n="@@settings.noRuntime">No campaign or narration service is connected.</p>
     <h2 i18n="@@settings.credits">Credits</h2><p i18n="@@settings.rights">Original scene, speaker and item vector illustrations, icons, frames and control geometry. Copyright 2026 Azim Ben Othman; distributed under the project MIT license. System fonts; no external media requests.</p>
     <p><a routerLink="/interface-kit" i18n="@@settings.kit">Review interface graphic kit</a> · <a href="/ui/README.md" i18n="@@settings.sources">Asset sources and provenance</a> · <a href="/ui/LICENSE.txt" i18n="@@settings.license">MIT license</a></p>

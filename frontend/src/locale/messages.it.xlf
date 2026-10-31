@@ -3837,5 +3837,743 @@
       <target>Nessun audio per questa battuta.</target>
       </segment>
     </unit>
+    <unit id="models.error.admissionDenied">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:13</note>
+      </notes>
+      <segment>
+        <source>This browser session is not allowed to change model settings. Reload the page and try again.</source>
+      <target>Questa sessione del browser non può modificare le impostazioni dei modelli. Ricarica la pagina e riprova.</target>
+      </segment>
+    </unit>
+    <unit id="models.error.storageUnavailable">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:14</note>
+      </notes>
+      <segment>
+        <source>Model settings could not be read or saved. Nothing was changed; try again later.</source>
+      <target>Le impostazioni dei modelli non possono essere lette o salvate. Non è stato modificato nulla; riprova più tardi.</target>
+      </segment>
+    </unit>
+    <unit id="models.error.malformed">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:15</note>
+      </notes>
+      <segment>
+        <source>The assignment was not in a form the engine accepts. Check each field and try again.</source>
+      <target>L’assegnazione non ha una forma accettata dal motore. Controlla ogni campo e riprova.</target>
+      </segment>
+    </unit>
+    <unit id="models.error.tooLarge">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:16</note>
+      </notes>
+      <segment>
+        <source>The assignment is too large. Nothing was saved.</source>
+      <target>L’assegnazione è troppo grande. Non è stato salvato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="models.error.slotNotAssigned">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:17</note>
+      </notes>
+      <segment>
+        <source>Assign a model to this slot before checking it.</source>
+      <target>Assegna un modello a questo slot prima di controllarlo.</target>
+      </segment>
+    </unit>
+    <unit id="models.error.acknowledgementRequired">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:18</note>
+      </notes>
+      <segment>
+        <source>Changing the class of a slot needs your acknowledgement. Nothing was saved.</source>
+      <target>Cambiare la classe di uno slot richiede la tua conferma esplicita. Non è stato salvato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="models.error.backendUnsupported">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:19</note>
+      </notes>
+      <segment>
+        <source>This backend cannot serve this slot.</source>
+      <target>Questo backend non può servire questo slot.</target>
+      </segment>
+    </unit>
+    <unit id="models.error.modelInvalid">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:20</note>
+      </notes>
+      <segment>
+        <source>The model or the effort is not a valid identifier. Nothing was saved.</source>
+      <target>Il modello o il livello di impegno non è un identificatore valido. Non è stato salvato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="models.error.classDeclarationInvalid">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:21</note>
+      </notes>
+      <segment>
+        <source>A custom endpoint needs a declared class of local or metered, and no other backend takes one. Nothing was saved.</source>
+      <target>Un endpoint personalizzato richiede una classe dichiarata, locale o a consumo, e nessun altro backend ne accetta una. Non è stato salvato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="models.error.fallbackInvalid">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:22</note>
+      </notes>
+      <segment>
+        <source>A fallback is invalid or repeated, or there are more than four. Nothing was saved.</source>
+      <target>Un’alternativa di riserva non è valida o è ripetuta, oppure ce ne sono più di quattro. Non è stato salvato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="models.error.fallbackClassCrossing">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:23</note>
+      </notes>
+      <segment>
+        <source>A fallback must stay in the same class as the main assignment. Nothing was saved.</source>
+      <target>Un’alternativa di riserva deve restare nella stessa classe dell’assegnazione principale. Non è stato salvato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="models.error.generic">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:32</note>
+      </notes>
+      <segment>
+        <source>The change was not accepted. Nothing was saved; check the fields and try again.</source>
+      <target>La modifica non è stata accettata. Non è stato salvato nulla; controlla i campi e riprova.</target>
+      </segment>
+    </unit>
+    <unit id="models.failure.denied">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:39</note>
+      </notes>
+      <segment>
+        <source>This browser session is not allowed to use model settings. Reload the page; only the installation owner can open them.</source>
+      <target>Questa sessione del browser non può usare le impostazioni dei modelli. Ricarica la pagina; solo il proprietario dell’installazione può aprirle.</target>
+      </segment>
+    </unit>
+    <unit id="models.failure.unconfigured">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:40</note>
+      </notes>
+      <segment>
+        <source>This installation has no owner configured, so model settings are unavailable.</source>
+      <target>Questa installazione non ha un proprietario configurato, quindi le impostazioni dei modelli non sono disponibili.</target>
+      </segment>
+    </unit>
+    <unit id="models.failure.invalid">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:41</note>
+      </notes>
+      <segment>
+        <source>The engine sent model settings in a form this page does not understand. Nothing was changed.</source>
+      <target>Il motore ha inviato impostazioni dei modelli in una forma che questa pagina non comprende. Non è stato modificato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="models.failure.unavailable">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:42</note>
+      </notes>
+      <segment>
+        <source>Model settings could not be reached. Nothing was changed; try again.</source>
+      <target>Le impostazioni dei modelli non sono raggiungibili. Non è stato modificato nulla; riprova.</target>
+      </segment>
+    </unit>
+    <unit id="models.slot.light">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:49</note>
+      </notes>
+      <segment>
+        <source>Light text</source>
+      <target>Testo leggero</target>
+      </segment>
+    </unit>
+    <unit id="models.slot.standard">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:50</note>
+      </notes>
+      <segment>
+        <source>Standard text</source>
+      <target>Testo standard</target>
+      </segment>
+    </unit>
+    <unit id="models.slot.deliberate">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:51</note>
+      </notes>
+      <segment>
+        <source>Deliberate text</source>
+      <target>Testo approfondito</target>
+      </segment>
+    </unit>
+    <unit id="models.slot.image">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:52</note>
+      </notes>
+      <segment>
+        <source>Images</source>
+      <target>Immagini</target>
+      </segment>
+    </unit>
+    <unit id="models.source.settings">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:59</note>
+      </notes>
+      <segment>
+        <source>Saved in settings</source>
+      <target>Salvato nelle impostazioni</target>
+      </segment>
+    </unit>
+    <unit id="models.source.environment">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:60</note>
+      </notes>
+      <segment>
+        <source>Set when the engine started</source>
+      <target>Impostato all’avvio del motore</target>
+      </segment>
+    </unit>
+    <unit id="models.source.unassigned">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:61</note>
+      </notes>
+      <segment>
+        <source>Not assigned</source>
+      <target>Non assegnato</target>
+      </segment>
+    </unit>
+    <unit id="models.class.local">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:67</note>
+      </notes>
+      <segment>
+        <source>Local</source>
+      <target>Locale</target>
+      </segment>
+    </unit>
+    <unit id="models.class.subscription">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:68</note>
+      </notes>
+      <segment>
+        <source>Subscription</source>
+      <target>Abbonamento</target>
+      </segment>
+    </unit>
+    <unit id="models.class.metered">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:69</note>
+      </notes>
+      <segment>
+        <source>Metered</source>
+      <target>A consumo</target>
+      </segment>
+    </unit>
+    <unit id="models.class.unknown">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:70</note>
+      </notes>
+      <segment>
+        <source>Not known</source>
+      <target>Non nota</target>
+      </segment>
+    </unit>
+    <unit id="models.billing.free">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:77</note>
+      </notes>
+      <segment>
+        <source>Free; uses your own hardware</source>
+      <target>Gratuito; usa il tuo hardware</target>
+      </segment>
+    </unit>
+    <unit id="models.billing.plan">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:78</note>
+      </notes>
+      <segment>
+        <source>Counts against your plan limits</source>
+      <target>Rientra nei limiti del tuo piano</target>
+      </segment>
+    </unit>
+    <unit id="models.billing.perUse">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:79</note>
+      </notes>
+      <segment>
+        <source>Billed per use by the vendor</source>
+      <target>Fatturato a consumo dal fornitore</target>
+      </segment>
+    </unit>
+    <unit id="models.privacy.thisMachine">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:86</note>
+      </notes>
+      <segment>
+        <source>Prompts stay on this machine</source>
+      <target>Le richieste restano su questo computer</target>
+      </segment>
+    </unit>
+    <unit id="models.privacy.runtimeVendor">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:87</note>
+      </notes>
+      <segment>
+        <source>Prompts leave this machine for the runtime vendor</source>
+      <target>Le richieste lasciano questo computer e vanno al fornitore dell’ambiente di esecuzione</target>
+      </segment>
+    </unit>
+    <unit id="models.privacy.apiVendor">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:88</note>
+      </notes>
+      <segment>
+        <source>Prompts leave this machine for the API vendor</source>
+      <target>Le richieste lasciano questo computer e vanno al fornitore dell’API</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.ready">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:95</note>
+      </notes>
+      <segment>
+        <source>Ready</source>
+      <target>Pronto</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.failed">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:96</note>
+      </notes>
+      <segment>
+        <source>Not ready</source>
+      <target>Non pronto</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.unreachable">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:97</note>
+      </notes>
+      <segment>
+        <source>Unreachable</source>
+      <target>Irraggiungibile</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.notRun">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:98</note>
+      </notes>
+      <segment>
+        <source>Not checked yet</source>
+      <target>Non ancora controllato</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.code.adapterNotInstalled">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:104</note>
+      </notes>
+      <segment>
+        <source>No adapter for this backend is installed in this engine.</source>
+      <target>In questo motore non è installato alcun adattatore per questo backend.</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.code.modelNotApproved">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:105</note>
+      </notes>
+      <segment>
+        <source>This model is not on your approved list.</source>
+      <target>Questo modello non è nel tuo elenco approvato.</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.code.runtimeStarting">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:106</note>
+      </notes>
+      <segment>
+        <source>The runtime is still starting.</source>
+      <target>L’ambiente di esecuzione si sta ancora avviando.</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.code.runtimeUnavailable">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:107</note>
+      </notes>
+      <segment>
+        <source>The runtime is unavailable.</source>
+      <target>L’ambiente di esecuzione non è disponibile.</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.code.runtimeStopped">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:108</note>
+      </notes>
+      <segment>
+        <source>The runtime is stopped.</source>
+      <target>L’ambiente di esecuzione è fermo.</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.code.probeError">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:109</note>
+      </notes>
+      <segment>
+        <source>The check could not finish.</source>
+      <target>Il controllo non è stato completato.</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.code.unknown">
+      <notes>
+        <note category="location">src/app/models/models-messages.ts:115</note>
+      </notes>
+      <segment>
+        <source>The check failed for a reason this page does not know.</source>
+      <target>Il controllo non è riuscito per un motivo che questa pagina non conosce.</target>
+      </segment>
+    </unit>
+    <unit id="models.field.backend">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:79</note>
+      </notes>
+      <segment>
+        <source>Backend</source>
+      <target>Backend</target>
+      </segment>
+    </unit>
+    <unit id="models.field.model">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:80</note>
+      </notes>
+      <segment>
+        <source>Model</source>
+      <target>Modello</target>
+      </segment>
+    </unit>
+    <unit id="models.field.effort">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:81</note>
+      </notes>
+      <segment>
+        <source>Effort</source>
+      <target>Livello di impegno</target>
+      </segment>
+    </unit>
+    <unit id="models.field.class">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:83</note>
+      </notes>
+      <segment>
+        <source>Class</source>
+      <target>Classe</target>
+      </segment>
+    </unit>
+    <unit id="models.class.unknownNote">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:86,87</note>
+      </notes>
+      <segment>
+        <source>The class of an assignment set at startup is not known until you save it here.</source>
+      <target>La classe di un’assegnazione impostata all’avvio non è nota finché non la salvi qui.</target>
+      </segment>
+    </unit>
+    <unit id="models.fallbacks.title">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:88,89</note>
+      </notes>
+      <segment>
+        <source>Fallbacks</source>
+      <target>Alternative di riserva</target>
+      </segment>
+    </unit>
+    <unit id="models.fallbacks.none">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:89,91</note>
+      </notes>
+      <segment>
+        <source>No fallbacks are configured. A fallback is used only if you list it, and only within the same class.</source>
+      <target>Nessuna alternativa di riserva configurata. Un’alternativa viene usata solo se la inserisci tu, e solo nella stessa classe.</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.title">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:95,96</note>
+      </notes>
+      <segment>
+        <source>Readiness</source>
+      <target>Disponibilità</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.note">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:97,98</note>
+      </notes>
+      <segment>
+        <source>Ready means the backend lists this model. It does not show that the model answers well.</source>
+      <target>Pronto significa che il backend elenca questo modello. Non dimostra che il modello risponda bene.</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.button">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:98,100</note>
+      </notes>
+      <segment>
+        <source>Check readiness</source>
+      <target>Controlla la disponibilità</target>
+      </segment>
+    </unit>
+    <unit id="models.form.legend">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:102,103</note>
+      </notes>
+      <segment>
+        <source>Change the assignment</source>
+      <target>Modifica l’assegnazione</target>
+      </segment>
+    </unit>
+    <unit id="models.field.modelHelp">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:110,112</note>
+      </notes>
+      <segment>
+        <source>The model name exactly as the backend lists it.</source>
+      <target>Il nome del modello esattamente come lo elenca il backend.</target>
+      </segment>
+    </unit>
+    <unit id="models.field.effortHelp">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:115,117</note>
+      </notes>
+      <segment>
+        <source>Lowercase letters only, as the backend names it.</source>
+      <target>Solo lettere minuscole, come le chiama il backend.</target>
+      </segment>
+    </unit>
+    <unit id="models.field.declared">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:118,119</note>
+      </notes>
+      <segment>
+        <source>Class of this endpoint</source>
+      <target>Classe di questo endpoint</target>
+      </segment>
+    </unit>
+    <unit id="models.field.declaredChoose">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:120,121</note>
+      </notes>
+      <segment>
+        <source>Choose a class</source>
+      <target>Scegli una classe</target>
+      </segment>
+    </unit>
+    <unit id="models.field.declaredHelp">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:124,126</note>
+      </notes>
+      <segment>
+        <source>You say whether this endpoint stays on your machine or bills per use. The engine cannot check it.</source>
+      <target>Dichiari tu se questo endpoint resta sul tuo computer o è a consumo. Il motore non può verificarlo.</target>
+      </segment>
+    </unit>
+    <unit id="models.fallbacks.edit">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:126,127</note>
+      </notes>
+      <segment>
+        <source>Fallbacks in this class</source>
+      <target>Alternative di riserva nella stessa classe</target>
+      </segment>
+    </unit>
+    <unit id="models.fallbacks.add">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:145,146</note>
+      </notes>
+      <segment>
+        <source>Add a fallback</source>
+      <target>Aggiungi un’alternativa di riserva</target>
+      </segment>
+    </unit>
+    <unit id="models.form.save">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:146,148</note>
+      </notes>
+      <segment>
+        <source>Save assignment</source>
+      <target>Salva l’assegnazione</target>
+      </segment>
+    </unit>
+    <unit id="models.ack.title">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:151,152</note>
+      </notes>
+      <segment>
+        <source>Confirm the change of class</source>
+      <target>Conferma il cambio di classe</target>
+      </segment>
+    </unit>
+    <unit id="models.ack.confirm">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:154,155</note>
+      </notes>
+      <segment>
+        <source>Acknowledge and save</source>
+      <target>Conferma e salva</target>
+      </segment>
+    </unit>
+    <unit id="models.ack.cancel">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:155,158</note>
+      </notes>
+      <segment>
+        <source>Cancel</source>
+      <target>Annulla</target>
+      </segment>
+    </unit>
+    <unit id="models.acknowledged">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:207</note>
+      </notes>
+      <segment>
+        <source>You acknowledged the class <ph id="0" equiv="class" disp="name"/> on <ph id="1" equiv="at" disp="at"/>.</source>
+      <target>Hai confermato la classe <ph id="0" equiv="class" disp="name"/> il <ph id="1" equiv="at" disp="at"/>.</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.timing">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:216</note>
+      </notes>
+      <segment>
+        <source>Checked <ph id="0" equiv="when" disp="when"/> in <ph id="1" equiv="milliseconds" disp="milliseconds"/> ms.</source>
+      <target>Controllato <ph id="0" equiv="when" disp="when"/> in <ph id="1" equiv="milliseconds" disp="milliseconds"/> ms.</target>
+      </segment>
+    </unit>
+    <unit id="models.fallbacks.item">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:223</note>
+      </notes>
+      <segment>
+        <source>Fallback <ph id="0" equiv="number" disp="number"/></source>
+      <target>Alternativa di riserva <ph id="0" equiv="number" disp="number"/></target>
+      </segment>
+    </unit>
+    <unit id="models.fallbacks.remove">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:229</note>
+      </notes>
+      <segment>
+        <source>Remove fallback <ph id="0" equiv="number" disp="number"/></source>
+      <target>Rimuovi l’alternativa di riserva <ph id="0" equiv="number" disp="number"/></target>
+      </segment>
+    </unit>
+    <unit id="models.ack.change">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:236</note>
+      </notes>
+      <segment>
+        <source>This slot would change from the class <ph id="0" equiv="from" disp="from"/> to the class <ph id="1" equiv="to" disp="to"/>.</source>
+      <target>Questo slot passerebbe dalla classe <ph id="0" equiv="from" disp="from"/> alla classe <ph id="1" equiv="to" disp="to"/>.</target>
+      </segment>
+    </unit>
+    <unit id="models.form.incomplete">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:305</note>
+      </notes>
+      <segment>
+        <source>Fill in the model, the effort and every fallback. A custom endpoint also needs its class.</source>
+      <target>Compila il modello, il livello di impegno e ogni alternativa di riserva. Un endpoint personalizzato richiede anche la sua classe.</target>
+      </segment>
+    </unit>
+    <unit id="models.ack.cancelled">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:322</note>
+      </notes>
+      <segment>
+        <source>The class change was cancelled. Nothing was saved.</source>
+      <target>Il cambio di classe è stato annullato. Non è stato salvato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.running">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:330</note>
+      </notes>
+      <segment>
+        <source>Checking readiness…</source>
+      <target>Controllo della disponibilità in corso…</target>
+      </segment>
+    </unit>
+    <unit id="models.probe.finished">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:335</note>
+      </notes>
+      <segment>
+        <source>The check finished.</source>
+      <target>Il controllo è terminato.</target>
+      </segment>
+    </unit>
+    <unit id="models.form.saving">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:363</note>
+      </notes>
+      <segment>
+        <source>Saving the assignment…</source>
+      <target>Salvataggio dell’assegnazione in corso…</target>
+      </segment>
+    </unit>
+    <unit id="models.form.saved">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:369</note>
+      </notes>
+      <segment>
+        <source>The assignment was saved.</source>
+      <target>L’assegnazione è stata salvata.</target>
+      </segment>
+    </unit>
+    <unit id="models.ack.needed">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:372</note>
+      </notes>
+      <segment>
+        <source>This change needs your acknowledgement. Nothing was saved yet.</source>
+      <target>Questa modifica richiede la tua conferma. Non è stato ancora salvato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="models.title">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:396,397</note>
+      </notes>
+      <segment>
+        <source>Models</source>
+      <target>Modelli</target>
+      </segment>
+    </unit>
+    <unit id="models.intro">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:398,399</note>
+      </notes>
+      <segment>
+        <source>Choose which model serves each task slot. This panel stores names only: it never shows or asks for a key or an address. Changing the class of a slot, which sets who receives your prompts and who bills you, needs your acknowledgement.</source>
+      <target>Scegli quale modello serve ogni slot di attività. Questo pannello salva solo nomi: non mostra né chiede mai una chiave o un indirizzo. Cambiare la classe di uno slot, che stabilisce chi riceve le tue richieste e chi ti addebita i costi, richiede la tua conferma.</target>
+      </segment>
+    </unit>
+    <unit id="models.loading">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:400,401</note>
+      </notes>
+      <segment>
+        <source>Loading the model slots…</source>
+      <target>Caricamento degli slot dei modelli…</target>
+      </segment>
+    </unit>
+    <unit id="models.retry">
+      <notes>
+        <note category="location">src/app/models/models-panel.ts:403,404</note>
+      </notes>
+      <segment>
+        <source>Try again</source>
+      <target>Riprova</target>
+      </segment>
+    </unit>
   </file>
 </xliff>

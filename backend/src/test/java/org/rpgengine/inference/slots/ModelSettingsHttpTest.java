@@ -71,6 +71,27 @@ class ModelSettingsHttpTest {
     }
 
     @Test
+    void aWriteWithTheWrongOriginOrCsrfProofIsRefusedAndStoresNothing() throws Exception {
+        String valid = "{\"slot\":\"text.light\",\"backend\":\"local\",\"model\":\"gemma\",\"effort\":\"low\"}";
+        String session = "Content-Type: application/json\r\nCookie: " + cookie + "\r\n";
+        String[] refusedHeaders = {
+                // Another origin, even with the session cookie and the proof.
+                "Origin: http://evil.example:8080\r\nX-CSRF-Token: " + csrf + "\r\n" + session,
+                // The right origin with the cookie but a wrong proof.
+                "Origin: http://127.0.0.1:8080\r\nX-CSRF-Token: not-the-proof\r\n" + session,
+                // The right origin and proof but no session cookie.
+                "Origin: http://127.0.0.1:8080\r\nX-CSRF-Token: " + csrf + "\r\nContent-Type: application/json\r\n"};
+        for (String headers : refusedHeaders) {
+            assertThat(exchange("PUT", "/api/v1/settings/models", valid, headers).status()).isEqualTo(403);
+            assertThat(exchange("POST", "/api/v1/models/probe", "{\"slot\":\"text.light\"}", headers).status()).isEqualTo(403);
+        }
+        assertThat(exchange("GET", "/api/v1/models/status", "", "Origin: http://evil.example:8080\r\nCookie: " + cookie
+                + "\r\n").status()).isEqualTo(403);
+        assertThat(exchange("GET", "/api/v1/models/status", "", "Cookie: " + cookie + "\r\n").status()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("select count(*) from inference_slot_setting", Integer.class)).isZero();
+    }
+
+    @Test
     void statusListsFourUnassignedSlotsFirst() throws Exception {
         var reply = exchange("GET", "/api/v1/models/status", "", headers());
         assertThat(reply.status()).isEqualTo(200);

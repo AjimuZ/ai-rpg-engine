@@ -20,7 +20,8 @@ The P05.6 roadmap box stays unchecked until a reviewer fills sections 2 and 4 an
 
 - Review the Italian text in section 2 against its English source. The source is authoritative; the
   catalog is `frontend/src/locale/messages.it.xlf` (433 units at the time of writing, checked by
-  `npm run check:i18n`). Write the verdict in the last column of each row: `OK`, or the change you ask for
+  `npm run check:i18n`; since P21.3-D the catalog has 515, and the 82 `models.*` units of the Settings → Models panel are
+  not in the section 2 table yet and need adding before the review). Write the verdict in the last column of each row: `OK`, or the change you ask for
   with a reason. Mark a row `?` when the meaning depends on context you cannot see.
 - Placeholders such as `{INTERPOLATION}`, `{path}` or `{day}` are values inserted at runtime. Their order may
   change in Italian; their number and names may not. `{VAR_PLURAL, plural, ...}` is an ICU plural. `<pc></pc>`

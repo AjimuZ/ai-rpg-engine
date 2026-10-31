@@ -329,24 +329,54 @@ class ImagePinTest(unittest.TestCase):
 
 
 class LocalizationCodeTest(unittest.TestCase):
-    """Campaign error codes must stay explained in the browser interface."""
+    """Campaign and model settings error codes must stay explained in the browser interface."""
 
     MESSAGES = "  COMMAND_INVALID: () => $localize`x`,\n  STREAM_CAPACITY_EXCEEDED: () => $localize`y`,\n"
+    MODEL_MESSAGES = "  MODEL_SLOT_NOT_ASSIGNED: () => $localize`x`,\n  FALLBACK_CLASS_CROSSING: () => $localize`y`,\n"
 
-    def _repository(self, controller: str, messages: str | None) -> Path:
-        """Build a minimal fixture repository under scratch with one controller and optional messages."""
+    def _write(self, root: Path, name: str, content: str) -> None:
+        """Write one fixture file, creating its directory."""
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+
+    def _repository(self, controller: str, messages: str | None, model_controller: str = "",
+                    model_messages: str | None = MODEL_MESSAGES) -> Path:
+        """Build a minimal fixture repository under scratch with the controllers and optional message modules."""
         SCRATCH.mkdir(parents=True, exist_ok=True)
         root = Path(tempfile.mkdtemp(dir=SCRATCH))
         self.addCleanup(shutil.rmtree, root, True)
         for name in checks.CAMPAIGN_CONTROLLERS:
-            target = root / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(controller, encoding="utf-8")
+            self._write(root, name, controller)
+        for name in checks.MODELS_CONTROLLERS:
+            self._write(root, name, model_controller)
         if messages is not None:
-            target = root / checks.CAMPAIGN_MESSAGES
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(messages, encoding="utf-8")
+            self._write(root, checks.CAMPAIGN_MESSAGES, messages)
+        if model_messages is not None:
+            self._write(root, checks.MODELS_MESSAGES, model_messages)
         return root
+
+    def test_model_settings_codes_need_a_message_too(self) -> None:
+        """A new owner API code without a panel sentence is a finding naming file and line, never the code."""
+        good = 'return error(404, "MODEL_SLOT_NOT_ASSIGNED");\nthrow new Invalid("FALLBACK_CLASS_CROSSING");\n'
+        self.assertEqual([], checks.check_localization(self._repository("", self.MESSAGES, good)))
+        bad = good + 'return error(409, "SLOT_NEW_FAILURE");\n'
+        findings = checks.check_localization(self._repository("", self.MESSAGES, bad))
+        self.assertEqual(len(checks.MODELS_CONTROLLERS), len(findings))
+        self.assertTrue(all(":3: error code has no localized browser message" in item for item in findings))
+        self.assertFalse(any("SLOT_NEW_FAILURE" in item for item in findings))
+        # Lowercase literals such as a file name or a probe code are not public error codes.
+        self.assertEqual([], checks.check_localization(self._repository(
+            "", self.MESSAGES, 'parser.parse("model-settings.json", body); return "adapter-not-installed";\n')))
+
+    def test_missing_model_files_cannot_disable_the_check(self) -> None:
+        """A moved panel message module or owner controller is itself reported."""
+        self.assertEqual(["%s:1: model settings message module is missing" % checks.MODELS_MESSAGES],
+                         checks.check_localization(self._repository("", self.MESSAGES, model_messages=None)))
+        root = self._repository("", self.MESSAGES)
+        (root / checks.MODELS_CONTROLLERS[1]).unlink()
+        self.assertEqual(["%s:1: model settings controller is missing" % checks.MODELS_CONTROLLERS[1]],
+                         checks.check_localization(root))
 
     def test_mapped_codes_pass_and_unmapped_codes_are_reported(self) -> None:
         """A new controller code without a message is a finding naming file and line, never the code."""

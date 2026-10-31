@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Settings → Models panel (P21.3-D), 31 October 2026
+
+- Settings now has a Models section for the installation owner. For each of the four slots (light, standard and deliberate text, and
+  images) it shows where the assignment comes from, the backend, model and effort, the billing and privacy class with what each means,
+  the configured fallbacks and the last readiness check, and lets the owner change the assignment, edit up to four same-class
+  fallbacks and run a readiness check.
+- A change that moves a slot to another class is held until the owner acknowledges it; the panel names both classes and says who
+  would receive the prompts and who bills. Cancelling stores nothing. The panel shows names only: it has no field for a key or an
+  address.
+- Every control is a native form field or button, so the panel works by keyboard alone. The panel and its 82 new strings exist in
+  English and Italian; the Italian wording has had one author pass and no independent review.
+- Most backends the panel offers have no adapter yet, so checking them answers that no adapter is installed. The initial interface
+  bundle is now 515 kB, above its 500 kB warning limit. The backend routes are those of P21.3-A; one test was added for refused
+  writes.
+
 ## Unreleased — Gateway budgets for metered destinations (P21.3-C.2), 31 October 2026
 
 - A destination in the gateway's allowlist can now have a `budget` with a daily and a monthly cap. A reached cap answers 429 with

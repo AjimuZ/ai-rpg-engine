@@ -129,5 +129,21 @@ summary { cursor: pointer; color: var(--focus); padding: .4rem 0; }
 .quick-replies button { white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .composer-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
 
+/* Settings → Models: each slot is a bordered group; busy buttons stay focusable and say so with aria-disabled. */
+.model-slot { border: 1px solid var(--line); border-radius: .4rem; padding: 1rem; margin: 1rem 0; }
+.model-slot h3 { margin: 0 0 .25rem; }
+.model-slot h4 { margin: 1rem 0 .25rem; }
+.model-facts { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; margin: .5rem 0; }
+.model-facts dd { margin: 0; }
+.model-badge { margin: .25rem 0; padding-left: 1.25rem; }
+.model-form, .model-fallback { border: 0; padding: 0; margin: .5rem 0; min-width: 0; }
+.model-form legend { font-weight: 650; padding: 0; }
+.model-fallback { border-top: 1px solid var(--line); padding-top: .5rem; }
+.model-slot button { margin: .75rem .6rem 0 0; }
+.model-acknowledge { border: 2px solid var(--accent); border-radius: .4rem; padding: 1rem; margin: 1rem 0; }
+button[aria-disabled="true"] { opacity: .65; cursor: progress; }
+[data-notice] { min-height: 1.5em; }
+[data-notice].error { color: #ffb4a8; }
+
 /* Apply kit state overrides after baseline element styles so media and invalid states win. */
 @include ui-kit.theme;

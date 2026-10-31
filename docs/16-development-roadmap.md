@@ -3174,7 +3174,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
         themselves are not taken: no metric of any model exists, and the catalog's `measured` stays `null`.
     - Remaining for P21.2: launcher selection of the service, a real fetch of the default model, running these probes against
       a loaded model, and the measurements. The box stays unchecked.
-- [ ] P21.3 Implement slot assignment and the remaining backend adapters behind the runtime-neutral task port: independent `light`, `standard`, `deliberate` and `image` slots, readiness probes with visible results, billing and privacy class badges with acknowledgement on a class change, same-class fallback lists only when configured, per-slot session retirement, and the `gateway` service for owner-key hosted APIs and allowlisted custom endpoints (keys as runtime-only secrets, budgets, bounded redirects and sizes). Expose `GET /api/v1/models/status`, the owner-only settings API and the Settings → Models panel.
+- [x] P21.3 Implement slot assignment and the remaining backend adapters behind the runtime-neutral task port: independent `light`, `standard`, `deliberate` and `image` slots, readiness probes with visible results, billing and privacy class badges with acknowledgement on a class change, same-class fallback lists only when configured, per-slot session retirement, and the `gateway` service for owner-key hosted APIs and allowlisted custom endpoints (keys as runtime-only secrets, budgets, bounded redirects and sizes). Expose `GET /api/v1/models/status`, the owner-only settings API and the Settings → Models panel.
   - Partial progress (31 October 2026, P21.3-A): the four slots, class badges, class-change acknowledgement, configured same-class
     fallbacks and stored readiness probes exist in the backend. The P21.3 box stays unchecked: the gateway, the Settings → Models
     panel, per-slot session retirement and the other adapters are not built.
@@ -3369,6 +3369,59 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       is shown by a new gateway on the same file and by a recreated container after a clean stop. Volume ownership was seen only on Docker Desktop
       on the reference host, so native Linux is unverified, and hosted CI has not run this change. No launcher command recovers from a damaged file
       or shows the counts. No weakened-copy run was made, so the new tests were not shown to fail on a removed check.
+  - Partial progress (31 October 2026, P21.3-D): the Settings → Models panel exists in the interface, over the owner routes of P21.3-A
+    (`GET /api/v1/models/status`, `PUT /api/v1/settings/models`, `POST /api/v1/models/probe`), which this task did not change. The P21.3 box
+    stays unchecked: the launcher's key command, the protocol behavior of the gateway, and the `claude`, `openai-compatible`,
+    `anthropic-api`, `a1111-http`, `openai-images` and `local-image` adapters are not built, so most backends the panel offers have no
+    adapter and a probe of them answers `adapter-not-installed`.
+    - Added: `frontend/src/app/models/` (`models-client.ts`: strict validation of every reply, CSRF-protected writes, one session renewal
+      after a 403, typed failures; `models-messages.ts`: the closed table of refusal codes, class, billing, privacy and probe wording;
+      `models-panel.ts`: `ModelsPanel` and `ModelSlotCard`; `models-fixtures.ts`: a simulated owner server for specs), the section in
+      `preview/settings.ts` and a few rules in `styles.scss`. Per slot the panel shows the source of the assignment, backend, model and
+      effort, the class badge with its billing and privacy lines, the stored acknowledgement, the configured fallbacks and the last
+      probe, and offers a form (backend, model, effort, the class of a custom endpoint, up to four fallbacks), a readiness button and
+      the acknowledgement step. A 409 `CLASS_ACKNOWLEDGEMENT_REQUIRED` holds the request, names both classes with the new class's billing and
+      privacy, moves focus to the explanation heading (not to a confirming button) and repeats the exact request with `acknowledgeClass` only
+      after "Acknowledge and save"; any edit or Cancel withdraws it. Busy buttons use `aria-disabled` so keyboard focus is kept. The panel
+      has no field for a key or an address, and its request body is a closed set of identifier fields.
+    - Strings: 82 new `models.*` messages, all with Italian targets (catalog 433 to 515 units). The repository `localization` check now also
+      requires every `MODEL_*`, `SLOT_*`, `FALLBACK_*`, `CLASS_*` and `LOCAL_*` code literal in `ModelSettingsController.java` and
+      `SlotSetting.java` to be a key of `ERRORS` in `models-messages.ts`, with two new cases in `test_checks.py`. The Italian targets had one
+      author pass and have not had independent review; the 82 units are not yet in the review kit table of
+      `docs/36-italian-and-screen-reader-review-kit.md`.
+    - Owner-only: the three routes already returned 403 without admission (`theRoutesRefuseARequestWithoutAdmission`). Added the backend case
+      `aWriteWithTheWrongOriginOrCsrfProofIsRefusedAndStoresNothing` (wrong origin, wrong proof, missing cookie on PUT and POST, and a wrong
+      origin on GET: all 403, no row stored). The panel shows a sentence for a denied session, an unconfigured owner and an outage, with a
+      retry button.
+    - Commands and results on the reference host (Git Bash), from `frontend/`: `npm run typecheck`: no error. `npm run check:i18n`:
+      `Localization parity: 515 reviewed messages`. `npm test`: 19 test files, 156 tests passed (was 17 files, 132), 24 of them new:
+      `models-client.spec.ts` 8, `models-panel.spec.ts` 15, and 1 in `italian-variant.spec.ts`, which now renders the panel in Italian with a
+      status fixture, checks the held class change text, the generic sentence for an unknown probe code and for `constructor`, and the absence
+      of English leftovers and unnamed controls. `npm run build`: succeeded, with the warning `bundle initial exceeded maximum budget`
+      (515.02 kB against the 500 kB warning limit; the error limit is 1 MB). Browser, keyboard only, headless Chrome from the host:
+      `node ../.local/scratch/models-keyboard.mjs` after `npm run build` (the script serves `frontend/dist/engine-ui/browser` and a small
+      stand-in for the three routes from its own process, and stays in the ignored `.local/scratch/`): 19 of 19 checks passed. Tab alone reached
+      the standard slot's backend select (13 presses); typing chose `codex`, Tab reached model and effort, Enter sent one PUT and the class
+      change was held with nothing stored; focus sat on the explanation heading; Tab reached "Acknowledge and save" and Enter repeated the PUT
+      with `acknowledgeClass: subscription`; Space on the readiness button probed once; in the light slot a second held change was cancelled
+      with Tab and Enter, stored nothing and returned focus to that slot's save button; axe found no violation inside the panel; the only console
+      errors were the two expected 409 answers.
+    - Not proven: the browser journey ran against a stand-in server written for it, not the Spring backend, and the packaged stack was not
+      started, so page and backend were never exercised together. Only English was driven in a browser; Italian is covered by the jsdom spec.
+      No screen reader was used, and an accessibility tree or axe report is not a screen-reader review. The Italian wording is unreviewed by
+      an independent speaker. The `models.*` units are missing from the review kit table. The panel cannot set a budget, a key or an allowlisted
+      endpoint, because those belong to the gateway files and the launcher key command that do not exist yet. The initial bundle now exceeds
+      its 500 kB warning limit. The two cases added to `test_checks.py` ran only inside `verify.sh`. No weakened-copy run was made, so the
+      new tests were not shown to fail on a removed check; the first `full` run did fail the repository checks on a fixture constant that
+      looked like a credential and on a heading anchor, both fixed before the run below.
+    - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full`, last run: 18 steps, all `PASS` (including `repository-checks`,
+      `repository-tests` with 40 tests in the run that first failed on the two findings above, `frontend-test`, `frontend-i18n`,
+      `frontend-locales` and `backend-verify`), `VERIFY PASSED (full)`. `backend-verify`: 1267 tests, 0 failures, 0 errors, 0 skipped, `BUILD
+      SUCCESS`, of which `ModelSettingsHttpTest` ran 9 (8 before this task). That run covered all code and test files of this task; the edits
+      after it touched documentation only (this entry, the P21.3 box restored to unchecked, and `docs/34`), and `"C:/Program
+      Files/Git/bin/bash.exe" .agents/ralph/verify.sh repo` passed after them (`diff-check`, `line-endings`, `repository-checks`,
+      `repository-tests` and `backup-tests` all `PASS`, `VERIFY PASSED (repo)`). `verify.sh containers` was not run, because no container
+      file changed.
 - [ ] P21.4 Implement the shared GPU and RAM admission coordinator for text, image and speech: priorities, leases using the model server's documented load and unload endpoints and slot save and restore, batching, interruption between diffusion steps, unowned-contention handling and metrics. Prove no engine-caused out-of-memory on the reference host.
 - [ ] P21.5 Implement the local image backend: a pinned image-worker container loading single-file safetensors checkpoints and LoRAs, with WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as catalog alternatives; prompt chunking beyond 77 tokens; default safe-content tags; step-boundary cancellation; output validation and provenance; and the `a1111-http` adapter for an owner-run Forge or A1111 server. Integrate with the P17 asset-job contract without changing authority rules.
 - [ ] P21.6 Verify and document: QA-43 and QA-44 on deterministic fixtures and on the reference host, synthetic-hardware advisor tests, custom-endpoint and secret-handling tests, the bilingual narration evaluation of the default and alternate models, license and attribution records, and the supported-defaults table for the reference host with honest limits.

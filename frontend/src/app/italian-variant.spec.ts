@@ -22,7 +22,7 @@
  * inline elements the catalog uses (`ph`, `pc`, ICU text); a wrong placeholder name makes
  * `$localize` throw, so a serializer mismatch fails loudly instead of rendering English.
  */
-import { registerLocaleData } from '@angular/common';
+import { formatDate, registerLocaleData } from '@angular/common';
 import italianLocaleData from '@angular/common/locales/it';
 import { LOCALE_ID } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -286,7 +286,7 @@ async function application() {
   return {
     ...await import('./app'), ...await import('./app.routes'), ...await import('./campaign/campaign-messages'),
     ...await import('./campaign/campaign-view'), ...await import('./campaign/campaign-session'), ...await import('./campaign/campaign-protocol'),
-    ...await import('./library/saved-library-client'), ...await import('./preview/story-input-state'),
+    ...await import('./library/saved-library-client'), ...await import('./models/models-messages'), ...await import('./preview/story-input-state'),
     ...await import('./preview/ui-language'), fixtures: await import('./campaign/fixtures'),
   };
 }
@@ -295,13 +295,36 @@ let modules: Awaited<ReturnType<typeof application>>;
 /** Recorded adventure reply, reused to answer the library list the transcript does not contain. */
 const RECORDED_ADVENTURE = EXCHANGES.find((entry) => entry.path === `/api/v1/adventures/${ADVENTURE}`)!.body;
 
+/** Instant and duration of the probe in the Models fixture below. */
+const PROBED_AT = '2026-10-31T10:15:00Z';
+/** Status body shaped like the real `GET /api/v1/models/status` reply: assigned, acknowledged, probed and unassigned slots. */
+const MODELS_STATUS = JSON.stringify({ slots: [
+  { slot: 'text.light', source: 'settings', backend: 'local', model: 'gemma-4', effort: 'low',
+    class: { class: 'local', billing: 'free', privacy: 'this-machine', leavesMachine: false }, fallbacks: [], acknowledged: null,
+    probe: { state: 'ready', code: null, at: PROBED_AT, elapsedMillis: 42 }, updatedAt: PROBED_AT },
+  { slot: 'text.standard', source: 'settings', backend: 'codex', model: 'model-one', effort: 'medium',
+    class: { class: 'subscription', billing: 'plan', privacy: 'runtime-vendor', leavesMachine: true },
+    fallbacks: [{ backend: 'claude', model: 'model-two', effort: 'low' }], acknowledged: { class: 'subscription', at: PROBED_AT },
+    probe: { state: 'failed', code: 'model-not-approved', at: PROBED_AT, elapsedMillis: 7 }, updatedAt: PROBED_AT },
+  { slot: 'text.deliberate', source: 'environment', backend: 'openai-compatible', model: 'model-three', effort: 'high', class: null,
+    fallbacks: [], acknowledged: null, probe: { state: 'unreachable', code: 'unheard-of-code', at: PROBED_AT, elapsedMillis: 1 }, updatedAt: null },
+  { slot: 'image', source: 'unassigned', backend: null, model: null, effort: null, class: null, fallbacks: [], acknowledged: null,
+    probe: { state: 'not-run', code: null, at: null, elapsedMillis: 0 }, updatedAt: null },
+] });
+
 /**
  * Configure the Italian variant with the replaying origin. The library list is answered with the
- * recorded adventure so the library cards render; every other request goes to the strict replay.
+ * recorded adventure so the library cards render, the model status with the fixture above, and
+ * every other request goes to the strict replay.
  */
 function configure(server: TranscriptServer): void {
+  const json = (body: string) => Promise.resolve(new Response(body, { headers: { 'Content-Type': 'application/json' } }));
   const fetcher = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => String(input).startsWith('/api/v1/adventures?')
-    ? Promise.resolve(new Response(`{"adventures":[${RECORDED_ADVENTURE}],"nextAfter":null}`, { headers: { 'Content-Type': 'application/json' } }))
+    ? json(`{"adventures":[${RECORDED_ADVENTURE}],"nextAfter":null}`)
+    : String(input) === '/api/v1/models/status' ? json(MODELS_STATUS)
+    // Any save is answered like the real server answers a class change that was not acknowledged.
+    : String(input) === '/api/v1/settings/models' && init?.method === 'PUT'
+      ? Promise.resolve(new Response('{"code":"CLASS_ACKNOWLEDGEMENT_REQUIRED","from":"local","to":"metered"}', { status: 409, headers: { 'Content-Type': 'application/json' } }))
     : server.fetch(input, init);
   const tab = new Memory();
   TestBed.configureTestingModule({ providers: [
@@ -341,7 +364,7 @@ describe('Italian variant with the reviewed catalog', /** Register Italian rende
   afterEach(/** Destroying fixtures aborts long polls. */ () => TestBed.resetTestingModule());
 
   it('loads every reviewed message and detects English leftovers', /** The detector itself must have something to find. */ () => {
-    expect(CATALOG.size).toBe(433);
+    expect(CATALOG.size).toBe(515);
     expect(ENGLISH_MESSAGES.has('Send')).toBe(true);
     expect(ENGLISH_RUNS).toContain(message('campaign.view.composerHelp', {}, 'source'));
     // ICU branches are checked too: an untranslated plural would show "One passage".
@@ -390,6 +413,7 @@ describe('Italian variant with the reviewed catalog', /** Register Italian rende
         expect(fixture.nativeElement.querySelector('.saved-card h3').getAttribute('lang')).toBe('en');
         expect(fixture.nativeElement.querySelector('.saved-card .badge').getAttribute('lang')).toBe('en');
       }
+      if (url === '/settings') await until(fixture, () => fixture.nativeElement.querySelectorAll('[data-slot]').length === 4, 'model slots');
       const root = fixture.nativeElement as HTMLElement;
       const problems = [...englishLeftovers(root), ...englishText(root), ...accessibilityProblems(root)];
       if (problems.length > 0) report[url] = problems;
@@ -397,6 +421,49 @@ describe('Italian variant with the reviewed catalog', /** Register Italian rende
       TestBed.resetTestingModule();
     }
     expect(report).toEqual({});
+  });
+
+  it('renders the Models panel with the reviewed Italian wording, a held class change and no raw codes', /** P21.3-D. */ async () => {
+    configure(new TranscriptServer());
+    const fixture = await shell('/settings');
+    await until(fixture, () => fixture.nativeElement.querySelectorAll('[data-slot]').length === 4, 'model slots');
+    const root = fixture.nativeElement as HTMLElement;
+    const text = (selector: string) => normalize(root.querySelector(selector)?.textContent ?? '');
+    const when = formatDate(PROBED_AT, 'medium', 'it');
+    const timing = (milliseconds: string) => message('models.probe.timing', { when, milliseconds });
+    expect(text('#models-title')).toBe(message('models.title'));
+    expect(text('[data-slot="text.light"] h3')).toBe(message('models.slot.light'));
+    expect(text('[data-slot="text.light"] [data-source]')).toBe(message('models.source.settings'));
+    expect(text('[data-slot="text.light"] [data-class]')).toBe(`${message('models.field.class')}: ${message('models.class.local')}`);
+    expect(Array.from(root.querySelectorAll('[data-slot="text.light"] [data-badge] li'), (item) => normalize(item.textContent!)))
+      .toEqual([message('models.billing.free'), message('models.privacy.thisMachine')]);
+    expect(text('[data-slot="text.light"] [data-probe]')).toBe(`${message('models.probe.ready')} · ${timing('42')}`);
+    expect(text('[data-slot="text.standard"] [data-acknowledged]')).toBe(message('models.acknowledged', { class: message('models.class.subscription'), at: when }));
+    expect(text('[data-slot="text.standard"] [data-probe]')).toBe(`${message('models.probe.failed')} · ${message('models.probe.code.modelNotApproved')} ${timing('7')}`);
+    // An unknown probe code gets the generic Italian sentence and an environment endpoint's class stays unknown.
+    expect(text('[data-slot="text.deliberate"] [data-probe]')).toBe(`${message('models.probe.unreachable')} · ${message('models.probe.code.unknown')} ${timing('1')}`);
+    expect(text('[data-slot="text.deliberate"] [data-class]')).toBe(`${message('models.field.class')}: ${message('models.class.unknown')}`);
+    expect(root.textContent).not.toContain('unheard-of-code');
+    expect(text('[data-slot="image"] [data-source]')).toBe(message('models.source.unassigned'));
+    expect(root.querySelector('[data-slot="image"] [data-probe]')).toBeNull();
+
+    // A save that changes the class is held, with the Italian explanation of both classes.
+    (root.querySelector('[data-slot="text.light"] [data-save]') as HTMLButtonElement).click();
+    await until(fixture, () => root.querySelector('[data-acknowledge]') !== null, 'held class change');
+    expect(text('[data-acknowledge] h4')).toBe(message('models.ack.title'));
+    expect(text('[data-acknowledge] p')).toBe(message('models.ack.change', { from: message('models.class.local'), to: message('models.class.metered') }));
+    expect(Array.from(root.querySelectorAll('[data-acknowledge] li'), (item) => normalize(item.textContent!)))
+      .toEqual([message('models.billing.perUse'), message('models.privacy.apiVendor')]);
+    expect(text('[data-acknowledge] [data-confirm]')).toBe(message('models.ack.confirm'));
+    expect(text('[data-slot="text.light"] [data-notice]')).toBe(message('models.ack.needed'));
+    expect([...englishLeftovers(root), ...englishText(root)]).toEqual([]);
+    expect(accessibilityProblems(root)).toEqual([]);
+
+    // Refusal sentences come from the closed table; unknown codes and prototype names fall back to one Italian sentence.
+    expect(modules.modelsErrorMessage('FALLBACK_CLASS_CROSSING')).toBe(message('models.error.fallbackClassCrossing'));
+    expect(modules.modelsErrorMessage('NOT_A_REAL_CODE')).toBe(message('models.error.generic'));
+    expect(modules.modelsErrorMessage('constructor')).toBe(message('models.error.generic'));
+    expect(modules.modelsErrorMessage(null)).toBe(message('models.error.generic'));
   });
 
   it('renders recorded real replies with the reviewed Italian statuses, receipts and notices', /** Same bytes as the contract spec. */ async () => {

@@ -482,29 +482,48 @@ CAMPAIGN_MESSAGES = "frontend/src/app/campaign/campaign-messages.ts"
 # Creation codes belong to the future creation screen and have their own contract (P06.1).
 CAMPAIGN_CODE = re.compile(r'"((?:COMMAND|CAMPAIGN|STREAM|LOCAL)_[A-Z0-9_]+)"')
 
+# The owner model settings API (P21.3-D): its controller and the slot validation that supplies the
+# 422 codes, and the module the Settings → Models panel maps them in.
+MODELS_CONTROLLERS = (
+    "backend/src/main/java/org/rpgengine/inference/slots/ModelSettingsController.java",
+    "backend/src/main/java/org/rpgengine/inference/slots/SlotSetting.java",
+)
+MODELS_MESSAGES = "frontend/src/app/models/models-messages.ts"
+MODELS_CODE = re.compile(r'"((?:MODEL|SLOT|FALLBACK|CLASS|LOCAL)_[A-Z0-9_]+)"')
+
+# (label, controllers, message module, code pattern) of each screen whose backend codes must be explained.
+LOCALIZED_SURFACES = (
+    ("campaign", CAMPAIGN_CONTROLLERS, CAMPAIGN_MESSAGES, CAMPAIGN_CODE),
+    ("model settings", MODELS_CONTROLLERS, MODELS_MESSAGES, MODELS_CODE),
+)
+
 
 def check_localization(root: Path = ROOT) -> list[str]:
-    """Return findings for campaign error codes lacking a localized browser message.
+    """Return findings for backend error codes lacking a localized browser message.
 
-    Every ``COMMAND_*``, ``CAMPAIGN_*``, ``STREAM_*`` and ``LOCAL_*`` string literal in the
-    campaign controllers is a public code. Each must appear as a key of the ``ERRORS`` table in
-    ``campaign-messages.ts``; the i18n tooling then guarantees an Italian target. A missing
-    controller or message module is itself a finding, so moving a file cannot disable the check.
+    Every string literal matching a surface's code pattern in its controllers is a public code
+    (campaign: ``COMMAND_*``, ``CAMPAIGN_*``, ``STREAM_*``, ``LOCAL_*``; model settings:
+    ``MODEL_*``, ``SLOT_*``, ``FALLBACK_*``, ``CLASS_*``, ``LOCAL_*``). Each must appear as a key of
+    the ``ERRORS`` table in that surface's message module; the i18n tooling then guarantees an
+    Italian target. A missing controller or message module is itself a finding, so moving a file
+    cannot disable the check.
     """
     findings: list[str] = []
-    messages_path = root / CAMPAIGN_MESSAGES
-    if not messages_path.is_file():
-        return [f"{CAMPAIGN_MESSAGES}:1: campaign message module is missing"]
-    mapped = set(re.findall(r"^\s{2}([A-Z][A-Z0-9_]+):\s*\(\)\s*=>", messages_path.read_text(encoding="utf-8"), re.M))
-    for controller in CAMPAIGN_CONTROLLERS:
-        path = root / controller
-        if not path.is_file():
-            findings.append(f"{controller}:1: campaign controller is missing")
+    for label, controllers, messages_file, pattern in LOCALIZED_SURFACES:
+        messages_path = root / messages_file
+        if not messages_path.is_file():
+            findings.append(f"{messages_file}:1: {label} message module is missing")
             continue
-        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            for code in CAMPAIGN_CODE.findall(line):
-                if code not in mapped:
-                    findings.append(f"{controller}:{number}: error code has no localized browser message")
+        mapped = set(re.findall(r"^\s{2}([A-Z][A-Z0-9_]+):\s*\(\)\s*=>", messages_path.read_text(encoding="utf-8"), re.M))
+        for controller in controllers:
+            path = root / controller
+            if not path.is_file():
+                findings.append(f"{controller}:1: {label} controller is missing")
+                continue
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                for code in pattern.findall(line):
+                    if code not in mapped:
+                        findings.append(f"{controller}:{number}: error code has no localized browser message")
     return findings
 
 
