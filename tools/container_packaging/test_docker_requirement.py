@@ -6,7 +6,7 @@ and the real process environment is not read. Outputs are test assertions.
 
 import unittest
 
-from docker_requirement import REQUIRE_FLAG, docker_required, missing_docker_reason
+from docker_requirement import DEMAND_FLAG, REQUIRE_FLAG, docker_required, missing_docker_reason, missing_image_reason
 
 
 def absent(_name: str) -> None:
@@ -50,6 +50,40 @@ class DockerRequirementTest(unittest.TestCase):
             with self.subTest(environ=environ):
                 self.assertFalse(docker_required(environ))
                 self.assertIsNotNone(missing_docker_reason(environ, absent))
+
+
+class MissingImageTest(unittest.TestCase):
+    """An absent pinned image may skip only when nothing demanded the running check."""
+
+    ABSENT = "Error response from daemon: No such image: example/server@sha256:00"
+
+    def test_absent_image_skips_with_what_was_not_proven(self) -> None:
+        """The reason names the image, the unproven service, the fetch and the demand flag."""
+        reason = missing_image_reason("example/server", self.ABSENT, {})
+        self.assertIsNotNone(reason)
+        self.assertIn("example/server", reason)
+        self.assertIn("nothing was proven", reason)
+        self.assertIn("--gpu-check", reason)
+        self.assertIn(f"{DEMAND_FLAG}=1", reason)
+
+    def test_hosted_ci_flags_do_not_demand_the_image(self) -> None:
+        """Hosted runners set these and hold no copy of the image, so they still skip."""
+        environ = {REQUIRE_FLAG: "1", "GITHUB_ACTIONS": "true"}
+        self.assertIsNotNone(missing_image_reason("example/server", self.ABSENT, environ))
+
+    def test_demand_turns_an_absent_image_into_a_failure(self) -> None:
+        """Only the exact value demands the check, matching the other PACKAGING_* flags."""
+        self.assertIsNone(missing_image_reason("example/server", self.ABSENT, {DEMAND_FLAG: "1"}))
+        for value in ("0", "", "true"):
+            with self.subTest(value=value):
+                self.assertIsNotNone(missing_image_reason("example/server", self.ABSENT, {DEMAND_FLAG: value}))
+
+    def test_other_docker_errors_never_skip(self) -> None:
+        """An unreachable daemon or any unknown error describes a broken host: it fails."""
+        for error in ("", "Cannot connect to the Docker daemon at unix:///var/run/docker.sock",
+                      "permission denied while trying to connect"):
+            with self.subTest(error=error):
+                self.assertIsNone(missing_image_reason("example/server", error, {}))
 
 
 if __name__ == "__main__":

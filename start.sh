@@ -645,7 +645,9 @@ cmd_stop() {
         return 0
     fi
     info "stopping $PROJECT (volumes are preserved)"
-    compose down --timeout 35 || die "stopping failed; run 'docker compose -p $PROJECT ps' to inspect. Data is not affected."
+    # The profile is named so a selected model server stops too: left running, it
+    # would keep its GPU memory and block removal of the network it shares.
+    compose --profile models down --timeout 35 || die "stopping failed; run 'docker compose -p $PROJECT ps' to inspect. Data is not affected."
     info "stopped. Run ./start.sh to start again; campaigns and the runtime account are kept."
 }
 

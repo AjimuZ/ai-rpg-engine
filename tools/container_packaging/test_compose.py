@@ -8,7 +8,9 @@ No services are started and no existing account or secret contents are read.
 """
 
 import json
+import os
 from pathlib import Path
+import re
 import subprocess
 import unittest
 
@@ -22,15 +24,25 @@ ROOT = Path(__file__).resolve().parents[2]
 class ComposeTest(unittest.TestCase):
     """Validate Compose's resolved configuration; unsafe service boundaries fail."""
 
-    def setUp(self) -> None:
-        """Render tracked inputs only and store JSON; fail on missing/invalid files."""
+    def render(self, *profiles: str) -> dict:
+        """Return the resolved configuration for exactly these profiles; fail if invalid.
+
+        Host selections are cleared so that only tracked inputs decide the result.
+        """
+        selection = [argument for profile in profiles for argument in ("--profile", profile)]
+        environment = {name: value for name, value in os.environ.items()
+                       if name not in {"COMPOSE_PROFILES", "MODELS_DIR"}}
         result = subprocess.run(
             ["docker", "compose", "--env-file", str(ROOT / ".env.example"),
-             "--file", str(ROOT / "compose.yaml"), "config", "--format", "json"],
-            capture_output=True, text=True, timeout=30, check=False,
+             "--file", str(ROOT / "compose.yaml"), *selection, "config", "--format", "json"],
+            capture_output=True, text=True, timeout=30, check=False, env=environment,
         )
         self.assertEqual(0, result.returncode, result.stderr)
-        self.config = json.loads(result.stdout)
+        return json.loads(result.stdout)
+
+    def setUp(self) -> None:
+        """Render tracked inputs only and store JSON; fail on missing/invalid files."""
+        self.config = self.render()
 
     def test_network_and_secret_boundaries(self) -> None:
         """Require isolated networks, loopback HTTP and a database/engine-only secret."""
@@ -40,7 +52,9 @@ class ComposeTest(unittest.TestCase):
         self.assertEqual({"inference"}, set(services["codex"]["networks"]))
         self.assertTrue(self.config["networks"]["data"]["internal"])
         self.assertFalse(self.config["networks"]["inference"].get("internal", False))
-        self.assertEqual({"web", "data"}, set(services["engine"]["networks"]))
+        # The engine alone may reach the optional model server, over an internal network.
+        self.assertEqual({"web", "data", "models"}, set(services["engine"]["networks"]))
+        self.assertTrue(self.config["networks"]["models"]["internal"])
         for name, service in services.items():
             if name != "engine":
                 self.assertFalse(service.get("ports"))
@@ -105,6 +119,57 @@ class ComposeTest(unittest.TestCase):
         ipc = self.config["volumes"]["runtime_ipc"]["driver_opts"]
         self.assertEqual({"type": "tmpfs", "device": "tmpfs",
                           "o": "uid=10001,gid=10001,mode=0700"}, ipc)
+
+    def test_model_server_runs_only_under_its_profile(self) -> None:
+        """Selecting the profile adds one service and changes no other service."""
+        selected = self.render("models")
+        self.assertNotIn("models", self.config["services"])
+        self.assertEqual(set(self.config["services"]) | {"models"}, set(selected["services"]))
+        self.assertEqual(["models"], selected["services"]["models"]["profiles"])
+        self.assertEqual(self.config["services"], {name: service for name, service
+                                                   in selected["services"].items() if name != "models"})
+        # A default start must not wait for, or implicitly start, the optional server.
+        self.assertNotIn("models", self.config["services"]["engine"]["depends_on"])
+
+    def test_model_server_boundaries(self) -> None:
+        """Require the launcher's pin, a read-only model bind and no way off its network."""
+        selected = self.render("models")
+        server = selected["services"]["models"]
+        launcher = (ROOT / "start.sh").read_text(encoding="utf-8")
+        pin = re.search(r'^readonly MODEL_SERVER_IMAGE="([^"]+)"$', launcher, re.M)
+        self.assertIsNotNone(pin)
+        self.assertEqual(pin.group(1), server["image"])
+        self.assertRegex(server["image"], r":server-cuda-b\d+@sha256:[0-9a-f]{64}$")
+        self.assertNotIn("build", server)
+        # No published port, host network, or second network reaching PostgreSQL or the runtime.
+        self.assertFalse(server.get("ports"))
+        self.assertNotIn("network_mode", server)
+        self.assertEqual({"models"}, set(server["networks"]))
+        self.assertTrue(selected["networks"]["models"]["internal"])
+        for name in ("postgres", "codex"):
+            self.assertNotIn("models", selected["services"][name]["networks"])
+        # The bind is the only mount: no account, database, socket or Docker control path.
+        self.assertEqual(1, len(server["volumes"]))
+        weights = server["volumes"][0]
+        self.assertEqual(("bind", "/models", True),
+                         (weights["type"], weights["target"], weights["read_only"]))
+        self.assertTrue(Path(weights["source"]).as_posix().endswith("/.local/models"), weights["source"])
+        self.assertIs(False, weights["bind"]["create_host_path"])
+        self.assertFalse(server.get("secrets"))
+        self.assertEqual({"LLAMA_CACHE": "/tmp/llama-cache"}, server["environment"])
+        self.assertEqual("65534:65534", server["user"])
+        self.assertIs(True, server["init"])
+        self.assertTrue(server["read_only"])
+        self.assertEqual(["ALL"], server["cap_drop"])
+        self.assertIn("no-new-privileges:true", server["security_opt"])
+        self.assertTrue(server["gpus"])
+        self.assertEqual("30s", server["stop_grace_period"])
+        command = server["command"]
+        self.assertEqual("/models", command[command.index("--models-dir") + 1])
+        self.assertEqual("1", command[command.index("--models-max") + 1])
+        # An explicit model argument would disable router mode, and a fetch path would need egress.
+        for forbidden in ("--model", "-m", "--hf-repo", "-hf", "--model-url", "-mu"):
+            self.assertNotIn(forbidden, command)
 
 
 if __name__ == "__main__":

@@ -147,6 +147,12 @@ host secret file in P02.6. PostgreSQL's official entrypoint initializes ownershi
 as root and then drops privileges; engine and runtime use UID/GID 10001, drop all
 capabilities and have read-only root filesystems. Engine mounts only read-only
 socket IPC plus engine-only content/assets, never runtime account/workspace.
+The optional model server (P21.2-A) runs under its own profile as user 65534 with
+a read-only root filesystem, no capabilities and no secrets. It mounts only the
+model directory, read-only, and its only network is internal and shared with the
+engine alone, so it has no default route. Containers on an internal network can
+still address the bridge's own host-side interface; that path was not tested. No
+API key protects the engine-to-server hop yet.
 The account-free integration test verifies HTTP, socket access,
 password-authenticated TCP and neutral persistence on recreation of all services;
 it never loads an account. This does not establish tool/inference containment or

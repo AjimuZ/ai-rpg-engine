@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Pinned model server packaged in Compose (P21.2-A), 31 October 2026
+
+- Add the optional Compose service `models`: the pinned llama.cpp CUDA image by digest, in router mode, as a non-root user with
+  a read-only root filesystem, a read-only model directory (`MODELS_DIR`, default `./.local/models`) and no published port.
+- It starts only with `docker compose --profile models up --detach models`. A plain `./start.sh` neither pulls nor starts it.
+  Its only network is internal and shared with the engine alone, so it has no route to the Internet, PostgreSQL or the runtime.
+- The engine joins the new internal network, so its container is recreated once at the next start. Volumes are kept.
+  `./start.sh --stop` now also stops a selected model server.
+- No model can be fetched or used yet: the fetch command, probes, measurements and the engine adapter are still to come.
+
 ## Unreleased — Italian and screen-reader review kit prepared (P05.6-C), 31 October 2026
 
 - Add `docs/36-italian-and-screen-reader-review-kit.md`: all 433 Italian strings with their English source and context, a

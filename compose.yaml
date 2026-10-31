@@ -22,7 +22,8 @@ services:
       - postgres_password
     # Only this service is reachable from the browser. Runtime inference egress
     # remains a different network, and control traffic uses the socket only.
-    networks: [web, data]
+    # `models` stays empty unless the optional model server was selected.
+    networks: [web, data, models]
     ports:
       - "127.0.0.1:${APP_PORT:-8080}:8080"
     volumes:
@@ -108,11 +109,61 @@ services:
       driver: json-file
       options: {max-size: 10m, max-file: "3"}
 
+  # Optional local text backend (P21.2, docs/34). Only `--profile models` selects it,
+  # so a plain `up` neither pulls nor starts it. It publishes nothing and its single
+  # network is internal: the engine is its only peer, and it has no route to the
+  # Internet, PostgreSQL or the runtime. Keep this pin equal to MODEL_SERVER_IMAGE
+  # in start.sh; test_compose.py compares them.
+  models:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda-b11960@sha256:4ccae195bf542f7844301ae06891baa32a7551cb16de8428af6e929403d4292c
+    profiles: [models]
+    # Router mode runs one child server per loaded model: the init reaps them and
+    # forwards stop signals.
+    init: true
+    # The image declares no USER and would otherwise run as root.
+    user: "65534:65534"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # Docker applies this request when the service starts; no other service depends on it.
+    gpus: all
+    # Without a loaded model router mode needs no tuning; layers, context and cache
+    # flags come from later P21.2 measurements.
+    command: [--host, 0.0.0.0, --port, "8080", --models-dir, /models, --models-max, "1"]
+    environment:
+      # User 65534 has no writable home; keep the server's cache lookup on tmpfs.
+      LLAMA_CACHE: /tmp/llama-cache
+    networks: [models]
+    volumes:
+      # A missing directory must fail startup, not appear empty and root-owned.
+      - type: bind
+        source: ${MODELS_DIR:-./.local/models}
+        target: /models
+        read_only: true
+        bind: {create_host_path: false}
+    tmpfs:
+      - /tmp:uid=65534,gid=65534,mode=0700
+    healthcheck:
+      # This is process availability only, never a loaded or usable model.
+      test: [CMD, curl, --fail, --silent, --output, /dev/null, "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
+      start_interval: 1s
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
 networks:
   web: {}
   data:
     internal: true
   inference: {}
+  # No gateway: containers on this network have no route off it.
+  models:
+    internal: true
 
 volumes:
   content: {}

@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 69/130 tasks verified.** The owner withdrew the pending P98 review entry on 30 October 2026, so older records below that count 131 entries or mention a pending P98 follow-up describe the queue as it stood then. The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P05.7, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1, P11.2, P11.3, P11.4 and P21.1. P21.1 is verified: the hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles, and, since 31 October 2026 (P21.1-A), the profile and container GPU check on the reference host (no model was loaded; see the P21.1 entry). P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P05.7 is checked for its contract, rendering and fallback: no real turn produces presentation cues yet, the asset route is not served, no scene or pose image is drawn, and QA-40's persistent visual and voice identities stay with P17. P06.5 is in progress and its explicit prerequisites are all checked: P05.7 (within those limits), P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 69/130 tasks verified.** The owner withdrew the pending P98 review entry on 30 October 2026, so older records below that count 131 entries or mention a pending P98 follow-up describe the queue as it stood then. The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P05.7, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1, P11.2, P11.3, P11.4 and P21.1. P21.1 is verified: the hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles, and, since 31 October 2026 (P21.1-A), the profile and container GPU check on the reference host (no model was loaded; see the P21.1 entry). P21.2 is in progress and unchecked: the pinned server is packaged in Compose (P21.2-A), with fetch, probes and measurements remaining. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P05.7 is checked for its contract, rendering and fallback: no real turn produces presentation cues yet, the asset route is not served, no scene or pose image is drawn, and QA-40's persistent visual and voice identities stay with P17. P06.5 is in progress and its explicit prerequisites are all checked: P05.7 (within those limits), P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -2955,6 +2955,64 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       are unchanged), and a refreshed `availableMiB` (recorded `null` on Windows). Loading a model
       and measuring it belong to P21.2. With this run every P21.1 exit check is done.
 - [ ] P21.2 Package and qualify the local text backend: a pinned model-server image in router mode with a read-only model volume and no network egress, hash-verified `./start.sh --models fetch` with license display and explicit confirmation, JSON-Schema readiness probes, an English and Italian narration probe set, and recorded measurements (load time, prefill and decode speed, peak VRAM and RAM, context limits, VRAM released by unload) for the default and alternate models.
+  - Partial progress (31 October 2026, P21.2-A): the pinned model server is packaged. `compose.yaml`
+    gains the service `models` behind the `models` profile: the image by the same digest as
+    `MODEL_SERVER_IMAGE` in `start.sh`, `--models-dir /models --models-max 1`, user 65534, read-only
+    root, no capabilities, `no-new-privileges`, `init`, `gpus: all`, a read-only bind of
+    `${MODELS_DIR:-./.local/models}` that refuses a missing directory, no published port and the single
+    internal network `models`. The engine joins that network, so the exact network sets in
+    `test_compose.py` and `test_infrastructure.py` now include it; the PostgreSQL and runtime sets are
+    unchanged. `./start.sh --stop` now names the profile so that a selected server stops too.
+    - New tests: two cases in `tools/container_packaging/test_compose.py` over the rendered
+      configuration (absent by default, selecting the profile changes no other service; launcher pin,
+      no ports, internal-only network, single read-only bind, hardening, router flags) and
+      `tools/container_packaging/test_model_server.py`: two cases that start the real image and two
+      route-parser cases that need no Docker. `docker_requirement.py` gains `missing_image_reason`, with
+      four cases in `test_docker_requirement.py`.
+    - When the running cases execute: there is no opt-in flag. They run wherever Docker and the pinned image
+      are present. The image is never pulled, so hosted CI reports them as skipped with a reason, and its
+      proof is limited to `test_compose.py` and the parser. An absent image fails when `PACKAGING_DOCKER=1`,
+      as in `verify.sh containers`; any other `docker image inspect` error always fails.
+    - Runtime proof, `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh containers`: `PASS
+      container-packaging` (259 s, `Ran 38 tests`, `OK (skipped=1)`, against 28 tests and the same count of
+      one skip before this change) and `PASS runtime-probe-docker` (80 s), `VERIFY PASSED (containers)`.
+      No host-dependent failure remained. The run is not verbose: the new cases are identified by that
+      count, and the skip's identity was not read from the log.
+      On the reference host the running cases assert these results: `/props` reports `role` `router` and
+      `max_instances` 1 with build b11960; the container has only the internal network and no port
+      binding; no default route in `/proc/net/route` or `/proc/net/ipv6_route`, while the same probe on a
+      bridge network finds one; `curl` to `192.0.2.1` exits 7 at once; writes to `/models` and `/` are
+      refused and the host directory stays empty; `/tmp` accepts writes; `id -u` is 65534; `--list-devices`
+      through the rendered `gpus: all` prints a CUDA device.
+    - Weakened copies, `py -B .local/scratch/weaken_model_server.py` (an ignored scratch script rendering copies of
+      `compose.yaml` and running three `test_compose.py` cases): the unchanged copy passes, and all eight
+      weakenings are caught: network not internal, published port, writable bind, added `data` network,
+      host network, digest differing from the launcher, no profile, and a single-model launch.
+    - Weakened copies of the running case, `py -B .local/scratch/model_server_paths.py` (an ignored scratch
+      script running the case against exported copies, `UNEXPECTED OUTCOMES: 0`): the unchanged copy passes.
+      With an absent digest the case skips with the flag unset and fails with `PACKAGING_DOCKER=1`, on the
+      daemon's `No such image` error. It fails with the network not internal, with a writable bind and with
+      an added `inference` network. With the network not internal and the `Internal` assertion removed from
+      the copied test, the route probe alone fails, reporting `eth0` with destination `00000000`.
+    - Other checks: `py -B tools/repository_checks/checks.py images` printed `images: 0 finding(s)`.
+      The Compose rendering runs in the test cases above. `test_compose.py` and `test_model_server.py` are in
+      the default suite of the hosted packaging job, which leaves `PACKAGING_DOCKER` unset; that job has not
+      run on this change yet, so the hosted skip was seen only on the exported copy above.
+    - Full plan, `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full`: all 17 steps passed,
+      with `docker-requirement` at `Ran 8 tests`, `OK` and `Tests run: 1167, Failures: 0, Errors: 0, Skipped: 0`
+      in the backend, `VERIFY PASSED (full)`. Only this roadmap entry changed after that run.
+    - Not proven: loading or serving any model, every speed and memory figure, and VRAM under load; an
+      engine-to-server connection (the engine was not running in this check, and it has no adapter yet);
+      that the `--api-key-file` hop works, because it is not configured; reachability of the bridge's own
+      host-side interface from the internal network, which was not tested; IPv6 behaviour beyond the route
+      table; `./start.sh --stop` with a server actually running; `up` on a host without a GPU, where the
+      override removes the GPU request and the device case skips; hosts other than the reference host; a
+      weakening of the immediate `curl` refusal, which the `Internal` and route assertions reach first.
+      Direct `docker run`, `docker image inspect` and `docker compose` commands were refused in this
+      session, so the image's `--help` text was not read: `/props` is the router-mode evidence.
+    - Remaining for P21.2: hash-verified `--models fetch` with license display and confirmation, launcher
+      selection of the service, schema readiness probes, the bilingual narration probe set, and the
+      measurements. The box stays unchecked.
 - [ ] P21.3 Implement slot assignment and the remaining backend adapters behind the runtime-neutral task port: independent `light`, `standard`, `deliberate` and `image` slots, readiness probes with visible results, billing and privacy class badges with acknowledgement on a class change, same-class fallback lists only when configured, per-slot session retirement, and the `gateway` service for owner-key hosted APIs and allowlisted custom endpoints (keys as runtime-only secrets, budgets, bounded redirects and sizes). Expose `GET /api/v1/models/status`, the owner-only settings API and the Settings → Models panel.
 - [ ] P21.4 Implement the shared GPU and RAM admission coordinator for text, image and speech: priorities, leases using the model server's documented load and unload endpoints and slot save and restore, batching, interruption between diffusion steps, unowned-contention handling and metrics. Prove no engine-caused out-of-memory on the reference host.
 - [ ] P21.5 Implement the local image backend: a pinned image-worker container loading single-file safetensors checkpoints and LoRAs, with WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as catalog alternatives; prompt chunking beyond 77 tokens; default safe-content tags; step-boundary cancellation; output validation and provenance; and the `a1111-http` adapter for an owner-run Forge or A1111 server. Integrate with the P17 asset-job contract without changing authority rules.

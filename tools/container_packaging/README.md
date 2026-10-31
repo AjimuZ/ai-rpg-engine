@@ -21,7 +21,18 @@ which the backend's drift check needs. The independent runtime policy admits its
 reviewed managed-profile files. Both exclude nested private paths. New inputs
 must update the relevant policy and fixtures. These checks do not inspect account
 files or detect secrets embedded in otherwise admitted source files.
-`test_compose.py` checks rendered service boundaries without starting services.
+`test_compose.py` checks rendered service boundaries without starting services,
+including the optional `models` service under its profile.
+`test_model_server.py` (P21.2-A) starts the pinned model server in a uniquely named
+project with an empty temporary `MODELS_DIR`, and removes it afterwards. It belongs to
+the default suite, needs no flag and never pulls: it runs wherever the image is on the
+host (`./start.sh --models profile --gpu-check` fetches it). It checks router mode
+through `/props`, the absence of a default route with a bridge-network positive
+control, an immediate refusal of an outbound connection, read-only mounts and, where
+`nvidia-smi` exists, a CUDA device through the rendered GPU request. Without
+`nvidia-smi` it drops the GPU request through an override and reports the device case
+as skipped. It loads no model. Its route-parser cases need no Docker and always run.
+Without the image it follows the table under [Hosts without Docker](#hosts-without-docker).
 `test_launcher.py` checks the root `start.sh` contract (static rules, redaction,
 refusal paths and read-only `--check`) without starting or stopping services.
 `test_hardware_profile.py` (P21.1) runs `--models profile [--gpu-check]` with every
@@ -64,6 +75,19 @@ count, because local tools set it to disable prompts. A skip on a Docker-less ho
 proves nothing about build-context filtering or Compose boundaries. Report it as not
 run there and rely on the hosted packaging job, or run the suite on a Docker host.
 The launcher fixture cases and the static checks need no Docker and always run.
+
+The running model-server cases also depend on the pinned image, which is about 2.6 GB
+compressed and never pulled by a test:
+
+| Host with Docker | Running model-server cases |
+| --- | --- |
+| image present | run; any Docker failure or isolation breach fails |
+| image absent, `PACKAGING_DOCKER=1` (as in `verify.sh containers`) | fail with the fetch command |
+| image absent, flag not set (hosted CI, a fresh host) | skipped, with a reason saying nothing was proven about the running service |
+| `docker image inspect` fails for any other reason | fail |
+
+So hosted CI proves only the rendered boundaries in `test_compose.py` and the route
+parser. The running isolation proof comes from a host that holds the image.
 
 ## Real backup and restore of two genres
 

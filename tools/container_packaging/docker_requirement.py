@@ -21,6 +21,11 @@ Policy:
 
 Only the complete absence of the executable can lead to a skip. A present but
 unusable installation is never treated as missing.
+
+A case that runs a large pinned image it never pulls (`test_model_server.py`) has one
+more outcome: the image is absent from a working Docker host, which is true of every
+hosted runner. It may skip only for that exact reason and only while
+`PACKAGING_DOCKER=1` does not demand the check; any other Docker failure still fails.
 """
 
 from collections.abc import Callable, Mapping
@@ -30,6 +35,7 @@ import unittest
 
 
 REQUIRE_FLAG = "PACKAGING_REQUIRE_DOCKER"
+DEMAND_FLAG = "PACKAGING_DOCKER"
 
 
 def docker_required(environ: Mapping[str, str]) -> bool:
@@ -56,6 +62,22 @@ def missing_docker_reason(environ: Mapping[str, str] = os.environ,
         return None
     return ("docker executable not found; hosted CI enforces this check "
             f"(set {REQUIRE_FLAG}=1 to fail instead of skip)")
+
+
+def missing_image_reason(image: str, inspect_error: str,
+                         environ: Mapping[str, str] = os.environ) -> str | None:
+    """Return a skip reason when a case may skip because `image` is absent, else None.
+
+    `inspect_error` is the error output of a failed `docker image inspect`. None means
+    the case must fail: `PACKAGING_DOCKER=1` demanded it, or the error is anything other
+    than an absent image, such as an unreachable daemon. Any other flag value counts as
+    unset, and `PACKAGING_REQUIRE_DOCKER` does not apply: hosted CI sets it and holds no
+    copy of this image.
+    """
+    if environ.get(DEMAND_FLAG) == "1" or "no such image" not in inspect_error.lower():
+        return None
+    return (f"{image} is not on this host, so nothing was proven about the running service; "
+            f"./start.sh --models profile --gpu-check fetches it (set {DEMAND_FLAG}=1 to fail instead of skip)")
 
 
 def requires_docker_cli(test_class: type) -> type:

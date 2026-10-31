@@ -160,7 +160,9 @@ defaulting to English. Finite preview GET routes serve compiled indexes; APIs an
 missing files keep their own HTTP semantics. Shared artwork/notices retain stable
 root URLs. Only engine and
 postgres join internal `data`; only runtime joins `inference`; engine alone joins
-`web` for published HTTP. Engine and runtime share UID 10001 for private socket
+`web` for published HTTP. The optional `models` service (P21.2-A) runs only under
+its Compose profile and shares only the internal `models` network with the engine.
+Engine and runtime share UID 10001 for private socket
 access, but never account/data mounts. Engine mounts socket IPC read-only and
 owns separate content/assets volumes. Its Spring `packaged` profile consumes
 the database file secret; the host profile remains loopback-only. Account-free

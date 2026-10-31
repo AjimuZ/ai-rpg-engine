@@ -216,7 +216,10 @@ class InfrastructureTest(unittest.TestCase):
         database = self.inspect("postgres")
         runtime = self.inspect("codex")
         engine = self.inspect("engine")
-        self.assertEqual({PROJECT + "_web", PROJECT + "_data"}, set(engine["NetworkSettings"]["Networks"]))
+        # `_models` is internal and stays empty here: the model server has its own profile.
+        self.assertEqual({PROJECT + "_web", PROJECT + "_data", PROJECT + "_models"},
+                         set(engine["NetworkSettings"]["Networks"]))
+        self.assertNotIn("models", self.compose("ps", "--all", "--format", "{{.Service}}").splitlines())
         self.assertEqual("10001:10001", engine["Config"]["User"])
         self.assertTrue(engine["HostConfig"]["ReadonlyRootfs"])
         self.assertEqual(["ALL"], engine["HostConfig"]["CapDrop"])
