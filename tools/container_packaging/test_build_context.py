@@ -109,6 +109,13 @@ class BuildContextTest(unittest.TestCase):
                             {".env", "auth.json", "private.key", "README.md",
                              ".local/account.json", ".codex/auth.json", "src/private.txt"})
 
+    def test_gateway_context(self) -> None:
+        """Admit only the gateway's Dockerfile and source, so no key or allowlist can reach an image."""
+        self.verify_context(ROOT / "docker/gateway/.dockerignore", {"Dockerfile", "gateway.py"},
+                            {".env", "destinations.json", "README.md", "scripted", "private.key",
+                             "keys/scripted", "secrets/gateway/scripted", ".local/secrets/gateway/scripted",
+                             "nested/gateway.py", "nested/Dockerfile"})
+
 
 if __name__ == "__main__":
     unittest.main()

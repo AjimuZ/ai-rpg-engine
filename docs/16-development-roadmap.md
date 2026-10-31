@@ -3249,6 +3249,87 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       Gameplay health shows ready when any adapter is ready, even if the backend of the slot narration uses is down. The restore rehearsal held
       no `ai_session_record` row, so restoring a `SLOT_CHANGED` value is unrehearsed. No weakened-copy run was made, so the tests were not shown
       to fail on a removed check, and the hosted CI job has not run this change.
+  - Partial progress (31 October 2026, P21.3-C.1): the `gateway` container exists with its allowlist, runtime-only keys and bounds, tested
+    against a scripted upstream only. The P21.3 box stays unchecked: budgets, the launcher's key command, the protocol behavior of the
+    gateway, the Settings → Models panel and the `claude`, `openai-compatible`, `anthropic-api`, `a1111-http`, `openai-images` and
+    `local-image` adapters are not built.
+    - Added `docker/gateway/` (`gateway.py`, one standard-library file; `Dockerfile` on the pinned Python image; `.dockerignore`) and the
+      Compose service behind `--profile gateway`, on the internal `gateway` network shared with the engine and the `gateway_egress` network
+      only it joins. Rules and codes are in `docs/34-inference-backends-and-model-selection.md` section 12.
+    - Decisions: the allowlist is a read-only JSON file and keys are one read-only file each, so neither is in an image, a variable or an
+      argument. A request names a destination by identifier and never a host. Responses are buffered whole, so an oversized one is a clean
+      refusal, and nothing streams yet. A non-2xx body is discarded, because providers echo key fragments in errors. A POST follows only 307
+      and 308. Connections arriving over the egress network are closed unanswered, because listening on every interface would otherwise make
+      the private network meaningless.
+    - Tests: `test_gateway.py` (58, in process against a scripted loopback upstream; every case asserts the sentinel key is absent from the
+      log and replies, and a positive control shows the upstream received it), `test_gateway_container.py` (12: 2 for the layer scan, 9 on
+      the real image and networks, including a trusted certificate, another authority and a wrong hostname, and 1 running the real
+      `./start.sh --stop` against a running gateway), 4 new cases in `test_compose.py`, 1 in `test_build_context.py`, 1 in `test_launcher.py`
+      (the stop command selects every long-running profile in `compose.yaml`), and `verify_gateway_boundary` in `test_infrastructure.py` (the real engine container reaches the gateway;
+      PostgreSQL and the runtime cannot resolve it; a mounted sentinel is absent from a `pg_dump`, whose control is `flyway_schema_history`,
+      and from every service's logs). The image scan builds from a context that deliberately holds the sentinel and reads every layer, with a
+      string from the gateway's source as its control.
+    - Review fixes, each test seen failing before its fix: `./start.sh --stop` named only the `models` profile, so a running gateway survived
+      it (`LauncherStopTest` found the container still present) and now names `gateway` too. A deadline passing during connection setup
+      severed nothing, because no socket is reachable then, and a dripping upstream held the call for 6.05 s against a 0.5 s bound. The
+      deadline is now checked again once `connect()` returns, before the request or key is sent, so the call ends with 504 and the upstream
+      records nothing.
+    - Commands and results on the reference host (Git Bash): `py -B -m unittest discover -s tools/container_packaging -p test_gateway.py`:
+      `Ran 58 tests`, `OK`. `py -B -m unittest discover -s tools/container_packaging -p test_launcher.py`: `Ran 18 tests`, `OK`.
+      `py -B -m unittest discover -s tools/container_packaging -p test_gateway_container.py -k LauncherStopTest`: `Ran 1 test`, `OK`.
+      `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh containers`: `PASS container-packaging` (465 s, `Ran 204 tests in 464.575s`,
+      `OK (skipped=1)`, restore rehearsal on schema 28 with 58 tables and 229 rows) and `PASS runtime-probe-docker` (83 s), `VERIFY PASSED
+      (containers)`. `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full`: 18 steps, all `PASS`, `VERIFY PASSED (full)`, with
+      `test_compose.py` passing on Compose 2.40.3 (`Ran 10 tests`) and 1266 backend tests, 0 failures, 0 errors, 0 skipped, `BUILD SUCCESS`.
+      This entry was written after those runs; `verify.sh repo` then checked it.
+    - Second verification pass (31 October 2026, no source, test or Compose change since the runs above; only this note changed). The first
+      `verify.sh containers` failed because the Docker daemon was not reachable (`failed to connect to the docker API`, `Ran 195 tests`,
+      `FAILED (failures=17, errors=1, skipped=1)`). Once the daemon answered, the next run gave `PASS container-packaging` (507 s, `Ran 204 tests
+      in 506.331s`, `OK (skipped=1)`, restore rehearsal on schema 28 with 58 tables and 229 rows), so those 18 failures came from the host. That
+      run's `runtime-probe-docker` step did not finish: the session's 10-minute limit on one command ended the profile at exit 143, and the
+      step's log reads `Ran 116 tests in 97.331s`, `FAILED (failures=9, errors=3)`, from children failing with status 3221225794 (`0xC0000142`)
+      and `provider-log-unavailable` after their parent was killed. `py -B -m unittest discover -s tools/runtime_probe` then gave `Ran 116 tests`,
+      `OK (skipped=18)`, so the transport cases pass; the 18 Docker cases have no pass newer than the `Ran 116 tests in 82.169s`, `OK` above. That
+      kill left `verify.lock` and the two `runtime-session` fixture containers behind, and a session may remove neither, so `verify.sh full`
+      and `verify.sh repo` were refused in this pass (`Another verification is running`). The last `verify.sh full` is the run above. The
+      profile now takes about 10 minutes (507 s + 97 s here), which reaches that limit, and the gateway's container cases add to it.
+      Direct commands in this pass: `test_gateway.py` `Ran 58 tests`, `OK`; `test_launcher.py` `Ran 18 tests`, `OK`.
+    - Third verification pass (31 October 2026, after an interrupted session, with no source, test or Compose change; only this note changed).
+      `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh containers`: `PASS container-packaging` (460 s, `Ran 204 tests in 458.223s`,
+      `OK (skipped=1)`, restore rehearsal on schema 28 with 58 tables and 229 rows), `PASS runtime-probe-docker` (80 s, `Ran 116 tests in 79.635s`,
+      `OK`), `VERIFY PASSED (containers)`. So the 18 Docker cases passed again, 60 s under the 10-minute limit on one command: that margin is
+      small. `py -B -m unittest discover -s tools/container_packaging -p test_gateway.py`: `Ran 58 tests`, `OK`.
+      The first `verify.sh full` of this pass failed in one backend case: `PlanAdmissionGateTest.transactionalGateRejectsLegacySnapshotsWithoutWriting`,
+      `NoSuchElementException` at the test's `jobs.claim(...).orElseThrow()`, `Tests run: 1266, Failures: 0, Errors: 1`. This change touches no
+      backend file. `verify.sh backend -Dtest=PlanAdmissionGateTest` then passed, and a second `verify.sh full` gave 18 steps, all `PASS`,
+      `VERIFY PASSED (full)`, with 1266 backend tests, 0 failures, 0 errors, 0 skipped, `BUILD SUCCESS`. The case therefore fails intermittently.
+      The cause is not established: `PreparationJobService.claim` documents an empty poll as safe when a row is locked or taken by another
+      claimer, while the test requires a lease on its first poll, but no competing claimer was observed. The test was not changed.
+      Three stopped containers of project `engine-gateway-check-2c79b911`, from the interrupted session, remain on the reference host because
+      sessions may not run `docker rm`. Their project name is unique, so they do not affect later runs.
+    - Weakened copies: 20 deliberate weakenings of `gateway.py`, each on an exported copy under `.local/scratch/`, run against
+      `test_gateway.py`: all 20 failed it. They removed the redirect bound, the origin and prefix checks on redirects, the POST redirect rule,
+      both response bounds, the request bound, the upstream timer, the whole-body client deadline, the key scan, the discarding of error
+      bodies, the header filter (cookies), the reorder of inbound headers, the log's restraint (path, exception text), the egress-peer refusal,
+      the path checks (two), the compressed-body refusal and the plain-key refusal. The reordering weakening failed only in two unrelated
+      header cases, because the inbound filter already removes key headers, so it proves little by itself. The first runs exposed three
+      faults that are now fixed: the timer lost its socket once a closing response had begun, a refused request's drain failed after a read
+      timeout and reset the connection, and the log line raced the answer. No weakening was run against the container, Compose or image cases.
+    - Not proven: no real provider or Internet destination has answered, so nothing shows that a hosted API accepts these requests or fits
+      the size and time defaults. The TLS success case trusts a fixture authority through `SSL_CERT_FILE`, so a handshake through the image's
+      public store is unseen; only that store's presence was checked. The connection-setup case delays `connect()` in process on plain HTTP,
+      so no real stalled TLS handshake was run, and such a call can answer late by the time left, at most 10 s, for each TCP attempt and the
+      handshake. The real launcher stop ran only at the launcher's Docker floors on the reference host; below them, as hosted CI may be, that
+      case asserts the refusal, and the recording test alone proves the selected profiles. No adapter calls the gateway, and the real engine only reached its
+      health path and one refusal. No code path can carry a key to the database today, because no setting accepts one, so the `pg_dump` check
+      guards a future path more than a present one. Hosted CI has not run this change, and native Linux is unverified: the fixtures make
+      their files world-readable, and the launcher's future key command must make real keys readable by UID 10002. Compose 2.x was exercised
+      only for rendering. On the reference host Docker Desktop did not refuse a missing keys directory despite `create_host_path: false`: a
+      one-off run stayed up and healthy, and whether it created the host path was not checked, so that step was dropped from the test and the
+      fail-closed `key-unavailable` answer is what is relied on. Not defended: DNS rebinding, and key fragments inside a 2xx body. No memory
+      limit is set or measured for the worst case of `max_in_flight` full bodies. The engine's `web` network remains an ordinary bridge, so
+      "the engine has no Internet route" (ADR 0021) is not yet true of the packaged stack. The two `GATEWAY_*` path variables have defaults and
+      are not listed in `.env.example`, which sessions do not edit.
 - [ ] P21.4 Implement the shared GPU and RAM admission coordinator for text, image and speech: priorities, leases using the model server's documented load and unload endpoints and slot save and restore, batching, interruption between diffusion steps, unowned-contention handling and metrics. Prove no engine-caused out-of-memory on the reference host.
 - [ ] P21.5 Implement the local image backend: a pinned image-worker container loading single-file safetensors checkpoints and LoRAs, with WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as catalog alternatives; prompt chunking beyond 77 tokens; default safe-content tags; step-boundary cancellation; output validation and provenance; and the `a1111-http` adapter for an owner-run Forge or A1111 server. Integrate with the P17 asset-job contract without changing authority rules.
 - [ ] P21.6 Verify and document: QA-43 and QA-44 on deterministic fixtures and on the reference host, synthetic-hardware advisor tests, custom-endpoint and secret-handling tests, the bilingual narration evaluation of the default and alternate models, license and attribution records, and the supported-defaults table for the reference host with honest limits.

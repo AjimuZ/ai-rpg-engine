@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Gateway container for hosted APIs and custom endpoints (P21.3-C.1), 31 October 2026
+
+- Add the optional `gateway` service behind `--profile gateway`. It is the only service that holds API keys and the only one
+  with this route out: the engine reaches it over a private network, and a plain start neither builds nor runs it.
+- It contacts only destinations in the owner's allowlist file (`.local/gateway/destinations.json`) and reads keys from read-only
+  files (`.local/secrets/gateway/`). Keys stay out of images, logs, responses and the engine.
+- It bounds request and response sizes, time, requests in flight and redirects, refuses redirects to another host, and neither
+  stores nor forwards cookies.
+- `./start.sh --stop` now also stops a selected gateway and removes its networks.
+- The engine has a new internal network that stays empty unless the gateway is selected. Nothing calls the gateway yet, no
+  launcher command sets a key, and budgets do not exist. It has been tested against a scripted upstream only, never a real
+  provider.
+
 ## Unreleased — Local text backend adapter and per-slot session retirement (P21.3-B), 31 October 2026
 
 - Add the `local` text backend, which talks to the packaged model server over its HTTP chat API. `engine.inference.local.url`

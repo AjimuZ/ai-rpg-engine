@@ -35,8 +35,9 @@ services:
       - postgres_password
     # Only this service is reachable from the browser. Runtime inference egress
     # remains a different network, and control traffic uses the socket only.
-    # `models` stays empty unless the optional model server was selected.
-    networks: [web, data, models]
+    # `models` and `gateway` stay empty unless their optional services were selected, and
+    # both are internal: neither gives the engine a route anywhere.
+    networks: [web, data, models, gateway]
     ports:
       - "127.0.0.1:${APP_PORT:-8080}:8080"
     volumes:
@@ -209,14 +210,57 @@ services:
         target: /models
         bind: {create_host_path: false}
 
+  # Optional gateway to hosted APIs and custom endpoints (P21.3, docs/34). Only
+  # `--profile gateway` selects it and no other service depends on it. It alone joins
+  # `gateway_egress`; the engine reaches it over the internal `gateway` network and never
+  # receives a key. Both inputs are read-only host paths that must already exist: the
+  # allowlist is a file of destinations, and each key is one file in the secrets directory.
+  gateway:
+    build:
+      context: ./docker/gateway
+    image: rpg-engine/gateway:0.1.0
+    profiles: [gateway]
+    user: "10002:10002"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [gateway, gateway_egress]
+    volumes:
+      - type: bind
+        source: ${GATEWAY_DESTINATIONS_FILE:-./.local/gateway/destinations.json}
+        target: /etc/gateway/destinations.json
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${GATEWAY_KEYS_DIR:-./.local/secrets/gateway}
+        target: /run/secrets/gateway
+        read_only: true
+        bind: {create_host_path: false}
+    healthcheck:
+      # This is process availability only, never a destination, key or provider answering.
+      test: [CMD, python, -I, -B, /opt/gateway/gateway.py, --health]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+      start_interval: 1s
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
 networks:
   web: {}
   data:
     internal: true
   inference: {}
-  # No gateway: containers on this network have no route off it.
+  # No route gateway on these two: containers on them have no route off them.
   models:
     internal: true
+  gateway:
+    internal: true
+  # The only network of the gateway service with a route out; nothing else joins it.
+  gateway_egress: {}
 
 volumes:
   content: {}

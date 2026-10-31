@@ -155,9 +155,10 @@ jobs:
         with:
           python-version: "3.15.1"
       # Exports real BuildKit contexts and renders Compose. The only Compose services it runs
-      # are the one-off models-license and models-fetch of test_model_fetch_launcher.py, on
-      # fixtures and the small pinned Python image; the model server's own cases skip here
-      # because its large image is absent. Those launcher-driven cases need Engine 29.0 and
+      # are the one-off models-license and models-fetch of test_model_fetch_launcher.py and the
+      # gateway with its scripted fixtures in test_gateway_container.py, all on the small pinned
+      # Python image; the model server's own cases skip here because its large image is absent.
+      # The launcher-driven cases need Engine 29.0 and
       # Compose 5.0, which this runner may lack: below them they are skipped with the
       # shortfall as reason and a separate case asserts the launcher's refusal instead.
       # test_restore_isolation.py builds the verification image and runs the shipped

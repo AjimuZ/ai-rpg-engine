@@ -1,0 +1,6 @@
+# Only the Dockerfile and the one file it copies are sent to the builder, so a key or a
+# destinations file placed here by mistake cannot reach an image.
+# Keep this policy independent: root .dockerignore does not cover this context.
+**
+!Dockerfile
+!gateway.py

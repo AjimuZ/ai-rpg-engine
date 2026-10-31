@@ -31,7 +31,7 @@ class ComposeTest(unittest.TestCase):
         """
         selection = [argument for profile in profiles for argument in ("--profile", profile)]
         environment = {name: value for name, value in os.environ.items()
-                       if name not in {"COMPOSE_PROFILES", "MODELS_DIR"}}
+                       if name not in {"COMPOSE_PROFILES", "MODELS_DIR", "GATEWAY_KEYS_DIR", "GATEWAY_DESTINATIONS_FILE"}}
         result = subprocess.run(
             ["docker", "compose", "--env-file", str(ROOT / ".env.example"),
              "--file", str(ROOT / "compose.yaml"), *selection, "config", "--format", "json"],
@@ -52,9 +52,10 @@ class ComposeTest(unittest.TestCase):
         self.assertEqual({"inference"}, set(services["codex"]["networks"]))
         self.assertTrue(self.config["networks"]["data"]["internal"])
         self.assertFalse(self.config["networks"]["inference"].get("internal", False))
-        # The engine alone may reach the optional model server, over an internal network.
-        self.assertEqual({"web", "data", "models"}, set(services["engine"]["networks"]))
+        # The engine alone may reach the optional model server and gateway, over internal networks.
+        self.assertEqual({"web", "data", "models", "gateway"}, set(services["engine"]["networks"]))
         self.assertTrue(self.config["networks"]["models"]["internal"])
+        self.assertTrue(self.config["networks"]["gateway"]["internal"])
         for name, service in services.items():
             if name != "engine":
                 self.assertFalse(service.get("ports"))
@@ -132,12 +133,12 @@ class ComposeTest(unittest.TestCase):
         self.assertNotIn("models", self.config["services"]["engine"]["depends_on"])
 
     def model_bind_creates_host_path(self, weights: dict, service: str = "models") -> bool:
-        """Return whether the `/models` bind of `service` may create its host path; fail if it cannot be told.
+        """Return whether a bind of `service` may create its host path; fail if it cannot be told.
 
         Compose 5.x prints `bind.create_host_path` even when false, while 2.x omits it.
         A rendered value is used as printed. When it is omitted, `compose.yaml` itself
-        must set `create_host_path: false` explicitly on the `/models` volume of that
-        service, so a missing key never passes for a safe setting.
+        must set `create_host_path: false` explicitly on the volume with that target in
+        that service, so a missing key never passes for a safe setting.
         """
         rendered = weights.get("bind", {}).get("create_host_path")
         if rendered is not None:
@@ -145,7 +146,7 @@ class ComposeTest(unittest.TestCase):
         text = (ROOT / "compose.yaml").read_text(encoding="utf-8")
         block = re.search(rf"^  {re.escape(service)}:\n((?:    .*\n|\n)*)", text, re.M)
         self.assertIsNotNone(block, f"compose.yaml has no {service} service")
-        setting = re.findall(r"^\s+target: /models\n(?:\s+read_only: \w+\n)?\s+bind:\s*\{\s*create_host_path:\s*(\w+)\s*\}\s*$",
+        setting = re.findall(rf"^\s+target: {re.escape(weights['target'])}\n(?:\s+read_only: \w+\n)?\s+bind:\s*\{{\s*create_host_path:\s*(\w+)\s*\}}\s*$",
                              block.group(1), re.M)
         self.assertEqual(["false"], setting,
                          "the rendered bind omits create_host_path and compose.yaml does not set it false")
@@ -243,6 +244,81 @@ class ComposeTest(unittest.TestCase):
             self.assertTrue(Path(mounts["/opt/model-fetch"]["source"]).as_posix().endswith("/docker/model-fetch"))
         self.assertFalse(fetch_mounts["/models"].get("read_only", False))
         self.assertIs(False, self.model_bind_creates_host_path(fetch_mounts["/models"], "models-fetch"))
+
+    def test_gateway_runs_only_under_its_profile(self) -> None:
+        """Selecting the profile adds one service and changes no other service."""
+        selected = self.render("gateway")
+        self.assertNotIn("gateway", self.config["services"])
+        self.assertEqual(set(self.config["services"]) | {"gateway"}, set(selected["services"]))
+        self.assertEqual(["gateway"], selected["services"]["gateway"]["profiles"])
+        self.assertEqual(self.config["services"], {name: service for name, service
+                                                   in selected["services"].items() if name != "gateway"})
+        # A default start must not wait for, or implicitly start, the optional gateway.
+        self.assertNotIn("gateway", self.config["services"]["engine"]["depends_on"])
+        # Nothing but the profile creates the route out.
+        self.assertNotIn("gateway_egress", self.config["networks"])
+
+    def test_gateway_networks_are_shared_only_as_declared(self) -> None:
+        """Only the gateway has the egress network, and only the engine shares its private one."""
+        selected = self.render("gateway", "models", "model-fetch")
+        services = selected["services"]
+        gateway = services["gateway"]
+        self.assertEqual({"gateway", "gateway_egress"}, set(gateway["networks"]))
+        self.assertNotIn("network_mode", gateway)
+        self.assertFalse(gateway.get("ports"))
+        self.assertTrue(selected["networks"]["gateway"]["internal"])
+        self.assertFalse(selected["networks"]["gateway_egress"].get("internal", False))
+        for name, service in services.items():
+            joined = set(service.get("networks") or {})
+            if name != "gateway":
+                self.assertNotIn("gateway_egress", joined, name)
+            if name not in {"gateway", "engine"}:
+                self.assertNotIn("gateway", joined, name)
+        # The route to the keys never crosses the database, runtime, browser or model networks.
+        self.assertFalse({"data", "inference", "web", "models"} & set(gateway["networks"]))
+
+    def test_gateway_keys_are_runtime_only(self) -> None:
+        """Keys and the allowlist are read-only host paths; no other route can bring in a secret."""
+        gateway = self.render("gateway")["services"]["gateway"]
+        mounts = {mount["target"]: mount for mount in gateway["volumes"]}
+        self.assertEqual({"/etc/gateway/destinations.json", "/run/secrets/gateway"}, set(mounts))
+        for mount in mounts.values():
+            self.assertEqual("bind", mount["type"])
+            self.assertIs(True, mount["read_only"])
+            self.assertIs(False, self.model_bind_creates_host_path(mount, "gateway"))
+        self.assertTrue(Path(mounts["/run/secrets/gateway"]["source"]).as_posix().endswith("/.local/secrets/gateway"))
+        self.assertTrue(Path(mounts["/etc/gateway/destinations.json"]["source"]).as_posix().endswith(
+            "/.local/gateway/destinations.json"))
+        self.assertFalse(gateway.get("environment"), "a key must never travel in a variable")
+        self.assertFalse(gateway.get("env_file"))
+        self.assertFalse(gateway.get("secrets"), "the database password is not this service's")
+        self.assertFalse(gateway["build"].get("args"), "a key must never travel in a build argument")
+        self.assertFalse(gateway["build"].get("secrets"))
+        self.assertFalse(gateway.get("command"), "a key must never travel in an argument")
+        # The engine and every other service stay away from these paths.
+        for name, service in self.render("gateway")["services"].items():
+            if name != "gateway":
+                sources = {Path(str(mount.get("source"))).as_posix() for mount in service.get("volumes", [])}
+                self.assertFalse(any("/.local/secrets/gateway" in source or "/.local/gateway" in source for source in sources), name)
+
+    def test_gateway_is_confined_and_pinned(self) -> None:
+        """Require the container profile and a build on the digest that ADR 0009 records."""
+        gateway = self.render("gateway")["services"]["gateway"]
+        self.assertEqual("10002:10002", gateway["user"])
+        self.assertTrue(gateway["read_only"])
+        self.assertEqual(["ALL"], gateway["cap_drop"])
+        self.assertIn("no-new-privileges:true", gateway["security_opt"])
+        self.assertEqual("15s", gateway["stop_grace_period"])
+        self.assertEqual((ROOT / "docker/gateway").as_posix(), Path(gateway["build"]["context"]).as_posix())
+        dockerfile = (ROOT / "docker/gateway/Dockerfile").read_text(encoding="utf-8")
+        base = re.findall(r"^FROM (\S+)$", dockerfile, re.M)
+        self.assertEqual(1, len(base))
+        self.assertRegex(base[0], r"^python:3\.15\.1-slim-trixie@sha256:[0-9a-f]{64}$")
+        self.assertEqual(self.render("model-fetch")["services"]["models-fetch"]["image"], base[0])
+        adr = (ROOT / "docs" / "adr" / "0009-toolchain-baseline.md").read_text(encoding="utf-8")
+        self.assertIn(base[0], adr)
+        self.assertIn("USER 10002:10002", dockerfile)
+        self.assertNotRegex(dockerfile, r"(?m)^(ARG|ENV)\b", "a key must have no way into the build")
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import secrets
 import subprocess
+import tempfile
 import unittest
 from urllib.request import ProxyHandler, build_opener
 from urllib.error import HTTPError
@@ -64,9 +65,12 @@ class InfrastructureTest(unittest.TestCase):
             "fixture", statement,
         )
 
-    def inspect(self, service: str) -> dict:
-        """Return one owned container's Docker metadata; missing/invalid metadata fails."""
-        identifier = self.compose("ps", "--quiet", service)
+    def inspect(self, service: str, *selection: str) -> dict:
+        """Return one owned container's Docker metadata; missing/invalid metadata fails.
+
+        `selection` holds the Compose arguments that select a service behind a profile.
+        """
+        identifier = self.compose(*selection, "ps", "--quiet", service)
         result = subprocess.run(["docker", "inspect", identifier], capture_output=True,
                                 text=True, timeout=30, check=False)
         self.assertEqual(0, result.returncode, result.stderr[-1000:])
@@ -197,6 +201,79 @@ class InfrastructureTest(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("does not exist", result.stdout + result.stderr)
 
+    def service_output(self, service: str, *command: str, check: bool = True) -> str:
+        """Run one command in a service and return its output as UTF-8 text, for scanning.
+
+        This does not use `compose()`, which decodes with the host's locale: a database dump
+        holds text that some locales cannot decode.
+        """
+        result = subprocess.run(
+            ["docker", "compose", "--project-name", PROJECT, "--env-file", str(ROOT / ".env.example"),
+             "--file", str(ROOT / "compose.yaml"), "--profile", "gateway", "exec", "-T", service, *command],
+            env=self.environment, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=180, check=False,
+        )
+        if check:
+            self.assertEqual(0, result.returncode, result.stderr[-2000:])
+        return result.stdout
+
+    def verify_gateway_boundary(self) -> None:
+        """Select the gateway beside the real engine: reachable from it alone, its key nowhere else.
+
+        A sentinel key is mounted while the real engine, database and runtime run. The engine
+        has no adapter for the gateway and the launcher has no key command yet, so no code path
+        can carry a key into the database today. The dump shows that holds with a key present,
+        and the check must stay meaningful once such a path exists.
+        """
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        fixture = Path(directory.name)
+        fixture.chmod(0o755)
+        keys = fixture / "keys"
+        keys.mkdir()
+        keys.chmod(0o755)
+        sentinel = "sentinel-key-" + secrets.token_hex(16)
+        key = keys / "fixture"
+        key.write_text(sentinel, encoding="ascii", newline="\n")
+        key.chmod(0o644)
+        destinations = fixture / "destinations.json"
+        destinations.write_text(json.dumps({"schema": "rpg-engine.gateway-destinations/1", "destinations": [
+            {"id": "fixture", "url": "https://provider.invalid", "path_prefixes": ["/v1"],
+             "key": {"file": "fixture", "header": "x-api-key"}}]}), encoding="utf-8", newline="\n")
+        destinations.chmod(0o644)
+        self.environment = dict(self.environment, GATEWAY_KEYS_DIR=str(keys), GATEWAY_DESTINATIONS_FILE=str(destinations))
+        # Without the profile, `down` would miss this service and the network only it uses.
+        self.addCleanup(self.compose, "--profile", "gateway", "down", "--timeout", "30")
+        self.compose("--profile", "gateway", "up", "--detach", "--build", "--wait", "--wait-timeout", "90", "gateway",
+                     timeout=420)
+        gateway = self.inspect("gateway", "--profile", "gateway")
+        self.assertEqual({PROJECT + "_gateway", PROJECT + "_gateway_egress"}, set(gateway["NetworkSettings"]["Networks"]))
+        self.assertNotIn(PROJECT + "_gateway_egress", self.inspect("engine")["NetworkSettings"]["Networks"])
+        # The real engine container reaches it, and an unlisted destination is refused there too.
+        self.assertEqual('{"status":"ok"}', self.service_output(
+            "engine", "curl", "--silent", "--show-error", "--fail", "--max-time", "10", "http://gateway:8080/healthz"))
+        self.assertEqual('{"code":"destination-not-allowed"}', self.service_output(
+            "engine", "curl", "--silent", "--show-error", "--max-time", "10", "http://gateway:8080/upstream/other/v1"))
+        self.assertEqual("", self.service_output("engine", "sh", "-ec", "test ! -e /run/secrets/gateway"))
+        # The gateway resolves its one peer and neither the database nor the runtime; they do not resolve it.
+        names = ("import socket\nfor name in ('engine', 'postgres', 'codex'):\n    try:\n"
+                 "        socket.getaddrinfo(name, 80)\n        print(name)\n    except OSError:\n        pass\n")
+        self.assertEqual("engine", self.service_output("gateway", "python", "-I", "-B", "-c", names).strip())
+        for service in ("postgres", "codex"):
+            self.assertEqual("", self.service_output(service, "sh", "-ec", "! getent hosts gateway"), service)
+        dump = self.service_output("postgres", "sh", "-ec", 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"')
+        self.assertIn("flyway_schema_history", dump, "control: the dump must hold the engine's schema")
+        self.assertNotIn(sentinel, dump, "database")
+        logs = subprocess.run(
+            ["docker", "compose", "--project-name", PROJECT, "--env-file", str(ROOT / ".env.example"),
+             "--file", str(ROOT / "compose.yaml"), "--profile", "gateway", "logs", "--no-color"],
+            env=self.environment, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=120, check=False,
+        )
+        self.assertEqual(0, logs.returncode, logs.stderr[-2000:])
+        self.assertIn('"event":"started"', logs.stdout)
+        self.assertNotIn(sentinel, logs.stdout + logs.stderr, "service logs")
+
     def test_recreation_preserves_private_storage(self) -> None:
         """Verify topology, UID/socket isolation and durable neutral markers on recreation."""
         STATE.mkdir(parents=True, exist_ok=True)
@@ -216,10 +293,12 @@ class InfrastructureTest(unittest.TestCase):
         database = self.inspect("postgres")
         runtime = self.inspect("codex")
         engine = self.inspect("engine")
-        # `_models` is internal and stays empty here: the model server has its own profile.
-        self.assertEqual({PROJECT + "_web", PROJECT + "_data", PROJECT + "_models"},
+        # `_models` and `_gateway` are internal and stay empty here: their services have profiles.
+        self.assertEqual({PROJECT + "_web", PROJECT + "_data", PROJECT + "_models", PROJECT + "_gateway"},
                          set(engine["NetworkSettings"]["Networks"]))
-        self.assertNotIn("models", self.compose("ps", "--all", "--format", "{{.Service}}").splitlines())
+        started = self.compose("ps", "--all", "--format", "{{.Service}}").splitlines()
+        self.assertNotIn("models", started)
+        self.assertNotIn("gateway", started)
         self.assertEqual("10001:10001", engine["Config"]["User"])
         self.assertTrue(engine["HostConfig"]["ReadonlyRootfs"])
         self.assertEqual(["ALL"], engine["HostConfig"]["CapDrop"])
@@ -310,6 +389,7 @@ class InfrastructureTest(unittest.TestCase):
         for directory in ("home", "workspace"):
             self.assertEqual(marker, self.compose("exec", "-T", "codex", "cat",
                                                  f"/var/lib/runtime/{directory}/.packaging-check"))
+        self.verify_gateway_boundary()
         # Only fixture-owned neutral markers are removed; volumes remain intact.
         self.database(f"DELETE FROM packaging_fixture.markers WHERE marker = '{marker}'")
         self.compose("exec", "-T", "codex", "rm",

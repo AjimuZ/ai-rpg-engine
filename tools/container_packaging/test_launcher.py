@@ -23,6 +23,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 LAUNCHER = ROOT / "start.sh"
+# Their containers run with `run --rm` and remove themselves, so a stop does not select them.
+ONE_OFF_PROFILES = {"model-fetch"}
 
 
 def find_bash() -> str:
@@ -162,6 +164,42 @@ class LauncherCommandSurfaceTest(unittest.TestCase):
         for args in (["--bogus"], ["--stop", "extra"], ["--status", "x"]):
             failed = run_bash(str(LAUNCHER), *args, cwd=ROOT)
             self.assertEqual(2, failed.returncode, (args, failed.stderr))
+
+    def test_stop_selects_every_long_running_profile(self) -> None:
+        """`down` skips a service of an unnamed profile, which would keep running and hold its network.
+
+        The profiles are read from compose.yaml, so a new one fails here until the stop command
+        names it or it joins the one-off profiles, whose containers remove themselves.
+        """
+        declared = set(re.findall(r"^\s+profiles: \[(\S+)\]$", (ROOT / "compose.yaml").read_text(encoding="utf-8"), re.M))
+        self.assertLessEqual({"models", "gateway", *ONE_OFF_PROFILES}, declared)
+        with tempfile.TemporaryDirectory(prefix="launcher stop ") as tmp:
+            copy = Path(tmp)
+            for name in ("start.sh", "compose.yaml"):
+                shutil.copyfile(ROOT / name, copy / name)
+            (copy / ".local").mkdir()
+            (copy / ".local" / "installation-id").write_text("0123456789ab\n", encoding="ascii", newline="\n")
+            log = copy / "docker.log"
+            (copy / "docker-fixture.sh").write_text('''docker() {
+    case "$*" in
+        'context show') printf 'fixture\\n' ;;
+        'info --format '*) printf 'linux 29.0.0\\n' ;;
+        'compose version --short') printf '5.0.0\\n' ;;
+        'buildx version') return 0 ;;
+        'compose '*) printf '%s\\n' "$*" >>"$FIXTURE_LOG" ;;
+        *) printf 'Unexpected Docker call: %s\\n' "$*" >&2; return 97 ;;
+    esac
+}
+''', encoding="utf-8", newline="\n")
+            result = run_bash(str(copy / "start.sh"), "--stop", cwd=copy, extra_env={
+                "BASH_ENV": (copy / "docker-fixture.sh").as_posix(), "FIXTURE_LOG": log.as_posix()})
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            calls = log.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(1, len(calls), calls)
+        words = calls[0].split()
+        self.assertEqual(["down", "--timeout", "35"], words[-3:])
+        selected = {words[index + 1] for index, word in enumerate(words) if word == "--profile"}
+        self.assertEqual(declared - ONE_OFF_PROFILES, selected)
 
     def test_old_bash_is_rejected_before_parsing(self) -> None:
         """The version guard text sits before the first Bash-4-only construct."""
