@@ -215,6 +215,7 @@ services:
   # `gateway_egress`; the engine reaches it over the internal `gateway` network and never
   # receives a key. Both inputs are read-only host paths that must already exist: the
   # allowlist is a file of destinations, and each key is one file in the secrets directory.
+  # Its one writable path is a volume of budget counts, which holds no key.
   gateway:
     build:
       context: ./docker/gateway
@@ -236,6 +237,7 @@ services:
         target: /run/secrets/gateway
         read_only: true
         bind: {create_host_path: false}
+      - gateway_state:/var/lib/gateway
     healthcheck:
       # This is process availability only, never a destination, key or provider answering.
       test: [CMD, python, -I, -B, /opt/gateway/gateway.py, --health]
@@ -268,6 +270,8 @@ volumes:
   database: {}
   runtime_account: {}
   runtime_workspace: {}
+  # Identifiers, period labels and counts of the gateway's budgets: never a key.
+  gateway_state: {}
   # Only the control socket/lock live here. No account or campaign state at rest.
   runtime_ipc:
     driver_opts:

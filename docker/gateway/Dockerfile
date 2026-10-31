@@ -13,5 +13,9 @@ FROM python:3.15.1-slim-trixie@sha256:533b0b2f9b5d46fd097091cf826f27902f1d6c3bca
 # this creates, which the account must be able to enter: a mode without execute stops startup.
 COPY --chmod=0755 gateway.py /opt/gateway/gateway.py
 
+# Docker gives a new named volume the owner and mode of the directory it mounts over, which is
+# how the service account can write its budget counts under a read-only root.
+RUN ["install", "-d", "-o", "10002", "-g", "10002", "-m", "0700", "/var/lib/gateway"]
+
 USER 10002:10002
 ENTRYPOINT ["python", "-I", "-B", "/opt/gateway/gateway.py"]

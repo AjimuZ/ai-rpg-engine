@@ -57,18 +57,20 @@ HTTP error, a server that is not ready and an unreachable server, and nothing ab
 so hosted CI runs it, and its name is matched by the `test_[!h]*.py` pattern of `verify.sh containers`.
 `test_gateway.py` (P21.3-C.1) runs `docker/gateway/gateway.py` in process against a scripted loopback upstream, which is
 a fixture and not a provider. It checks the allowlist file's refusals, key files, cookies, request and response bounds,
-time limits and redirects, and every case asserts that a random sentinel key is absent from the log and from what the
-caller received. It needs no Docker, so hosted CI runs it. `test_gateway_container.py` starts the service as Compose
+time limits, redirects and (P21.3-C.2) budgets on an injected clock: both caps, resets at the UTC boundaries, restarts, a
+damaged or unwritable count file and concurrent calls. Every case asserts that a random sentinel key is absent from the log
+and from what the caller received. It needs no Docker, so hosted CI runs it. `test_gateway_container.py` starts the service as Compose
 renders it, in a uniquely named project that it removes, beside a scripted upstream on the egress network and a prober
 on the private network. It checks the confinement, that only the private network is served, the routes, the rules in
-the real networks and TLS (a trusted certificate passes; another authority or a wrong name gets no request). It also
+the real networks and TLS (a trusted certificate passes; another authority or a wrong name gets no request). A reached
+cap stays reached in a recreated container, because the service account really writes the real volume. It also
 scans logs, container metadata, the process environment and every layer of an image built from a context that
 deliberately holds the sentinel. The images are small, so hosted CI runs it too, on its own Compose 2.x. Under
 `PACKAGING_DOCKER=1`, `test_infrastructure.py` also selects the gateway beside the real stack: the real engine container
 reaches it, the database and runtime cannot resolve it, and a sentinel key mounted in it is absent from a database dump
 and from every service's logs. No code path can carry a key to the database today, so that dump guards a future path.
 `LauncherStopTest` in `test_gateway_container.py` runs the real `./start.sh --stop` from a temporary copy against a running
-gateway and requires its container and both networks gone. Below the launcher's Docker floors, as on hosted CI, it
+gateway and requires its container and both networks gone and its budget volume kept. Below the launcher's Docker floors, as on hosted CI, it
 asserts the launcher's refusal instead.
 `test_launcher.py` checks the root `start.sh` contract (static rules, redaction,
 refusal paths, read-only `--check` and, with a recording stand-in for Docker, that `--stop` selects every long-running

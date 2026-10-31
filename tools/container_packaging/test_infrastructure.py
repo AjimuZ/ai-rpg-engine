@@ -255,6 +255,9 @@ class InfrastructureTest(unittest.TestCase):
         self.assertEqual('{"code":"destination-not-allowed"}', self.service_output(
             "engine", "curl", "--silent", "--show-error", "--max-time", "10", "http://gateway:8080/upstream/other/v1"))
         self.assertEqual("", self.service_output("engine", "sh", "-ec", "test ! -e /run/secrets/gateway"))
+        # Budget counts live in the gateway's own volume, which its account can write and no other service mounts.
+        self.assertEqual("10002 700", self.service_output("gateway", "stat", "-c", "%u %a", "/var/lib/gateway").strip())
+        self.assertEqual("", self.service_output("engine", "sh", "-ec", "test ! -e /var/lib/gateway"))
         # The gateway resolves its one peer and neither the database nor the runtime; they do not resolve it.
         names = ("import socket\nfor name in ('engine', 'postgres', 'codex'):\n    try:\n"
                  "        socket.getaddrinfo(name, 80)\n        print(name)\n    except OSError:\n        pass\n")

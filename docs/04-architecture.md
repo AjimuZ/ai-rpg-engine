@@ -166,6 +166,8 @@ The optional `gateway` service (P21.3-C.1) runs only under `--profile gateway`, 
 internal `gateway`, which it shares only with the engine, and `gateway_egress`, which only
 it joins, and publishes nothing. It mounts its allowlist file and keys directory read-only,
 and no launcher command creates those paths yet ([inference backends section 12](34-inference-backends-and-model-selection.md#p213-c1-gateway-container)).
+Its own `gateway_state` volume keeps the call counts of metered destinations, and a reached
+cap stops that destination without moving the call anywhere ([P21.3-C.2](34-inference-backends-and-model-selection.md#p213-c2-gateway-budgets)).
 The one-off `models-fetch` service (P21.2-B) is the only container that writes its model directory and the only path by which the engine downloads catalog weights; the owner may still add files by hand.
 Engine and runtime share UID 10001 for private socket
 access, but never account/data mounts. Engine mounts socket IPC read-only and

@@ -13,6 +13,7 @@ import base64
 from collections.abc import Callable
 import contextlib
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 import http.client
 import http.server
 import importlib.util
@@ -168,6 +169,10 @@ class GatewayCase(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.keys = Path(directory.name)
         (self.keys / "scripted").write_text(SENTINEL + "\n", encoding="ascii", newline="\n")
+        states = tempfile.TemporaryDirectory()
+        self.addCleanup(states.cleanup)
+        self.budget_file = Path(states.name) / "budgets.json"
+        self.now = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
         self.addCleanup(self.assert_log_clean)
         self.release = threading.Event()
         self.addCleanup(self.release.set)
@@ -186,16 +191,21 @@ class GatewayCase(unittest.TestCase):
         return upstream
 
     def serve(self, url: str, refused_peers: tuple = (), max_in_flight: int = 16, client_timeout: float = 5.0,
-              **changes: object) -> "GatewayCase":
-        """Start the gateway with one destination at `url`; `changes` replace its fields."""
+              others: tuple[dict, ...] = (), **changes: object) -> "GatewayCase":
+        """Start the gateway with one destination at `url`; `changes` replace its fields.
+
+        `others` are further destinations. Serving again on the same case is a restart: a new
+        gateway reads the same budget file, on the clock this case holds in `self.now`.
+        """
         destination = {"id": ID, "url": url, "path_prefixes": ["/v1"], "plaintext_key": True,
                        "key": {"file": "scripted", "header": "x-api-key"}, "timeout_seconds": 5}
         destination.update(changes)
         settings = gateway.parse_settings(json.dumps(
             {"schema": gateway.SCHEMA, "max_in_flight": max_in_flight, "client_timeout_seconds": client_timeout,
-             "destinations": [{name: value for name, value in destination.items() if value is not None}]}))
+             "destinations": [{name: value for name, value in destination.items() if value is not None}, *others]}))
         keys = gateway.load_keys(settings, self.keys, self.log)
-        server = gateway.GatewayServer(("127.0.0.1", 0), gateway.Gateway(settings, keys, self.log), refused_peers)
+        budgets = gateway.BudgetLedger(settings, self.budget_file, self.log, lambda: self.now.timestamp())
+        server = gateway.GatewayServer(("127.0.0.1", 0), gateway.Gateway(settings, keys, self.log, budgets=budgets), refused_peers)
         self.address = server.server_address
         thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": POLL_SECONDS}, daemon=True)
         thread.start()
@@ -260,6 +270,12 @@ class SettingsTest(unittest.TestCase):
         self.assertEqual(gateway.DEFAULT_MAX_IN_FLIGHT, settings.max_in_flight)
         self.assertEqual((("anthropic-version", "2023-06-01"),), destination.headers)
 
+    def test_a_budget_is_optional_and_holds_both_caps(self) -> None:
+        """No budget means an unmetered destination; the ceiling itself is accepted."""
+        self.assertIsNone(gateway.parse_settings(self.document()).destinations["hosted"].budget)
+        settings = gateway.parse_settings(self.document(budget={"daily_calls": 1, "monthly_calls": gateway.MAX_BUDGET_CALLS}))
+        self.assertEqual(gateway.Budget(1, gateway.MAX_BUDGET_CALLS), settings.destinations["hosted"].budget)
+
     def test_an_owner_server_without_a_key_may_use_plain_http(self) -> None:
         """Plain HTTP is refused only when a key would cross it unasked."""
         settings = gateway.parse_settings(self.document(url="http://forge.invalid:7860", key=None))
@@ -292,6 +308,16 @@ class SettingsTest(unittest.TestCase):
             "a response bound over the ceiling": self.document(max_response_bytes=gateway.MAX_BODY_BYTES + 1),
             "no response at all": self.document(max_response_bytes=0),
             "an excessive time": self.document(timeout_seconds=gateway.MAX_TIMEOUT_SECONDS + 1),
+            "a budget that is not an object": self.document(budget=SENTINEL),
+            "a budget without a monthly cap": self.document(budget={"daily_calls": 1}),
+            "a budget without a daily cap": self.document(budget={"monthly_calls": 1}),
+            "an unknown budget field": self.document(budget={"daily_calls": 1, "monthly_calls": 1, "tokens": SENTINEL}),
+            "a cap of text": self.document(budget={"daily_calls": SENTINEL, "monthly_calls": 1}),
+            "a boolean cap": self.document(budget={"daily_calls": True, "monthly_calls": 1}),
+            "a fractional cap": self.document(budget={"daily_calls": 1.5, "monthly_calls": 2}),
+            "a cap of zero": self.document(budget={"daily_calls": 0, "monthly_calls": 1}),
+            "a negative cap": self.document(budget={"daily_calls": 1, "monthly_calls": -1}),
+            "a cap over the ceiling": self.document(budget={"daily_calls": 1, "monthly_calls": gateway.MAX_BUDGET_CALLS + 1}),
             "a repeated field": '{"schema":"' + gateway.SCHEMA + '","schema":"x","destinations":[]}',
             "another schema": json.dumps({"schema": SENTINEL, "destinations": []}),
             "no JSON": SENTINEL,
@@ -870,6 +896,326 @@ class TimeLimitTest(GatewayCase):
         self.assertEqual((502, "upstream-unreachable"), (reply.status, reply.code))
         self.assertNotIn(str(port).encode("ascii"), reply.body)
         self.assertNotIn(str(port), self.stream.getvalue())
+
+
+class BudgetTest(GatewayCase):
+    """A metered destination stops at its caps, across restarts, and nothing moves elsewhere."""
+
+    def metered(self, url: str, daily: int = 2, monthly: int = 10, **changes: object) -> "BudgetTest":
+        """Start the gateway with one destination under these caps."""
+        return self.serve(url, budget={"daily_calls": daily, "monthly_calls": monthly}, **changes)
+
+    def state(self) -> dict:
+        """Return the budget file's stored document."""
+        return json.loads(self.budget_file.read_text(encoding="ascii"))
+
+    def counts(self) -> tuple[int, int]:
+        """Return the stored daily and monthly counts of the destination."""
+        entry = self.state()["destinations"][ID]
+        return entry["day_calls"], entry["month_calls"]
+
+    def assert_refused(self, code: str, status: int = 429, path: str = "/v1/call") -> Reply:
+        """Require one fixed refusal and return it."""
+        reply = self.get(path)
+        self.assertEqual((status, code), (reply.status, reply.code))
+        self.assertEqual({"code": code}, json.loads(reply.body))
+        return reply
+
+    def test_the_daily_cap_stops_the_destination_without_contact(self) -> None:
+        """Calls up to the cap pass; the next one is refused for both methods and reaches nothing."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.metered(upstream.url, daily=2)
+        self.assertEqual(200, self.get().status)
+        self.assertEqual(200, self.post().status)
+        reply = self.assert_refused("budget-exhausted-daily")
+        self.assertEqual(str(12 * 3600), reply.headers["retry-after"])
+        refused_post = self.post(body=b"payload")
+        self.assertEqual((429, "budget-exhausted-daily"), (refused_post.status, refused_post.code))
+        self.assertEqual(2, len(upstream.seen))
+        self.assertEqual((2, 2), self.counts())
+        line = self.events()[-1]
+        self.assertEqual(("request", ID, 429, "budget-exhausted-daily"),
+                         (line["event"], line["destination"], line["status"], line["code"]))
+
+    def test_the_monthly_cap_stops_the_destination_without_contact(self) -> None:
+        """The monthly refusal names its own code and the start of the next month."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.metered(upstream.url, daily=10, monthly=2)
+        self.assertEqual(200, self.get().status)
+        self.now += timedelta(days=1)
+        self.assertEqual(200, self.get().status)
+        reply = self.assert_refused("budget-exhausted-monthly")
+        boundary = datetime(2026, 11, 1, tzinfo=timezone.utc)
+        self.assertEqual(str(int((boundary - self.now).total_seconds())), reply.headers["retry-after"])
+        self.assertEqual(2, len(upstream.seen))
+
+    def test_the_monthly_code_wins_when_both_caps_are_reached(self) -> None:
+        """Waiting for the next day would not help, so the longer stop is the one reported."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.metered(upstream.url, daily=1, monthly=1)
+        self.assertEqual(200, self.get().status)
+        self.assert_refused("budget-exhausted-monthly")
+
+    def test_the_day_boundary_resets_only_the_daily_count(self) -> None:
+        """The cap holds up to the last second of the UTC day, and the month keeps counting."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.metered(upstream.url, daily=1, monthly=2)
+        self.assertEqual(200, self.get().status)
+        self.now = datetime(2026, 10, 15, 23, 59, 59, tzinfo=timezone.utc)
+        self.assertEqual("1", self.assert_refused("budget-exhausted-daily").headers["retry-after"])
+        self.now = datetime(2026, 10, 16, 0, 0, 0, tzinfo=timezone.utc)
+        self.assertEqual(200, self.get().status)
+        self.assertEqual((1, 2), self.counts())
+        self.now += timedelta(days=1)
+        self.assert_refused("budget-exhausted-monthly")
+        self.assertEqual(2, len(upstream.seen))
+
+    def test_the_month_boundary_resets_both_counts_also_across_a_year(self) -> None:
+        """December's refusal points at January, and January starts empty."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.now = datetime(2026, 12, 31, 23, 0, tzinfo=timezone.utc)
+        self.metered(upstream.url, daily=1, monthly=1)
+        self.assertEqual(200, self.get().status)
+        self.assertEqual("3600", self.assert_refused("budget-exhausted-monthly").headers["retry-after"])
+        self.now = datetime(2027, 1, 1, tzinfo=timezone.utc)
+        self.assertEqual(200, self.get().status)
+        self.assertEqual({"day": "2027-01-01", "day_calls": 1, "month": "2027-01", "month_calls": 1},
+                         self.state()["destinations"][ID])
+
+    def test_a_clock_moved_back_reopens_nothing(self) -> None:
+        """An earlier label keeps the later period's count, so a clock fix cannot refund spending."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.metered(upstream.url, daily=1, monthly=10)
+        self.assertEqual(200, self.get().status)
+        self.now -= timedelta(days=2)
+        self.assert_refused("budget-exhausted-daily")
+        self.assertEqual("2026-10-15", self.state()["destinations"][ID]["day"])
+        self.assertEqual(1, len(upstream.seen))
+
+    def test_counts_survive_a_restart_and_still_reset_afterwards(self) -> None:
+        """A new gateway on the same file continues the count and the stop, until the period ends."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.metered(upstream.url, daily=2, monthly=3)
+        self.assertEqual(200, self.get().status)
+        self.metered(upstream.url, daily=2, monthly=3)
+        self.assertEqual(200, self.get().status)
+        self.assertEqual((2, 2), self.counts())
+        self.metered(upstream.url, daily=2, monthly=3)
+        self.assert_refused("budget-exhausted-daily")
+        self.now += timedelta(days=1)
+        self.metered(upstream.url, daily=2, monthly=3)
+        self.assertEqual(200, self.get().status)
+        self.metered(upstream.url, daily=2, monthly=3)
+        self.assert_refused("budget-exhausted-monthly")
+        self.assertEqual(3, len(upstream.seen))
+
+    def test_a_reserved_count_is_on_disk_before_the_call_is_made(self) -> None:
+        """A process killed during a call has already recorded it, so a restart cannot forget it."""
+        stored: list[tuple[int, int]] = []
+
+        def record(handler: http.server.BaseHTTPRequestHandler) -> None:
+            stored.append(self.counts())
+            answer()(handler)
+
+        upstream = self.upstream({"/v1/call": record})
+        self.metered(upstream.url)
+        self.assertEqual(200, self.get().status)
+        self.assertEqual([(1, 1)], stored)
+
+    def test_a_missing_file_starts_at_zero_and_is_created(self) -> None:
+        """A first start looks like this, and the file exists after the first call."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.metered(upstream.url)
+        self.assertFalse(self.budget_file.exists())
+        self.assertEqual(200, self.get().status)
+        self.assertEqual((1, 1), self.counts())
+        self.assertNotIn("budget-state-refused", self.stream.getvalue())
+
+    def test_a_damaged_file_stops_metered_destinations_and_nothing_else(self) -> None:
+        """Resetting would reopen spending, so each damage fails closed and leaves the file for the owner."""
+        entry = {"day": "2026-10-15", "day_calls": 1, "month": "2026-10", "month_calls": 1}
+        document = {"schema": gateway.BUDGET_SCHEMA, "destinations": {ID: entry}}
+        cases = {
+            "not JSON": SENTINEL.encode("ascii"),
+            "cut short": json.dumps(document).encode("ascii")[:-5],
+            "not text": b"\xff\xfe" + SENTINEL.encode("ascii"),
+            "nested without end": b"[" * 60000,
+            "too large": json.dumps({**document, "padding": SENTINEL}).encode("ascii") + b" " * gateway.MAX_BUDGET_FILE_BYTES,
+            "another schema": json.dumps({**document, "schema": SENTINEL}).encode("ascii"),
+            "an unknown field": json.dumps({**document, "note": SENTINEL}).encode("ascii"),
+            "a repeated field": ('{"schema":"' + gateway.BUDGET_SCHEMA + '","schema":"x","destinations":{}}').encode("ascii"),
+            "a list of destinations": json.dumps({**document, "destinations": [entry]}).encode("ascii"),
+            "an invalid identifier": json.dumps({**document, "destinations": {SENTINEL.upper(): entry}}).encode("ascii"),
+            "a missing count": json.dumps({**document, "destinations": {ID: {"day": "2026-10-15", "month": "2026-10"}}}).encode("ascii"),
+            "a negative count": json.dumps({**document, "destinations": {ID: {**entry, "day_calls": -1}}}).encode("ascii"),
+            "a boolean count": json.dumps({**document, "destinations": {ID: {**entry, "month_calls": True}}}).encode("ascii"),
+            "a text count": json.dumps({**document, "destinations": {ID: {**entry, "day_calls": SENTINEL}}}).encode("ascii"),
+            "a bad day label": json.dumps({**document, "destinations": {ID: {**entry, "day": SENTINEL}}}).encode("ascii"),
+            "a bad month label": json.dumps({**document, "destinations": {ID: {**entry, "month": "2026-10-15"}}}).encode("ascii"),
+            "an unknown entry field": json.dumps({**document, "destinations": {ID: {**entry, "key": SENTINEL}}}).encode("ascii"),
+        }
+        upstream = self.upstream({"/v1/call": answer()})
+        open_upstream = self.upstream({"/v1/call": answer()})
+        others = ({"id": "open", "url": open_upstream.url, "path_prefixes": ["/v1"]},)
+        for name, content in cases.items():
+            with self.subTest(name):
+                self.budget_file.write_bytes(content)
+                refusals_before = self.stream.getvalue().count("budget-state-refused")
+                self.metered(upstream.url, others=others)
+                self.assertEqual(refusals_before + 1, self.stream.getvalue().count("budget-state-refused"))
+                self.assert_refused("budget-unavailable", 503)
+                self.assertEqual(200, self.call("GET", "/upstream/open/v1/call").status)
+                self.assertEqual(200, self.call("GET", "/healthz").status)
+                self.assertEqual(content, self.budget_file.read_bytes())
+        self.assertEqual([], upstream.seen)
+        self.assertEqual(len(cases), len(open_upstream.seen))
+
+    def test_an_unreadable_path_fails_closed(self) -> None:
+        """A path that exists and cannot be read is not the same as a first start."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.budget_file.mkdir()
+        self.metered(upstream.url)
+        self.assert_refused("budget-unavailable", 503)
+        self.assertEqual([], upstream.seen)
+        self.assertIn("budget-state-refused", self.stream.getvalue())
+
+    def test_a_failed_write_refuses_the_call_and_consumes_nothing(self) -> None:
+        """No call leaves unrecorded, and space returning restores service with the count intact."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.metered(upstream.url, daily=2)
+        self.assertEqual(200, self.get().status)
+        with mock.patch.object(gateway.os, "replace", side_effect=OSError(SENTINEL)):
+            self.assert_refused("budget-unavailable", 503)
+            self.assert_refused("budget-unavailable", 503)
+        self.assertEqual(1, len(upstream.seen))
+        self.assertEqual((1, 1), self.counts())
+        self.assertEqual(200, self.get().status)
+        self.assertEqual((2, 2), self.counts())
+        self.assert_refused("budget-exhausted-daily")
+
+    def test_a_metered_destination_without_a_ledger_fails_closed(self) -> None:
+        """A cap nobody counts must not mean no cap."""
+        upstream = self.upstream({"/v1/call": answer()})
+        settings = gateway.parse_settings(json.dumps({"schema": gateway.SCHEMA, "destinations": [
+            {"id": ID, "url": upstream.url, "path_prefixes": ["/v1"], "budget": {"daily_calls": 1, "monthly_calls": 1}}]}))
+        with self.assertRaises(gateway.Refusal) as caught:
+            gateway.Gateway(settings, {}, self.log).charge(settings.destinations[ID])
+        self.assertEqual((503, "budget-unavailable"), (caught.exception.status, caught.exception.code))
+
+    def test_a_capped_destination_never_moves_work_elsewhere(self) -> None:
+        """The other destination sees nothing from the refused calls and keeps its own count."""
+        capped = self.upstream({"/v1/call": answer(200, b"capped")})
+        spare = self.upstream({"/v1/call": answer(200, b"spare")})
+        others = ({"id": "spare-metered", "url": spare.url, "path_prefixes": ["/v1"],
+                   "budget": {"daily_calls": 5, "monthly_calls": 5}},
+                  {"id": "spare-open", "url": spare.url, "path_prefixes": ["/v1"]})
+        self.metered(capped.url, daily=1, others=others)
+        self.assertEqual(b"capped", self.get().body)
+        for _ in range(3):
+            self.assert_refused("budget-exhausted-daily")
+        self.assertEqual([], spare.seen)
+        self.assertEqual(1, len(capped.seen))
+        self.assertEqual(b"spare", self.call("GET", "/upstream/spare-metered/v1/call").body)
+        self.assertEqual(b"spare", self.call("GET", "/upstream/spare-open/v1/call").body)
+        self.assertEqual(2, len(spare.seen))
+        destinations = self.state()["destinations"]
+        self.assertEqual({ID, "spare-metered"}, set(destinations))
+        self.assertEqual(1, destinations["spare-metered"]["day_calls"])
+
+    def test_a_destination_without_a_budget_is_unchanged(self) -> None:
+        """It never reads or writes the file, even a damaged one, and answers as before."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.serve(upstream.url)
+        for _ in range(5):
+            self.assertEqual(200, self.get().status)
+        self.assertEqual(5, len(upstream.seen))
+        self.assertFalse(self.budget_file.exists())
+        self.budget_file.write_bytes(b"damaged")
+        self.serve(upstream.url)
+        self.assertEqual(200, self.get().status)
+        self.assertEqual(b"damaged", self.budget_file.read_bytes())
+        self.assertNotIn("budget-state-refused", self.stream.getvalue())
+
+    def test_a_request_refused_before_contact_costs_nothing(self) -> None:
+        """Only a call that may reach the destination spends the budget."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.metered(upstream.url, max_request_bytes=4)
+        self.assert_refused("path-not-allowed", 403, "/v2/call")
+        self.assertEqual(413, self.post(body=b"too large").status)
+        self.assertEqual(400, self.call("GET", f"/upstream/{ID}/v1/call", b"body").status)
+        self.assertFalse(self.budget_file.exists())
+        keyless = self.upstream({"/v1/call": answer()})
+        self.metered(keyless.url, key={"file": "absent", "header": "x-api-key"})
+        self.assert_refused("key-unavailable", 503)
+        self.assertFalse(self.budget_file.exists())
+        self.assertEqual([], upstream.seen + keyless.seen)
+
+    def test_a_failed_call_counts_once_and_redirect_hops_share_it(self) -> None:
+        """The gateway cannot tell whether the provider billed a failure, so it counts as spent."""
+        upstream = self.upstream({"/v1/call": answer(), "/v1/denied": answer(500, b"failed"),
+                                  "/v1/hop": redirect("/v1/call")})
+        self.metered(upstream.url, daily=10)
+        self.assertEqual(500, self.get("/v1/denied").status)
+        self.assertEqual((1, 1), self.counts())
+        self.assertEqual(200, self.get("/v1/hop").status)
+        self.assertEqual((2, 2), self.counts())
+        self.assertEqual(3, len(upstream.seen))
+        with socket.socket() as unused:
+            unused.bind(("127.0.0.1", 0))
+            port = unused.getsockname()[1]
+        self.metered(f"http://127.0.0.1:{port}", daily=10)
+        self.assert_refused("upstream-unreachable", 502)
+        self.assertEqual((3, 3), self.counts())
+
+    def test_the_time_budget_ends_a_metered_call_and_it_counts(self) -> None:
+        """`timeout_seconds` is the per-call time budget, whatever the destination's caps."""
+        def silent(_handler: http.server.BaseHTTPRequestHandler) -> None:
+            self.release.wait(15)
+
+        upstream = self.upstream({"/v1/call": silent})
+        self.metered(upstream.url, daily=1, timeout_seconds=0.5)
+        started = time.monotonic()
+        self.assert_refused("upstream-timeout", 504)
+        elapsed = time.monotonic() - started
+        self.assertGreaterEqual(elapsed, 0.4)
+        self.assertLess(elapsed, 3)
+        self.assertEqual((1, 1), self.counts())
+        self.assert_refused("budget-exhausted-daily")
+        self.assertEqual(1, len(upstream.seen))
+
+    def test_concurrent_calls_cannot_pass_the_cap(self) -> None:
+        """Reserving before contact means exactly the cap reaches the destination."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.metered(upstream.url, daily=5, monthly=5, max_in_flight=32)
+        replies: list[Reply] = []
+        threads = [threading.Thread(target=lambda: replies.append(self.get()), daemon=True) for _ in range(20)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(30)
+        self.assertEqual(20, len(replies))
+        self.assertEqual(5, sum(reply.status == 200 for reply in replies))
+        self.assertEqual(15, sum(reply.status == 429 for reply in replies))
+        self.assertEqual(5, len(upstream.seen))
+        self.assertEqual((5, 5), self.counts())
+
+    def test_no_key_reaches_the_budget_file_or_a_refusal(self) -> None:
+        """The file holds identifiers, labels and counts only, while the upstream really got the key (QA-16)."""
+        upstream = self.upstream({"/v1/call": answer()})
+        self.metered(upstream.url, daily=1)
+        self.assertEqual(200, self.get().status)
+        self.assertEqual(SENTINEL, upstream.seen[0].headers["x-api-key"], "control: the key must really have been sent")
+        reply = self.assert_refused("budget-exhausted-daily")
+        self.assertEqual({"content-type", "content-length", "cache-control", "connection", "retry-after", "server", "date"},
+                         set(reply.headers))
+        raw_state = self.budget_file.read_bytes()
+        self.assertNotIn(SENTINEL.encode("ascii"), raw_state)
+        self.assertNotIn(upstream.url.encode("ascii"), raw_state)
+        self.assertEqual({"schema": gateway.BUDGET_SCHEMA, "destinations": {
+            ID: {"day": "2026-10-15", "day_calls": 1, "month": "2026-10", "month_calls": 1}}}, self.state())
+        self.assertEqual([self.budget_file.name], [path.name for path in self.budget_file.parent.iterdir()])
+        self.assertNotIn(SENTINEL, self.stream.getvalue())
+        self.assertNotIn(str(self.budget_file.parent), self.stream.getvalue())
 
 
 class RedirectTest(GatewayCase):

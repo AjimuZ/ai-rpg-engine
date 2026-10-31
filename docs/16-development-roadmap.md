@@ -3330,6 +3330,45 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       limit is set or measured for the worst case of `max_in_flight` full bodies. The engine's `web` network remains an ordinary bridge, so
       "the engine has no Internet route" (ADR 0021) is not yet true of the packaged stack. The two `GATEWAY_*` path variables have defaults and
       are not listed in `.env.example`, which sessions do not edit.
+  - Partial progress (31 October 2026, P21.3-C.2): the gateway keeps a daily and a monthly call cap per metered destination, with counts that
+    survive restarts, tested against a scripted upstream only. The P21.3 box stays unchecked: the launcher's key command, the protocol behavior
+    of the gateway, the Settings → Models panel and the `claude`, `openai-compatible`, `anthropic-api`, `a1111-http`, `openai-images` and
+    `local-image` adapters are not built.
+    - Added to `docker/gateway/gateway.py`: the optional destination field `budget` (`daily_calls`, `monthly_calls`, both required, 1 to
+      1,000,000,000), `BudgetLedger` and the option `--budget-file`. Added the named volume `gateway_state` at `/var/lib/gateway`, the service's
+      only writable path, and the directory in the image that gives a new volume UID 10002 and mode 0700. Rules and codes are in
+      `docs/34-inference-backends-and-model-selection.md` section 12.
+    - Decisions: the gateway knows destinations, not slots, so a metered slot is a destination with its own caps. The unit is the relayed call per
+      UTC day and calendar month, because counting tokens or images needs protocol parsing that is not built. A call is reserved and written
+      to disk after validation and before contact, and counts even if it then fails, because the gateway cannot tell what the provider billed.
+      The monthly code wins when both caps are reached. A missing file starts at zero; a damaged one stops metered destinations with 503
+      `budget-unavailable` and is left in place, because a reset would silently reopen spending. A failed write refuses that call and consumes
+      nothing. A clock moved back reopens nothing. The per-call time budget is the existing `timeout_seconds`, with no second mechanism.
+    - Tests: `test_gateway.py` went from 58 to 79 cases: `BudgetTest` (20: both caps with their codes and `Retry-After`, which code wins, day,
+      month and year boundaries on an injected clock, a clock moved back, restart, the count on disk before the call, a missing file, 17 kinds of
+      damage, an unreadable path, a failed write, no ledger, a capped destination leaving others untouched, a destination without a budget,
+      refusals that cost nothing, failed calls and redirect hops, the time budget, 20 concurrent calls against a cap of 5, and the key sentinel
+      absent from the file and refusal) and 1 settings case, plus 10 new refused forms in the existing settings case. `test_gateway_container.py`
+      gained 1 case on the real image and volume: a reached cap stays reached in a recreated container, no upstream contact, the sentinel
+      absent from the file, logs, metadata and process environment, with the upstream's record as the control. Its confinement case now requires
+      exactly one writable mount, owned by UID 10002 with mode 0700. `LauncherStopTest` requires the volume to survive `./start.sh --stop`
+      and to be gone after the cleanup's `down --volumes`. `test_compose.py` and `verify_gateway_boundary` in `test_infrastructure.py` check the
+      new mount and that no other service has it. Container fixtures now remove their volume, or each run would leave one on the host.
+    - Commands and results on the reference host (Git Bash): `py -B -m unittest discover -s tools/container_packaging -p test_gateway.py`: `Ran 79
+      tests`, `OK`. `sh .agents/ralph/verify.sh probe`: 4 of 4 steps passed, `VERIFY PASSED (probe)`, with `test_compose.py` passing on Compose 2.x
+      (`Ran 10 tests`). `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh containers`: `PASS container-packaging` (477 s, `Ran 226 tests in
+      475.563s`, `OK (skipped=1)`, restore rehearsal on schema 28 with 58 tables and 229 rows), `PASS runtime-probe-docker` (80 s, `Ran 116 tests in
+      80.065s`, `OK`), `VERIFY PASSED (containers)`. `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full`: 18 steps, all `PASS`,
+      `VERIFY PASSED (full)`, with 1266 backend tests, 0 failures, 0 errors, 0 skipped, `BUILD SUCCESS`. This entry was written after those runs;
+      `verify.sh repo` then checked it.
+    - Not proven: no real provider or Internet destination has answered, so whether counted calls match any bill is unknown, and a cap limits
+      spending only as far as calls predict it. No adapter calls the gateway, so the engine's reaction to these codes is unbuilt and unseen: the
+      rule that work never moves to another class is shown at the gateway, where a capped call contacts nothing, while the engine's same-class rule
+      stays the one from P21.3-A. Repeated calls during an outage spend the budget, and a readiness probe through a metered destination counts. A
+      host power failure can lose the latest counts, because the directory is not synced, and no power failure or real process kill was run: restart
+      is shown by a new gateway on the same file and by a recreated container after a clean stop. Volume ownership was seen only on Docker Desktop
+      on the reference host, so native Linux is unverified, and hosted CI has not run this change. No launcher command recovers from a damaged file
+      or shows the counts. No weakened-copy run was made, so the new tests were not shown to fail on a removed check.
 - [ ] P21.4 Implement the shared GPU and RAM admission coordinator for text, image and speech: priorities, leases using the model server's documented load and unload endpoints and slot save and restore, batching, interruption between diffusion steps, unowned-contention handling and metrics. Prove no engine-caused out-of-memory on the reference host.
 - [ ] P21.5 Implement the local image backend: a pinned image-worker container loading single-file safetensors checkpoints and LoRAs, with WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as catalog alternatives; prompt chunking beyond 77 tokens; default safe-content tags; step-boundary cancellation; output validation and provenance; and the `a1111-http` adapter for an owner-run Forge or A1111 server. Integrate with the P17 asset-job contract without changing authority rules.
 - [ ] P21.6 Verify and document: QA-43 and QA-44 on deterministic fixtures and on the reference host, synthetic-hardware advisor tests, custom-endpoint and secret-handling tests, the bilingual narration evaluation of the default and alternate models, license and attribution records, and the supported-defaults table for the reference host with honest limits.

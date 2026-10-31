@@ -23,13 +23,17 @@ Guarantees:
 - every refusal carries one fixed code. Log lines hold fixed codes, an allowlisted
   identifier and counts: never a path, query, header, body, peer text or exception message;
 - connections arriving over the egress network are closed unanswered, so only the private
-  network shared with the engine reaches the keys.
+  network shared with the engine reaches the keys;
+- a destination with a `budget` is stopped at its daily or monthly cap with 429 and a fixed
+  code, and its counts survive a restart. A capped call contacts nothing: the gateway has no
+  route from one destination to another, so it cannot move work elsewhere (`BudgetLedger`).
 
 Limits: name resolution follows the system resolver's own time limit, and a hostname is
 trusted to mean what the owner allowlisted, so DNS rebinding is not defended against. A call
 whose deadline passes during connection setup is answered once setup ends, so the answer can
 come late by the time left, at most `CONNECT_SECONDS`, for each TCP attempt and the TLS
-handshake. Nothing is sent to the destination after the deadline.
+handshake. Nothing is sent to the destination after the deadline. Budgets count relayed
+calls, not tokens or images, because the protocols are not interpreted here.
 
 Exit status: 0 stopped by SIGTERM or a passing `--health`; 1 a failing `--health`; 78 a
 refused configuration, named by JSON location and never by value.
@@ -39,11 +43,15 @@ The standard library is the only dependency, because the pinned image adds nothi
 
 import argparse
 import base64
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 import http.client
 import http.server
 import ipaddress
 import json
+import math
+import os
 from pathlib import Path
 import re
 import signal
@@ -58,8 +66,10 @@ import urllib.parse
 
 
 SCHEMA = "rpg-engine.gateway-destinations/1"
+BUDGET_SCHEMA = "rpg-engine.gateway-budgets/1"
 DESTINATIONS_FILE = "/etc/gateway/destinations.json"
 KEYS_DIRECTORY = "/run/secrets/gateway"
+BUDGET_FILE = "/var/lib/gateway/budgets.json"
 ROUTE_TABLE = "/proc/net/route"
 LISTEN_PORT = 8080
 
@@ -88,6 +98,9 @@ MAX_KEY_BYTES = 8192
 MAX_DESTINATIONS = 64
 MAX_PREFIXES = 32
 MAX_FIXED_HEADERS = 16
+MAX_BUDGET_CALLS = 1_000_000_000
+# Far above what `MAX_DESTINATIONS` entries occupy, so only a damaged file reaches it.
+MAX_BUDGET_FILE_BYTES = 64 * 1024
 
 HEALTH_FAILED_STATUS = 1
 CONFIG_STATUS = 78
@@ -113,6 +126,8 @@ FORWARDED_VALUE_RULE = re.compile(r"[\x20-\x7e]{1,256}")
 CONTENT_TYPE_RULE = re.compile(r"[A-Za-z0-9!#$&^_.+-]{1,64}/[A-Za-z0-9!#$&^_.+-]{1,64}"
                                r"(?: *; *[A-Za-z0-9_.-]{1,32}=[A-Za-z0-9_.\"-]{1,64}){0,4}")
 RETRY_AFTER_RULE = re.compile(r"[0-9]{1,10}|[A-Z][a-z]{2}, [0-9]{2} [A-Z][a-z]{2} [0-9]{4} [0-9]{2}:[0-9]{2}:[0-9]{2} GMT")
+DAY_RULE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+MONTH_RULE = re.compile(r"[0-9]{4}-[0-9]{2}")
 
 FORWARDED_REQUEST_HEADERS = ("content-type", "accept")
 # These never come from the destinations file: the gateway owns them or they carry credentials.
@@ -134,10 +149,11 @@ class ConfigError(Exception):
 class Refusal(Exception):
     """One request ends with this status and fixed code; nothing from any peer is attached."""
 
-    def __init__(self, status: int, code: str) -> None:
+    def __init__(self, status: int, code: str, retry_after: str | None = None) -> None:
         super().__init__(code)
         self.status = status
         self.code = code
+        self.retry_after = retry_after
 
 
 @dataclass(frozen=True)
@@ -147,6 +163,14 @@ class KeySpec:
     file: str
     header: str
     prefix: str
+
+
+@dataclass(frozen=True)
+class Budget:
+    """The caps of one metered destination, in relayed calls per UTC day and UTC calendar month."""
+
+    daily_calls: int
+    monthly_calls: int
 
 
 @dataclass(frozen=True)
@@ -164,6 +188,7 @@ class Destination:
     max_response_bytes: int
     timeout_seconds: float
     max_redirects: int
+    budget: Budget | None
 
     @property
     def origin(self) -> tuple[str, str, int]:
@@ -313,11 +338,18 @@ def parse_prefixes(node: object, where: str) -> tuple[str, ...]:
     return tuple(node)
 
 
+def parse_budget(node: object, where: str) -> Budget:
+    """Return both caps: a metered destination never runs with only one of them."""
+    node = object_at(node, where, {"daily_calls", "monthly_calls"}, set())
+    return Budget(number_at(node, "daily_calls", where, 0, 1, MAX_BUDGET_CALLS, True),
+                  number_at(node, "monthly_calls", where, 0, 1, MAX_BUDGET_CALLS, True))
+
+
 def parse_destination(node: object, where: str) -> Destination:
     """Return one destination, or refuse it with its JSON location."""
     node = object_at(node, where, {"id", "url", "path_prefixes"},
                      {"key", "plaintext_key", "headers", "max_request_bytes", "max_response_bytes",
-                      "timeout_seconds", "max_redirects"})
+                      "timeout_seconds", "max_redirects", "budget"})
     url = node["url"]
     try:
         if not isinstance(url, str):
@@ -343,7 +375,8 @@ def parse_destination(node: object, where: str) -> Destination:
         number_at(node, "max_response_bytes", where, DEFAULT_MAX_RESPONSE_BYTES, 1, MAX_BODY_BYTES, True),
         float(number_at(node, "timeout_seconds", where, DEFAULT_TIMEOUT_SECONDS, MIN_DURATION_SECONDS,
                         MAX_TIMEOUT_SECONDS, False)),
-        number_at(node, "max_redirects", where, DEFAULT_MAX_REDIRECTS, 0, MAX_REDIRECTS, True))
+        number_at(node, "max_redirects", where, DEFAULT_MAX_REDIRECTS, 0, MAX_REDIRECTS, True),
+        parse_budget(node["budget"], f"{where}.budget") if "budget" in node else None)
 
 
 def parse_settings(text: str) -> Settings:
@@ -376,6 +409,137 @@ def load_settings(path: str | Path) -> Settings:
         return parse_settings(Path(path).read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError):
         raise ConfigError("the destinations file cannot be read") from None
+
+
+@dataclass(frozen=True)
+class Usage:
+    """The calls counted for one destination in the UTC day and month these labels name."""
+
+    day: str
+    day_calls: int
+    month: str
+    month_calls: int
+
+    def at(self, day: str, month: str) -> "Usage":
+        """Return this usage as of the given labels.
+
+        Only a later label restarts a count, and ISO labels sort by time, so a wall clock moved
+        back reopens nothing: the later label and its count stay until the clock passes it.
+        """
+        return Usage(max(self.day, day), 0 if day > self.day else self.day_calls,
+                     max(self.month, month), 0 if month > self.month else self.month_calls)
+
+
+def parse_budget_state(text: str) -> dict[str, Usage]:
+    """Return the usage in a budget file, or raise ConfigError for anything but its exact shape."""
+    try:
+        root = json.loads(text, object_pairs_hook=refuse_repeated_fields)
+    except (ValueError, RecursionError):
+        raise ConfigError("the budget file is not valid JSON") from None
+    root = object_at(root, "file", {"schema", "destinations"}, set())
+    if root["schema"] != BUDGET_SCHEMA or not isinstance(root["destinations"], dict):
+        raise ConfigError("the budget file has another shape")
+    usage = {}
+    for identifier, node in root["destinations"].items():
+        if not IDENTIFIER_RULE.fullmatch(identifier):
+            raise ConfigError("the budget file holds an invalid identifier")
+        node = object_at(node, "entry", {"day", "day_calls", "month", "month_calls"}, set())
+        usage[identifier] = Usage(text_at(node, "day", "entry", DAY_RULE),
+                                  number_at(node, "day_calls", "entry", 0, 0, MAX_BUDGET_CALLS, True),
+                                  text_at(node, "month", "entry", MONTH_RULE),
+                                  number_at(node, "month_calls", "entry", 0, 0, MAX_BUDGET_CALLS, True))
+    return usage
+
+
+def retry_seconds(moment: datetime, boundary: datetime) -> str:
+    """Return the whole seconds from `moment` to a later `boundary` as a `Retry-After` value."""
+    return str(max(1, math.ceil((boundary - moment).total_seconds())))
+
+
+class BudgetLedger:
+    """Count the relayed calls of metered destinations per UTC day and month, across restarts.
+
+    A call is reserved and written to disk before any contact, so concurrent calls cannot pass a
+    cap and a killed process cannot forget a call it made. The cost is that a call counts even if
+    it then fails, because the gateway cannot tell whether the provider billed it.
+
+    The file holds only allowlisted identifiers, period labels and counts, and is replaced whole,
+    so a kill leaves the old or the new content and never a mixture. A host power failure can still
+    lose the latest replacements, because the directory itself is not synced.
+
+    Failure is closed. A missing file means nothing was counted yet, since a first start looks the
+    same. Any other unreadable or malformed file stops every metered destination with 503
+    `budget-unavailable` and is left in place for the owner: resetting it would silently reopen
+    spending. A write that fails refuses that call and leaves its count unconsumed, so space
+    returning restores service. Destinations without a budget never touch the file. Counts of a
+    destination that is no longer metered are dropped on the next write.
+    """
+
+    def __init__(self, settings: Settings, path: str | Path, log: EventLog,
+                 now: Callable[[], float] = time.time) -> None:
+        self.path = Path(path)
+        self.now = now
+        self.lock = threading.Lock()
+        self.metered = frozenset(destination.identifier for destination in settings.destinations.values()
+                                 if destination.budget is not None)
+        self.usage = self.load(log) if self.metered else {}
+
+    def load(self, log: EventLog) -> dict[str, Usage] | None:
+        """Return the stored usage of metered destinations, or None when the file cannot be trusted."""
+        try:
+            with self.path.open("rb") as source:
+                raw = source.read(MAX_BUDGET_FILE_BYTES + 1)
+            if len(raw) > MAX_BUDGET_FILE_BYTES:
+                raise ConfigError("the budget file is too large")
+            stored = parse_budget_state(raw.decode("utf-8"))
+        except FileNotFoundError:
+            return {}
+        except (OSError, UnicodeDecodeError, ConfigError):
+            # No reason is logged: the file's content must not reach the log in any form.
+            log.write("budget-state-refused")
+            return None
+        return {identifier: usage for identifier, usage in stored.items() if identifier in self.metered}
+
+    def save(self, usage: dict[str, Usage]) -> None:
+        """Replace the file whole; raises OSError when it could not be written."""
+        document = {"schema": BUDGET_SCHEMA, "destinations": {
+            identifier: {"day": entry.day, "day_calls": entry.day_calls,
+                         "month": entry.month, "month_calls": entry.month_calls}
+            for identifier, entry in usage.items()}}
+        temporary = self.path.with_name(self.path.name + ".tmp")
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, "wb") as output:
+            output.write(json.dumps(document, separators=(",", ":")).encode("ascii"))
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, self.path)
+
+    def reserve(self, destination: Destination) -> None:
+        """Count one call of a metered destination, or refuse it with a fixed code.
+
+        The monthly code wins when both caps are reached, because the next day would not help.
+        `Retry-After` says when the refusing period ends. The file is written under the lock,
+        because one small synced write is cheap beside the call it protects.
+        """
+        moment = datetime.fromtimestamp(self.now(), timezone.utc)
+        today = moment.replace(hour=0, minute=0, second=0, microsecond=0)
+        day, month = today.date().isoformat(), today.date().isoformat()[:7]
+        with self.lock:
+            if self.usage is None:
+                raise Refusal(503, "budget-unavailable")
+            usage = self.usage.get(destination.identifier, Usage(day, 0, month, 0)).at(day, month)
+            if usage.month_calls >= destination.budget.monthly_calls:
+                next_month = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+                raise Refusal(429, "budget-exhausted-monthly", retry_seconds(moment, next_month))
+            if usage.day_calls >= destination.budget.daily_calls:
+                raise Refusal(429, "budget-exhausted-daily", retry_seconds(moment, today + timedelta(days=1)))
+            counted = {**self.usage, destination.identifier: Usage(usage.day, usage.day_calls + 1,
+                                                                   usage.month, usage.month_calls + 1)}
+            try:
+                self.save(counted)
+            except OSError:
+                raise Refusal(503, "budget-unavailable") from None
+            self.usage = counted
 
 
 def read_key(path: Path) -> bytes:
@@ -551,11 +715,12 @@ class Gateway:
     """Hold the validated destinations and keys, and relay one call under their rules."""
 
     def __init__(self, settings: Settings, keys: dict[str, bytes], log: EventLog,
-                 context: ssl.SSLContext | None = None) -> None:
+                 context: ssl.SSLContext | None = None, budgets: BudgetLedger | None = None) -> None:
         self.settings = settings
         self.keys = keys
         self.log = log
         self.context = context if context is not None else tls_context()
+        self.budgets = budgets
         self.leak_forms = tuple(form for key in keys.values() for form in leak_forms(key))
 
     def resolve(self, request_target: str) -> tuple[Destination, str]:
@@ -578,6 +743,14 @@ class Gateway:
     def holds_key(self, data: bytes) -> bool:
         """Return whether a reply carries any loaded key, whichever destination it belongs to."""
         return any(form in data for form in self.leak_forms)
+
+    def charge(self, destination: Destination) -> None:
+        """Reserve one call of a metered destination or refuse it; other destinations pass untouched."""
+        if destination.budget is None:
+            return
+        if self.budgets is None:
+            raise Refusal(503, "budget-unavailable")
+        self.budgets.reserve(destination)
 
     def upstream_headers(self, destination: Destination, inbound: dict[str, str]) -> dict[str, bytes | str]:
         """Build the headers of one call: nothing from the engine can replace the key or fixed values."""
@@ -769,10 +942,14 @@ class RelayHandler(http.server.BaseHTTPRequestHandler):
                     raise Refusal(503, "gateway-busy")
                 body = self.read_body(destination)
                 request_bytes = len(body or b"")
+                # After the body, so that a request refused above costs nothing, and once per call,
+                # so that redirect hops share it.
+                gateway.charge(destination)
                 answer = gateway.forward(destination, self.command, target, self.inbound_headers(), body)
                 fields.update(status=answer.status, code=answer.code, hops=answer.hops, response_bytes=len(answer.payload))
             except Refusal as refusal:
-                answer = Answer(refusal.status, encode_code(refusal.code), "application/json", None, refusal.code, 0)
+                answer = Answer(refusal.status, encode_code(refusal.code), "application/json", refusal.retry_after,
+                                refusal.code, 0)
                 fields.update(status=refusal.status, code=refusal.code)
             except Exception as failure:
                 # The type is the only safe part of an unexpected failure: its text may hold peer data.
@@ -866,6 +1043,7 @@ def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Relay engine calls to allowlisted destinations.")
     parser.add_argument("--config", default=DESTINATIONS_FILE)
     parser.add_argument("--keys-dir", default=KEYS_DIRECTORY)
+    parser.add_argument("--budget-file", default=BUDGET_FILE)
     parser.add_argument("--port", type=int, default=LISTEN_PORT)
     parser.add_argument("--health", action="store_true")
     options = parser.parse_args(arguments)
@@ -882,9 +1060,10 @@ def main(arguments: list[str] | None = None) -> int:
         log.write("startup-refused", reason="the route table cannot be read")
         return CONFIG_STATUS
     keys = load_keys(settings, options.keys_dir, log)
+    budgets = BudgetLedger(settings, options.budget_file, log)
     signal.signal(signal.SIGTERM, stop_on_signal)
-    with GatewayServer(("0.0.0.0", options.port), Gateway(settings, keys, log), refused_peers) as server:
-        log.write("started", destinations=len(settings.destinations), keys=len(keys))
+    with GatewayServer(("0.0.0.0", options.port), Gateway(settings, keys, log, budgets=budgets), refused_peers) as server:
+        log.write("started", destinations=len(settings.destinations), keys=len(keys), metered=len(budgets.metered))
         server.serve_forever()
     return 0
 

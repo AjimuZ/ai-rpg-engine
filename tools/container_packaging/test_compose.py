@@ -255,8 +255,9 @@ class ComposeTest(unittest.TestCase):
                                                    in selected["services"].items() if name != "gateway"})
         # A default start must not wait for, or implicitly start, the optional gateway.
         self.assertNotIn("gateway", self.config["services"]["engine"]["depends_on"])
-        # Nothing but the profile creates the route out.
+        # Nothing but the profile creates the route out or the budget volume.
         self.assertNotIn("gateway_egress", self.config["networks"])
+        self.assertNotIn("gateway_state", self.config["volumes"])
 
     def test_gateway_networks_are_shared_only_as_declared(self) -> None:
         """Only the gateway has the egress network, and only the engine shares its private one."""
@@ -281,7 +282,11 @@ class ComposeTest(unittest.TestCase):
         """Keys and the allowlist are read-only host paths; no other route can bring in a secret."""
         gateway = self.render("gateway")["services"]["gateway"]
         mounts = {mount["target"]: mount for mount in gateway["volumes"]}
-        self.assertEqual({"/etc/gateway/destinations.json", "/run/secrets/gateway"}, set(mounts))
+        self.assertEqual({"/etc/gateway/destinations.json", "/run/secrets/gateway", "/var/lib/gateway"}, set(mounts))
+        # The one writable path is a named volume of counts, so no key file can be replaced from here.
+        state = mounts.pop("/var/lib/gateway")
+        self.assertEqual(("volume", "gateway_state"), (state["type"], state["source"]))
+        self.assertFalse(state.get("read_only", False))
         for mount in mounts.values():
             self.assertEqual("bind", mount["type"])
             self.assertIs(True, mount["read_only"])
@@ -300,6 +305,7 @@ class ComposeTest(unittest.TestCase):
             if name != "gateway":
                 sources = {Path(str(mount.get("source"))).as_posix() for mount in service.get("volumes", [])}
                 self.assertFalse(any("/.local/secrets/gateway" in source or "/.local/gateway" in source for source in sources), name)
+                self.assertNotIn("gateway_state", sources, name)
 
     def test_gateway_is_confined_and_pinned(self) -> None:
         """Require the container profile and a build on the digest that ADR 0009 records."""

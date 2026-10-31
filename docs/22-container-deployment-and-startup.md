@@ -144,11 +144,14 @@ The optional `gateway` service (P21.3-C.1) runs only under `--profile gateway`, 
 publishes nothing. It mounts `${GATEWAY_DESTINATIONS_FILE:-./.local/gateway/destinations.json}` and
 `${GATEWAY_KEYS_DIR:-./.local/secrets/gateway}` read-only. Both variables hold paths, never keys, and
 no launcher command creates these paths yet ([inference backends section 12](34-inference-backends-and-model-selection.md#p213-c1-gateway-container)).
+Its one writable path is the named volume `gateway_state` at `/var/lib/gateway`, UID/GID 10002, mode
+0700, which holds budget counts and no key ([P21.3-C.2](34-inference-backends-and-model-selection.md#p213-c2-gateway-budgets)).
 The one-off services `models-license` (no network) and `models-fetch` (bridge network,
 the only container that writes the model directory, and the only download path for catalog
 weights; the owner may still add files by hand) run only for `./start.sh --models fetch`, under
 the `model-fetch` profile. They join no project network and hold no secret.
-Named `database`, `content`, `assets`, `runtime_account`, and `runtime_workspace` volumes persist;
+Named `database`, `content`, `assets`, `runtime_account`, and `runtime_workspace` volumes persist,
+as does `gateway_state` once the gateway has been selected;
 `runtime_ipc` is tmpfs-backed, UID/GID 10001, mode 0700. The runtime has a read-only
 root filesystem, no capabilities, no account bind from the host, and no database
 secret. PostgreSQL's official entrypoint initializes volume ownership as root

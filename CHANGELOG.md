@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Gateway budgets for metered destinations (P21.3-C.2), 31 October 2026
+
+- A destination in the gateway's allowlist can now have a `budget` with a daily and a monthly cap. A reached cap answers 429 with
+  `budget-exhausted-daily` or `budget-exhausted-monthly` and a `Retry-After`, contacts nothing, and never moves the call to another
+  destination. Destinations without a budget behave as before.
+- A cap counts relayed calls per UTC day and UTC calendar month, not tokens or images. A call that fails after being sent still
+  counts, because the gateway cannot tell what the provider billed.
+- Counts survive restarts and `./start.sh --stop` in the new `gateway_state` volume, which holds no key. A damaged count file stops
+  metered destinations with 503 `budget-unavailable` and is not reset; the owner must remove it, and no launcher command does that yet.
+- Each call's time budget is the existing `timeout_seconds`. Tested against a scripted upstream only. Nothing in the engine calls the
+  gateway yet, so nothing reads these answers.
+
 ## Unreleased — Gateway container for hosted APIs and custom endpoints (P21.3-C.1), 31 October 2026
 
 - Add the optional `gateway` service behind `--profile gateway`. It is the only service that holds API keys and the only one

@@ -231,6 +231,9 @@ class GatewayContainerTest(unittest.TestCase):
             {"id": "mismatched", "url": "https://scripted-other:8443", **shared},
             {**shared, "id": "keyless", "url": "http://scripted-upstream:8081", "plaintext_key": True,
              "key": {"file": "absent", "header": "x-api-key"}},
+            # The daily cap stays out of reach, so a UTC day ending during a run changes nothing.
+            {"id": "metered", "url": "http://scripted-upstream:8081", "plaintext_key": True,
+             "budget": {"daily_calls": 1000, "monthly_calls": 2}, **shared},
         ]}
 
     @classmethod
@@ -283,7 +286,8 @@ class GatewayContainerTest(unittest.TestCase):
         override_file = cls.root / "override.yaml"
         override_file.write_text(json.dumps(override), encoding="utf-8", newline="\n")
         cls.compose = [*cls.base_compose, "--file", str(override_file)]
-        cls.addClassCleanup(cls.run_docker, *cls.compose, "down", "--timeout", "10")
+        # The project name is unique per run, so its budget volume would otherwise stay on the host.
+        cls.addClassCleanup(cls.run_docker, *cls.compose, "down", "--volumes", "--timeout", "10")
         started = cls.run_docker(*cls.compose, "up", "--detach", "--build", "--wait", "--wait-timeout", "120",
                                  "gateway", "scripted-upstream", "prober", timeout=420)
         if started.returncode != 0:
@@ -341,9 +345,12 @@ class GatewayContainerTest(unittest.TestCase):
         self.assertEqual(["ALL"], state["HostConfig"]["CapDrop"])
         self.assertIn("no-new-privileges:true", state["HostConfig"]["SecurityOpt"])
         mounts = {mount["Destination"]: mount for mount in state["Mounts"]}
-        self.assertEqual({"/etc/gateway/destinations.json", "/run/secrets/gateway", "/fixture-ca/ca.pem"}, set(mounts))
-        self.assertFalse(any(mount["RW"] for mount in mounts.values()))
+        self.assertEqual({"/etc/gateway/destinations.json", "/run/secrets/gateway", "/fixture-ca/ca.pem", "/var/lib/gateway"},
+                         set(mounts))
+        self.assertEqual({"/var/lib/gateway"}, {destination for destination, mount in mounts.items() if mount["RW"]})
+        self.assertEqual("volume", mounts["/var/lib/gateway"]["Type"])
         self.assertEqual("10002", self.in_gateway("id", "-u").stdout.strip())
+        self.assertEqual("10002 700", self.in_gateway("stat", "-c", "%u %a", "/var/lib/gateway").stdout.strip())
         # Keys, the allowlist and the root filesystem all refuse writes, and there is no tmpfs.
         for path in ("/run/secrets/gateway/probe", "/etc/gateway/probe", "/opt/gateway/probe", "/tmp/probe"):
             refused = self.in_gateway("touch", path)
@@ -401,6 +408,28 @@ class GatewayContainerTest(unittest.TestCase):
         self.assertEqual(403, self.relay("not-listed", "/v1/ok")["status"])
         self.assertEqual(503, self.relay("keyless", "/v1/ok")["status"])
         self.assertEqual(before, len(self.seen()), "refused calls must contact nothing")
+
+    def test_a_budget_stops_the_destination_and_survives_recreation(self) -> None:
+        """The real account writes the real volume: a new container continues the stop, and no key lands there."""
+        for _ in range(2):
+            self.assertEqual(200, self.relay("metered", "/v1/ok")["status"])
+        self.assertEqual(SENTINEL, self.seen()[-1]["key"], "control: the upstream must really have held the key")
+        before = len(self.seen())
+        stopped = self.relay("metered", "/v1/ok")
+        self.assertEqual((429, {"code": "budget-exhausted-monthly"}), (stopped["status"], json.loads(stopped["body"])))
+        self.assertRegex(stopped["headers"]["Retry-After"], r"^[0-9]+$")
+        self.docker(*self.compose, "up", "--detach", "--force-recreate", "--wait", "--wait-timeout", "60", "gateway", timeout=180)
+        again = self.relay("metered", "/v1/ok")
+        self.assertEqual((429, {"code": "budget-exhausted-monthly"}), (again["status"], json.loads(again["body"])))
+        self.assertEqual(before, len(self.seen()), "a capped call must contact nothing")
+        # Another destination on the same server is untouched by this cap.
+        self.assertEqual(200, self.relay("plain", "/v1/ok")["status"])
+        state = self.in_gateway("cat", "/var/lib/gateway/budgets.json")
+        self.assertEqual(0, state.returncode, state.stderr[-500:])
+        entries = json.loads(state.stdout)["destinations"]
+        self.assertEqual(({"metered"}, 2), (set(entries), entries["metered"]["month_calls"]))
+        self.assertNotIn(SENTINEL, state.stdout)
+        self.assert_no_sentinel_outside_the_gateway_memory()
 
     def test_tls_verifies_the_chain_and_the_hostname(self) -> None:
         """A trusted certificate is accepted, while a stranger or a wrong name never gets a request."""
@@ -532,13 +561,15 @@ class LauncherStopTest(unittest.TestCase):
             return subprocess.run([*command, *arguments], cwd=self.copy, env=environment, capture_output=True, text=True,
                                   encoding="utf-8", errors="replace", timeout=timeout, check=False)
 
-        self.addCleanup(run, "down", "--timeout", "10", timeout=120)
+        # This cleanup removes the budget volume, which the launcher's stop deliberately keeps.
+        self.remove_project = lambda: run("down", "--volumes", "--timeout", "10", timeout=120)
+        self.addCleanup(self.remove_project)
         started = run("up", "--detach", "--build", "--wait", "--wait-timeout", "120", "gateway", timeout=420)
         self.assertEqual(0, started.returncode, started.stdout[-2000:] + started.stderr[-2000:])
 
     def owned(self, kind: str) -> list[str]:
-        """Return this project's containers (running or not) or networks, by their Compose label."""
-        listing = ("ps", "--all") if kind == "container" else ("network", "ls")
+        """Return this project's containers (running or not), networks or volumes, by their Compose label."""
+        listing = {"container": ("ps", "--all"), "network": ("network", "ls"), "volume": ("volume", "ls")}[kind]
         result = subprocess.run(["docker", *listing, "--quiet", "--filter", f"label=com.docker.compose.project={self.project}"],
                                 capture_output=True, text=True, timeout=60, check=False)
         self.assertEqual(0, result.returncode, result.stderr[-1000:])
@@ -554,12 +585,18 @@ class LauncherStopTest(unittest.TestCase):
         self.start_gateway()
         self.assertEqual(1, len(self.owned("container")), "control: the gateway must be running before the stop")
         self.assertEqual(2, len(self.owned("network")), "control: its two networks must exist before the stop")
+        self.assertEqual(1, len(self.owned("volume")), "control: its budget volume must exist before the stop")
         stopped = self.run_launcher_stop()
         self.assertEqual(0, stopped.returncode, stopped.stdout[-2000:] + stopped.stderr[-2000:])
         self.assertEqual([], self.owned("container"))
         self.assertEqual([], self.owned("network"))
+        # A stop that forgot the counts would reopen spending.
+        self.assertEqual(1, len(self.owned("volume")), "the budget counts must survive a stop")
         again = self.run_launcher_stop()
         self.assertEqual(0, again.returncode, again.stdout[-2000:] + again.stderr[-2000:])
+        # The same removal the cleanups use: a volume it missed would stay on the host after every run.
+        self.remove_project()
+        self.assertEqual([], self.owned("volume"))
 
 
 if __name__ == "__main__":
