@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Fixture evidence for the inference backends and licence records (P21.6-A), 31 October 2026
+
+- [Inference backends and model selection](docs/34-inference-backends-and-model-selection.md) now maps each clause of the backend,
+  slot and advisor acceptance check (QA-43) and the shared-admission acceptance check (QA-44) to the tests that cover it, and states
+  which clauses are shown only on scripted fixtures and which are not proven: no model was loaded, no image was generated, the
+  executor's yield is not connected to the image worker, and the asset rules and text-only fallback belong to later work.
+- `THIRD_PARTY_NOTICES.md` records the terms of the text and image models, the model-server image, the image worker packages and an
+  owner-run image server. Nothing is bundled; the licences of the llama.cpp image and the image worker packages are listed as not yet read.
+- No behavior changed, and no reference-host measurement, bilingual evaluation or supported-defaults table exists yet.
+
 ## Unreleased — Image-generation port and `a1111-http` adapter (P21.5-B.2), 31 October 2026
 
 - The engine now has one backend-neutral image-generation port: a request with a prompt, size, steps, guidance and seed (no game

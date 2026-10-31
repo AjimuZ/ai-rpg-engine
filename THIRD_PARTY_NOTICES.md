@@ -65,6 +65,31 @@ Official documentation is linked for technical and rights background in [the ref
 
 Future dependencies and assets require their own license/provenance inventory. Mentioning a technology or an inspiration does not imply affiliation or transfer of rights.
 
+## Local inference models and runtimes — nothing bundled
+
+Recorded 31 October 2026 (P21.6-A). The [model catalog](docs/34-inference-backends-and-model-selection.md#5-catalog-and-hardware-advisor)
+and the container profiles name the items below. **No model weight, checkpoint, LoRA, VAE or runtime binary is committed to this
+repository.** The owner fetches each model explicitly with `./start.sh --models fetch`, which prints the licence, class, source and
+attribution first and needs a confirmation, and the container images are built or pulled on the owner's machine. The project's MIT
+license does not relicense any of this. "Source" below means read from the cited page or API on the date in
+[docs/34 section 2](docs/34-inference-backends-and-model-selection.md#2-verified-facts-and-sources); a licence file in a built image
+was **not** read, because no image has been built.
+
+| Item | Declared terms | Where it appears | Obligation carried |
+| --- | --- | --- | --- |
+| [Gemma 4](https://huggingface.co/google/gemma-4-12B-it) 12B, E4B, E2B and 26B-A4B, Google's 4-bit `qat-q4_0` GGUF builds | Apache-2.0 (model card and file headers) | Catalog entries; recommended text default is the 12B build | Keep the licence and the Google attribution shown by the fetch command |
+| [Qwen3.5-9B](https://huggingface.co/Qwen/Qwen3.5-9B), community quantization [unsloth/Qwen3.5-9B-GGUF](https://huggingface.co/unsloth/Qwen3.5-9B-GGUF) at commit `3885219b` | Apache-2.0 | Catalog alternate text entry | As above; credit the original model and the third-party quantization separately |
+| [WAI-illustrious-SDXL](https://civitai.com/models/827184) v17.0, derived from Illustrious XL | [FAIPL-1.0-SD](https://freedevproject.org/faipl-1.0-sd/), **inherited** from the base model's card; the WAI page's own licence text could not be read, so this is an unconfirmed basis | Catalog entry and recommended image default; NSFW-capable, so the safe-content defaults apply | Copies of the model must carry the licence and its source; modifications stay under the same or a more permissive licence; the prohibited-use list applies; generated images are not covered by the licence. Confirm the page's own terms before any public redistribution of a prepared model |
+| [Illustrious XL v0.1](https://huggingface.co/OnomaAIResearch/Illustrious-xl-early-release-v0) | FAIPL-1.0-SD (model card) | Basis for the WAI entry only; not in the catalog | Same as above |
+| [SDXL base 1.0](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0) | OpenRAIL++ | Catalog alternate image entry | Carry the licence and its use restrictions to anyone receiving the weights |
+| [Pony Diffusion V6 XL](https://civitai.com/models/257749) and a separate SDXL VAE | Modified FAIPL-1.0-SD, class `restricted`: inference on websites or applications that allow any form of monetization is forbidden, and credit is required | Catalog alternate image entry; never a default | Do not enable it in a monetized deployment; the fetch command asks for confirmation whatever the class |
+| llama.cpp server image `ghcr.io/ggml-org/llama.cpp:server-cuda-b11960` | Licence **not read in this change**. Confirm it from the pinned image or the upstream repository before distributing the image or a derivative | Model server container pinned by digest in [docs/34 section 2](docs/34-inference-backends-and-model-selection.md#2-verified-facts-and-sources) | Pulled by the owner; nothing is copied into this repository |
+| Image worker packages in `docker/image-worker/requirements.lock`: torch 2.15.0+cu132, diffusers 0.42.1, transformers 5.22.1, safetensors 0.8.0, accelerate 1.15.0, peft, pillow and their dependencies, plus CUDA runtime wheels | **Not inventoried.** Each package carries its own licence, and the CUDA wheels are under NVIDIA's own terms. The pinned list exists, but the image has not been built, so no licence file was read | Built on the owner's machine from hash-pinned wheels | Before any image is distributed, produce the full per-package licence inventory from the built image and add it here |
+| A user-run Forge or A1111 server reached through the `a1111-http` gateway profile | Owner-installed software; its terms are the owner's to read. The engine only sends HTTP requests to it | Optional destination, no code or binary copied | None for this repository |
+
+Attribution for a model the owner installs goes to the credits registry of [presentation assets](docs/23-presentation-assets.md).
+This section is a record of what was known and what was not on 31 October 2026, not a legal opinion.
+
 ## Music research references — no bundled recordings
 
 The [dynamic music specification](docs/24-dynamic-music-and-credits.md) records two candidate works by Kevin MacLeod (incompetech.com): [Wholesome](https://commons.wikimedia.org/wiki/File:Wholesome_by_Kevin_MacLeod.ogg), declared [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), and [Darkest Child, ISRC USUAN1100783](https://commons.wikimedia.org/wiki/File:Darkest_Child_%28ISRC_USUAN1100783%29.mp3), declared [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). Source/file-page declarations were checked on 23 October 2026. These are reference-only credits: no recording is copied, modified, installed or played by this change. Before runtime admission, retain the selected recording's complete rights evidence, exact license version, source and any processing notice. The project's MIT license does not relicense that music.
