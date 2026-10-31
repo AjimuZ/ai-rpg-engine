@@ -4,6 +4,19 @@
 # Never publish database/runtime ports or attach the runtime to the data network.
 name: rpg-engine
 
+x-model-fetch-base: &model-fetch-base
+  image: python:3.15.1-slim-trixie@sha256:533b0b2f9b5d46fd097091cf826f27902f1d6c3bca714b6dc74551356aa97a51
+  profiles: [model-fetch]
+  entrypoint: [python, -I, -B, /opt/model-fetch/model_fetch.py]
+  # The launcher replaces this with the host account so that installed files stay the owner's.
+  user: "65534:65534"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp:mode=1777
+  stop_grace_period: 15s
+
 services:
   engine:
     build:
@@ -155,6 +168,46 @@ services:
     logging:
       driver: json-file
       options: {max-size: 10m, max-file: "3"}
+
+  # One-off helpers of `./start.sh --models fetch` (P21.2, docs/34). Only their profile or
+  # a `compose run` selects them, they join no project network, and no other service
+  # depends on them. `models-license` shows catalog facts with no network and no model
+  # directory; only `models-fetch`, run after the owner's confirmation, has egress and
+  # write access to the directory that the model server mounts read-only.
+  models-license:
+    <<: *model-fetch-base
+    network_mode: none
+    volumes:
+      - type: bind
+        source: ./docker/model-fetch
+        target: /opt/model-fetch
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ./backend/src/main/resources/inference/model-catalog.json
+        target: /catalog/model-catalog.json
+        read_only: true
+        bind: {create_host_path: false}
+
+  models-fetch:
+    <<: *model-fetch-base
+    network_mode: bridge
+    volumes:
+      - type: bind
+        source: ./docker/model-fetch
+        target: /opt/model-fetch
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ./backend/src/main/resources/inference/model-catalog.json
+        target: /catalog/model-catalog.json
+        read_only: true
+        bind: {create_host_path: false}
+      # The launcher creates the directory; a missing one must fail, not appear root-owned.
+      - type: bind
+        source: ${MODELS_DIR:-./.local/models}
+        target: /models
+        bind: {create_host_path: false}
 
 networks:
   web: {}

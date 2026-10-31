@@ -131,22 +131,22 @@ class ComposeTest(unittest.TestCase):
         # A default start must not wait for, or implicitly start, the optional server.
         self.assertNotIn("models", self.config["services"]["engine"]["depends_on"])
 
-    def model_bind_creates_host_path(self, weights: dict) -> bool:
-        """Return whether the model bind may create its host path; fail if it cannot be told.
+    def model_bind_creates_host_path(self, weights: dict, service: str = "models") -> bool:
+        """Return whether the `/models` bind of `service` may create its host path; fail if it cannot be told.
 
         Compose 5.x prints `bind.create_host_path` even when false, while 2.x omits it.
         A rendered value is used as printed. When it is omitted, `compose.yaml` itself
-        must set `create_host_path: false` explicitly on the `models` service, so a
-        missing key never passes for a safe setting.
+        must set `create_host_path: false` explicitly on the `/models` volume of that
+        service, so a missing key never passes for a safe setting.
         """
         rendered = weights.get("bind", {}).get("create_host_path")
         if rendered is not None:
             return rendered
         text = (ROOT / "compose.yaml").read_text(encoding="utf-8")
-        service = re.search(r"^  models:\n((?:    .*\n|\n)*)", text, re.M)
-        self.assertIsNotNone(service, "compose.yaml has no models service")
-        setting = re.findall(r"^\s+bind:\s*\{\s*create_host_path:\s*(\w+)\s*\}\s*$",
-                             service.group(1), re.M)
+        block = re.search(rf"^  {re.escape(service)}:\n((?:    .*\n|\n)*)", text, re.M)
+        self.assertIsNotNone(block, f"compose.yaml has no {service} service")
+        setting = re.findall(r"^\s+target: /models\n(?:\s+read_only: \w+\n)?\s+bind:\s*\{\s*create_host_path:\s*(\w+)\s*\}\s*$",
+                             block.group(1), re.M)
         self.assertEqual(["false"], setting,
                          "the rendered bind omits create_host_path and compose.yaml does not set it false")
         return False
@@ -190,6 +190,59 @@ class ComposeTest(unittest.TestCase):
         # An explicit model argument would disable router mode, and a fetch path would need egress.
         for forbidden in ("--model", "-m", "--hf-repo", "-hf", "--model-url", "-mu"):
             self.assertNotIn(forbidden, command)
+
+    def test_model_fetch_runs_only_under_its_profile(self) -> None:
+        """Selecting the profile adds its two services and changes no other service."""
+        selected = self.render("model-fetch")
+        helpers = {"models-license", "models-fetch"}
+        self.assertFalse(helpers & set(self.config["services"]))
+        self.assertEqual(set(self.config["services"]) | helpers, set(selected["services"]))
+        self.assertEqual(self.config["services"], {name: service for name, service
+                                                   in selected["services"].items() if name not in helpers})
+        self.assertEqual(self.render("models")["services"]["models"]["volumes"][0]["source"],
+                         self.fetch_mounts(selected)["/models"]["source"])
+
+    def fetch_mounts(self, rendered: dict) -> dict:
+        """Return the fetch service's mounts by target."""
+        return {mount["target"]: mount for mount in rendered["services"]["models-fetch"]["volumes"]}
+
+    def test_model_fetch_boundaries(self) -> None:
+        """Only the fetch service has egress and write access, to the model directory alone."""
+        selected = self.render("model-fetch")
+        license_service = selected["services"]["models-license"]
+        fetch = selected["services"]["models-fetch"]
+        self.assertEqual("none", license_service["network_mode"])
+        self.assertEqual("bridge", fetch["network_mode"])
+        self.assertRegex(fetch["image"], r"^python:3\.15\.1-slim-trixie@sha256:[0-9a-f]{64}$")
+        adr = (ROOT / "docs" / "adr" / "0009-toolchain-baseline.md").read_text(encoding="utf-8")
+        self.assertIn(fetch["image"], adr)
+        for service in (license_service, fetch):
+            self.assertEqual(fetch["image"], service["image"])
+            self.assertNotIn("build", service)
+            self.assertNotIn("networks", service)
+            self.assertFalse(service.get("ports"))
+            self.assertFalse(service.get("secrets"))
+            self.assertFalse(service.get("environment"))
+            self.assertFalse(service.get("depends_on"))
+            self.assertEqual("65534:65534", service["user"])
+            self.assertTrue(service["read_only"])
+            self.assertEqual(["ALL"], service["cap_drop"])
+            self.assertIn("no-new-privileges:true", service["security_opt"])
+            self.assertEqual(["python", "-I", "-B", "/opt/model-fetch/model_fetch.py"], service["entrypoint"])
+        license_mounts = {mount["target"]: mount for mount in license_service["volumes"]}
+        fetch_mounts = self.fetch_mounts(selected)
+        self.assertEqual({"/opt/model-fetch", "/catalog/model-catalog.json"}, set(license_mounts))
+        self.assertEqual({"/opt/model-fetch", "/catalog/model-catalog.json", "/models"}, set(fetch_mounts))
+        for mounts in (license_mounts, fetch_mounts):
+            for target in ("/opt/model-fetch", "/catalog/model-catalog.json"):
+                self.assertEqual("bind", mounts[target]["type"])
+                self.assertIs(True, mounts[target]["read_only"])
+            # The real catalog is the only input: no variable can replace its path.
+            self.assertTrue(Path(mounts["/catalog/model-catalog.json"]["source"]).as_posix().endswith(
+                "/backend/src/main/resources/inference/model-catalog.json"))
+            self.assertTrue(Path(mounts["/opt/model-fetch"]["source"]).as_posix().endswith("/docker/model-fetch"))
+        self.assertFalse(fetch_mounts["/models"].get("read_only", False))
+        self.assertIs(False, self.model_bind_creates_host_path(fetch_mounts["/models"], "models-fetch"))
 
 
 if __name__ == "__main__":

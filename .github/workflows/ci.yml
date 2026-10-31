@@ -154,7 +154,12 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.15.1"
-      # Exports real BuildKit contexts and renders Compose; starts no Compose service.
+      # Exports real BuildKit contexts and renders Compose. The only Compose services it runs
+      # are the one-off models-license and models-fetch of test_model_fetch_launcher.py, on
+      # fixtures and the small pinned Python image; the model server's own cases skip here
+      # because its large image is absent. Those launcher-driven cases need Engine 29.0 and
+      # Compose 5.0, which this runner may lack: below them they are skipped with the
+      # shortfall as reason and a separate case asserts the launcher's refusal instead.
       # test_restore_isolation.py builds the verification image and runs the shipped
       # backup tool against its own disposable database containers. The
       # opt-in PACKAGING_DOCKER service-recreation check stays out of ordinary CI

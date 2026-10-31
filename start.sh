@@ -6,7 +6,8 @@
 # health-based readiness, and offer sign-in, status, log and stop commands.
 #
 # Usage: ./start.sh [--check | --login | --status | --logs [SERVICE] [--no-follow]
-#                    | --stop | --models profile [--gpu-check] | --help]
+#                    | --stop | --models profile [--gpu-check]
+#                    | --models fetch [--accept-license ID[,ID...]] ID... | --help]
 #                    (no argument: validate, build, start)
 #
 # Exit status: 0 success; 1 failure (prerequisite, configuration, build, start,
@@ -118,6 +119,15 @@ Usage: ./start.sh [COMMAND]
                 advisor (GPU memory from the NVIDIA driver tool, RAM, disk,
                 container memory). --gpu-check also runs the pinned model-server
                 image (about 2.6 GB, pulled once) to test container GPU access.
+  --models fetch [--accept-license ID[,ID...]] ID...
+                Show the license and source of each named catalog model, ask for
+                confirmation, download the files and install them in the model
+                directory (MODELS_DIR, default .local/models) only after their
+                exact size and SHA-256 match the catalog. Any failure installs
+                nothing. --accept-license records a confirmation already given:
+                it must name each model it accepts, among those requested, and
+                without a terminal every requested model must be named there.
+                Wildcards are refused, and nothing is downloaded otherwise.
   --help        Show this text.
 
 Prerequisites: GNU Bash 4.4+, Docker Engine 29.0+ running Linux containers,
@@ -998,10 +1008,198 @@ EOF_PROFILE
 )"
 }
 
-# cmd_models ARGS... - model-management commands. Only `profile [--gpu-check]`
-# exists today; fetch, verify, advise and remove are planned (P21.2-P21.3).
+# --- Model fetch (P21.2) --------------------------------------------------------
+#
+# `./start.sh --models fetch` is the only path by which catalog weights reach the
+# model directory (docs/34-inference-backends-and-model-selection.md section 5). The
+# catalog, the download and the hash checks all run in one-off pinned containers
+# (docker/model-fetch/model_fetch.py), because ADR 0009 allows no JSON parser, HTTP client
+# or hash tool on the host. Only the confirmation stays here: the license is shown from a
+# container with no network, and the container with egress starts only after every
+# requested model has been accepted. A catalog entry's `confirmationRequired` flag does not
+# relax this: every model is confirmed, whatever its license class.
+
+readonly MODEL_CATALOG="backend/src/main/resources/inference/model-catalog.json"
+readonly MODEL_CATALOG_IN_CONTAINER="/catalog/model-catalog.json"
+readonly DEFAULT_MODELS_DIR="./$STATE_DIR/models"
+readonly MODEL_ID_RULE='^[a-z0-9][a-z0-9._-]{0,63}$'
+
+# Name of the running fetch container, shared with the interrupt handler.
+FETCH_CONTAINER=""
+# Model IDs named by --accept-license.
+ACCEPTED_MODELS=()
+
+# models_usage_error MESSAGE - report a bad fetch command line and exit 2.
+models_usage_error() {
+    echo "start.sh: $*" >&2
+    usage >&2
+    exit 2
+}
+
+# stdin_is_terminal - succeed when a person can answer on stdin. A function, so that tests
+# can stand in for a terminal; every other stdin fails closed.
+stdin_is_terminal() { [ -t 0 ]; }
+
+# list_contains VALUE ITEM... - succeed when VALUE is one of the items.
+list_contains() {
+    local value="$1" item
+    shift
+    for item in "$@"; do
+        [ "$item" != "$value" ] || return 0
+    done
+    return 1
+}
+
+# resolve_models_dir - create the model directory Compose will mount and leave its path in
+# MODELS_DIR for Compose, with the same precedence and default as the `models` service. A
+# new directory is world-readable because the model server runs as user 65534; an existing
+# one is the owner's and keeps its mode.
+resolve_models_dir() {
+    local directory
+    directory="$(config_value MODELS_DIR "$DEFAULT_MODELS_DIR")"
+    if [ ! -d "$directory" ]; then
+        mkdir -p -- "$directory" || die "could not create the model directory $directory."
+        chmod 755 -- "$directory" 2>/dev/null || true
+    fi
+    # Compose needs a path docker.exe understands, as for the password file.
+    case "$directory" in
+        /*) if command -v cygpath >/dev/null 2>&1; then directory="$(cygpath -m "$directory")"; fi ;;
+    esac
+    export MODELS_DIR="$directory"
+}
+
+# fetch_tool SERVICE ARGS... - run the fetch helper once in SERVICE, with this host
+# account's numeric identity so that installed files belong to the owner. Returns the
+# helper's exit status. `-T`: Git Bash terminals cannot hand a TTY to docker.exe.
+fetch_tool() {
+    local service="$1"
+    shift
+    compose --profile model-fetch run --rm --no-deps -T --name "$FETCH_CONTAINER" \
+        --user "$UID:${GROUPS[0]:-$UID}" "$service" "$@"
+}
+
+# on_fetch_interrupt - Ctrl+C / termination during a fetch. The Compose client may be what
+# was interrupted, so stop the named container: the stop signal makes the helper remove its
+# unfinished files, and then the container itself is removed. Nothing reaches the model
+# directory, because files move there only after every download has been verified.
+on_fetch_interrupt() {
+    printf '\nstart.sh: model fetch interrupted. Nothing new was installed; rerun the command to download again.\n' >&2
+    if [ -n "$FETCH_CONTAINER" ]; then
+        docker stop --time 15 "$FETCH_CONTAINER" >/dev/null 2>&1 || true
+        docker rm --force "$FETCH_CONTAINER" >/dev/null 2>&1 || true
+    fi
+    exit 130
+}
+
+# accept_licenses LIST - add a comma-separated --accept-license value to ACCEPTED_MODELS.
+# An empty element would hide a mistyped list, and a wildcard is not a model ID: both are
+# usage errors, so a confirmation always names exactly what it accepts.
+accept_licenses() {
+    local item
+    local -a named=()
+    case "$1" in
+        '' | ,* | *, | *,,*) models_usage_error "--accept-license needs comma-separated model IDs, each one named." ;;
+    esac
+    IFS=, read -r -a named <<<"$1"
+    for item in "${named[@]}"; do
+        [[ "$item" =~ $MODEL_ID_RULE ]] ||
+            models_usage_error "--accept-license takes exact model IDs; '$item' is not one."
+        ACCEPTED_MODELS+=("$item")
+    done
+}
+
+# confirm_licenses ID... - return when every ID is in ACCEPTED_MODELS or answered with
+# exactly `yes`. Dies on any other answer, on end of input and, without a terminal, on any
+# unnamed ID, always before a download starts.
+confirm_licenses() {
+    local answer identifier
+    for identifier in "$@"; do
+        if list_contains "$identifier" "${ACCEPTED_MODELS[@]}"; then
+            info "$identifier: license accepted by --accept-license"
+            continue
+        fi
+        stdin_is_terminal ||
+            die "no confirmation for $identifier and no terminal to ask on. After reading the license above, name it: --accept-license $identifier. Nothing was downloaded."
+        printf "start.sh: type yes to accept the license of %s and download it: " "$identifier"
+        answer=""
+        IFS= read -r answer || true
+        [ "${answer%$'\r'}" = yes ] ||
+            die "the license of $identifier was not accepted. Nothing was downloaded."
+    done
+}
+
+# cmd_models_fetch ARGS... - parse, show the licenses, confirm, then download and install.
+# Exit status: 0 installed or already present; 1 refused or failed, with nothing installed
+# from this command; 2 a usage error or unknown model ID; 130 interrupted.
+cmd_models_fetch() {
+    local -a identifiers=()
+    local item
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --accept-license)
+                [ "$#" -ge 2 ] || models_usage_error "--accept-license needs model IDs."
+                accept_licenses "$2"
+                shift 2
+                ;;
+            --accept-license=*)
+                accept_licenses "${1#*=}"
+                shift
+                ;;
+            -*) models_usage_error "unknown --models fetch argument '$1'" ;;
+            *)
+                [[ "$1" =~ $MODEL_ID_RULE ]] || models_usage_error "'$1' is not a model ID."
+                list_contains "$1" "${identifiers[@]}" || identifiers+=("$1")
+                shift
+                ;;
+        esac
+    done
+    [ "${#identifiers[@]}" -gt 0 ] || models_usage_error "--models fetch needs at least one model ID."
+    for item in "${ACCEPTED_MODELS[@]}"; do
+        list_contains "$item" "${identifiers[@]}" ||
+            models_usage_error "--accept-license names '$item', which this command does not fetch."
+    done
+
+    require_utilities
+    [ -f "$MODEL_CATALOG" ] || die "$MODEL_CATALOG is missing from the checkout; restore it from version control."
+    check_docker
+    resolve_config
+    ensure_identity
+    FETCH_CONTAINER="$PROJECT-model-fetch-$$"
+    trap on_fetch_interrupt INT TERM
+
+    info "reading the catalog in a container with no network (the first fetch pulls the pinned helper image, about 45 MB)"
+    local status=0
+    fetch_tool models-license describe --catalog "$MODEL_CATALOG_IN_CONTAINER" "${identifiers[@]}" || status=$?
+    case "$status" in
+        0) ;;
+        2) exit 2 ;;
+        *) die "could not read the licenses (exit $status). Nothing was downloaded." ;;
+    esac
+
+    confirm_licenses "${identifiers[@]}"
+
+    resolve_models_dir
+    info "downloading to $MODELS_DIR; files are installed only after size and SHA-256 match the catalog"
+    local confirmed="${identifiers[*]}"
+    status=0
+    fetch_tool models-fetch install --catalog "$MODEL_CATALOG_IN_CONTAINER" --models-dir /models \
+        --accepted "${confirmed// /,}" "${identifiers[@]}" || status=$?
+    case "$status" in
+        0) info "model fetch complete: ${identifiers[*]}" ;;
+        2) exit 2 ;;
+        *) die "model fetch failed (exit $status); see the message above. Nothing new was installed." ;;
+    esac
+}
+
+# cmd_models ARGS... - model-management commands: `profile [--gpu-check]` and `fetch`.
+# verify, advise and remove are planned (P21.3).
 cmd_models() {
     local action="${1:-}" check=0
+    if [ "$action" = fetch ]; then
+        shift
+        cmd_models_fetch "$@"
+        return
+    fi
     [ "$action" = profile ] || { echo "start.sh: unknown --models command '${action}'" >&2; usage >&2; exit 2; }
     shift
     case "$#:${1:-}" in

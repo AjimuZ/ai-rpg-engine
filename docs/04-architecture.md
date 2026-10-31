@@ -162,6 +162,7 @@ root URLs. Only engine and
 postgres join internal `data`; only runtime joins `inference`; engine alone joins
 `web` for published HTTP. The optional `models` service (P21.2-A) runs only under
 its Compose profile and shares only the internal `models` network with the engine.
+The one-off `models-fetch` service (P21.2-B) is the only container that writes its model directory and the only path by which the engine downloads catalog weights; the owner may still add files by hand.
 Engine and runtime share UID 10001 for private socket
 access, but never account/data mounts. Engine mounts socket IPC read-only and
 owns separate content/assets volumes. Its Spring `packaged` profile consumes

@@ -153,6 +153,15 @@ model directory, read-only, and its only network is internal and shared with the
 engine alone, so it has no default route. Containers on an internal network can
 still address the bridge's own host-side interface; that path was not tested. No
 API key protects the engine-to-server hop yet.
+`./start.sh --models fetch` is the only path by which the engine itself downloads
+catalog weights into the model directory (P21.2); the owner may still place a file there
+by hand, as docs/34 section 6 allows, and the engine does not verify such a file. The fetch command's one-off containers run a pinned image with a read-only root, no
+capabilities and no secrets, and only the second has egress and write access to that
+directory. That one starts only after the owner has seen the license and confirmed it
+for the named model. A file is installed only when its exact size and SHA-256 match the
+reviewed catalog, and HTTPS is required for catalog URLs and redirects. The digest, not
+the transport or the host, establishes a file's identity. This protects integrity
+against the catalog's recorded hash. It says nothing about a model's safety or quality.
 The account-free integration test verifies HTTP, socket access,
 password-authenticated TCP and neutral persistence on recreation of all services;
 it never loads an account. This does not establish tool/inference containment or

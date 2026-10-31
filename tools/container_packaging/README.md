@@ -39,6 +39,30 @@ as skipped. It loads no model. Its route-parser cases need no Docker and always 
 Without the image it follows the table under [Hosts without Docker](#hosts-without-docker).
 `test_launcher.py` checks the root `start.sh` contract (static rules, redaction,
 refusal paths and read-only `--check`) without starting or stopping services.
+`test_model_fetch.py` (P21.2-B) drives `docker/model-fetch/model_fetch.py` through its
+`main` with a fixture catalog and a recording opener. It needs no Docker and opens no
+socket. It checks catalog refusals, the license text, size and SHA-256 mismatches, atomic
+installation, existing files, staging cleanup and HTTPS-only redirects. Nothing is skipped
+on Windows: the file-mode request and the handling of a delivered SIGTERM run in process.
+`test_model_fetch_launcher.py` (P21.2-B) runs `./start.sh --models fetch` in a temporary
+copy whose catalog is a fixture at the real path, with URLs under the reserved `.invalid`
+domain, so no case can download a model. `LauncherGateTest` replaces `docker` with a
+recording function and needs no Docker: it proves the confirmation gate, and that the
+container with egress never starts without it. A function stands in for the terminal.
+`RealLauncherTest` runs the launcher's real Compose calls in the pinned Python image, which
+it may pull because the image is small, so hosted CI runs it, but the real launcher enforces
+Engine 29.0 and Compose 5.0 and hosted CI may report less. The test file reads the host's
+versions once at import: at or above the floors each `RealLauncherTest` case runs the fetch;
+below them each case asserts instead that the real launcher refuses, prints no license and
+creates no model directory, and returns. No case is skipped, but below the floors the fetch is
+unproven on that host. Unreadable versions or an unreachable daemon count as no shortfall, so
+those cases run and fail. `test_compose.py` reads the `/models` bind of both the model server
+and `models-fetch` through one helper that tolerates Compose 2.x omitting `create_host_path`.
+`ComposeServiceTest`
+calls `docker compose run` itself, never reaches the floors and needs only the Docker CLI. A
+wrapper at the helper's path in the copy supplies the fixture opener, and one case keeps the
+unmodified helper, whose real transport fails on the unresolvable name. The effect of the file
+mode and a real `docker stop` are also read here, in the Linux container, whatever the host is.
 `test_hardware_profile.py` (P21.1) runs `--models profile [--gpu-check]` with every
 host tool replaced by recorded output (driver tool, `/proc`, PowerShell, `df`,
 Docker), so it needs no GPU, daemon or Windows host. It checks the profile format,

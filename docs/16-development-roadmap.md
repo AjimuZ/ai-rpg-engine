@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 69/130 tasks verified.** The owner withdrew the pending P98 review entry on 30 October 2026, so older records below that count 131 entries or mention a pending P98 follow-up describe the queue as it stood then. The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P05.7, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1, P11.2, P11.3, P11.4 and P21.1. P21.1 is verified: the hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles, and, since 31 October 2026 (P21.1-A), the profile and container GPU check on the reference host (no model was loaded; see the P21.1 entry). P21.2 is in progress and unchecked: the pinned server is packaged in Compose (P21.2-A), with fetch, probes and measurements remaining. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P05.7 is checked for its contract, rendering and fallback: no real turn produces presentation cues yet, the asset route is not served, no scene or pose image is drawn, and QA-40's persistent visual and voice identities stay with P17. P06.5 is in progress and its explicit prerequisites are all checked: P05.7 (within those limits), P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 69/130 tasks verified.** The owner withdrew the pending P98 review entry on 30 October 2026, so older records below that count 131 entries or mention a pending P98 follow-up describe the queue as it stood then. The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P05.7, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1, P11.2, P11.3, P11.4 and P21.1. P21.1 is verified: the hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles, and, since 31 October 2026 (P21.1-A), the profile and container GPU check on the reference host (no model was loaded; see the P21.1 entry). P21.2 is in progress and unchecked: the pinned server is packaged in Compose (P21.2-A) and the fixture-tested fetch is implemented (P21.2-B), with launcher selection, a real download, probes and measurements remaining. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P05.7 is checked for its contract, rendering and fallback: no real turn produces presentation cues yet, the asset route is not served, no scene or pose image is drawn, and QA-40's persistent visual and voice identities stay with P17. P06.5 is in progress and its explicit prerequisites are all checked: P05.7 (within those limits), P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -3010,8 +3010,8 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       weakening of the immediate `curl` refusal, which the `Internal` and route assertions reach first.
       Direct `docker run`, `docker image inspect` and `docker compose` commands were refused in this
       session, so the image's `--help` text was not read: `/props` is the router-mode evidence.
-    - Remaining for P21.2: hash-verified `--models fetch` with license display and confirmation, launcher
-      selection of the service, schema readiness probes, the bilingual narration probe set, and the
+    - Remaining for P21.2 at that date: hash-verified `--models fetch` with license display and confirmation,
+      launcher selection of the service, schema readiness probes, the bilingual narration probe set, and the
       measurements. The box stays unchecked.
     - Hosted CI repair (31 October 2026, P21.2-CI): hosted CI failed on commit 5cdb85a in the job
       "Container build contexts and Compose boundaries". Cause: `test_compose.ComposeTest.test_model_server_boundaries`
@@ -3034,6 +3034,111 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
         by calling the helper with an empty `bind` and by the 2.40.3 container in `verify.sh probe`, not by
         Compose 2.x rendering a weakened file. The launcher floors raised by P21.2-B stay in P21.2-B.
         The P21.2 box stays unchecked.
+  - Partial progress (31 October 2026, P21.2-B): `./start.sh --models fetch [--accept-license ID[,ID...]] ID...`
+    is implemented and tested on fixtures only; no real model was downloaded. `start.sh` keeps only the
+    argument rules and the confirmation. The catalog, download and hashes are handled by
+    `docker/model-fetch/model_fetch.py`, standard library only, in two new one-off Compose services under the
+    `model-fetch` profile, both on the pinned `python:3.15.1-slim-trixie` image. `models-license` has no network
+    and no model directory. `models-fetch` has the bridge network and the writable model directory, and starts
+    only after every requested ID is confirmed. ADR 0009 gains the image row and no host command. The launcher
+    reads `backend/src/main/resources/inference/model-catalog.json`; `docker/codex-runtime/engine-model-catalog.json`
+    is the narration runtime's separate file and is not involved.
+    - Decisions: every license class is confirmed, whatever `confirmationRequired` says, as the task requires.
+      The exact answer is `yes`. Installation covers the whole command: one failing file of several models
+      installs none of them. Files sit directly in `MODELS_DIR`, the router's documented single-file layout.
+      No token support: a source that asks for a sign-in fails with its HTTP status, and docs/34 section 8
+      now lists the token as planned.
+    - New tests: `tools/container_packaging/test_model_fetch.py` (38 cases, no Docker, no socket),
+      `tools/container_packaging/test_model_fetch_launcher.py` (29 cases after the second review fix: `LauncherGateTest` with a recording
+      `docker` function; `RealLauncherTest` and `ComposeServiceTest` on real containers;
+      `LauncherFloorPolicyTest` for the version comparison) and two cases in `test_compose.py`. All fixture URLs are under the reserved `.invalid` domain, and the fixture catalog sits at
+      the real catalog path in a temporary copy, so production code has no override.
+    - Hosted-CI gating (review fix, 31 October 2026, superseded by the second review fix below): the real
+      `start.sh` enforces Engine 29.0 and Compose 5.0 in
+      `check_docker`, and the hosted packaging job may report less (`.github/workflows/ci.yml`). The test file reads
+      `docker info` and `docker compose version --short` once at import. This fix used `unittest.skipIf` on
+      `RealLauncherTest` and a separate `FloorRefusalTest`; the second review fix removed both, because a skip
+      decorator is a disabled test. Unreadable output, a missing CLI or an unreachable daemon
+      count as no shortfall, so those cases run and fail on the real problem. `ComposeServiceTest` (the two cases
+      that call `docker compose run` themselves) never reaches the floors and needs only the Docker CLI.
+      `LauncherFloorPolicyTest` (3 cases) covers the comparison, including that unreadable versions are no
+      shortfall. The CI comment that said the job starts no Compose service now names these one-off services.
+    - Focused runs on the reference host (Engine and Compose at or above the floors; their versions were not
+      printed): `py -B -m unittest discover -s tools/container_packaging -p test_model_fetch.py`: `Ran 38 tests in
+      0.241s`, `OK`, before the gating change and not repeated. `-p test_model_fetch_launcher.py` after it:
+      `Ran 30 tests in 61.164s`, `OK (skipped=1)`; the skip is `FloorRefusalTest`, whose reason says this host meets the floors
+      (read in a separate `-v` run of the policy and refusal classes, which also passed the 3 policy cases).
+      `test_model_fetch.py` has no skip decorator. `RealLauncherTest`, `FloorRefusalTest` and `ComposeServiceTest`
+      skip on a host with no `docker` executable unless Docker is required (`PACKAGING_REQUIRE_DOCKER=1` or
+      `GITHUB_ACTIONS=true`). Two POSIX facts run on every host instead
+      of being skipped on Windows: the helper's mode request and its handler for a delivered SIGTERM are checked in
+      process, while the mode's effect and a real stop signal are read in a Linux container.
+      The real-container cases observed on real containers (before the gating change, in 26 cases then; the
+      later 30-case run passed the same cases): a matching fixture installed on the real bind mount with
+      the host account's IDs; a wrong digest and a short body each exit 1 and leave the directory empty; a refusal
+      creates no model directory; an unknown ID exits 2 through Compose; the unmodified helper fails with `download
+      failed` on the `.invalid` name and installs nothing; `docker stop` ends the helper in under 14 s and removes
+      the unfinished file; `models-license` runs as 65534 with no IPv4 route, no `/models` and no writable path;
+      the image has a non-empty CA store; under umask 077 the helper leaves mode 0644 on the container's tmpfs.
+    - Weakened copies, `py -B .local/scratch/weaken_model_fetch.py` (an ignored scratch script, exported copies):
+      `UNEXPECTED OUTCOMES: 0`, and all 34 weakenings are caught against the final tests, in two runs naming the cases.
+      20 are in the helper: hash, final size, oversize stop, declared length, confirmation, per-file install, rollback,
+      replace at commit, existing file, staging cleanup, stale staging, HTTP URL, file-name rule, redirect downgrade,
+      free space, the stop signal (against both the in-process case and the real `docker stop` case), no mode request
+      (against both the helper case and the container case), and a refused mode failing the install. 9 are in the
+      launcher: no confirmation step, any answer accepted, no terminal check, license not shown, accepted list not
+      compared, empty list element, interrupt leaving the container, ignored `MODELS_DIR`, dropped host identity. 5 are
+      in Compose: network on the license service, no egress on the fetch service, floating image, writable root,
+      catalog path from a variable. Naming cases omits the script's run on an unchanged copy; the focused runs above and
+      `verify.sh containers` below cover the unchanged tree.
+    - `sh .agents/ralph/verify.sh containers` before the gating change: `PASS container-packaging` (297 s,
+      `Ran 104 tests in 296.149s`, `OK (skipped=1)`) and `PASS runtime-probe-docker` (78 s, `Ran 116 tests`, `OK`),
+      `VERIFY PASSED (containers)`.
+    - `sh .agents/ralph/verify.sh containers` after the gating change (review fix, 31 October 2026): `PASS
+      container-packaging` (308 s, `Ran 108 tests in 307.026s`, `OK (skipped=2)`) and `PASS runtime-probe-docker` (80 s),
+      `VERIFY PASSED (containers)`. No host-dependent failure remained. The 4 added tests are the 3 policy cases and
+      `FloorRefusalTest`; the second skip is `FloorRefusalTest` by deduction from the focused run above, and the
+      identity of the older skip was not read, because the log is not verbose.
+    - Second review fix (31 October 2026): `verify.sh full` failed in `compose-v2` (Compose v2.40.3) with
+      `KeyError: 'create_host_path'` in `test_model_fetch_boundaries`, which read the rendered key that Compose 2.x
+      omits. It now calls `model_bind_creates_host_path(mounts["/models"], "models-fetch")`, the P21.2-CI helper
+      generalised to a service name: the rendered value when present, else an explicit `create_host_path: false`
+      on the `/models` volume of that service in `compose.yaml`. The review also flagged `skipIf` in
+      `test_model_fetch_launcher.py` as a disabled test. Both decorators and `FloorRefusalTest` are gone; every
+      `RealLauncherTest` case first calls `below_floors_refused()`, which on a host below the floors asserts that the
+      real launcher exits 1 with `older than the required`, prints no license and creates no model directory, and
+      returns, and on a conforming host returns False so the fetch runs. No case is skipped on any host.
+    - Commands and results after that fix, on the reference host: `py -B -m unittest discover -s
+      tools/container_packaging -p test_compose.py`: `Ran 6 tests`, `OK`. `-p test_model_fetch_launcher.py`: `Ran 29
+      tests in 45.598s`, `OK`. `sh .agents/ralph/verify.sh probe`: `PASS runtime-probe-tests`, `PASS docker-requirement`,
+      `PASS hardware-profile`, `PASS compose-v2`, `VERIFY PASSED (probe)`. `sh .agents/ralph/verify.sh containers`:
+      `PASS container-packaging` (325 s), `PASS runtime-probe-docker` (86 s), `VERIFY PASSED (containers)`; no
+      host-dependent failure. `verify.sh full` was not rerun by this session.
+    - Not proven by the second fix: the below-floor branch of `below_floors_refused()` was never executed, because this
+      host meets the floors and a fake Docker was not possible here; only the version comparison is tested
+      (`LauncherFloorPolicyTest`). The weakened-copy runs were not repeated for it. The hosted packaging job has not run
+      the change. On a host below the floors the fetch itself is unproven, by design.
+    - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full` before the gating change: all 17 steps passed, with
+      `Tests run: 1167, Failures: 0, Errors: 0, Skipped: 0` in the backend, `VERIFY PASSED (full)`. It was not repeated after
+      the gating change, which touched a Python test file, a CI comment and documents and no backend code.
+    - `sh .agents/ralph/verify.sh repo` after the last edit of the CI comment and documents: 5 of 5 steps passed,
+      `VERIFY PASSED (repo)`.
+    - Order of the evidence: the weakened copies above ran before the gating change and a last correction to documentation
+      section numbers; they were not repeated. They never covered the gating, which has no weakened-copy run.
+    - Not proven: any real download, so HTTPS to the catalog's hosts, their redirects, whether CivitAI accepts this
+      client, and multi-gigabyte behaviour are all open; a run with no fixture wrapper that succeeds; the prompt
+      in a real terminal (a function stands in for it, and child processes here have none); Ctrl+C in Git Bash
+      (the handler was exercised by a signal in a stub, and `docker stop` separately on a real container); a
+      full disk beyond the mocked free-space check; a running model server seeing `.partial` or a fetched file; the
+      router accepting these file names; the first-run image pull on a host without the image (it was already
+      on this host); hosts other than the reference host, and the hosted packaging job, which has not run this
+      change. The below-floor path was never run end to end: the refusal branch of `RealLauncherTest` was not
+      exercised against a Docker below the floors (a fake `docker` on `PATH` was refused in this session),
+      so its outcome on such a host is unproven, as is `ComposeServiceTest` on Compose 2.x, which `verify.sh probe`
+      does not run (`test_compose.py` does run there, in `compose-v2`). `docker buildx imagetools inspect` was refused in this session, so that the pinned Python digest is a
+      multi-platform index is not confirmed; ADR 0009 says so.
+    - Remaining for P21.2: launcher selection of the service, a real fetch of the default model, schema readiness
+      probes, the bilingual narration probe set, and the measurements. The box stays unchecked.
 - [ ] P21.3 Implement slot assignment and the remaining backend adapters behind the runtime-neutral task port: independent `light`, `standard`, `deliberate` and `image` slots, readiness probes with visible results, billing and privacy class badges with acknowledgement on a class change, same-class fallback lists only when configured, per-slot session retirement, and the `gateway` service for owner-key hosted APIs and allowlisted custom endpoints (keys as runtime-only secrets, budgets, bounded redirects and sizes). Expose `GET /api/v1/models/status`, the owner-only settings API and the Settings → Models panel.
 - [ ] P21.4 Implement the shared GPU and RAM admission coordinator for text, image and speech: priorities, leases using the model server's documented load and unload endpoints and slot save and restore, batching, interruption between diffusion steps, unowned-contention handling and metrics. Prove no engine-caused out-of-memory on the reference host.
 - [ ] P21.5 Implement the local image backend: a pinned image-worker container loading single-file safetensors checkpoints and LoRAs, with WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as catalog alternatives; prompt chunking beyond 77 tokens; default safe-content tags; step-boundary cancellation; output validation and provenance; and the `a1111-http` adapter for an owner-run Forge or A1111 server. Integrate with the P17 asset-job contract without changing authority rules.

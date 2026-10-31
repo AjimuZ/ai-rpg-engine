@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Hash-verified model fetch with license confirmation (P21.2-B), 31 October 2026
+
+- Add `./start.sh --models fetch [--accept-license ID[,ID...]] ID...`. It prints each named catalog model's license, source and
+  files, asks for the exact answer `yes` on a terminal, and only then starts a download container. There is no default model.
+- `--accept-license` applies a recorded owner decision without a prompt. It must name each accepted model ID, among those
+  requested; a wildcard, an empty list or another ID is refused. Without a terminal and without that option, nothing is downloaded.
+- Files are installed in `MODELS_DIR` (default `./.local/models`) only after every requested file matches the catalog's exact
+  size and SHA-256. Any failure installs nothing from that command, leaves no unfinished file behind, and never replaces an existing
+  different file.
+- The first fetch pulls a small pinned helper image by digest. Download and hashing run in containers, so the host still needs
+  only Bash, its basic utilities and Docker. No token is sent, so a source that asks for a sign-in fails with its HTTP status.
+- This is tested on fixtures only. No real model has been downloaded with it, and no engine feature uses a fetched model yet.
+
 ## Unreleased — Pinned model server packaged in Compose (P21.2-A), 31 October 2026
 
 - Add the optional Compose service `models`: the pinned llama.cpp CUDA image by digest, in router mode, as a non-root user with
