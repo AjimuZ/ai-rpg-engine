@@ -220,6 +220,10 @@ class, acknowledgement and last probe; no key or endpoint). They are installatio
 brings back the assignments with the database, and the next start reads them. Offline checks cover the V27 manifest/catalog;
 no live V27 dump/restore rehearsal has been run, and the rehearsal below ran on V26.
 
+V28 scope (P21.3-B) adds no table: `ai_session_record` accepts `SLOT_CHANGED` as an opening cause and a retirement reason, and no
+row changes. Offline checks cover the V28 manifest/catalog. The live rehearsal below passed on V28 on 31 October 2026 (58 tables, 229
+rows, a 371,216-byte dump), but it held no `ai_session_record` row, so restoring that value remains unrehearsed.
+
 ## Live two-genre rehearsal (P06.5-B.1, V26)
 
 `tools/container_packaging/test_restore_isolation.py` runs this tool as an operator would on a populated world, then

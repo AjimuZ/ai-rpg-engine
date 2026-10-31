@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V27 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V28 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -691,6 +691,30 @@ class CanonicalMigrationUpgradeTest {
                     assertEquals(1, jdbc.update("delete from inference_slot_setting where slot = 'text.standard'"));
                     assertEquals(0, jdbc.queryForObject("select count(*) from inference_slot_fallback", Integer.class));
                     assertEquals(0, v27.migrate().migrationsExecuted);
+                    // V28 lets a session end, and its successor open, because a slot's assignment changed.
+                    // No row changes, and any other unknown value is still refused.
+                    String sessionRecords = jdbc.queryForObject("select count(*) || '|' || max(retired_reason) from "
+                            + "ai_session_record", String.class);
+                    String sessionInsert = "insert into ai_session_record (id, adventure_id, campaign_id, campaign_generation, "
+                            + "role, audience, pack_hash, policy_hash, line_generation, predecessor_id, opened_cause, status, "
+                            + "rehydration_basis, rehydration_code, opened_at, retired_reason, retired_at) select ?, adventure_id, "
+                            + "id, recovery_generation, 'narrator', 'public', ?, ?, 2, ?, ?, 'RETIRED', 'UNAVAILABLE', "
+                            + "'rehydration-failed', now(), ?, now() from campaign";
+                    assertThrows(DataAccessException.class, () -> jdbc.update(sessionInsert, UUID.randomUUID(),
+                            "a".repeat(64), "b".repeat(64), record, "OWNER", "SLOT_CHANGED"), "V17 has no such reason");
+                    Flyway v28 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("28").load();
+                    assertEquals(1, v28.migrate().migrationsExecuted);
+                    assertTrue(v28.validateWithResult().validationSuccessful);
+                    assertEquals(sessionRecords, jdbc.queryForObject("select count(*) || '|' || max(retired_reason) from "
+                            + "ai_session_record", String.class));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(sessionInsert, UUID.randomUUID(),
+                            "a".repeat(64), "b".repeat(64), record, "OWNER", "SLOT_RENAMED"), "the reasons stay closed");
+                    assertThrows(DataAccessException.class, () -> jdbc.update(sessionInsert, UUID.randomUUID(),
+                            "a".repeat(64), "b".repeat(64), record, "SLOT_RENAMED", "OWNER"), "the causes stay closed");
+                    assertEquals(1, jdbc.update(sessionInsert, UUID.randomUUID(), "a".repeat(64), "b".repeat(64), record,
+                            "SLOT_CHANGED", "SLOT_CHANGED"));
+                    assertEquals(0, v28.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

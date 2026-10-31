@@ -7,7 +7,8 @@
  * billing and privacy {@link org.rpgengine.inference.slots.BackendClass class}, refuses a class
  * change that the owner did not acknowledge, records readiness probes, and reports the visible
  * state of every slot. {@link org.rpgengine.inference.slots.PersistedSlotAssignments} offers the
- * stored text assignments to the profile resolver.
+ * stored text assignments to the profile resolver. {@link org.rpgengine.inference.slots.SlotSessionRetirement}
+ * retires the sessions of a slot whose assignment changed (P21.3-B).
  *
  * <p>Fallbacks are configuration, never failover: {@link org.rpgengine.inference.slots.SlotFallback}
  * considers only candidates the owner listed, only within the primary's class, and ends in an

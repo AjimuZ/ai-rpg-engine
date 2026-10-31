@@ -334,6 +334,7 @@ never runs two tasks of one line at once.
 | Context pressure | The accumulated conversation plus the next task (its input and its slot's output allowance) would exceed `context-renew-percent` (85) of `context-window` (128,000 estimated units, 8,000–2,000,000). Crossing `context-warn-percent` (75) is counted and logged once per session. A session without turns is never renewed for pressure, so one oversized task cannot cause a loop | `CONTEXT_PRESSURE` |
 | Unreliable context | A turn that may have run (its result has provenance, or it is unconfirmed) but did not complete: failed, timed out, cancelled or preempted, or `UNRESOLVED`. The session is retired at once, when the result is settled | `UNRELIABLE` |
 | Manual idle renewal | The owner calls `POST /api/v1/campaigns/{id}/ai-session/renew` (below) | `OWNER` |
+| Slot change (P21.3-B) | The owner saved a changed assignment of a slot (backend, model, parameters, class declaration or fallbacks). Every session that ran a task under that slot retires at once, and sessions of other slots stay open. Saving an identical assignment retires nothing ([specification](34-inference-backends-and-model-selection.md#p213-b-local-text-adapter-and-per-slot-session-retirement)) | `SLOT_CHANGED` |
 
 Units are the scheduler's estimate (4 UTF-8 bytes per unit), not model tokens. The window is a
 conservative application default, not a claim about any model; the 75%/85% thresholds are the

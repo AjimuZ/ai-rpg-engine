@@ -29,11 +29,14 @@ public record TaskResult(UUID taskId, Status status, String output, String error
     public enum Status {
         /** The runtime confirmed a completed turn and returned its final output. */
         COMPLETED,
-        /** Cancelled by the caller or by shutdown; a started turn was confirmed interrupted. */
+        /**
+         * Cancelled by the caller or by shutdown; a started turn was confirmed interrupted, or its
+         * request was aborted where the backend offers no confirmation (the local adapter).
+         */
         CANCELLED,
         /** The runtime reported failure or broke the protocol/isolation contract. */
         FAILED,
-        /** The budget expired; a started turn was confirmed interrupted. */
+        /** The budget expired; a started turn ended as for {@link #CANCELLED}. */
         TIMED_OUT,
         /**
          * The outcome could not be confirmed (lost connection, unacknowledged request or

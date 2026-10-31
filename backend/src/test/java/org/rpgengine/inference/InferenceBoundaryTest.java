@@ -19,11 +19,12 @@ import org.junit.jupiter.api.Test;
  * Enforces the P08.1 boundary: no Codex-specific type leaks into domain or application code.
  * Only the adapter package may name its own types, the adapter depends on nothing of the engine
  * except the neutral port package, every adapter type is package-private, and the neutral API
- * exposes only JDK and neutral types.
+ * exposes only JDK and neutral types. The local adapter (P21.3-B) keeps the same rules.
  */
 class InferenceBoundaryTest {
     static final Path MAIN = Path.of("src/main/java/org/rpgengine");
     static final Path ADAPTER = MAIN.resolve("inference/codex");
+    static final Path LOCAL_ADAPTER = MAIN.resolve("inference/local");
     static final Pattern IMPORT = Pattern.compile("^import\\s+(?:static\\s+)?(org\\.rpgengine\\.[\\w.]+);", Pattern.MULTILINE);
     static final Pattern CODEX_TYPE = Pattern.compile("\\b(Codex[A-Z]\\w*|StdioFrameWire|UnixSocketFrameWire|RpcGeneration"
             + "|TurnInbox|FrameWire)\\b");
@@ -82,6 +83,30 @@ class InferenceBoundaryTest {
             }
         }
         assertThat(exposed).isEmpty();
+    }
+
+    @Test
+    void theLocalAdapterKeepsTheSameBoundary() throws Exception {
+        List<String> violations = new ArrayList<>();
+        for (Path source : sources(MAIN)) {
+            if (!source.startsWith(LOCAL_ADAPTER) && Files.readString(source).contains("org.rpgengine.inference.local")) {
+                violations.add(source + ": imports the adapter package");
+            }
+        }
+        for (Path source : sources(LOCAL_ADAPTER)) {
+            String name = source.getFileName().toString().replace(".java", "");
+            Matcher matcher = IMPORT.matcher(Files.readString(source));
+            while (matcher.find()) {
+                if (!matcher.group(1).matches("org\\.rpgengine\\.inference\\.[A-Z]\\w*(\\.\\w+)*")) {
+                    violations.add(name + " -> " + matcher.group(1));
+                }
+            }
+            if (!name.equals("package-info")
+                    && Modifier.isPublic(Class.forName("org.rpgengine.inference.local." + name).getModifiers())) {
+                violations.add(name + " is public");
+            }
+        }
+        assertThat(violations).isEmpty();
     }
 
     @Test

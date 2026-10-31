@@ -15,6 +15,7 @@ import org.rpgengine.inference.SlotAssignments;
 import org.rpgengine.inference.ConfiguredSlotAssignments;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +33,8 @@ import org.springframework.stereotype.Service;
  *       An environment assignment of an endpoint has no known class, so replacing it always does.</li>
  *   <li>A stored assignment overrides the environment assignment of the same text slot.</li>
  *   <li>A changed assignment loses its probe result: a probe describes one exact assignment.</li>
+ *   <li>A changed assignment publishes {@link SlotAssignmentChanged} after it is saved; an identical
+ *       save publishes nothing, so it costs no session its continuity.</li>
  *   <li>Settings are cached after the first read and replaced only after a successful save, so the
  *       dispatcher's hot path reads memory. A storage failure never produces a substitute assignment.</li>
  * </ul>
@@ -129,6 +132,7 @@ public class SlotSettingsService {
     private final BackendProbe probe;
     private final SlotAssignments configured;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
     private final Object lock = new Object();
     private volatile Map<ModelSlot, SlotSettingsStore.Stored> cache;
 
@@ -136,17 +140,25 @@ public class SlotSettingsService {
      * @param store durable storage
      * @param probe readiness probe port
      * @param configured the startup-settings assignments, shown for slots with no stored one
+     * @param events receives {@link SlotAssignmentChanged}
      */
     @Autowired
-    public SlotSettingsService(SlotSettingsStore store, BackendProbe probe, ConfiguredSlotAssignments configured) {
-        this(store, probe, (SlotAssignments) configured, Clock.systemUTC());
+    public SlotSettingsService(SlotSettingsStore store, BackendProbe probe, ConfiguredSlotAssignments configured,
+            ApplicationEventPublisher events) {
+        this(store, probe, (SlotAssignments) configured, Clock.systemUTC(), events);
     }
 
     SlotSettingsService(SlotSettingsStore store, BackendProbe probe, SlotAssignments configured, Clock clock) {
+        this(store, probe, configured, clock, event -> { });
+    }
+
+    SlotSettingsService(SlotSettingsStore store, BackendProbe probe, SlotAssignments configured, Clock clock,
+            ApplicationEventPublisher events) {
         this.store = Objects.requireNonNull(store, "store");
         this.probe = Objects.requireNonNull(probe, "probe");
         this.configured = Objects.requireNonNull(configured, "configured");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.events = Objects.requireNonNull(events, "events");
     }
 
     /** Load the settings once the application is up, so the first task does not read storage. */
@@ -177,7 +189,8 @@ public class SlotSettingsService {
     }
 
     /**
-     * Validate and save an assignment.
+     * Validate and save an assignment, then announce it when it changed what the slot runs. A failure
+     * while announcing is logged and never fails the save, which is already durable.
      *
      * @param request the requested assignment
      * @return the visible state of the slot after the save
@@ -188,6 +201,8 @@ public class SlotSettingsService {
     public SlotStatus update(Request request) {
         SlotSetting setting = SlotSetting.of(request.slot(), request.backend(), request.model(), request.effort(),
                 request.declaredClass(), request.fallbacks());
+        SlotStatus saved;
+        boolean changed;
         synchronized (lock) {
             Map<ModelSlot, SlotSettingsStore.Stored> current = stored();
             SlotSettingsStore.Stored previous = current.get(setting.slot());
@@ -206,13 +221,34 @@ public class SlotSettingsService {
             ProbeResult kept = previous != null && previous.setting().equals(setting) ? previous.probe()
                     : ProbeResult.notRun();
             SlotSettingsStore.Stored next = new SlotSettingsStore.Stored(setting, acknowledged, acknowledgedAt, kept, now);
+            changed = !unchanged(setting, previous);
             store.save(next);
             Map<ModelSlot, SlotSettingsStore.Stored> copy = new EnumMap<>(ModelSlot.class);
             copy.putAll(current);
             copy.put(setting.slot(), next);
             cache = copy;
-            return status(setting.slot(), copy);
+            saved = status(setting.slot(), copy);
         }
+        if (changed) {
+            // Outside the lock: retiring sessions calls the task port and writes the session journal.
+            try {
+                events.publishEvent(new SlotAssignmentChanged(setting.slot()));
+            } catch (RuntimeException failure) {
+                LOG.log(System.Logger.Level.WARNING, "slot change not announced: " + failure.getClass().getName());
+            }
+        }
+        return saved;
+    }
+
+    /**
+     * @return whether {@code setting} is what the slot already runs: the stored assignment, or the
+     *         startup one when nothing is stored. A slot with neither has changed by being assigned.
+     */
+    private boolean unchanged(SlotSetting setting, SlotSettingsStore.Stored previous) {
+        if (previous != null) {
+            return previous.setting().equals(setting);
+        }
+        return environment(setting.slot()).filter(assignment -> assignment.equals(setting.toAssignment())).isPresent();
     }
 
     /**

@@ -2,12 +2,14 @@ package org.rpgengine.inference;
 
 import java.util.Collection;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
  * Runtime-neutral boundary for every inference task of the engine (ADR 0020 decision 5).
- * Exactly one implementation is active per installation: the selected runtime's adapter, or
- * {@link UnavailableTaskPort} when none is configured. Domain and application services depend
+ * Exactly one implementation is the installation's port: the selected runtime's adapter,
+ * {@link UnavailableTaskPort} when none is configured, or {@link SlotRoutingTaskPort} in front of the
+ * adapters when the local backend is configured too. Domain and application services depend
  * on this interface and the neutral records of this package only.
  *
  * <p>Contract for implementations:
@@ -53,6 +55,17 @@ public interface NarrationTaskPort {
 
     /** @return current non-sensitive readiness */
     RuntimeStatus status();
+
+    /**
+     * Readiness of one backend, for probes of a slot assigned to it.
+     *
+     * @param backend protocol adapter name
+     * @return its status when this port runs that backend, otherwise empty
+     */
+    default Optional<RuntimeStatus> statusOf(String backend) {
+        RuntimeStatus status = status();
+        return status.runtime().equals(backend) ? Optional.of(status) : Optional.empty();
+    }
 
     /**
      * Attach the scheduler's write-ahead journal (P08.6). A port that can leave work running in

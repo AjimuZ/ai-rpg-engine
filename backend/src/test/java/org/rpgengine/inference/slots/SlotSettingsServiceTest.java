@@ -87,6 +87,77 @@ class SlotSettingsServiceTest {
                 List.of(fallbacks), acknowledge);
     }
 
+    private SlotSettingsService announcing(List<Object> events) {
+        SlotAssignments configured = slot -> Optional.ofNullable(environment.get(slot));
+        return new SlotSettingsService(store, (backend, settings) -> BackendProbe.Outcome.ready(), configured,
+                Clock.fixed(NOW, ZoneOffset.UTC), events::add);
+    }
+
+    private static SlotAssignmentChanged changed(ModelSlot slot) {
+        return new SlotAssignmentChanged(slot);
+    }
+
+    @Test
+    void aChangedAssignmentIsAnnouncedOnceForItsSlotOnly() {
+        List<Object> events = new ArrayList<>();
+        var announcing = announcing(events);
+        announcing.update(request(ModelSlot.LIGHT, "local", "model-a", null, null));
+        assertThat(events).containsExactly(changed(ModelSlot.LIGHT));
+        events.clear();
+
+        announcing.update(request(ModelSlot.LIGHT, "local", "model-a", null, null));
+        assertThat(events).as("an identical save changes nothing").isEmpty();
+
+        announcing.update(request(ModelSlot.LIGHT, "local", "model-b", null, null));
+        assertThat(events).as("model").containsExactly(changed(ModelSlot.LIGHT));
+        events.clear();
+        announcing.update(new Request(ModelSlot.LIGHT, "local", "model-b", "high", null, List.of(), null));
+        assertThat(events).as("parameter").containsExactly(changed(ModelSlot.LIGHT));
+        events.clear();
+        announcing.update(new Request(ModelSlot.LIGHT, "codex", "model-b", "high", null, List.of(),
+                BackendClass.SUBSCRIPTION));
+        assertThat(events).as("backend").containsExactly(changed(ModelSlot.LIGHT));
+        events.clear();
+        announcing.update(new Request(ModelSlot.LIGHT, "codex", "model-b", "high", null,
+                List.of(new SlotSetting.Fallback("codex", "model-c", "low")), null));
+        assertThat(events).as("fallbacks").containsExactly(changed(ModelSlot.LIGHT));
+    }
+
+    @Test
+    void aRefusedOrFailedSaveAnnouncesNothing() {
+        List<Object> events = new ArrayList<>();
+        var announcing = announcing(events);
+        assertThatThrownBy(() -> announcing.update(request(ModelSlot.LIGHT, "codex", "model-a", null, null)))
+                .isInstanceOf(SlotSettingsService.AcknowledgementRequired.class);
+        store.failSaves = true;
+        assertThatThrownBy(() -> announcing.update(request(ModelSlot.LIGHT, "local", "model-a", null, null)))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        assertThat(events).isEmpty();
+    }
+
+    @Test
+    void savingWhatTheStartupSettingAlreadyRunsAnnouncesNothing() {
+        environment.put(InferenceSlot.LIGHT, SlotAssignment.of("local", new EffectiveSettings("model-a", "medium")));
+        List<Object> events = new ArrayList<>();
+        var announcing = announcing(events);
+        announcing.update(request(ModelSlot.LIGHT, "local", "model-a", null, null));
+        assertThat(events).isEmpty();
+        announcing.update(request(ModelSlot.LIGHT, "local", "model-b", null, null));
+        assertThat(events).containsExactly(changed(ModelSlot.LIGHT));
+    }
+
+    @Test
+    void aFailingAnnouncementNeverFailsASaveThatIsAlreadyDurable() {
+        SlotAssignments configured = slot -> Optional.empty();
+        var failing = new SlotSettingsService(store, (backend, settings) -> BackendProbe.Outcome.ready(), configured,
+                Clock.fixed(NOW, ZoneOffset.UTC), event -> {
+                    throw new IllegalStateException("listener failed");
+                });
+        var saved = failing.update(request(ModelSlot.LIGHT, "local", "model-a", null, null));
+        assertThat(saved.model()).isEqualTo("model-a");
+        assertThat(store.rows).containsKey(ModelSlot.LIGHT);
+    }
+
     @Test
     void everySlotStartsUnassignedAndNothingIsClaimedAboutIt() {
         var status = service.status();

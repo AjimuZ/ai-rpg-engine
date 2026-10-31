@@ -2,6 +2,7 @@ package org.rpgengine.inference;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -89,6 +90,33 @@ public final class ProfileResolver {
         this.assignments = Objects.requireNonNull(assignments, "assignments");
         this.allowlist = Objects.requireNonNull(allowlist, "allowlist");
         this.fixedQuality = Objects.requireNonNull(fixedQuality, "fixedQuality");
+    }
+
+    /**
+     * The backend a task would run on, for routing it to an adapter. The adapter still resolves the
+     * task in full; this checks nothing beyond the assignment.
+     *
+     * @param requested the slot named by the task
+     * @return the backend assigned to the slot that serves the task, or empty when it is unassigned
+     */
+    public Optional<String> assignedBackend(InferenceSlot requested) {
+        Objects.requireNonNull(requested, "requested");
+        return assignments.resolve(fixedQuality.orElse(requested)).map(SlotAssignment::backend);
+    }
+
+    /**
+     * The task slots whose work an assignment serves, for retiring their sessions when it changes.
+     *
+     * @param assigned the slot whose assignment is read
+     * @return {@code assigned} alone; under {@code fixedQuality}, every slot when {@code assigned} is
+     *         the fixed one and none otherwise, because no task reads another slot's assignment then
+     */
+    public Set<InferenceSlot> slotsServedBy(InferenceSlot assigned) {
+        Objects.requireNonNull(assigned, "assigned");
+        if (fixedQuality.isEmpty()) {
+            return Set.of(assigned);
+        }
+        return fixedQuality.get() == assigned ? Set.of(InferenceSlot.values()) : Set.of();
     }
 
     /**

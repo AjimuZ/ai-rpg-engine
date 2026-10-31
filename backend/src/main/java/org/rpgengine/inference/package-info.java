@@ -4,8 +4,10 @@
  * logical {@link org.rpgengine.inference.InferenceSlot} ({@code light}, {@code standard} or
  * {@code deliberate}), a logical session identifier, instructions and a JSON output schema, and
  * receive an untrusted {@link org.rpgengine.inference.TaskResult}. Nothing here names a runtime
- * protocol, process, socket, thread or turn: those belong to one adapter per runtime (today only the
- * Codex adapter in the {@code codex} subpackage), which no other package may reference.
+ * protocol, process, socket, thread or turn: those belong to one adapter per runtime (the Codex
+ * adapter in the {@code codex} subpackage and the model server adapter in the {@code local}
+ * subpackage), which no other package may reference. When both can run,
+ * {@link org.rpgengine.inference.SlotRoutingTaskPort} chooses by each task's slot assignment.
  *
  * <p>Engine code does not call the port directly: the {@code session} subpackage maps each
  * campaign, generation, role, audience, content and policy scope to its own logical session and

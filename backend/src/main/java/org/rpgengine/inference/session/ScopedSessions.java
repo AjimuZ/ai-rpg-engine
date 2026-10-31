@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -86,6 +87,10 @@ import org.springframework.stereotype.Component;
  * proves that the campaign is idle. No retirement touches campaign state, events, the public
  * transcript or any pending decision: renewal is not a new campaign, a rest or a turn.
  *
+ * <p><b>Slot change</b> (P21.3-B). {@link #retireSlot} retires the sessions bound to one slot as
+ * {@link Reason#SLOT_CHANGED}. A session is bound to every slot a task of it was submitted under,
+ * because its conversation holds work of each, and other sessions stay open.
+ *
  * <p>Every retirement is forwarded to {@link NarrationTaskPort#retireSession}, so the adapter also
  * forgets the runtime conversation; a task already running on it finishes on its conversation and
  * is still counted. The registry is in memory, like the adapter's session-to-conversation
@@ -137,7 +142,9 @@ public final class ScopedSessions {
         /** A turn that may have run did not complete, so the conversation's content is uncertain. */
         UNRELIABLE,
         /** {@link #renewCampaign}: the owner renewed an idle campaign's sessions. */
-        OWNER;
+        OWNER,
+        /** {@link #retireSlot}: the owner changed the assignment of a slot the session ran under. */
+        SLOT_CHANGED;
 
         /** @return lowercase hyphenated name used in continuity blocks */
         public String wire() {
@@ -170,6 +177,7 @@ public final class ScopedSessions {
     private static final class Session {
         final UUID id;
         final SessionScope scope;
+        final EnumSet<InferenceSlot> slots = EnumSet.noneOf(InferenceSlot.class);
         int turns;
         int completed;
         long units;
@@ -350,7 +358,7 @@ public final class ScopedSessions {
                 due = due(current, units(instructions, outputSchema) + allowance);
                 if (due == null) {
                     reuse = current;
-                    track(taskId, current, instructions, outputSchema, allowance);
+                    track(taskId, current, slot, instructions, outputSchema, allowance);
                 } else {
                     renewing = current;
                 }
@@ -428,7 +436,7 @@ public final class ScopedSessions {
             journal.opened(new SessionJournal.Opened(session.id, scope, openedCause, ready, basis, code, now));
         }
         synchronized (this) {
-            track(taskId, session, sent, outputSchema, allowance);
+            track(taskId, session, slot, sent, outputSchema, allowance);
         }
         return port.submit(new TaskRequest(taskId, session.id, slot, sent, outputSchema, timeout));
     }
@@ -537,6 +545,20 @@ public final class ScopedSessions {
     }
 
     /**
+     * Retire the sessions bound to one slot, because the slot's assignment changed: backend, model or
+     * parameters. Each affected line's next task opens a fresh session with a continuity block, and
+     * sessions never submitted under this slot stay open. A task still running finishes on its old
+     * conversation. Idempotent.
+     *
+     * @param slot slot whose sessions end
+     * @return number of sessions retired
+     */
+    public int retireSlot(InferenceSlot slot) {
+        Objects.requireNonNull(slot, "slot");
+        return retireSessions(session -> session.slots.contains(slot), Reason.SLOT_CHANGED);
+    }
+
+    /**
      * Read the current session of a scope without counting as a use (the least-recently-used
      * order is unchanged). For diagnostics and tests; submission never needs it.
      *
@@ -619,8 +641,10 @@ public final class ScopedSessions {
         }
     }
 
-    /** Remember a forwarded task for {@link #settled}; caller holds the monitor. */
-    private void track(UUID taskId, Session session, String instructions, String outputSchema, long allowance) {
+    /** Remember a forwarded task for {@link #settled} and bind its session to its slot; caller holds the monitor. */
+    private void track(UUID taskId, Session session, InferenceSlot slot, String instructions, String outputSchema,
+            long allowance) {
+        session.slots.add(slot);
         inFlight.put(taskId, new InFlight(session, units(instructions, outputSchema), allowance));
     }
 
@@ -682,11 +706,15 @@ public final class ScopedSessions {
 
     /** Remove every matching session and retire it at the port and the journal outside the monitor. */
     private int retireWhere(Predicate<SessionScope> match, Reason reason) {
+        return retireSessions(session -> match.test(session.scope), reason);
+    }
+
+    private int retireSessions(Predicate<Session> match, Reason reason) {
         List<Session> sessions = new ArrayList<>();
         synchronized (this) {
             for (Iterator<Map.Entry<SessionScope, Session>> entries = active.entrySet().iterator(); entries.hasNext();) {
                 Map.Entry<SessionScope, Session> entry = entries.next();
-                if (match.test(entry.getKey())) {
+                if (match.test(entry.getValue())) {
                     sessions.add(entry.getValue());
                     lineHistory.put(Line.of(entry.getKey()), reason);
                     entries.remove();

@@ -1,6 +1,7 @@
 package org.rpgengine.inference.slots;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import org.rpgengine.inference.EffectiveSettings;
@@ -12,15 +13,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * {@link BackendProbe} that answers from the one task port the installation runs. It sends nothing:
- * it reads the port's non-sensitive status, so it is bounded and cannot spend quota.
+ * {@link BackendProbe} that answers from the task port the installation runs. It sends nothing:
+ * it reads the port's non-sensitive status of that backend, so it is bounded and cannot spend quota.
  *
- * <p>A backend other than the active runtime has no adapter in this process and is
- * {@code UNREACHABLE} with {@code adapter-not-installed}. For the active runtime the verdict is the
- * port's state; a ready runtime is {@code FAILED} with {@code model-not-approved} when the owner's
- * allowlist for that backend does not list the exact pair. A ready verdict therefore means the
- * runtime is signed in and the pair is not excluded: it does not prove the account serves that
- * model, which only a task proves.
+ * <p>A backend without an adapter in this process is {@code UNREACHABLE} with
+ * {@code adapter-not-installed}. For an installed backend the verdict is its adapter's state; a ready
+ * one is {@code FAILED} with {@code model-not-approved} when the owner's allowlist for that backend
+ * does not list the exact pair. A ready verdict therefore means the adapter is usable (signed in, or
+ * the model server listed its models) and the pair is not excluded: it does not prove the account
+ * or server serves that model, which only a task proves.
  */
 @Component
 public class RuntimeBackendProbe implements BackendProbe {
@@ -48,10 +49,11 @@ public class RuntimeBackendProbe implements BackendProbe {
 
     @Override
     public Outcome probe(String backend, EffectiveSettings settings) {
-        RuntimeStatus status = port.get().status();
-        if (!status.runtime().equals(backend)) {
+        Optional<RuntimeStatus> installed = port.get().statusOf(backend);
+        if (installed.isEmpty()) {
             return Outcome.unreachable("adapter-not-installed");
         }
+        RuntimeStatus status = installed.get();
         return switch (status.state()) {
             case READY -> allowlist.configured(backend) && !allowlist.permits(backend, settings)
                     ? Outcome.failed("model-not-approved") : Outcome.ready();

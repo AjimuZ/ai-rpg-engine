@@ -210,7 +210,54 @@ class ScopedSessionsTest {
                 ScopedSessions.Reason.SUPERSEDED, 0L, ScopedSessions.Reason.CAMPAIGN, 2L,
                 ScopedSessions.Reason.INSTALLATION, 1L, ScopedSessions.Reason.CAPACITY, 0L,
                 ScopedSessions.Reason.TURN_CEILING, 0L, ScopedSessions.Reason.CONTEXT_PRESSURE, 0L,
-                ScopedSessions.Reason.UNRELIABLE, 0L, ScopedSessions.Reason.OWNER, 0L)));
+                ScopedSessions.Reason.UNRELIABLE, 0L, ScopedSessions.Reason.OWNER, 0L,
+                ScopedSessions.Reason.SLOT_CHANGED, 0L)));
+    }
+
+    @Test
+    void aSlotChangeRetiresOnlyTheSessionsBoundToThatSlot() throws Exception {
+        SessionScope onStandard = narrator(1, POLICY);
+        SessionScope onLight = scope(CAMPAIGN, 1, AiRole.INTERPRETER, Audience.PUBLIC, POLICY);
+        SessionScope onDeliberate = planner(1);
+        SessionScope elsewhere = scope(OTHER_CAMPAIGN, 1, AiRole.NARRATOR, Audience.PUBLIC, POLICY);
+        sessions.submit(onStandard, UUID.randomUUID(), InferenceSlot.STANDARD, "a", "{}", Duration.ofSeconds(5));
+        UUID standard = lastSession();
+        sessions.submit(onLight, UUID.randomUUID(), InferenceSlot.LIGHT, "b", "{}", Duration.ofSeconds(5));
+        UUID light = lastSession();
+        sessions.submit(onDeliberate, UUID.randomUUID(), InferenceSlot.DELIBERATE, "c", "{}", Duration.ofSeconds(5));
+        UUID deliberate = lastSession();
+        sessions.submit(elsewhere, UUID.randomUUID(), InferenceSlot.STANDARD, "d", "{}", Duration.ofSeconds(5));
+        UUID otherCampaign = lastSession();
+
+        assertThat(sessions.retireSlot(InferenceSlot.STANDARD)).isEqualTo(2);
+
+        assertThat(port.retired).containsExactlyInAnyOrder(standard, otherCampaign);
+        assertThat(sessions.activeSession(onStandard)).isEmpty();
+        assertThat(sessions.activeSession(elsewhere)).isEmpty();
+        assertThat(sessions.activeSession(onLight)).contains(light);
+        assertThat(sessions.activeSession(onDeliberate)).contains(deliberate);
+        assertThat(sessions.status().retired()).containsEntry(ScopedSessions.Reason.SLOT_CHANGED, 2L);
+        assertThat(sessions.retireSlot(InferenceSlot.STANDARD)).isZero();
+
+        // The next task of the line opens a new session, and the kept sessions continue unchanged.
+        sessions.submit(onStandard, UUID.randomUUID(), InferenceSlot.STANDARD, "a", "{}", Duration.ofSeconds(5));
+        assertThat(lastSession()).isNotEqualTo(standard);
+        sessions.submit(onLight, UUID.randomUUID(), InferenceSlot.LIGHT, "b", "{}", Duration.ofSeconds(5));
+        assertThat(lastSession()).isEqualTo(light);
+    }
+
+    @Test
+    void aSessionIsBoundToEverySlotItRanUnder() throws Exception {
+        SessionScope scope = narrator(1, POLICY);
+        sessions.submit(scope, UUID.randomUUID(), InferenceSlot.LIGHT, "a", "{}", Duration.ofSeconds(5));
+        UUID first = lastSession();
+        sessions.submit(scope, UUID.randomUUID(), InferenceSlot.STANDARD, "b", "{}", Duration.ofSeconds(5));
+        assertThat(lastSession()).isEqualTo(first);
+
+        assertThat(sessions.retireSlot(InferenceSlot.DELIBERATE)).isZero();
+        assertThat(sessions.activeSession(scope)).contains(first);
+        assertThat(sessions.retireSlot(InferenceSlot.LIGHT)).isEqualTo(1);
+        assertThat(port.retired).containsExactly(first);
     }
 
     @Test
@@ -439,6 +486,18 @@ class ScopedSessionsTest {
         assertThat(port.requests.getLast().instructions()).isEqualTo("c");
         assertThat(journal.calls).contains("opened TURN_CEILING OMITTED");
         assertThat(registry.status().rehydrated()).isZero();
+    }
+
+    @Test
+    void aSlotChangeIsJournaledAndTheNextSessionCarriesTheContinuityBlock() throws Exception {
+        var registry = renewing(RenewalPolicy.defaults());
+        settle(registry, narrator(1, POLICY), "a");
+        assertThat(registry.retireSlot(InferenceSlot.LIGHT)).isEqualTo(1);
+        settle(registry, narrator(1, POLICY), "b");
+        assertThat(port.requests.getLast().instructions()).isEqualTo("BLOCK" + ScopedSessions.SEPARATOR + "b");
+        assertThat(rehydrator.causes).containsExactly("slot-changed");
+        assertThat(journal.calls).containsExactly("opened FIRST NONE", "used 1/1", "retired SLOT_CHANGED",
+                "opened SLOT_CHANGED STATE", "used 1/1");
     }
 
     @Test

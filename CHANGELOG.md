@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Local text backend adapter and per-slot session retirement (P21.3-B), 31 October 2026
+
+- Add the `local` text backend, which talks to the packaged model server over its HTTP chat API. `engine.inference.local.url`
+  turns it on; without that setting nothing changes. Every request names its model and parameters explicitly, and the output
+  goes through the same schema, disclosure and text checks as any other backend.
+- With the local backend on, each task goes to the backend assigned to its slot. A slot whose backend is not installed ends
+  with a clear error and never moves to another backend.
+- Saving a changed slot assignment now retires only that slot's AI sessions, so its next task starts a fresh conversation and
+  other slots keep theirs. Saving the same assignment again retires nothing.
+- Migration V28 lets session records store this retirement reason. The backup tool now expects schema version 28.
+- Tested against a scripted HTTP server only: no real model has answered, and Compose and the launcher do not select the
+  backend yet. A readiness probe of a `local` slot can now answer `ready` when the server lists its models, which does not show
+  that a model loads or answers.
+
 ## Unreleased — Model slots with class badges and readiness probes (P21.3-A), 31 October 2026
 
 - Add owner-only backend routes for the four model slots (`text.light`, `text.standard`, `text.deliberate`, `image`):

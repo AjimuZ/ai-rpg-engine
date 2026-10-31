@@ -3207,6 +3207,48 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       sees only same-backend entries. Unassigning a stored slot, an audit trail, budgets, the hardware profile in the status, the
       panel and any Italian wording are not built. No weakened-copy run was made, so the tests were not shown to fail on a removed
       check. The V27 migration was not rehearsed with a live dump and restore, and the hosted CI job has not run this change.
+  - Partial progress (31 October 2026, P21.3-B): the `local` text adapter, routing by slot assignment and per-slot session retirement
+    exist in the backend, tested against a scripted HTTP server only. The P21.3 box stays unchecked: the gateway, the Settings → Models
+    panel, the `claude`, `openai-compatible`, `anthropic-api`, `a1111-http`, `openai-images` and `local-image` adapters and budgets are
+    not built.
+    - Added package `org.rpgengine.inference.local` (`LocalTaskAdapter`, `LocalProtocol`, `LocalSettings`, `BoundedBody`,
+      `LocalConfiguration`; all package-private), selected by `engine.inference.local.url`, and `SlotRoutingTaskPort`, which becomes the
+      installation's port only when that setting is present. Added `ProfileResolver.assignedBackend` and `slotsServedBy`,
+      `NarrationTaskPort.statusOf` (`RuntimeBackendProbe` now reads the slot's own backend), `ScopedSessions.retireSlot` with reason
+      `SLOT_CHANGED`, `SlotAssignmentChanged`, `SlotSessionRetirement`, and migration `V28__session_slot_retirement.sql`, which adds the
+      value to the two closed checks of `ai_session_record`. Backup tool: schema version 28, no new table. Rules and result codes are in
+      `docs/34-inference-backends-and-model-selection.md` section 12.
+    - Decisions: the adapter keeps each session's conversation in memory, because the chat API has none. It uses the same `ContractRunner`
+      path as the other adapter, since validation sits above the port. A session is bound to every slot it ran under, so it retires when any
+      of them changes. Under `fixedQuality` only the fixed slot's assignment retires anything. Any change to the stored assignment counts,
+      fallbacks and class declaration included.
+    - Tests: `LocalTaskAdapterTest` (17), `LocalAdapterContractTest` (7; the real runner, scheduler and registry over the adapter and a
+      scripted server: valid output accepted, and malformed JSON, an unknown field, a disclosed secret and an unsupported number each rejected
+      after the single repair), `SlotRoutingTaskPortTest` (8), `SlotSessionRetirementTest` (6; a changed model, parameter or backend retires
+      only that slot's sessions, and the next requests show an empty history on that slot and a kept history on the other), plus new cases
+      in `SlotSettingsServiceTest`, `ScopedSessionsTest`, `RuntimeBackendProbeTest`, `TaskPortSelectionTest` (also the real application event),
+      `InferenceBoundaryTest` and `CanonicalMigrationUpgradeTest` (V28 on PostgreSQL). `ScopedSessionsTest`'s exact status map gained the new
+      reason at 0.
+    - Commands and results on the reference host (Git Bash, scoped JDK 21 and PostgreSQL 18.6 containers):
+      `sh .agents/ralph/verify.sh backend -Dtest=LocalTaskAdapterTest,LocalAdapterContractTest,SlotRoutingTaskPortTest,SlotSessionRetirementTest,SlotSettingsServiceTest,RuntimeBackendProbeTest,TaskPortSelectionTest,InferenceBoundaryTest,ScopedSessionsTest,SessionBoundaryTest,SchedulerBoundaryTest,CanonicalMigrationUpgradeTest`:
+      105 tests, 0 failures, 0 errors, 0 skipped, run before the last `TaskPortSelectionTest` case was added.
+      `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full`: 18 steps, all `PASS`, `VERIFY PASSED (full)`, with 1266 backend
+      tests, 0 failures, 0 errors, 0 skipped, `BUILD SUCCESS`. `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh containers`:
+      `PASS container-packaging` (450 s, `Ran 128 tests in 448.268s`, `OK (skipped=1)`) and `PASS runtime-probe-docker` (80 s),
+      `VERIFY PASSED (containers)`. Its restore rehearsal reported schema 28, 58 tables, 229 rows and a 371,216-byte dump. This roadmap
+      entry's results and the matching note in `tools/database_backup/README.md` were written after those two runs; `verify.sh repo` checked
+      them: 5 of 5 steps passed, `VERIFY PASSED (repo)`.
+    - Not proven: no real llama.cpp server or model has answered, so the pinned build's acceptance of this request (`reasoning_effort`,
+      `chat_template_kwargs.enable_thinking`, `top_k`, a contract schema as `json_schema`), its `/v1/models` shape in router mode, its answer
+      while a model loads, its `finish_reason` values and structured output with thinking on are all open. Nothing shows that closing the
+      connection stops generation at the server: the scripted server only shows that the adapter ends the task and that the next one runs. The
+      reply's `model` field is not compared with the requested model. Compose does not pass `engine.inference.local.url` and the launcher does
+      not select the service, so the packaged engine has not used the adapter. A `ready` probe of a `local` slot means only that the model list
+      parsed. Not built: the model file hash in provenance, per-slot sampling and context parameters, the thinking budget, and an API key for
+      `--api-key-file` servers. Running tasks on two adapters at once is not relevant yet, because the scheduler's single permit covers both.
+      Gameplay health shows ready when any adapter is ready, even if the backend of the slot narration uses is down. The restore rehearsal held
+      no `ai_session_record` row, so restoring a `SLOT_CHANGED` value is unrehearsed. No weakened-copy run was made, so the tests were not shown
+      to fail on a removed check, and the hosted CI job has not run this change.
 - [ ] P21.4 Implement the shared GPU and RAM admission coordinator for text, image and speech: priorities, leases using the model server's documented load and unload endpoints and slot save and restore, batching, interruption between diffusion steps, unowned-contention handling and metrics. Prove no engine-caused out-of-memory on the reference host.
 - [ ] P21.5 Implement the local image backend: a pinned image-worker container loading single-file safetensors checkpoints and LoRAs, with WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as catalog alternatives; prompt chunking beyond 77 tokens; default safe-content tags; step-boundary cancellation; output validation and provenance; and the `a1111-http` adapter for an owner-run Forge or A1111 server. Integrate with the P17 asset-job contract without changing authority rules.
 - [ ] P21.6 Verify and document: QA-43 and QA-44 on deterministic fixtures and on the reference host, synthetic-hardware advisor tests, custom-endpoint and secret-handling tests, the bilingual narration evaluation of the default and alternate models, license and attribution records, and the supported-defaults table for the reference host with honest limits.

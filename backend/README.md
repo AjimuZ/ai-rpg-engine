@@ -1233,6 +1233,19 @@ fail startup without echoing a value. Tests: `ProfileResolverTest`, `ProfileSett
 `CodexProfileResolutionTest` (through the real adapter and the scripted app-server) and the
 wiring case in `TaskPortSelectionTest`.
 
+## Local text backend and slot routing (P21.3-B)
+
+`engine.inference.local.url` (unset by default; `http://models:8080` for the packaged service)
+installs `org.rpgengine.inference.local`, and `SlotRoutingTaskPort` then sends each task to the
+adapter of its slot's backend. Without the setting, one task port stays selected as before. The
+other settings, the request shape, the result codes and the limits are in
+[docs/34 section 12](../docs/34-inference-backends-and-model-selection.md#p213-b-local-text-adapter-and-per-slot-session-retirement).
+Saving a changed slot assignment retires only that slot's sessions (`ScopedSessions.retireSlot`,
+reason `SLOT_CHANGED`). Tests use `ScriptedModelServer`, a scripted HTTP fixture and not a model:
+`LocalTaskAdapterTest`, `LocalAdapterContractTest` (real contract runner, scheduler and registry),
+`SlotRoutingTaskPortTest`, `SlotSessionRetirementTest` and the wiring cases in
+`TaskPortSelectionTest`.
+
 ## Grounded narration publication, receipt fallback and retry (P08.5)
 
 `org.rpgengine.narration` connects the presentation jobs to the narration contract. The rules

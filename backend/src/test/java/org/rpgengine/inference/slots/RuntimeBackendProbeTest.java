@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,36 @@ class RuntimeBackendProbeTest {
         assertThat(starting.probe("codex", PAIR)).isEqualTo(BackendProbe.Outcome.unreachable("runtime-starting"));
         var stopped = new RuntimeBackendProbe(port(status(RuntimeStatus.State.STOPPED, null)), ModelAllowlist.empty());
         assertThat(stopped.probe("codex", PAIR)).isEqualTo(BackendProbe.Outcome.unreachable("runtime-stopped"));
+    }
+
+    @Test
+    void underRoutingEachBackendAnswersFromItsOwnAdapter() {
+        NarrationTaskPort routed = new NarrationTaskPort() {
+            @Override
+            public TaskHandle submit(TaskRequest request) {
+                throw new AssertionError("a probe never submits a task");
+            }
+
+            @Override
+            public void retireSession(UUID sessionId) {
+                throw new AssertionError("a probe never touches a session");
+            }
+
+            @Override
+            public RuntimeStatus status() {
+                return new RuntimeStatus("routed", RuntimeStatus.State.READY, null, 0, 0);
+            }
+
+            @Override
+            public Optional<RuntimeStatus> statusOf(String backend) {
+                return backend.equals("local")
+                        ? Optional.of(new RuntimeStatus("local", RuntimeStatus.State.UNAVAILABLE, "model-server-starting", 0, 0))
+                        : Optional.empty();
+            }
+        };
+        var probe = new RuntimeBackendProbe(() -> routed, ModelAllowlist.empty());
+        assertThat(probe.probe("local", PAIR)).isEqualTo(BackendProbe.Outcome.unreachable("model-server-starting"));
+        assertThat(probe.probe("codex", PAIR)).isEqualTo(BackendProbe.Outcome.unreachable("adapter-not-installed"));
     }
 
     @Test
