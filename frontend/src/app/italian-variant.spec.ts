@@ -366,6 +366,16 @@ describe('Italian variant with the reviewed catalog', /** Register Italian rende
     expect($localize`:@@campaign.view.send:Send`).not.toBe('Send');
   });
 
+  it('pins the Italian wording fixed in the first-pass review', /** Parity and render checks pass with or without these fixes. */ () => {
+    // The target must keep the space before the placeholder: "dal" + clock text, not "dalGiorno".
+    expect(message('campaign.panels.overdue', { due: 'Giorno 2, 03:46' })).toBe('Scadenza superata dal Giorno 2, 03:46');
+    // Every cue text uses the typographic apostrophe like the rest of the catalog.
+    for (const id of ['campaign.cues.help', 'campaign.cues.play', 'campaign.cues.stop', 'campaign.cues.unavailable']) {
+      expect(message(id), id).toMatch(/\bl’audio/i);
+      expect(message(id), id).not.toContain("'");
+    }
+  });
+
   it('shows no English-only catalog text and names every control on each routed screen', /** Shell, previews and Settings. */ async () => {
     const screens = ['/library', '/settings', '/interface-kit', '/adventures/mosslight/story', '/adventures/mosslight/create',
       '/adventures/mosslight/sheet', '/adventures/mosslight/inventory', '/adventures/mosslight/journal', '/adventures/mosslight/guide',

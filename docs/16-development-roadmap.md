@@ -1040,6 +1040,48 @@ hosted success is inferred from that local result. No roadmap checkbox changes.
       change). Not proven: reload with a draft and an in-flight operation on a real server. It
       needs the browser submit path (P05.7/P07 scope) and the owner action above. This box stays
       unchecked until P05.6-O.
+    - P05.6-C (31 October 2026, review kit and tool evidence; box stays unchecked): added
+      [docs/36-italian-and-screen-reader-review-kit.md](36-italian-and-screen-reader-review-kit.md) and linked it from
+      `docs/README.md`. It lists all 433 Italian catalog units with English source, context and an empty verdict column,
+      a screen-reader script of 18 steps for both variants with empty result columns, and an empty reviewer evidence block.
+      - First-pass Italian review by this session, **not independent** (same author line as the earlier author pass; it does
+        not count towards QA-35): it fixed two clear errors in `frontend/src/locale/messages.it.xlf`.
+        `campaign.panels.overdue` "Scaduta dal" became "Scadenza superata dal" (feminine form beside the masculine kinds
+        "Obbligo" and "Accordo"), and the straight apostrophes in `campaign.cues.help`, `play`, `stop` and `unavailable`
+        became `’` like every other target. Placeholders and ICU branches were not touched. Judgement calls (for example
+        "round", "Visual novel", "brano", the mixed command-label forms and the stale English text of `settings.languagePending`
+        in the development-only branch) are listed in the kit for the reviewer and were not changed.
+      - Commands and results: `"C:/Program Files/Git/bin/bash.exe" ./start.sh` rebuilt the image from this tree (inside the
+        build: 131 frontend tests in 17 files passed, `test:i18n` 5 passed, "Localization parity: 433 reviewed messages", both
+        locale variants built, `PackagedSecretsTest` 4 passed) and started the installation with gameplay not ready.
+        `node .local/scratch/p056c/audit.mjs` (private, ignored) loaded 13 routes in each of `en` and `it` in host Chrome:
+        26 loads, all HTTP 200, `html lang` correct, tab titles localized, **0 axe violations** (axe-core 4.14.0) and an
+        accessibility-tree dump per load. `browser.mjs` on `/en/settings --axe` and `/it/library --axe` showed one
+        unexplained `404` console error per page (plus the expected `503` of `/api/v1/session` on `/library` and the saved
+        route). `./start.sh --stop` stopped the installation. The browser and `start.sh` runs above preceded the repair
+        described next; the repair touched one text node of one Italian target and no other file they exercise.
+      - Repair after review (attempt 2): the first edit of `campaign.panels.overdue` dropped the space before the clock
+        placeholder, so the target read "dal" glued to the clock text ("dalGiorno 2, 03:46"). Nothing caught it: the parity
+        check and the Italian render tests pass either way, and only the review of the diff found it. The space is restored
+        (`Scadenza superata dal <ph id="0" equiv="due" disp="clock" />`), and `frontend/src/app/italian-variant.spec.ts` gained
+        one test, "pins the Italian wording fixed in the first-pass review", which asserts the overdue target renders as
+        "Scadenza superata dal Giorno 2, 03:46" and that the four cue targets contain `l’audio` and no straight apostrophe.
+        The test reads the catalog text, not a rendered screen (the overdue panel needs a saved campaign the packaged
+        installation cannot provision). Its first run failed on my own case-sensitive pattern (`L’audio` at sentence start),
+        which I fixed in the test, not in the catalog. Its power to fail was not measured against the old target (no
+        deliberate weakening on an exported copy).
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full` after the repair and the new test: **VERIFY
+        PASSED (full)**, all 17 steps; frontend 17 files and 132 tests passed (131 before), `test:i18n` passed, "Localization
+        parity: 433 reviewed messages". Its first run on the new test failed as described and was rerun after the fix.
+      - These are **tool evidence, not a screen-reader review**: no screen reader was run, and nothing about spoken output,
+        voice, pronunciation or reading order is proven.
+      - Not proven: any independent Italian review; any screen-reader pass; the saved-campaign screens in a browser (no owner
+        or campaign can be provisioned in the packaged installation, so they were reviewed from text only); the source of the
+        404 (a request to check the favicon was refused); the Chrome version of this run (not recorded). The two fixed
+        strings are now pinned by one catalog-level test (see the repair above), not by a rendered screen; the browser audit
+        was not rerun after the repair.
+        P05.6 stays unchecked until the independent Italian review, the screen-reader pass and the owner's QA-35
+        sign-off (P05.6-O).
 - [x] P05.7 Define and render bounded typed public presentation events for scene, pose/expression and optional line audio hooks; reject executable/raw-URL directives, deduplicate delivery and preserve text-only/keyboard/reduced-motion behavior under QA-40.
     - P05.7-A (30 October 2026, backend admission gate only; box stays unchecked): the existing
       `org.rpgengine.presentation` package gained `PresentationEvent` (typed SCENE, POSE and

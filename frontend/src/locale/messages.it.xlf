@@ -3465,7 +3465,7 @@
       </notes>
       <segment>
         <source>Overdue since <ph id="0" equiv="due" disp="clock" /></source>
-      <target>Scaduta dal <ph id="0" equiv="due" disp="clock" /></target>
+      <target>Scadenza superata dal <ph id="0" equiv="due" disp="clock" /></target>
       </segment>
     </unit>
     <unit id="campaign.panels.due">
@@ -3753,7 +3753,7 @@
       </notes>
       <segment>
         <source>These lines describe what the scene shows. The written account is complete without them, and audio plays only when you choose to start it.</source>
-      <target>Queste righe descrivono ciò che mostra la scena. Il racconto scritto è completo anche senza di esse e l'audio parte solo quando scegli di avviarlo.</target>
+      <target>Queste righe descrivono ciò che mostra la scena. Il racconto scritto è completo anche senza di esse e l’audio parte solo quando scegli di avviarlo.</target>
       </segment>
     </unit>
     <unit id="campaign.cues.scene">
@@ -3807,7 +3807,7 @@
       </notes>
       <segment>
         <source>Play line audio</source>
-      <target>Riproduci l'audio della battuta</target>
+      <target>Riproduci l’audio della battuta</target>
       </segment>
     </unit>
     <unit id="campaign.cues.stop">
@@ -3816,7 +3816,7 @@
       </notes>
       <segment>
         <source>Stop line audio</source>
-      <target>Ferma l'audio della battuta</target>
+      <target>Ferma l’audio della battuta</target>
       </segment>
     </unit>
     <unit id="campaign.cues.unavailable">
@@ -3825,7 +3825,7 @@
       </notes>
       <segment>
         <source>Audio is not available for this line. The text above is unchanged.</source>
-      <target>L'audio non è disponibile per questa battuta. Il testo qui sopra non cambia.</target>
+      <target>L’audio non è disponibile per questa battuta. Il testo qui sopra non cambia.</target>
       </segment>
     </unit>
     <unit id="campaign.cues.noAudio">

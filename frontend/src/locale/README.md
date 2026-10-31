@@ -60,7 +60,9 @@ error codes (a closed table; unknown codes use one generic sentence), operation
 statuses, receipt lines with named placeholders (`path`, `kind`, `resource`, `before`,
 `after`, ...), narration and stream-reset reasons, command labels and the source-language
 fallback notice. Numbers are formatted for the compiled locale only; resource keys and
-destinations stay literal identifiers. `npm run check:i18n` now reports 317 messages.
+destinations stay literal identifiers. `npm run check:i18n` now reports 433 messages. The [review kit](../../../docs/36-italian-and-screen-reader-review-kit.md)
+lists every Italian target with its English source for the independent review and holds the screen-reader script; its
+first-pass fixes are by the same author line and are not independent.
 The Italian targets of those 77 messages (plus the
 reworded `saved.readOnly`) had one author review pass on 28 October 2026, which corrected
 11 targets (ambiguous `Ricevuta`, identical sentences for two narration reasons, `tempo di
@@ -81,3 +83,6 @@ mirrors Angular's parser for `ph`, `pc` and ICU text; adding another inline elem
 catalog makes it throw until the serializer is extended. After compiling, `build:locales`
 runs `tools/localize-index.mjs`, which writes the reviewed `shell.brand` message into each
 variant's `<title>` (Angular does not translate `index.html`); `npm run test:i18n` covers it.
+The same spec also pins the two first-pass fixes (the overdue text with its space before the
+clock placeholder, and the typographic apostrophe in the four audio-cue texts), because the
+parity check and the render checks pass with or without them.

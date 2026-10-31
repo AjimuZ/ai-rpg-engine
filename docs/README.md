@@ -53,6 +53,7 @@ Requirements stated by the project owner are binding for this design. Technical 
 | [30 — Optional local speech](30-local-speech-synthesis.md) | Verified candidate/license comparison, persistent voices, audio cache/playback, GPU admission and conditional selection |
 | [31 — Research evaluation protocol](31-research-validation-and-evaluations.md) | Planned paired narrative studies, bilingual quality, 100/500-turn safety/continuity and speech/GPU measurements |
 | [32 — Italian technical summary](32-research-executive-summary-it.md) | Owner-facing findings, decisions, priorities, sharing, remaining risks and actual documentation scope |
+| [36 — Italian and screen-reader review kit](36-italian-and-screen-reader-review-kit.md) | Every Italian UI string with its English source and context, the screen-reader script for both variants, empty reviewer evidence tables and axe/accessibility-tree tool evidence (not a review) |
 | [Visual-novel story UI concept](mockups/visual-novel-ui-v1.png) | Primary narrative-screen direction; [prompt and provenance](mockups/visual-novel-ui-v1.prompt.md) |
 | [Advanced gameplay UI concept](mockups/advanced-gameplay-ui-v1.png) | Illustrative interface image; [prompt and provenance](mockups/advanced-gameplay-ui-v1.prompt.md) |
 | [Architecture decision records](adr/README.md) | Rationale and consequences of major proposed decisions |

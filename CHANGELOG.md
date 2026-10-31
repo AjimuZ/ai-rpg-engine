@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Italian and screen-reader review kit prepared (P05.6-C), 31 October 2026
+
+- Add `docs/36-italian-and-screen-reader-review-kit.md`: all 433 Italian strings with their English source and context, a
+  screen-reader script for the English and Italian variants, and empty tables for the reviewer's evidence.
+- Fix two Italian errors found on a first read by the author line (not an independent review): an overdue promise, obligation
+  or agreement no longer reads "Scaduta" (feminine only) but "Scadenza superata", and the audio-cue texts use the same
+  typographic apostrophe as the rest of the interface. A new Vitest test pins both fixes (132 frontend tests).
+- Axe (0 violations on 13 routes in each language) and accessibility-tree reports are recorded as tool evidence only. No screen
+  reader was run and no independent Italian review has happened, so P05.6 stays open.
+
 ## Unreleased — Hardware profile and GPU check run on the reference host (P21.1-A), 31 October 2026
 
 - Run `./start.sh --models profile --gpu-check` on the reference host. The driver tool reports the RTX 4070 with
