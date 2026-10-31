@@ -3013,6 +3013,27 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     - Remaining for P21.2: hash-verified `--models fetch` with license display and confirmation, launcher
       selection of the service, schema readiness probes, the bilingual narration probe set, and the
       measurements. The box stays unchecked.
+    - Hosted CI repair (31 October 2026, P21.2-CI): hosted CI failed on commit 5cdb85a in the job
+      "Container build contexts and Compose boundaries". Cause: `test_compose.ComposeTest.test_model_server_boundaries`
+      read `weights["bind"]["create_host_path"]`, which Compose 2.x omits from `config --format json` when
+      false, while the 5.x on the reference host prints it; reproduced on Compose 2.40.3 as
+      `KeyError: 'create_host_path'`. Fix, in the test only: `model_bind_creates_host_path` uses the rendered
+      value when present and otherwise requires `compose.yaml` to set `bind: {create_host_path: false}`
+      explicitly inside the `models` service, so a missing setting never passes. `compose.yaml` is unchanged.
+      - `sh .agents/ralph/verify.sh probe`: `PASS runtime-probe-tests`, `PASS docker-requirement`,
+        `PASS hardware-profile`, `PASS compose-v2`, `VERIFY PASSED (probe)`. The `compose-v2.log` of that run
+        shows `Docker Compose version v2.40.3` and `Ran 4 tests`, `OK` for `test_compose.py`.
+      - `py -B -m unittest discover -s tools/container_packaging -p test_compose.py` on the host's Compose
+        (version not printed in this session): `Ran 4 tests`, `OK`.
+      - Weakened exported copies, `py -B .local/scratch/weaken_create_host_path.py` (an ignored scratch script):
+        the unchanged copy passes the suite and the omitted-key fallback returns false. With
+        `create_host_path: true` the suite fails (`failures=1`, rendered true) and the omitted-key fallback
+        fails its assertion on `['true']`. With the setting line removed the suite fails (`failures=1`, the host
+        renders the default true) and the fallback fails on `[]`.
+      - Not proven: the hosted job itself, which has not run this change; the omitted-key path was exercised
+        by calling the helper with an empty `bind` and by the 2.40.3 container in `verify.sh probe`, not by
+        Compose 2.x rendering a weakened file. The launcher floors raised by P21.2-B stay in P21.2-B.
+        The P21.2 box stays unchecked.
 - [ ] P21.3 Implement slot assignment and the remaining backend adapters behind the runtime-neutral task port: independent `light`, `standard`, `deliberate` and `image` slots, readiness probes with visible results, billing and privacy class badges with acknowledgement on a class change, same-class fallback lists only when configured, per-slot session retirement, and the `gateway` service for owner-key hosted APIs and allowlisted custom endpoints (keys as runtime-only secrets, budgets, bounded redirects and sizes). Expose `GET /api/v1/models/status`, the owner-only settings API and the Settings → Models panel.
 - [ ] P21.4 Implement the shared GPU and RAM admission coordinator for text, image and speech: priorities, leases using the model server's documented load and unload endpoints and slot save and restore, batching, interruption between diffusion steps, unowned-contention handling and metrics. Prove no engine-caused out-of-memory on the reference host.
 - [ ] P21.5 Implement the local image backend: a pinned image-worker container loading single-file safetensors checkpoints and LoRAs, with WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as catalog alternatives; prompt chunking beyond 77 tokens; default safe-content tags; step-boundary cancellation; output validation and provenance; and the `a1111-http` adapter for an owner-run Forge or A1111 server. Integrate with the P17 asset-job contract without changing authority rules.

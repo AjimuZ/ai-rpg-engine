@@ -131,6 +131,26 @@ class ComposeTest(unittest.TestCase):
         # A default start must not wait for, or implicitly start, the optional server.
         self.assertNotIn("models", self.config["services"]["engine"]["depends_on"])
 
+    def model_bind_creates_host_path(self, weights: dict) -> bool:
+        """Return whether the model bind may create its host path; fail if it cannot be told.
+
+        Compose 5.x prints `bind.create_host_path` even when false, while 2.x omits it.
+        A rendered value is used as printed. When it is omitted, `compose.yaml` itself
+        must set `create_host_path: false` explicitly on the `models` service, so a
+        missing key never passes for a safe setting.
+        """
+        rendered = weights.get("bind", {}).get("create_host_path")
+        if rendered is not None:
+            return rendered
+        text = (ROOT / "compose.yaml").read_text(encoding="utf-8")
+        service = re.search(r"^  models:\n((?:    .*\n|\n)*)", text, re.M)
+        self.assertIsNotNone(service, "compose.yaml has no models service")
+        setting = re.findall(r"^\s+bind:\s*\{\s*create_host_path:\s*(\w+)\s*\}\s*$",
+                             service.group(1), re.M)
+        self.assertEqual(["false"], setting,
+                         "the rendered bind omits create_host_path and compose.yaml does not set it false")
+        return False
+
     def test_model_server_boundaries(self) -> None:
         """Require the launcher's pin, a read-only model bind and no way off its network."""
         selected = self.render("models")
@@ -154,7 +174,7 @@ class ComposeTest(unittest.TestCase):
         self.assertEqual(("bind", "/models", True),
                          (weights["type"], weights["target"], weights["read_only"]))
         self.assertTrue(Path(weights["source"]).as_posix().endswith("/.local/models"), weights["source"])
-        self.assertIs(False, weights["bind"]["create_host_path"])
+        self.assertIs(False, self.model_bind_creates_host_path(weights))
         self.assertFalse(server.get("secrets"))
         self.assertEqual({"LLAMA_CACHE": "/tmp/llama-cache"}, server["environment"])
         self.assertEqual("65534:65534", server["user"])

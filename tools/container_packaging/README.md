@@ -22,7 +22,11 @@ reviewed managed-profile files. Both exclude nested private paths. New inputs
 must update the relevant policy and fixtures. These checks do not inspect account
 files or detect secrets embedded in otherwise admitted source files.
 `test_compose.py` checks rendered service boundaries without starting services,
-including the optional `models` service under its profile.
+including the optional `models` service under its profile. It must pass on Compose 2.x
+and 5.x (`verify.sh probe` runs it on 2.40.3): 2.x omits `bind.create_host_path` from
+`config --format json` when false, so the model bind's value is read from the rendered form
+when present and otherwise from `compose.yaml`, which must set `create_host_path: false`
+explicitly. A missing setting never passes.
 `test_model_server.py` (P21.2-A) starts the pinned model server in a uniquely named
 project with an empty temporary `MODELS_DIR`, and removes it afterwards. It belongs to
 the default suite, needs no flag and never pulls: it runs wherever the image is on the
