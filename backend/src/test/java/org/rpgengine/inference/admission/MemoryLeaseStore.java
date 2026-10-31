@@ -85,6 +85,20 @@ final class MemoryLeaseStore implements LeaseStore {
     }
 
     @Override
+    public boolean reconcile(UUID leaseId, UUID instance, Instant now) {
+        if (failSettle) {
+            throw new IllegalStateException("store unavailable");
+        }
+        LeaseRecord row = rows.get(leaseId);
+        if (row == null || row.status() != LeaseStatus.ACTIVE || !row.instance().equals(instance)) {
+            return false;
+        }
+        rows.put(leaseId, new LeaseRecord(row.id(), row.instance(), row.modality(), row.model(), row.demand(),
+                row.batchSize(), LeaseStatus.RECONCILING, row.grantedAt(), row.expiresAt(), null));
+        return true;
+    }
+
+    @Override
     public boolean confirmUnloaded(UUID leaseId, UUID instance, Instant now) {
         LeaseRecord row = rows.get(leaseId);
         if (row == null || row.status() != LeaseStatus.RECONCILING || !row.instance().equals(instance)) {

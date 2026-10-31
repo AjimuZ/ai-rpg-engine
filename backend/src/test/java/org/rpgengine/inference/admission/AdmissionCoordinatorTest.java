@@ -209,6 +209,78 @@ class AdmissionCoordinatorTest {
     }
 
     @Test
+    void underTheHoldingRuleAnExpiredLeaseKeepsItsCapacityUntilItsModelIsConfirmedGone() {
+        var holding = new AdmissionCoordinator(settings(), store, clock, AdmissionCoordinator.Expiry.HOLDS_UNTIL_UNLOADED);
+        holding.submit(fixtures.text("holder", WorkClass.INTERACTIVE, A, "text-a", LARGE));
+        var leaseId = holding.poll().grants().getFirst().lease().id();
+        var next = fixtures.text("next", WorkClass.INTERACTIVE, B, "text-b", LARGE);
+        holding.submit(next);
+        clock.advance(Duration.ofSeconds(60));
+
+        var poll = holding.poll();
+
+        assertThat(poll.expired()).extracting(Lease::id).containsExactly(leaseId);
+        assertThat(poll.unrecorded()).isZero();
+        assertThat(poll.grants()).as("the old model may still be resident").isEmpty();
+        assertThat(store.rows.get(leaseId).status()).isEqualTo(LeaseStatus.RECONCILING);
+        assertThat(store.rows.get(leaseId).instance()).isEqualTo(holding.instance());
+        assertThat(holding.held()).isEqualTo(LARGE);
+
+        assertThat(holding.confirmUnloaded(leaseId)).isTrue();
+        assertThat(store.rows.get(leaseId).status()).isEqualTo(LeaseStatus.RELEASED);
+        assertThat(holding.poll().grants().getFirst().admitted()).containsExactly(next);
+    }
+
+    @Test
+    void underTheHoldingRuleAnExpiryTheStoreRefusedIsWrittenWhenTheModelIsConfirmedGone() {
+        var holding = new AdmissionCoordinator(settings(), store, clock, AdmissionCoordinator.Expiry.HOLDS_UNTIL_UNLOADED);
+        holding.submit(fixtures.text("holder", WorkClass.INTERACTIVE, A, "text-a", LARGE));
+        var leaseId = holding.poll().grants().getFirst().lease().id();
+        store.failSettle = true;
+        clock.advance(Duration.ofSeconds(60));
+
+        assertThat(holding.poll().unrecorded()).isEqualTo(1);
+        assertThat(holding.held()).as("the hold does not depend on the write").isEqualTo(LARGE);
+        assertThat(store.rows.get(leaseId).status()).isEqualTo(LeaseStatus.ACTIVE);
+
+        store.failSettle = false;
+        assertThat(holding.confirmUnloaded(leaseId)).isTrue();
+        assertThat(store.rows.get(leaseId).status()).isEqualTo(LeaseStatus.RELEASED);
+        assertThat(holding.held()).isEqualTo(Demand.NONE);
+    }
+
+    @Test
+    void reconcilingALiveLeaseEndsItsAdmissionAndKeepsItsCapacityHeld() {
+        var holder = fixtures.text("holder", WorkClass.INTERACTIVE, A, "text-a", LARGE);
+        coordinator.submit(holder);
+        var leaseId = coordinator.poll().grants().getFirst().lease().id();
+
+        assertThat(coordinator.reconcile(leaseId).orElseThrow().members()).containsExactly(holder.id());
+
+        assertThat(coordinator.leases()).isEmpty();
+        assertThat(coordinator.finish(holder.id())).isFalse();
+        assertThat(coordinator.held()).isEqualTo(LARGE);
+        assertThat(store.rows.get(leaseId).status()).isEqualTo(LeaseStatus.RECONCILING);
+        assertThat(coordinator.reconcile(leaseId)).as("not live any more").isEmpty();
+        assertThat(coordinator.confirmUnloaded(leaseId)).isTrue();
+        assertThat(coordinator.free()).isEqualTo(CAPACITY);
+    }
+
+    @Test
+    void onlyAWaitingInteractiveTextRequestCountsAsInteractiveTextDemand() {
+        assertThat(coordinator.interactiveTextWaiting()).isFalse();
+        coordinator.submit(fixtures.text("plan", WorkClass.CONTINUITY, A, "text-a", SMALL));
+        coordinator.submit(fixtures.request("art", Modality.IMAGE, WorkClass.INTERACTIVE, A, "image-a", SMALL, T0));
+        assertThat(coordinator.interactiveTextWaiting()).isFalse();
+
+        var turn = fixtures.text("turn", WorkClass.INTERACTIVE, B, "text-b", SMALL);
+        coordinator.submit(turn);
+        assertThat(coordinator.interactiveTextWaiting()).isTrue();
+        coordinator.cancel(turn.id());
+        assertThat(coordinator.interactiveTextWaiting()).isFalse();
+    }
+
+    @Test
     void duplicatesAndOversizedRequestsAreRefusedAndCancellationRemovesAWaitingRequest() {
         var turn = fixtures.text("turn", WorkClass.INTERACTIVE, A, "text-a", LARGE);
         assertThat(coordinator.submit(turn)).isEqualTo(Submission.ACCEPTED);

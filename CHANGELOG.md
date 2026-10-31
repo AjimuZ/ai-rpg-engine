@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Lease executor over the model server (P21.4-B), 31 October 2026
+
+- The engine has an executor that can turn the coordinator's leases into real residency: it saves the text slot's prompt cache, unloads
+  the text model, confirms the memory came free, runs an image or speech batch, unloads that model, reloads the text model and restores
+  the cache. A failure at any step leaves the text model usable or retried, and capacity stays held until a model is confirmed gone,
+  including after a lease expires. A swapped-out text model comes back on its own only if it fits beside what is resident.
+- A request that waits or was put back can be withdrawn and is then never granted again. A running batch yields between steps when interactive text needs the room. Low free GPU memory delays a batch and then falls back to
+  text-only play or catalog art; no other process is ever stopped. Counters and gauges are available in the process, as fixed names
+  and numbers only.
+- Nothing in the running application uses it yet, so players see no change: it has been tested against scripted servers only, with no
+  real model server, worker or GPU reading, and no out-of-memory protection is claimed.
+
 ## Unreleased — GPU and RAM admission coordinator core (P21.4-A), 31 October 2026
 
 - The engine has a coordinator that decides which local text, image or speech model may be resident next within a fixed GPU and RAM

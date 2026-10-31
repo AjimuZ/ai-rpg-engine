@@ -2,6 +2,7 @@ package org.rpgengine.inference.local;
 
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.rpgengine.inference.ModelServerControl;
 import org.rpgengine.inference.NarrationTaskPort;
 import org.rpgengine.inference.ProfileResolver;
 import org.rpgengine.inference.RuntimeStatus;
@@ -44,6 +45,15 @@ public final class LocalAdapters {
         public void close() {
             adapter.stop();
         }
+    }
+
+    /**
+     * @param server the scripted server
+     * @return the real HTTP control client, pointed at that server
+     */
+    public static ModelServerControl control(ScriptedModelServer server) {
+        return new LocalModelControl(
+                LocalSettings.from(new MockEnvironment().withProperty(LocalSettings.PREFIX + "url", server.url())));
     }
 
     /**

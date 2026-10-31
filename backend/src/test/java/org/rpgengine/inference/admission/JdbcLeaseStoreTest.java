@@ -126,6 +126,42 @@ class JdbcLeaseStoreTest {
     }
 
     @Test
+    void itsOwnerParksAnActiveLeaseAsReconcilingAndConfirmsItLater() {
+        Lease lease = lease("text-a", LARGE, 1);
+        store.grant(INSTANCE, lease);
+
+        assertThat(store.reconcile(lease.id(), OTHER, T0)).as("only the owner").isFalse();
+        assertThat(store.status(lease.id())).contains(LeaseStatus.ACTIVE);
+        assertThat(store.reconcile(lease.id(), INSTANCE, T0)).isTrue();
+        assertThat(store.status(lease.id())).contains(LeaseStatus.RECONCILING);
+        assertThat(store.open().getFirst().instance()).isEqualTo(INSTANCE);
+        assertThat(store.reconcile(lease.id(), INSTANCE, T0)).as("only an active lease").isFalse();
+        assertThat(store.renew(lease.id(), INSTANCE, T0.plusSeconds(200), T0)).as("no longer active").isFalse();
+
+        assertThat(store.confirmUnloaded(lease.id(), INSTANCE, T0.plusSeconds(1))).isTrue();
+        assertThat(store.status(lease.id())).contains(LeaseStatus.RELEASED);
+        assertThat(store.reconcile(lease.id(), INSTANCE, T0)).as("terminal").isFalse();
+    }
+
+    @Test
+    void theHoldingRuleKeepsExpiredCapacityOverRealStorageUntilTheModelIsConfirmedGone() {
+        SteppedClock clock = new SteppedClock(T0);
+        var coordinator = new AdmissionCoordinator(settings(), store, clock, AdmissionCoordinator.Expiry.HOLDS_UNTIL_UNLOADED);
+        AdmissionFixtures fixtures = new AdmissionFixtures();
+        coordinator.submit(fixtures.text("holder", WorkClass.INTERACTIVE, A, "text-a", LARGE));
+        UUID leaseId = coordinator.poll().grants().getFirst().lease().id();
+        clock.advance(TTL);
+
+        assertThat(coordinator.poll().unrecorded()).isZero();
+
+        assertThat(store.status(leaseId)).contains(LeaseStatus.RECONCILING);
+        assertThat(coordinator.held()).isEqualTo(LARGE);
+        assertThat(coordinator.confirmUnloaded(leaseId)).isTrue();
+        assertThat(store.status(leaseId)).contains(LeaseStatus.RELEASED);
+        assertThat(coordinator.free()).isEqualTo(CAPACITY);
+    }
+
+    @Test
     void aNewProcessTakesOverOpenLeasesOfEarlierOnesAndKeepsThemReconcilingUntilConfirmed() {
         Lease older = new Lease(UUID.randomUUID(), Modality.IMAGE, "image-x", MEDIUM, List.of(UUID.randomUUID()), T0,
                 T0.plus(TTL));

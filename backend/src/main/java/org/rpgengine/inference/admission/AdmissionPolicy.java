@@ -154,11 +154,11 @@ final class AdmissionPolicy {
     }
 
     /**
-     * Reserve capacity for a lease of an earlier process whose model may still be resident. The hold
-     * may push the total over the budget when the budget was lowered since; nothing is admitted until
-     * it drains.
+     * Reserve capacity for an ended lease whose model may still be resident: one of an earlier process,
+     * or one of this process whose unload is not confirmed. The hold may push the total over the budget
+     * when the budget was lowered since; nothing is admitted until it drains.
      *
-     * @param leaseId identity of the earlier lease
+     * @param leaseId identity of the ended lease
      * @param demand capacity it reserved
      */
     void hold(UUID leaseId, Demand demand) {
@@ -170,7 +170,12 @@ final class AdmissionPolicy {
         return holds.remove(leaseId) != null;
     }
 
-    /** @return capacity currently held for unconfirmed leases of earlier processes */
+    /** @return true when capacity is held for {@code leaseId} */
+    boolean holding(UUID leaseId) {
+        return holds.containsKey(leaseId);
+    }
+
+    /** @return capacity currently held for leases whose model is not confirmed gone */
     Demand held() {
         Demand total = Demand.NONE;
         for (Demand hold : holds.values()) {

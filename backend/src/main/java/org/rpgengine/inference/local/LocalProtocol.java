@@ -1,10 +1,13 @@
 package org.rpgengine.inference.local;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.rpgengine.inference.EffectiveSettings;
+import org.rpgengine.inference.ModelServerControl.Residency;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -33,6 +36,11 @@ final class LocalProtocol {
     static final int MAX_CATALOG_ENTRIES = 4096;
     /** Effort name that switches thinking off (docs/34 section 7). */
     static final String NO_THINKING = "none";
+    /** Router routes that list, load and unload models. */
+    static final String CONTROL_MODELS_PATH = "/models";
+    static final String CONTROL_LOAD_PATH = "/models/load";
+    static final String CONTROL_UNLOAD_PATH = "/models/unload";
+    private static final String CONTROL_MALFORMED = "control-malformed";
 
     private LocalProtocol() {
     }
@@ -110,6 +118,55 @@ final class LocalProtocol {
             models.add(model.get("id").stringValue());
         }
         return Set.copyOf(models);
+    }
+
+    /**
+     * @param json mapper
+     * @param body a router's {@code GET /models} response
+     * @return each listed model with where it stands; {@code failed} wins over the status value, and a
+     *         value this engine does not name is {@link Residency#OTHER}, because it may hold memory
+     * @throws Refused with {@code control-malformed} for any other shape
+     */
+    static Map<String, Residency> parseResidency(JsonMapper json, byte[] body) throws Refused {
+        JsonNode data = parse(json, body, CONTROL_MALFORMED).path("data");
+        if (!data.isArray() || data.size() > MAX_CATALOG_ENTRIES) {
+            throw new Refused(CONTROL_MALFORMED);
+        }
+        Map<String, Residency> models = new HashMap<>();
+        for (JsonNode model : data) {
+            JsonNode value = model.path("status").path("value");
+            if (!model.path("id").isString() || !value.isString()) {
+                throw new Refused(CONTROL_MALFORMED);
+            }
+            boolean failed = model.path("status").path("failed").asBoolean(false);
+            models.put(model.get("id").stringValue(), failed ? Residency.FAILED : switch (value.stringValue()) {
+                case "loaded" -> Residency.LOADED;
+                case "loading" -> Residency.LOADING;
+                case "unloaded" -> Residency.GONE;
+                default -> Residency.OTHER;
+            });
+        }
+        return Map.copyOf(models);
+    }
+
+    /**
+     * @param json mapper
+     * @param body a 2xx answer to a load or unload request
+     * @throws Refused with {@code control-malformed} unless it reports {@code success: true}
+     */
+    static void requireSuccess(JsonMapper json, byte[] body) throws Refused {
+        if (!parse(json, body, CONTROL_MALFORMED).path("success").asBoolean(false)) {
+            throw new Refused(CONTROL_MALFORMED);
+        }
+    }
+
+    /**
+     * @param json mapper
+     * @param body a 2xx answer to a slot action; its counters are not used
+     * @throws Refused with {@code control-malformed} unless it is a JSON object
+     */
+    static void requireObject(JsonMapper json, byte[] body) throws Refused {
+        parse(json, body, CONTROL_MALFORMED);
     }
 
     /**

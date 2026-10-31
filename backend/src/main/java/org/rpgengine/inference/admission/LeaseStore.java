@@ -42,6 +42,14 @@ public interface LeaseStore {
      */
     List<LeaseRecord> recover(UUID instance, Instant now);
 
+    /**
+     * Keep an active lease of {@code instance} open as RECONCILING: it ended, but its model may still be
+     * resident, so its capacity stays reserved until {@link #confirmUnloaded}.
+     *
+     * @return true when the lease was active under {@code instance} and is now RECONCILING
+     */
+    boolean reconcile(UUID leaseId, UUID instance, Instant now);
+
     /** @return true when a RECONCILING lease of {@code instance} is now RELEASED, its model confirmed gone */
     boolean confirmUnloaded(UUID leaseId, UUID instance, Instant now);
 

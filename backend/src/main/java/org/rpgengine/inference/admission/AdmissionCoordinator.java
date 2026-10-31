@@ -20,10 +20,21 @@ import java.util.UUID;
  *
  * <p>The coordinator reserves capacity; it does not load or unload anything. Callers that load a
  * model for a created grant must renew its lease while they use it, and must unload the model
- * before they call {@link #revoke} or {@link #finish} for the last member. A lease that expires frees
- * its capacity on paper at once, whether or not the model is still resident.
+ * before they call {@link #revoke} or {@link #finish} for the last member, or call {@link #reconcile}
+ * when they could not. What an expiry does to capacity is the {@link Expiry} rule.
  */
 public final class AdmissionCoordinator {
+    /** What a lease that expires does to its capacity. */
+    public enum Expiry {
+        /** The capacity is free at once, whether or not the model is still resident: accounting only. */
+        FREES_AT_ONCE,
+        /**
+         * The lease becomes RECONCILING and its capacity stays held until {@link #confirmUnloaded}. Anything
+         * that really loads models needs this rule, because otherwise a next model could load beside the old one.
+         */
+        HOLDS_UNTIL_UNLOADED
+    }
+
     /**
      * Result of one {@link #poll}.
      *
@@ -42,22 +53,48 @@ public final class AdmissionCoordinator {
     private final AdmissionPolicy policy;
     private final LeaseStore store;
     private final Clock clock;
+    private final Demand capacity;
+    private final Expiry expiry;
     private final UUID instance = UUID.randomUUID();
 
     /**
+     * A coordinator that only keeps accounts: an expiry frees capacity at once.
+     *
      * @param settings budget, lease lifetime, aging step and batch limits
      * @param store durable lease record
      * @param clock time source; tests inject a fixed or stepped clock
      */
     public AdmissionCoordinator(AdmissionSettings settings, LeaseStore store, Clock clock) {
+        this(settings, store, clock, Expiry.FREES_AT_ONCE);
+    }
+
+    /**
+     * @param settings budget, lease lifetime, aging step and batch limits
+     * @param store durable lease record
+     * @param clock time source; tests inject a fixed or stepped clock
+     * @param expiry what an expiry does to capacity
+     */
+    public AdmissionCoordinator(AdmissionSettings settings, LeaseStore store, Clock clock, Expiry expiry) {
         policy = new AdmissionPolicy(Objects.requireNonNull(settings, "settings"));
+        capacity = settings.capacity();
         this.store = Objects.requireNonNull(store, "store");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.expiry = Objects.requireNonNull(expiry, "expiry");
     }
 
     /** @return this process's identity, the owner of every row it writes */
     public UUID instance() {
         return instance;
+    }
+
+    /** @return the rule applied when a lease expires */
+    public Expiry expiry() {
+        return expiry;
+    }
+
+    /** @return the whole budget this coordinator may lease out */
+    public Demand capacity() {
+        return capacity;
     }
 
     /** @return the outcome; an accepted request waits until {@link #poll} grants it */
@@ -85,7 +122,7 @@ public final class AdmissionCoordinator {
         List<Lease> expired = policy.expire(now);
         int unrecorded = 0;
         for (Lease lease : expired) {
-            if (!settle(lease.id(), LeaseStatus.EXPIRED, now)) {
+            if (!endExpired(lease, now)) {
                 unrecorded++;
             }
         }
@@ -161,6 +198,28 @@ public final class AdmissionCoordinator {
     }
 
     /**
+     * End a live lease whose model could not be unloaded: its members lose their admission and its
+     * capacity stays held until {@link #confirmUnloaded}. A store that refuses the write does not change
+     * that; {@link #confirmUnloaded} repeats the write.
+     *
+     * @return the lease with the members that lost their admission, or empty when it was not live
+     */
+    public synchronized Optional<Lease> reconcile(UUID leaseId) {
+        Optional<Lease> taken = policy.revoke(leaseId);
+        taken.ifPresent(lease -> {
+            policy.hold(lease.id(), lease.demand());
+            park(lease.id(), clock.instant());
+        });
+        return taken;
+    }
+
+    /** @return true when a text request of a player's turn is waiting for admission */
+    public synchronized boolean interactiveTextWaiting() {
+        return policy.waiting().stream().anyMatch(request -> request.modality() == Modality.TEXT
+                && !request.workClass().background());
+    }
+
+    /**
      * Take over the leases an earlier process left open and keep their capacity reserved. Call it once
      * at start, before the first {@link #poll}; a model such a lease names may still be resident.
      *
@@ -173,12 +232,18 @@ public final class AdmissionCoordinator {
     }
 
     /**
-     * Record that the model of a recovered lease is gone and free its capacity.
+     * Record that the model of a held lease is gone and free its capacity.
      *
      * @return true when the lease was held by this process and the store recorded its release
+     * @throws RuntimeException when the store cannot record it; the capacity stays held
      */
     public synchronized boolean confirmUnloaded(UUID leaseId) {
-        if (!store.confirmUnloaded(leaseId, instance, clock.instant())) {
+        Instant now = clock.instant();
+        if (policy.holding(leaseId)) {
+            // A hold whose move to RECONCILING could not be written earlier still has an ACTIVE row.
+            store.reconcile(leaseId, instance, now);
+        }
+        if (!store.confirmUnloaded(leaseId, instance, now)) {
             return false;
         }
         policy.unhold(leaseId);
@@ -190,7 +255,7 @@ public final class AdmissionCoordinator {
         return policy.free();
     }
 
-    /** @return capacity held for unconfirmed leases of earlier processes */
+    /** @return capacity held for leases whose model is not confirmed gone */
     public synchronized Demand held() {
         return policy.held();
     }
@@ -214,9 +279,22 @@ public final class AdmissionCoordinator {
     }
 
     /** @return false when the store could not record the end */
-    private boolean settle(UUID leaseId, LeaseStatus status, Instant now) {
+    private boolean endExpired(Lease lease, Instant now) {
+        if (expiry == Expiry.HOLDS_UNTIL_UNLOADED) {
+            policy.hold(lease.id(), lease.demand());
+            return park(lease.id(), now);
+        }
         try {
-            return store.settle(leaseId, instance, status, now);
+            return store.settle(lease.id(), instance, LeaseStatus.EXPIRED, now);
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
+    /** @return false when the store could not record the move to RECONCILING */
+    private boolean park(UUID leaseId, Instant now) {
+        try {
+            return store.reconcile(leaseId, instance, now);
         } catch (RuntimeException failure) {
             return false;
         }

@@ -103,6 +103,14 @@ public class JdbcLeaseStore implements LeaseStore {
 
     /** {@inheritDoc} */
     @Override
+    public boolean reconcile(UUID leaseId, UUID instance, Instant now) {
+        return Objects.equals(transaction.execute(status -> jdbc.update("update resource_lease set status = 'RECONCILING', "
+                + "row_version = row_version + 1 where id = ? and instance_id = ? and status = 'ACTIVE'", leaseId,
+                instance)), 1);
+    }
+
+    /** {@inheritDoc} */
+    @Override
     public boolean confirmUnloaded(UUID leaseId, UUID instance, Instant now) {
         return Objects.equals(transaction.execute(status -> jdbc.update("update resource_lease set status = 'RELEASED', "
                 + "finished_at = ?, row_version = row_version + 1 "

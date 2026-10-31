@@ -3454,6 +3454,56 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       supported. The memory a batch member adds is not modelled. The modality order of `docs/34` section 10 (image before speech) is not
       encoded. No weakened-copy run was made, so the tests were not shown to fail on a removed rule; the policy tests were checked against
       the expected orders by hand before the first run.
+  - P21.4-B (31 October 2026, story done, task open): the coordinator connected to the model server's load, unload and slot routes,
+    against scripted fixtures only.
+    - Built: `LeaseExecutor` (`org.rpgengine.inference.admission`) runs slot save, text unload, confirmed free memory, batch steps, batch
+      unload, text reload and slot restore, with a defined result for a failure at each step; it renews leases, yields between the steps
+      of a `SteppedJob` to interactive demand named by `preemptionVictims`, delays or falls back on a low `GpuMemoryReading`, recovers
+      after a restart and reports `metrics()`, an in-process map of fixed names and numbers. `AdmissionCoordinator` gains
+      `Expiry.HOLDS_UNTIL_UNLOADED` (the executor refuses any other rule), `reconcile` and `interactiveTextWaiting`; `LeaseStore` gains
+      `reconcile`, which V29 already allowed, so no migration was added. `LocalModelControl` (`org.rpgengine.inference.local`) speaks the
+      documented routes behind the neutral `ModelServerControl`. Specification: `docs/34` section 10 "P21.4-B lease executor over the
+      model server"; `docs/adr/0021` records the decision.
+    - Corrected after review (same date, same story): `restoreText` could load a swapped-out text model beside a warm one that did not
+      fit beside it, because a warm model counts for nothing in the coordinator's accounting and an unknown reading, a card larger than
+      the budget or a RAM shortage passed its checks. A reload now has to fit on paper beside every lease, hold and warm model, never
+      evicts, and takes the model evicted last first. A request put back could not be withdrawn and was granted again; the new
+      `LeaseExecutor.cancel` withdraws it from either state and removes its delay, and a member of a lease that expires or yields before
+      it starts leaves the delayed gauge too. A request that holds a lease is not withdrawn: `cancel` answers false and it is not put
+      back when that lease gives way.
+    - Tests: `LeaseExecutorTest` (53, the real HTTP client against the extended `ScriptedModelServer`, a `ScriptedWorker` and a scripted
+      reading: exact happy-path order; failed text unload, unconfirmed unload, failed batch unload kept `RECONCILING` until a retry;
+      failed reload recovered by a later pass and by a text turn; failed slot save and slot restore; interruption between steps with the
+      lease still `ACTIVE` at the unload and `REVOKED` at the reload, also from another thread; queued and expected demand; contention
+      delay, recovery and fallback with the text model untouched; a delayed request leaving the delayed gauge once it is served or given
+      up; unknown reading; expiry while running and while waiting; restart; two text models with no reload beside a warm one, with an
+      accurate reading, an unknown one, a larger card and RAM alone; cancelling from the queue, while put back, and while holding a lease;
+      metrics with no key, address, model or prompt text), `LocalModelControlTest` (9: request shapes, status parsing, fixed codes,
+      dropped server text, size bound, deadline), `AdmissionCoordinatorTest` (14, 4 new) and `JdbcLeaseStoreTest` (10, 2 new, on
+      PostgreSQL).
+    - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=LeaseExecutorTest,LocalModelControlTest,AdmissionCoordinatorTest,AdmissionPolicyTest,JdbcLeaseStoreTest,TaskPortSelectionTest,InferenceBoundaryTest`:
+      `VERIFY PASSED`, 127 tests, 0 failures, 0 errors, 0 skipped. An earlier focused run failed 1 of 129 tests: the interruption test showed that a text model
+      found on the server at start, sized as the whole budget, could never pass the reload's memory check. Such a model now comes back
+      only for a text request, which brings its real size, and a test asserts that.
+    - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=LeaseExecutorTest`, with the 12 tests of the review
+      correction added before the code, and `cancel` passing straight to the coordinator: 53 tests, 8 failures, covering the reload and
+      cancel defects and the delayed gauge after an expiry. All 8 pass after the fix. The 4 others pass either way: a turn still swaps
+      models, two models that fit both come back, a plain queued request cancels, and the accurate-reading case, where the reading alone
+      already refused the reload.
+    - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full`: 18 steps all `PASS`, `VERIFY PASSED (full)`, `backend-verify`
+      1378 tests, 0 failures, 0 errors, 0 skipped, `BUILD SUCCESS`, `backup-tests` `Ran 9 tests`, `OK (skipped=1)`. Only this file changed
+      after that run, and `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh repo` passed after it (5 steps all `PASS`,
+      `VERIFY PASSED (repo)`).
+    - Not proven: no real model server, model, worker or GPU reading was used, so the routes' real behavior is open, including slot
+      actions through the router and how fast an unload frees memory. The packaged service does not pass `--slot-save-path` and does not
+      turn off automatic loading. No deliberate-weakening run was made, so apart from the 8 failures above the new tests were not shown
+      to fail on a removed check. `verify.sh containers` was not run; no container file or migration changed. No out-of-memory proof
+      exists, so the box stays unchecked.
+    - Not built: Spring wiring and settings, a real `GpuMemoryReading`, the image and speech workers, the link to the scheduler's text
+      permit and the adapters, and measured profiles. Nothing in the running application constructs the executor.
+    - Leftover: `admission/ModelServerControl.java` and `admission/ModelControlException.java` hold only a package line and a comment.
+      The types moved to `org.rpgengine.inference` because `InferenceBoundaryTest` keeps the adapter package from importing `admission`,
+      and this session could not delete files. Both stubs can be deleted with no other change.
 - [ ] P21.5 Implement the local image backend: a pinned image-worker container loading single-file safetensors checkpoints and LoRAs, with WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as catalog alternatives; prompt chunking beyond 77 tokens; default safe-content tags; step-boundary cancellation; output validation and provenance; and the `a1111-http` adapter for an owner-run Forge or A1111 server. Integrate with the P17 asset-job contract without changing authority rules.
 - [ ] P21.6 Verify and document: QA-43 and QA-44 on deterministic fixtures and on the reference host, synthetic-hardware advisor tests, custom-endpoint and secret-handling tests, the bilingual narration evaluation of the default and alternate models, license and attribution records, and the supported-defaults table for the reference host with honest limits.
 

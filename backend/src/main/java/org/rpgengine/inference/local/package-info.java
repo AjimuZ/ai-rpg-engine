@@ -8,7 +8,9 @@
  *   <li>{@code LocalTaskAdapter}: bounded admission, one request at a time, per-session
  *       conversations, cancellation and deadlines;</li>
  *   <li>{@code LocalConfiguration}: selects the adapter and the slot routing port when a server URL
- *       is configured.</li>
+ *       is configured;</li>
+ *   <li>{@code LocalModelControl}: the load, unload, model list and slot routes behind the neutral
+ *       {@code ModelServerControl}; nothing constructs it outside tests yet.</li>
  * </ul>
  * Everything here is package-private; no other package of the engine may import from it (enforced by
  * {@code InferenceBoundaryTest}). This package never touches the database or canonical state, and it
