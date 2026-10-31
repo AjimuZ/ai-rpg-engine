@@ -3175,6 +3175,38 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     - Remaining for P21.2: launcher selection of the service, a real fetch of the default model, running these probes against
       a loaded model, and the measurements. The box stays unchecked.
 - [ ] P21.3 Implement slot assignment and the remaining backend adapters behind the runtime-neutral task port: independent `light`, `standard`, `deliberate` and `image` slots, readiness probes with visible results, billing and privacy class badges with acknowledgement on a class change, same-class fallback lists only when configured, per-slot session retirement, and the `gateway` service for owner-key hosted APIs and allowlisted custom endpoints (keys as runtime-only secrets, budgets, bounded redirects and sizes). Expose `GET /api/v1/models/status`, the owner-only settings API and the Settings → Models panel.
+  - Partial progress (31 October 2026, P21.3-A): the four slots, class badges, class-change acknowledgement, configured same-class
+    fallbacks and stored readiness probes exist in the backend. The P21.3 box stays unchecked: the gateway, the Settings → Models
+    panel, per-slot session retirement and the other adapters are not built.
+    - Added migration `V27__model_slot_settings.sql` (`inference_slot_setting`, `inference_slot_fallback`; identifiers only, no
+      campaign reference, check constraints for class declaration, image backends and effort, probe shape and at most four
+      fallbacks) and package `org.rpgengine.inference.slots`: `ModelSlot`, `BackendClass` (fixed billing and privacy codes),
+      `SlotSetting` (validation and class derivation), `SlotFallback` (selection), `SlotSettingsService`, `JdbcSlotSettingsStore`,
+      `PersistedSlotAssignments` (offers stored text assignments to `ProfileResolver`, ahead of the startup settings; unreadable
+      storage resolves as unassigned and never as the startup settings), `RuntimeBackendProbe` and `ModelSettingsController`
+      (`GET /api/v1/models/status`, `PUT /api/v1/settings/models`, `POST /api/v1/models/probe`; `LocalHttpAdmission` now guards the
+      `/api/v1/models` and `/api/v1/settings` subtrees). Backup tool: schema version 27 and the two tables (`tools/database_backup`).
+    - Rules, as implemented: a class change (an unassigned slot counts as `local`) is a 409 `CLASS_ACKNOWLEDGEMENT_REQUIRED` unless
+      `acknowledgeClass` names the new class, and the acknowledgement is stored. A fallback outside the primary's class is a 422
+      `FALLBACK_CLASS_CROSSING`. `SlotFallback.select` considers the primary, then listed entries, and otherwise returns
+      `slot-unavailable`. A changed assignment loses its probe result; a probe that finishes after a change is discarded.
+    - Commands and results on the reference host (Git Bash, scoped JDK 21 and PostgreSQL 18.6 containers):
+      `sh .agents/ralph/verify.sh backend -Dtest=SlotSettingTest,SlotSettingsServiceTest,RuntimeBackendProbeTest,SlotSettingsPersistenceTest,ModelSettingsHttpTest,EngineApplicationTest,CanonicalMigrationUpgradeTest,LocalHttpAdmissionTest,InferenceBoundaryTest`:
+      60 tests, 0 failures, 0 errors, 0 skipped. The new suites hold 47 cases: 10 domain (badge per backend, class declaration,
+      backend per slot, fallback class rules, selection), 19 service (acknowledgement both ways, environment precedence, probe
+      states, discard, restart, failed save, fail-closed resolver), 4 probe (ready, failed, unreachable, no adapter), 6 on PostgreSQL
+      (round trip, replacement, restart, damaged rows) and 8 over real HTTP (admission, badge, 409, 422, 400/413, probe). A first
+      whole-backend run failed 6 cases in `TaskPortSelectionTest`; that exposed a startup cycle (adapter, resolver, stored settings,
+      probe, adapter), fixed by looking the task port up at probe time, and that test now wires an in-memory store like its in-memory
+      ledger. `sh .agents/ralph/verify.sh backend`: 1214 tests, 0 failures, 0 errors, 4 skipped, `BUILD SUCCESS`. `sh .agents/ralph/verify.sh repo`
+      (after the backup tool update): `VERIFY PASSED (repo)`. `sh .agents/ralph/verify.sh full`: 18 steps, all `PASS`, `VERIFY PASSED (full)`.
+    - Not proven: no probe has run against a signed-in Codex runtime or any model server, so a `ready` verdict from a live runtime is
+      unseen (`ready` and `failed` come from a scripted task port and the allowlist); a `ready` verdict does not show the account
+      serves the model. No adapter other than Codex is installed, so every other backend probes `unreachable` with
+      `adapter-not-installed`. Cross-backend fallback entries are validated and stored but no adapter selects them; the resolver
+      sees only same-backend entries. Unassigning a stored slot, an audit trail, budgets, the hardware profile in the status, the
+      panel and any Italian wording are not built. No weakened-copy run was made, so the tests were not shown to fail on a removed
+      check. The V27 migration was not rehearsed with a live dump and restore, and the hosted CI job has not run this change.
 - [ ] P21.4 Implement the shared GPU and RAM admission coordinator for text, image and speech: priorities, leases using the model server's documented load and unload endpoints and slot save and restore, batching, interruption between diffusion steps, unowned-contention handling and metrics. Prove no engine-caused out-of-memory on the reference host.
 - [ ] P21.5 Implement the local image backend: a pinned image-worker container loading single-file safetensors checkpoints and LoRAs, with WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as catalog alternatives; prompt chunking beyond 77 tokens; default safe-content tags; step-boundary cancellation; output validation and provenance; and the `a1111-http` adapter for an owner-run Forge or A1111 server. Integrate with the P17 asset-job contract without changing authority rules.
 - [ ] P21.6 Verify and document: QA-43 and QA-44 on deterministic fixtures and on the reference host, synthetic-hardware advisor tests, custom-endpoint and secret-handling tests, the bilingual narration evaluation of the default and alternate models, license and attribution records, and the supported-defaults table for the reference host with honest limits.

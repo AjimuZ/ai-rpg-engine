@@ -192,8 +192,9 @@ schema versions for persisted/imported data.
 | `POST /api/v1/campaigns/{id}/ai-session/renew` | Renew every AI session of an idle campaign (P09.4) | Does not advance the world or change the transcript; 409 while anything of the campaign runs |
 | `GET /api/v1/campaigns/{id}/resume` | Short factual resume card (P09.5) | No advancement or write; shows missing pinned content and the mutation pause |
 | `GET /api/v1/runtime/status` | Selected narration runtime (Codex or Claude), version, account and model readiness | No credentials or raw RPC identifiers; read-only, the runtime is changed through the launcher (ADR 0020) |
-| `GET /api/v1/models/status` | Slots, assigned backends and models, billing and privacy classes, probe results, hardware profile and admission state | No keys or endpoint credentials; read-only |
-| `PUT /api/v1/settings/models` | Owner-only slot assignment and same-class fallback lists | Validates, probes and audits; a class change needs acknowledgement; keys are never accepted here (ADR 0021) |
+| `GET /api/v1/models/status` | Slots, assigned backends and models, billing and privacy classes, probe results, hardware profile and admission state | No keys or endpoint credentials; read-only. Implemented (P21.3-A) for the four slots, their class badges, fallbacks, acknowledgements and last probe; the hardware profile and admission state are not part of it yet |
+| `PUT /api/v1/settings/models` | Owner-only slot assignment and same-class fallback lists | Validates; a class change needs acknowledgement; keys are never accepted here (ADR 0021). Implemented (P21.3-A) without an audit trail; saving a changed assignment clears its probe result |
+| `POST /api/v1/models/probe` | Run the readiness probe of one stored slot assignment and record the result (P21.3-A) | Owner-only; sends no task content; 404 `MODEL_SLOT_NOT_ASSIGNED` for a slot with no saved assignment |
 | `PUT /api/v1/preferences` | Reading, sound, routing, renewal preferences | No game effects |
 | `POST /api/v1/campaigns/{id}/exports` | Create full-owner or player-facing export | Explicit audience selection |
 | `POST /api/v1/restore/preview` | Validate archive compatibility and integrity | No overwrite |

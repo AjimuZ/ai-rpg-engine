@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V26 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V27 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -660,6 +660,37 @@ class CanonicalMigrationUpgradeTest {
                             + "operation_id, ordinal, committed_revision, kind, scene_id, created_at) values (?, ?, 1, 6, "
                             + "'SCENE', 'harbour', now())", campaign, operation), "the operation committed at another revision");
                     assertEquals(0, v26.migrate().migrationsExecuted);
+                    // V27 adds the owner's model-slot settings: an upgraded save has none, so every slot stays
+                    // unassigned until the owner saves one, and the checks keep class, image effort and fallback coherent.
+                    Flyway v27 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("27").load();
+                    assertEquals(1, v27.migrate().migrationsExecuted);
+                    assertTrue(v27.validateWithResult().validationSuccessful);
+                    assertEquals(0, jdbc.queryForObject("select count(*) from inference_slot_setting", Integer.class));
+                    String slotInsert = "insert into inference_slot_setting (slot, backend, model, effort, declared_class, "
+                            + "backend_class, updated_at) values (?, ?, ?, ?, ?, ?, now())";
+                    assertEquals(1, jdbc.update(slotInsert, "text.standard", "codex", "model-a", "medium", null, "subscription"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(slotInsert, "text.light", "openai-compatible",
+                            "model-a", "low", null, "local"), "an endpoint of unknown class is never stored");
+                    assertThrows(DataAccessException.class, () -> jdbc.update(slotInsert, "text.light", "codex", "model-a",
+                            "low", "local", "subscription"), "only an endpoint can declare a class");
+                    assertThrows(DataAccessException.class, () -> jdbc.update(slotInsert, "image", "codex", "model-a", "none",
+                            null, "subscription"), "a text backend cannot serve the image slot");
+                    assertThrows(DataAccessException.class, () -> jdbc.update(slotInsert, "text.light", "local-image",
+                            "model-a", "low", null, "local"), "an image backend cannot serve a text slot");
+                    assertThrows(DataAccessException.class, () -> jdbc.update(slotInsert, "image", "local-image", "model-a",
+                            "medium", null, "local"), "the image slot carries no effort");
+                    assertEquals(1, jdbc.update(slotInsert, "image", "local-image", "model-a", "none", null, "local"));
+                    String fallbackInsert = "insert into inference_slot_fallback (slot, position, backend, model, effort) "
+                            + "values (?, ?, ?, ?, ?)";
+                    assertEquals(1, jdbc.update(fallbackInsert, "text.standard", 0, "codex", "model-b", "low"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(fallbackInsert, "text.standard", 4, "codex",
+                            "model-c", "low"), "a fallback list holds at most four entries");
+                    assertThrows(DataAccessException.class, () -> jdbc.update(fallbackInsert, "text.light", 0, "codex",
+                            "model-b", "low"), "a fallback needs its slot");
+                    assertEquals(1, jdbc.update("delete from inference_slot_setting where slot = 'text.standard'"));
+                    assertEquals(0, jdbc.queryForObject("select count(*) from inference_slot_fallback", Integer.class));
+                    assertEquals(0, v27.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

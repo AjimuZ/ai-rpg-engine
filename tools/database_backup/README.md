@@ -215,6 +215,11 @@ restore creates triggers after loading rows, so restored cues announce nothing a
 manifest/catalog. The rehearsal below ran on V26 but held no cue rows, because no real turn produces cues yet, so
 restoring a stored cue remains unrehearsed.
 
+V27 scope (P21.3-A) adds `inference_slot_setting` and `inference_slot_fallback`, the owner's model-slot assignments (identifiers,
+class, acknowledgement and last probe; no key or endpoint). They are installation-wide rather than campaign state, so a restore
+brings back the assignments with the database, and the next start reads them. Offline checks cover the V27 manifest/catalog;
+no live V27 dump/restore rehearsal has been run, and the rehearsal below ran on V26.
+
 ## Live two-genre rehearsal (P06.5-B.1, V26)
 
 `tools/container_packaging/test_restore_isolation.py` runs this tool as an operator would on a populated world, then

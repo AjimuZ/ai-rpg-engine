@@ -81,8 +81,11 @@ public class LocalHttpAdmission extends OncePerRequestFilter {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         // Guard every method in both scope subtrees, including malformed identities and
         // unsupported sections, so future workspace/campaign routes cannot omit admission.
-        if (!Set.of("/api/v1/session", "/api/v1/campaigns", "/api/v1/adventures").contains(path)
-                && !path.startsWith("/api/v1/campaigns/") && !path.startsWith("/api/v1/adventures/")) {
+        // The model status and settings subtrees (P21.3-A) are owner-only too: same admission, same rules.
+        if (!Set.of("/api/v1/session", "/api/v1/campaigns", "/api/v1/adventures", "/api/v1/models",
+                "/api/v1/settings").contains(path)
+                && !path.startsWith("/api/v1/campaigns/") && !path.startsWith("/api/v1/adventures/")
+                && !path.startsWith("/api/v1/models/") && !path.startsWith("/api/v1/settings/")) {
             chain.doFilter(request, response);
             return;
         }

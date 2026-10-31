@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Model slots with class badges and readiness probes (P21.3-A), 31 October 2026
+
+- Add owner-only backend routes for the four model slots (`text.light`, `text.standard`, `text.deliberate`, `image`):
+  `GET /api/v1/models/status`, `PUT /api/v1/settings/models` and `POST /api/v1/models/probe`. Assignments are stored and
+  survive a restart; a stored text assignment overrides the startup setting of the same slot.
+- Every assignment shows a billing and privacy class (`local`, `subscription` or `metered`). Changing a slot's class is refused
+  until the new class is acknowledged, and the acknowledgement is recorded.
+- Fallbacks apply only when listed, and only inside the class of the primary assignment; when nothing of that class is available
+  the slot stays unavailable instead of moving to another class.
+- A readiness probe records `ready`, `failed` or `unreachable` with a reason code and shows it in the status.
+- Backend only: the Settings → Models panel and the gateway are not built, only the Codex backend can probe `ready`, and no
+  model has been run through these routes.
+
 ## Unreleased — Readiness probes and bilingual narration probe set (P21.2-C), 31 October 2026
 
 - Add `tools/container_packaging/model_probe.py`, a developer tool that checks a local text server's `/health` and sends eight
