@@ -1341,6 +1341,168 @@ class RedirectTest(GatewayCase):
             self.assertEqual("/v1/done?page=2", upstream.seen[-1].path)
 
 
+class A1111ProtocolTest(GatewayCase):
+    """The `a1111-http` profile reaches three routes of an owner-run server and nothing else.
+
+    The upstream is a scripted fixture standing in for Forge or A1111; no real server has answered.
+    """
+
+    TXT2IMG = "/sdapi/v1/txt2img"
+    INTERRUPT = "/sdapi/v1/interrupt"
+    PROGRESS = "/sdapi/v1/progress"
+
+    def serve_profile(self, upstream: ScriptedUpstream, **changes: object) -> "A1111ProtocolTest":
+        """Serve the profile at the upstream: no key, no prefixes, so every default is the profile's."""
+        return self.serve(upstream.url, **{"protocol": gateway.A1111_PROTOCOL, "path_prefixes": None, "key": None,
+                                           "timeout_seconds": None, **changes})
+
+    def destination(self, **changes: object) -> "gateway.Destination":
+        """Return the parsed profile destination; `changes` replace or, with None, remove its fields."""
+        node = {"id": "forge", "url": "http://forge.invalid:7860", "protocol": gateway.A1111_PROTOCOL, **changes}
+        return gateway.parse_settings(json.dumps({
+            "schema": gateway.SCHEMA,
+            "destinations": [{name: value for name, value in node.items() if value is not None}]})).destinations["forge"]
+
+    def test_the_profile_applies_its_routes_and_bounds_without_further_settings(self) -> None:
+        """An owner who names only the protocol gets the three routes, image-sized bounds and no redirect."""
+        destination = self.destination()
+        self.assertEqual((self.TXT2IMG, self.INTERRUPT, self.PROGRESS), destination.prefixes)
+        self.assertEqual(
+            (gateway.A1111_MAX_REQUEST_BYTES, gateway.A1111_MAX_RESPONSE_BYTES, gateway.A1111_TIMEOUT_SECONDS, 0),
+            (destination.max_request_bytes, destination.max_response_bytes, destination.timeout_seconds,
+             destination.max_redirects))
+        self.assertGreater(destination.max_response_bytes, gateway.DEFAULT_MAX_RESPONSE_BYTES)
+        self.assertEqual(destination.prefixes, self.destination(path_prefixes=list(destination.prefixes)).prefixes)
+
+    def test_the_owner_may_narrow_the_bounds_and_the_routes_but_not_widen_the_routes(self) -> None:
+        """Explicit bounds win over the profile's, a subset of routes is kept and any other route is refused."""
+        narrowed = self.destination(max_response_bytes=1000, timeout_seconds=7, max_redirects=1,
+                                    path_prefixes=[self.TXT2IMG])
+        self.assertEqual(((self.TXT2IMG,), 1000, 7.0, 1),
+                         (narrowed.prefixes, narrowed.max_response_bytes, narrowed.timeout_seconds, narrowed.max_redirects))
+        for name, prefixes in {"the whole API": ["/sdapi/v1"], "the options route": ["/sdapi/v1/options"],
+                               "a sub-path": [self.TXT2IMG + "/extra"], "the root": ["/"]}.items():
+            with self.subTest(name), self.assertRaises(gateway.ConfigError):
+                self.destination(path_prefixes=prefixes)
+        for name, protocol in {"another protocol": SENTINEL, "a list": ["a1111-http"]}.items():
+            with self.subTest(name), self.assertRaises(gateway.ConfigError) as caught:
+                self.destination(protocol=protocol)
+            self.assertNotIn(SENTINEL, str(caught.exception))
+
+    def test_the_three_routes_reach_the_server_with_their_methods(self) -> None:
+        """Positive control: generation, interrupt and progress arrive intact; a query passes."""
+        upstream = self.upstream({self.TXT2IMG: answer(200, b'{"images":[]}', (("Content-Type", "application/json"),)),
+                                  self.INTERRUPT: answer(200, b"{}"), self.PROGRESS: answer(200, b'{"progress":0}')})
+        self.serve_profile(upstream)
+        self.assertEqual(200, self.post(self.TXT2IMG, b'{"prompt":"a"}', {"Content-Type": "application/json"}).status)
+        self.assertEqual(200, self.post(self.INTERRUPT, b"").status)
+        self.assertEqual(200, self.get(self.PROGRESS + "?skip_current_image=true").status)
+        self.assertEqual([("POST", self.TXT2IMG, b'{"prompt":"a"}'), ("POST", self.INTERRUPT, b""),
+                          ("GET", self.PROGRESS + "?skip_current_image=true", b"")],
+                         [(seen.method, seen.path, seen.body) for seen in upstream.seen])
+
+    def test_every_other_route_of_the_server_is_refused_without_contact(self) -> None:
+        """Settings, checkpoint reload, shutdown and sub-paths of the three routes never reach the server."""
+        upstream = self.upstream({"/": answer()})
+        self.serve_profile(upstream)
+        for path in ("/sdapi/v1/options", "/sdapi/v1/cmd-flags", "/sdapi/v1/reload-checkpoint", "/sdapi/v1/server-kill",
+                     "/sdapi/v1/server-restart", "/sdapi/v1/img2img", "/sdapi/v1", "/sdapi/v1/txt2img/extra",
+                     "/sdapi/v1/progress/", "/sdapi/v1/%74xt2img", "/sdapi/v1/./txt2img", "/internal/ping", "/", "/docs"):
+            for method in ("GET", "POST"):
+                reply = self.call(method, f"/upstream/{ID}{path}", b"{}" if method == "POST" else None)
+                self.assertEqual((403, "path-not-allowed"), (reply.status, reply.code), f"{method} {path}")
+        self.assertEqual([], upstream.seen)
+
+    def test_a_route_answers_only_to_its_own_method(self) -> None:
+        """Reading txt2img or posting to progress is refused before contact."""
+        upstream = self.upstream({self.TXT2IMG: answer(), self.INTERRUPT: answer(), self.PROGRESS: answer()})
+        self.serve_profile(upstream)
+        for method, path in (("GET", self.TXT2IMG), ("GET", self.INTERRUPT), ("POST", self.PROGRESS)):
+            reply = self.call(method, f"/upstream/{ID}{path}", b"{}" if method == "POST" else None)
+            self.assertEqual((405, "method-not-allowed"), (reply.status, reply.code), f"{method} {path}")
+        self.assertEqual([], upstream.seen)
+
+    def test_the_request_bound_is_the_profiles_and_a_bigger_one_is_refused(self) -> None:
+        """One byte over the profile's request bound is refused without contact; the bound itself passes."""
+        upstream = self.upstream({self.TXT2IMG: answer()})
+        self.serve_profile(upstream)
+        self.assertEqual(200, self.post(self.TXT2IMG, b"x" * gateway.A1111_MAX_REQUEST_BYTES).status)
+        reply = self.post(self.TXT2IMG, b"x" * (gateway.A1111_MAX_REQUEST_BYTES + 1))
+        self.assertEqual((413, "request-too-large"), (reply.status, reply.code))
+        self.assertEqual(1, len(upstream.seen))
+
+    def test_an_image_sized_answer_passes_whole_and_an_oversized_one_is_refused(self) -> None:
+        """An answer past the generic default but within the profile arrives intact; past the bound it never does."""
+        size = gateway.DEFAULT_MAX_RESPONSE_BYTES + 1
+        upstream = self.upstream({self.TXT2IMG: answer(200, b"x" * size), self.PROGRESS: answer(200, b"y" * 65)})
+        self.serve_profile(upstream)
+        self.assertEqual(size, len(self.post(self.TXT2IMG, b"{}").body))
+        self.serve_profile(upstream, max_response_bytes=64)
+        reply = self.get(self.PROGRESS)
+        self.assertEqual((502, "response-too-large"), (reply.status, reply.code))
+
+    def test_the_time_budget_ends_a_call_with_a_fixed_code(self) -> None:
+        """A server that never answers is cut at the destination's time bound."""
+        def silent(_handler: http.server.BaseHTTPRequestHandler) -> None:
+            self.release.wait(15)
+
+        upstream = self.upstream({self.TXT2IMG: silent})
+        self.serve_profile(upstream, timeout_seconds=0.5)
+        started = time.monotonic()
+        reply = self.post(self.TXT2IMG, b"{}")
+        self.assertEqual((504, "upstream-timeout"), (reply.status, reply.code))
+        self.assertLess(time.monotonic() - started, 3)
+
+    def test_an_error_body_is_discarded_and_only_the_status_returns(self) -> None:
+        """The server's error text, which can echo the prompt, never reaches the engine."""
+        upstream = self.upstream({self.TXT2IMG: answer(500, b'{"error":"privatevalue"}')})
+        self.serve_profile(upstream)
+        reply = self.post(self.TXT2IMG, b"{}")
+        self.assertEqual(500, reply.status)
+        self.assertEqual({"code": "upstream-status", "status": 500}, json.loads(reply.body))
+        self.assertNotIn(b"privatevalue", reply.body)
+
+    def test_cookies_cross_in_neither_direction(self) -> None:
+        """A cookie from the engine is dropped, and one set by the server is neither stored nor returned."""
+        upstream = self.upstream({self.TXT2IMG: answer(200, b"{}", (("Set-Cookie", "session=server"),))})
+        self.serve_profile(upstream)
+        for _ in range(2):
+            reply = self.post(self.TXT2IMG, b"{}", {"Cookie": "from=engine"})
+            self.assertEqual(200, reply.status)
+            self.assertNotIn("set-cookie", reply.headers)
+        for seen in upstream.seen:
+            self.assertNotIn("cookie", seen.headers)
+
+    def test_no_redirect_is_followed_by_default_and_none_leaves_the_origin(self) -> None:
+        """The profile follows no redirect; with the owner's allowance a cross-host one is still refused."""
+        other = self.upstream({self.TXT2IMG: answer(200, b"elsewhere")})
+        upstream = self.upstream({self.TXT2IMG: redirect(self.TXT2IMG + "x", 307)})
+        self.serve_profile(upstream)
+        reply = self.post(self.TXT2IMG, b"{}")
+        self.assertEqual((502, "redirect-limit"), (reply.status, reply.code))
+        away = self.upstream({self.TXT2IMG: redirect(f"http://localhost:{other.port}{self.TXT2IMG}", 307)})
+        self.serve_profile(away, max_redirects=2)
+        reply = self.post(self.TXT2IMG, b"{}")
+        self.assertEqual((502, "redirect-cross-origin"), (reply.status, reply.code))
+        self.assertEqual([], other.seen)
+
+    def test_a_redirect_to_another_route_of_the_same_server_is_refused(self) -> None:
+        """Even with redirects allowed, a hop must land on one of the profile's exact routes."""
+        upstream = self.upstream({self.TXT2IMG: redirect("/sdapi/v1/options", 307), "/sdapi/v1/options": answer()})
+        self.serve_profile(upstream, max_redirects=2)
+        reply = self.post(self.TXT2IMG, b"{}")
+        self.assertEqual((502, "redirect-path"), (reply.status, reply.code))
+        self.assertEqual([self.TXT2IMG], [seen.path for seen in upstream.seen])
+
+    def test_an_owner_credential_reaches_only_the_server_and_is_never_returned(self) -> None:
+        """A server started with basic authentication gets the key from the file, over the owner's plain http."""
+        upstream = self.upstream({self.TXT2IMG: answer(200, b"{}")})
+        self.serve(upstream.url, protocol=gateway.A1111_PROTOCOL, path_prefixes=None,
+                   key={"file": "scripted", "header": "Authorization", "prefix": "Basic "})
+        self.assertEqual(200, self.post(self.TXT2IMG, b"{}", {"Authorization": "from-the-caller"}).status)
+        self.assertEqual(f"Basic {SENTINEL}", upstream.seen[0].headers["authorization"])
+
+
 class MainTest(unittest.TestCase):
     """The process entry point refuses bad configuration without echoing it."""
 

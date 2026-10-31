@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Image-generation port and `a1111-http` adapter (P21.5-B.2), 31 October 2026
+
+- The engine now has one backend-neutral image-generation port: a request with a prompt, size, steps, guidance and seed (no game
+  state), a cancel, and a result that is either a validated PNG with provenance, a cancellation, or a fixed failure code. P17.6 builds
+  the runtime image jobs on it.
+- An adapter for an owner-run Forge or A1111 server implements the port through the gateway. It runs the engine's own jobs one at a
+  time, reports a server that is busy with someone else's job instead of queuing behind it, and cancels through the server's interrupt
+  route only while its own job is running. A returned image must be strict base64 and a well-formed PNG of the requested size, and
+  its text chunks, which can hold the prompt, are removed.
+- The gateway gained the optional destination protocol `a1111-http`: only the txt2img, interrupt and progress routes with their own
+  methods are reachable, with image-sized size and time bounds and no redirect by default. The server's settings, reload and shutdown
+  routes are refused.
+- Nothing selects the adapter yet, so players see no change. The tests use scripted fixtures: no real Forge or A1111 server was run.
+
 ## Unreleased — Packaged local image worker (P21.5-A), 31 October 2026
 
 - The project now defines an optional local image worker, selected with `--profile images`: a confined container with no route out and

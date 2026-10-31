@@ -110,11 +110,37 @@ class InferenceBoundaryTest {
     }
 
     @Test
+    void theImageAdapterKeepsTheSameBoundary() throws Exception {
+        Path imageAdapter = MAIN.resolve("inference/image");
+        List<String> violations = new ArrayList<>();
+        for (Path source : sources(MAIN)) {
+            if (!source.startsWith(imageAdapter) && Files.readString(source).contains("org.rpgengine.inference.image")) {
+                violations.add(source + ": imports the adapter package");
+            }
+        }
+        for (Path source : sources(imageAdapter)) {
+            String name = source.getFileName().toString().replace(".java", "");
+            Matcher matcher = IMPORT.matcher(Files.readString(source));
+            while (matcher.find()) {
+                if (!matcher.group(1).matches("org\\.rpgengine\\.inference\\.[A-Z]\\w*(\\.\\w+)*")) {
+                    violations.add(name + " -> " + matcher.group(1));
+                }
+            }
+            if (!name.equals("package-info")
+                    && Modifier.isPublic(Class.forName("org.rpgengine.inference.image." + name).getModifiers())) {
+                violations.add(name + " is public");
+            }
+        }
+        assertThat(violations).isEmpty();
+    }
+
+    @Test
     void neutralApiUsesOnlyJdkAndNeutralTypes() {
         List<Class<?>> api = List.of(NarrationTaskPort.class, TaskHandle.class, TaskRequest.class, TaskResult.class,
                 TaskResult.Provenance.class, RuntimeStatus.class, SlotAssignments.class, EffectiveSettings.class,
                 InferenceSlot.class, SlotAssignment.class, ModelAllowlist.class, ProfileResolver.class,
-                ProfileResolver.Resolved.class, ProfileResolver.Refused.class);
+                ProfileResolver.Resolved.class, ProfileResolver.Refused.class, ImageGenerationPort.class,
+                ImageHandle.class, ImageRequest.class, ImageResult.class, ImageProvenance.class);
         List<String> foreign = new ArrayList<>();
         for (Class<?> type : api) {
             List<Class<?>> used = new ArrayList<>();
@@ -130,8 +156,9 @@ class InferenceBoundaryTest {
                 }
             }
             for (Class<?> candidate : used) {
-                String name = candidate.isArray() ? candidate.getComponentType().getName() : candidate.getName();
-                if (!candidate.isPrimitive() && !name.startsWith("java.")
+                Class<?> element = candidate.isArray() ? candidate.getComponentType() : candidate;
+                String name = element.getName();
+                if (!element.isPrimitive() && !name.startsWith("java.")
                         && !name.startsWith("org.rpgengine.inference.")) {
                     foreign.add(type.getSimpleName() + " uses " + name);
                 }

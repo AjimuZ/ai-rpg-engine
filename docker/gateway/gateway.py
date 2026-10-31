@@ -24,6 +24,12 @@ Guarantees:
   identifier and counts: never a path, query, header, body, peer text or exception message;
 - connections arriving over the egress network are closed unanswered, so only the private
   network shared with the engine reaches the keys;
+- a destination with `"protocol": "a1111-http"` (an owner-run Forge or A1111 server) can reach
+  exactly three routes, each with its own method: `POST /sdapi/v1/txt2img`, `POST
+  /sdapi/v1/interrupt` and `GET /sdapi/v1/progress`. The server's other routes, which change its
+  settings, reload checkpoints or stop it, are refused, and so is a sub-path or a wrong method.
+  The profile's bounds fit a base64 image answer and no redirect is followed unless the owner
+  raises `max_redirects`; every other rule above applies unchanged;
 - a destination with a `budget` is stopped at its daily or monthly cap with 429 and a fixed
   code, and its counts survive a restart. A capped call contacts nothing: the gateway has no
   route from one destination to another, so it cannot move work elsewhere (`BudgetLedger`).
@@ -84,6 +90,15 @@ DEFAULT_MAX_REDIRECTS = 3
 MAX_REDIRECTS = 5
 DEFAULT_MAX_IN_FLIGHT = 16
 MAX_IN_FLIGHT = 64
+# The `a1111-http` profile: a txt2img request is a small JSON document, the answer is a base64
+# PNG in one JSON document, and a render on modest hardware can take minutes.
+A1111_PROTOCOL = "a1111-http"
+A1111_MAX_REQUEST_BYTES = MEBIBYTE
+A1111_MAX_RESPONSE_BYTES = 32 * MEBIBYTE
+A1111_TIMEOUT_SECONDS = 300.0
+A1111_MAX_REDIRECTS = 0
+# Route to the one method it accepts. Interrupt is server-wide, so the engine alone decides when to send it.
+A1111_ROUTES = {"/sdapi/v1/txt2img": "POST", "/sdapi/v1/interrupt": "POST", "/sdapi/v1/progress": "GET"}
 DEFAULT_CLIENT_TIMEOUT_SECONDS = 30.0
 MAX_CLIENT_TIMEOUT_SECONDS = 300.0
 MIN_DURATION_SECONDS = 0.1
@@ -189,6 +204,12 @@ class Destination:
     timeout_seconds: float
     max_redirects: int
     budget: Budget | None
+    protocol: str | None = None
+
+    @property
+    def routes(self) -> dict[str, str] | None:
+        """Return the exact routes and their methods when a protocol pins them, else None."""
+        return A1111_ROUTES if self.protocol == A1111_PROTOCOL else None
 
     @property
     def origin(self) -> tuple[str, str, int]:
@@ -258,7 +279,12 @@ def path_is_safe(path: str) -> bool:
 
 
 def path_allowed(destination: Destination, path: str) -> bool:
-    """Return whether a safe path falls under a prefix, matching whole segments only."""
+    """Return whether a safe path falls under a prefix, matching whole segments only.
+
+    A destination with a protocol allows its listed routes exactly: a sub-path is another route.
+    """
+    if destination.routes is not None:
+        return path_is_safe(path) and path in destination.prefixes
     return path_is_safe(path) and any(path == prefix or path.startswith(prefix.rstrip("/") + "/")
                                       for prefix in destination.prefixes)
 
@@ -347,9 +373,13 @@ def parse_budget(node: object, where: str) -> Budget:
 
 def parse_destination(node: object, where: str) -> Destination:
     """Return one destination, or refuse it with its JSON location."""
-    node = object_at(node, where, {"id", "url", "path_prefixes"},
-                     {"key", "plaintext_key", "headers", "max_request_bytes", "max_response_bytes",
-                      "timeout_seconds", "max_redirects", "budget"})
+    protocol = node.get("protocol") if isinstance(node, dict) else None
+    if isinstance(node, dict) and "protocol" in node and protocol != A1111_PROTOCOL:
+        raise ConfigError(f"{where}.protocol is not supported")
+    # A protocol names its own routes, so the owner may leave the prefixes out but not widen them.
+    node = object_at(node, where, {"id", "url"} | ({"path_prefixes"} if protocol is None else set()),
+                     {"path_prefixes", "key", "plaintext_key", "headers", "max_request_bytes", "max_response_bytes",
+                      "timeout_seconds", "max_redirects", "budget", "protocol"})
     url = node["url"]
     try:
         if not isinstance(url, str):
@@ -367,16 +397,23 @@ def parse_destination(node: object, where: str) -> Destination:
     # A key leaves in clear text only through the owner's explicit choice, for a LAN server.
     if key is not None and scheme != "https" and not plaintext_key:
         raise ConfigError(f"{where}.key needs an https url, or plaintext_key for an owner-run server")
+    if protocol is None:
+        prefixes = parse_prefixes(node["path_prefixes"], f"{where}.path_prefixes")
+        defaults = (DEFAULT_MAX_REQUEST_BYTES, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_TIMEOUT_SECONDS, DEFAULT_MAX_REDIRECTS)
+    else:
+        prefixes = parse_prefixes(node.get("path_prefixes", list(A1111_ROUTES)), f"{where}.path_prefixes")
+        if not set(prefixes) <= set(A1111_ROUTES):
+            raise ConfigError(f"{where}.path_prefixes names a route the protocol does not have")
+        defaults = (A1111_MAX_REQUEST_BYTES, A1111_MAX_RESPONSE_BYTES, A1111_TIMEOUT_SECONDS, A1111_MAX_REDIRECTS)
     return Destination(
-        text_at(node, "id", where, IDENTIFIER_RULE), scheme, host, port,
-        parse_prefixes(node["path_prefixes"], f"{where}.path_prefixes"), key,
+        text_at(node, "id", where, IDENTIFIER_RULE), scheme, host, port, prefixes, key,
         parse_fixed_headers(node.get("headers", {}), f"{where}.headers", key),
-        number_at(node, "max_request_bytes", where, DEFAULT_MAX_REQUEST_BYTES, 1, MAX_BODY_BYTES, True),
-        number_at(node, "max_response_bytes", where, DEFAULT_MAX_RESPONSE_BYTES, 1, MAX_BODY_BYTES, True),
-        float(number_at(node, "timeout_seconds", where, DEFAULT_TIMEOUT_SECONDS, MIN_DURATION_SECONDS,
+        number_at(node, "max_request_bytes", where, defaults[0], 1, MAX_BODY_BYTES, True),
+        number_at(node, "max_response_bytes", where, defaults[1], 1, MAX_BODY_BYTES, True),
+        float(number_at(node, "timeout_seconds", where, defaults[2], MIN_DURATION_SECONDS,
                         MAX_TIMEOUT_SECONDS, False)),
-        number_at(node, "max_redirects", where, DEFAULT_MAX_REDIRECTS, 0, MAX_REDIRECTS, True),
-        parse_budget(node["budget"], f"{where}.budget") if "budget" in node else None)
+        number_at(node, "max_redirects", where, defaults[3], 0, MAX_REDIRECTS, True),
+        parse_budget(node["budget"], f"{where}.budget") if "budget" in node else None, protocol)
 
 
 def parse_settings(text: str) -> Settings:
@@ -723,8 +760,12 @@ class Gateway:
         self.budgets = budgets
         self.leak_forms = tuple(form for key in keys.values() for form in leak_forms(key))
 
-    def resolve(self, request_target: str) -> tuple[Destination, str]:
-        """Return the destination and upstream target of a request, or refuse before any contact."""
+    def resolve(self, request_target: str, method: str) -> tuple[Destination, str]:
+        """Return the destination and upstream target of a request, or refuse before any contact.
+
+        A destination with a protocol also fixes the method of each route, so a route that
+        exists for POST cannot be read with GET or the other way round.
+        """
         match = TARGET_RULE.fullmatch(request_target)
         if match is None:
             raise Refusal(404, "not-found")
@@ -736,6 +777,8 @@ class Gateway:
         if not path_allowed(destination, path) or (query is not None and (
                 len(query) > MAX_TARGET_CHARACTERS or not QUERY_RULE.fullmatch(query))):
             raise Refusal(403, "path-not-allowed")
+        if destination.routes is not None and destination.routes[path] != method:
+            raise Refusal(405, "method-not-allowed")
         if destination.key is not None and destination.identifier not in self.keys:
             raise Refusal(503, "key-unavailable")
         return destination, path + (f"?{query}" if query else "")
@@ -934,7 +977,7 @@ class RelayHandler(http.server.BaseHTTPRequestHandler):
         holding_slot = False
         try:
             try:
-                destination, target = gateway.resolve(self.path)
+                destination, target = gateway.resolve(self.path, self.command)
                 fields["destination"] = destination.identifier
                 holding_slot = self.server.slots.acquire(blocking=False)
                 if not holding_slot:
