@@ -171,7 +171,7 @@ remains usable. This settles the P01 capability record; P17.6 must qualify a
 separate restricted invocation before enabling generation. The production
 pipeline, catalog/category UI fallback and QA-31 remain undelivered.
 
-**Local capability (ADR 0021, planned in P21.5):** neither agent runtime supplies images, so the supported capability for P17.6 is a local image worker with the owner's chosen checkpoint (recommended default WAI-illustrious-SDXL v17.0), the owner's own A1111-compatible server, or a hosted images API with an owner key. All of them follow this pipeline's authority, budget, provenance and fallback rules ([inference backends](34-inference-backends-and-model-selection.md)).
+**Local capability (ADR 0021, worker packaged in P21.5-A, the rest planned in P21.5):** neither agent runtime supplies images, so the supported capability for P17.6 is a local image worker with the owner's chosen checkpoint (recommended default WAI-illustrious-SDXL v17.0), the owner's own A1111-compatible server, or a hosted images API with an owner key. All of them follow this pipeline's authority, budget, provenance and fallback rules ([inference backends](34-inference-backends-and-model-selection.md)).
 
 Pack/owner policy chooses `disabled`, `catalogOnly` or `bounded` by category. The owner enables generation explicitly and sets request/concurrency/budget limits before calls. Default to one active image job per campaign, coalesce duplicate requests and enforce a finite queue; the actual limits and provider behavior require implementation evidence. Do not generate a shop's entire unseen catalog merely because a panel opened.
 

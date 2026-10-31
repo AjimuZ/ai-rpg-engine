@@ -1,0 +1,8 @@
+# Only the Dockerfile and the files it copies are sent to the builder, so model weights or a
+# file placed here by mistake cannot reach an image.
+# Keep this policy independent: root .dockerignore does not cover this context.
+**
+!Dockerfile
+!image_worker.py
+!build-requirements.lock
+!requirements.lock

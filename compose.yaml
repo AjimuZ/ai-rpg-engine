@@ -35,9 +35,9 @@ services:
       - postgres_password
     # Only this service is reachable from the browser. Runtime inference egress
     # remains a different network, and control traffic uses the socket only.
-    # `models` and `gateway` stay empty unless their optional services were selected, and
-    # both are internal: neither gives the engine a route anywhere.
-    networks: [web, data, models, gateway]
+    # `models`, `gateway` and `images` stay empty unless their optional services were selected,
+    # and all three are internal: none gives the engine a route anywhere.
+    networks: [web, data, models, gateway, images]
     ports:
       - "127.0.0.1:${APP_PORT:-8080}:8080"
     volumes:
@@ -170,6 +170,49 @@ services:
       driver: json-file
       options: {max-size: 10m, max-file: "3"}
 
+  # Optional local image backend (P21.5-A, docs/34). Only `--profile images` selects or
+  # builds it, so a plain `up` builds and starts nothing of it. It publishes nothing and its
+  # single network is internal: the engine is its only peer, and it has no route to the
+  # Internet, PostgreSQL or the runtime. It reads the same model directory as `models`.
+  image-worker:
+    build:
+      context: ./docker/image-worker
+    image: rpg-engine/image-worker:0.1.0
+    profiles: [images]
+    # Library worker threads are reaped and stop signals forwarded by the init.
+    init: true
+    user: "10003:10003"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # Docker applies this request when the service starts; no other service depends on it.
+    gpus: all
+    environment:
+      # The owner's switch for private use; a job request has no way to change it (docs/34).
+      IMAGE_CONTENT_POLICY: ${IMAGE_CONTENT_POLICY:-safe}
+    networks: [images]
+    volumes:
+      # A missing directory must fail startup, not appear empty and root-owned.
+      - type: bind
+        source: ${MODELS_DIR:-./.local/models}
+        target: /models
+        read_only: true
+        bind: {create_host_path: false}
+    tmpfs:
+      - /tmp:uid=10003,gid=10003,mode=0700
+    healthcheck:
+      # This is process availability only, never a loaded or usable model.
+      test: [CMD, python, -I, -B, /opt/image-worker/image_worker.py, --health]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+      start_interval: 1s
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+
   # One-off helpers of `./start.sh --models fetch` (P21.2, docs/34). Only their profile or
   # a `compose run` selects them, they join no project network, and no other service
   # depends on them. `models-license` shows catalog facts with no network and no model
@@ -256,10 +299,12 @@ networks:
   data:
     internal: true
   inference: {}
-  # No route gateway on these two: containers on them have no route off them.
+  # No route gateway on these three: containers on them have no route off them.
   models:
     internal: true
   gateway:
+    internal: true
+  images:
     internal: true
   # The only network of the gateway service with a route out; nothing else joins it.
   gateway_egress: {}

@@ -296,12 +296,13 @@ class InfrastructureTest(unittest.TestCase):
         database = self.inspect("postgres")
         runtime = self.inspect("codex")
         engine = self.inspect("engine")
-        # `_models` and `_gateway` are internal and stay empty here: their services have profiles.
-        self.assertEqual({PROJECT + "_web", PROJECT + "_data", PROJECT + "_models", PROJECT + "_gateway"},
+        # `_models`, `_gateway` and `_images` are internal and stay empty here: their services have profiles.
+        self.assertEqual({PROJECT + "_web", PROJECT + "_data", PROJECT + "_models", PROJECT + "_gateway", PROJECT + "_images"},
                          set(engine["NetworkSettings"]["Networks"]))
         started = self.compose("ps", "--all", "--format", "{{.Service}}").splitlines()
         self.assertNotIn("models", started)
         self.assertNotIn("gateway", started)
+        self.assertNotIn("image-worker", started)
         self.assertEqual("10001:10001", engine["Config"]["User"])
         self.assertTrue(engine["HostConfig"]["ReadonlyRootfs"])
         self.assertEqual(["ALL"], engine["HostConfig"]["CapDrop"])

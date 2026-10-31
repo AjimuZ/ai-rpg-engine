@@ -116,6 +116,21 @@ class BuildContextTest(unittest.TestCase):
                              "keys/scripted", "secrets/gateway/scripted", ".local/secrets/gateway/scripted",
                              "nested/gateway.py", "nested/Dockerfile"})
 
+    def test_image_worker_context(self) -> None:
+        """Admit only the worker's Dockerfile, source and locks, so no weights can reach an image."""
+        self.verify_context(ROOT / "docker/image-worker/.dockerignore",
+                            {"Dockerfile", "image_worker.py", "requirements.lock", "build-requirements.lock"},
+                            {".env", "README.md", "model.safetensors", "style.ckpt", "loras/style.safetensors",
+                             ".local/models/model.safetensors", "private.key", "nested/image_worker.py",
+                             "nested/requirements.lock", "nested/Dockerfile"})
+
+    def test_image_worker_dockerfile_passes_the_builders_check(self) -> None:
+        """Parse the real Dockerfile with the builder's own check; this builds nothing and runs no step."""
+        context = ROOT / "docker/image-worker"
+        result = subprocess.run(["docker", "buildx", "build", "--check", "--progress=plain", "-f", str(context / "Dockerfile"), str(context)],
+                                capture_output=True, text=True, timeout=180, check=False)
+        self.assertEqual(0, result.returncode, result.stdout[-2000:] + result.stderr[-2000:])
+
 
 if __name__ == "__main__":
     unittest.main()

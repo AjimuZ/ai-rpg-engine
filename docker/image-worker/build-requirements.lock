@@ -1,0 +1,4 @@
+# Installed before requirements.lock: PyYAML has no wheel for this Python, and building it from its
+# hash-pinned source without an isolated environment keeps every build input pinned too.
+--index-url https://pypi.org/simple
+setuptools==84.2.1 --hash=sha256:ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2

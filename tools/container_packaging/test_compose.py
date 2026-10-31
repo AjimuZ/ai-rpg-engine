@@ -31,7 +31,8 @@ class ComposeTest(unittest.TestCase):
         """
         selection = [argument for profile in profiles for argument in ("--profile", profile)]
         environment = {name: value for name, value in os.environ.items()
-                       if name not in {"COMPOSE_PROFILES", "MODELS_DIR", "GATEWAY_KEYS_DIR", "GATEWAY_DESTINATIONS_FILE"}}
+                       if name not in {"COMPOSE_PROFILES", "MODELS_DIR", "GATEWAY_KEYS_DIR", "GATEWAY_DESTINATIONS_FILE",
+                                       "IMAGE_CONTENT_POLICY"}}
         result = subprocess.run(
             ["docker", "compose", "--env-file", str(ROOT / ".env.example"),
              "--file", str(ROOT / "compose.yaml"), *selection, "config", "--format", "json"],
@@ -52,10 +53,11 @@ class ComposeTest(unittest.TestCase):
         self.assertEqual({"inference"}, set(services["codex"]["networks"]))
         self.assertTrue(self.config["networks"]["data"]["internal"])
         self.assertFalse(self.config["networks"]["inference"].get("internal", False))
-        # The engine alone may reach the optional model server and gateway, over internal networks.
-        self.assertEqual({"web", "data", "models", "gateway"}, set(services["engine"]["networks"]))
+        # The engine alone may reach the optional model server, image worker and gateway, over internal networks.
+        self.assertEqual({"web", "data", "models", "gateway", "images"}, set(services["engine"]["networks"]))
         self.assertTrue(self.config["networks"]["models"]["internal"])
         self.assertTrue(self.config["networks"]["gateway"]["internal"])
+        self.assertTrue(self.config["networks"]["images"]["internal"])
         for name, service in services.items():
             if name != "engine":
                 self.assertFalse(service.get("ports"))
@@ -191,6 +193,48 @@ class ComposeTest(unittest.TestCase):
         # An explicit model argument would disable router mode, and a fetch path would need egress.
         for forbidden in ("--model", "-m", "--hf-repo", "-hf", "--model-url", "-mu"):
             self.assertNotIn(forbidden, command)
+
+    def test_image_worker_runs_only_under_its_profile(self) -> None:
+        """Selecting the profile adds one service and changes no other service."""
+        selected = self.render("images")
+        self.assertNotIn("image-worker", self.config["services"])
+        self.assertEqual(set(self.config["services"]) | {"image-worker"}, set(selected["services"]))
+        self.assertEqual(["images"], selected["services"]["image-worker"]["profiles"])
+        self.assertEqual(self.config["services"], {name: service for name, service
+                                                   in selected["services"].items() if name != "image-worker"})
+        # A default start must not wait for, build or implicitly start the optional worker.
+        self.assertNotIn("image-worker", self.config["services"]["engine"]["depends_on"])
+
+    def test_image_worker_boundaries(self) -> None:
+        """Require a local build, a read-only model bind, the safe policy and no way off its network."""
+        selected = self.render("images", "models", "gateway", "model-fetch")
+        worker = selected["services"]["image-worker"]
+        self.assertEqual((ROOT / "docker/image-worker").as_posix(), Path(worker["build"]["context"]).as_posix())
+        self.assertFalse(worker["build"].get("args"))
+        self.assertEqual("rpg-engine/image-worker:0.1.0", worker["image"])
+        self.assertFalse(worker.get("ports"))
+        self.assertNotIn("network_mode", worker)
+        self.assertEqual({"images"}, set(worker["networks"]))
+        self.assertTrue(selected["networks"]["images"]["internal"])
+        # The engine is the only peer: no other service joins, whatever is selected.
+        for name, service in selected["services"].items():
+            if name not in {"image-worker", "engine"}:
+                self.assertNotIn("images", set(service.get("networks") or {}), name)
+        self.assertEqual(1, len(worker["volumes"]))
+        weights = worker["volumes"][0]
+        self.assertEqual(("bind", "/models", True), (weights["type"], weights["target"], weights["read_only"]))
+        self.assertEqual(selected["services"]["models"]["volumes"][0]["source"], weights["source"])
+        self.assertIs(False, self.model_bind_creates_host_path(weights, "image-worker"))
+        self.assertFalse(worker.get("secrets"))
+        self.assertFalse(worker.get("env_file"))
+        self.assertEqual({"IMAGE_CONTENT_POLICY": "safe"}, worker["environment"])
+        self.assertEqual("10003:10003", worker["user"])
+        self.assertIs(True, worker["init"])
+        self.assertTrue(worker["read_only"])
+        self.assertEqual(["ALL"], worker["cap_drop"])
+        self.assertIn("no-new-privileges:true", worker["security_opt"])
+        self.assertTrue(worker["gpus"])
+        self.assertEqual("30s", worker["stop_grace_period"])
 
     def test_model_fetch_runs_only_under_its_profile(self) -> None:
         """Selecting the profile adds its two services and changes no other service."""

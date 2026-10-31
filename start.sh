@@ -655,10 +655,10 @@ cmd_stop() {
         return 0
     fi
     info "stopping $PROJECT (volumes are preserved)"
-    # The profiles are named so a selected model server and gateway stop too: left
-    # running, one would keep its GPU memory and the other its keys in memory and its
-    # egress network, and either would block removal of the network it shares.
-    compose --profile models --profile gateway down --timeout 35 || die "stopping failed; run 'docker compose -p $PROJECT ps' to inspect. Data is not affected."
+    # The profiles are named so a selected model server, image worker and gateway stop
+    # too: left running, the first two would keep their GPU memory and the third its keys
+    # in memory and its egress network, and each would block removal of the network it shares.
+    compose --profile models --profile images --profile gateway down --timeout 35 || die "stopping failed; run 'docker compose -p $PROJECT ps' to inspect. Data is not affected."
     info "stopped. Run ./start.sh to start again; campaigns and the runtime account are kept."
 }
 

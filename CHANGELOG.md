@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Packaged local image worker (P21.5-A), 31 October 2026
+
+- The project now defines an optional local image worker, selected with `--profile images`: a confined container with no route out and
+  no published port, reading the owner's model directory read-only. It loads single-file SDXL safetensors checkpoints and LoRAs, with
+  WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as alternatives.
+- Prompts beyond CLIP's 77 tokens are split into chunks, with no token lost, and a prompt needing more than 8 chunks is refused rather
+  than cut. Safe-content tags are added to every job. Only the owner's `IMAGE_CONTENT_POLICY=owner-private` setting changes them, never a request.
+- `./start.sh --stop` also stops this service, and the engine joins one more empty internal network. A plain start builds and starts nothing new.
+- Nothing calls the worker yet, so players see no change. Its image has not been built: no checkpoint has been loaded, no image
+  generated, and memory and speed are unmeasured. Cancellation, output validation and provenance are still to come.
+
 ## Unreleased — Lease executor over the model server (P21.4-B), 31 October 2026
 
 - The engine has an executor that can turn the coordinator's leases into real residency: it saves the text slot's prompt cache, unloads

@@ -13,12 +13,12 @@ in [ADR 0009](../../docs/adr/0009-toolchain-baseline.md):
 py -B -m unittest discover -s tools/container_packaging -v
 ```
 
-Three context checks copy only the ignore policies into neutral fixture trees
+Four context checks copy only the ignore policies into neutral fixture trees
 under `.local/scratch/`, then export actual BuildKit contexts and compare exact
 file sets. The root policy admits frontend/backend inputs, the engine
 Dockerfile and one probe file, `tools/runtime_probe/fixtures/0.164.0/neutral-session.json`,
 which the backend's drift check needs. The independent runtime policy admits its Dockerfile and five
-reviewed managed-profile files, and the gateway's policy admits its Dockerfile and one source file. All exclude nested private paths. New inputs
+reviewed managed-profile files, the gateway's policy admits its Dockerfile and one source file, and the image worker's admits its Dockerfile, one source file and two lock files, and `test_build_context.py` also runs the builder's own check on that Dockerfile, which builds nothing. All exclude nested private paths. New inputs
 must update the relevant policy and fixtures. These checks do not inspect account
 files or detect secrets embedded in otherwise admitted source files.
 `test_compose.py` checks rendered service boundaries without starting services,
@@ -72,6 +72,14 @@ and from every service's logs. No code path can carry a key to the database toda
 `LauncherStopTest` in `test_gateway_container.py` runs the real `./start.sh --stop` from a temporary copy against a running
 gateway and requires its container and both networks gone and its budget volume kept. Below the launcher's Docker floors, as on hosted CI, it
 asserts the launcher's refusal instead.
+`test_image_worker.py` (P21.5-A) runs `docker/image-worker/image_worker.py` in process through its real HTTP surface. It needs no
+Docker, GPU, torch or weights, so hosted CI runs it. Scripted word tokenizers and a scripted backend prove prompt chunking beyond 77
+tokens, the safe-content defaults, the recommended default against the real catalog, and the file refusals. Recording stand-ins for
+`torch` and `diffusers` prove which calls the real backend makes, not that those libraries accept them. It also checks statically that
+every input of the image is pinned by digest, version or hash. `test_image_worker_container.py` starts the service as Compose renders
+it and runs the image's real tokenizers and text encoder classes on the CPU with no weights. It never builds the image, which is about
+3 GB. An absent image skips with a reason, even under `PACKAGING_DOCKER=1`, because `verify.sh containers` must not demand an optional
+build; `PACKAGING_IMAGE_WORKER=1` makes it fail instead. To run it, use `docker compose --profile images build image-worker` first.
 `test_launcher.py` checks the root `start.sh` contract (static rules, redaction,
 refusal paths, read-only `--check` and, with a recording stand-in for Docker, that `--stop` selects every long-running
 profile declared in `compose.yaml`) without starting or stopping services.
