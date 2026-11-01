@@ -1,6 +1,7 @@
 package org.rpgengine.inference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.time.Duration;
 import java.util.List;
@@ -8,7 +9,12 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.rpgengine.health.GameplayHealthIndicator;
+import org.rpgengine.inference.admission.AdmissionControls;
+import org.rpgengine.inference.admission.AdmissionCoordinator;
 import org.rpgengine.inference.admission.JdbcLeaseStore;
+import org.rpgengine.inference.admission.LeaseExecutor;
+import org.rpgengine.inference.admission.LeaseStore;
+import org.rpgengine.inference.admission.Modality;
 import org.rpgengine.inference.scheduling.InferenceScheduler;
 import org.rpgengine.inference.scheduling.JdbcTaskLedger;
 import org.rpgengine.inference.scheduling.MemoryTaskLedger;
@@ -183,6 +189,44 @@ class TaskPortSelectionTest {
                             Duration.ofSeconds(5)).result().toCompletableFuture().get(5, TimeUnit.SECONDS);
                     assertThat(toCodex.errorCode()).isEqualTo("slot-backend-mismatch");
                 });
+    }
+
+    @Test
+    void theAdmissionSwitchIsOffByDefaultAndWithItOffNoAdmissionBeanExists() {
+        runner.run(context -> assertThat(context).doesNotHaveBean(LeaseExecutor.class));
+        runner.withPropertyValues("engine.inference.local.url=http://127.0.0.1:9",
+                "engine.inference.admission.gpu-budget-mib=10240").run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).doesNotHaveBean(LeaseExecutor.class).doesNotHaveBean(AdmissionCoordinator.class)
+                            .doesNotHaveBean(ModelServerControl.class);
+                    assertThat(context.getBean(NarrationTaskPort.class)).isInstanceOf(SlotRoutingTaskPort.class);
+                });
+    }
+
+    @Test
+    void theAdmissionSwitchWithALocalUrlBuildsTheExecutorOverTheLocalControlAndLeavesPortSelectionAlone() {
+        runner.withBean(LeaseStore.class, () -> mock(LeaseStore.class))
+                .withPropertyValues("engine.inference.local.url=http://127.0.0.1:9",
+                        "engine.inference.local.reconnect-initial=50ms", "engine.inference.admission.enabled=true",
+                        "engine.inference.admission.gpu-budget-mib=10240")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(LeaseExecutor.class);
+                    assertThat(context.getBean(ModelServerControl.class).getClass().getPackageName())
+                            .isEqualTo("org.rpgengine.inference.local");
+                    assertThat(context.getBean(AdmissionControls.class).byModality()).containsOnlyKeys(Modality.TEXT)
+                            .containsValue(context.getBean(ModelServerControl.class));
+                    assertThat(context.getBean(NarrationTaskPort.class)).isInstanceOf(SlotRoutingTaskPort.class);
+                });
+    }
+
+    @Test
+    void theAdmissionSwitchWithoutALocalUrlFailsStartup() {
+        runner.withBean(LeaseStore.class, () -> mock(LeaseStore.class))
+                .withPropertyValues("engine.inference.admission.enabled=true",
+                        "engine.inference.admission.gpu-budget-mib=10240")
+                .run(context -> assertThat(context).hasFailed().getFailure()
+                        .hasStackTraceContaining("needs exactly one model server control"));
     }
 
     @Test

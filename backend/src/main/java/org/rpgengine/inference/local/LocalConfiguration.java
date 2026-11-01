@@ -16,8 +16,8 @@ import org.springframework.core.type.AnnotatedTypeMetadata;
 /**
  * Selects the local adapter when {@code engine.inference.local.url} is set, and then puts the slot
  * routing port in front of every adapter as the installation's task port. Without the setting nothing
- * here exists and exactly one port stays selected, as before. This is the only place that exposes the
- * adapter, so no other package needs to name a type of this package.
+ * here exists and exactly one port stays selected, as before. Together with {@link LocalControlConfiguration}
+ * this is the only place that exposes the package, so no other package needs to name a type of it.
  */
 @Configuration(proxyBeanMethods = false)
 @Conditional(LocalConfiguration.Configured.class)

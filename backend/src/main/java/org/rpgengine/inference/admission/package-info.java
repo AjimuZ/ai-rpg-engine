@@ -18,8 +18,12 @@
  * {@link org.rpgengine.inference.admission.SteppedJob}, contention from processes the engine does not
  * own through a {@link org.rpgengine.inference.admission.GpuMemoryReading}, and metrics.
  *
- * <p>Not built here: Spring wiring, any real GPU reading, any real image or speech worker, and any link
- * to the task scheduler or the adapters. Everything is tested against scripted servers, so nothing yet
- * proves that the host stays out of memory trouble.
+ * <p>{@link org.rpgengine.inference.admission.HostGpuMemoryReading} reads free memory from
+ * {@code nvidia-smi}, and {@code AdmissionConfiguration} builds the
+ * coordinator and the executor only when {@code engine.inference.admission.enabled} is {@code true}.
+ *
+ * <p>Not built here: any caller of the executor, any real image or speech worker, and any link to the
+ * task scheduler or the adapters. Everything is tested against scripted servers, so nothing yet proves
+ * that the host stays out of memory trouble.
  */
 package org.rpgengine.inference.admission;

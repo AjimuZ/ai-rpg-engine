@@ -3634,6 +3634,22 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       runner, and the real process runner on a missing program. `verify.sh full` was not run by this session.
     - Not proven: no real `nvidia-smi` or GPU was used, so the output format and the first-GPU rule on a real host are untested; the
       timeout kill path of the real runner has no test. The reading is not wired into the application.
+  - P21.4-C.1.2.1 (1 November 2026, task open): the application builds the coordinator and the lease executor only behind an opt-in switch.
+    - Delivered: `engine.inference.admission.enabled` (default `false`), `gpu-budget-mib` (required with the switch on), `ram-budget-mib`,
+      `headroom-mib` and `patience` in `AdmissionOptions`; `AdmissionConfiguration` builds `AdmissionCoordinator` (`HOLDS_UNTIL_UNLOADED`, over the
+      `LeaseStore` bean), `AdmissionControls` (the `TEXT` entry is the local server's control), `HostGpuMemoryReading` and `LeaseExecutor`;
+      `LocalControlConfiguration` exposes `LocalModelControl` as the neutral `ModelServerControl` bean when the local URL and the switch are both
+      set, so no visibility change or public factory was needed. Settings, placeholders and limits are in
+      [docs/34 section 10](34-inference-backends-and-model-selection.md#p214-c121-opt-in-construction-of-the-lease-executor).
+    - `sh .agents/ralph/verify.sh backend -Dtest=AdmissionConfigurationTest,LocalControlConfigurationTest,TaskPortSelectionTest,InferenceBoundaryTest`:
+      `VERIFY PASSED`; the log shows `Tests run: 11` (`AdmissionConfigurationTest`), `4` (`LocalControlConfigurationTest`), `14`
+      (`TaskPortSelectionTest`, 3 new) and `6` (`InferenceBoundaryTest`), 35 in all, `Failures: 0, Errors: 0, Skipped: 0`. They cover the switch off
+      (missing, `false`, blank) with no bean, the switch on with its beans, the control map, the holding expiry rule, the capacity and defaults, no
+      call on the control at construction, a missing control or budget, and out-of-range or malformed values with messages that omit the value.
+    - Not proven: `verify.sh full` was not run by this session. No real database, `nvidia-smi`, GPU or model server was used, and a start of the
+      packaged stack with the switch on was not tried. The fixed lease, swap and RAM values are unmeasured placeholders. Nothing calls
+      `LeaseExecutor.start` or `pass`, so no model is loaded; the link to the scheduler and the adapters is still to build. No
+      deliberate-weakening run was made.
 - [x] P21.5 Implement the local image backend: a pinned image-worker container loading single-file safetensors checkpoints and LoRAs, with WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as catalog alternatives; prompt chunking beyond 77 tokens; default safe-content tags; step-boundary cancellation; output validation and provenance; and the `a1111-http` adapter for an owner-run Forge or A1111 server. Integrate with the P17 asset-job contract without changing authority rules.
   - P21.5-A progress (31 October 2026, box stays unchecked): the local image worker is packaged, its rules are tested without torch, a GPU or weights, and its image has never been built.
     - Delivered: `docker/image-worker/` (`image_worker.py`, `Dockerfile`, `.dockerignore`, `requirements.lock`, `build-requirements.lock`), the Compose service `image-worker` under the new profile `images`, on the new internal network `images`, which the engine also joins, and `--profile images` in `./start.sh --stop`. Behavior and limits are in [docs/34 section 8](34-inference-backends-and-model-selection.md#8-local-image-worker-profile).

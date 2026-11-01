@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Opt-in construction of the lease executor (P21.4-C.1.2.1), 1 November 2026
+
+- A new setting, `engine.inference.admission.enabled` (off by default), makes the application build the admission coordinator
+  and the lease executor over the local model server's control. It needs `engine.inference.local.url` and
+  `engine.inference.admission.gpu-budget-mib`; optional are `ram-budget-mib`, `headroom-mib` (default 1024) and `patience`
+  (default 2 minutes). An invalid value stops startup with a message that does not repeat the value.
+- With the switch off nothing is built and behaviour is unchanged. With it on, nothing calls the executor yet, so no model is
+  loaded or unloaded. The fixed lease and swap values are unmeasured placeholders, and the wiring was tested without a GPU.
+
 ## Unreleased — Host GPU memory reading (P21.4-C.1.1), 1 November 2026
 
 - A reading of free GPU memory from `nvidia-smi` now exists for the admission coordinator. It answers unknown when the tool is

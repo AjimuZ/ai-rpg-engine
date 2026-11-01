@@ -1272,6 +1272,12 @@ reason `SLOT_CHANGED`). Tests use `ScriptedModelServer`, a scripted HTTP fixture
 `SlotRoutingTaskPortTest`, `SlotSessionRetirementTest` and the wiring cases in
 `TaskPortSelectionTest`.
 
+`engine.inference.admission.enabled=true` (default `false`; it needs `engine.inference.local.url` and
+`engine.inference.admission.gpu-budget-mib`) builds the admission coordinator and the lease executor over the local
+server's control. Nothing calls the executor yet, so the switch changes no behaviour. The settings and limits are in
+[docs/34 section 10](../docs/34-inference-backends-and-model-selection.md#p214-c121-opt-in-construction-of-the-lease-executor);
+tests are `AdmissionConfigurationTest`, `LocalControlConfigurationTest` and the wiring cases in `TaskPortSelectionTest`.
+
 ## Grounded narration publication, receipt fallback and retry (P08.5)
 
 `org.rpgengine.narration` connects the presentation jobs to the narration contract. The rules
