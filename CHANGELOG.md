@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — GPU contention harness (P21.4-C.1.3.2), 1 November 2026
+
+- New `tools/gpu_contention/contention.py`: one command drives text, image and speech load against the owner's endpoints
+  beside an owner-supplied GPU competitor and writes peak GPU memory (`nvidia-smi` sampling), out-of-memory events (server,
+  engine and container logs, counts only) and the lease executor's metrics (from `GET /api/v1/models/admission-metrics`) to a
+  new JSON file. Anything it cannot observe, such as a missing image or speech endpoint, route or tool, is recorded as
+  `unavailable` with a reason, never as zero. The owner's session value is read from a file, sent only to a loopback URL and
+  never written. A no-GPU self-test with stand-in servers runs in CI. No run on the reference host or any GPU has been made.
+  See [tools/gpu_contention](tools/gpu_contention/README.md) and
+  [docs/34](docs/34-inference-backends-and-model-selection.md#10-shared-admission-and-speed).
+
 ## Unreleased — Lease executor metrics route (P21.4-C.1.3.1), 1 November 2026
 
 - With `engine.inference.admission.enabled` on, the owner can read the lease executor's counters at

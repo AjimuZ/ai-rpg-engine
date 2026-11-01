@@ -59,6 +59,9 @@ jobs:
       # Offline backup-tool logic; the real PostgreSQL rehearsal stays a manual release check.
       - name: Test the database backup tool
         run: python -B -m unittest discover -s tools/database_backup -v
+      # Offline self-test of the GPU contention harness: stand-in servers, no GPU, no Docker.
+      - name: Test the GPU contention harness
+        run: python -B -m unittest discover -s tools/gpu_contention
       # Neutral runtime-adapter fixtures: opt-in Docker and account checks stay skipped.
       - name: Run account-free runtime probe tests
         run: python -B -m unittest discover -s tools/runtime_probe
