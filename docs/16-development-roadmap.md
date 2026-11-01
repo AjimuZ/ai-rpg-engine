@@ -2954,7 +2954,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       behaviour under load, the advisor run against this exact profile (the committed fixtures
       are unchanged), and a refreshed `availableMiB` (recorded `null` on Windows). Loading a model
       and measuring it belong to P21.2. With this run every P21.1 exit check is done.
-- [ ] P21.2 Package and qualify the local text backend: a pinned model-server image in router mode with a read-only model volume and no network egress, hash-verified `./start.sh --models fetch` with license display and explicit confirmation, JSON-Schema readiness probes, an English and Italian narration probe set, and recorded measurements (load time, prefill and decode speed, peak VRAM and RAM, context limits, VRAM released by unload) for the default and alternate models.
+- [x] P21.2 Package and qualify the local text backend: a pinned model-server image in router mode with a read-only model volume and no network egress, hash-verified `./start.sh --models fetch` with license display and explicit confirmation, JSON-Schema readiness probes, an English and Italian narration probe set, and recorded measurements (load time, prefill and decode speed, peak VRAM and RAM, context limits, VRAM released by unload) for the default and alternate models.
   - Partial progress (31 October 2026, P21.2-A): the pinned model server is packaged. `compose.yaml`
     gains the service `models` behind the `models` profile: the image by the same digest as
     `MODEL_SERVER_IMAGE` in `start.sh`, `--models-dir /models --models-max 1`, user 65534, read-only
@@ -3174,6 +3174,39 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
         themselves are not taken: no metric of any model exists, and the catalog's `measured` stays `null`.
     - Remaining for P21.2: launcher selection of the service, a real fetch of the default model, running these probes against
       a loaded model, and the measurements. The box stays unchecked.
+    - Partial progress (1 November 2026, P21.2-D): the host measurements are recorded in
+      `docs/34-inference-backends-and-model-selection.md` section 7 ("P21.2 host measurements"). This session only recorded
+      them, no measurement was repeated and no check was run by it. The owner ran the real fetch and the supervising session
+      ran the rest on the reference host (i5-14600KF, 16 GB RAM, RTX 4070 12,282 MiB, driver 617.42, Docker Desktop with
+      7,823 MiB of container memory; image `server-cuda-b11960`, fingerprint `b11960-8642541b2`).
+      - Commands: `./start.sh --models fetch gemma-4-12b-it-qat-q4_0 qwen3.5-9b-q4_k_m gemma-4-e4b-it-qat-q4_0
+        gemma-4-e2b-it-qat-q4_0 gemma-4-26b-a4b-it-qat-q4_0` (size and SHA-256 verified by the fetch); `docker compose -p
+        measure-models --profile models up --detach models`; `python -B measure.py MODEL` for each model (`/models/load`,
+        `/props`, one `/v1/chat/completions`, `model_probe.py` from a `python:3.15.1-slim-trixie` container on the
+        `measure-models_models` network, `/models/unload`, sampling `nvidia-smi` and `docker stats`); `docker compose -p
+        measure-models --profile models down --timeout 35`.
+      - Results (load s; prefill t/s; decode t/s; VRAM before, peak, after unload MiB; released MiB; container RAM peak MiB;
+        n_ctx): `gemma-4-12b-it-qat-q4_0` (default) 107.53; 871.1; 44.3; 1313, 11934, 1494; 10440; 6356; 117504.
+        `Qwen3.5-9B-Q4_K_M` (alternate) 38.26; 3501.4; 68.0; 1271, 11522, 1264; 10258; 5749; 151808. `gemma-4-E2B_q4_0-it`
+        19.77; 6261.3; 172.6; 1262, 3920, 1306; 2614; 1993; 131072. `gemma-4-E4B_q4_0-it` 27.63; 5037.4; 102.4; 1273, 6606,
+        1273; 5333; 3367; 131072. `gemma-4-26B_q4_0-it` 164.38; 236.2; 31.9; 1272, 11546, 1258; 10288; 5804; 4096. Speeds come
+        from one request of about 2400 prompt tokens and 200 completion tokens, thinking on, `cache_prompt` false.
+      - Probes: `model_probe.py` gave 0 passed, 8 failed, exit 1 on all five models, `reply is not valid JSON`. Replaying the
+        probes on the default and alternate models showed thinking, on by default, uses all of `max_tokens` (120 to 300), so
+        `finish_reason` is `length` with empty content. With `chat_template_kwargs.enable_thinking=false` the 8 replies stop
+        by themselves and parse as JSON on both models; that replay parses JSON and does not apply the probe schemas, so it is
+        not a probe pass. P21.2-E repairs the harness.
+      - Docs: only the statements these numbers measure changed in docs/34 (status, decode ceiling, 26B expectation, open
+        points, new measurements subsection). The catalog `measured` stays `null` and no catalog file changed.
+      - Not proven: other runner sessions were active, so times can be disturbed; load times are one sample each and not
+        comparable cold against warm; `docker stats` can count the mapped model file as container memory; `n_ctx` is what
+        the router chose by default across `n_slots=4` with `kv_unified`, not a tested maximum; whether layers stayed off the
+        GPU for 26B was not read; the launch profile is the current candidate one, started by hand and not through the
+        launcher; narration quality was not judged; no engine ran against this server; each model was measured once; no
+        probe passed. Router IDs are file stems and differ from catalog IDs for four of five models (`Qwen3.5-9B-Q4_K_M`,
+        `gemma-4-E2B_q4_0-it`, `gemma-4-E4B_q4_0-it`, `gemma-4-26B_q4_0-it`); P21.2-F handles it.
+    - Remaining for P21.2: P21.2-E (repair the probe harness so probes can pass) and P21.2-F (router ID mapping). The box stays
+      unchecked.
 - [x] P21.3 Implement slot assignment and the remaining backend adapters behind the runtime-neutral task port: independent `light`, `standard`, `deliberate` and `image` slots, readiness probes with visible results, billing and privacy class badges with acknowledgement on a class change, same-class fallback lists only when configured, per-slot session retirement, and the `gateway` service for owner-key hosted APIs and allowlisted custom endpoints (keys as runtime-only secrets, budgets, bounded redirects and sizes). Expose `GET /api/v1/models/status`, the owner-only settings API and the Settings → Models panel.
   - Partial progress (31 October 2026, P21.3-A): the four slots, class badges, class-change acknowledgement, configured same-class
     fallbacks and stored readiness probes exist in the backend. The P21.3 box stays unchecked: the gateway, the Settings → Models

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Local text backend measurements (P21.2-D), 1 November 2026
+
+- The documentation now records the first measurements of the local text backend on the reference host: load time, prefill and
+  decode speed, peak VRAM and RAM, default context and VRAM released by unload, for the default model, the alternate and three
+  more catalog models, each measured once.
+- The readiness probes were run against all five models and none passed (0 of 8 each), because the thinking mode used the whole
+  reply budget. The harness repair is still to do, and the model catalog and advisor are unchanged.
+- No code changed. Router model IDs differ from catalog IDs for four of the five models, which is documented and not yet handled.
+
 ## Unreleased — Negotiation, surrender and agreement in a fight (P11.5-B), 1 November 2026
 
 - An encounter can now declare a check for a social action and, for a negotiation, the terms it proposes and a counteroffer. An
