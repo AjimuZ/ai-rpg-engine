@@ -3,7 +3,8 @@
 The rendered configuration is checked by `test_compose.py`; this case starts the real
 pinned image under the `models` profile, with an empty temporary model directory, in a
 uniquely named project that it always removes. It proves router mode, the absence of a
-route off the network and the refusal of writes. It loads no model, so it says nothing
+route off the network, the refusal of writes and, with a file that is not a model, that a
+chat request starts no load unless it asks to. It loads no model, so it says nothing
 about inference, memory or speed. A host without `nvidia-smi` drops only the GPU
 request through an override, and then proves nothing about GPU passthrough.
 
@@ -30,6 +31,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # Reserved for documentation (RFC 5737): never a real peer, whatever the host's network.
 UNROUTED_ADDRESS = "192.0.2.1"
 GPU_OVERRIDE = "services:\n  models:\n    gpus: !reset []\n"
+STUB_MODEL = "stub-not-a-model"
 
 
 def default_routes(ipv4_table: str, ipv6_table: str) -> list[str]:
@@ -72,9 +74,8 @@ class DefaultRoutesTest(unittest.TestCase):
         self.assertEqual([ipv6], default_routes(self.IPV4_HEADER, ipv6))
 
 
-@requires_docker_cli
-class ModelServerIsolationTest(unittest.TestCase):
-    """Run the selected service as Compose renders it and probe it from inside."""
+class RunningModelServer(unittest.TestCase):
+    """Run the selected service as Compose renders it, for cases that probe it from inside."""
 
     def run_docker(self, *arguments: str, timeout: int = 180) -> subprocess.CompletedProcess:
         """Run Docker without a shell and return the outcome, whatever its exit code."""
@@ -102,6 +103,26 @@ class ModelServerIsolationTest(unittest.TestCase):
         self.fail(f"{self.image} is not usable here; ./start.sh --models profile --gpu-check fetches it. "
                   + inspected.stderr[-2000:])
 
+    def prepare_models(self) -> None:
+        """Fill the model directory before the service starts; by default it stays empty."""
+
+    def chat(self, model: str, query: str = "") -> tuple[int, str]:
+        """Send one chat request from inside the service and return its status and body."""
+        body = json.dumps({"model": model, "max_tokens": 1, "messages": [{"role": "user", "content": "hi"}]})
+        reply = self.in_server("curl", "--silent", "--show-error", "--max-time", "45", "--write-out", "\n%{http_code}",
+                               "--header", "Content-Type: application/json", "--data", body,
+                               "http://127.0.0.1:8080/v1/chat/completions" + query)
+        self.assertEqual(0, reply.returncode, reply.stderr)
+        text, _, status = reply.stdout.rpartition("\n")
+        return int(status), text
+
+    def status(self, model: str) -> dict:
+        """Return the router's status object of one listed model."""
+        listed = self.in_server("curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/models")
+        self.assertEqual(0, listed.returncode, listed.stderr)
+        entries = {entry["id"]: entry for entry in json.loads(listed.stdout)["data"]}
+        return entries[model]["status"]
+
     def setUp(self) -> None:
         """Start only the model server in a disposable project, or skip or fail with the reason."""
         models = tempfile.TemporaryDirectory()
@@ -109,6 +130,7 @@ class ModelServerIsolationTest(unittest.TestCase):
         self.models = Path(models.name)
         # The user inside the container must be able to list the directory on any host.
         self.models.chmod(0o755)
+        self.prepare_models()
         self.environment = {name: value for name, value in os.environ.items() if name != "COMPOSE_PROFILES"}
         self.environment["MODELS_DIR"] = str(self.models)
         self.project = "engine-model-server-check-" + secrets.token_hex(4)
@@ -126,6 +148,11 @@ class ModelServerIsolationTest(unittest.TestCase):
         self.addCleanup(self.run_docker, *self.compose, "down", "--timeout", "10")
         self.docker(*self.compose, "up", "--detach", "--pull", "never", "--wait", "--wait-timeout", "120",
                     "models", timeout=240)
+
+
+@requires_docker_cli
+class ModelServerIsolationTest(RunningModelServer):
+    """Require the rendered boundaries on the running service."""
 
     def test_running_server_is_isolated_and_in_router_mode(self) -> None:
         """Require the rendered boundaries on the real container and from inside it."""
@@ -185,6 +212,39 @@ class ModelServerIsolationTest(unittest.TestCase):
                                   "--list-devices", timeout=120)
         self.assertEqual(0, listing.returncode, listing.stderr[-2000:])
         self.assertIn("CUDA", listing.stdout + listing.stderr)
+
+
+@requires_docker_cli
+class ModelServerLoadingTest(RunningModelServer):
+    """Prove on the pinned image that a chat request cannot load a model unless it asks to.
+
+    The directory holds one file that is not a model. The router lists it without opening it,
+    and an attempt to load it fails visibly, so `failed` in the model list is the trace of an
+    attempt and its absence is the proof that none was made. No weights are involved, so this
+    says nothing about a request served by a loaded model.
+    """
+
+    def prepare_models(self) -> None:
+        """Place the file the router lists."""
+        (self.models / f"{STUB_MODEL}.gguf").write_bytes(b"this is not a model")
+
+    def test_chat_loads_only_when_it_asks(self) -> None:
+        """Require a refusal that leaves no trace, then the trace when a request does ask."""
+        self.assertEqual("unloaded", self.status(STUB_MODEL)["value"])
+        self.assertFalse(self.status(STUB_MODEL).get("failed"))
+
+        for query in ("", "?autoload=false"):
+            status, body = self.chat(STUB_MODEL, query)
+            self.assertEqual(400, status, query + body[:500])
+            # LocalProtocol.refusedAsNotLoaded reads exactly this field and ending.
+            self.assertTrue(json.loads(body)["error"]["message"].endswith(" is not loaded"), query + body[:500])
+            self.assertEqual("unloaded", self.status(STUB_MODEL)["value"], query)
+            self.assertFalse(self.status(STUB_MODEL).get("failed"), query)
+
+        # Positive control: the same request that asks does start a load, so the checks above can fail.
+        status, body = self.chat(STUB_MODEL, "?autoload=true")
+        self.assertNotEqual(200, status, body[:500])
+        self.assertTrue(self.status(STUB_MODEL).get("failed"), body[:500])
 
 
 if __name__ == "__main__":

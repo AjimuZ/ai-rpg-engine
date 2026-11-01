@@ -231,6 +231,9 @@ class ComposeTest(unittest.TestCase):
         command = server["command"]
         self.assertEqual("/models", command[command.index("--models-dir") + 1])
         self.assertEqual("1", command[command.index("--models-max") + 1])
+        # A chat request must not load a model beside a running batch; test_model_server.py runs this flag.
+        self.assertIn("--no-models-autoload", command)
+        self.assertNotIn("--models-autoload", command)
         # An explicit model argument would disable router mode, and a fetch path would need egress.
         for forbidden in ("--model", "-m", "--hf-repo", "-hf", "--model-url", "-mu"):
             self.assertNotIn(forbidden, command)

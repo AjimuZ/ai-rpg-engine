@@ -41,6 +41,7 @@ final class LocalProtocol {
     static final String CONTROL_LOAD_PATH = "/models/load";
     static final String CONTROL_UNLOAD_PATH = "/models/unload";
     private static final String CONTROL_MALFORMED = "control-malformed";
+    private static final String NOT_LOADED = " is not loaded";
 
     private LocalProtocol() {
     }
@@ -96,6 +97,31 @@ final class LocalProtocol {
         ObjectNode format = body.putObject("response_format").put("type", "json_schema");
         format.putObject("json_schema").put("name", "task_output").put("strict", true).set("schema", schema);
         return body;
+    }
+
+    /**
+     * The packaged router loads nothing on a chat request unless the request asks, which
+     * {@code test_model_server.py} runs on the pinned image. Every request still says what it wants, so a
+     * router the owner started with automatic loading on is asked the same; that combination has not run.
+     *
+     * @param mayLoad whether the router may load the named model for this request
+     * @return the chat route with that choice
+     */
+    static String chatPath(boolean mayLoad) {
+        return CHAT_PATH + "?autoload=" + mayLoad;
+    }
+
+    /**
+     * @param json mapper
+     * @param body the body of a refused chat request; any shape is accepted, and its text goes no further
+     * @return whether the router refused because the named model is not loaded, as build b11960 words it
+     */
+    static boolean refusedAsNotLoaded(JsonMapper json, byte[] body) {
+        try {
+            return json.readTree(body).path("error").path("message").asString("").endsWith(NOT_LOADED);
+        } catch (JacksonException malformed) {
+            return false;
+        }
     }
 
     /**

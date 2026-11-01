@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.Locale;
 import org.springframework.boot.convert.DurationStyle;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.PropertyResolver;
 
 /**
  * Validated adapter settings, read once from {@code engine.inference.local.*}. Values are owner
@@ -23,11 +24,26 @@ import org.springframework.core.env.Environment;
  * @param temperature sampling temperature sent on every request (0–2)
  * @param topP top-p sent on every request (above 0, at most 1)
  * @param topK top-k sent on every request (0–1000)
+ * @param chatMayLoad whether a chat request asks the server to load its model; false with the admission
+ *        switch on, where only a lease may load, and true otherwise, where nothing else would load it
  */
 record LocalSettings(String baseUrl, int queueCapacity, Duration requestTimeout, Duration reconnectInitial,
         Duration reconnectMax, Duration catalogInterval, int maxSessions, long maxConversationBytes,
-        double temperature, double topP, int topK) {
+        double temperature, double topP, int topK, boolean chatMayLoad) {
     static final String PREFIX = "engine.inference.local.";
+    private static final String ADMISSION_SWITCH = "engine.inference.admission.enabled";
+
+    /**
+     * The switch is read here by its name because this package may not import the admission package, which
+     * stops startup on any value other than {@code true} or {@code false}.
+     *
+     * @param properties source of the switch
+     * @return whether the admission switch is on: only {@code true} is on
+     */
+    static boolean admissionOn(PropertyResolver properties) {
+        String text = properties.getProperty(ADMISSION_SWITCH);
+        return text != null && text.strip().equalsIgnoreCase("true");
+    }
 
     /**
      * @param environment Spring environment
@@ -56,7 +72,7 @@ record LocalSettings(String baseUrl, int queueCapacity, Duration requestTimeout,
                 duration(environment, "reconnect-initial", Duration.ofSeconds(1)),
                 duration(environment, "reconnect-max", Duration.ofSeconds(30)),
                 duration(environment, "catalog-interval", Duration.ofSeconds(5)), sessions, conversation, temperature,
-                topP, topK);
+                topP, topK, !admissionOn(environment));
     }
 
     /** @return the URI of a server route, which starts with a slash */

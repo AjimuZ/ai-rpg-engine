@@ -51,6 +51,8 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>Per task: {@link ProfileResolver} resolves the slot afresh to a pair that must be in that list
  * (and the owner's allowlist, when set). The request names the model, effort, reply limit, sampling
  * and output schema explicitly, so nothing is inherited from an earlier task or the server's defaults.
+ * It also says whether the server may load that model: never with the admission switch on, where only a
+ * lease loads, so a task with no lease behind it ends UNAVAILABLE ({@code model-not-loaded}).
  * The reply is returned as untrusted text: the contract runner validates it exactly as it validates
  * any other adapter's output, and this class never judges its content.
  *
@@ -422,7 +424,7 @@ final class LocalTaskAdapter implements NarrationTaskPort, SmartLifecycle {
                 effective.model(), effective.effort(), resolved.degradedFrom());
         byte[] body = json.writeValueAsBytes(LocalProtocol.chatBody(json, effective, conversation.messages,
                 request.instructions(), schema, maxTokens(resolved.slot()), settings));
-        HttpRequest http = HttpRequest.newBuilder(settings.uri(LocalProtocol.CHAT_PATH))
+        HttpRequest http = HttpRequest.newBuilder(settings.uri(LocalProtocol.chatPath(settings.chatMayLoad())))
                 .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofByteArray(body)).build();
         TaskResult result = exchange(job, http, provenance, fresh);
         if (result.status() == Status.COMPLETED) {
@@ -479,6 +481,10 @@ final class LocalTaskAdapter implements NarrationTaskPort, SmartLifecycle {
         }
         if (code >= 500) {
             return new TaskResult(id, Status.FAILED, null, "model-server-error", provenance, fresh);
+        }
+        if (code == 400 && LocalProtocol.refusedAsNotLoaded(json, response.body())) {
+            // No turn ran and the conversation is not at fault, so the session must not be retired.
+            return TaskResult.withoutTurn(id, Status.UNAVAILABLE, "model-not-loaded");
         }
         if (code != 200) {
             // Provenance makes the registry retire the session, because an oversized history is a likely cause.

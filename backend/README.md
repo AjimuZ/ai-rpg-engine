@@ -1275,7 +1275,9 @@ reason `SLOT_CHANGED`). Tests use `ScriptedModelServer`, a scripted HTTP fixture
 `engine.inference.admission.enabled=true` (default `false`; it needs `engine.inference.local.url` and
 `engine.inference.admission.gpu-budget-mib`) builds the admission coordinator and the lease executor over the local
 server's control and runs them: a task on a local slot that holds the scheduler's permit loads its model through the
-executor before its turn and releases it afterwards. With the switch off the scheduler behaves as before. The same
+executor before its turn and releases it afterwards, and a chat request asks the server not to load anything (a refusal
+ends `model-not-loaded`). With the switch off the scheduler behaves as before, and a chat request asks the packaged server,
+which otherwise loads nothing for it, to load its model. The same
 switch adds an `ImageAdmission` bean, which runs an image job on a lease as a stepped job and ends it with a fixed
 failure code when it cannot run, so the caller shows catalog art. No code calls it yet, and without the bean a caller
 uses `ImageAdmission.direct()`, which calls the adapter. With the switch on, `engine.inference.image-worker.url` (unset by

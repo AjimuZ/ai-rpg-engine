@@ -22,8 +22,7 @@ class LocalControlConfiguration {
     static final class AdmissionOn implements Condition {
         @Override
         public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
-            String text = context.getEnvironment().getProperty("engine.inference.admission.enabled");
-            return text != null && text.strip().equalsIgnoreCase("true");
+            return LocalSettings.admissionOn(context.getEnvironment());
         }
     }
 

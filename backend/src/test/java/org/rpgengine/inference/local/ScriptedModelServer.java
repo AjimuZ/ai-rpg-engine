@@ -38,6 +38,7 @@ public final class ScriptedModelServer implements AutoCloseable {
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final Queue<Consumer<HttpExchange>> script = new ConcurrentLinkedQueue<>();
     private final List<JsonNode> chats = Collections.synchronizedList(new ArrayList<>());
+    private final List<String> chatPaths = Collections.synchronizedList(new ArrayList<>());
     private final CountDownLatch closing = new CountDownLatch(1);
     private final AtomicBoolean closed = new AtomicBoolean();
     private volatile String catalogBody;
@@ -65,6 +66,7 @@ public final class ScriptedModelServer implements AutoCloseable {
         server.createContext("/v1/models", exchange -> respond(exchange, catalogStatus, catalogBody));
         server.createContext("/v1/chat/completions", exchange -> {
             chats.add(JSON.readTree(exchange.getRequestBody().readAllBytes()));
+            chatPaths.add(exchange.getRequestURI().toString());
             Consumer<HttpExchange> reply = script.poll();
             if (reply == null) {
                 respond(exchange, 500, "{\"error\":\"script exhausted\"}");
@@ -242,6 +244,13 @@ public final class ScriptedModelServer implements AutoCloseable {
     public List<JsonNode> chats() {
         synchronized (chats) {
             return List.copyOf(chats);
+        }
+    }
+
+    /** @return a copy of the chat request paths with their queries, oldest first */
+    public List<String> chatPaths() {
+        synchronized (chatPaths) {
+            return List.copyOf(chatPaths);
         }
     }
 

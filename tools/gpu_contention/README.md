@@ -38,7 +38,8 @@ be `unavailable`), `1` the run failed and no file was kept, `2` bad arguments.
   `POST /v1/chat/completions`; image: `POST /sdapi/v1/txt2img`; speech:
   `POST /v1/audio/speech`. Each path can be changed with `--text-path`, `--image-path` and
   `--speech-path`. Give at least one URL. The harness counts HTTP statuses and fixed error codes
-  and keeps no response body.
+  and keeps no response body. The packaged model server loads nothing for a plain chat request, so its
+  model must already be loaded, or every text request counts as a 400.
 - **Unowned competitor.** `--competitor PROGRAM` with repeatable `--competitor-arg` is started
   without a shell `--competitor-start-after` seconds into the run and stopped when the load ends.
   The harness contains no GPU code; you supply the program that takes memory outside the engine.

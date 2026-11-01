@@ -42,8 +42,12 @@ control, an immediate refusal of an outbound connection, read-only mounts and, w
 `nvidia-smi` it drops the GPU request through an override and reports the device case
 as skipped. It loads no model. Its route-parser cases need no Docker and always run.
 Without the image it follows the table under [Hosts without Docker](#hosts-without-docker).
+`ModelServerLoadingTest` (P21.4-E.3) puts one file that is not a model in that directory and requires
+that a chat request, plain or with `?autoload=false`, gets a 400 ending ` is not loaded` and leaves no load attempt in `GET
+/models`, while `?autoload=true` does start one. No test here loads real weights.
 `model_probe.py` (P21.2-C) is the readiness and narration probe harness: `py -B
-tools/container_packaging/model_probe.py --base-url URL --model ID [--probes FILE]`. It calls `GET /health`, then
+tools/container_packaging/model_probe.py --base-url URL --model ID [--probes FILE]`. The packaged server loads nothing
+for it (P21.4-E.3), so load the model first with `POST /models/load`. It calls `GET /health`, then
 sends each probe of `probes/narration-probes.json` (four tasks, each in English and Italian) to
 `/v1/chat/completions` with a strict `json_schema` response format, checks the reply against the probe's schema with
 its own checker for a keyword subset (an unsupported keyword raises instead of passing), and prints one `PASS` or `FAIL`

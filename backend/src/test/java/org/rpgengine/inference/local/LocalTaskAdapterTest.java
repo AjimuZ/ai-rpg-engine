@@ -283,6 +283,54 @@ class LocalTaskAdapterTest {
     }
 
     @Test
+    void aChatRequestAsksTheServerToLoadOnlyWithTheAdmissionSwitchOff() throws Exception {
+        server.answers("{\"off\":1}").answers("{\"false\":1}").answers("{\"on\":1}").answers("{\"spaced\":1}");
+        assertThat(run().status()).isEqualTo(Status.COMPLETED);
+        for (String value : List.of("false", "true", " TRUE ")) {
+            adapter = started(settings(server.url()).withProperty("engine.inference.admission.enabled", value));
+            assertThat(run().status()).as(value).isEqualTo(Status.COMPLETED);
+        }
+        assertThat(server.chatPaths()).containsExactly("/v1/chat/completions?autoload=true",
+                "/v1/chat/completions?autoload=true", "/v1/chat/completions?autoload=false",
+                "/v1/chat/completions?autoload=false");
+    }
+
+    @Test
+    void aRefusalBecauseTheModelIsNotLoadedRunsNoTurnAndKeepsTheSession() throws Exception {
+        // The wording test_model_server.py requires from the pinned image.
+        String refusal = "{\"error\":{\"code\":400,\"message\":\"model '" + SERVER_SECRET + "' is not loaded\","
+                + "\"type\":\"invalid_request_error\"}}";
+        server.answers("first reply").replies(400, refusal).answers("third reply");
+        UUID session = UUID.randomUUID();
+        assertThat(run(session, InferenceSlot.STANDARD, "first").status()).isEqualTo(Status.COMPLETED);
+
+        TaskResult refused = run(session, InferenceSlot.STANDARD, "second");
+
+        assertThat(refused.status()).isEqualTo(Status.UNAVAILABLE);
+        assertThat(refused.errorCode()).isEqualTo("model-not-loaded");
+        assertThat(refused.provenance()).isNull();
+        assertThat(refused.toString()).doesNotContain(SERVER_SECRET);
+        assertThat(server.controlPaths()).isEmpty();
+        assertThat(run(session, InferenceSlot.STANDARD, "third").freshSession()).isFalse();
+        assertThat(server.lastMessages()).containsExactly("first", "first reply", "third");
+    }
+
+    @Test
+    void onlyThatExactRefusalCountsAsNotLoaded() throws Exception {
+        for (String body : List.of("not json", "[]", "{\"error\":\"model is not loaded\"}",
+                "{\"message\":\"model is not loaded\"}", "{\"error\":{\"message\":\"model is not loaded yet\"}}",
+                "{\"error\":{\"message\":7}}")) {
+            server.replies(400, body);
+            TaskResult result = run();
+            assertThat(result.status()).as(body).isEqualTo(Status.FAILED);
+            assertThat(result.errorCode()).as(body).isEqualTo("turn-rejected");
+        }
+        // Any other status is what it was, whatever the body says.
+        server.replies(404, "{\"error\":{\"message\":\"model is not loaded\"}}");
+        assertThat(run().errorCode()).isEqualTo("turn-rejected");
+    }
+
+    @Test
     void aFailedTaskLeavesNothingInTheConversation() throws Exception {
         server.replies(500, "{}").answers("reply");
         UUID session = UUID.randomUUID();

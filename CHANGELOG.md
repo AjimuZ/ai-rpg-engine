@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — A chat request no longer loads a model beside a batch (P21.4-E.3), 1 November 2026
+
+- The packaged model server now starts with `--no-models-autoload`, so a chat request loads nothing unless it asks. The engine
+  asks only with `engine.inference.admission.enabled` off, where a local turn still loads its model as before. With the switch
+  on, only a lease loads, and a task whose model is not loaded ends `UNAVAILABLE` with `model-not-loaded`, without a turn, and
+  keeps its session. `model_probe.py` and `tools/gpu_contention` now need their model loaded first with `POST /models/load`.
+  The pinned b11960 image was shown to refuse such a request and to start no load, using a file that is not a model. No real
+  weights, batch or engine took part. See
+  [docs/34](docs/34-inference-backends-and-model-selection.md#p214-e3-no-model-loads-from-a-chat-request-beside-a-batch).
+
 ## Unreleased — Image batches wait while the player reads (P21.4-E.2), 1 November 2026
 
 - With `engine.inference.admission.enabled` on, an image batch no longer starts within a reading window after a player's text

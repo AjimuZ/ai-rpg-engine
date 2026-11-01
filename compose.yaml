@@ -142,8 +142,10 @@ services:
     # Docker applies this request when the service starts; no other service depends on it.
     gpus: all
     # Without a loaded model router mode needs no tuning; layers, context and cache
-    # flags come from later P21.2 measurements.
-    command: [--host, 0.0.0.0, --port, "8080", --models-dir, /models, --models-max, "1"]
+    # flags come from later P21.2 measurements. Automatic loading stays off so that a chat
+    # request cannot put a model beside a running batch: only POST /models/load, or a request
+    # that asks with ?autoload=true (the engine does only with the lease switch off), loads.
+    command: [--host, 0.0.0.0, --port, "8080", --models-dir, /models, --models-max, "1", --no-models-autoload]
     environment:
       # User 65534 has no writable home; keep the server's cache lookup on tmpfs.
       LLAMA_CACHE: /tmp/llama-cache

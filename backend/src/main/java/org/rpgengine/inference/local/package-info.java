@@ -3,7 +3,8 @@
  * decisions 1 and 5, docs/34 section 7). Contents:
  * <ul>
  *   <li>{@code LocalSettings}: validated {@code engine.inference.local.*} settings;</li>
- *   <li>{@code LocalProtocol}: the request builder and strict parsers of the HTTP chat API;</li>
+ *   <li>{@code LocalProtocol}: the request builder and strict parsers of the HTTP chat API, including
+ *       each request's choice on whether the server may load its model;</li>
  *   <li>{@code BoundedBody}: a response body subscriber with a size limit;</li>
  *   <li>{@code LocalTaskAdapter}: bounded admission, one request at a time, per-session
  *       conversations, cancellation and deadlines;</li>
