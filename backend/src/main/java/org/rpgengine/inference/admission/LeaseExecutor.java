@@ -459,8 +459,8 @@ public final class LeaseExecutor {
 
     /**
      * Counters and gauges under fixed names, numbers only: no key, endpoint, model name, prompt or output
-     * can appear here. This in-process snapshot is the only exposure; no route or actuator endpoint reads it.
-     * It waits while a swap holds the monitor.
+     * can appear here. Outside the process only {@link AdmissionMetricsController} reads it, owner-only and
+     * while the opt-in switch is on; no actuator endpoint does. It waits while a swap holds the monitor.
      *
      * @return every metric by name, sorted
      */

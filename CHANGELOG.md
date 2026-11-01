@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Lease executor metrics route (P21.4-C.1.3.1), 1 November 2026
+
+- With `engine.inference.admission.enabled` on, the owner can read the lease executor's counters at
+  `GET /api/v1/models/admission-metrics` as sorted JSON of fixed names and numbers. With the switch off the route does not
+  exist. A request without the owner is refused with 403 `LOCAL_ADMISSION_DENIED`. Tested without a real HTTP request or
+  GPU. See [docs/34](docs/34-inference-backends-and-model-selection.md#10-shared-admission-and-speed).
+
 ## Unreleased — Image requests through the lease executor (P21.4-C.1.2.2.2), 1 November 2026
 
 - With `engine.inference.admission.enabled` on, a new `ImageAdmission` path runs an image request on a lease, as a stepped job
