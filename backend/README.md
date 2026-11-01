@@ -1193,6 +1193,17 @@ only the frozen encounter. V25 stores the participant's `effects`, `reaction_pol
 Limits: items cannot apply or remove effects and stay single-target; no forced movement; other participants use no abilities until
 P12.3/P12.4; remaining effects are not converted at settlement yet (P11.5); no frontend control (P12).
 
+## Terminal predicates (P11.5)
+
+`EncounterOutcome.decide` is a pure function of `EncounterState`, which now carries the frozen objectives: defeat, then a met
+reach-zone, survive or protect objective, then no active hostile, then an escape zone
+([ADR 0032](../docs/adr/0032-terminal-predicates-from-committed-state.md)). `CombatScheduler` applies it from `RESOLVING`,
+`ACTOR_START` and `ROUND_END`, stores `OUTCOME_PENDING` and writes `ENCOUNTER_OUTCOME_PENDING`; `CommandReceipts` allowlists
+`combat.outcome`. No migration was needed. Tests: `EncounterOutcomeTest` (pure) and `OutcomeCommandsTest` (PostgreSQL).
+
+Limits: surrender, negotiated ends, the stalemate policy, Withdraw and settlement are not implemented, so nothing leaves
+`OUTCOME_PENDING` and the campaign stays in encounter mode there; a round left unfinished adds no time.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

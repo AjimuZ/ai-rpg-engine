@@ -187,6 +187,18 @@ class EventStatementsTest {
         assertEquals("bandit si mette in guardia: +2 alla Guardia (1 punto azione).", state(SupportedLocale.IT, "GUARD_RAISED", guard));
         assertEquals("raider is defeated.", state(SupportedLocale.EN, "PARTICIPANT_DEFEATED", "{\"participantId\":\"raider\"}"));
         assertEquals("raider è fuori combattimento.", state(SupportedLocale.IT, "PARTICIPANT_DEFEATED", "{\"participantId\":\"raider\"}"));
+        assertEquals("No opponent remains in the fight: it is won.", state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"VICTORY\"}"));
+        assertEquals("Nessun avversario resta in combattimento: lo scontro è vinto.", state(SupportedLocale.IT, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"VICTORY\"}"));
+        assertEquals("The protagonist is down: the fight is lost.", state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"DEFEAT\"}"));
+        assertEquals("Il personaggio protagonista è fuori combattimento: lo scontro è perso.", state(SupportedLocale.IT, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"DEFEAT\"}"));
+        assertEquals("The way out is reached: the fight is left behind.", state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"ESCAPE\"}"));
+        assertEquals("La via di fuga è raggiunta: lo scontro resta alle spalle.", state(SupportedLocale.IT, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"ESCAPE\"}"));
+        String met = "{\"outcome\":\"OBJECTIVE\",\"objectiveId\":\"hold\"}";
+        assertEquals("Objective hold is met: the fight ends.", state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", met));
+        assertEquals("L'obiettivo hold è raggiunto: lo scontro termina.", state(SupportedLocale.IT, "ENCOUNTER_OUTCOME_PENDING", met));
+        assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"OBJECTIVE\"}"));
+        assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"PEACE\"}"));
+        assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{}"));
         String lapse = "{\"actorId\":\"" + PLAYER + "\",\"targetId\":\"raider\",\"reason\":\"OUT_OF_RANGE\"}";
         assertEquals("Mira's opening strike against raider cannot be made.", state(SupportedLocale.EN, "OPENING_STRIKE_LAPSED", lapse));
         assertEquals("L'attacco d'apertura di Mira contro raider non può essere portato.", state(SupportedLocale.IT, "OPENING_STRIKE_LAPSED", lapse));

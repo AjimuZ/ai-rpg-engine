@@ -135,20 +135,20 @@ class CombatSchedulerTest {
         assertEquals(TacticalRules.Refusal.TURN, TacticalRules.refusal(capped, new TacticalIntent.MoveZone("yard")));
     }
 
-    /** Participants who no longer stand are skipped; a round without a standing player ends and stops. */
+    /** Participants who no longer stand are skipped; a fight without a standing player stops at its outcome. */
     @Test
     void onlyStandingParticipantsActivate() throws Exception {
-        var downed = status(entering("trail-ambush"), "raider", EncounterState.Status.DEFEATED);
-        var plan = CombatScheduler.apply(downed, new TacticalIntent.RollInitiative(), dice(1, 1, 9, 9));
+        var downed = status(entering("toll-parley"), "keeper", EncounterState.Status.DEFEATED);
+        var plan = CombatScheduler.apply(downed, new TacticalIntent.RollInitiative(), dice(9, 9, 1, 1, 1, 1));
         assertEquals(List.of("INITIATIVE_ROLLED", "ROUND_STARTED", "ACTIVATION_STARTED"), types(plan));
-        assertEquals(0, update(plan, "raider").reactions(), "no reaction budget for a defeated participant");
+        assertEquals(0, update(plan, "keeper").reactions(), "no reaction budget for a defeated participant");
         var next = CombatScheduler.apply(after(downed, plan), new TacticalIntent.EndActivation(), dice());
-        assertTrue(next.notes().stream().noneMatch(note -> "raider".equals(note.payload().get("participantId"))));
+        assertTrue(next.notes().stream().noneMatch(note -> "keeper".equals(note.payload().get("participantId"))));
         assertEquals(2, next.last().round());
         var alone = status(entering("trail-ambush"), "player", EncounterState.Status.DEFEATED);
         var stopped = CombatScheduler.apply(alone, new TacticalIntent.RollInitiative(), dice(9, 9, 1, 1));
-        assertEquals(EncounterPhase.ROUND_END, stopped.last().phase(), "no decision exists without a standing player");
-        assertEquals(8L, stopped.elapsedSeconds());
+        assertEquals(EncounterPhase.OUTCOME_PENDING, stopped.last().phase(), "no decision exists without a standing player");
+        assertEquals(0L, stopped.elapsedSeconds());
         assertEquals(1, stopped.last().round());
     }
 
@@ -168,10 +168,10 @@ class CombatSchedulerTest {
         var yard = after(state, plan);
         assertEquals(TacticalRules.Refusal.ZONE, TacticalRules.refusal(yard, new TacticalIntent.MoveZone("yard")));
         assertEquals(TacticalRules.Refusal.ZONE, TacticalRules.refusal(yard, new TacticalIntent.MoveZone("cellar")));
-        var tired = after(yard, CombatScheduler.apply(yard, new TacticalIntent.MoveZone("escape-route"), dice()));
+        var tired = after(yard, CombatScheduler.apply(yard, new TacticalIntent.MoveZone("entry"), dice()));
         assertEquals(1, tired.actionPoints());
         assertEquals(TacticalRules.Refusal.ACTION_POINTS, TacticalRules.refusal(tired,
-                new TacticalIntent.MoveZone("entry")), "the difficult edge back costs 2");
+                new TacticalIntent.MoveZone("escape-route")), "the difficult edge costs 2");
         // A zone at capacity cannot be entered.
         var crowded = space(state, "yard", 1);
         assertEquals(TacticalRules.Refusal.ZONE, TacticalRules.refusal(crowded, new TacticalIntent.MoveZone("yard")));

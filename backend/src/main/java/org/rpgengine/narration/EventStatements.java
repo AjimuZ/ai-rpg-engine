@@ -322,6 +322,23 @@ public final class EventStatements {
                 yield participant == null ? null
                         : it ? participant + " è fuori combattimento." : participant + " is defeated.";
             }
+            case "ENCOUNTER_OUTCOME_PENDING" -> {
+                // P11.5: the verdict of the terminal predicates; settlement and its consequences are later events.
+                String outcome = token(payload, "outcome");
+                String objective = token(payload, "objectiveId");
+                yield switch (outcome == null ? "" : outcome) {
+                    case "VICTORY" -> it ? "Nessun avversario resta in combattimento: lo scontro è vinto."
+                            : "No opponent remains in the fight: it is won.";
+                    case "DEFEAT" -> it ? "Il personaggio protagonista è fuori combattimento: lo scontro è perso."
+                            : "The protagonist is down: the fight is lost.";
+                    case "ESCAPE" -> it ? "La via di fuga è raggiunta: lo scontro resta alle spalle."
+                            : "The way out is reached: the fight is left behind.";
+                    case "OBJECTIVE" -> objective == null ? null
+                            : it ? "L'obiettivo " + objective + " è raggiunto: lo scontro termina."
+                            : "Objective " + objective + " is met: the fight ends.";
+                    default -> null;
+                };
+            }
             case "COMBAT_ITEM_USED" -> {
                 String participant = participant(payload, names);
                 String item = token(payload, "definitionId");

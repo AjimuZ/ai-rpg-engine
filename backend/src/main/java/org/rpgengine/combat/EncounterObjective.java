@@ -10,8 +10,8 @@ import java.util.Set;
  * One frozen encounter objective and its pure evaluation (P11.1, docs/11 sections 13-14, docs/12 section 3).
  * Objectives are structured predicates over the encounter's mechanical state, never prose: a narration that
  * says the gate was reached establishes nothing. Evaluation reads a {@link Progress} view and returns
- * {@link Status#MET}, {@link Status#PENDING} or {@link Status#FAILED}; turning statuses into an outcome and
- * settling it exactly once is P11.5.
+ * {@link Status#MET}, {@link Status#PENDING} or {@link Status#FAILED}; {@link EncounterOutcome} turns statuses into
+ * an outcome, and settling it exactly once is later P11.5 work.
  *
  * <p>Semantics, all for the player's side:
  * <ul>
@@ -140,6 +140,19 @@ public record EncounterObjective(String id, Kind kind, String zone, String parti
             case PROTECT -> progress.defeated(participant) ? Status.FAILED
                     : progress.hostilesActive() ? Status.PENDING : Status.MET;
         };
+    }
+
+    /**
+     * Read a stored frozen objective back.
+     *
+     * @param form parsed {@link #canonicalForm}
+     * @return the objective
+     * @throws ClassCastException or {@link IllegalArgumentException} for a malformed form
+     */
+    public static EncounterObjective fromCanonical(Map<?, ?> form) {
+        return new EncounterObjective((String) form.get("id"), Kind.parse((String) form.get("kind")),
+                (String) form.get("zone"), (String) form.get("participant"),
+                form.get("rounds") == null ? 0 : ((Number) form.get("rounds")).intValue());
     }
 
     /** @return the frozen form: ID, wire kind and only the parameter the kind uses */

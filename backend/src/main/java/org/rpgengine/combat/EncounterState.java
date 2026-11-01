@@ -20,8 +20,9 @@ import org.rpgengine.rules.ZoneGraph;
  * the row versions recorded here.
  *
  * <p>Invariants (also enforced by V22/V23): {@code cursor} and {@code actionPoints} are set exactly while an
- * activation is in progress (phases {@code ACTOR_START} through {@code ACTOR_END}); initiative ranks are a
- * permutation of {@code 0..n-1} once initiative is rolled and absent before.
+ * activation is in progress (phases {@code ACTOR_START} through {@code ACTOR_END}) and at a {@code OUTCOME_PENDING} the
+ * fight reached inside a round; initiative ranks are a permutation of {@code 0..n-1} once initiative is rolled and
+ * absent before.
  *
  * @param id encounter identity
  * @param rowVersion storage version of the encounter row
@@ -42,12 +43,23 @@ import org.rpgengine.rules.ZoneGraph;
  * @param ammunition the player's unworn stacks of the items its frozen attacks consume, in identity order (P11.3)
  * @param effects frozen effect definitions the fight can reach, by canonical ID (P11.4)
  * @param effectsApplied the encounter's application counter: how many effect instances it has created (P11.4)
+ * @param objectives frozen objectives in declared order (P11.5)
  */
 public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int round, Integer cursor,
         Integer actionPoints, int speechUsed, List<EncounterAction.Passage> passages, CombatProfile profile,
         ZoneGraph frozenSpace, Set<String> escapeZones, List<EncounterAction> actions, OpeningPolicy opening,
         String openingTarget, String openingStatus, List<Combatant> participants, List<Ammunition> ammunition,
-        Map<String, CombatEffect> effects, int effectsApplied) {
+        Map<String, CombatEffect> effects, int effectsApplied, List<EncounterObjective> objectives) {
+    /** Tactical state without objectives, the shape used before P11.5; the structural predicates still apply to it. */
+    public EncounterState(UUID id, long rowVersion, EncounterPhase phase, int round, Integer cursor,
+            Integer actionPoints, int speechUsed, List<EncounterAction.Passage> passages, CombatProfile profile,
+            ZoneGraph frozenSpace, Set<String> escapeZones, List<EncounterAction> actions, OpeningPolicy opening,
+            String openingTarget, String openingStatus, List<Combatant> participants, List<Ammunition> ammunition,
+            Map<String, CombatEffect> effects, int effectsApplied) {
+        this(id, rowVersion, phase, round, cursor, actionPoints, speechUsed, passages, profile, frozenSpace, escapeZones,
+                actions, opening, openingTarget, openingStatus, participants, ammunition, effects, effectsApplied, List.of());
+    }
+
     /** Tactical state without effects, the shape used before P11.4. */
     public EncounterState(UUID id, long rowVersion, EncounterPhase phase, int round, Integer cursor,
             Integer actionPoints, int speechUsed, List<EncounterAction.Passage> passages, CombatProfile profile,
@@ -281,6 +293,7 @@ public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int
         participants = List.copyOf(participants);
         ammunition = List.copyOf(ammunition);
         effects = Map.copyOf(effects);
+        objectives = List.copyOf(objectives);
         if ((cursor == null) != (actionPoints == null)) {
             throw new IllegalArgumentException("cursor and action points are set together");
         }

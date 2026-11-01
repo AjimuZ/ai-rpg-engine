@@ -216,7 +216,7 @@ class CombatReactionsTest {
                 plan.notes().stream().map(TacticalPlan.Note::type).toList(), "the attack's record comes before its answer");
     }
 
-    /** A counter can fell the player during its own action: the activation ends and the schedule goes on. */
+    /** A counter can fell the player during its own action: the fight ends there, inside the action. */
     @Test
     void aCounterCanFellThePlayer() {
         var heavy = new CombatAttack("heavy", "force", 1, 1, 6, "force", 20, 0, 0, CombatAttack.Defense.GUARD, false, null);
@@ -226,7 +226,7 @@ class CombatReactionsTest {
         var after = after(state, plan);
         assertEquals(0, after.player().health());
         assertEquals(EncounterState.Status.DEFEATED, after.player().status());
-        assertEquals(EncounterPhase.ROUND_END, after.phase(), "no decision is left for a player who fell");
+        assertEquals(EncounterPhase.OUTCOME_PENDING, after.phase(), "no decision is left for a player who fell");
         assertEquals(-5, plan.playerHealthDelta());
     }
 
@@ -507,7 +507,8 @@ class CombatReactionsTest {
     @Test
     void aTargetFellingBeforeTheRollEndsTheAttack() {
         var burn = tick("burn", Phase.PRE_ROLL, 5, false);
-        var state = library(fight(values(), player().attacks(BLADE), foe("foe").guard(0).health(3, 9).holding(active(burn, 1, 0))), burn);
+        var state = library(fight(values(), player().attacks(BLADE), foe("foe").guard(0).health(3, 9).holding(active(burn, 1, 0)),
+                foe("other")), burn);
         var plan = CombatScheduler.apply(state, strike("blade", "foe"), script());
         var after = after(state, plan);
         assertEquals(EncounterState.Status.DEFEATED, after.participant("foe").status());
@@ -535,7 +536,7 @@ class CombatReactionsTest {
     void aPoisonedDefeatedActorCannotAct() {
         var poison = tick("poison", Phase.ACTIVATION_START, 5, false);
         var state = library(fight(values(), player().attacks(BLADE),
-                foe("foe").health(3, 9).attacks(CLAW).holding(active(poison, 1, 0))), poison);
+                foe("foe").health(3, 9).attacks(CLAW).holding(active(poison, 1, 0)), foe("other")), poison);
         var plan = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script());
         var after = after(state, plan);
         assertEquals(EncounterState.Status.DEFEATED, after.participant("foe").status());
@@ -555,7 +556,8 @@ class CombatReactionsTest {
         var plan = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script());
         var after = after(state, plan);
         assertEquals(EncounterState.Status.DEFEATED, after.player().status());
-        assertEquals(EncounterPhase.ROUND_END, after.phase());
+        assertEquals(EncounterPhase.OUTCOME_PENDING, after.phase());
+        assertEquals(EncounterPhase.ACTOR_START, plan.steps().get(plan.steps().size() - 2).phase(), "the start leads straight to the outcome");
         assertFalse(after.playerDecision());
     }
 

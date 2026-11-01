@@ -121,6 +121,9 @@ public final class EncounterWriter {
             var space = ZoneGraph.fromCanonical((Map<?, ?>) definition.get("space"));
             var escapes = new java.util.TreeSet<String>();
             ((List<?>) definition.get("escapeZones")).forEach(zone -> escapes.add((String) zone));
+            var objectives = new ArrayList<EncounterObjective>();
+            ((List<?>) definition.get("objectives")).forEach(objective ->
+                    objectives.add(EncounterObjective.fromCanonical((Map<?, ?>) objective)));
             var actions = new ArrayList<EncounterAction>();
             if (definition.get("actions") instanceof List<?> declared) {
                 declared.forEach(action -> actions.add(EncounterAction.fromCanonical((Map<?, ?>) action)));
@@ -198,7 +201,7 @@ public final class EncounterWriter {
             return Optional.of(new EncounterState(id, (Long) row[1], EncounterPhase.valueOf((String) row[2]), (Integer) row[3],
                     (Integer) row[4], (Integer) row[5], (Integer) row[6], passages, profile, space, escapes, actions,
                     OpeningPolicy.parse((String) row[10]), (String) row[11], (String) row[12], participants, ammunition,
-                    effects, (Integer) row[13]));
+                    effects, (Integer) row[13], objectives));
         } catch (RuntimeException unreadable) {
             throw new IllegalStateException("stored encounter " + id + " cannot be read back", unreadable);
         }

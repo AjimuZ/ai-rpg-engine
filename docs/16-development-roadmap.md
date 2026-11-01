@@ -3965,6 +3965,36 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     (P11.5); the Docker-dependent probe cases and `verify.sh containers`; a live V25 dump and restore; balance of the provisional
     numbers (P18.3); independent review of the two new Italian messages. Frontend weakenings do not apply: no frontend logic changed.
 - [ ] P11.5 Implement defeat, escape, surrender/agreement predicates, refused/counteroffered/explicitly accepted negotiation, stalemate policy and idempotent settlement; prose alone cannot establish an outcome.
+  - Package A, terminal predicates ([ADR 0032](adr/0032-terminal-predicates-from-committed-state.md)), partial progress of 1 November 2026: pure
+    `EncounterOutcome.decide` over `EncounterState`, which now carries the frozen objectives; `CombatScheduler` stops at `OUTCOME_PENDING`
+    from `RESOLVING`, `ACTOR_START` and `ROUND_END`; public `ENCOUNTER_OUTCOME_PENDING` with EN/IT statements; receipt `combat.outcome`. No migration.
+  - Remaining for this task, so its box stays unchecked: surrender and agreement predicates, refused, counteroffered and accepted
+    negotiation, the stalemate policy, idempotent settlement, the return to narrative, and the decision on Withdraw, Ready and Assess.
+  - Limits of this package: nothing leaves `OUTCOME_PENDING` until settlement exists, so a campaign whose fight ended stays in encounter
+    mode and refuses every command; a round left unfinished adds no world time; the player's status stays `ACTIVE` after an escape; hostiles
+    who all escaped or surrendered read as a victory, though no code sets those statuses yet; a surrendered player gets no verdict;
+    effects are not converted when a fight ends; objectives are alternatives by decision, and no pack can yet require all of them.
+  - Existing tests changed because the behavior they pinned was a documented limit of P11.3: the worked fight, `healthStopsAtZero`,
+    `otherLapses` and the fatal item of `CombatStrikeTest`; four cases of `CombatReactionsTest` (`aCounterCanFellThePlayer`,
+    `aTargetFellingBeforeTheRollEndsTheAttack`, `aPoisonedDefeatedActorCannotAct`, `aPlayerFellingAtItsOwnStartHasNoDecision`);
+    `CombatSchedulerTest.onlyStandingParticipantsActivate` and `StrikeCommandsTest.anOpponentStrikesUntilThePlayerFalls` now expect the outcome or keep
+    a second opponent standing; the long fight of `TacticalCommandsTest` holds back what could end it until round eight, then requires it to end;
+    `CombatSchedulerTest.movementFollowsTheZoneGraph` and `TacticalCommandsTest.movementSpendsItsDeclaredPoints` test the difficult edge from `entry`, since the zone beyond it now ends the fight. None was deleted or disabled.
+  - Verification (1 November 2026, JDK 21.0.12.1 and PostgreSQL 18.6 in the images pinned by ADR 0009, on the Windows reference host):
+    `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full` passed on this tree, the last time after the comments of `CombatScheduler`, `CommandRules` and two tests were corrected to the new behavior. Backend `clean verify -Ppackaged-ui` ran 1,447 tests
+    with 0 failures, 0 errors and 0 skipped (`PackagedInterfaceTest` included); frontend typecheck, unit tests, localization tests, production
+    and locale builds passed; repository tests 40 with 11 skipped, backup 9 with 1 skipped, runtime probe 116 with 18 skipped, Docker requirement 8,
+    hardware profile 12 and Compose 2.x rendering 12 in Linux containers. New: `EncounterOutcomeTest` (30, pure: each predicate, ties, words
+    deciding nothing, each scheduler path, 200 seeded fights, seed 20261101, over five fixture templates, each reaching `OUTCOME_PENDING` with
+    its invariants held, replaying identically and reaching all four outcomes) and `OutcomeCommandsTest` (7 on PostgreSQL: victory, defeat, escape,
+    reached zone, survived rounds with a fallen ally, words, the database arrows; retries of victory and defeat replay the same receipt and
+    write nothing, and every later command is refused without writing), plus additions to `EventStatementsTest`.
+  - Not proven here: **no deliberate weakening ran.** The session's shell refused the `docker run` that would have applied them to a copy inside
+    a throw-away container, so whether each new check fails a test is argued from reading the tests, not observed; a later session or the
+    owner must still run them. The runner written for this is `.local/scratch/p115a/` (ignored and not committed); it lists 57 weakenings, of
+    which `s-flush` and `s-next-speech` no longer apply, because those two production lines were removed as unneeded.
+    Also not proven: `verify.sh containers`; a retry through the HTTP layer; independent review of the four new Italian statements;
+    any terminal path back to narrative, which does not exist yet.
 - [ ] P11.6 Persist/recover every combat cursor, partial-round time boundary and combat-dialogue operation/transcript without duplicate social effects or settlement.
 
 **Exit:** seeded fights produce reproducible legal outcomes and all terminal paths return to a valid narrative state. **Checks:** QA-09, QA-11–13, effect properties and restore mid-round. **Suggested commit:** `Implement deterministic turn-based combat`.

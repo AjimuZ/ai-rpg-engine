@@ -367,6 +367,9 @@ docs/11 state machine (a trigger mirrors `EncounterPhase`), and a campaign has a
 `actor_resource`) and each template participant with encounter-local Health and Focus, a side, a zone and a
 status (`ACTIVE`, `DEFEATED`, `ESCAPED`, `SURRENDERED`). Initiative, activations, action points, reactions and
 effect timers were added by P11.2 to P11.4; the V16 checkpoint still records `"encounter": null` until P11.6.
+Since P11.5 ([ADR 0032](adr/0032-terminal-predicates-from-committed-state.md)) the scheduler stores `OUTCOME_PENDING` when
+a terminal predicate holds. No column stores the outcome: it follows from the row and is stated by a public event. The cursor
+stays set when the fight ended inside a round, and is empty when it ended at a round end.
 
 Since P11.2 (V23, [ADR 0029](adr/0029-initiative-rounds-activations-and-bounded-combat-dialogue.md)) the
 encounter row also holds the tactical cursor: `actor_cursor` (initiative rank of the acting participant) and

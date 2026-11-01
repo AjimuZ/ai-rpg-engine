@@ -20,6 +20,9 @@
  *
  * <p>Since P11.4 (ADR 0031) {@code CombatEffect} is a frozen timed effect, {@code CombatEffects} its pure stacking, order and
  * clock rules, {@code CombatReaction} a predeclared reaction with its policy and {@code CombatAbility} a frozen ability, which
- * the scheduler resolves with the same recorded draws. Settlement of a later task completes the fight.
+ * the scheduler resolves with the same recorded draws.
+ *
+ * <p>Since P11.5 (ADR 0032) {@code EncounterOutcome} holds the pure terminal predicates over an {@code EncounterState}, and the
+ * scheduler stops at {@code OUTCOME_PENDING} when one holds. Settlement of a later task completes the fight.
  */
 package org.rpgengine.combat;

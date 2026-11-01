@@ -122,10 +122,11 @@ class CombatStrikeTest {
         assertFalse(state.participant("bandit").guarding(), "a defeated participant holds no stance");
         assertTrue(last.notes().stream().anyMatch(n -> n.type().equals("PARTICIPANT_DEFEATED")));
 
-        // It takes no further activation: the next round goes straight back to the player.
-        var next = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), script());
-        assertEquals(3, after(state, next).round());
-        assertEquals(1, next.notes().stream().filter(n -> n.type().equals("ACTIVATION_STARTED")).count());
+        // The last opponent is down, so the fight is won: it stops here, with nothing left to decide or to wait for.
+        assertEquals(EncounterPhase.OUTCOME_PENDING, state.phase());
+        assertEquals("VICTORY", note(last, "ENCOUNTER_OUTCOME_PENDING").payload().get("outcome"));
+        assertEquals(0, last.elapsedSeconds(), "the second round did not complete");
+        assertEquals(TacticalRules.Refusal.TURN, TacticalRules.refusal(state, new TacticalIntent.EndActivation()));
     }
 
     /** Draws come in a fixed order with the attack's own dice: attack, damage, strong die; a miss draws only the attack. */
@@ -187,8 +188,8 @@ class CombatStrikeTest {
         assertEquals(0, next.participant("foe").health());
         assertEquals(3, note(plan, "STRIKE_RESOLVED").payload().get("damage"), "only the Health there was");
         assertEquals(EncounterState.Status.DEFEATED, next.participant("foe").status());
-        assertEquals(TacticalRules.Refusal.TARGET,
-                TacticalRules.refusal(next, new TacticalIntent.Strike("sword", "foe")), "a defeated target is illegal");
+        assertEquals(TacticalRules.Refusal.TURN,
+                TacticalRules.refusal(next, new TacticalIntent.Strike("sword", "foe")), "the fight is over with its only foe");
     }
 
     /** Every refusal of a strike, in the documented order, with nothing to spend. */
@@ -386,7 +387,7 @@ class CombatStrikeTest {
         }
     }
 
-    /** An unarmed player's opening lapses as such, and a player who fell before its slot loses the strike at round end. */
+    /** An unarmed player's opening lapses as such, and a player who fell before its slot loses the strike at the outcome. */
     @Test
     void otherLapses() throws Exception {
         var unarmed = withPlayerAttacks(fixture("close-rush", 24, "dummy"), List.of());
@@ -401,7 +402,7 @@ class CombatStrikeTest {
         assertEquals("RESOLVED", lost.last().openingStatus());
         assertEquals("ATTACKER_DOWN", note(lost, "OPENING_STRIKE_LAPSED").payload().get("reason"));
         assertEquals(EncounterState.Status.DEFEATED, next.player().status());
-        assertEquals(EncounterPhase.ROUND_END, next.phase(), "the schedule stops: no decision is left to take");
+        assertEquals(EncounterPhase.OUTCOME_PENDING, next.phase(), "the schedule stops: no decision is left to take");
         assertEquals(-1, lost.playerHealthDelta());
         assertEquals(TacticalRules.Refusal.TURN, TacticalRules.refusal(next, new TacticalIntent.Guard()));
     }
@@ -463,16 +464,16 @@ class CombatStrikeTest {
         assertEquals("salve", note(own, "COMBAT_ITEM_USED").payload().get("definitionId"));
         assertEquals(TacticalRules.Refusal.ACTION_POINTS, TacticalRules.refusal(points(state, 1), new TacticalIntent.UseItem(null)));
 
-        // An item that fells its user ends the activation and continues the schedule, drawing past the item's own dice.
+        // An item that fells its user ends the fight there: nothing runs on after it.
         var cudgel = new CombatAttack("cudgel", "force", 0, 1, 6, "force", 0, 0, 0, CombatAttack.Defense.GUARD, false, null);
         var armed = withHealth(duel(List.of(BLADE), new Foe(40, 0, 0, 0, List.of(cudgel))), "player", 1);
         var asked = new ArrayList<int[]>();
         var fatal = CombatScheduler.useItem(armed, new TacticalIntent.UseItem(null),
                 new CombatScheduler.ItemOutcome("poison", 0, null, 0), recording(asked), 5);
         assertEquals(EncounterState.Status.DEFEATED, after(armed, fatal).player().status());
-        assertEquals(EncounterPhase.ROUND_END, fatal.last().phase());
+        assertEquals(EncounterPhase.OUTCOME_PENDING, fatal.last().phase());
         assertEquals(-1, fatal.playerHealthDelta());
-        assertTrue(asked.isEmpty(), "the foe has no standing opponent left to strike");
+        assertTrue(asked.isEmpty(), "the foe takes no activation after the fight is lost");
     }
 
     /** Item targets: the player, or a standing ally beside it; never an opponent, an absentee or someone unknown. */
@@ -576,7 +577,7 @@ class CombatStrikeTest {
      * random walk over the legal options (seed 20261030). At every step Health stays in bounds,
      * points stay within the allowance, a defeated participant stays defeated and never starts an activation, every draw
      * lies on its die and every plan respects its bounds; replaying a whole fight from its recorded seed gives the same
-     * plans. A fight ends when the player can no longer decide or at the round cap.
+     * plans. A fight ends when the player can no longer decide: at an outcome or at the round cap.
      */
     @Test
     void seededFightsKeepEveryInvariant() throws Exception {

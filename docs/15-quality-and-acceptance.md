@@ -1690,6 +1690,13 @@ exactly zero with a retry that changes nothing, an effect applied in the holder'
 cooldown of two rounds refusing, ending and paying again. Effects through renewal and restore wait for P11.6, terminal
 outcomes for P11.5, and observed balance for P18.3, so the renewal half of QA-12 and QA-09 stay open.
 
+P11.5-A (1 November 2026) adds the detection half of QA-13, not its settlement, on `EncounterOutcomeTest` and
+`OutcomeCommandsTest`: victory, defeat, escape and objective success decided from state alone, their ties, speech and a
+declared social attempt deciding nothing, each scheduler path to `OUTCOME_PENDING`, and 200 seeded fights reaching a terminal
+state with their invariants held and replaying identically. On real PostgreSQL each outcome stops the fight through a commit, a
+retry replays the same receipt and every later command is refused without writing. Surrender, agreement, the negotiation
+cases, settling once and the lost-response retry of a negotiated ending stay open, so QA-13 is not met.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

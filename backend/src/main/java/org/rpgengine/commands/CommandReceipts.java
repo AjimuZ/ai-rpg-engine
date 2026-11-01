@@ -164,7 +164,7 @@ public final class CommandReceipts {
      * Copy the allowlisted members of a tactical summary: scalar cursor facts, the initiative order, each participant's
      * public standing with any effects it holds, the operation's strikes (never a hidden defense, armor or Health value) and the legal options
      * (moves, speech allowance and recipients, declared actions, attacks with costs, targets and disabled reasons, Guard
-     * and item use).
+     * and item use), and the terminal verdict once the fight has one.
      */
     private static Map<String, Object> combat(JsonNode combat) {
         var entry = new LinkedHashMap<String, Object>();
@@ -221,6 +221,21 @@ public final class CommandReceipts {
         }
         if (!outcomes.isEmpty()) {
             entry.put("strikes", List.copyOf(outcomes));
+        }
+        JsonNode verdict = combat.path("outcome");
+        if (verdict.isObject()) {
+            var outcome = new LinkedHashMap<String, Object>();
+            outcome.put("outcome", verdict.path("outcome").asString());
+            outcome.put("objectiveId", verdict.path("objectiveId").isString() ? verdict.path("objectiveId").asString() : null);
+            var statuses = new ArrayList<Map<String, Object>>();
+            for (JsonNode line : verdict.path("objectives")) {
+                var status = new LinkedHashMap<String, Object>();
+                status.put("objectiveId", line.path("objectiveId").asString());
+                status.put("status", line.path("status").asString());
+                statuses.add(status);
+            }
+            outcome.put("objectives", List.copyOf(statuses));
+            entry.put("outcome", outcome);
         }
         JsonNode options = combat.path("options");
         if (options.isObject()) {

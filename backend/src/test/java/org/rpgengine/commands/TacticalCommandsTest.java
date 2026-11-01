@@ -142,8 +142,8 @@ class TacticalCommandsTest {
         assertEquals(0L, moved.receipt().get("elapsedSeconds"));
         rejects(OperationAdmissionFailure.Kind.ZONE_UNAVAILABLE, new TypedCommand.MoveZone("yard"));
         rejects(OperationAdmissionFailure.Kind.ZONE_UNAVAILABLE, new TypedCommand.MoveZone("cellar"));
-        execute(new TypedCommand.MoveZone("escape-route"));
-        rejects(OperationAdmissionFailure.Kind.ACTION_POINTS_INSUFFICIENT, new TypedCommand.MoveZone("entry"));
+        execute(new TypedCommand.MoveZone("entry"));
+        rejects(OperationAdmissionFailure.Kind.ACTION_POINTS_INSUFFICIENT, new TypedCommand.MoveZone("escape-route"));
         var last = execute(new TypedCommand.MoveZone("yard"));
         var combat = combat(last);
         assertEquals(0, combat.get("actionPoints"));
@@ -151,7 +151,7 @@ class TacticalCommandsTest {
         assertEquals(List.of(), ((Map<?, ?>) combat.get("options")).get("moves"));
         var event = JSON.readTree(jdbc.queryForObject("select payload::text from campaign_event where campaign_id = ? "
                 + "order by sequence desc limit 1", String.class, campaign));
-        assertEquals("escape-route", event.get("from").asString());
+        assertEquals("entry", event.get("from").asString());
         assertEquals(player.toString(), event.get("actorId").asString());
     }
 
@@ -240,8 +240,9 @@ class TacticalCommandsTest {
      * writes nothing, points never carry over, the speech allowance returns only with a new activation, a sealed
      * passage stays sealed, each completed round adds its eight seconds once, no draw follows the initiative roll, the
      * receipt's moves are the model's and the stored activations follow the initiative order round after round. Each
-     * strike's outcome is recalculated from the dice in its receipt; when the raider falls it stops taking activations and
-     * stops being a legal recipient or target.
+     * strike's outcome is recalculated from the dice in its receipt. Reaching the escape zone or felling the raider ends
+     * the fight (P11.5), so the walk holds back what could do that until round eight, then lets it happen: the model
+     * names the outcome, the receipt must agree, and every candidate is then refused without writing anything.
      */
     @Test
     void aLongFightKeepsEveryActivationLegal() {
@@ -274,6 +275,9 @@ class TacticalCommandsTest {
                 rejects(refusal, command);
                 continue;
             }
+            if (fight.round < 8 && fight.canEndTheFight(command)) {
+                continue;
+            }
             if (command instanceof TypedCommand.EndActivation) {
                 expired.add(fight.points);
             }
@@ -284,6 +288,18 @@ class TacticalCommandsTest {
                 fight.struck((List<?>) execution.receipt().get("randomDraws"));
             }
             var stored = EncounterWriter.state(jdbc, campaign).orElseThrow();
+            if (fight.outcome() != null) {
+                assertEquals(EncounterPhase.OUTCOME_PENDING, stored.phase(), command.toString());
+                assertEquals(fight.outcome(), ((Map<?, ?>) combat(execution).get("outcome")).get("outcome"), command.toString());
+                assertEquals(fight.zone, stored.player().zone(), command.toString());
+                assertEquals(fight.raiderHealth, number("raider", "health_current"), command.toString());
+                assertEquals(8L * (fight.round - 1), state("world_time_seconds"), "a round left unfinished adds no time");
+                assertEquals(false, combat(execution).containsKey("options"), command.toString());
+                for (TypedCommand after : candidates) {
+                    rejects(OperationAdmissionFailure.Kind.TURN_UNAVAILABLE, after);
+                }
+                break;
+            }
             assertEquals(EncounterPhase.AWAITING_ACTION, stored.phase(), command.toString());
             assertTrue(stored.playerDecision(), command.toString());
             assertEquals(fight.round, stored.round(), command.toString());
@@ -305,6 +321,7 @@ class TacticalCommandsTest {
         }
         assertTrue(committed >= 30 && fight.round >= 6 && fight.sealed, "the walk must exercise the fight: " + committed
                 + " commits, round " + fight.round + ", sealed " + fight.sealed);
+        assertTrue(fight.outcome() != null, "the walk must end the fight within its steps");
         // The dice decide when the raider falls, but not the first strike: the candidates before it are seeded.
         assertTrue(fight.strikes >= 1, "the walk must strike: " + fight.strikes);
         assertEquals(4 + fight.draws, jdbc.queryForObject("select count(*) from operation_random_draw", Integer.class));
@@ -444,7 +461,8 @@ class TacticalCommandsTest {
      * sword costs two points, needs the raider in its own zone and rolls {@code 2d10 + force 2 + rank 2} against Guard 12:
      * a hit deals {@code 1d6 + 2}, a margin of six adds {@code 1d4}, and armor 1 takes one off, out of 14 Health. The Guard
      * action costs one point, once per activation. The raider's default Brace adds 2 to its Guard against the first strike
-     * of each round, and only that one; changing the player's own policy costs nothing and moves nothing.
+     * of each round, and only that one; changing the player's own policy costs nothing and moves nothing. Reaching the
+     * escape zone is an escape and felling the raider a victory, either of which ends the fight at once.
      */
     private static final class FightModel {
         int round = 1;
@@ -464,10 +482,21 @@ class TacticalCommandsTest {
         Integer price(String to) {
             return switch (zone + ">" + to) {
                 case "entry>yard", "yard>entry" -> 1;
-                case "entry>escape-route", "escape-route>entry" -> 2;
-                case "yard>escape-route", "escape-route>yard" -> sealed ? null : 1;
+                case "entry>escape-route" -> 2;
+                case "yard>escape-route" -> sealed ? null : 1;
                 default -> null;
             };
+        }
+
+        /** @return the outcome the fight has reached, or null while it goes on */
+        String outcome() {
+            return raiderHealth == 0 ? "VICTORY" : zone.equals("escape-route") ? "ESCAPE" : null;
+        }
+
+        /** @return whether a legal intention could end the fight: the largest hit is {@code 6 + 2 + 4 - 1 = 11} */
+        boolean canEndTheFight(TypedCommand command) {
+            return command instanceof TypedCommand.MoveZone move && move.zoneId().equals("escape-route")
+                    || command instanceof TypedCommand.Strike && raiderHealth <= 11;
         }
 
         /** The expected refusal of an intention, or null when it must commit. */

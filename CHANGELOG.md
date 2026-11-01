@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — A fight stops when it is won, lost or left (P11.5-A), 1 November 2026
+
+- A fight now ends where it is decided: when the last opponent falls, when the player falls, when the player reaches an escape
+  zone, or when a reach-zone, survive or protect objective is met. It no longer runs on to the round cap or waits at a round end.
+- Only committed game state decides. Speech and social attempts cannot win, lose or end a fight.
+- The record gains one public event in English and Italian, and the command receipt gains the outcome with each objective's status.
+- A fight that has ended cannot be resumed yet: settlement does not exist, so the campaign stays in encounter mode and refuses every
+  command after the outcome. Surrender, negotiated ends, the stalemate policy and Withdraw are not included.
+- A round left unfinished adds no world time for now.
+
 ## Unreleased — Fixture evidence for the inference backends and licence records (P21.6-A), 31 October 2026
 
 - [Inference backends and model selection](docs/34-inference-backends-and-model-selection.md) now maps each clause of the backend,

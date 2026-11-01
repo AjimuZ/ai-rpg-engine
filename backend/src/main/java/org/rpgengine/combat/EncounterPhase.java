@@ -13,7 +13,8 @@ import java.util.Set;
  * repeats {@link #successors} as a trigger, so no writer can skip or reverse a step.
  *
  * <p>Since P11.1 only entry is executed; the round, activation and settlement steps are the transitions
- * later tasks drive (initiative and activations P11.2, outcome and settlement P11.5).
+ * later tasks drive (initiative and activations P11.2, outcome and settlement P11.5). The scheduler reaches
+ * {@link #OUTCOME_PENDING} since P11.5; nothing leaves it until settlement exists.
  */
 public enum EncounterPhase {
     /** A candidate encounter exists but has not been checked. */

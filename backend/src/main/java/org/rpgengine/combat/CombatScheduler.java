@@ -22,8 +22,15 @@ import org.rpgengine.rules.CombatProfile;
  * budget once. Activations run in rank order over active participants only (defeated, escaped and surrendered
  * participants are skipped). An activation start grants the profile's action points and resets the speech
  * allowance; its end expires unused points. After the last activation the round ends and adds
- * {@code roundSeconds} of world time. The scheduler then opens the next round, unless the round cap is reached or
- * the player no longer stands (the stalemate and terminal policies of P11.5 decide those encounters).
+ * {@code roundSeconds} of world time. The scheduler then opens the next round, unless the fight is over or the round
+ * cap is reached (the stalemate policy of a later P11.5 story decides that encounter).
+ *
+ * <p><b>Terminal predicates</b> (P11.5, docs/11 section 13): {@link EncounterOutcome#decide} is checked after each resolved
+ * action, at each activation start and at each round end, and a verdict moves the encounter to {@code OUTCOME_PENDING} with
+ * one public {@code ENCOUNTER_OUTCOME_PENDING} event, whether the blow came from the player, an opponent, a reaction or an
+ * effect. Those are the only three places the state machine can leave from, so a fight decided at an activation's end passes
+ * through the next start without granting points or firing start triggers, or through a round end without round-end ticks.
+ * Inside a round the cursor stays set, which tells a stored outcome that the round did not complete and adds no time for it.
  *
  * <p><b>Decision boundaries</b>: the scheduler advances until the player's own activation waits for an action, so
  * an operation never stops at another participant's turn and the player never decides out of turn. Because the player
@@ -51,8 +58,9 @@ import org.rpgengine.rules.CombatProfile;
  * <p><b>The opening strike</b> resolves once in the initiative operation: under {@code first} right after round one
  * opens, paid by granting fewer points at the player's round-one activation, and under {@code initiative} when that
  * activation starts. Its legality is judged at the slot, because the target may have moved or fallen by then. A strike
- * that cannot be made at its slot lapses with its public reason, costing nothing; so does one whose attacker fell
- * before its slot, when round one closes. Either way {@code opening_status} ends {@code RESOLVED}.
+ * that cannot be made at its slot lapses with its public reason, costing nothing; so does one whose slot never comes,
+ * where the fight ends ({@code ATTACKER_DOWN} for a fallen attacker, otherwise {@code ENCOUNTER_ENDED}). Either way
+ * {@code opening_status} ends {@code RESOLVED}.
  *
  * <p><b>Reactions</b> (P11.4, docs/11 section 10) are predeclared and fire inside the action that provokes them: the
  * reactor's stored policy decides, never a choice after seeing a roll. Simultaneous reactions run by declared priority,
@@ -116,7 +124,7 @@ public final class CombatScheduler {
             throw new IllegalStateException("validated tactical intention is refused: " + refusal);
         }
         var run = new Run(state);
-        // Any action can draw since P11.4: a move or an item can provoke a counter strike.
+        // Any of these can draw since P11.4: even a move can provoke a counter strike.
         run.draws(dice);
         switch (intent) {
             case TacticalIntent.RollInitiative roll -> {
@@ -161,9 +169,11 @@ public final class CombatScheduler {
      * @param state the encounter as read under the campaign lock
      * @param intent an intention {@link TacticalRules#refusal} accepts for {@code state}
      * @param outcome the item's resolved effects
-     * @param dice recorded draws, used only when the item leaves the player at zero and the schedule continues
+     * @param dice recorded draws for the run; nothing draws today, because no reaction answers an item and a player it
+     *        fells ends the fight
      * @param firstDraw the operation's first draw ordinal the item's own effects did not use
-     * @return the complete plan; a player the item itself left at zero Health is defeated and the schedule continues
+     * @return the complete plan; a player the item itself left at zero Health is defeated and the plan stops at
+     *         {@code OUTCOME_PENDING} with that defeat, so no other participant acts after it
      * @throws IllegalStateException when the intention is refused
      */
     public static TacticalPlan useItem(EncounterState state, TacticalIntent.UseItem intent, ItemOutcome outcome,
@@ -221,6 +231,8 @@ public final class CombatScheduler {
         private final List<Object> effectLines = new ArrayList<>();
         /** Lines naming hidden values, waiting for the next internal {@code EFFECTS_CALCULATED}. */
         private final List<Object> hiddenLines = new ArrayList<>();
+        /** The verdict this operation reached, for the receipt; null while the fight goes on. */
+        private EncounterOutcome outcome;
 
         /** Give the run the operation's draws. */
         void draws(Dice source) {
@@ -336,7 +348,7 @@ public final class CombatScheduler {
                 step(EncounterPhase.RESOLVING);
             }
             strike(player, chosen, target, cost, true, true);
-            if (charge) {
+            if (charge && !concluded()) {
                 step(EncounterPhase.AWAITING_ACTION);
             }
             return true;
@@ -348,7 +360,7 @@ public final class CombatScheduler {
                     .put("targetId", base.openingTarget()).put("reason", reason).build(), true);
         }
 
-        /** Continue the schedule until the player's decision, the round cap or a round without a standing player. */
+        /** Continue the schedule until the player's decision, a terminal predicate, the round cap or a player out of the fight. */
         void advance() {
             for (int guard = 0; guard < TacticalPlan.MAX_STEPS; guard++) {
                 switch (phase) {
@@ -360,15 +372,21 @@ public final class CombatScheduler {
                             return;
                         }
                         tactic(acting);
+                        if (phase == EncounterPhase.OUTCOME_PENDING) {
+                            return;
+                        }
                         endActivation(false);
                     }
                     case ACTOR_END -> next(cursor);
                     case ROUND_END -> {
-                        if (round >= profile.roundCap()
+                        if (concluded() || round >= profile.roundCap()
                                 || participants.get(EncounterTemplate.PLAYER).status != EncounterState.Status.ACTIVE) {
                             return;
                         }
                         openRound();
+                    }
+                    case OUTCOME_PENDING -> {
+                        return;
                     }
                     default -> throw new IllegalStateException("the scheduler cannot continue from " + phase);
                 }
@@ -376,13 +394,54 @@ public final class CombatScheduler {
             throw new IllegalStateException("the schedule did not reach a decision within its step bound");
         }
 
-        /** Start the next active participant after a rank, or end the round when none is left. */
+        /**
+         * Move to {@code OUTCOME_PENDING} when a terminal predicate holds. The caller stands at a phase with that arrow.
+         *
+         * @return whether the fight is over
+         */
+        private boolean concluded() {
+            var verdict = EncounterOutcome.decide(state());
+            if (verdict == null) {
+                return false;
+            }
+            conclude(verdict);
+            return true;
+        }
+
+        /** Record the verdict; a declared opening strike still waiting for its slot lapses, because the slot never comes. */
+        private void conclude(EncounterOutcome verdict) {
+            if (pendingOpening()) {
+                openingStatus = "RESOLVED";
+                lapse(participants.get(EncounterTemplate.PLAYER).status != EncounterState.Status.ACTIVE
+                        ? "ATTACKER_DOWN" : "ENCOUNTER_ENDED");
+            }
+            outcome = verdict;
+            step(EncounterPhase.OUTCOME_PENDING);
+            var payload = new TreeMap<String, Object>(verdict.publicForm());
+            payload.put("encounterId", base.id().toString());
+            payload.put("round", round);
+            note("ENCOUNTER_OUTCOME_PENDING", payload, false);
+        }
+
+        /**
+         * Start the next active participant after a rank, or end the round when none is left. A fight already decided starts
+         * nobody: the row passes through {@code ACTOR_START} with no points, because the state machine leads to the outcome
+         * only from there, and no start trigger fires. That also covers a round whose opening ticks felled everyone.
+         */
         private void next(int after) {
             Working next = participants.values().stream()
                     .filter(w -> w.rank != null && w.rank > after && w.status == EncounterState.Status.ACTIVE)
                     .min(Comparator.comparingInt(w -> w.rank)).orElse(null);
+            var verdict = EncounterOutcome.decide(state());
+            if (verdict != null && (next != null || phase == EncounterPhase.ROUND_OPEN)) {
+                cursor = next != null ? next.rank : 0;
+                points = 0;
+                step(EncounterPhase.ACTOR_START);
+                conclude(verdict);
+                return;
+            }
             if (next == null) {
-                endRound();
+                endRound(verdict != null);
                 return;
             }
             cursor = next.rank;
@@ -402,6 +461,9 @@ public final class CombatScheduler {
             }
             step(EncounterPhase.ACTOR_START);
             note("ACTIVATION_STARTED", activation(next).put("actionPoints", points).build(), next.source.player());
+            if (concluded()) {
+                return;
+            }
             step(EncounterPhase.AWAITING_ACTION);
             if (next.source.player() && pendingOpening()) {
                 openingStrike(true);
@@ -422,10 +484,15 @@ public final class CombatScheduler {
             note("ACTIVATION_ENDED", activation(acting).put("unusedActionPoints", unused).build(), byPlayer);
         }
 
-        /** Close the round and add its world time. */
-        private void endRound() {
+        /**
+         * Close the round and add its world time.
+         *
+         * @param decided whether a terminal predicate already holds: the round still took its time, but no tick of a fight
+         *        already over can change its result
+         */
+        private void endRound(boolean decided) {
             if (pendingOpening()) {
-                // The player fell before its slot: the strike can never be made.
+                // The player left the fight before its slot: the strike can never be made.
                 openingStatus = "RESOLVED";
                 lapse("ATTACKER_DOWN");
             }
@@ -433,13 +500,15 @@ public final class CombatScheduler {
             points = null;
             speech = 0;
             elapsed += profile.roundSeconds();
-            fire(CombatEffect.Phase.ROUND_END, standing(), "");
-            for (Working participant : participants.values()) {
-                var after = CombatEffects.afterRound(participant.effects, library, profile.roundSeconds());
-                participant.effects = new ArrayList<>(after.kept());
-                after.expired().forEach(active -> ended(participant, active, "EXPIRED"));
+            if (!decided) {
+                fire(CombatEffect.Phase.ROUND_END, standing(), "");
+                for (Working participant : participants.values()) {
+                    var after = CombatEffects.afterRound(participant.effects, library, profile.roundSeconds());
+                    participant.effects = new ArrayList<>(after.kept());
+                    after.expired().forEach(active -> ended(participant, active, "EXPIRED"));
+                }
+                flush(CombatEffect.Phase.ROUND_END.wire());
             }
-            flush(CombatEffect.Phase.ROUND_END.wire());
             step(EncounterPhase.ROUND_END);
             note("ROUND_ENDED", Map.of("encounterId", base.id().toString(), "round", round,
                     "seconds", profile.roundSeconds()), false);
@@ -494,11 +563,15 @@ public final class CombatScheduler {
         }
 
         /**
-         * Return to the decision after the player's action, or, when the action left the player down, end the activation
-         * and continue the schedule without it.
+         * Return to the decision after the player's action, or stop at the outcome when the action decided the fight, as one
+         * that left the player defeated always does. Only a player out of the fight without a verdict, which today can only
+         * be a surrendered one and no code sets that status yet, ends the activation and continues the schedule without it.
          */
         private void settle(Working player) {
             flush("action");
+            if (concluded()) {
+                return;
+            }
             if (player.status != EncounterState.Status.ACTIVE) {
                 endActivation(true);
                 advance();
@@ -678,7 +751,7 @@ public final class CombatScheduler {
 
         /**
          * Pay for an item whose effects are already resolved and take over the Health values they left. A player left
-         * at zero by its own item falls: the activation ends and the schedule continues without it.
+         * at zero by its own item falls, and the fight ends there with a defeat.
          */
         void playerItem(TacticalIntent.UseItem intent, ItemOutcome outcome) {
             Working player = participants.get(EncounterTemplate.PLAYER);
@@ -720,6 +793,9 @@ public final class CombatScheduler {
             int strikeCost = profile.value("strikeCost");
             if (reach(actor) == null && !CombatEffects.prevents(actor.effects, library, CombatEffect.Prevents.MOVEMENT)) {
                 approach(actor);
+                if (phase == EncounterPhase.OUTCOME_PENDING) {
+                    return;
+                }
             }
             var reach = actor.status == EncounterState.Status.ACTIVE ? reach(actor) : null;
             if (reach != null && points >= strikeCost) {
@@ -729,11 +805,17 @@ public final class CombatScheduler {
                     strike(actor, reach.attack(), reach.target(), strikeCost, false, false);
                 }
                 flush("action");
+                if (concluded()) {
+                    return;
+                }
                 step(EncounterPhase.AWAITING_ACTION);
             }
             if (actor.status == EncounterState.Status.ACTIVE && points >= profile.value("guardCost") && !actor.guarding) {
                 guard(actor, false);
                 flush("action");
+                if (concluded()) {
+                    return;
+                }
                 step(EncounterPhase.AWAITING_ACTION);
             }
         }
@@ -781,7 +863,9 @@ public final class CombatScheduler {
                 step(EncounterPhase.RESOLVING);
                 traverse(actor, destination, cost, false);
                 flush("action");
-                step(EncounterPhase.AWAITING_ACTION);
+                if (!concluded()) {
+                    step(EncounterPhase.AWAITING_ACTION);
+                }
             }
         }
 
@@ -1329,10 +1413,13 @@ public final class CombatScheduler {
             summary.put("phase", phase.name());
             summary.put("round", round);
             summary.put("zone", participants.get(EncounterTemplate.PLAYER).zone);
-            Working acting = cursor == null ? null : acting();
+            Working acting = cursor == null || outcome != null ? null : acting();
             if (acting != null) {
                 summary.put("acting", acting.source.id());
                 summary.put("actionPoints", points);
+            }
+            if (outcome != null) {
+                summary.put("outcome", outcome.publicForm());
             }
             var order = new ArrayList<Object>();
             participants.values().stream().filter(w -> w.rank != null).sorted(Comparator.comparingInt(w -> w.rank))
@@ -1374,7 +1461,7 @@ public final class CombatScheduler {
             }
             return new EncounterState(base.id(), base.rowVersion(), phase, round, cursor, points, speech, passages,
                     profile, base.frozenSpace(), base.escapeZones(), base.actions(), base.opening(),
-                    base.openingTarget(), openingStatus, list, ammunition, library, effectsApplied);
+                    base.openingTarget(), openingStatus, list, ammunition, library, effectsApplied, base.objectives());
         }
 
         /** Record the current encounter row state after checking its arrow. */

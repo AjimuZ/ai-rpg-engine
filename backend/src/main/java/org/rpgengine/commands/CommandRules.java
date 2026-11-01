@@ -98,8 +98,9 @@ final class CommandRules {
     private CommandRules() { }
 
     /**
-     * Most dice an item's use contract may draw in a fight. The schedule that continues when the item fells the player
-     * draws at most 56 more (eight strikes of seven dice), which stays under the operation's budget of 128.
+     * Most dice an item's use contract may draw in a fight, half the operation's budget of 128. Since P11.5 an item that
+     * fells the player ends the fight, so no strike follows it in the operation and the budget alone would allow more; the
+     * limit stays as the documented refusal ({@code EFFECT_UNSUPPORTED}) rather than as a sum of what must still fit.
      */
     private static final int MAX_COMBAT_ITEM_DRAWS = 64;
 
@@ -513,8 +514,8 @@ final class CommandRules {
          * Using an item in a fight: a held instance with a runnable use contract, as in exploration, whose target policy
          * matches what the intention names. A self-policy item names nobody; a single-target item names a participant
          * {@link TacticalRules} accepted, and a campaign-less ally can receive healing but not items, so an item that
-         * creates units cannot target one. A contract may use at most {@link #MAX_COMBAT_ITEM_DRAWS} dice, so the
-         * schedule that continues if the item fells the player still fits the operation's draw budget. Other target
+         * creates units cannot target one. A contract may use at most {@link #MAX_COMBAT_ITEM_DRAWS} dice, well inside
+         * the operation's draw budget. Other target
          * policies stay refused: an item runs the exploration effect program, and a multi-target or hostile form belongs to
          * an ability's frozen combat block (P11.4).
          */

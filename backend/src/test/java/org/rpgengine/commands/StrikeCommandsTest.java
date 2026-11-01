@@ -198,7 +198,7 @@ class StrikeCommandsTest {
     /**
      * The armed bandit of the worked fight approaches and strikes: each strike's result follows from its recorded dice and
      * the frozen values, the player's Health pool falls by exactly that and stops at zero, and a defeated player is
-     * marked, draws no further strikes and has no decision left, with the fight waiting at a round end.
+     * marked, draws no further strikes and has no decision left, with the fight stopped at its outcome.
      */
     @Test
     void anOpponentStrikesUntilThePlayerFalls() {
@@ -246,7 +246,7 @@ class StrikeCommandsTest {
         assertEquals("DEFEATED", participant("player", "status"));
         assertEquals(1, eventCount("PARTICIPANT_DEFEATED"));
         var stored = EncounterWriter.state(jdbc, campaign).orElseThrow();
-        assertEquals(EncounterPhase.ROUND_END, stored.phase());
+        assertEquals(EncounterPhase.OUTCOME_PENDING, stored.phase(), "a fallen player ends the fight where it fell");
         assertFalse(stored.playerDecision());
         rejects(OperationAdmissionFailure.Kind.TURN_UNAVAILABLE, new TypedCommand.EndActivation());
         rejects(OperationAdmissionFailure.Kind.TURN_UNAVAILABLE, new TypedCommand.Guard());

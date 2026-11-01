@@ -410,8 +410,8 @@ Continuing the schedule: start the next active participant by rank (`ACTIVATION_
 run a non-player activation (below; `ACTIVATION_ENDED`), end the round after the last
 activation (`ROUND_ENDED` {encounterId, round, seconds}, adding `roundSeconds` of world time) and open the next
 one (`ROUND_STARTED` {encounterId, round}, refreshing reaction budgets), until the player's own activation waits
-for an action. The schedule stops instead at a round end when the round cap is reached or the player no longer
-stands. Each phase step is its own row version, so an operation adds at most one round's seconds. Every tactical
+for an action. The schedule stops instead at a round end when the round cap is reached, or, since P11.5, wherever a
+terminal predicate holds (below). Each phase step is its own row version, so an operation adds at most one round's seconds. Every tactical
 intention advances the game turn. The receipt gains `combat` {encounterId, phase, round, zone, acting,
 actionPoints, initiative: [{participantId, initiative}], options?: {moves: [{zone, cost}], speech: {remaining,
 recipients}, actions: [{actionId, kind, cost, targets}], endActivation}}; `options` appears only at the player's
@@ -434,8 +434,8 @@ damage, drawOrdinals, opening?, ammunition?, and for a player target defense and
 `STRIKE_CALCULATED` with the complete calculation. Zero Health adds `PARTICIPANT_DEFEATED`. `GUARD` writes `GUARD_RAISED`
 {…, bonus, actionPoints, remainingActionPoints}. An item writes its contract's events (`ITEM_USED`, `EFFECT_RESOLVED`),
 then `COMBAT_ITEM_USED` {…, definitionId, actionPoints, remainingActionPoints, targetId?, healed?}. Each passes through
-`RESOLVING` and returns to `AWAITING_ACTION`, so only `END_ACTIVATION` passes control; an item that fells its own user ends
-the activation and continues the schedule.
+`RESOLVING` and returns to `AWAITING_ACTION`, so only `END_ACTIVATION` passes control; since P11.5 an action that decides
+the fight, such as an item that fells its own user, moves to `OUTCOME_PENDING` instead.
 
 The initiative roll now also resolves a declared opening strike at its slot, or writes `OPENING_STRIKE_LAPSED` {…,
 targetId, reason}. A non-player activation with an attack may write `PARTICIPANT_MOVED`, strike events and `GUARD_RAISED`
@@ -445,6 +445,16 @@ before `ACTIVATION_ENDED`. The receipt's `combat` gains `participants` [{partici
 change appears in `resources` and spent ammunition in `items`. Tactical commands skip the quest engine: the next
 exploration command evaluates the possession facts they change.
 
+
+### P11.5 terminal predicates
+
+Any operation can end a fight ([ADR 0032](adr/0032-terminal-predicates-from-committed-state.md)). When committed state
+satisfies a terminal predicate the operation moves to `OUTCOME_PENDING` and writes the public `ENCOUNTER_OUTCOME_PENDING`
+{encounterId, round, outcome: `VICTORY` | `DEFEAT` | `ESCAPE` | `OBJECTIVE`, objectiveId?, objectives: [{objectiveId,
+status: `pending` | `met` | `failed`}]}. That operation's receipt has `combat.outcome` {outcome, objectiveId, objectives} and
+no acting participant, action points or `options`. A retry replays the same receipt. Every later
+tactical intention is refused with `TURN_UNAVAILABLE` and exploration stays `MODE_ILLEGAL`, writing nothing, until
+settlement exists. A declared opening strike still waiting lapses with `ATTACKER_DOWN` or `ENCOUNTER_ENDED`.
 
 ### P11.4 reactions, effects and abilities
 
