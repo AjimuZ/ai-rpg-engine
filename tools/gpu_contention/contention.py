@@ -12,10 +12,15 @@ proves nothing about the engine unless the owner ran it on the reference host wi
 servers; the file's ``limits`` say so. Anything it could not observe is written as
 ``{"status": "unavailable", "reason": <fixed code>}``, never as zero.
 
+Load path: by default the load goes straight to the model servers, which proves nothing
+about the engine's admission. With ``--via-entry-point`` the load is the owner-only
+``POST /api/v1/models/admission-probe`` of the engine instead, so it passes through the
+scheduler and the lease executor. The file's ``load_path`` says which of the two happened.
+
 Privacy: the file holds counts, fixed codes and numbers. It holds no endpoint, model
-name, prompt, path, log line or session value. The session value for the metrics route
-is read from a file the owner names (never from the command line), validated, sent only
-to a loopback metrics URL, and never printed or written.
+name, prompt, path, log line, session value or CSRF token. The session value for the
+metrics route and the entry point is read from a file the owner names (never from the
+command line), validated, sent only to a loopback engine URL, and never printed or written.
 
 Standard library only; ``http.client`` is used instead of ``urllib`` so that proxy
 environment variables and redirects can never carry the session value elsewhere.
@@ -36,8 +41,18 @@ import urllib.parse
 
 FORMAT = 'gpu-contention-observations/1'
 METRICS_PATH = '/api/v1/models/admission-metrics'
+PROBE_PATH = '/api/v1/models/admission-probe'
+BOOTSTRAP_PATH = '/api/v1/session'
 SESSION_COOKIE = 'ENGINE_SESSION'
+# The two values of the output's ``load_path``; fixed so that a reader can rely on them.
+PATH_ENTRY_POINT = 'executor-entry-point'
+PATH_DIRECT = 'direct-to-model-servers'
+# The hosts the engine accepts in its configured origin (LocalHttpAdmission).
+_ENTRY_HOSTS = ('127.0.0.1', 'localhost', '::1')
 _SESSION_VALUE = re.compile(r'[A-Za-z0-9_-]{43}')
+_OUTCOME_STATUS = re.compile(r'[A-Z][A-Z_]{0,31}')
+_OUTCOME_CODE = re.compile(r'[a-z][a-z0-9-]{0,63}|[a-z][A-Za-z0-9]{0,63}')
+MAX_OUTCOME_KINDS = 50
 _CONTAINER_NAME = re.compile(r'[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}')
 _PATH = re.compile(r'/[A-Za-z0-9._~/-]*')
 _PREFIX = re.compile(r'(/[A-Za-z0-9._~-]+)*')
@@ -151,6 +166,10 @@ def build_parser():
     load.add_argument('--concurrency', type=_number(1, 8, True), default=1, help='parallel requests per backend')
     load.add_argument('--max-requests', type=_number(1, 100000, True), default=200, help='cap per backend')
     load.add_argument('--request-timeout', type=_number(0.1, 3600), default=120.0)
+    load.add_argument('--via-entry-point', action='store_true',
+                      help='send the load through the engine\'s owner-only admission-probe route instead of to '
+                           'model servers; needs --metrics-url (an http loopback engine URL) and '
+                           '--metrics-session-file, and excludes the backend URLs')
     sampling = parser.add_argument_group('observation')
     sampling.add_argument('--interval', type=_number(0.02, 60), default=1.0, help='seconds between samples')
     sampling.add_argument('--nvidia-smi', default='nvidia-smi', help='program that samples GPU memory')
@@ -178,8 +197,11 @@ def build_parser():
 
 def parse_arguments(argv):
     """@return the validated namespace, with ``session`` read from its file; @raise UsageError otherwise"""
-    config = build_parser().parse_args(argv)
-    if not (config.text_url or config.image_url or config.speech_url):
+    parser = build_parser()
+    config = parser.parse_args(argv)
+    if config.via_entry_point:
+        _check_entry_point_mode(config, parser)
+    elif not (config.text_url or config.image_url or config.speech_url):
         raise UsageError('give at least one of --text-url, --image-url and --speech-url')
     for kind in ('text', 'speech'):
         url, model = getattr(config, f'{kind}_url'), getattr(config, f'{kind}_model')
@@ -201,6 +223,27 @@ def parse_arguments(argv):
     if config.docker_arg and not config.docker_logs:
         raise UsageError('--docker-arg needs --docker-logs')
     return config
+
+
+def _check_entry_point_mode(config, parser):
+    """Refuse every combination ``--via-entry-point`` cannot honour; the messages are fixed text.
+
+    The probe route accepts no caller content and runs one probe at a time (a second gets 409), so the
+    backend options, a concurrency above one and the request-shape options have no meaning in this mode.
+    """
+    if config.text_url or config.image_url or config.speech_url or config.text_model or config.speech_model:
+        raise UsageError('--via-entry-point sends no load to model servers; drop the backend URLs and models')
+    if not config.metrics_url:
+        raise UsageError('--via-entry-point needs --metrics-url and --metrics-session-file')
+    if config.concurrency != 1:
+        raise UsageError('--via-entry-point runs one probe at a time; leave --concurrency at 1')
+    for dest in ('text_path', 'image_path', 'speech_path', 'image_steps', 'image_size'):
+        if getattr(config, dest) != parser.get_default(dest):
+            raise UsageError('--via-entry-point has fixed requests; drop the path, step and size options')
+    url = config.metrics_url
+    if url.https or url.prefix or url.host not in _ENTRY_HOSTS:
+        raise UsageError('--via-entry-point needs --metrics-url as http://127.0.0.1:<port>, '
+                         'http://localhost:<port> or http://[::1]:<port>, the engine\'s configured origin')
 
 
 def _is_loopback(host):
@@ -334,6 +377,98 @@ def drive(stats, endpoint, path, payload, deadline, tickets, stop, timeout):
             stop.wait(0.05)
         else:
             stats.record(status, None, (time.monotonic() - began) * 1000.0)
+
+
+class EntryStats(LoadStats):
+    """Tally of the probe calls, plus what the probe said about its text and image requests.
+
+    The outcomes are the route's own fixed ``status`` and ``code`` words. Anything that does not look
+    like such a word is counted as ``unreadable`` and never copied, because the body comes from a server.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.outcomes = {'text': collections.Counter(), 'image': collections.Counter()}
+        self.unreadable = 0
+
+    def record_body(self, body):
+        parsed = {}
+        try:
+            reply = json.loads(body.decode('utf-8'))
+            for kind in self.outcomes:
+                status, code = reply[kind]['status'], reply[kind]['code']
+                if (not isinstance(status, str) or not isinstance(code, str)
+                        or _OUTCOME_STATUS.fullmatch(status) is None or _OUTCOME_CODE.fullmatch(code) is None):
+                    raise ValueError('unreadable')
+                parsed[kind] = f'{status}/{code}'
+        except (ValueError, KeyError, TypeError):
+            parsed = None
+        with self._lock:
+            if parsed is None:
+                self.unreadable += 1
+                return
+            for kind, outcome in parsed.items():
+                counter = self.outcomes[kind]
+                if outcome in counter or len(counter) < MAX_OUTCOME_KINDS:
+                    counter[outcome] += 1
+                else:
+                    self.unreadable += 1
+
+    def summary(self):
+        result = super().summary()
+        with self._lock:
+            result['outcomes'] = {kind: dict(sorted(counter.items())) for kind, counter in self.outcomes.items()}
+            result['unreadable_replies'] = self.unreadable
+        return result
+
+
+def entry_headers(endpoint, session):
+    """Headers the engine's admission requires: exact Host and Origin of its configured origin, and the session."""
+    authority = f'[{endpoint.host}]:{endpoint.port}' if ':' in endpoint.host else f'{endpoint.host}:{endpoint.port}'
+    return {'Host': authority, 'Origin': f'http://{authority}', 'Accept': 'application/json',
+            'Cookie': f'{SESSION_COOKIE}={session}'}
+
+
+def fetch_csrf(endpoint, session, timeout):
+    """@return the CSRF token the engine ties to this session, or None when it did not hand one out.
+
+    ``GET /api/v1/session`` with a live session cookie reuses that session and returns its token; with an
+    unknown cookie the engine would start another session, whose token does not match, so the caller's
+    probe is then refused and counted by status.
+    @raise OSError, http.client.HTTPException on a transport failure
+    """
+    status, body = exchange(endpoint, 'GET', BOOTSTRAP_PATH, timeout, headers=entry_headers(endpoint, session),
+                            keep=4096)
+    if status != 200:
+        return None
+    try:
+        token = json.loads(body.decode('utf-8'))['csrfToken']
+    except (ValueError, KeyError, TypeError):
+        return None
+    return token if isinstance(token, str) and _SESSION_VALUE.fullmatch(token) else None
+
+
+def entry_drive(stats, endpoint, session, deadline, tickets, stop, timeout):
+    """Worker loop: call the probe route until the deadline, the request cap or ``stop``; one call at a time."""
+    while not stop.is_set() and time.monotonic() < deadline and tickets.take():
+        began = time.monotonic()
+        try:
+            token = fetch_csrf(endpoint, session, timeout)
+            if token is None:
+                stats.record(None, 'csrf-unavailable', 0.0)
+                stop.wait(0.05)
+                continue
+            headers = entry_headers(endpoint, session)
+            headers.update({'Content-Type': 'application/json', 'X-CSRF-Token': token})
+            status, body = exchange(endpoint, 'POST', PROBE_PATH, timeout, body=b'{}', headers=headers,
+                                    keep=MAX_METRICS_BYTES)
+        except (OSError, http.client.HTTPException) as exc:
+            stats.record(None, error_code(exc), 0.0)
+            stop.wait(0.05)
+        else:
+            stats.record(status, None, (time.monotonic() - began) * 1000.0)
+            if status == 200:
+                stats.record_body(body)
 
 
 def load_plans(config):
@@ -621,6 +756,11 @@ def observe(config):
         for _ in range(config.concurrency):
             workers.append(threading.Thread(daemon=True, target=drive, args=(
                 stats[name], endpoint, path, payload, deadline, tickets, stop, config.request_timeout)))
+    if config.via_entry_point:
+        stats['entry_point'] = EntryStats()
+        workers.append(threading.Thread(daemon=True, target=entry_drive, args=(
+            stats['entry_point'], config.metrics_url, config.session, deadline, Tickets(config.max_requests), stop,
+            config.request_timeout)))
     command = [config.nvidia_smi] + config.nvidia_smi_arg
     gpu = Sampler(config.interval, lambda: gpu_sample(command))
     metrics = None
@@ -655,13 +795,16 @@ def observe(config):
     docker_command = [config.docker] + config.docker_arg
     oom = summarize_oom({source.label: scan_source(source, since, docker_command) for source in sources})
     load = {name: stats[name].summary() if name in stats else {'status': 'unavailable', 'reason': 'not-configured'}
-            for name in ('text', 'image', 'speech')}
+            for name in ('text', 'image', 'speech', 'entry_point')}
     metrics_result = summarize_metrics(metrics.results) if metrics else {
         'status': 'unavailable', 'reason': 'not-configured', 'samples': 0, 'failed_samples': 0}
-    metrics_result['driven'] = {name: name in plans for name in ('text', 'image', 'speech')}
+    # The probe route sends one text and one image request per call, so both count as driven in that mode.
+    metrics_result['driven'] = {name: name in plans or (config.via_entry_point and name != 'speech')
+                                for name in ('text', 'image', 'speech')}
     return {
         'format': FORMAT,
         'complete': complete,
+        'load_path': PATH_ENTRY_POINT if config.via_entry_point else PATH_DIRECT,
         'started_at': _utc(started),
         'duration_seconds': round(elapsed, 2),
         'settings': {'duration_seconds': config.duration, 'concurrency': config.concurrency,
@@ -681,6 +824,7 @@ def summary_lines(observations):
     peaks = [item['peak_mib'] for item in gpu.get('gpus', {}).values()]
     return [
         f"complete={str(observations['complete']).lower()}",
+        f"load_path={observations['load_path']}",
         f"gpu_memory={'peak_mib=' + str(max(peaks)) if peaks else 'unavailable (' + gpu['reason'] + ')'}",
         f"out_of_memory={observations['out_of_memory']['status']} events={observations['out_of_memory']['events']}",
         f"executor_metrics={observations['executor_metrics']['status']}",

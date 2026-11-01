@@ -30,12 +30,14 @@ class Server:
 
     def __init__(self, routes):
         self.requests = []
+        self.headers = []  # one lower-cased header map per request, in the order of ``requests``
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
             def _serve(self, method):
                 body = self.rfile.read(int(self.headers.get('Content-Length') or 0))
                 outer.requests.append((method, self.path, self.headers.get('Cookie'), body))
+                outer.headers.append({key.lower(): value for key, value in self.headers.items()})
                 route = routes.get((method, self.path))
                 status, payload = route(self) if route else (404, b'')
                 self.send_response(status)
@@ -249,8 +251,12 @@ class FullRunTests(HarnessCase):
         data = self.observations()
         self.assertEqual(data['format'], 'gpu-contention-observations/1')
         self.assertTrue(data['complete'])
-        self.assertEqual(set(data), {'format', 'complete', 'started_at', 'duration_seconds', 'settings', 'load',
-                                     'competitor', 'gpu_memory', 'out_of_memory', 'executor_metrics', 'limits'})
+        self.assertEqual(set(data), {'format', 'complete', 'load_path', 'started_at', 'duration_seconds', 'settings',
+                                     'load', 'competitor', 'gpu_memory', 'out_of_memory', 'executor_metrics',
+                                     'limits'})
+        self.assertEqual(data['load_path'], 'direct-to-model-servers')
+        self.assertEqual(data['load']['entry_point'], {'status': 'unavailable', 'reason': 'not-configured'})
+        self.assertIn('load_path=direct-to-model-servers', out)
         for name in ('text', 'speech'):
             self.assertEqual(data['load'][name]['status'], 'ok', name)
             self.assertEqual(set(data['load'][name]['statuses']), {'200'})
@@ -353,6 +359,152 @@ class FullRunTests(HarnessCase):
         self.invoke('--image-url', server.url, '--image-path', '/x', *self.smi())
         image = self.observations()['load']['image']
         self.assertEqual((image['status'], list(image['statuses'])), ('ok', ['503']))
+
+
+CSRF = 'ZYXWVUTSRQ' * 4 + 'zyx'
+PROBE_REPLY = {'text': {'status': 'COMPLETED', 'code': 'none'},
+               'image': {'status': 'UNAVAILABLE', 'code': 'no-image-port'}}
+
+
+class EntryPointTests(HarnessCase):
+    """The load goes through the engine's probe route; the stand-in engine enforces the admission rules."""
+
+    def engine(self, reply=PROBE_REPLY, session=SESSION):
+        """A stand-in engine that checks cookie, Host, Origin, CSRF token and content type like LocalHttpAdmission."""
+        def authority(handler):
+            host = handler.headers.get('Host')
+            return host == f'127.0.0.1:{self.engine_server.port}' and handler.headers.get('Origin') == f'http://{host}'
+
+        def bootstrap(handler):
+            if handler.headers.get('Cookie') != f'ENGINE_SESSION={session}' or not authority(handler):
+                return 403, b'{"code": "LOCAL_ADMISSION_DENIED"}'
+            return 200, json.dumps({'csrfToken': CSRF}).encode()
+
+        def probe(handler):
+            if (handler.headers.get('Cookie') != f'ENGINE_SESSION={session}' or not authority(handler)
+                    or handler.headers.get('X-CSRF-Token') != CSRF):
+                return 403, b'{"code": "LOCAL_ADMISSION_DENIED"}'
+            if handler.headers.get('Content-Type') != 'application/json':
+                return 415, b'{"code": "JSON_REQUIRED"}'
+            return 200, json.dumps(reply).encode()
+
+        def metrics(handler):
+            return 200, b'{"jobs_running": 0}'
+
+        self.engine_server = self.serve({('GET', contention.BOOTSTRAP_PATH): bootstrap,
+                                         ('POST', contention.PROBE_PATH): probe,
+                                         ('GET', contention.METRICS_PATH): metrics})
+        return self.engine_server
+
+    def run_entry(self, *extra):
+        server = self.engine_server
+        code, out, err = self.invoke('--via-entry-point', '--metrics-url', server.url,
+                                     '--metrics-session-file', str(self.session_file), *self.smi(), *extra)
+        self.assertEqual((code, err), (0, ''))
+        return self.observations(), out
+
+    def test_the_load_goes_through_the_entry_point_and_the_output_says_so(self):
+        self.engine()
+        data, out = self.run_entry()
+        self.assertEqual(data['load_path'], 'executor-entry-point')
+        entry = data['load']['entry_point']
+        self.assertEqual((entry['status'], list(entry['statuses'])), ('ok', ['200']))
+        self.assertGreater(entry['answered'], 0)
+        self.assertEqual(entry['outcomes'], {'text': {'COMPLETED/none': entry['answered']},
+                                             'image': {'UNAVAILABLE/no-image-port': entry['answered']}})
+        self.assertEqual(entry['unreadable_replies'], 0)
+        for name in ('text', 'image', 'speech'):
+            self.assertEqual(data['load'][name], {'status': 'unavailable', 'reason': 'not-configured'})
+        self.assertEqual(data['executor_metrics']['driven'], {'text': True, 'image': True, 'speech': False})
+        self.assertIn('load_path=executor-entry-point', out)
+
+    def test_each_probe_call_carries_the_proofs_the_engine_requires(self):
+        self.engine()
+        self.run_entry('--max-requests', '2')
+        probes = [headers for (method, path, _, _), headers in zip(self.engine_server.requests, self.engine_server.headers)
+                  if (method, path) == ('POST', contention.PROBE_PATH)]
+        self.assertEqual(len(probes), 2)
+        for headers in probes:
+            self.assertEqual(headers['cookie'], f'ENGINE_SESSION={SESSION}')
+            self.assertEqual(headers['x-csrf-token'], CSRF)
+            self.assertEqual(headers['content-type'], 'application/json')
+            self.assertEqual(headers['origin'], f'http://127.0.0.1:{self.engine_server.port}')
+            self.assertEqual(headers['host'], f'127.0.0.1:{self.engine_server.port}')
+
+    def test_neither_the_session_nor_the_csrf_token_is_written_or_printed(self):
+        self.engine()
+        data, out = self.run_entry()
+        raw = self.output.read_text(encoding='utf-8')
+        for secret in (SESSION, CSRF, '127.0.0.1', str(self.tmp)):
+            self.assertNotIn(secret, raw, secret)
+        for secret in (SESSION, CSRF, '127.0.0.1'):
+            self.assertNotIn(secret, out)  # the terminal names the output file, so its directory is allowed
+        self.assertNotIn(b'\r', self.output.read_bytes())
+
+    def test_a_session_the_engine_does_not_know_is_counted_not_hidden(self):
+        self.engine(session='q' * 43)
+        data, _ = self.run_entry()
+        entry = data['load']['entry_point']
+        self.assertEqual((entry['status'], entry['reason'], entry['answered']), ('unavailable', 'no-answer', 0))
+        self.assertEqual(set(entry['errors']), {'csrf-unavailable'})
+        self.assertNotIn(CSRF, self.output.read_text(encoding='utf-8'))
+
+    def test_a_reply_that_is_not_fixed_words_is_counted_unreadable_and_never_copied(self):
+        self.engine(reply={'text': {'status': 'COMPLETED', 'code': 'secret ' + MODEL_NAME},
+                           'image': {'status': 'COMPLETED', 'code': 'none'}})
+        data, _ = self.run_entry()
+        entry = data['load']['entry_point']
+        self.assertEqual(entry['outcomes'], {'text': {}, 'image': {}})
+        self.assertEqual(entry['unreadable_replies'], entry['answered'])
+        self.assertNotIn(MODEL_NAME, self.output.read_text(encoding='utf-8'))
+
+    def test_a_refusal_from_the_engine_is_recorded_by_status(self):
+        server = self.serve({('GET', contention.BOOTSTRAP_PATH): lambda h: (200, json.dumps({'csrfToken': CSRF}).encode()),
+                             ('POST', contention.PROBE_PATH): lambda h: (409, b'{"code": "PROBE_BUSY"}')})
+        code, _, err = self.invoke('--via-entry-point', '--metrics-url', server.url,
+                                   '--metrics-session-file', str(self.session_file), *self.smi('fail'))
+        self.assertEqual((code, err), (0, ''))
+        entry = self.observations()['load']['entry_point']
+        self.assertEqual(entry['statuses'], {'409': entry['answered']})
+        self.assertEqual(entry['outcomes'], {'text': {}, 'image': {}})
+
+    def test_a_run_without_the_mode_names_the_direct_path_and_calls_no_entry_point(self):
+        self.engine()
+        backend = self.serve({('POST', '/x'): ok()})
+        code, out, err = self.invoke('--image-url', backend.url, '--image-path', '/x',
+                                     '--metrics-url', self.engine_server.url,
+                                     '--metrics-session-file', str(self.session_file), *self.smi('fail'))
+        self.assertEqual((code, err), (0, ''))
+        self.assertEqual(self.observations()['load_path'], 'direct-to-model-servers')
+        self.assertIn('load_path=direct-to-model-servers', out)
+        self.assertEqual([r for r in self.engine_server.requests if r[1] == contention.PROBE_PATH], [])
+
+    def refused(self, *args):
+        code, out, err = self.invoke('--via-entry-point', *args)
+        self.assertEqual(code, 2, err)
+        self.assertNotIn(SESSION, out + err)
+        self.assertFalse(self.output.exists())
+        return err
+
+    def test_the_mode_refuses_what_it_cannot_honour(self):
+        url, session = 'http://127.0.0.1:9', str(self.session_file)
+        metrics = ('--metrics-url', url, '--metrics-session-file', session)
+        self.assertIn('needs --metrics-url', self.refused())
+        self.assertIn('needs --metrics-url', self.refused('--metrics-session-file', session))
+        self.assertIn('go together', self.refused('--metrics-url', url))
+        self.assertIn('cannot be read', self.refused('--metrics-url', url, '--metrics-session-file',
+                                                     str(self.tmp / 'absent.txt')))
+        for host in ('http://example.invalid:80', 'http://192.0.2.1:80', 'http://[2001:db8::1]:80'):
+            self.assertIn('--metrics-url as', self.refused('--metrics-url', host, '--metrics-session-file', session))
+        for odd in ('https://127.0.0.1:9', 'http://127.0.0.1:9/prefix', 'http://127.0.0.2:9'):
+            self.assertIn('--metrics-url as', self.refused('--metrics-url', odd, '--metrics-session-file', session))
+        self.assertIn('no load to model servers', self.refused(*metrics, '--text-url', url, '--text-model', 'm'))
+        self.assertIn('no load to model servers', self.refused(*metrics, '--image-url', url))
+        self.assertIn('one probe at a time', self.refused(*metrics, '--concurrency', '2'))
+        for flag, value in (('--image-size', '512'), ('--image-steps', '7'), ('--text-path', '/x'),
+                            ('--image-path', '/x'), ('--speech-path', '/x')):
+            with self.subTest(flag=flag):
+                self.assertIn('fixed requests', self.refused(*metrics, flag, value))
 
 
 class MetricsRouteTests(HarnessCase):

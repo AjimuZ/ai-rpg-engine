@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Contention harness can drive its load through the engine's entry point (P21.4-F.2), 2 November 2026
+
+- `tools/gpu_contention/contention.py --via-entry-point` sends its load through the owner-only
+  `POST /api/v1/models/admission-probe` instead of to model servers, using the owner session file, and every output file
+  now has a `load_path` field (`executor-entry-point` or `direct-to-model-servers`) and a `load_path=` summary line. The
+  README states that load sent straight to a model server proves nothing about admission and documents a trusted-owner
+  competitor started with `docker exec` in the packaged model server's container. The no-GPU self-test runs against a
+  stand-in engine. No GPU was available, so no competitor run and no run against the real engine happened. See
+  [tools/gpu_contention/README.md](tools/gpu_contention/README.md).
+
 ## Unreleased — Owner-only probe of the text and image admission paths (P21.4-F.1), 1 November 2026
 
 - With `engine.inference.admission.enabled` on, the owner can call `POST /api/v1/models/admission-probe`. It sends one fixed,
