@@ -26,6 +26,11 @@ public record AdmissionRequest(UUID id, Modality modality, WorkClass workClass, 
         Instant enqueuedAt) {
     private static final Pattern MODEL = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}");
 
+    /** @return true when {@code model} can name a lease */
+    static boolean validModel(String model) {
+        return model != null && MODEL.matcher(model).matches();
+    }
+
     /** Require every component; a malformed model identifier or an empty demand fails. */
     public AdmissionRequest {
         Objects.requireNonNull(id, "id");
@@ -34,7 +39,7 @@ public record AdmissionRequest(UUID id, Modality modality, WorkClass workClass, 
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(demand, "demand");
         Objects.requireNonNull(enqueuedAt, "enqueuedAt");
-        if (model == null || !MODEL.matcher(model).matches()) {
+        if (!validModel(model)) {
             throw new IllegalArgumentException("model identifier is malformed");
         }
         if (demand.isEmpty()) {

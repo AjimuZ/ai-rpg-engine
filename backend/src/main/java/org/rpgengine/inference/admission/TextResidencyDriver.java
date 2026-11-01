@@ -26,7 +26,7 @@ import org.springframework.context.SmartLifecycle;
  * Drives the {@link LeaseExecutor} and serves the scheduler's {@link TextResidency} claims over it: the one
  * caller of {@link LeaseExecutor#start} and {@link LeaseExecutor#pass}.
  *
- * <p>Everything that touches the executor runs on this driver's single worker thread, because the executor
+ * <p>Everything this driver asks of the executor runs on its single worker thread, because the executor
  * holds its monitor across server calls and the scheduler's drain loop must never wait for those. Claims and
  * releases only enqueue work, and their order is kept, so a release always follows its claim and a released
  * model is free before the next claim asks. A long load on the worker delays the next pass and later claims,
@@ -40,6 +40,9 @@ import org.springframework.context.SmartLifecycle;
  * its model unloaded under the running turn. A failed renewal, an expiry or the coordinator naming the lease
  * tells the holder to stop. The lease ends only through {@link TextResidency.Claim#release}, or when the
  * executor ended it first.
+ *
+ * <p>Because a pass hands each grant out once, this driver also takes the image grants, and hands them to the
+ * {@link LeasedImageAdmission} (P21.4-C.1.2.2.2). Batches run on that class's threads, never on this worker.
  *
  * <p>Failures: a failed pass is logged by class name only and repeats on the next tick. {@link #stop} lets
  * queued releases run for a bounded time; anything left is an open lease row, which the next process takes
@@ -88,6 +91,7 @@ final class TextResidencyDriver implements TextResidency, SmartLifecycle {
     private final Demand demand;
     private final Clock clock;
     private final Duration tick;
+    private final LeasedImageAdmission images;
     private final ScheduledExecutorService work = Executors.newSingleThreadScheduledExecutor(task -> {
         Thread thread = new Thread(task, "inference-residency");
         thread.setDaemon(true);
@@ -99,6 +103,12 @@ final class TextResidencyDriver implements TextResidency, SmartLifecycle {
     private final Map<UUID, Entry> entries = new LinkedHashMap<>();
     private boolean started;
 
+    /** A driver with no image path: a grant of another modality is unwanted and given back. */
+    TextResidencyDriver(LeaseExecutor leases, AdmissionCoordinator coordinator,
+            Function<InferenceSlot, Optional<String>> models, Demand demand, Clock clock, Duration tick) {
+        this(leases, coordinator, models, demand, clock, tick, null);
+    }
+
     /**
      * @param leases the executor; it is started by the first tick
      * @param coordinator receives the requests and the renewals of their leases
@@ -107,9 +117,12 @@ final class TextResidencyDriver implements TextResidency, SmartLifecycle {
      * @param demand what a text model is taken to need, within the coordinator's capacity
      * @param clock the coordinator's time source
      * @param tick time between two passes, positive
+     * @param images receives every image grant, or null when no image path exists
      */
     TextResidencyDriver(LeaseExecutor leases, AdmissionCoordinator coordinator,
-            Function<InferenceSlot, Optional<String>> models, Demand demand, Clock clock, Duration tick) {
+            Function<InferenceSlot, Optional<String>> models, Demand demand, Clock clock, Duration tick,
+            LeasedImageAdmission images) {
+        this.images = images;
         this.leases = Objects.requireNonNull(leases, "leases");
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
         this.models = Objects.requireNonNull(models, "models");
@@ -243,6 +256,9 @@ final class TextResidencyDriver implements TextResidency, SmartLifecycle {
             pass.expired().forEach(lease -> ended(lease.members(), LOST));
             pass.grants().forEach(this::serve);
             askHoldersToYield();
+            if (images != null) {
+                images.sweep();
+            }
         } catch (RuntimeException failure) {
             LOG.log(System.Logger.Level.WARNING, "residency pass failed: " + failure.getClass().getName());
         }
@@ -272,8 +288,12 @@ final class TextResidencyDriver implements TextResidency, SmartLifecycle {
         }
     }
 
-    /** Make a grant's model resident. Only this driver submits requests, and only text ones. */
+    /** Make a text grant's model resident, or pass an image grant on. Only this driver submits text requests. */
     private void serve(Grant grant) {
+        if (images != null && grant.lease().modality() == Modality.IMAGE) {
+            images.accept(grant);
+            return;
+        }
         List<UUID> admitted = grant.admitted().stream().map(AdmissionRequest::id).toList();
         if (admitted.stream().noneMatch(this::wanted)) {
             admitted.forEach(leases::finishText);

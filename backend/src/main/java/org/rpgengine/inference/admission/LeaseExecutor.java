@@ -368,6 +368,12 @@ public final class LeaseExecutor {
      * Run a batch for a created lease of a non-text model, on the caller's thread. Requests that join the
      * lease during the run are the job's to absorb, through the grants of a later {@link #pass}.
      *
+     * <p>An interrupt stops the job at its current step, as {@link Status#JOB_FAILED} when the step reports it.
+     * {@link SteppedJob#abandoned} and the unload then run with the thread's interrupt flag down, because with it set
+     * every wait and server call there fails at once, the model stays unconfirmed and its capacity stays held. The
+     * flag is set again before this returns. An interrupt that arrives during a load or an unload still fails that
+     * call, which leaves the lease reconciling for {@link #pass} to retry.
+     *
      * @param grant the grant that created the lease
      * @param job the work, called one step at a time
      * @return the outcome; the lease is over in every case
@@ -390,6 +396,7 @@ public final class LeaseExecutor {
             lease.members().forEach(delays::remove);
         }
         int steps = 0;
+        boolean interrupted = false;
         Status status = null;
         while (status == null) {
             status = checkpoint(run);
@@ -403,14 +410,33 @@ public final class LeaseExecutor {
                 if (!more) {
                     status = Status.COMPLETED;
                 }
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
+            } catch (InterruptedException stop) {
+                interrupted = true;
                 status = Status.JOB_FAILED;
             } catch (Exception failure) {
                 status = Status.JOB_FAILED;
             }
         }
-        return endBatch(run, status, steps);
+        interrupted |= Thread.interrupted();
+        try {
+            if (status != Status.COMPLETED) {
+                abandon(job);
+                interrupted |= Thread.interrupted();
+            }
+            return endBatch(run, status, steps);
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    private static void abandon(SteppedJob job) {
+        try {
+            job.abandoned();
+        } catch (RuntimeException failure) {
+            // The model must still leave memory, and the outcome already says the job did not finish.
+        }
     }
 
     /**

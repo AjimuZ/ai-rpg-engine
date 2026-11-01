@@ -18,8 +18,9 @@ import org.springframework.core.env.Environment;
  * @param textDemand what any text model is taken to need, within {@code capacity}. It defaults to the whole
  *        capacity, the same answer the executor gives for a resident model of unknown size, because too large
  *        a figure only costs waiting and too small a one could overcommit the card. The GPU part is at least 1 MiB.
+ * @param imageDemand what any image model is taken to need, under the same rules and with the same default
  */
-record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience, Demand textDemand) {
+record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience, Demand textDemand, Demand imageDemand) {
     static final String PREFIX = "engine.inference.admission.";
     static final String ENABLED = PREFIX + "enabled";
     /** Largest accepted budget or headroom, in MiB: far above any single card, so a typo in the unit fails. */
@@ -70,16 +71,22 @@ record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience, 
         if (headroom < 0 || headroom > MAX_HEADROOM_MIB) {
             throw new IllegalStateException(PREFIX + "headroom-mib out of range");
         }
-        long textGpu = number(environment, "text-gpu-demand-mib", gpu);
-        long textRam = number(environment, "text-ram-demand-mib", ram);
-        if (textGpu < 1 || textGpu > gpu) {
-            throw new IllegalStateException(PREFIX + "text-gpu-demand-mib must be between 1 and gpu-budget-mib");
-        }
-        if (textRam < 0 || textRam > ram) {
-            throw new IllegalStateException(PREFIX + "text-ram-demand-mib must be between 0 and ram-budget-mib");
-        }
+        Demand textDemand = modelDemand(environment, "text", gpu, ram);
+        Demand imageDemand = modelDemand(environment, "image", gpu, ram);
         return new AdmissionOptions(new Demand(gpu * BYTES_PER_MIB, ram * BYTES_PER_MIB), headroom * BYTES_PER_MIB,
-                patience(environment), new Demand(textGpu * BYTES_PER_MIB, textRam * BYTES_PER_MIB));
+                patience(environment), textDemand, imageDemand);
+    }
+
+    private static Demand modelDemand(Environment environment, String kind, long gpu, long ram) {
+        long modelGpu = number(environment, kind + "-gpu-demand-mib", gpu);
+        long modelRam = number(environment, kind + "-ram-demand-mib", ram);
+        if (modelGpu < 1 || modelGpu > gpu) {
+            throw new IllegalStateException(PREFIX + kind + "-gpu-demand-mib must be between 1 and gpu-budget-mib");
+        }
+        if (modelRam < 0 || modelRam > ram) {
+            throw new IllegalStateException(PREFIX + kind + "-ram-demand-mib must be between 0 and ram-budget-mib");
+        }
+        return new Demand(modelGpu * BYTES_PER_MIB, modelRam * BYTES_PER_MIB);
     }
 
     private static Long number(Environment environment, String key, Long fallback) {

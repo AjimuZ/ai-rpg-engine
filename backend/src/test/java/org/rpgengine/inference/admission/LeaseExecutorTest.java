@@ -480,6 +480,128 @@ class LeaseExecutorTest {
         assertThat(executor.pass().grants()).hasSize(1);
     }
 
+    /** A job whose steps do as told and that records being abandoned. */
+    private SteppedJob abandonable(boolean finishes, boolean abandonFails) {
+        return new SteppedJob() {
+            @Override
+            public boolean step() {
+                if (finishes) {
+                    return false;
+                }
+                throw new IllegalStateException("broken step");
+            }
+
+            @Override
+            public void abandoned() {
+                events.add("abandoned");
+                if (abandonFails) {
+                    throw new IllegalStateException("broken stop");
+                }
+            }
+        };
+    }
+
+    @Test
+    void anAbandonedJobIsToldOnceBeforeItsModelUnloads() {
+        Grant grant = grantImage();
+        events.clear();
+
+        assertThat(executor.runBatch(grant, abandonable(false, false)).status()).isEqualTo(Status.JOB_FAILED);
+
+        assertThat(events).containsSubsequence("abandoned", "worker unload " + IMAGE);
+        assertThat(events.stream().filter("abandoned"::equals)).hasSize(1);
+    }
+
+    @Test
+    void aJobThatFinishedIsNotToldItWasAbandoned() {
+        Grant grant = grantImage();
+        events.clear();
+
+        assertThat(executor.runBatch(grant, abandonable(true, false)).status()).isEqualTo(Status.COMPLETED);
+
+        assertThat(events).doesNotContain("abandoned");
+    }
+
+    @Test
+    void aFailureWhileAbandoningStillUnloadsTheModel() {
+        Grant grant = grantImage();
+
+        Outcome outcome = executor.runBatch(grant, abandonable(false, true));
+
+        assertThat(outcome.status()).isEqualTo(Status.JOB_FAILED);
+        assertThat(outcome.reconciling()).isFalse();
+        assertThat(worker.holds(IMAGE)).isFalse();
+    }
+
+    /** A batch through a control that fails on an interrupted thread; the test's thread gets its flag cleared. */
+    private Outcome interruptedBatch(SteppedJob job) {
+        executor = executor(coordinator, SETTINGS, Map.of(Modality.TEXT, LocalAdapters.control(server), Modality.IMAGE,
+                new InterruptibleControl(worker)));
+        Grant grant = grantImage();
+        try {
+            return executor.runBatch(grant, job);
+        } finally {
+            events.add("flag " + Thread.interrupted());
+        }
+    }
+
+    @Test
+    void aStepInterruptedOnItsThreadStillConfirmsTheUnloadAndTheFlagComesBackAfterwards() {
+        AtomicReference<Boolean> flagWhileAbandoned = new AtomicReference<>();
+
+        Outcome outcome = interruptedBatch(new SteppedJob() {
+            @Override
+            public boolean step() throws InterruptedException {
+                throw new InterruptedException();
+            }
+
+            @Override
+            public void abandoned() {
+                flagWhileAbandoned.set(Thread.currentThread().isInterrupted());
+            }
+        });
+
+        assertThat(outcome.status()).isEqualTo(Status.JOB_FAILED);
+        assertThat(outcome.reconciling()).isFalse();
+        assertThat(flagWhileAbandoned).hasValue(false);
+        assertThat(worker.holds(IMAGE)).isFalse();
+        assertThat(executor.metrics()).containsEntry("leases_reconciling", 0L).containsEntry("leases_active", 0L);
+        assertThat(events).contains("flag true");
+    }
+
+    @Test
+    void aFlagSetDuringALastStepDoesNotCostTheUnloadAndComesBackAfterwards() {
+        Outcome outcome = interruptedBatch(() -> {
+            Thread.currentThread().interrupt();
+            return false;
+        });
+
+        assertThat(outcome.status()).isEqualTo(Status.COMPLETED);
+        assertThat(outcome.reconciling()).isFalse();
+        assertThat(worker.holds(IMAGE)).isFalse();
+        assertThat(events).contains("flag true");
+    }
+
+    @Test
+    void anInterruptThatArrivesWhileAbandoningDoesNotCostTheUnloadAndComesBackAfterwards() {
+        Outcome outcome = interruptedBatch(new SteppedJob() {
+            @Override
+            public boolean step() {
+                throw new IllegalStateException("broken step");
+            }
+
+            @Override
+            public void abandoned() {
+                Thread.currentThread().interrupt();
+            }
+        });
+
+        assertThat(outcome.status()).isEqualTo(Status.JOB_FAILED);
+        assertThat(outcome.reconciling()).isFalse();
+        assertThat(worker.holds(IMAGE)).isFalse();
+        assertThat(events).contains("flag true");
+    }
+
     @Test
     void anInteractiveDemandThatFitsBesideTheJobDoesNotInterruptIt() {
         var speech = fixtures.request("line", Modality.SPEECH, WorkClass.PREPARATION, A, "speech-a", SMALL, clock.instant());

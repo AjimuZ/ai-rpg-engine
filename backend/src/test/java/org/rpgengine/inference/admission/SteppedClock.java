@@ -8,7 +8,8 @@ import java.time.ZoneOffset;
 
 /** Test clock that moves only when told to, so lease expiry and aging are deterministic. */
 final class SteppedClock extends Clock {
-    private Instant now;
+    /** Volatile because a batch thread reads it between steps while a test moves it. */
+    private volatile Instant now;
 
     SteppedClock(Instant start) {
         now = start;

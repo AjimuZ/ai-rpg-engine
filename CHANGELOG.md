@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Image requests through the lease executor (P21.4-C.1.2.2.2), 1 November 2026
+
+- With `engine.inference.admission.enabled` on, a new `ImageAdmission` path runs an image request on a lease, as a stepped job
+  through the lease executor. A running job can be cancelled or interrupted between steps, and the backend is told to stop
+  before the model is unloaded. When the application stops, a running job is stopped the same way within a bounded wait and
+  ends `image-shutdown`. With the switch off, the adapter is called directly.
+- A job that cannot run ends with a fixed `image-admission-*` failure code, which the caller answers with catalog art. Each
+  job's ticket says how long it may wait for its model.
+- New optional settings `engine.inference.admission.image-gpu-demand-mib` and `image-ram-demand-mib` give the size any image
+  model is taken to need. Both default to the whole budget.
+- Nothing visible changes yet: no code calls this path and no image control is registered, so a batch in the application would
+  end `LOAD_FAILED`. Tested with a recording port and no GPU only. See
+  [docs/34](docs/34-inference-backends-and-model-selection.md#p214-c1222-image-requests-through-the-lease-executor).
+
 ## Unreleased — Scheduler text permit linked to the lease executor (P21.4-C.1.2.2.1), 1 November 2026
 
 - With `engine.inference.admission.enabled` on, a task on a local slot that holds the scheduler's permit now loads its model

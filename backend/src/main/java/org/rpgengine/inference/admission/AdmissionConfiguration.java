@@ -67,7 +67,9 @@ class AdmissionConfiguration {
 
     /**
      * @param text the text model server's control, present when {@code engine.inference.local.url} is set
-     * @return the text modality's control; image and speech have none until their workers exist
+     * @return the text modality's control. Image and speech have none until their workers exist: a stand-in that
+     *         reported a checkpoint gone while its server still held it would let a text model load beside it, so an
+     *         image batch ends {@code LOAD_FAILED} instead.
      * @throws IllegalStateException when no text control exists, so the owner learns at startup that the switch
      *         has nothing to drive
      */
