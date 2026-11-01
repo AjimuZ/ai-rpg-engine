@@ -10,7 +10,10 @@
  *   <li>{@code LocalConfiguration}: selects the adapter and the slot routing port when a server URL
  *       is configured;</li>
  *   <li>{@code LocalModelControl}: the load, unload, model list and slot routes behind the neutral
- *       {@code ModelServerControl}; nothing constructs it outside tests yet.</li>
+ *       {@code ModelServerControl}. {@code LocalControlConfiguration} builds it only when
+ *       {@code engine.inference.local.url} and {@code engine.inference.admission.enabled} are both set,
+ *       and the admission package's {@code TextResidencyDriver} then drives it through the
+ *       {@code LeaseExecutor}.</li>
  * </ul>
  * Everything here is package-private; no other package of the engine may import from it (enforced by
  * {@code InferenceBoundaryTest}). This package never touches the database or canonical state, and it

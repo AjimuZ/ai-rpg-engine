@@ -29,6 +29,7 @@ import org.rpgengine.inference.TaskHandle;
 import org.rpgengine.inference.TaskRequest;
 import org.rpgengine.inference.TaskResult;
 import org.rpgengine.inference.session.ScopedSessions;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.SmartLifecycle;
@@ -98,6 +99,15 @@ import org.springframework.stereotype.Component;
  * <p><b>Concurrency default</b>: one runtime turn installation-wide. {@link SchedulerSettings#from}
  * refuses a higher limit until P01.7 evidence and a QA-37 qualification exist, and the V14 index
  * enforces the same limit in the database.
+ *
+ * <p><b>Residency</b> (only with a {@link TextResidency}, which exists behind
+ * {@code engine.inference.admission.enabled}): a task that took the permit first claims residency and
+ * is forwarded only when the claim says ready, with what then remains of its budget. Until then it can
+ * be cancelled, preempted, expired ({@value #QUEUE_TIMEOUT}) or ended by shutdown at once, without a turn
+ * and without its reservation. A refused claim ends the task UNAVAILABLE with the claim's code. The claim
+ * is released exactly once, when the port's result arrives, whatever becomes of the ledger write; an
+ * UNRESOLVED result keeps it until the port confirms that nothing runs, because the model may still be
+ * in use until then. Without a {@link TextResidency} a dispatched task is forwarded at once.
  *
  * <p>Thread-safety: all scheduling state is confined to a serialized drain loop
  * ({@link #pump()}): submissions, cancellations, port completions and timer ticks enqueue events
@@ -184,6 +194,8 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
     private final SchedulerSettings settings;
     private final Clock clock;
     private final DoubleSupplier jitter;
+    /** Null when nothing manages residency, which leaves dispatch as it always was. */
+    private final TextResidency residency;
     private final UUID instance = UUID.randomUUID();
     private final AtomicLong sequence = new AtomicLong();
     private final AtomicInteger pumpRequests = new AtomicInteger();
@@ -200,6 +212,8 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
     private final List<Settlement> unsettled = new ArrayList<>();
     /** RECONCILING rows of this process whose permits are held until the port confirms them. */
     private final List<UUID> reconciling = new ArrayList<>();
+    /** Claims of UNRESOLVED results, released once the port confirms that nothing runs. */
+    private final List<TextResidency.Claim> reconcilingClaims = new ArrayList<>();
 
     /**
      * Spring constructor: settings from {@code engine.inference.scheduler.*}, the system clock and
@@ -209,16 +223,19 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
      * @param port the installation's task port, read for readiness and reconciliation
      * @param ledger durable ledger
      * @param environment source of the settings
+     * @param residency the residency side, which exists only behind the admission switch
      * @throws IllegalArgumentException for invalid or unqualified settings, failing startup
      */
     @Autowired
     public InferenceScheduler(ScopedSessions sessions, NarrationTaskPort port, TaskLedger ledger,
-            Environment environment) {
+            Environment environment, ObjectProvider<TextResidency> residency) {
         this(sessions, port, ledger, SchedulerSettings.from(environment), Clock.systemUTC(),
-                () -> ThreadLocalRandom.current().nextDouble());
+                () -> ThreadLocalRandom.current().nextDouble(), residency.getIfAvailable());
     }
 
     /**
+     * A scheduler without residency management.
+     *
      * @param sessions the scoped session registry
      * @param port the task port behind {@code sessions}
      * @param ledger durable ledger
@@ -228,6 +245,21 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
      */
     public InferenceScheduler(ScopedSessions sessions, NarrationTaskPort port, TaskLedger ledger,
             SchedulerSettings settings, Clock clock, DoubleSupplier jitter) {
+        this(sessions, port, ledger, settings, clock, jitter, null);
+    }
+
+    /**
+     * @param sessions the scoped session registry
+     * @param port the task port behind {@code sessions}
+     * @param ledger durable ledger
+     * @param settings validated limits
+     * @param clock clock of deadlines, quotas and backoff; tests supply a controllable one
+     * @param jitter source of uniform values in [0, 1) for the backoff jitter
+     * @param residency what makes a task's model resident before its turn, or null for nothing
+     */
+    public InferenceScheduler(ScopedSessions sessions, NarrationTaskPort port, TaskLedger ledger,
+            SchedulerSettings settings, Clock clock, DoubleSupplier jitter, TextResidency residency) {
+        this.residency = residency;
         this.sessions = Objects.requireNonNull(sessions, "sessions");
         this.port = Objects.requireNonNull(port, "port");
         this.ledger = Objects.requireNonNull(ledger, "ledger");
@@ -413,6 +445,7 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
         Instant now = clock.instant();
         retryUnsettled(now);
         expireWaiting(now);
+        expireResidencyWaits(now);
         releaseReconciliation(now);
         preempt(now);
         dispatchReady(now);
@@ -515,6 +548,8 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
         } else if (task.portHandle != null) {
             // Running: the port interrupts the exact turn and reports the confirmed terminal status.
             task.portHandle.cancel();
+        } else if (task.awaitingResidency) {
+            endResidencyWait(task, TaskResult.Status.CANCELLED, CANCELLED);
         }
         // Not yet admitted: admission sees the flag.
     }
@@ -540,6 +575,16 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
         }
     }
 
+    /** The same budget rule as a queued task, for a task that holds the permit and waits for its model. */
+    private void expireResidencyWaits(Instant now) {
+        for (Scheduled task : queue.active()) {
+            if (task.awaitingResidency
+                    && Duration.between(now, task.deadline).compareTo(TaskRequest.MIN_TIMEOUT) < 0) {
+                endResidencyWait(task, TaskResult.Status.TIMED_OUT, QUEUE_TIMEOUT);
+            }
+        }
+    }
+
     private void shutdownWork() {
         Instant now = clock.instant();
         for (Scheduled task : queue.waiting()) {
@@ -550,6 +595,8 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
         for (Scheduled task : queue.active()) {
             if (task.portHandle != null) {
                 task.portHandle.cancel();
+            } else if (task.awaitingResidency) {
+                endResidencyWait(task, TaskResult.Status.CANCELLED, SHUTDOWN);
             }
         }
     }
@@ -598,10 +645,83 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
                 }
                 case DISPATCHED -> {
                     queue.started(task);
-                    forward(task, remaining);
+                    if (residency == null) {
+                        forward(task, remaining);
+                    } else {
+                        claimResidency(task);
+                    }
                 }
             }
         }
+    }
+
+    /** Ask for the task's model; the answer returns to the drain loop, and this loop never waits for it. */
+    private void claimResidency(Scheduled task) {
+        task.awaitingResidency = true;
+        try {
+            task.claim = residency.claim(task.task, new TextResidency.Listener() {
+                @Override
+                public void ready() {
+                    residencyEvent(() -> residencyReady(task));
+                }
+
+                @Override
+                public void refused(String code) {
+                    residencyEvent(() -> residencyRefused(task, code));
+                }
+
+                @Override
+                public void mustStop() {
+                    residencyEvent(() -> residencyTakenBack(task));
+                }
+            });
+        } catch (RuntimeException failure) {
+            LOG.log(System.Logger.Level.WARNING, "residency claim failed: " + failure.getClass().getName());
+            endResidencyWait(task, TaskResult.Status.UNAVAILABLE, TextResidency.UNAVAILABLE);
+        }
+    }
+
+    private void residencyEvent(Runnable event) {
+        events.add(event);
+        signal();
+    }
+
+    /** The model is resident: start the turn with what remains of the budget, unless the task ended first. */
+    private void residencyReady(Scheduled task) {
+        if (!task.awaitingResidency) {
+            return;
+        }
+        Duration remaining = Duration.between(clock.instant(), task.deadline);
+        if (state != State.READY) {
+            endResidencyWait(task, TaskResult.Status.CANCELLED, SHUTDOWN);
+        } else if (task.cancelRequested) {
+            // The cancellation's own event is still queued behind this one.
+            endResidencyWait(task, TaskResult.Status.CANCELLED, CANCELLED);
+        } else if (remaining.compareTo(TaskRequest.MIN_TIMEOUT) < 0) {
+            endResidencyWait(task, TaskResult.Status.TIMED_OUT, QUEUE_TIMEOUT);
+        } else {
+            task.awaitingResidency = false;
+            forward(task, remaining);
+        }
+    }
+
+    private void residencyRefused(Scheduled task, String code) {
+        if (task.awaitingResidency) {
+            endResidencyWait(task, TaskResult.Status.UNAVAILABLE, code);
+        }
+    }
+
+    /** Stop the turn of a task whose admission was taken back; it ends like a preempted task, and may be retried. */
+    private void residencyTakenBack(Scheduled task) {
+        if (!task.future.isDone() && !task.preempted) {
+            interrupt(task);
+        }
+    }
+
+    /** End a task that holds the permit but never reached the port: no turn ran, so nothing stays charged. */
+    private void endResidencyWait(Scheduled task, TaskResult.Status status, String code) {
+        task.awaitingResidency = false;
+        settle(task, TaskResult.withoutTurn(task.taskId(), status, code));
     }
 
     /** Submit a dispatched task in its scope's session; its completion returns to the drain loop. */
@@ -637,6 +757,14 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
                     result.freshSession());
         }
         boolean uncertain = result.status() == TaskResult.Status.UNRESOLVED;
+        if (task.claim != null) {
+            if (uncertain) {
+                reconcilingClaims.add(task.claim);
+            } else {
+                task.claim.release(task.preempted && result.status() == TaskResult.Status.CANCELLED);
+            }
+            task.claim = null;
+        }
         // A result without provenance never started a runtime turn (TaskResult contract).
         boolean keepCharge = uncertain || result.provenance() != null;
         var settlement = new Settlement(task, uncertain ? "RECONCILING" : result.status().name(),
@@ -709,6 +837,8 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
                 return;
             }
             reconciling.clear();
+            reconcilingClaims.forEach(claim -> claim.release(false));
+            reconcilingClaims.clear();
             while (queue.held() > 0) {
                 queue.release();
             }
@@ -725,18 +855,22 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
     }
 
     private void preempt(Instant now) {
-        queue.preemptionVictim(now).ifPresent(victim -> {
-            queue.markPreempting(victim);
-            victim.preempted = true;
-            try {
-                ledger.markPreempted(victim.taskId(), instance);
-            } catch (RuntimeException storage) {
-                // The mark is diagnostic; the interruption itself must not wait for it.
-            }
-            if (victim.portHandle != null) {
-                victim.portHandle.cancel();
-            }
-        });
+        queue.preemptionVictim(now).ifPresent(this::interrupt);
+    }
+
+    private void interrupt(Scheduled victim) {
+        queue.markPreempting(victim);
+        victim.preempted = true;
+        try {
+            ledger.markPreempted(victim.taskId(), instance);
+        } catch (RuntimeException storage) {
+            // The mark is diagnostic; the interruption itself must not wait for it.
+        }
+        if (victim.portHandle != null) {
+            victim.portHandle.cancel();
+        } else if (victim.awaitingResidency) {
+            endResidencyWait(victim, TaskResult.Status.CANCELLED, PREEMPTED);
+        }
     }
 
     // ---------------------------------------------------------------- account backoff
@@ -829,6 +963,8 @@ public class InferenceScheduler implements SmartLifecycle, SmartInitializingSing
         // Drain-confined.
         private TaskHandle portHandle;
         private boolean preempted;
+        private TextResidency.Claim claim;
+        private boolean awaitingResidency;
 
         private Scheduled(ScheduledTask task, long sequence, Instant enqueuedAt, Instant deadline) {
             this.task = task;

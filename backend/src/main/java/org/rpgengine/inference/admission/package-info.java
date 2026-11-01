@@ -21,9 +21,11 @@
  * <p>{@link org.rpgengine.inference.admission.HostGpuMemoryReading} reads free memory from
  * {@code nvidia-smi}, and {@code AdmissionConfiguration} builds the
  * coordinator and the executor only when {@code engine.inference.admission.enabled} is {@code true}.
+ * Behind the same switch {@link org.rpgengine.inference.admission.TextResidencyDriver} runs the executor
+ * on its own thread and serves the scheduler's text permit through the neutral
+ * {@link org.rpgengine.inference.scheduling.TextResidency}.
  *
- * <p>Not built here: any caller of the executor, any real image or speech worker, and any link to the
- * task scheduler or the adapters. Everything is tested against scripted servers, so nothing yet proves
- * that the host stays out of memory trouble.
+ * <p>Not built here: any real image or speech worker, and any source of expected text demand. Everything is
+ * tested against scripted servers, so nothing yet proves that the host stays out of memory trouble.
  */
 package org.rpgengine.inference.admission;

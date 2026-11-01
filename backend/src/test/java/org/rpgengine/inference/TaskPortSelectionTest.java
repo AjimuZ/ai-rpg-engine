@@ -21,6 +21,7 @@ import org.rpgengine.inference.scheduling.MemoryTaskLedger;
 import org.rpgengine.inference.scheduling.ScheduledTask;
 import org.rpgengine.inference.scheduling.SchedulerSettings;
 import org.rpgengine.inference.scheduling.TaskLedger;
+import org.rpgengine.inference.scheduling.TextResidency;
 import org.rpgengine.inference.scheduling.WorkClass;
 import org.rpgengine.inference.session.AiRole;
 import org.rpgengine.inference.session.Audience;
@@ -193,12 +194,13 @@ class TaskPortSelectionTest {
 
     @Test
     void theAdmissionSwitchIsOffByDefaultAndWithItOffNoAdmissionBeanExists() {
-        runner.run(context -> assertThat(context).doesNotHaveBean(LeaseExecutor.class));
+        runner.run(context -> assertThat(context).doesNotHaveBean(LeaseExecutor.class)
+                .doesNotHaveBean(TextResidency.class));
         runner.withPropertyValues("engine.inference.local.url=http://127.0.0.1:9",
                 "engine.inference.admission.gpu-budget-mib=10240").run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).doesNotHaveBean(LeaseExecutor.class).doesNotHaveBean(AdmissionCoordinator.class)
-                            .doesNotHaveBean(ModelServerControl.class);
+                            .doesNotHaveBean(ModelServerControl.class).doesNotHaveBean(TextResidency.class);
                     assertThat(context.getBean(NarrationTaskPort.class)).isInstanceOf(SlotRoutingTaskPort.class);
                 });
     }
@@ -217,6 +219,29 @@ class TaskPortSelectionTest {
                     assertThat(context.getBean(AdmissionControls.class).byModality()).containsOnlyKeys(Modality.TEXT)
                             .containsValue(context.getBean(ModelServerControl.class));
                     assertThat(context.getBean(NarrationTaskPort.class)).isInstanceOf(SlotRoutingTaskPort.class);
+                });
+    }
+
+    @Test
+    void theAdmissionSwitchGivesTheSchedulerAResidencySideThatServesATaskOnAnotherBackendAtOnce() {
+        runner.withBean(LeaseStore.class, () -> mock(LeaseStore.class))
+                .withPropertyValues("engine.inference.local.url=http://127.0.0.1:9",
+                        "engine.inference.local.reconnect-initial=50ms", "engine.inference.admission.enabled=true",
+                        "engine.inference.admission.gpu-budget-mib=10240",
+                        "engine.inference.slots.standard.backend=codex", "engine.inference.slots.standard.model=model-a",
+                        "engine.inference.slots.standard.effort=medium")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(TextResidency.class);
+                    var scope = new SessionScope(UUID.randomUUID(), UUID.randomUUID(), 0, AiRole.NARRATOR, Audience.PUBLIC,
+                            "a".repeat(64), "b".repeat(64));
+                    // The slot is on a backend with no adapter here, so the routing port refuses it, and no lease is taken.
+                    TaskResult result = context.getBean(InferenceScheduler.class).submit(new ScheduledTask(UUID.randomUUID(),
+                            scope, WorkClass.INTERACTIVE, InferenceSlot.STANDARD, "x", "{}", Duration.ofSeconds(5))).result()
+                            .toCompletableFuture().get(5, TimeUnit.SECONDS);
+                    assertThat(result.status()).isEqualTo(TaskResult.Status.FAILED);
+                    assertThat(result.errorCode()).isEqualTo("slot-backend-mismatch");
+                    assertThat(context.getBean(LeaseExecutor.class).metrics()).containsEntry("leases_active", 0L);
                 });
     }
 

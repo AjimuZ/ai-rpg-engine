@@ -14,5 +14,9 @@
  * reconciliation of unconfirmed outcomes and restart recovery. It never stores instructions or
  * outputs, never replays captured requests and holds no canonical authority: results are untrusted
  * proposals that the contracts validate.
+ *
+ * <p>{@link org.rpgengine.inference.scheduling.TextResidency} is the optional seam through which a task
+ * holding the permit obtains and releases its model; only the admission package implements it, and only
+ * behind {@code engine.inference.admission.enabled}.
  */
 package org.rpgengine.inference.scheduling;

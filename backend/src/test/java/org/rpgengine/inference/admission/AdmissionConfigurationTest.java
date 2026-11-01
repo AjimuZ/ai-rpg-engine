@@ -99,6 +99,31 @@ class AdmissionConfigurationTest {
     }
 
     @Test
+    void aTextModelIsTakenToNeedTheWholeBudgetUntilTheOwnerSaysOtherwise() {
+        MockEnvironment defaults = new MockEnvironment().withProperty("engine.inference.admission.gpu-budget-mib", "8192")
+                .withProperty("engine.inference.admission.ram-budget-mib", "16384");
+        assertThat(AdmissionOptions.from(defaults).textDemand()).isEqualTo(new Demand(8192 * MIB, 16384 * MIB));
+        defaults.setProperty("engine.inference.admission.text-gpu-demand-mib", "4096");
+        defaults.setProperty("engine.inference.admission.text-ram-demand-mib", "0");
+        assertThat(AdmissionOptions.from(defaults).textDemand()).isEqualTo(new Demand(4096 * MIB, 0));
+    }
+
+    @Test
+    void aTextDemandOutsideTheBudgetFailsStartupWithoutEchoingIt() {
+        String[][] cases = {
+                {"text-gpu-demand-mib=10241", "text-gpu-demand-mib must be between", "10241"},
+                {"text-gpu-demand-mib=0", "text-gpu-demand-mib must be between", "=0"},
+                {"text-gpu-demand-mib=secret-size", "text-gpu-demand-mib is not a whole number", "secret-size"},
+                {"text-ram-demand-mib=7654321", "text-ram-demand-mib must be between", "7654321"},
+                {"text-ram-demand-mib=-7654321", "text-ram-demand-mib must be between", "7654321"}};
+        for (String[] each : cases) {
+            on("engine.inference.admission." + each[0]).run(context -> assertThat(context).hasFailed().getFailure()
+                    .hasStackTraceContaining("engine.inference.admission." + each[1])
+                    .satisfies(failure -> assertThat(failure.toString()).doesNotContain(each[2])));
+        }
+    }
+
+    @Test
     void theSwitchWithoutAModelServerControlFailsStartup() {
         new ApplicationContextRunner().withUserConfiguration(AdmissionConfiguration.class)
                 .withBean(LeaseStore.class, MemoryLeaseStore::new)

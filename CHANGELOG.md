@@ -1,13 +1,30 @@
 # Changelog
 
+## Unreleased — Scheduler text permit linked to the lease executor (P21.4-C.1.2.2.1), 1 November 2026
+
+- With `engine.inference.admission.enabled` on, a task on a local slot that holds the scheduler's permit now loads its model
+  through the lease executor before its turn and releases it afterwards. A task on another backend is unaffected. The switch
+  now really loads and unloads models. With it off, or with no executor, the scheduler behaves as before.
+- A task whose model cannot be made resident ends `UNAVAILABLE` with `residency-contention`, `residency-load-failed`,
+  `residency-lost` or `residency-unavailable`, without a turn or a charge. Waiting for a model can be cancelled, preempted or
+  timed out at once. A turn whose lease is lost or taken back ends `CANCELLED` with `preempted`.
+- New optional settings `engine.inference.admission.text-gpu-demand-mib` and `text-ram-demand-mib` give the size any text model
+  is taken to need. Both default to the whole budget.
+- Two fixed placeholder values changed, neither measured as a setting: the lease lifetime is now 5 minutes (was 2), and a load
+  or unload is checked 240 times (was 30), because the slowest recorded load took 164 s.
+- Tested without a GPU or a model server only. The default headroom may refuse every cold load on the reference host, and no
+  working combination of settings has been tried. See
+  [docs/34](docs/34-inference-backends-and-model-selection.md#p214-c1221-link-from-the-schedulers-text-permit-to-the-lease-executor).
+
 ## Unreleased — Opt-in construction of the lease executor (P21.4-C.1.2.1), 1 November 2026
 
 - A new setting, `engine.inference.admission.enabled` (off by default), makes the application build the admission coordinator
   and the lease executor over the local model server's control. It needs `engine.inference.local.url` and
   `engine.inference.admission.gpu-budget-mib`; optional are `ram-budget-mib`, `headroom-mib` (default 1024) and `patience`
   (default 2 minutes). An invalid value stops startup with a message that does not repeat the value.
-- With the switch off nothing is built and behaviour is unchanged. With it on, nothing calls the executor yet, so no model is
-  loaded or unloaded. The fixed lease and swap values are unmeasured placeholders, and the wiring was tested without a GPU.
+- With the switch off nothing is built and behaviour is unchanged. With it on, this change alone called nothing on the executor, so
+  no model was loaded or unloaded; the scheduler link above adds the caller. The fixed lease and swap values are unmeasured
+  placeholders, and the wiring was tested without a GPU.
 
 ## Unreleased — Host GPU memory reading (P21.4-C.1.1), 1 November 2026
 
@@ -135,8 +152,9 @@
 - A request that waits or was put back can be withdrawn and is then never granted again. A running batch yields between steps when interactive text needs the room. Low free GPU memory delays a batch and then falls back to
   text-only play or catalog art; no other process is ever stopped. Counters and gauges are available in the process, as fixed names
   and numbers only.
-- Nothing in the running application uses it yet, so players see no change: it has been tested against scripted servers only, with no
-  real model server, worker or GPU reading, and no out-of-memory protection is claimed.
+- Nothing in the running application used it when this entry was written, so players saw no change: it was tested against scripted
+  servers only, with no real model server, worker or GPU reading, and no out-of-memory protection is claimed. The opt-in scheduler
+  link above now uses it.
 
 ## Unreleased — GPU and RAM admission coordinator core (P21.4-A), 31 October 2026
 
@@ -146,8 +164,8 @@
 - Leases expire unless renewed and are recorded in the new `resource_lease` table (migration V29). After a restart the leases of the
   earlier process stay reserved until a caller confirms their model is gone. The backup tool now expects schema version 29 and the
   new table.
-- Nothing calls the coordinator yet: it loads and unloads no model, interrupts no image run, measures nothing and is not tied to the
-  text scheduler or the adapters. No out-of-memory protection is claimed.
+- Nothing called the coordinator when this entry was written: by itself it loads and unloads no model, interrupts no image run,
+  measures nothing and is not tied to the text scheduler or the adapters. No out-of-memory protection is claimed.
 
 ## Unreleased — Settings → Models panel (P21.3-D), 31 October 2026
 

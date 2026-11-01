@@ -9,14 +9,17 @@ import org.springframework.core.env.Environment;
  * owner configuration, never task data; an invalid value fails startup with a message that names the
  * setting but not its value.
  *
- * <p>Only these three values are the owner's to choose today. Every other value of the coordinator and the
+ * <p>Only these values are the owner's to choose today. Every other value of the coordinator and the
  * executor is fixed in {@link AdmissionConfiguration} and has not been measured on a host.
  *
  * @param capacity the GPU and RAM the engine allows itself in total, set by the owner below the real totals
  * @param headroomBytes GPU bytes that must stay free beside a model about to load (0 up to 64 GiB)
  * @param patience how long a request may stay delayed by contention before it falls back (above 0, at most 1 hour)
+ * @param textDemand what any text model is taken to need, within {@code capacity}. It defaults to the whole
+ *        capacity, the same answer the executor gives for a resident model of unknown size, because too large
+ *        a figure only costs waiting and too small a one could overcommit the card. The GPU part is at least 1 MiB.
  */
-record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience) {
+record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience, Demand textDemand) {
     static final String PREFIX = "engine.inference.admission.";
     static final String ENABLED = PREFIX + "enabled";
     /** Largest accepted budget or headroom, in MiB: far above any single card, so a typo in the unit fails. */
@@ -67,8 +70,16 @@ record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience) 
         if (headroom < 0 || headroom > MAX_HEADROOM_MIB) {
             throw new IllegalStateException(PREFIX + "headroom-mib out of range");
         }
+        long textGpu = number(environment, "text-gpu-demand-mib", gpu);
+        long textRam = number(environment, "text-ram-demand-mib", ram);
+        if (textGpu < 1 || textGpu > gpu) {
+            throw new IllegalStateException(PREFIX + "text-gpu-demand-mib must be between 1 and gpu-budget-mib");
+        }
+        if (textRam < 0 || textRam > ram) {
+            throw new IllegalStateException(PREFIX + "text-ram-demand-mib must be between 0 and ram-budget-mib");
+        }
         return new AdmissionOptions(new Demand(gpu * BYTES_PER_MIB, ram * BYTES_PER_MIB), headroom * BYTES_PER_MIB,
-                patience(environment));
+                patience(environment), new Demand(textGpu * BYTES_PER_MIB, textRam * BYTES_PER_MIB));
     }
 
     private static Long number(Environment environment, String key, Long fallback) {

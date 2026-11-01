@@ -1,0 +1,60 @@
+package org.rpgengine.inference.admission;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.util.Optional;
+import java.util.function.Function;
+
+import org.rpgengine.inference.InferenceSlot;
+import org.rpgengine.inference.NarrationTaskPort;
+import org.rpgengine.inference.ProfileResolver;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
+import org.springframework.context.annotation.Configuration;
+
+/**
+ * Links the scheduler's text permit to the lease executor when {@code engine.inference.admission.enabled} is
+ * {@code true}, apart from {@link AdmissionConfiguration}, which only constructs. Without the switch the
+ * scheduler finds no {@link org.rpgengine.inference.scheduling.TextResidency} and behaves as before.
+ */
+@Configuration(proxyBeanMethods = false)
+@Conditional(AdmissionConfiguration.Enabled.class)
+class TextResidencyConfiguration {
+    /** Backend name of the local adapter, which this package may not import. */
+    static final String LOCAL_BACKEND = "local";
+    /** Placeholder, not measured: a pass is cheap unless it has an unload to retry or a model to bring back. */
+    private static final Duration TICK = Duration.ofSeconds(1);
+
+    /**
+     * @param profiles resolves a slot the way the adapter does
+     * @param port the task port, whose answers come from the adapter's last model list
+     * @return the model the local adapter would run for a slot; empty when the slot is on another backend or
+     *         the adapter would refuse it, so that the adapter's own refusal or unavailability stands
+     */
+    static Function<InferenceSlot, Optional<String>> localModels(ProfileResolver profiles, NarrationTaskPort port) {
+        return slot -> {
+            if (profiles.assignedBackend(slot).filter(LOCAL_BACKEND::equals).isEmpty()) {
+                return Optional.empty();
+            }
+            ProfileResolver.Resolution resolution = profiles.resolve(slot, LOCAL_BACKEND,
+                    candidate -> port.listsModel(LOCAL_BACKEND, candidate.model()).orElse(false));
+            return resolution instanceof ProfileResolver.Resolved resolved ? Optional.of(resolved.settings().model())
+                    : Optional.empty();
+        };
+    }
+
+    /**
+     * @param executor the executor this driver starts and passes
+     * @param coordinator receives the requests
+     * @param options what a text model is taken to need
+     * @param profiles resolves a task's slot
+     * @param port the task port
+     * @return the driver, which the lifecycle starts and stops
+     */
+    @Bean
+    TextResidencyDriver textResidencyDriver(LeaseExecutor executor, AdmissionCoordinator coordinator,
+            AdmissionOptions options, ProfileResolver profiles, NarrationTaskPort port) {
+        return new TextResidencyDriver(executor, coordinator, localModels(profiles, port), options.textDemand(),
+                Clock.systemUTC(), TICK);
+    }
+}

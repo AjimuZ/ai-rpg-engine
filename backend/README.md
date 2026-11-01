@@ -1274,9 +1274,13 @@ reason `SLOT_CHANGED`). Tests use `ScriptedModelServer`, a scripted HTTP fixture
 
 `engine.inference.admission.enabled=true` (default `false`; it needs `engine.inference.local.url` and
 `engine.inference.admission.gpu-budget-mib`) builds the admission coordinator and the lease executor over the local
-server's control. Nothing calls the executor yet, so the switch changes no behaviour. The settings and limits are in
-[docs/34 section 10](../docs/34-inference-backends-and-model-selection.md#p214-c121-opt-in-construction-of-the-lease-executor);
-tests are `AdmissionConfigurationTest`, `LocalControlConfigurationTest` and the wiring cases in `TaskPortSelectionTest`.
+server's control and runs them: a task on a local slot that holds the scheduler's permit loads its model through the
+executor before its turn and releases it afterwards. With the switch off the scheduler behaves as before. This has
+never run against a real server or GPU. The settings and limits are in
+[docs/34 section 10](../docs/34-inference-backends-and-model-selection.md#p214-c121-opt-in-construction-of-the-lease-executor)
+and [the scheduler link](../docs/34-inference-backends-and-model-selection.md#p214-c1221-link-from-the-schedulers-text-permit-to-the-lease-executor);
+tests are `AdmissionConfigurationTest`, `LocalControlConfigurationTest`, `SchedulerResidencyTest`,
+`TextResidencyDriverTest` and the wiring cases in `TaskPortSelectionTest`.
 
 ## Grounded narration publication, receipt fallback and retry (P08.5)
 

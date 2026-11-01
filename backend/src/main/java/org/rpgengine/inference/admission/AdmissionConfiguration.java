@@ -19,19 +19,21 @@ import org.springframework.core.type.AnnotatedTypeMetadata;
  * before; the {@link JdbcLeaseStore} component stays a passive bean that touches the database only when
  * called.
  *
- * <p>This only constructs: nothing calls {@link LeaseExecutor#start} or {@link LeaseExecutor#pass}, and no
- * task or job submits a request yet, so enabling the switch loads and unloads nothing. Every value that is
- * not an owner setting ({@link AdmissionOptions}) is a placeholder fixed below and has not been measured.
+ * <p>This only constructs; {@link TextResidencyConfiguration} adds the driver that runs the executor and the
+ * link to the scheduler. Every value that is not an owner setting ({@link AdmissionOptions}) is a placeholder
+ * fixed below and has not been measured.
  */
 @Configuration(proxyBeanMethods = false)
 @Conditional(AdmissionConfiguration.Enabled.class)
 class AdmissionConfiguration {
-    private static final Duration LEASE_TTL = Duration.ofMinutes(2);
+    /** Outlasts the longest load {@link #STATUS_ATTEMPTS} allows, because nothing can renew a lease during a load. */
+    private static final Duration LEASE_TTL = Duration.ofMinutes(5);
     private static final Duration AGING_STEP = Duration.ofMinutes(1);
     private static final Duration STATUS_DELAY = Duration.ofSeconds(1);
     private static final Duration RECHECK = Duration.ofSeconds(5);
     private static final Duration TIME_CAP = Duration.ofMinutes(10);
-    private static final int STATUS_ATTEMPTS = 30;
+    /** Four minutes at one check a second: the slowest load measured on the reference host took 164 s (docs/34 section 7). */
+    private static final int STATUS_ATTEMPTS = 240;
 
     /** Reads the switch in code rather than an expression, which could echo a mistyped value. */
     static final class Enabled implements Condition {
@@ -90,8 +92,8 @@ class AdmissionConfiguration {
      * @param controls what holds each modality's models
      * @param reading free GPU memory
      * @param options headroom and patience
-     * @return the executor, not started: the first {@link LeaseExecutor#start} belongs to whoever drives it. No
-     *         text request is ever expected soon, because no scheduler link exists yet.
+     * @return the executor, not started: the first {@link LeaseExecutor#start} belongs to {@link TextResidencyDriver}.
+     *         No text request is ever reported as expected soon, because no source of that demand exists yet.
      */
     @Bean
     LeaseExecutor leaseExecutor(AdmissionCoordinator coordinator, AdmissionControls controls, GpuMemoryReading reading,
