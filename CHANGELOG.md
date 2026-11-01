@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Host GPU memory reading (P21.4-C.1.1), 1 November 2026
+
+- A reading of free GPU memory from `nvidia-smi` now exists for the admission coordinator. It answers unknown when the tool is
+  missing, fails, times out or prints something unexpected, and uses the first GPU on a multi-GPU host.
+- It is not wired into the application yet and was tested only with a stand-in command, not on a real GPU.
+
 ## Unreleased — Narration probes pass on the default and alternate local models (P21.2-G), 1 November 2026
 
 - The repaired model probe was re-run on the reference host: `gemma-4-12b-it-qat-q4_0` and `Qwen3.5-9B-Q4_K_M` each exited 0

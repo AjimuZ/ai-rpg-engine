@@ -3625,6 +3625,15 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     - Leftover: `admission/ModelServerControl.java` and `admission/ModelControlException.java` hold only a package line and a comment.
       The types moved to `org.rpgengine.inference` because `InferenceBoundaryTest` keeps the adapter package from importing `admission`,
       and this session could not delete files. Both stubs can be deleted with no other change.
+  - P21.4-C.1.1 (1 November 2026, task open): a host `GpuMemoryReading` exists, tested without a GPU.
+    - Delivered: `inference/admission/HostGpuMemoryReading.java` runs `nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits`
+      through an injectable `CommandRunner` (5 s default timeout, the child is killed on timeout), returns the first GPU's free MiB as
+      bytes, and returns an empty `OptionalLong` for a missing tool, non-zero exit, timeout, interruption or unparsable output.
+    - `sh .agents/ralph/verify.sh backend -Dtest=HostGpuMemoryReadingTest`: `VERIFY PASSED`; the log shows `Tests run: 11, Failures: 0,
+      Errors: 0, Skipped: 0`. They cover parsing (single, multi-GPU, empty, garbage, negative, decimal, overflow), each failure of a fake
+      runner, and the real process runner on a missing program. `verify.sh full` was not run by this session.
+    - Not proven: no real `nvidia-smi` or GPU was used, so the output format and the first-GPU rule on a real host are untested; the
+      timeout kill path of the real runner has no test. The reading is not wired into the application.
 - [x] P21.5 Implement the local image backend: a pinned image-worker container loading single-file safetensors checkpoints and LoRAs, with WAI-illustrious-SDXL v17.0 as the recommended default and Pony Diffusion V6 XL and SDXL base 1.0 as catalog alternatives; prompt chunking beyond 77 tokens; default safe-content tags; step-boundary cancellation; output validation and provenance; and the `a1111-http` adapter for an owner-run Forge or A1111 server. Integrate with the P17 asset-job contract without changing authority rules.
   - P21.5-A progress (31 October 2026, box stays unchecked): the local image worker is packaged, its rules are tested without torch, a GPU or weights, and its image has never been built.
     - Delivered: `docker/image-worker/` (`image_worker.py`, `Dockerfile`, `.dockerignore`, `requirements.lock`, `build-requirements.lock`), the Compose service `image-worker` under the new profile `images`, on the new internal network `images`, which the engine also joins, and `--profile images` in `./start.sh --stop`. Behavior and limits are in [docs/34 section 8](34-inference-backends-and-model-selection.md#8-local-image-worker-profile).
