@@ -6,8 +6,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.rpgengine.inference.ImageModelControl;
 import org.rpgengine.inference.ModelServerControl;
+import org.rpgengine.inference.scheduling.WorkClass;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.mock.env.MockEnvironment;
 
@@ -119,6 +123,41 @@ class AdmissionConfigurationTest {
     }
 
     @Test
+    void theReadingWindowIsOneMinuteUntilTheOwnerSaysOtherwiseAndAcceptsItsBounds() {
+        MockEnvironment environment = new MockEnvironment().withProperty("engine.inference.admission.gpu-budget-mib", "8192");
+        assertThat(AdmissionOptions.from(environment).readingWindow()).isEqualTo(Duration.ofMinutes(1));
+        environment.setProperty("engine.inference.admission.reading-window", " ");
+        assertThat(AdmissionOptions.from(environment).readingWindow()).isEqualTo(Duration.ofMinutes(1));
+        environment.setProperty("engine.inference.admission.reading-window", "0s");
+        assertThat(AdmissionOptions.from(environment).readingWindow()).isZero();
+        environment.setProperty("engine.inference.admission.reading-window", "10m");
+        assertThat(AdmissionOptions.from(environment).readingWindow()).isEqualTo(Duration.ofMinutes(10));
+    }
+
+    @Test
+    void theExecutorIsBuiltOverTheReadingWindowSoAFinishedTurnDefersABatch() {
+        // Stops at the start condition, before anything reads the card: this test's reading is the real nvidia-smi one.
+        ModelServerControl image = mock(ModelServerControl.class);
+        on().withBean(ImageModelControl.class, () -> new ImageModelControl(image)).run(context -> {
+                    assertThat(context).hasNotFailed().hasSingleBean(ReadingWindow.class);
+                    AdmissionCoordinator coordinator = context.getBean(AdmissionCoordinator.class);
+                    LeaseExecutor executor = context.getBean(LeaseExecutor.class);
+                    ReadingWindow window = context.getBean(ReadingWindow.class);
+                    assertThat(window.getAsBoolean()).isFalse();
+                    window.turnEnded();
+                    assertThat(window.getAsBoolean()).isTrue();
+
+                    executor.start();
+                    coordinator.submit(new AdmissionRequest(UUID.randomUUID(), Modality.IMAGE, WorkClass.PREPARATION,
+                            UUID.randomUUID(), "image-a", new Demand(MIB, 0), Instant.now()));
+                    Grant grant = executor.pass().grants().getFirst();
+
+                    assertThat(executor.runBatch(grant, () -> false).status()).isEqualTo(LeaseExecutor.Status.DEFERRED);
+                    verifyNoInteractions(image);
+                });
+    }
+
+    @Test
     void aTextDemandOutsideTheBudgetFailsStartupWithoutEchoingIt() {
         String[][] cases = {
                 {"text-gpu-demand-mib=10241", "text-gpu-demand-mib must be between", "10241"},
@@ -174,7 +213,10 @@ class AdmissionConfigurationTest {
                 {"patience=0s", "patience must be between 0 and 1 hour", "0s"},
                 {"patience=-9876s", "patience must be between 0 and 1 hour", "9876"},
                 {"patience=3h", "patience must be between 0 and 1 hour", "3h"},
-                {"patience=sometime-soon", "patience is not a duration", "sometime-soon"}};
+                {"patience=sometime-soon", "patience is not a duration", "sometime-soon"},
+                {"reading-window=-9876s", "reading-window must be between 0 and 10 minutes", "9876"},
+                {"reading-window=601s", "reading-window must be between 0 and 10 minutes", "601s"},
+                {"reading-window=sometime-soon", "reading-window is not a duration", "sometime-soon"}};
         for (String[] each : cases) {
             on("engine.inference.admission." + each[0]).run(context -> assertThat(context).hasFailed().getFailure()
                     .hasStackTraceContaining("engine.inference.admission." + each[1])

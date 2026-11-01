@@ -1281,14 +1281,16 @@ failure code when it cannot run, so the caller shows catalog art. No code calls 
 uses `ImageAdmission.direct()`, which calls the adapter. With the switch on, `engine.inference.image-worker.url` (unset by
 default; `http://image-worker:8080` for the packaged service, which no Compose file sets) adds an image control and an
 `ImageGenerationPort` over the packaged worker's routes. Without that address no image control is registered, so a batch
-ends `LOAD_FAILED`; an `a1111-http` server never gets one, because it cannot release its checkpoint. None of this has run
-against a real server, worker or GPU. The settings and limits are in
+ends `LOAD_FAILED`; an `a1111-http` server never gets one, because it cannot release its checkpoint. An image batch does not
+start within `engine.inference.admission.reading-window` (default one minute, 0 turns it off) after a player's text turn on a
+local model ends. None of this has run against a real server, worker or GPU. The settings and limits are in
 [docs/34 section 10](../docs/34-inference-backends-and-model-selection.md#p214-c121-opt-in-construction-of-the-lease-executor),
 [the scheduler link](../docs/34-inference-backends-and-model-selection.md#p214-c1221-link-from-the-schedulers-text-permit-to-the-lease-executor),
-[the image path](../docs/34-inference-backends-and-model-selection.md#p214-c1222-image-requests-through-the-lease-executor)
-and [the packaged worker](../docs/34-inference-backends-and-model-selection.md#p214-d-packaged-image-worker-behind-the-lease-executor);
+[the image path](../docs/34-inference-backends-and-model-selection.md#p214-c1222-image-requests-through-the-lease-executor),
+[the packaged worker](../docs/34-inference-backends-and-model-selection.md#p214-d-packaged-image-worker-behind-the-lease-executor)
+and [the reading window](../docs/34-inference-backends-and-model-selection.md#p214-e2-reading-window-as-expected-text-demand);
 tests are `AdmissionConfigurationTest`, `LocalControlConfigurationTest`, `SchedulerResidencyTest`,
-`TextResidencyDriverTest`, `ImageAdmissionTest`, `WorkerModelControlTest`, `WorkerImageAdapterTest`,
+`TextResidencyDriverTest`, `ReadingWindowTest`, `ImageAdmissionTest`, `WorkerModelControlTest`, `WorkerImageAdapterTest`,
 `WorkerImageConfigurationTest`, `WorkerImageAdmissionTest` and the wiring cases in `TaskPortSelectionTest`.
 
 ## Grounded narration publication, receipt fallback and retry (P08.5)

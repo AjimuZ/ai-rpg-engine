@@ -24,9 +24,11 @@ import org.springframework.core.env.Environment;
  * @param unmeasuredExtraBytes GPU bytes asked on top of {@code headroomBytes} before a model without a recorded size
  *        loads (0 up to 64 GiB)
  * @param sizes the recorded size of each measured model, and the two fallbacks above
+ * @param readingWindow how long after a player's text turn the next one is expected, so that no batch starts (0 up to
+ *        10 minutes, 0 turning this off). The default is a placeholder, not measured
  */
 record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience, Demand textDemand, Demand imageDemand,
-        long unmeasuredExtraBytes, ModelSizes sizes) {
+        long unmeasuredExtraBytes, ModelSizes sizes, Duration readingWindow) {
     static final String PREFIX = "engine.inference.admission.";
     static final String ENABLED = PREFIX + "enabled";
     /** Largest accepted budget or headroom, in MiB: far above any single card, so a typo in the unit fails. */
@@ -39,6 +41,9 @@ record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience, 
     static final long MAX_HEADROOM_MIB = 64 * 1024;
     static final Duration DEFAULT_PATIENCE = Duration.ofMinutes(2);
     static final Duration MAX_PATIENCE = Duration.ofHours(1);
+    static final Duration DEFAULT_READING_WINDOW = Duration.ofMinutes(1);
+    /** A longer window would keep images out between any two turns, and is more likely a mistyped unit. */
+    static final Duration MAX_READING_WINDOW = Duration.ofMinutes(10);
     private static final long BYTES_PER_MIB = 1024L * 1024L;
 
     /**
@@ -87,7 +92,7 @@ record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience, 
         Demand imageDemand = modelDemand(environment, "image", gpu, ram);
         Demand capacity = new Demand(gpu * BYTES_PER_MIB, ram * BYTES_PER_MIB);
         return new AdmissionOptions(capacity, headroom * BYTES_PER_MIB, patience(environment), textDemand, imageDemand,
-                extra * BYTES_PER_MIB, ModelSizes.recorded(capacity, textDemand, imageDemand));
+                extra * BYTES_PER_MIB, ModelSizes.recorded(capacity, textDemand, imageDemand), readingWindow(environment));
     }
 
     private static Demand modelDemand(Environment environment, String kind, long gpu, long ram) {
@@ -112,16 +117,27 @@ record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience, 
     }
 
     private static Duration patience(Environment environment) {
-        String text = environment.getProperty(PREFIX + "patience");
-        Duration value;
-        try {
-            value = text == null || text.isBlank() ? DEFAULT_PATIENCE : DurationStyle.detectAndParse(text.strip());
-        } catch (IllegalArgumentException malformed) {
-            throw new IllegalStateException(PREFIX + "patience is not a duration");
-        }
+        Duration value = duration(environment, "patience", DEFAULT_PATIENCE);
         if (value.isNegative() || value.isZero() || value.compareTo(MAX_PATIENCE) > 0) {
             throw new IllegalStateException(PREFIX + "patience must be between 0 and 1 hour");
         }
         return value;
+    }
+
+    private static Duration readingWindow(Environment environment) {
+        Duration value = duration(environment, "reading-window", DEFAULT_READING_WINDOW);
+        if (value.isNegative() || value.compareTo(MAX_READING_WINDOW) > 0) {
+            throw new IllegalStateException(PREFIX + "reading-window must be between 0 and 10 minutes");
+        }
+        return value;
+    }
+
+    private static Duration duration(Environment environment, String key, Duration fallback) {
+        String text = environment.getProperty(PREFIX + key);
+        try {
+            return text == null || text.isBlank() ? fallback : DurationStyle.detectAndParse(text.strip());
+        } catch (IllegalArgumentException malformed) {
+            throw new IllegalStateException(PREFIX + key + " is not a duration");
+        }
     }
 }

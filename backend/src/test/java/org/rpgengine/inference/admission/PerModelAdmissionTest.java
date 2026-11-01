@@ -96,7 +96,8 @@ class PerModelAdmissionTest {
         options = AdmissionOptions.from(environment);
         coordinator = configuration.admissionCoordinator(options, new MemoryLeaseStore());
         AdmissionControls controls = new AdmissionControls(Map.of(Modality.TEXT, textServer, Modality.IMAGE, imageServer));
-        executor = configuration.leaseExecutor(coordinator, controls, () -> OptionalLong.of(freeMib * MIB), options);
+        executor = configuration.leaseExecutor(coordinator, controls, () -> OptionalLong.of(freeMib * MIB), options,
+                configuration.readingWindow(options));
         images = new LeasedImageAdmission(executor, coordinator, model -> options.sizes().demandFor(Modality.IMAGE, model),
                 Clock.systemUTC(), Duration.ofMillis(2), Duration.ofSeconds(5), Duration.ofSeconds(20));
         driver = new TextResidencyDriver(executor, coordinator, slot -> served,

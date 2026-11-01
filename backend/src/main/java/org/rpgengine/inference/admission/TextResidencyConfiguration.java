@@ -72,12 +72,14 @@ class TextResidencyConfiguration {
      * @param profiles resolves a task's slot
      * @param port the task port
      * @param images receives the image grants of each pass
+     * @param expected the executor's source of expected text demand, which a finished player turn opens
      * @return the driver, which the lifecycle starts and stops
      */
     @Bean
     TextResidencyDriver textResidencyDriver(LeaseExecutor executor, AdmissionCoordinator coordinator,
-            AdmissionOptions options, ProfileResolver profiles, NarrationTaskPort port, LeasedImageAdmission images) {
+            AdmissionOptions options, ProfileResolver profiles, NarrationTaskPort port, LeasedImageAdmission images,
+            ReadingWindow expected) {
         return new TextResidencyDriver(executor, coordinator, localModels(profiles, port),
-                model -> options.sizes().demandFor(Modality.TEXT, model), Clock.systemUTC(), TICK, images);
+                model -> options.sizes().demandFor(Modality.TEXT, model), Clock.systemUTC(), TICK, images, expected);
     }
 }

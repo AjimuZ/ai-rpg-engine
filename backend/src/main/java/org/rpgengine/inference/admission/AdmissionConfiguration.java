@@ -97,19 +97,28 @@ class AdmissionConfiguration {
     }
 
     /**
+     * @param options how long the window stays open
+     * @return the executor's source of expected text demand, which {@link TextResidencyDriver} opens
+     */
+    @Bean
+    ReadingWindow readingWindow(AdmissionOptions options) {
+        return new ReadingWindow(Clock.systemUTC(), options.readingWindow());
+    }
+
+    /**
      * @param coordinator the leases
      * @param controls what holds each modality's models
      * @param reading free GPU memory
      * @param options headroom and patience
-     * @return the executor, not started: the first {@link LeaseExecutor#start} belongs to {@link TextResidencyDriver}.
-     *         No text request is ever reported as expected soon, because no source of that demand exists yet.
+     * @param expected says when a text request is expected soon; no batch starts while it does
+     * @return the executor, not started: the first {@link LeaseExecutor#start} belongs to {@link TextResidencyDriver}
      */
     @Bean
     LeaseExecutor leaseExecutor(AdmissionCoordinator coordinator, AdmissionControls controls, GpuMemoryReading reading,
-            AdmissionOptions options) {
+            AdmissionOptions options, ReadingWindow expected) {
         LeaseExecutorSettings settings = new LeaseExecutorSettings(0, options.headroomBytes(), 0, STATUS_ATTEMPTS,
                 STATUS_DELAY, RECHECK, options.patience(), TIME_CAP, options.unmeasuredExtraBytes());
-        return new LeaseExecutor(coordinator, controls.byModality(), reading, () -> false, settings, Clock.systemUTC(),
+        return new LeaseExecutor(coordinator, controls.byModality(), reading, expected, settings, Clock.systemUTC(),
                 duration -> Thread.sleep(duration.toMillis()),
                 lease -> options.sizes().isMeasured(lease.modality(), lease.model()));
     }

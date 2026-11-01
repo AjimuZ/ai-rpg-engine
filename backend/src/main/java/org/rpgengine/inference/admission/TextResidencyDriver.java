@@ -20,6 +20,7 @@ import java.util.function.Function;
 import org.rpgengine.inference.InferenceSlot;
 import org.rpgengine.inference.scheduling.ScheduledTask;
 import org.rpgengine.inference.scheduling.TextResidency;
+import org.rpgengine.inference.scheduling.WorkClass;
 import org.springframework.context.SmartLifecycle;
 
 /**
@@ -43,6 +44,11 @@ import org.springframework.context.SmartLifecycle;
  *
  * <p>Because a pass hands each grant out once, this driver also takes the image grants, and hands them to the
  * {@link LeasedImageAdmission} (P21.4-C.1.2.2.2). Batches run on that class's threads, never on this worker.
+ *
+ * <p>An interactive turn that held a local model and was not ended by yielding opens the {@link ReadingWindow}, before
+ * its lease is released so that no batch can start in between. Background work has no reader, and a turn on another
+ * backend needs no local model next time. A release does not say how the turn went, so a failed or cancelled turn opens
+ * it too, which costs only a wait.
  *
  * <p>Failures: a failed pass is logged by class name only and repeats on the next tick. {@link #stop} lets
  * queued releases run for a bounded time; anything left is an open lease row, which the next process takes
@@ -92,6 +98,7 @@ final class TextResidencyDriver implements TextResidency, SmartLifecycle {
     private final Clock clock;
     private final Duration tick;
     private final LeasedImageAdmission images;
+    private final ReadingWindow readingWindow;
     private final ScheduledExecutorService work = Executors.newSingleThreadScheduledExecutor(task -> {
         Thread thread = new Thread(task, "inference-residency");
         thread.setDaemon(true);
@@ -116,6 +123,13 @@ final class TextResidencyDriver implements TextResidency, SmartLifecycle {
         this(leases, coordinator, models, fixed(demand), clock, tick, images);
     }
 
+    /** A driver whose finished turns expect nothing: its reading window is never open. */
+    TextResidencyDriver(LeaseExecutor leases, AdmissionCoordinator coordinator,
+            Function<InferenceSlot, Optional<String>> models, Function<String, Demand> demands, Clock clock,
+            Duration tick, LeasedImageAdmission images) {
+        this(leases, coordinator, models, demands, clock, tick, images, new ReadingWindow(clock, Duration.ZERO));
+    }
+
     /**
      * @param leases the executor; it is started by the first tick
      * @param coordinator receives the requests and the renewals of their leases
@@ -126,11 +140,13 @@ final class TextResidencyDriver implements TextResidency, SmartLifecycle {
      * @param clock the coordinator's time source
      * @param tick time between two passes, positive
      * @param images receives every image grant, or null when no image path exists
+     * @param readingWindow opened by each finished player turn; the executor reads it as its expected demand
      */
     TextResidencyDriver(LeaseExecutor leases, AdmissionCoordinator coordinator,
             Function<InferenceSlot, Optional<String>> models, Function<String, Demand> demands, Clock clock,
-            Duration tick, LeasedImageAdmission images) {
+            Duration tick, LeasedImageAdmission images, ReadingWindow readingWindow) {
         this.images = images;
+        this.readingWindow = Objects.requireNonNull(readingWindow, "readingWindow");
         this.leases = Objects.requireNonNull(leases, "leases");
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
         this.models = Objects.requireNonNull(models, "models");
@@ -252,6 +268,9 @@ final class TextResidencyDriver implements TextResidency, SmartLifecycle {
                 members.remove(id);
                 ended(members, LOST);
             } else if (state == State.HELD) {
+                if (!yielded && entry.task.workClass() == WorkClass.INTERACTIVE) {
+                    readingWindow.turnEnded();
+                }
                 leases.finishText(id);
             }
         } catch (RuntimeException failure) {

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Image batches wait while the player reads (P21.4-E.2), 1 November 2026
+
+- With `engine.inference.admission.enabled` on, an image batch no longer starts within a reading window after a player's text
+  turn on a local model ends, so the next turn finds its model loaded. The new setting
+  `engine.inference.admission.reading-window` sets its length (0 to 10 minutes, default 1 minute, 0 turns it off); an invalid
+  value stops startup without being echoed. A turn ended by yielding, background work and a turn on another backend do not open
+  it. A batch already running goes on. An image whose wait ends inside the window falls back to catalog art with
+  `image-admission-deferred`. The default is a placeholder, tested with a stepped clock and scripted servers only: no real
+  player, card, server or engine run took part. See
+  [docs/34](docs/34-inference-backends-and-model-selection.md#p214-e2-reading-window-as-expected-text-demand).
+
 ## Unreleased — Per-model sizes and reference-host settings for admission (P21.4-E.1), 1 November 2026
 
 - With `engine.inference.admission.enabled` on, each of the five measured catalog text models is now admitted with its own size

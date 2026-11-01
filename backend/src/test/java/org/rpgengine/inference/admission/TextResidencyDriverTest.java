@@ -61,6 +61,7 @@ class TextResidencyDriverTest {
     private static final String WORKER_THREAD = "inference-residency";
     private static final Duration RECHECK = Duration.ofSeconds(10);
     private static final Duration PATIENCE = Duration.ofSeconds(30);
+    private static final Duration WINDOW = Duration.ofSeconds(60);
     private static final LeaseExecutorSettings SETTINGS = new LeaseExecutorSettings(0, 0, 0, 3, Duration.ofSeconds(1),
             RECHECK, PATIENCE, Duration.ofMinutes(5));
 
@@ -106,8 +107,9 @@ class TextResidencyDriverTest {
     private final LeaseExecutor executor = new LeaseExecutor(coordinator, Map.of(Modality.TEXT, server),
             () -> OptionalLong.of(free), () -> false, SETTINGS, clock, clock::advance);
     private Optional<String> served = Optional.of(TEXT);
-    private final TextResidencyDriver driver = new TextResidencyDriver(executor, coordinator, slot -> served, LARGE,
-            clock, Duration.ofHours(1));
+    private final ReadingWindow window = new ReadingWindow(clock, WINDOW);
+    private final TextResidencyDriver driver = new TextResidencyDriver(executor, coordinator, slot -> served, model -> LARGE,
+            clock, Duration.ofHours(1), null, window);
     private final RecordingListener listener = new RecordingListener();
 
     @AfterEach
@@ -199,6 +201,100 @@ class TextResidencyDriverTest {
         assertThat(store.rows.get(lease).status()).isEqualTo(LeaseStatus.RELEASED);
         assertThat(server.holds(TEXT)).isTrue();
         assertThat(metric("text_models_resident")).isEqualTo(1);
+    }
+
+    @Test
+    void aFinishedInteractiveTurnOpensTheReadingWindowAndNothingBeforeItsEndDoes() throws Exception {
+        driver.start();
+        TextResidency.Claim claim = claim(WorkClass.INTERACTIVE);
+        assertThat(listener.heard).containsExactly("ready");
+        assertThat(window.getAsBoolean()).as("the turn is still running").isFalse();
+
+        claim.release(false);
+        driver.awaitIdle();
+        assertThat(window.getAsBoolean()).isTrue();
+
+        clock.advance(WINDOW);
+        assertThat(window.getAsBoolean()).isFalse();
+    }
+
+    @Test
+    void aTurnEndedByYieldingDoesNotOpenTheReadingWindow() throws Exception {
+        driver.start();
+        TextResidency.Claim claim = claim(WorkClass.INTERACTIVE);
+
+        claim.release(true);
+        driver.awaitIdle();
+
+        assertThat(metric("leases_active")).isZero();
+        assertThat(window.getAsBoolean()).isFalse();
+    }
+
+    @Test
+    void aTurnWhoseLeaseWasLostAndThatYieldedDoesNotOpenTheReadingWindow() throws Exception {
+        driver.start();
+        TextResidency.Claim claim = claim(WorkClass.INTERACTIVE);
+        clock.advance(AdmissionFixtures.TTL.plusSeconds(1));
+        driver.tickNow();
+        assertThat(listener.heard).containsExactly("ready", "stop");
+
+        claim.release(true);
+        driver.awaitIdle();
+
+        assertThat(window.getAsBoolean()).isFalse();
+    }
+
+    @Test
+    void backgroundWorkHasNoReaderAndDoesNotOpenTheReadingWindow() throws Exception {
+        driver.start();
+        for (WorkClass background : new WorkClass[] {WorkClass.CONTINUITY, WorkClass.PREPARATION, WorkClass.SPECULATIVE}) {
+            claim(background).release(false);
+            driver.awaitIdle();
+            assertThat(window.getAsBoolean()).as(background.name()).isFalse();
+        }
+    }
+
+    @Test
+    void aTurnThatNeededNoLocalModelDoesNotOpenTheReadingWindow() throws Exception {
+        served = Optional.empty();
+        driver.start();
+        TextResidency.Claim claim = claim(WorkClass.INTERACTIVE);
+
+        claim.release(false);
+        driver.awaitIdle();
+
+        assertThat(listener.heard).containsExactly("ready");
+        assertThat(window.getAsBoolean()).isFalse();
+    }
+
+    @Test
+    void aClaimWithdrawnBeforeItsTurnDoesNotOpenTheReadingWindow() throws Exception {
+        driver.start();
+        free = 0;
+        TextResidency.Claim claim = claim(WorkClass.INTERACTIVE);
+        assertThat(metric("requests_delayed")).isEqualTo(1);
+
+        claim.release(false);
+        driver.awaitIdle();
+
+        assertThat(listener.heard).isEmpty();
+        assertThat(window.getAsBoolean()).isFalse();
+    }
+
+    @Test
+    void theNextFinishedTurnRestartsTheReadingWindow() throws Exception {
+        driver.start();
+        claim(WorkClass.INTERACTIVE).release(false);
+        driver.awaitIdle();
+
+        clock.advance(WINDOW.minusSeconds(1));
+        claim(WorkClass.INTERACTIVE).release(false);
+        driver.awaitIdle();
+
+        clock.advance(WINDOW.minusSeconds(1));
+        assertThat(window.getAsBoolean()).isTrue();
+        clock.advance(Duration.ofSeconds(1));
+        assertThat(window.getAsBoolean()).isFalse();
     }
 
     @Test
