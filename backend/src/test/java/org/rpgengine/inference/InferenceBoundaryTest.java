@@ -140,7 +140,7 @@ class InferenceBoundaryTest {
                 TaskResult.Provenance.class, RuntimeStatus.class, SlotAssignments.class, EffectiveSettings.class,
                 InferenceSlot.class, SlotAssignment.class, ModelAllowlist.class, ProfileResolver.class,
                 ProfileResolver.Resolved.class, ProfileResolver.Refused.class, ImageGenerationPort.class,
-                ImageHandle.class, ImageRequest.class, ImageResult.class, ImageProvenance.class);
+                ImageHandle.class, ImageRequest.class, ImageResult.class, ImageProvenance.class, ImageModelControl.class);
         List<String> foreign = new ArrayList<>();
         for (Class<?> type : api) {
             List<Class<?>> used = new ArrayList<>();

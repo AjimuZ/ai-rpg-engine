@@ -55,7 +55,7 @@ class TextResidencyConfiguration {
      * @param executor runs the batches
      * @param coordinator receives the requests
      * @param options what an image model is taken to need
-     * @return the image path, which {@code close} stops. With no image control registered, each of its batches ends
+     * @return the image path, which {@code close} stops. Without the packaged worker's control, each of its batches ends
      *         {@code LOAD_FAILED}, so the caller gets catalog art (docs/34 section 10).
      */
     @Bean

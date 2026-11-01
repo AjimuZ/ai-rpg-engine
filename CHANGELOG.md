@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Packaged image worker behind the lease executor (P21.4-D), 1 November 2026
+
+- New setting `engine.inference.image-worker.url`. With it and `engine.inference.admission.enabled` on, an image batch can
+  run on the packaged worker: a control loads and unloads its checkpoint through `/v1/load` and `/v1/unload` and confirms
+  the result from the worker's own answer, and an image port submits, waits for and cancels a job through `/v1/generate` and
+  `/v1/cancel`. With either setting off, no bean is added and behaviour is unchanged. An `a1111-http` server still gets no
+  image control, because it cannot release its checkpoint. Tested against a double of the worker only: no real worker,
+  checkpoint or GPU has answered, no Compose file sets the address and nothing submits an image yet. See
+  [docs/34](docs/34-inference-backends-and-model-selection.md#p214-d-packaged-image-worker-behind-the-lease-executor).
+
 ## Unreleased — GPU contention harness (P21.4-C.1.3.2), 1 November 2026
 
 - New `tools/gpu_contention/contention.py`: one command drives text, image and speech load against the owner's endpoints

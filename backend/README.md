@@ -1277,14 +1277,19 @@ reason `SLOT_CHANGED`). Tests use `ScriptedModelServer`, a scripted HTTP fixture
 server's control and runs them: a task on a local slot that holds the scheduler's permit loads its model through the
 executor before its turn and releases it afterwards. With the switch off the scheduler behaves as before. The same
 switch adds an `ImageAdmission` bean, which runs an image job on a lease as a stepped job and ends it with a fixed
-failure code when it cannot run, so the caller shows catalog art. No code calls it yet, no image control is registered
-(so a batch ends `LOAD_FAILED`), and without the bean a caller uses `ImageAdmission.direct()`, which calls the adapter.
-None of this has run against a real server or GPU. The settings and limits are in
+failure code when it cannot run, so the caller shows catalog art. No code calls it yet, and without the bean a caller
+uses `ImageAdmission.direct()`, which calls the adapter. With the switch on, `engine.inference.image-worker.url` (unset by
+default; `http://image-worker:8080` for the packaged service, which no Compose file sets) adds an image control and an
+`ImageGenerationPort` over the packaged worker's routes. Without that address no image control is registered, so a batch
+ends `LOAD_FAILED`; an `a1111-http` server never gets one, because it cannot release its checkpoint. None of this has run
+against a real server, worker or GPU. The settings and limits are in
 [docs/34 section 10](../docs/34-inference-backends-and-model-selection.md#p214-c121-opt-in-construction-of-the-lease-executor),
-[the scheduler link](../docs/34-inference-backends-and-model-selection.md#p214-c1221-link-from-the-schedulers-text-permit-to-the-lease-executor)
-and [the image path](../docs/34-inference-backends-and-model-selection.md#p214-c1222-image-requests-through-the-lease-executor);
+[the scheduler link](../docs/34-inference-backends-and-model-selection.md#p214-c1221-link-from-the-schedulers-text-permit-to-the-lease-executor),
+[the image path](../docs/34-inference-backends-and-model-selection.md#p214-c1222-image-requests-through-the-lease-executor)
+and [the packaged worker](../docs/34-inference-backends-and-model-selection.md#p214-d-packaged-image-worker-behind-the-lease-executor);
 tests are `AdmissionConfigurationTest`, `LocalControlConfigurationTest`, `SchedulerResidencyTest`,
-`TextResidencyDriverTest`, `ImageAdmissionTest` and the wiring cases in `TaskPortSelectionTest`.
+`TextResidencyDriverTest`, `ImageAdmissionTest`, `WorkerModelControlTest`, `WorkerImageAdapterTest`,
+`WorkerImageConfigurationTest`, `WorkerImageAdmissionTest` and the wiring cases in `TaskPortSelectionTest`.
 
 ## Grounded narration publication, receipt fallback and retry (P08.5)
 

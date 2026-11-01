@@ -163,7 +163,8 @@ postgres join internal `data`; only runtime joins `inference`; engine alone join
 `web` for published HTTP. The optional `models` service (P21.2-A) runs only under
 its Compose profile and shares only the internal `models` network with the engine.
 The optional `image-worker` service (P21.5-A) likewise runs only under `--profile images` and
-shares only the internal `images` network with the engine; nothing calls it yet.
+shares only the internal `images` network with the engine. The engine can reach it only with
+`engine.inference.image-worker.url` and the admission switch set, and nothing submits an image yet (P21.4-D).
 The optional `gateway` service (P21.3-C.1) runs only under `--profile gateway`, joins
 internal `gateway`, which it shares only with the engine, and `gateway_egress`, which only
 it joins, and publishes nothing. It mounts its allowlist file and keys directory read-only,

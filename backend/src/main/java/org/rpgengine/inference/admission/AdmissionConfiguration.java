@@ -2,7 +2,9 @@ package org.rpgengine.inference.admission;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.EnumMap;
 import java.util.Map;
+import org.rpgengine.inference.ImageModelControl;
 import org.rpgengine.inference.ModelServerControl;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
@@ -67,20 +69,25 @@ class AdmissionConfiguration {
 
     /**
      * @param text the text model server's control, present when {@code engine.inference.local.url} is set
-     * @return the text modality's control. Image and speech have none until their workers exist: a stand-in that
-     *         reported a checkpoint gone while its server still held it would let a text model load beside it, so an
-     *         image batch ends {@code LOAD_FAILED} instead.
+     * @param image the packaged image worker's control, present when {@code engine.inference.image-worker.url} is set
+     * @return the text modality's control, and the image modality's when the worker is configured. Without it an image
+     *         batch ends {@code LOAD_FAILED}, as for an {@code a1111-http} server: a control that reported a checkpoint
+     *         gone while its server still held it would let a text model load beside it. Speech has none until its worker
+     *         exists.
      * @throws IllegalStateException when no text control exists, so the owner learns at startup that the switch
      *         has nothing to drive
      */
     @Bean
-    AdmissionControls admissionControls(ObjectProvider<ModelServerControl> text) {
+    AdmissionControls admissionControls(ObjectProvider<ModelServerControl> text, ObjectProvider<ImageModelControl> image) {
         ModelServerControl control = text.getIfUnique();
         if (control == null) {
             throw new IllegalStateException(AdmissionOptions.ENABLED + " needs exactly one model server control, "
                     + "which engine.inference.local.url provides");
         }
-        return new AdmissionControls(Map.of(Modality.TEXT, control));
+        Map<Modality, ModelServerControl> controls = new EnumMap<>(Modality.class);
+        controls.put(Modality.TEXT, control);
+        image.ifAvailable(worker -> controls.put(Modality.IMAGE, worker.control()));
+        return new AdmissionControls(controls);
     }
 
     /** @return the free GPU memory read from the host's {@code nvidia-smi}; unknown when it cannot be read */

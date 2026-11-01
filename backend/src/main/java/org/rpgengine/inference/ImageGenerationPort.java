@@ -2,8 +2,8 @@ package org.rpgengine.inference;
 
 /**
  * Backend-neutral port of image generation: request, cancel and a validated result with
- * provenance (docs/34 section 8, docs/23). The {@code local-image} worker and the {@code a1111-http}
- * adapter both serve it. P17.6 builds the runtime asset jobs on it; this port holds no job queue of
+ * provenance (docs/34 section 8, docs/23). The {@code local-image} and {@code a1111-http}
+ * adapters both serve it. P17.6 builds the runtime asset jobs on it; this port holds no job queue of
  * the game, no authority rule and no game state, and an image is never canonical.
  *
  * <p>Contract for every implementation: requests are serialized by the adapter, which owns no more

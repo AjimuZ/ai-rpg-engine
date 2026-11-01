@@ -28,8 +28,9 @@
  * {@link org.rpgengine.inference.admission.ImageSteppedJob}, on a grant the driver passes on; without the switch
  * the adapter is called directly.
  *
- * <p>Not built here: any real image or speech worker or its control, so an image batch in the application ends
- * {@code LOAD_FAILED}; any caller of the image path; and any source of expected text demand. Everything is tested
- * against scripted servers, so nothing yet proves that the host stays out of memory trouble.
+ * <p>The image control is the neutral {@link org.rpgengine.inference.ImageModelControl}, which only the packaged worker's
+ * address provides; without it an image batch ends {@code LOAD_FAILED}. Not built here: a speech worker or its control,
+ * any caller of the image path, and any source of expected text demand. Everything is tested against scripted servers, so
+ * nothing yet proves that the host stays out of memory trouble.
  */
 package org.rpgengine.inference.admission;

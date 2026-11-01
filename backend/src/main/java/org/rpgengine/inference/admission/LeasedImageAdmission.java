@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.rpgengine.inference.ImageGenerationPort;
 import org.rpgengine.inference.ImageHandle;
+import org.rpgengine.inference.ImageModelControl;
 import org.rpgengine.inference.ImageRequest;
 import org.rpgengine.inference.ImageResult;
 
@@ -47,7 +48,7 @@ import org.rpgengine.inference.ImageResult;
  */
 final class LeasedImageAdmission implements ImageAdmission, AutoCloseable {
     /** The lease model of a request that names no checkpoint and takes the backend's current one. */
-    static final String CURRENT_CHECKPOINT = "image-current";
+    static final String CURRENT_CHECKPOINT = ImageModelControl.CURRENT_CHECKPOINT;
     private static final String SHUTDOWN = "image-shutdown";
     private static final System.Logger LOG = System.getLogger(LeasedImageAdmission.class.getName());
 

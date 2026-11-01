@@ -143,6 +143,8 @@ The optional `image-worker` service (P21.5-A) runs and builds only under `--prof
 only internal `images`, which it shares only with the engine, mounts the same directory read-only
 and publishes nothing. `IMAGE_CONTENT_POLICY` (`safe` when unset, or `owner-private`) sets its content
 defaults ([inference backends section 8](34-inference-backends-and-model-selection.md#8-local-image-worker-profile)).
+The engine reaches it only with `engine.inference.image-worker.url` and the admission switch set, and no Compose
+file sets that address ([section 10](34-inference-backends-and-model-selection.md#p214-d-packaged-image-worker-behind-the-lease-executor)).
 The optional `gateway` service (P21.3-C.1) runs only under `--profile gateway`, joins internal
 `gateway`, which it shares only with the engine, and `gateway_egress`, which only it joins, and
 publishes nothing. It mounts `${GATEWAY_DESTINATIONS_FILE:-./.local/gateway/destinations.json}` and

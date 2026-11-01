@@ -2,6 +2,7 @@ package org.rpgengine.inference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.util.List;
@@ -219,6 +220,59 @@ class TaskPortSelectionTest {
                     assertThat(context.getBean(AdmissionControls.class).byModality()).containsOnlyKeys(Modality.TEXT)
                             .containsValue(context.getBean(ModelServerControl.class));
                     assertThat(context.getBean(NarrationTaskPort.class)).isInstanceOf(SlotRoutingTaskPort.class);
+                });
+    }
+
+    @Test
+    void theWorkerAddressAddsTheImageControlAndPortAndLeavesTheTextLookupAlone() {
+        runner.withBean(LeaseStore.class, () -> mock(LeaseStore.class))
+                .withPropertyValues("engine.inference.local.url=http://127.0.0.1:9",
+                        "engine.inference.local.reconnect-initial=50ms", "engine.inference.admission.enabled=true",
+                        "engine.inference.admission.gpu-budget-mib=10240",
+                        "engine.inference.image-worker.url=http://127.0.0.1:9")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(ModelServerControl.class).hasSingleBean(ImageModelControl.class);
+                    ModelServerControl text = context.getBean(ModelServerControl.class);
+                    assertThat(text.getClass().getPackageName()).isEqualTo("org.rpgengine.inference.local");
+                    assertThat(context.getBean(AdmissionControls.class).byModality())
+                            .containsOnlyKeys(Modality.TEXT, Modality.IMAGE).containsEntry(Modality.TEXT, text)
+                            .containsEntry(Modality.IMAGE, context.getBean(ImageModelControl.class).control());
+                    assertThat(context.getBean(ImageGenerationPort.class).backend()).isEqualTo("local-image");
+                });
+    }
+
+    @Test
+    void withTheSwitchOffTheWorkerAddressAddsNoBeanAndPortSelectionStaysAsItWas() {
+        runner.withPropertyValues("engine.inference.local.url=http://127.0.0.1:9",
+                "engine.inference.image-worker.url=http://127.0.0.1:9").run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).doesNotHaveBean(ImageModelControl.class).doesNotHaveBean(ImageGenerationPort.class)
+                            .doesNotHaveBean(ModelServerControl.class).doesNotHaveBean(AdmissionControls.class)
+                            .doesNotHaveBean(LeaseExecutor.class);
+                    assertThat(context.getBean(NarrationTaskPort.class)).isInstanceOf(SlotRoutingTaskPort.class);
+                });
+        runner.withPropertyValues("engine.inference.image-worker.url=http://127.0.0.1:9",
+                "engine.inference.admission.enabled=false").run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).doesNotHaveBean(ImageModelControl.class).doesNotHaveBean(ImageGenerationPort.class);
+                    assertThat(context.getBean(NarrationTaskPort.class)).isInstanceOf(UnavailableTaskPort.class);
+                });
+    }
+
+    @Test
+    void anA1111PortGetsNoImageControl() {
+        ImageGenerationPort a1111 = mock(ImageGenerationPort.class);
+        when(a1111.backend()).thenReturn("a1111-http");
+        runner.withBean(LeaseStore.class, () -> mock(LeaseStore.class))
+                .withBean(ImageGenerationPort.class, () -> a1111)
+                .withPropertyValues("engine.inference.local.url=http://127.0.0.1:9",
+                        "engine.inference.local.reconnect-initial=50ms", "engine.inference.admission.enabled=true",
+                        "engine.inference.admission.gpu-budget-mib=10240")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).doesNotHaveBean(ImageModelControl.class);
+                    assertThat(context.getBean(AdmissionControls.class).byModality()).containsOnlyKeys(Modality.TEXT);
                 });
     }
 

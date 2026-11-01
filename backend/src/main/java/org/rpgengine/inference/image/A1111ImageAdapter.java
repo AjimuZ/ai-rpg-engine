@@ -340,7 +340,7 @@ final class A1111ImageAdapter implements ImageGenerationPort, AutoCloseable {
         }
     }
 
-    private static String sha256(byte[] data) {
+    static String sha256(byte[] data) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data));
         } catch (NoSuchAlgorithmException missing) {
