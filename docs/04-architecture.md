@@ -164,7 +164,7 @@ postgres join internal `data`; only runtime joins `inference`; engine alone join
 its Compose profile and shares only the internal `models` network with the engine.
 The optional `image-worker` service (P21.5-A) likewise runs only under `--profile images` and
 shares only the internal `images` network with the engine. The engine can reach it only with
-`engine.inference.image-worker.url` and the admission switch set, and nothing submits an image yet (P21.4-D).
+`engine.inference.image-worker.url` and the admission switch set, and only the owner-only admission probe route submits an image (P21.4-D, P21.4-F.1); no gameplay path does yet.
 The optional `gateway` service (P21.3-C.1) runs only under `--profile gateway`, joins
 internal `gateway`, which it shares only with the engine, and `gateway_egress`, which only
 it joins, and publishes nothing. It mounts its allowlist file and keys directory read-only,

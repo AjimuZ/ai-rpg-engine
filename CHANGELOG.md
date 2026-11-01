@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Owner-only probe of the text and image admission paths (P21.4-F.1), 1 November 2026
+
+- With `engine.inference.admission.enabled` on, the owner can call `POST /api/v1/models/admission-probe`. It sends one fixed,
+  neutral text task through the scheduler and one fixed image job through the image admission, accepts no text from the caller
+  and answers only a fixed `status` and `code` for each. With the switch off the route does not exist; anyone but the owner is
+  refused. Waits are bounded and a second probe during one is refused. The text task is recorded in the scheduler's ledger
+  under the first campaign. This is the first caller of the image admission. The tests use stand-ins: no real scheduler, model
+  server, image worker or GPU ran. See
+  [docs/34](docs/34-inference-backends-and-model-selection.md#p214-f1-owner-only-probe-of-the-text-and-image-paths).
+
 ## Unreleased — A chat request no longer loads a model beside a batch (P21.4-E.3), 1 November 2026
 
 - The packaged model server now starts with `--no-models-autoload`, so a chat request loads nothing unless it asks. The engine

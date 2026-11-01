@@ -1279,19 +1279,31 @@ executor before its turn and releases it afterwards, and a chat request asks the
 ends `model-not-loaded`). With the switch off the scheduler behaves as before, and a chat request asks the packaged server,
 which otherwise loads nothing for it, to load its model. The same
 switch adds an `ImageAdmission` bean, which runs an image job on a lease as a stepped job and ends it with a fixed
-failure code when it cannot run, so the caller shows catalog art. No code calls it yet, and without the bean a caller
-uses `ImageAdmission.direct()`, which calls the adapter. With the switch on, `engine.inference.image-worker.url` (unset by
+failure code when it cannot run, so the caller shows catalog art. Only the owner-only probe route below calls it, and
+without the bean a caller uses `ImageAdmission.direct()`, which calls the adapter. With the switch on, `engine.inference.image-worker.url` (unset by
 default; `http://image-worker:8080` for the packaged service, which no Compose file sets) adds an image control and an
 `ImageGenerationPort` over the packaged worker's routes. Without that address no image control is registered, so a batch
 ends `LOAD_FAILED`; an `a1111-http` server never gets one, because it cannot release its checkpoint. An image batch does not
 start within `engine.inference.admission.reading-window` (default one minute, 0 turns it off) after a player's text turn on a
-local model ends. None of this has run against a real server, worker or GPU. The settings and limits are in
+local model ends. With the switch on, the owner can also send `POST /api/v1/models/admission-probe` (the same admission
+rules as every `/api/v1/models/` route: session, loopback origin, CSRF token, JSON content type; no body is read). It
+sends one fixed text task through the scheduler, in an isolated `tactician` line of the first campaign (lowest identifier),
+and one fixed 512 x 512 image job through `ImageAdmission`, and answers only
+`{"text": {"status", "code"}, "image": {"status", "code"}}`, where each `status` is an enum name or `UNAVAILABLE` and each
+`code` is a fixed code or `none`. Each wait is bounded (a request still open is cancelled and reported `wait-expired`), a
+second probe during one gets 409 `PROBE_BUSY`, and a non-owner gets 403 `LOCAL_ADMISSION_DENIED`. With the switch off the
+route does not exist. The text task leaves one ledger row in the scheduler, and an install with no campaign answers
+`no-campaign`; without an image port the image request answers `no-image-port`. None of this has run against a real server,
+worker or GPU. The settings and limits are in
 [docs/34 section 10](../docs/34-inference-backends-and-model-selection.md#p214-c121-opt-in-construction-of-the-lease-executor),
 [the scheduler link](../docs/34-inference-backends-and-model-selection.md#p214-c1221-link-from-the-schedulers-text-permit-to-the-lease-executor),
 [the image path](../docs/34-inference-backends-and-model-selection.md#p214-c1222-image-requests-through-the-lease-executor),
-[the packaged worker](../docs/34-inference-backends-and-model-selection.md#p214-d-packaged-image-worker-behind-the-lease-executor)
-and [the reading window](../docs/34-inference-backends-and-model-selection.md#p214-e2-reading-window-as-expected-text-demand);
-tests are `AdmissionConfigurationTest`, `LocalControlConfigurationTest`, `SchedulerResidencyTest`,
+[the packaged worker](../docs/34-inference-backends-and-model-selection.md#p214-d-packaged-image-worker-behind-the-lease-executor),
+[the reading window](../docs/34-inference-backends-and-model-selection.md#p214-e2-reading-window-as-expected-text-demand)
+and [the probe route](../docs/34-inference-backends-and-model-selection.md#p214-f1-owner-only-probe-of-the-text-and-image-paths);
+tests are `AdmissionConfigurationTest`, `AdmissionProbeControllerTest`, `JdbcProbeCampaignsTest` (the campaign lookup
+against inserted rows on PostgreSQL),
+`LocalControlConfigurationTest`, `SchedulerResidencyTest`,
 `TextResidencyDriverTest`, `ReadingWindowTest`, `ImageAdmissionTest`, `WorkerModelControlTest`, `WorkerImageAdapterTest`,
 `WorkerImageConfigurationTest`, `WorkerImageAdmissionTest` and the wiring cases in `TaskPortSelectionTest`.
 
