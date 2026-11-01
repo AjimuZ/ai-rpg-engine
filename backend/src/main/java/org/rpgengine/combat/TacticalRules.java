@@ -44,6 +44,9 @@ import org.rpgengine.rules.ZoneGraph;
  *       spending Focus. Speech and the end of the activation stay available, so a prevented player is never stuck.</li>
  *   <li><b>Reaction policy</b> (P11.4) — a reaction of the player's frozen profile, set before the first round or at the
  *       player's own decision, at no cost. It never answers a roll already seen.</li>
+ *   <li><b>Negotiation</b> (P11.5) — an action that proposes terms needs a recipient still standing, because a surrendered
+ *       one has nothing left to agree. An answer names the one offer on the table by its identity, so a stale or unknown one
+ *       is refused. Declining is free, and accepting costs what the terms declare, which a prevented player cannot pay.</li>
  * </ul>
  */
 public final class TacticalRules {
@@ -76,7 +79,9 @@ public final class TacticalRules {
         /** The reaction is unknown to the player's frozen profile. */
         REACTION,
         /** An active effect prevents this intention. */
-        PREVENTED
+        PREVENTED,
+        /** No offer with this identity is on the table. */
+        OFFER
     }
 
     /** Why one attack cannot reach one target right now; public, because every participant is observable. */
@@ -144,7 +149,8 @@ public final class TacticalRules {
                 if (action.kind() == EncounterAction.Kind.SOCIAL) {
                     var target = interact.target() == null ? null : state.participant(interact.target());
                     if (target == null || !action.recipients().admits(target.side())
-                            || !canAddress(state.space(), state.profile(), player, target)) {
+                            || !canAddress(state.space(), state.profile(), player, target)
+                            || action.terms() != null && target.status() != EncounterState.Status.ACTIVE) {
                         yield Refusal.TARGET;
                     }
                 } else {
@@ -182,12 +188,25 @@ public final class TacticalRules {
                 }
                 yield state.profile().value("useItemCost") > state.actionPoints() ? Refusal.ACTION_POINTS : null;
             }
+            case TacticalIntent.AnswerOffer answer -> {
+                var offer = state.openOffer();
+                if (offer == null || !offer.id().equals(answer.offer())) {
+                    yield Refusal.OFFER;
+                }
+                int cost = answer.accept() ? offer.terms().cost() : 0;
+                yield cost > 0 && state.prevented(player, CombatEffect.Prevents.ACTIONS) ? Refusal.PREVENTED
+                        : cost > state.actionPoints() ? Refusal.ACTION_POINTS : null;
+            }
         };
     }
 
-    /** @return whether the intention is an action paid in points, which a prevented participant cannot take */
+    /**
+     * @return whether the intention is an action paid in points, which a prevented participant cannot take. An answer is a
+     *         decision first: only what its terms declare can make it an action, which its own rule checks
+     */
     private static boolean costsPoints(TacticalIntent intent) {
-        return !(intent instanceof TacticalIntent.EndActivation || intent instanceof TacticalIntent.Speech);
+        return !(intent instanceof TacticalIntent.EndActivation || intent instanceof TacticalIntent.Speech
+                || intent instanceof TacticalIntent.AnswerOffer);
     }
 
     /**
@@ -381,8 +400,10 @@ public final class TacticalRules {
      * Legal candidates of the player's current decision (docs/11 section 12), for the receipt: affordable moves
      * with their cost, the speech allowance and addressable recipients, each declared action that is legal now
      * with its cost and admissible recipients and, since P11.3, each frozen attack with its cost, its reachable targets
-     * and the reason it cannot be used now, the Guard action and the price of using an item. Everything listed is
-     * public: every participant is observable.
+     * and the reason it cannot be used now, the Guard action and the price of using an item. Since P11.5 a declared
+     * action also lists its check and proposed terms, and the offer on the table is listed with what accepting costs. A
+     * check's difficulty and a counteroffer not yet made are absent. Everything listed is public: every participant is
+     * observable.
      *
      * @param state encounter state at the player's decision
      * @return ordered canonical values, or an empty map when the player has no decision now
@@ -432,6 +453,13 @@ public final class TacticalRules {
             line.put("kind", action.kind().wire());
             line.put("cost", action.cost());
             line.put("targets", targets);
+            // Present only when declared, so the options of an action without them read as they did before P11.5.
+            if (action.check() != null) {
+                line.put("check", action.check().publicForm());
+            }
+            if (action.terms() != null) {
+                line.put("terms", action.terms().canonicalForm());
+            }
             actions.add(line);
         }
         var strikes = new ArrayList<Object>();
@@ -494,6 +522,12 @@ public final class TacticalRules {
         options.put("reactions", reactions);
         options.put("reactionsLeft", player.reactions());
         options.put("endActivation", true);
+        var offer = state.openOffer();
+        if (offer != null) {
+            var line = new LinkedHashMap<String, Object>(offer.canonicalForm());
+            line.put("canAccept", refusal(state, new TacticalIntent.AnswerOffer(offer.id(), true)) == null);
+            options.put("offer", line);
+        }
         return options;
     }
 

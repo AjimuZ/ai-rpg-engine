@@ -14,7 +14,7 @@ import java.util.Set;
  *
  * <p>Since P11.1 only entry is executed; the round, activation and settlement steps are the transitions
  * later tasks drive (initiative and activations P11.2, outcome and settlement P11.5). The scheduler reaches
- * {@link #OUTCOME_PENDING} since P11.5; nothing leaves it until settlement exists.
+ * {@link #OUTCOME_PENDING} since P11.5; nothing leaves it until settlement exists, also after a surrender or an agreement.
  */
 public enum EncounterPhase {
     /** A candidate encounter exists but has not been checked. */

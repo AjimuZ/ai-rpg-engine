@@ -28,7 +28,8 @@ import tools.jackson.databind.json.JsonMapper;
  * second active encounter of the campaign violates a unique index, so a replayed, stale or
  * racing write rolls the whole commit back. {@link #active} reads the current encounter summary for rules and tests.
  * Since P11.4 each participant row also stores its active effects, reaction policies and ability uses as canonical JSON,
- * and the encounter row its application counter; V25 bounds them and refuses a counter that goes back.
+ * and the encounter row its application counter; V25 bounds them and refuses a counter that goes back. Since P11.5 the
+ * encounter row also stores the offer on the table and the accepted truce as canonical JSON, under the V30 guards.
  */
 public final class EncounterWriter {
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -105,11 +106,12 @@ public final class EncounterWriter {
     public static Optional<EncounterState> state(JdbcTemplate jdbc, UUID campaign) {
         var rows = jdbc.query("select id, row_version, phase, round, actor_cursor, action_points, speech_used, "
                         + "passages::text, profile::text, definition::text, opening_policy, opening_target, opening_status, "
-                        + "effects_applied from encounter where campaign_id = ? and phase not in ('SETTLED', 'NARRATIVE_RESUME')",
+                        + "effects_applied, open_offer::text, agreement::text from encounter where campaign_id = ? "
+                        + "and phase not in ('SETTLED', 'NARRATIVE_RESUME')",
                 (row, index) -> new Object[] {row.getObject(1, UUID.class), row.getLong(2), row.getString(3),
                         row.getInt(4), row.getObject(5, Integer.class), row.getObject(6, Integer.class), row.getInt(7),
                         row.getString(8), row.getString(9), row.getString(10), row.getString(11), row.getString(12),
-                        row.getString(13), row.getInt(14)}, campaign);
+                        row.getString(13), row.getInt(14), row.getString(15), row.getString(16)}, campaign);
         if (rows.isEmpty()) {
             return Optional.empty();
         }
@@ -201,7 +203,9 @@ public final class EncounterWriter {
             return Optional.of(new EncounterState(id, (Long) row[1], EncounterPhase.valueOf((String) row[2]), (Integer) row[3],
                     (Integer) row[4], (Integer) row[5], (Integer) row[6], passages, profile, space, escapes, actions,
                     OpeningPolicy.parse((String) row[10]), (String) row[11], (String) row[12], participants, ammunition,
-                    effects, (Integer) row[13], objectives));
+                    effects, (Integer) row[13], objectives,
+                    row[14] == null ? null : Negotiation.Offer.fromCanonical(JSON.readValue((String) row[14], Map.class)),
+                    row[15] == null ? null : Negotiation.Agreement.fromCanonical(JSON.readValue((String) row[15], Map.class))));
         } catch (RuntimeException unreadable) {
             throw new IllegalStateException("stored encounter " + id + " cannot be read back", unreadable);
         }
@@ -247,10 +251,13 @@ public final class EncounterWriter {
             }).toList();
             if (jdbc.update("update encounter set phase = ?, round = ?, actor_cursor = ?, action_points = ?, "
                             + "speech_used = ?, passages = ?::jsonb, opening_status = ?, effects_applied = ?, "
+                            + "open_offer = ?::jsonb, agreement = ?::jsonb, "
                             + "updated_revision = ?, row_version = row_version + 1 "
                             + "where id = ? and campaign_id = ? and row_version = ?",
                     step.phase().name(), step.round(), step.cursor(), step.actionPoints(), step.speechUsed(),
-                    CanonicalJson.write(passages), step.openingStatus(), step.effectsApplied(), revision,
+                    CanonicalJson.write(passages), step.openingStatus(), step.effectsApplied(),
+                    step.openOffer() == null ? null : CanonicalJson.write(step.openOffer().canonicalForm()),
+                    step.agreement() == null ? null : CanonicalJson.write(step.agreement().canonicalForm()), revision,
                     plan.encounterId(), campaign, version) != 1) {
                 throw new IllegalStateException("stale encounter");
             }

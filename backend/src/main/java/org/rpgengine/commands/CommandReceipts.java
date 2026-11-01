@@ -160,11 +160,21 @@ public final class CommandReceipts {
         return view;
     }
 
+    /** Copy declared terms: identity, what accepting does and costs; they hold no hidden value. */
+    private static Map<String, Object> terms(JsonNode terms) {
+        var line = new LinkedHashMap<String, Object>();
+        line.put("termsId", terms.path("id").asString());
+        line.put("kind", terms.path("kind").asString());
+        line.put("cost", terms.path("cost").asInt());
+        return java.util.Collections.unmodifiableMap(line);
+    }
+
     /**
      * Copy the allowlisted members of a tactical summary: scalar cursor facts, the initiative order, each participant's
      * public standing with any effects it holds, the operation's strikes (never a hidden defense, armor or Health value) and the legal options
      * (moves, speech allowance and recipients, declared actions, attacks with costs, targets and disabled reasons, Guard
-     * and item use), and the terminal verdict once the fight has one.
+     * and item use), and the terminal verdict once the fight has one. Since P11.5 also what a social attempt or an answer
+     * did and the offer on the table, never a check's difficulty or margin.
      */
     private static Map<String, Object> combat(JsonNode combat) {
         var entry = new LinkedHashMap<String, Object>();
@@ -222,11 +232,29 @@ public final class CommandReceipts {
         if (!outcomes.isEmpty()) {
             entry.put("strikes", List.copyOf(outcomes));
         }
+        // Since P11.5, only for an operation with a declared check, a negotiation response or an answer to an offer.
+        JsonNode social = combat.path("social");
+        if (social.isObject()) {
+            var line = new LinkedHashMap<String, Object>();
+            for (String member : List.of("actionId", "targetId", "response", "offerId", "termsId", "decision")) {
+                if (social.path(member).isString()) {
+                    line.put(member, social.path(member).asString());
+                }
+            }
+            if (social.path("total").isInt()) {
+                line.put("total", social.path("total").asInt());
+                line.put("success", social.path("success").asBoolean());
+            }
+            entry.put("social", java.util.Collections.unmodifiableMap(line));
+        }
         JsonNode verdict = combat.path("outcome");
         if (verdict.isObject()) {
             var outcome = new LinkedHashMap<String, Object>();
             outcome.put("outcome", verdict.path("outcome").asString());
             outcome.put("objectiveId", verdict.path("objectiveId").isString() ? verdict.path("objectiveId").asString() : null);
+            if (verdict.path("termsId").isString()) {
+                outcome.put("termsId", verdict.path("termsId").asString());
+            }
             var statuses = new ArrayList<Map<String, Object>>();
             for (JsonNode line : verdict.path("objectives")) {
                 var status = new LinkedHashMap<String, Object>();
@@ -259,9 +287,32 @@ public final class CommandReceipts {
                 line.put("kind", action.path("kind").asString());
                 line.put("cost", action.path("cost").asInt());
                 line.put("targets", strings(action.path("targets")));
+                // Since P11.5, and only for an action that declares them.
+                if (action.path("check").isObject()) {
+                    var check = new LinkedHashMap<String, Object>();
+                    check.put("attribute", action.path("check").path("attribute").asString());
+                    check.put("skill", action.path("check").path("skill").isString() ? action.path("check").path("skill").asString() : null);
+                    check.put("rank", action.path("check").path("rank").asInt());
+                    line.put("check", java.util.Collections.unmodifiableMap(check));
+                }
+                if (action.path("terms").isObject()) {
+                    line.put("terms", terms(action.path("terms")));
+                }
                 actions.add(line);
             }
             view.put("actions", List.copyOf(actions));
+            // Since P11.5, and only while terms wait for the player's answer.
+            JsonNode offer = options.path("offer");
+            if (offer.isObject()) {
+                var line = new LinkedHashMap<String, Object>();
+                line.put("offerId", offer.path("id").asString());
+                line.put("actionId", offer.path("actionId").asString());
+                line.put("recipientId", offer.path("recipientId").asString());
+                line.put("response", offer.path("response").asString());
+                line.put("terms", terms(offer.path("terms")));
+                line.put("canAccept", offer.path("canAccept").asBoolean());
+                view.put("offer", java.util.Collections.unmodifiableMap(line));
+            }
             if (options.path("strikes").isArray()) {
                 var strikes = new ArrayList<Map<String, Object>>();
                 for (JsonNode strike : options.path("strikes")) {

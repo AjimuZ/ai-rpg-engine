@@ -3,7 +3,7 @@ package org.rpgengine.combat;
 import java.util.Objects;
 
 /**
- * Closed vocabulary of the player's tactical intentions inside an encounter (P11.2 to P11.4, docs/11 sections 6-11).
+ * Closed vocabulary of the player's tactical intentions inside an encounter (P11.2 to P11.5, docs/11 sections 6-13).
  * Each value names only what the player decides: a destination zone, a recipient, a declared action, an attack and
  * its target. Costs, legality and every effect come from the frozen encounter through {@link TacticalRules} and
  * {@link CombatScheduler}; the commands layer decodes the wire payloads and hands these values over.
@@ -94,6 +94,20 @@ public sealed interface TacticalIntent {
         public UseAbility {
             Objects.requireNonNull(ability, "ability");
             targets = java.util.List.copyOf(targets);
+        }
+    }
+
+    /**
+     * Answer the terms on the table by their identity (P11.5). This is the only way an agreement or a surrender comes
+     * about: words, a response or a retry of the attempt never accept anything for the player.
+     *
+     * @param offer identity of the offer answered
+     * @param accept true to accept its terms, false to decline them
+     */
+    record AnswerOffer(String offer, boolean accept) implements TacticalIntent {
+        /** Require the offer. */
+        public AnswerOffer {
+            Objects.requireNonNull(offer, "offer");
         }
     }
 

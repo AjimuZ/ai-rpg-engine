@@ -68,9 +68,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       one and it names a hostile participant. Every refusal shares {@code ENCOUNTER_UNAVAILABLE}.</li>
  *   <li><b>Tactical intentions (P11.2, P11.3)</b> — the campaign's active encounter must exist and its player participant
  *       must be the acting player; {@link TacticalRules} then decides turn, movement, addressing, speech allowance,
- *       declared-action eligibility, attack reach, the Guard action, abilities, prevention, reaction policies and action points over the stored tactical state ({@code TURN_UNAVAILABLE},
+ *       declared-action eligibility, attack reach, the Guard action, abilities, prevention, reaction policies, answers to an
+ *       offer and action points over the stored tactical state ({@code TURN_UNAVAILABLE},
  *       {@code ZONE_UNAVAILABLE}, {@code TARGET_ILLEGAL}, {@code SPEECH_LIMIT_REACHED}, {@code INTERACTION_UNAVAILABLE},
- *       {@code ACTION_POINTS_INSUFFICIENT}). The initiative roll and the end of an activation may close a round, so
+ *       {@code OFFER_UNAVAILABLE}, {@code ACTION_POINTS_INSUFFICIENT}). The initiative roll and the end of an activation may close a round, so
  *       the clock must be able to take one round's seconds ({@code TIME_ILLEGAL}).</li>
  *   <li><b>Causal attribution</b> — at commit, resolved effects may only touch the participants
  *       this intention lawfully involves ({@link #requireAttributed}).</li>
@@ -499,6 +500,7 @@ final class CommandRules {
                     case RESOURCE -> OperationAdmissionFailure.Kind.RESOURCE_INSUFFICIENT;
                     case REACTION -> OperationAdmissionFailure.Kind.REACTION_UNAVAILABLE;
                     case PREVENTED -> OperationAdmissionFailure.Kind.ACTION_PREVENTED;
+                    case OFFER -> OperationAdmissionFailure.Kind.OFFER_UNAVAILABLE;
                 });
             }
             if (tactical instanceof TypedCommand.CombatUseItem use) {

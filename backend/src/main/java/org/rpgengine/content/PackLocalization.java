@@ -224,6 +224,17 @@ public final class PackLocalization {
                             definition.id(), visibility, definition.kind(), "name", "description");
                 }
             }
+            // A negotiation's terms are public text too: the player must read what they would accept (P11.5).
+            if (definition.kind().equals("encounter")) {
+                for (Map<String, Object> action : (List<Map<String, Object>>) data.getOrDefault("actions", List.of())) {
+                    for (String terms : List.of("terms", "counteroffer")) {
+                        if (action.get(terms) instanceof Map<?, ?> declared) {
+                            add(definition.id(), "/actions/" + action.get("id") + "/" + terms, (Map<String, Object>) declared,
+                                    definition.id(), visibility, definition.kind(), "name", "description");
+                        }
+                    }
+                }
+            }
         }
 
         /** Register existing allowlisted strings only; callers cannot manufacture new fields via an overlay. */

@@ -262,7 +262,7 @@ class TypedCommandTest {
     @Test
     void decodesTacticalIntentionsExactly() {
         for (String type : List.of("ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT", "STRIKE",
-                "GUARD", "COMBAT_USE_ITEM", "COMBAT_USE_ABILITY", "SET_REACTION_POLICY")) {
+                "GUARD", "COMBAT_USE_ITEM", "COMBAT_USE_ABILITY", "SET_REACTION_POLICY", "ANSWER_OFFER")) {
             assertTrue(TypedCommand.registered(type), type);
         }
         assertEquals(new TypedCommand.RollInitiative(), decode("ROLL_INITIATIVE", Map.of()));
@@ -333,6 +333,21 @@ class TypedCommandTest {
         assertInvalid("SET_REACTION_POLICY", Map.of("reactionId", "brace", "mode", "healthAtMost", "value", 101));
         assertInvalid("SET_REACTION_POLICY", Map.of("reactionId", "brace", "mode", "off", "value", 1));
         assertInvalid("SET_REACTION_POLICY", Map.of("reactionId", "brace"));
+        // P11.5: only the two exact decisions exist, because guessing what another one meant would bind the player.
+        assertEquals(new TypedCommand.AnswerOffer("offer-7", "accept"), decode("ANSWER_OFFER", Map.of("offerId", "offer-7", "decision", "accept")));
+        assertEquals(new TypedCommand.AnswerOffer("offer-7", "decline"), decode("ANSWER_OFFER", Map.of("offerId", "offer-7", "decision", "decline")));
+        assertEquals(Map.of("offerId", "offer-7", "decision", "accept"), new TypedCommand.AnswerOffer("offer-7", "accept").payload());
+        assertEquals(new org.rpgengine.combat.TacticalIntent.AnswerOffer("offer-7", true), new TypedCommand.AnswerOffer("offer-7", "accept").intent());
+        assertEquals(new org.rpgengine.combat.TacticalIntent.AnswerOffer("offer-7", false), new TypedCommand.AnswerOffer("offer-7", "decline").intent());
+        assertInvalid("ANSWER_OFFER", Map.of());
+        assertInvalid("ANSWER_OFFER", Map.of("offerId", "offer-7"));
+        assertInvalid("ANSWER_OFFER", Map.of("decision", "accept"));
+        assertInvalid("ANSWER_OFFER", Map.of("offerId", "offer-7", "decision", "yes"));
+        assertInvalid("ANSWER_OFFER", Map.of("offerId", "offer-7", "decision", "ACCEPT"));
+        assertInvalid("ANSWER_OFFER", Map.of("offerId", "offer-7", "decision", 1));
+        assertInvalid("ANSWER_OFFER", Map.of("offerId", "", "decision", "accept"));
+        assertInvalid("ANSWER_OFFER", Map.of("offerId", "x".repeat(65), "decision", "accept"));
+        assertInvalid("ANSWER_OFFER", Map.of("offerId", "offer-7", "decision", "accept", "termsId", "toll"));
         assertInvalid("COMBAT_USE_ITEM", Map.of());
         assertInvalid("COMBAT_USE_ITEM", Map.of("itemInstanceId", "not-a-uuid"));
         assertInvalid("COMBAT_USE_ITEM", Map.of("itemInstanceId", instance.toString(), "targetId", ""));

@@ -1,6 +1,6 @@
 # ADR 0032: Terminal predicates from committed state
 
-- Status: Accepted; implemented for victory, defeat, escape and objective success in P11.5-A (1 November 2026). Surrender, negotiated ends, the stalemate policy and settlement are later P11.5 work and build on it.
+- Status: Accepted; implemented for victory, defeat, escape and objective success in P11.5-A (1 November 2026). [ADR 0033](0033-negotiation-explicit-answers-and-surrender.md) extends the predicates with surrender and agreement. The stalemate policy and settlement are later P11.5 work and build on it.
 - Date: 1 November 2026
 - Builds on: [ADR 0028](0028-encounter-lifecycle-frozen-profiles-and-zone-graph.md) (lifecycle and objectives), [ADR 0029](0029-initiative-rounds-activations-and-bounded-combat-dialogue.md) (scheduler), [ADR 0031](0031-predeclared-reactions-effect-phases-and-cooldowns.md) (effects).
 

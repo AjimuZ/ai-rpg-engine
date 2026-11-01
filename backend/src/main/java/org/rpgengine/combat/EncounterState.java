@@ -44,12 +44,26 @@ import org.rpgengine.rules.ZoneGraph;
  * @param effects frozen effect definitions the fight can reach, by canonical ID (P11.4)
  * @param effectsApplied the encounter's application counter: how many effect instances it has created (P11.4)
  * @param objectives frozen objectives in declared order (P11.5)
+ * @param openOffer terms waiting for the player's explicit answer, or null; set only at the player's decision (P11.5)
+ * @param agreement the truce the player accepted, or null; set only once the fight has its outcome (P11.5)
  */
 public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int round, Integer cursor,
         Integer actionPoints, int speechUsed, List<EncounterAction.Passage> passages, CombatProfile profile,
         ZoneGraph frozenSpace, Set<String> escapeZones, List<EncounterAction> actions, OpeningPolicy opening,
         String openingTarget, String openingStatus, List<Combatant> participants, List<Ammunition> ammunition,
-        Map<String, CombatEffect> effects, int effectsApplied, List<EncounterObjective> objectives) {
+        Map<String, CombatEffect> effects, int effectsApplied, List<EncounterObjective> objectives,
+        Negotiation.Offer openOffer, Negotiation.Agreement agreement) {
+    /** Tactical state with no negotiation under way, the shape of a fight without one. */
+    public EncounterState(UUID id, long rowVersion, EncounterPhase phase, int round, Integer cursor,
+            Integer actionPoints, int speechUsed, List<EncounterAction.Passage> passages, CombatProfile profile,
+            ZoneGraph frozenSpace, Set<String> escapeZones, List<EncounterAction> actions, OpeningPolicy opening,
+            String openingTarget, String openingStatus, List<Combatant> participants, List<Ammunition> ammunition,
+            Map<String, CombatEffect> effects, int effectsApplied, List<EncounterObjective> objectives) {
+        this(id, rowVersion, phase, round, cursor, actionPoints, speechUsed, passages, profile, frozenSpace, escapeZones,
+                actions, opening, openingTarget, openingStatus, participants, ammunition, effects, effectsApplied, objectives,
+                null, null);
+    }
+
     /** Tactical state without objectives, the shape used before P11.5; the structural predicates still apply to it. */
     public EncounterState(UUID id, long rowVersion, EncounterPhase phase, int round, Integer cursor,
             Integer actionPoints, int speechUsed, List<EncounterAction.Passage> passages, CombatProfile profile,

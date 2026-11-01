@@ -99,6 +99,9 @@ import tools.jackson.databind.node.ObjectNode;
  * effect beside Health; a reaction or effect that moves the player's pools during another participant's action is part
  * of the same plan.
  *
+ * <p>Social checks and negotiation (P11.5): {@code INTERACT} draws a declared check through the same recorded source, and
+ * {@code ANSWER_OFFER} applies terms from the frozen encounter. Neither reads the pinned catalog.
+ *
  * <p>Rest (P10.4): the pinned policy restores its resources up to each pool's maximum and, when not
  * interrupted, ends the listed conditions the player has. An interruption is one recorded percentile
  * draw; it halves the time and the restoration and removes no condition ({@link RestRules}).

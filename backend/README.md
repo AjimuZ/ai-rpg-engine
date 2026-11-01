@@ -1201,8 +1201,23 @@ reach-zone, survive or protect objective, then no active hostile, then an escape
 `ACTOR_START` and `ROUND_END`, stores `OUTCOME_PENDING` and writes `ENCOUNTER_OUTCOME_PENDING`; `CommandReceipts` allowlists
 `combat.outcome`. No migration was needed. Tests: `EncounterOutcomeTest` (pure) and `OutcomeCommandsTest` (PostgreSQL).
 
-Limits: surrender, negotiated ends, the stalemate policy, Withdraw and settlement are not implemented, so nothing leaves
-`OUTCOME_PENDING` and the campaign stays in encounter mode there; a round left unfinished adds no time.
+Limits: the stalemate policy, Withdraw and settlement are not implemented, so nothing leaves `OUTCOME_PENDING` and the campaign
+stays in encounter mode there; a round left unfinished adds no time.
+
+## Negotiation, surrender and agreement (P11.5)
+
+`Negotiation` holds a social action's declared `Check` and `Terms`, the stored `Offer` and `Agreement`, and the pure
+`respond` over frozen data and a recorded roll ([ADR 0033](../docs/adr/0033-negotiation-explicit-answers-and-surrender.md)).
+`CombatScheduler` draws the check, stores at most one offer, lapses it at any action other than speech or a policy change, and
+applies terms only on `TacticalIntent.AnswerOffer` from the command `ANSWER_OFFER` {offerId, decision}. `EncounterOutcome` adds
+`PLAYER_SURRENDER`, `HOSTILE_SURRENDER` and `AGREEMENT`. V30 stores `open_offer` and `agreement` on the encounter row and guards
+them, and refuses bringing a surrendered participant back; the backup tool covers schema 30. Pack data: `check`, `terms` and
+`counteroffer` on a social action. Refusal: `OFFER_UNAVAILABLE` (`COMMAND_OFFER_UNAVAILABLE`, HTTP 422). Tests: `NegotiationTest`
+(pure), `NegotiationCommandsTest` (PostgreSQL) and `CampaignCommandHttpTest.aNegotiatedEndingAnswersAndReplays` (HTTP).
+
+Limits: nothing leaves `OUTCOME_PENDING` until settlement exists; terms cost points only and cannot transfer items; a check on any
+intent but `negotiate` records its result and changes nothing else; morale, knowledge and objective policies and a recipient
+proposing terms by itself are not modelled (P12.3/P12.4); no generated reply, preview, confirmation or panel yet (P12).
 
 ## Interface reload contract (P05.6)
 

@@ -17,24 +17,34 @@ import java.util.TreeMap;
  * <ol>
  *   <li>{@link Kind#DEFEAT}: the player is defeated. It comes first because a fallen protagonist meets no objective
  *       ({@link EncounterObjective#evaluate}), so a mutual fall is a defeat, not a victory.</li>
+ *   <li>{@link Kind#PLAYER_SURRENDER}: the player surrendered, for the same reason: it meets no objective either.</li>
  *   <li>{@link Kind#OBJECTIVE}: a reach-zone, survive or protect objective is met, the first in declared order. Objectives
  *       are alternative ways out of a fight, so one is enough.</li>
- *   <li>{@link Kind#VICTORY}: no hostile participant is still active.</li>
+ *   <li>{@link Kind#HOSTILE_SURRENDER} or {@link Kind#VICTORY}: no hostile participant is still active. It is a surrender
+ *       when any of them surrendered, because settlement must not read a spared opponent as a fallen one.</li>
  *   <li>{@link Kind#ESCAPE}: the player has escaped or stands in one of the encounter's escape zones.</li>
+ *   <li>{@link Kind#AGREEMENT}: the player accepted a truce. The stored acceptance is the only way here: speech, a
+ *       response or an open offer never reach this predicate.</li>
  * </ol>
  * The defeat-hostiles and escape objectives read the same facts as {@link Kind#VICTORY} and {@link Kind#ESCAPE}, and keep
  * those outcomes and their place in the order. A failed objective ends nothing by itself: the fight can still be won, lost or
- * left, and {@link #objectives} reports every status for settlement. A player who surrendered gets no verdict here, and
- * surrender, negotiated ends, stalemate and settlement are later P11.5 work; the round cap therefore stays a pause.
+ * left, and {@link #objectives} reports every status for settlement. Stalemate and settlement are later P11.5 work, so the
+ * round cap stays a pause.
  *
  * @param kind how the fight ends
  * @param objective the objective met for {@link Kind#OBJECTIVE}, otherwise null
+ * @param terms the terms accepted for {@link Kind#AGREEMENT}, otherwise null
  * @param objectives every objective's status in declared order
  */
-public record EncounterOutcome(Kind kind, String objective, Map<String, EncounterObjective.Status> objectives) {
+public record EncounterOutcome(Kind kind, String objective, String terms, Map<String, EncounterObjective.Status> objectives) {
     /** How a fight ends. */
     public enum Kind {
-        VICTORY, DEFEAT, ESCAPE, OBJECTIVE
+        VICTORY, DEFEAT, ESCAPE, OBJECTIVE, PLAYER_SURRENDER, HOSTILE_SURRENDER, AGREEMENT
+    }
+
+    /** A verdict that names no accepted terms. */
+    public EncounterOutcome(Kind kind, String objective, Map<String, EncounterObjective.Status> objectives) {
+        this(kind, objective, null, objectives);
     }
 
     /** Require the kind and keep the objective order. */
@@ -42,6 +52,9 @@ public record EncounterOutcome(Kind kind, String objective, Map<String, Encounte
         Objects.requireNonNull(kind, "kind");
         if ((kind == Kind.OBJECTIVE) != (objective != null)) {
             throw new IllegalArgumentException("only an objective outcome names an objective");
+        }
+        if ((kind == Kind.AGREEMENT) != (terms != null)) {
+            throw new IllegalArgumentException("only an agreement names its terms");
         }
         objectives = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(objectives));
     }
@@ -70,16 +83,21 @@ public record EncounterOutcome(Kind kind, String objective, Map<String, Encounte
             return new EncounterOutcome(Kind.DEFEAT, null, statuses);
         }
         if (standing == EncounterState.Status.SURRENDERED) {
-            return null;
+            return new EncounterOutcome(Kind.PLAYER_SURRENDER, null, statuses);
         }
         if (met != null) {
             return new EncounterOutcome(Kind.OBJECTIVE, met, statuses);
         }
         if (!progress.hostilesActive()) {
-            return new EncounterOutcome(Kind.VICTORY, null, statuses);
+            boolean spared = state.participants().stream().anyMatch(participant ->
+                    participant.side() == EncounterTemplate.Side.HOSTILE && participant.status() == EncounterState.Status.SURRENDERED);
+            return new EncounterOutcome(spared ? Kind.HOSTILE_SURRENDER : Kind.VICTORY, null, statuses);
         }
         if (standing == EncounterState.Status.ESCAPED || progress.escapeZones().contains(progress.playerZone())) {
             return new EncounterOutcome(Kind.ESCAPE, null, statuses);
+        }
+        if (state.agreement() != null) {
+            return new EncounterOutcome(Kind.AGREEMENT, null, state.agreement().terms(), statuses);
         }
         return null;
     }
@@ -106,6 +124,11 @@ public record EncounterOutcome(Kind kind, String objective, Map<String, Encounte
             @Override
             public boolean playerDefeated() {
                 return state.player().status() == EncounterState.Status.DEFEATED;
+            }
+
+            @Override
+            public boolean playerSurrendered() {
+                return state.player().status() == EncounterState.Status.SURRENDERED;
             }
 
             @Override
@@ -139,12 +162,15 @@ public record EncounterOutcome(Kind kind, String objective, Map<String, Encounte
         return closed ? state.round() : Math.max(0, state.round() - 1);
     }
 
-    /** @return the public form of this verdict: outcome, the objective met if any and each objective's status */
+    /** @return the public form of this verdict: outcome, the objective met or terms accepted if any and each objective's status */
     public Map<String, Object> publicForm() {
         var form = new TreeMap<String, Object>();
         form.put("outcome", kind.name());
         if (objective != null) {
             form.put("objectiveId", objective);
+        }
+        if (terms != null) {
+            form.put("termsId", terms);
         }
         var lines = new ArrayList<Object>();
         objectives.forEach((id, status) -> {

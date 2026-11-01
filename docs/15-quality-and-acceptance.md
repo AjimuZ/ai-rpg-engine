@@ -1697,6 +1697,16 @@ state with their invariants held and replaying identically. On real PostgreSQL e
 retry replays the same receipt and every later command is refused without writing. Surrender, agreement, the negotiation
 cases, settling once and the lost-response retry of a negotiated ending stay open, so QA-13 is not met.
 
+P11.5-B (1 November 2026) adds the negotiation half of QA-13 and the social costs and checks of QA-11, still not their full result,
+on `NegotiationTest`, `NegotiationCommandsTest`, `EncounterOutcomeTest` and `CampaignCommandHttpTest`. Refused negotiation, a counteroffer,
+explicit player acceptance, a decline and a lapse are each tested, purely and on real PostgreSQL. Words saying "I accept" change nothing,
+an attempt pays its declared cost and draws its declared check once, every pair of dice gives the response an independent model
+expects, and ambiguous, unknown, stale or malformed input is refused without writing. Surrender is tested for an opponent, the last opponent and
+the player. A retry of a negotiated ending's lost response replays the same receipt through the service and through HTTP, paying nothing
+twice; only the outcome is proven, because that ending does not settle yet. A hundred more seeded fights (seed 20261102) reach every negotiated outcome, each
+only by the player's explicit acceptance, and replay identically. Settling once, the return to narrative, renewal and restore during a social check (P11.6),
+generated replies and the browser path (P12) stay open, so QA-11 and QA-13 are not met.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

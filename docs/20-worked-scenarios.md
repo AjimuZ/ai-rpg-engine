@@ -95,6 +95,10 @@ An author changes a weapon formula in pack version 1.1. A campaign pinned to 1.0
 ## 9. Talk and change the situation during a fight
 
 This example specifies future P11/P12 behavior, not a runnable encounter fixture.
+Since P11.5-B the backend implements steps 2 and 3 up to the outcome, with a stored
+offer and the explicit `ANSWER_OFFER`: a refusal, a counteroffer and the player's
+acceptance are tested on the `parley-ground` fixture. Settlement, the return to
+narrative, generated replies and the composer's preview are still to come.
 The player is active with 3 AP. Mira and a hostile captain are known participants
 in communicating range. The frozen encounter permits a negotiated ending and
 defines an interaction with an existing dock gate; no new ability is improvised.

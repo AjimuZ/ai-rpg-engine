@@ -978,8 +978,29 @@ public final class PackCompiler {
                 // A normal action costs at least one point and fits one activation (docs/11 section 7).
                 action.integer("cost", 1, combatProfile.actionPoints(), combatProfile.value("interactCost"));
                 if (kind.equals("social")) {
-                    action.choice("intent", Set.of("persuade", "intimidate", "negotiate", "distract", "request"), null);
-                    action.choice("recipients", Set.of("hostile", "ally", "any"), "hostile");
+                    String intent = action.choice("intent", Set.of("persuade", "intimidate", "negotiate", "distract", "request"), null);
+                    String recipients = action.choice("recipients", Set.of("hostile", "ally", "any"), "hostile");
+                    // A declared check and negotiation terms (P11.5): an agreement exists only through these.
+                    Fields check = action.object("check", false);
+                    if (check != null) {
+                        check.choice("attribute", new HashSet<>(CombatProfile.ROLES), null);
+                        check.ref("skill", SKILL, false);
+                        if (check.has("difficulty")) {
+                            check.integer("difficulty", 0, CombatProfile.CHECK_DIFFICULTY_MAX, null);
+                        }
+                        check.close();
+                    }
+                    String terms = terms(action, "terms");
+                    String counteroffer = terms(action, "counteroffer");
+                    if (terms != null && !(intent.equals("negotiate") && recipients.equals("hostile"))) {
+                        throw action.fail("CONSTRAINT_CONFLICT", "terms", "Only a negotiation addressing hostiles proposes terms");
+                    }
+                    if (counteroffer != null && terms == null) {
+                        throw action.fail("CONSTRAINT_CONFLICT", "counteroffer", "A counteroffer answers proposed terms");
+                    }
+                    if (counteroffer != null && counteroffer.equals(terms)) {
+                        throw action.fail("DUPLICATE", "counteroffer", "A counteroffer differs from the proposed terms");
+                    }
                 } else {
                     if (action.has("zone")) {
                         zoneRef(action, "zone", zones);
@@ -1003,6 +1024,26 @@ public final class PackCompiler {
                     throw action.fail("DUPLICATE", "id", "Action ID already defined in this encounter");
                 }
             }
+        }
+
+        /**
+         * Optional declared terms of a negotiation: a closed kind, public text and what accepting costs, which fits one
+         * activation like any action but may be zero, because accepting can be a decision alone.
+         *
+         * @return the terms ID, or null when the action declares none
+         */
+        private String terms(Fields action, String key) {
+            Fields terms = action.object(key, false);
+            if (terms == null) {
+                return null;
+            }
+            String id = terms.id("id", true);
+            terms.text("name", true);
+            terms.text("description", false);
+            terms.choice("kind", Set.of("truce", "recipientSurrenders", "playerSurrenders"), null);
+            terms.integer("cost", 0, combatProfile.actionPoints(), 0);
+            terms.close();
+            return id;
         }
 
         /** A required zone reference of an encounter; an undeclared zone is REFERENCE_UNKNOWN listing the zones. */

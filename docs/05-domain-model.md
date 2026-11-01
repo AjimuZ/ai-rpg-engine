@@ -369,7 +369,11 @@ status (`ACTIVE`, `DEFEATED`, `ESCAPED`, `SURRENDERED`). Initiative, activations
 effect timers were added by P11.2 to P11.4; the V16 checkpoint still records `"encounter": null` until P11.6.
 Since P11.5 ([ADR 0032](adr/0032-terminal-predicates-from-committed-state.md)) the scheduler stores `OUTCOME_PENDING` when
 a terminal predicate holds. No column stores the outcome: it follows from the row and is stated by a public event. The cursor
-stays set when the fight ended inside a round, and is empty when it ended at a round end.
+stays set when the fight ended inside a round, and is empty when it ended at a round end. Since V30
+([ADR 0033](adr/0033-negotiation-explicit-answers-and-surrender.md)) the row also holds `open_offer`, the one set of terms waiting
+for the player's explicit answer, only at `AWAITING_ACTION`, and `agreement`, the accepted truce, only with the outcome it causes
+and never changed. `SURRENDERED` is set only by accepted terms and is never undone; a surrendered participant keeps its Health and
+holds no stance or effect.
 
 Since P11.2 (V23, [ADR 0029](adr/0029-initiative-rounds-activations-and-bounded-combat-dialogue.md)) the
 encounter row also holds the tactical cursor: `actor_cursor` (initiative rank of the acting participant) and

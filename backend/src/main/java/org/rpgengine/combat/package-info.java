@@ -23,6 +23,8 @@
  * the scheduler resolves with the same recorded draws.
  *
  * <p>Since P11.5 (ADR 0032) {@code EncounterOutcome} holds the pure terminal predicates over an {@code EncounterState}, and the
- * scheduler stops at {@code OUTCOME_PENDING} when one holds. Settlement of a later task completes the fight.
+ * scheduler stops at {@code OUTCOME_PENDING} when one holds. Settlement of a later task completes the fight. Also since P11.5
+ * (ADR 0033) {@code Negotiation} holds declared checks and terms, a stored offer and the pure response of a recipient; only an
+ * explicit {@code TacticalIntent.AnswerOffer} applies terms, and {@code EncounterWriter} stores the offer and an accepted truce.
  */
 package org.rpgengine.combat;

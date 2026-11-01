@@ -400,7 +400,8 @@ blocked edges). Effects:
 - `MOVE_ZONE` and `INTERACT` pass through `RESOLVING` back to `AWAITING_ACTION`, spending their cost, and write
   `PARTICIPANT_MOVED` {encounterId, round, participantId, actorId, from, to, actionPoints, remainingActionPoints}
   or `INTERACTION_ATTEMPTED` {…, actionId, kind, actionPoints, remainingActionPoints, intent and targetId | passage
-  {from, to, blocked}}. A scene action stores its passage state; a social attempt establishes no outcome (P11.5).
+  {from, to, blocked}}. A scene action stores its passage state. A social attempt establishes no outcome; since P11.5 a
+  declared check and a negotiation's response follow it (see [P11.5 negotiation](#p115-social-checks-negotiation-and-surrender)).
 - `COMBAT_SPEAK` only counts the utterance and writes `COMBAT_SPEECH` {encounterId, round, participantId, actorId,
   recipientId, text}: no point, draw, world time or cursor change.
 - `END_ACTIVATION` expires the remaining points (`ACTIVATION_ENDED` {…, unusedActionPoints}) and continues the
@@ -450,11 +451,48 @@ exploration command evaluates the possession facts they change.
 
 Any operation can end a fight ([ADR 0032](adr/0032-terminal-predicates-from-committed-state.md)). When committed state
 satisfies a terminal predicate the operation moves to `OUTCOME_PENDING` and writes the public `ENCOUNTER_OUTCOME_PENDING`
-{encounterId, round, outcome: `VICTORY` | `DEFEAT` | `ESCAPE` | `OBJECTIVE`, objectiveId?, objectives: [{objectiveId,
-status: `pending` | `met` | `failed`}]}. That operation's receipt has `combat.outcome` {outcome, objectiveId, objectives} and
+{encounterId, round, outcome: `VICTORY` | `DEFEAT` | `ESCAPE` | `OBJECTIVE` | `PLAYER_SURRENDER` | `HOSTILE_SURRENDER` |
+`AGREEMENT`, objectiveId?, termsId?, objectives: [{objectiveId,
+status: `pending` | `met` | `failed`}]}. That operation's receipt has `combat.outcome` {outcome, objectiveId, termsId?, objectives} and
 no acting participant, action points or `options`. A retry replays the same receipt. Every later
 tactical intention is refused with `TURN_UNAVAILABLE` and exploration stays `MODE_ILLEGAL`, writing nothing, until
 settlement exists. A declared opening strike still waiting lapses with `ATTACKER_DOWN` or `ENCOUNTER_ENDED`.
+
+### P11.5 social checks, negotiation and surrender
+
+A social action may declare a check and a negotiation may declare terms ([ADR 0033](adr/0033-negotiation-explicit-answers-and-surrender.md)).
+One more tactical intention follows the same gates:
+
+| Intention | Payload | Legal when | Refusal |
+| --- | --- | --- | --- |
+| `ANSWER_OFFER` | `offerId` (1..64) and `decision` (exactly `accept` or `decline`; anything else is `INVALID_COMMAND`) | The player's decision; `offerId` names the offer on the table; to accept, the terms' `cost` is left and, when it is above zero, actions are not prevented | `TURN_UNAVAILABLE`, `OFFER_UNAVAILABLE`, `ACTION_PREVENTED`, `ACTION_POINTS_INSUFFICIENT` |
+
+`INTERACT` on an action that proposes terms also needs a recipient still standing (`TARGET_ILLEGAL`). After its
+`INTERACTION_ATTEMPTED`, a declared check draws two d10 and writes the public `SOCIAL_CHECK_RESOLVED` {encounterId, round,
+participantId, actorId?, actionId, targetId, dice, total, success, drawOrdinals} and the internal `SOCIAL_CHECK_CALCULATED`, which adds
+the role, rank, difficulty, margin and whether it was strong. A negotiation then writes `NEGOTIATION_RESPONDED` {encounterId, round, participantId, actorId?,
+actionId, response: `REFUSED` | `COUNTEROFFERED` | `OFFERED`, offerId?, termsId?, termsKind?, cost?}. Any response but a refusal stores
+one offer and changes nothing else: no status, outcome or further cost. Words saying "I accept" commit as speech and change nothing.
+
+The offer stands through speech and `SET_REACTION_POLICY`. Any other action or the end of the activation takes it off the table
+with the public `OFFER_LAPSED` {encounterId, round, participantId, actorId?, offerId, termsId, reason: `ACTION_TAKEN` | `ACTIVATION_ENDED` |
+`ENCOUNTER_ENDED`}. Declining writes `OFFER_ANSWERED` {…, offerId, termsId, termsKind, recipientId, decision: `DECLINED`} and stays at
+the decision. Accepting passes through `RESOLVING`, pays the terms' `cost`, runs declared-action ticks when that cost is above zero,
+and writes `OFFER_ANSWERED` with `decision: ACCEPTED`, `actionPoints` and `remainingActionPoints`. A tick that fells the player first
+lapses the offer instead, and the fight ends with that fall. Then:
+
+- `truce` stores the agreement and ends the fight as `AGREEMENT`, every participant still standing.
+- `recipientSurrenders` writes `PARTICIPANT_SURRENDERED` {…, termsId} for the recipient. The fight ends as `HOSTILE_SURRENDER` when no
+  hostile is left active and otherwise returns to the decision.
+- `playerSurrenders` does the same for the player and ends the fight as `PLAYER_SURRENDER`, failing every objective.
+
+A surrendered participant keeps its Health and holds no stance or effect; `EFFECTS_RESOLVED` lines say `HOLDER_SURRENDERED` or
+`SOURCE_SURRENDERED`. It takes no activation and cannot be attacked or asked for terms, but can still be spoken to. The receipt's
+`combat` gains `social` {actionId?, targetId?, total?, success?, response?, offerId?, termsId?, decision?} for an operation with a
+declared check, a response or an answer, and `options` gains `offer` {offerId, actionId, recipientId, response, terms: {termsId, kind,
+cost}, canAccept} while one stands. `options.actions[]` gains `check` {attribute, skill, rank} and `terms` {termsId, kind, cost} when
+declared; neither a difficulty nor a counteroffer not yet made is listed. A retry replays the same receipt, with no second draw, cost
+or effect.
 
 ### P11.4 reactions, effects and abilities
 

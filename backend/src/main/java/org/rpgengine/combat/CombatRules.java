@@ -317,10 +317,16 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
             int cost = number(action.get("cost"), interact);
             String actionId = (String) action.get("id");
             if ("social".equals(action.get("kind"))) {
+                // A check's skill rank is the player's, frozen at entry; a negotiation's terms are this data (P11.5).
+                var check = action.get("check") instanceof Map<?, ?> declared ? new Negotiation.Check(
+                        (String) declared.get("attribute"), declared.get("skill") instanceof String reference
+                                ? snapshot.resolve(pack, reference, "skill").id() : null, 0,
+                        declared.get("difficulty") == null ? null : number(declared.get("difficulty"), 0)) : null;
                 actions.add(new EncounterAction(actionId, EncounterAction.Kind.SOCIAL,
                         EncounterAction.Intent.valueOf(((String) action.get("intent")).toUpperCase(java.util.Locale.ROOT)),
                         EncounterAction.Recipients.valueOf(text(action.get("recipients"), "hostile")
-                                .toUpperCase(java.util.Locale.ROOT)), cost, null, null));
+                                .toUpperCase(java.util.Locale.ROOT)), cost, null, null, check, terms(action.get("terms")),
+                        terms(action.get("counteroffer"))));
             } else {
                 var passage = (Map<?, ?>) action.get("passage");
                 actions.add(new EncounterAction(actionId, EncounterAction.Kind.SCENE, null, null, cost,
@@ -333,6 +339,12 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
         return new EncounterTemplate(id, packId, location, new ZoneGraph(zones, edges), (String) data.get("playerZone"),
                 new TreeSet<>(strings(data.get("escapeZones"))), participants, objectives,
                 OpeningPolicy.parse(text(data.get("opening"), "initiative")), actions);
+    }
+
+    /** Declared terms of a validated negotiation, or null when it declares none; an omitted cost is a free decision. */
+    private static Negotiation.Terms terms(Object value) {
+        return value instanceof Map<?, ?> terms ? new Negotiation.Terms((String) terms.get("id"),
+                Negotiation.Terms.Kind.parse((String) terms.get("kind")), number(terms.get("cost"), 0)) : null;
     }
 
     /** Object elements of an optional validated list; absent lists are empty. */

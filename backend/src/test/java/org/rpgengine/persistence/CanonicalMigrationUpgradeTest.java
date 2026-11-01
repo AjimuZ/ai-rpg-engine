@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V29 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V30 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -738,6 +738,37 @@ class CanonicalMigrationUpgradeTest {
                     assertThrows(DataAccessException.class, () -> jdbc.update("delete from resource_lease where id = ?", lease),
                             "lease rows are never deleted");
                     assertEquals(0, v29.migrate().migrationsExecuted);
+                    // V30 adds the offer on the table and the accepted truce: a fight frozen earlier has neither and keeps
+                    // every other value, and the checks and triggers hold from here on. The fight above waits at a decision.
+                    String v29Fight = jdbc.queryForObject("select jsonb_agg(to_jsonb(e))::text from encounter e", String.class);
+                    String v29Checksums = "select string_agg(version || ':' || checksum, ',' order by installed_rank) "
+                            + "from flyway_schema_history where version::int <= 29";
+                    String beforeV30 = jdbc.queryForObject(v29Checksums, String.class);
+                    Flyway v30 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("30").load();
+                    assertEquals(1, v30.migrate().migrationsExecuted);
+                    assertTrue(v30.validateWithResult().validationSuccessful);
+                    assertEquals(beforeV30, jdbc.queryForObject(v29Checksums, String.class));
+                    assertEquals(v29Fight, jdbc.queryForObject("select jsonb_agg(to_jsonb(e) - 'open_offer' - 'agreement')::text "
+                            + "from encounter e", String.class));
+                    assertEquals(0L, jdbc.queryForObject("select count(*) from encounter where open_offer is not null "
+                            + "or agreement is not null", Long.class));
+                    String setOffer = "update encounter set open_offer = ?::jsonb, row_version = row_version + 1";
+                    String setAgreement = "update encounter set agreement = ?::jsonb, row_version = row_version + 1";
+                    assertThrows(DataAccessException.class, () -> jdbc.update(setOffer, "[]"), "an offer is an object");
+                    assertEquals(1, jdbc.update(setOffer, "{\"id\":\"offer-1\"}"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update("update encounter set phase = 'RESOLVING', "
+                            + "row_version = row_version + 1"), "an offer waits only at the player's decision");
+                    assertEquals(1, jdbc.update(setOffer, (Object) null));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(setAgreement, "[]"), "an agreement is an object");
+                    assertThrows(DataAccessException.class, () -> jdbc.update(setAgreement, "{\"termsId\":\"pass\"}"),
+                            "an agreement comes with the outcome it causes");
+                    String surrendered = "update encounter_participant set status = ?, guarding = false, "
+                            + "row_version = row_version + 1 where participant_id = 'raider'";
+                    assertEquals(1, jdbc.update(surrendered, "SURRENDERED"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(surrendered, "ACTIVE"), "a surrender is not undone");
+                    assertThrows(DataAccessException.class, () -> jdbc.update(surrendered, "DEFEATED"), "nor turned into a defeat");
+                    assertEquals(0, v30.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

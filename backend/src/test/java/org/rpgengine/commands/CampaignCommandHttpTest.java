@@ -41,6 +41,8 @@ class CampaignCommandHttpTest {
     @Autowired private PlatformTransactionManager manager;
     @Autowired private OperationAdmissionService admissions;
     @Autowired private org.rpgengine.presentation.PresentationJobService presentations;
+    @Autowired private org.rpgengine.content.PackRegistry registry;
+    @Autowired private org.rpgengine.campaign.CampaignCreationService creation;
     private final JsonMapper json = JsonMapper.builder().build();
     private UUID adventure;
     private UUID campaign;
@@ -116,6 +118,64 @@ class CampaignCommandHttpTest {
         assertEquals(receipt, json.readTree(status.body()).get("receipt"));
         assertEquals(1, jdbc.queryForObject("select state_revision from campaign where id = ?", Long.class, campaign));
         assertEquals(1, count());
+    }
+
+    /**
+     * A negotiated ending through the real adapter on a real pack: the offer and the verdict reach the projected receipt
+     * without a check's difficulty, a stale or malformed answer has its stable code and writes nothing, and the same request
+     * after a lost response replays 200 with the identical receipt, without paying or writing again (QA-13).
+     */
+    @Test
+    void aNegotiatedEndingAnswersAndReplays() throws Exception {
+        UUID content = registry.register(adventure, new org.rpgengine.content.PackStaging(org.rpgengine.content.PackStaging.Limits.standard())
+                .archive(new java.io.ByteArrayInputStream(org.rpgengine.characters.ArmoryPack.zip(
+                        org.rpgengine.combat.EncounterPack.tactics())))).revisionId();
+        campaign = creation.create(OWNER, adventure, new org.rpgengine.campaign.CampaignCreationService.Request(UUID.randomUUID(), content,
+                "Campaign", SupportedLocale.EN, new org.rpgengine.campaign.CharacterChoices("Player", "surveyor", java.util.Map.of(), java.util.Map.of(),
+                        null, null))).campaignId();
+        command(0, "ENGAGE", "{\"encounterId\":\"parley-ground\"}");
+        command(1, "ROLL_INITIATIVE", "{}");
+        JsonNode offered = command(2, "INTERACT", "{\"actionId\":\"haggle\",\"targetId\":\"captain\"}");
+        JsonNode offer = offered.get("receipt").get("combat").get("options").get("offer");
+        assertEquals("COUNTEROFFERED", offer.get("response").asText());
+        assertEquals("toll", offer.get("terms").get("termsId").asText());
+        assertEquals(2, offer.get("terms").get("cost").asInt());
+        String id = offer.get("offerId").asText();
+
+        int operations = count();
+        var stale = post(commandsPath(), envelope(UUID.randomUUID().toString(), 3, "{\"offerId\":\"offer-999\",\"decision\":\"accept\"}")
+                .replace("\"MOVE\"", "\"ANSWER_OFFER\""));
+        assertEquals(422, stale.status(), stale.body());
+        assertEquals("{\"code\":\"COMMAND_OFFER_UNAVAILABLE\"}", stale.body());
+        var malformed = post(commandsPath(), envelope(UUID.randomUUID().toString(), 3, "{\"offerId\":\"" + id + "\",\"decision\":\"maybe\"}")
+                .replace("\"MOVE\"", "\"ANSWER_OFFER\""));
+        assertEquals(422, malformed.status(), malformed.body());
+        assertEquals("{\"code\":\"COMMAND_INVALID\"}", malformed.body());
+        assertEquals(operations, count(), "neither refusal retains an operation");
+
+        String request = UUID.randomUUID().toString();
+        String answer = envelope(request, 3, "{\"offerId\":\"" + id + "\",\"decision\":\"accept\"}").replace("\"MOVE\"", "\"ANSWER_OFFER\"");
+        var accepted = post(commandsPath(), answer);
+        assertEquals(202, accepted.status(), accepted.body());
+        JsonNode receipt = json.readTree(accepted.body()).get("receipt");
+        assertEquals("OUTCOME_PENDING", receipt.get("combat").get("phase").asText());
+        assertEquals("AGREEMENT", receipt.get("combat").get("outcome").get("outcome").asText());
+        assertEquals("toll", receipt.get("combat").get("outcome").get("termsId").asText());
+        assertFalse(accepted.body().contains("difficulty") || accepted.body().contains("margin"));
+        int points = jdbc.queryForObject("select action_points from encounter", Integer.class);
+        var replay = post(commandsPath(), answer);
+        assertEquals(200, replay.status(), replay.body());
+        assertTrue(json.readTree(replay.body()).get("replayed").asBoolean());
+        assertEquals(receipt, json.readTree(replay.body()).get("receipt"));
+        assertEquals(points, jdbc.queryForObject("select action_points from encounter", Integer.class));
+        assertEquals(1, jdbc.queryForObject("select count(*) from campaign_event where event_type = 'OFFER_ANSWERED'", Integer.class));
+    }
+
+    /** Post one command at this revision that must commit, and return its body. */
+    private JsonNode command(long revision, String type, String payload) throws Exception {
+        var reply = post(commandsPath(), envelope(UUID.randomUUID().toString(), revision, payload).replace("\"MOVE\"", "\"" + type + "\""));
+        assertEquals(202, reply.status(), reply.body());
+        return json.readTree(reply.body());
     }
 
     /**

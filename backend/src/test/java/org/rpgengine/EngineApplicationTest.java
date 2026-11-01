@@ -32,7 +32,7 @@ class EngineApplicationTest {
     @Autowired
     private Flyway flyway;
 
-    /** Tables created by V1–V29, sorted by name; identifiers are constants, never user input. */
+    /** Tables created by V1–V30, sorted by name; identifiers are constants, never user input. */
     private static final List<String> CANONICAL_TABLES = List.of(
             "actor", "actor_commitment", "actor_condition", "actor_resource", "actor_sighting", "adventure_workspace", "ai_job", "ai_job_attempt", "ai_session_record", "campaign", "campaign_checkpoint", "campaign_creation", "campaign_event",
             "campaign_known_fact", "campaign_known_quest", "campaign_mutation_lease", "campaign_random_seed",

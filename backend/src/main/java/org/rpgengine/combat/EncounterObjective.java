@@ -23,7 +23,8 @@ import java.util.Set;
  *       remains active and the ally stands.</li>
  * </ul>
  * A defeated player fails every objective: the default defeat policy is incapacitation, not death, and no
- * objective is met by an incapacitated protagonist.
+ * objective is met by an incapacitated protagonist. A player who surrendered fails them too (P11.5): giving up the fight
+ * meets nothing the fight asked for.
  *
  * @param id stable objective ID, unique within the encounter
  * @param kind predicate kind
@@ -94,6 +95,11 @@ public record EncounterObjective(String id, Kind kind, String zone, String parti
         /** @return whether the player is defeated */
         boolean playerDefeated();
 
+        /** @return whether the player surrendered; a view of a fight before P11.5 has no surrender to report */
+        default boolean playerSurrendered() {
+            return false;
+        }
+
         /**
          * @param participant participant ID
          * @return whether that participant is defeated
@@ -129,7 +135,7 @@ public record EncounterObjective(String id, Kind kind, String zone, String parti
      * @return the status those facts establish
      */
     public Status evaluate(Progress progress) {
-        if (progress.playerDefeated()) {
+        if (progress.playerDefeated() || progress.playerSurrendered()) {
             return Status.FAILED;
         }
         return switch (kind) {

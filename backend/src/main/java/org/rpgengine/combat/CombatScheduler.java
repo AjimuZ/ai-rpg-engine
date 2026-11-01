@@ -75,6 +75,17 @@ import org.rpgengine.rules.CombatProfile;
  * operation, skipping the ticks beyond it with a public mark rather than failing the fight. An attack runs: declared
  * action ticks, {@code attacked} reactions, pre-roll ticks, the dice, hit reactions, damage, post-hit effects, defeat,
  * post-damage effects and {@code damaged} reactions. A tick that fells the actor at an activation start leaves it no points.
+ *
+ * <p><b>Social attempts and negotiation</b> (P11.5, docs/11 section 7.1): a social action pays its declared cost and, when
+ * it declares a check, draws two recorded dice for a public {@code SOCIAL_CHECK_RESOLVED} and an internal
+ * {@code SOCIAL_CHECK_CALCULATED} holding the difficulty and margin. A negotiation then gets {@link Negotiation#respond}'s
+ * public {@code NEGOTIATION_RESPONDED}. A response other than a refusal puts terms on the table as one stored offer and
+ * changes nothing else. The offer stands while the player only speaks or sets a reaction policy, and lapses with a public
+ * {@code OFFER_LAPSED} when the activation ends or the player takes any other action, so nobody can strike first and accept
+ * afterwards. Only an explicit answer ends it: declining is free and stays at the decision, and accepting pays what the terms
+ * declare, then applies them. A truce is stored for the terminal predicates, and a surrender leaves the fight as a defeat
+ * would, without the zero Health: stance and held effects end, and it takes no further activation. A surrendered
+ * participant stays addressable by voice but can no longer be attacked or agree to more.
  */
 public final class CombatScheduler {
     /** Sides of each initiative die (kernel). */
@@ -142,6 +153,7 @@ public final class CombatScheduler {
             case TacticalIntent.Guard guard -> run.playerGuard();
             case TacticalIntent.UseAbility use -> run.playerAbility(use);
             case TacticalIntent.SetReactionPolicy policy -> run.setPolicy(policy);
+            case TacticalIntent.AnswerOffer answer -> run.answer(answer);
             case TacticalIntent.UseItem use -> throw new IllegalStateException("an item use needs its resolved outcome");
         }
         return run.plan();
@@ -233,6 +245,12 @@ public final class CombatScheduler {
         private final List<Object> hiddenLines = new ArrayList<>();
         /** The verdict this operation reached, for the receipt; null while the fight goes on. */
         private EncounterOutcome outcome;
+        /** Terms on the table; null when none wait for an answer. */
+        private Negotiation.Offer offer;
+        /** The truce the player accepted; null without one. */
+        private Negotiation.Agreement agreement;
+        /** What this operation's social attempt or answer did, for the receipt; null without one. */
+        private Map<String, Object> social;
 
         /** Give the run the operation's draws. */
         void draws(Dice source) {
@@ -253,6 +271,8 @@ public final class CombatScheduler {
             ammunition = new ArrayList<>(state.ammunition());
             library = state.effects();
             effectsApplied = state.effectsApplied();
+            offer = state.openOffer();
+            agreement = state.agreement();
             for (var participant : state.participants()) {
                 participants.put(participant.id(), new Working(participant));
             }
@@ -360,15 +380,17 @@ public final class CombatScheduler {
                     .put("targetId", base.openingTarget()).put("reason", reason).build(), true);
         }
 
-        /** Continue the schedule until the player's decision, a terminal predicate, the round cap or a player out of the fight. */
+        /**
+         * Continue the schedule until the player's decision, a terminal predicate or the round cap. A player out of the fight
+         * always has a verdict, so the schedule never runs on without one.
+         */
         void advance() {
             for (int guard = 0; guard < TacticalPlan.MAX_STEPS; guard++) {
                 switch (phase) {
                     case ROUND_OPEN -> next(-1);
                     case AWAITING_ACTION -> {
-                        // A player who fell at the start of its activation has no decision left.
                         Working acting = acting();
-                        if (acting.source.player() && acting.status == EncounterState.Status.ACTIVE) {
+                        if (acting.source.player()) {
                             return;
                         }
                         tactic(acting);
@@ -379,8 +401,7 @@ public final class CombatScheduler {
                     }
                     case ACTOR_END -> next(cursor);
                     case ROUND_END -> {
-                        if (concluded() || round >= profile.roundCap()
-                                || participants.get(EncounterTemplate.PLAYER).status != EncounterState.Status.ACTIVE) {
+                        if (concluded() || round >= profile.roundCap()) {
                             return;
                         }
                         openRound();
@@ -470,11 +491,12 @@ public final class CombatScheduler {
             }
         }
 
-        /** End the acting participant's activation: unused points expire. */
+        /** End the acting participant's activation: unused points and any offer still on the table expire. */
         void endActivation(boolean byPlayer) {
             Working acting = acting();
             int unused = points;
             points = 0;
+            lapseOffer("ACTIVATION_ENDED");
             fire(CombatEffect.Phase.ACTIVATION_END, List.of(acting), "");
             var counted = CombatEffects.afterActivation(acting.effects, library);
             acting.effects = new ArrayList<>(counted.kept());
@@ -491,11 +513,6 @@ public final class CombatScheduler {
          *        already over can change its result
          */
         private void endRound(boolean decided) {
-            if (pendingOpening()) {
-                // The player left the fight before its slot: the strike can never be made.
-                openingStatus = "RESOLVED";
-                lapse("ATTACKER_DOWN");
-            }
             cursor = null;
             points = null;
             speech = 0;
@@ -537,10 +554,11 @@ public final class CombatScheduler {
         void move(String zone) {
             Working player = participants.get(EncounterTemplate.PLAYER);
             int cost = TacticalRules.moveCost(base, zone);
+            lapseOffer("ACTION_TAKEN");
             points -= cost;
             step(EncounterPhase.RESOLVING);
             traverse(player, zone, cost, true);
-            settle(player);
+            settle();
         }
 
         /**
@@ -564,20 +582,13 @@ public final class CombatScheduler {
 
         /**
          * Return to the decision after the player's action, or stop at the outcome when the action decided the fight, as one
-         * that left the player defeated always does. Only a player out of the fight without a verdict, which today can only
-         * be a surrendered one and no code sets that status yet, ends the activation and continues the schedule without it.
+         * that left the player out of the fight always does.
          */
-        private void settle(Working player) {
+        private void settle() {
             flush("action");
-            if (concluded()) {
-                return;
+            if (!concluded()) {
+                step(EncounterPhase.AWAITING_ACTION);
             }
-            if (player.status != EncounterState.Status.ACTIVE) {
-                endActivation(true);
-                advance();
-                return;
-            }
-            step(EncounterPhase.AWAITING_ACTION);
         }
 
         /**
@@ -613,10 +624,14 @@ public final class CombatScheduler {
                     .put("recipientId", words.recipient()).put("text", words.text()).build(), true);
         }
 
-        /** Attempt a declared action: pay its cost and, for a scene action, set its passage. */
+        /**
+         * Attempt a declared action: pay its cost and either set a scene action's passage or carry out a social action's
+         * declared check and response. A new attempt replaces whatever was on the table, because taking it declines by acting.
+         */
         void interact(TacticalIntent.Interact interact) {
             Working player = participants.get(EncounterTemplate.PLAYER);
             var action = base.action(interact.action());
+            lapseOffer("ACTION_TAKEN");
             points -= action.cost();
             step(EncounterPhase.RESOLVING);
             if (declare(player)) {
@@ -625,35 +640,162 @@ public final class CombatScheduler {
                         .put("remainingActionPoints", points);
                 if (action.kind() == EncounterAction.Kind.SOCIAL) {
                     announced.put("intent", action.intent().wire()).put("targetId", interact.target());
+                    note("INTERACTION_ATTEMPTED", announced.build(), true);
+                    socialOutcome(player, action, participants.get(interact.target()));
                 } else {
                     var passage = action.passage();
                     passages.removeIf(set -> set.covers(passage.from(), passage.to()));
                     passages.add(passage);
                     announced.put("passage", Map.of("from", passage.from(), "to", passage.to(), "blocked", passage.blocked()));
+                    note("INTERACTION_ATTEMPTED", announced.build(), true);
                 }
-                note("INTERACTION_ATTEMPTED", announced.build(), true);
             }
-            settle(player);
+            settle();
+        }
+
+        /**
+         * Resolve what a social attempt declares beyond its cost: the recorded check, then a negotiation's response, which at
+         * most puts terms on the table. An action declaring neither leaves no trace in the receipt, as before P11.5.
+         */
+        private void socialOutcome(Working player, EncounterAction action, Working recipient) {
+            if (action.check() == null && action.terms() == null) {
+                return;
+            }
+            social = new TreeMap<>();
+            social.put("actionId", action.id());
+            social.put("targetId", recipient.source.id());
+            var roll = action.check() == null ? null : socialCheck(player, action, recipient);
+            var response = Negotiation.respond(action, roll);
+            if (response == null) {
+                return;
+            }
+            var responded = activation(recipient).put("actionId", action.id()).put("response", response.name());
+            social.put("response", response.name());
+            if (response != Negotiation.Response.REFUSED) {
+                offer = Negotiation.offer(action, response, recipient.source.id(), base.rowVersion());
+                responded.put("offerId", offer.id()).put("termsId", offer.terms().id())
+                        .put("termsKind", offer.terms().kind().wire()).put("cost", offer.terms().cost());
+                social.put("offerId", offer.id());
+            }
+            note("NEGOTIATION_RESPONDED", responded.build(), false);
+        }
+
+        /**
+         * Draw and record a declared social check: {@code 2d10 + role + rank} against the fixed difficulty or the recipient's
+         * effective Resistance. The public event states the dice and whether it worked; the difficulty and margin are hidden,
+         * because either can stand for the recipient's Resistance.
+         *
+         * @return the roll; a strong result is one that meets the profile's {@code strongHitMargin}
+         */
+        private CombatMath.Roll socialCheck(Working player, EncounterAction action, Working recipient) {
+            var check = action.check();
+            int difficulty = check.difficulty() != null ? check.difficulty()
+                    : CombatMath.resistance(recipient.source.sheet().resistance(),
+                            CombatEffects.resistance(recipient.effects, library), profile.value("situationalGuardCap"));
+            var ordinals = new ArrayList<Object>();
+            int first = recorded(INITIATIVE_SIDES, ordinals);
+            int second = recorded(INITIATIVE_SIDES, ordinals);
+            int attribute = player.source.sheet().role(check.attribute());
+            var roll = CombatMath.attack(first, second, attribute, check.rank(), 0, profile.value("situationalModifierCap"),
+                    difficulty, profile.value("strongHitMargin"), true);
+            note("SOCIAL_CHECK_RESOLVED", activation(player).put("actionId", action.id())
+                    .put("targetId", recipient.source.id()).put("dice", List.of(first, second)).put("total", roll.total())
+                    .put("success", roll.hit()).put("drawOrdinals", ordinals).build(), true);
+            notes.add(new TacticalPlan.Note("SOCIAL_CHECK_CALCULATED", activation(player).put("actionId", action.id())
+                    .put("targetId", recipient.source.id()).put("drawOrdinals", ordinals).put("attributeRole", check.attribute())
+                    .put("attributeValue", attribute).put("rank", check.rank()).put("total", roll.total())
+                    .put("difficulty", difficulty).put("margin", roll.margin()).put("success", roll.hit())
+                    .put("strong", roll.strong()).build(), true, true));
+            social.put("total", roll.total());
+            social.put("success", roll.hit());
+            return roll;
+        }
+
+        /**
+         * Answer the offer on the table. Declining is a free decision that stays where it is. Accepting pays what the terms
+         * declare and applies them, unless a declared-action tick of that payment fells the player first: then nothing was
+         * agreed, and the fight ends with that fall.
+         */
+        void answer(TacticalIntent.AnswerOffer intent) {
+            Working player = participants.get(EncounterTemplate.PLAYER);
+            var answered = offer;
+            offer = null;
+            var announced = activation(player).put("offerId", answered.id()).put("termsId", answered.terms().id())
+                    .put("termsKind", answered.terms().kind().wire()).put("recipientId", answered.recipient());
+            if (!intent.accept()) {
+                step(phase);
+                answered(answered, "DECLINED");
+                note("OFFER_ANSWERED", announced.put("decision", "DECLINED").build(), true);
+                return;
+            }
+            int cost = answered.terms().cost();
+            points -= cost;
+            step(EncounterPhase.RESOLVING);
+            if (cost > 0 && !declare(player)) {
+                announceLapse(answered, "ENCOUNTER_ENDED");
+                settle();
+                return;
+            }
+            answered(answered, "ACCEPTED");
+            note("OFFER_ANSWERED", announced.put("decision", "ACCEPTED").put("actionPoints", cost)
+                    .put("remainingActionPoints", points).build(), true);
+            switch (answered.terms().kind()) {
+                case TRUCE -> agreement = new Negotiation.Agreement(answered.id(), answered.terms().id(), answered.recipient());
+                case RECIPIENT_SURRENDERS -> surrender(participants.get(answered.recipient()), answered.terms().id(), false);
+                case PLAYER_SURRENDERS -> surrender(player, answered.terms().id(), true);
+            }
+            settle();
+        }
+
+        /** Record the player's answer for the receipt. */
+        private void answered(Negotiation.Offer offer, String decision) {
+            social = new TreeMap<>();
+            social.put("offerId", offer.id());
+            social.put("termsId", offer.terms().id());
+            social.put("decision", decision);
+        }
+
+        /** Take the terms off the table, unanswered, for a public reason; nothing happens when none are there. */
+        private void lapseOffer(String reason) {
+            if (offer != null) {
+                announceLapse(offer, reason);
+                offer = null;
+            }
+        }
+
+        /** Announce that terms lapsed unanswered; the caller already took them off the table or is about to. */
+        private void announceLapse(Negotiation.Offer lapsed, String reason) {
+            note("OFFER_LAPSED", activation(participants.get(lapsed.recipient())).put("offerId", lapsed.id())
+                    .put("termsId", lapsed.terms().id()).put("reason", reason).build(), false);
+        }
+
+        /** A participant leaves the fight by accepted terms: no Health changes, and it stays addressable by voice. */
+        private void surrender(Working participant, String terms, boolean byPlayer) {
+            participant.status = EncounterState.Status.SURRENDERED;
+            note("PARTICIPANT_SURRENDERED", activation(participant).put("termsId", terms).build(), byPlayer);
+            leaveFight(participant, "HOLDER_SURRENDERED", "SOURCE_SURRENDERED");
         }
 
         /** The player's strike: pay, resolve inside {@code RESOLVING}, and return to the decision. */
         void playerStrike(TacticalIntent.Strike intent) {
             Working player = participants.get(EncounterTemplate.PLAYER);
             int cost = profile.value("strikeCost");
+            lapseOffer("ACTION_TAKEN");
             points -= cost;
             step(EncounterPhase.RESOLVING);
             if (declare(player)) {
                 strike(player, player.source.sheet().attack(intent.attack()), participants.get(intent.target()), cost, true,
                         false);
             }
-            settle(player);
+            settle();
         }
 
         /** The player's Guard action. */
         void playerGuard() {
             Working player = participants.get(EncounterTemplate.PLAYER);
+            lapseOffer("ACTION_TAKEN");
             guard(player, true);
-            settle(player);
+            settle();
         }
 
         /**
@@ -664,6 +806,7 @@ public final class CombatScheduler {
         void playerAbility(TacticalIntent.UseAbility intent) {
             Working player = participants.get(EncounterTemplate.PLAYER);
             var ability = player.source.sheet().ability(intent.ability());
+            lapseOffer("ACTION_TAKEN");
             points -= ability.cost();
             player.focus -= ability.focus();
             var use = player.uses.get(ability.id());
@@ -680,7 +823,7 @@ public final class CombatScheduler {
                     operate(player, ability, operation, operation.toSelf() ? List.of(player) : targets);
                 }
             }
-            settle(player);
+            settle();
         }
 
         /** Run one ability operation for each standing affected participant. */
@@ -756,6 +899,7 @@ public final class CombatScheduler {
         void playerItem(TacticalIntent.UseItem intent, ItemOutcome outcome) {
             Working player = participants.get(EncounterTemplate.PLAYER);
             int cost = profile.value("useItemCost");
+            lapseOffer("ACTION_TAKEN");
             points -= cost;
             step(EncounterPhase.RESOLVING);
             var announced = activation(player).put("definitionId", outcome.definition()).put("actionPoints", cost)
@@ -775,7 +919,7 @@ public final class CombatScheduler {
             if (player.status == EncounterState.Status.ACTIVE) {
                 declare(player);
             }
-            settle(player);
+            settle();
         }
 
         /**
@@ -1350,20 +1494,26 @@ public final class CombatScheduler {
         private void defeatIfDown(Working participant) {
             if (participant.health == 0 && participant.status == EncounterState.Status.ACTIVE) {
                 participant.status = EncounterState.Status.DEFEATED;
-                participant.guarding = false;
                 note("PARTICIPANT_DEFEATED", activation(participant).build(), false);
-                // Its own effects end with it; another holder's follow their definition, and one waiting for this
-                // participant's next activation has nothing left to wait for.
-                participant.effects.forEach(active -> ended(participant, active, "HOLDER_DEFEATED"));
-                participant.effects = new ArrayList<>();
-                String id = participant.source.id();
-                for (Working holder : participants.values()) {
-                    for (var active : List.copyOf(holder.effects)) {
-                        boolean source = id.equals(active.sourceId()) && library.get(active.effectId()).endsWithSource();
-                        if (source || id.equals(active.untilId())) {
-                            holder.effects.remove(active);
-                            ended(holder, active, source ? "SOURCE_DEFEATED" : "ACTOR_GONE");
-                        }
+                leaveFight(participant, "HOLDER_DEFEATED", "SOURCE_DEFEATED");
+            }
+        }
+
+        /**
+         * What a participant leaving the fight ends. Its stance and its own effects end with it; another holder's follow their
+         * definition, and one waiting for this participant's next activation has nothing left to wait for.
+         */
+        private void leaveFight(Working participant, String held, String sourced) {
+            participant.guarding = false;
+            participant.effects.forEach(active -> ended(participant, active, held));
+            participant.effects = new ArrayList<>();
+            String id = participant.source.id();
+            for (Working holder : participants.values()) {
+                for (var active : List.copyOf(holder.effects)) {
+                    boolean source = id.equals(active.sourceId()) && library.get(active.effectId()).endsWithSource();
+                    if (source || id.equals(active.untilId())) {
+                        holder.effects.remove(active);
+                        ended(holder, active, source ? sourced : "ACTOR_GONE");
                     }
                 }
             }
@@ -1443,6 +1593,9 @@ public final class CombatScheduler {
             if (!strikes.isEmpty()) {
                 summary.put("strikes", strikes);
             }
+            if (social != null) {
+                summary.put("social", social);
+            }
             var options = TacticalRules.options(after);
             if (!options.isEmpty()) {
                 summary.put("options", options);
@@ -1461,7 +1614,8 @@ public final class CombatScheduler {
             }
             return new EncounterState(base.id(), base.rowVersion(), phase, round, cursor, points, speech, passages,
                     profile, base.frozenSpace(), base.escapeZones(), base.actions(), base.opening(),
-                    base.openingTarget(), openingStatus, list, ammunition, library, effectsApplied, base.objectives());
+                    base.openingTarget(), openingStatus, list, ammunition, library, effectsApplied, base.objectives(), offer,
+                    agreement);
         }
 
         /** Record the current encounter row state after checking its arrow. */
@@ -1471,7 +1625,8 @@ public final class CombatScheduler {
                 previous.require(next);
             }
             phase = next;
-            steps.add(new TacticalPlan.Step(phase, round, cursor, points, speech, passages, openingStatus, effectsApplied));
+            steps.add(new TacticalPlan.Step(phase, round, cursor, points, speech, passages, openingStatus, effectsApplied, offer,
+                    agreement));
         }
 
         /** Append one event note. */

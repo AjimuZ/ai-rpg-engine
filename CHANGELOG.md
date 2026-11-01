@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — Negotiation, surrender and agreement in a fight (P11.5-B), 1 November 2026
+
+- An encounter can now declare a check for a social action and, for a negotiation, the terms it proposes and a counteroffer. An
+  attempt pays its declared cost and draws its declared check once, with recorded dice. The opponent's response follows from those
+  dice and the pack's data alone: it refuses, makes a counteroffer or is open to the proposed terms.
+- A response never ends a fight or binds the player, and neither do words. Terms take effect only through the new `ANSWER_OFFER`
+  command, which names the offer and says `accept` or `decline`; any other decision is refused. An offer lapses when the turn ends or
+  when the player does anything else but speak, so nobody can strike first and accept afterwards.
+- Accepted terms can be a truce, which ends the fight as an agreement with everyone standing, the addressed opponent's surrender, or
+  the player's own surrender, which ends the fight and fails its objectives. When no opponent is left and any of them surrendered, the
+  fight ends as their surrender and no longer reads as a victory. A surrendered participant keeps its Health, takes no turn, cannot be
+  attacked and can still be spoken to.
+- A retry after a lost response replays the same receipt, with no second draw, cost or effect. Refusals write nothing. The new refusal
+  `COMMAND_OFFER_UNAVAILABLE` has reviewed English and Italian wording (the Italian still needs independent human review), and the record
+  gains public statements in both languages. PostgreSQL stores the offer and the truce (migration V30), and backups require schema 30.
+- A fight that has ended still cannot be resumed, because settlement does not exist yet. The stalemate policy, Withdraw and moving items
+  through terms are not included. A check on an action other than a negotiation records its result and changes nothing else, and no
+  opponent proposes terms by itself. No interface control uses any of this yet.
+
 ## Unreleased — A fight stops when it is won, lost or left (P11.5-A), 1 November 2026
 
 - A fight now ends where it is decided: when the last opponent falls, when the player falls, when the player reaches an escape

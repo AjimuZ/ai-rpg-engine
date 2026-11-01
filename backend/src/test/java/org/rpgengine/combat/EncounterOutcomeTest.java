@@ -57,15 +57,28 @@ class EncounterOutcomeTest {
         assertNull(EncounterOutcome.decide(state));
     }
 
-    /** No hostile still active is a victory, however each one left the fight; allies do not count. */
+    /**
+     * No hostile still active ends the fight, however each one left it, and allies do not count. It reads as a surrender
+     * when any of them surrendered, because settlement must not treat a spared opponent as a fallen one, and otherwise as a
+     * victory.
+     */
     @Test
-    void noActiveOpponentIsAVictory() {
+    void noActiveOpponentIsAVictoryOrTheirSurrender() {
         for (var status : List.of(EncounterState.Status.DEFEATED, EncounterState.Status.ESCAPED, EncounterState.Status.SURRENDERED)) {
             var verdict = EncounterOutcome.decide(fight(List.of(WIN), player(), foe("foe").status(status), ally("ally")));
-            assertEquals(EncounterOutcome.Kind.VICTORY, verdict.kind(), status.name());
+            assertEquals(status == EncounterState.Status.SURRENDERED ? EncounterOutcome.Kind.HOSTILE_SURRENDER
+                    : EncounterOutcome.Kind.VICTORY, verdict.kind(), status.name());
             assertNull(verdict.objective());
             assertEquals(Map.of("win", EncounterObjective.Status.MET), verdict.objectives());
         }
+        assertEquals(EncounterOutcome.Kind.HOSTILE_SURRENDER, EncounterOutcome.decide(fight(List.of(WIN), player(),
+                foe("foe").status(EncounterState.Status.DEFEATED), foe("other").status(EncounterState.Status.SURRENDERED))).kind(),
+                "one spared opponent among the fallen is still a surrender");
+        assertEquals(EncounterOutcome.Kind.VICTORY, EncounterOutcome.decide(fight(List.of(WIN), player(),
+                foe("foe").status(EncounterState.Status.DEFEATED), ally("ally").status(EncounterState.Status.SURRENDERED))).kind(),
+                "an ally's standing says nothing about the opposition");
+        assertNull(EncounterOutcome.decide(fight(List.of(WIN), player(), foe("foe").status(EncounterState.Status.SURRENDERED),
+                foe("other"))), "a surrender ends nothing while another opponent stands");
         assertNull(EncounterOutcome.decide(fight(List.of(WIN), player(), foe("foe").status(EncounterState.Status.DEFEATED), foe("other"))),
                 "one opponent still stands");
         assertEquals(EncounterOutcome.Kind.VICTORY,
@@ -168,11 +181,58 @@ class EncounterOutcomeTest {
         assertEquals(EncounterOutcome.Kind.OBJECTIVE, objectiveOverEscape.kind(), "an explicit objective outranks an escape");
     }
 
-    /** A surrendered player has no verdict here: surrender belongs to its own predicate. */
+    /**
+     * A player who surrendered has that verdict and fails every objective, even with no opponent left: giving up the fight
+     * meets nothing the fight asked for. Only a defeat outranks it, and only the player's standing decides it.
+     */
     @Test
-    void aSurrenderedPlayerIsNotDecidedHere() {
-        assertNull(EncounterOutcome.decide(fight(List.of(WIN), player().status(EncounterState.Status.SURRENDERED),
-                foe("foe").status(EncounterState.Status.DEFEATED))));
+    void aSurrenderedPlayerHasItsOwnVerdict() {
+        var verdict = EncounterOutcome.decide(fight(List.of(WIN, RUN, REACH, HOLD, KEEP), player().status(EncounterState.Status.SURRENDERED),
+                foe("foe").status(EncounterState.Status.DEFEATED), ally("ally")));
+        assertEquals(EncounterOutcome.Kind.PLAYER_SURRENDER, verdict.kind());
+        assertNull(verdict.objective());
+        assertEquals(5, verdict.objectives().size());
+        assertTrue(verdict.objectives().values().stream().allMatch(status -> status == EncounterObjective.Status.FAILED));
+        assertEquals(EncounterOutcome.Kind.PLAYER_SURRENDER, EncounterOutcome.decide(escapes(fight(List.of(REACH),
+                player().zone("far").status(EncounterState.Status.SURRENDERED), foe("foe")))).kind(), "an escape zone changes nothing");
+    }
+
+    /**
+     * An accepted truce is the last predicate that can end a fight: everything else already decided outranks it, and no
+     * objective is met or failed by it. A verdict names the terms, and only an agreement does.
+     */
+    @Test
+    void anAgreementComesAfterEveryOtherPredicate() {
+        var truce = new Negotiation.Agreement("offer-1", "open-road", "foe");
+        var verdict = EncounterOutcome.decide(agreed(fight(List.of(WIN, HOLD), player(), foe("foe")), truce));
+        assertEquals(EncounterOutcome.Kind.AGREEMENT, verdict.kind());
+        assertEquals("open-road", verdict.terms());
+        assertEquals("open-road", verdict.publicForm().get("termsId"));
+        assertEquals(EncounterObjective.Status.PENDING, verdict.objectives().get("win"));
+
+        assertEquals(EncounterOutcome.Kind.DEFEAT, EncounterOutcome.decide(agreed(fight(List.of(WIN),
+                player().status(EncounterState.Status.DEFEATED), foe("foe")), truce)).kind());
+        assertEquals(EncounterOutcome.Kind.OBJECTIVE, EncounterOutcome.decide(agreed(fight(List.of(REACH), player().zone("mid"), foe("foe")), truce)).kind());
+        assertEquals(EncounterOutcome.Kind.VICTORY, EncounterOutcome.decide(agreed(fight(List.of(WIN), player(),
+                foe("foe").status(EncounterState.Status.DEFEATED)), truce)).kind());
+        assertEquals(EncounterOutcome.Kind.ESCAPE, EncounterOutcome.decide(agreed(escapes(fight(List.of(WIN), player().zone("far"), foe("foe"))), truce)).kind());
+
+        assertThrows(IllegalArgumentException.class, () -> new EncounterOutcome(EncounterOutcome.Kind.AGREEMENT, null, Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> new EncounterOutcome(EncounterOutcome.Kind.VICTORY, null, "open-road", Map.of()));
+        assertFalse(EncounterOutcome.decide(fight(List.of(), player(), foe("foe").status(EncounterState.Status.DEFEATED)))
+                .publicForm().containsKey("termsId"));
+    }
+
+    /** An offer waiting for its answer is not an agreement, whatever its terms: the fight has no verdict while it stands. */
+    @Test
+    void anOpenOfferDecidesNothing() {
+        var state = fight(List.of(WIN), player(), foe("foe"));
+        var open = new Negotiation.Offer("offer-1", "parley", "foe", new Negotiation.Terms("open-road", Negotiation.Terms.Kind.TRUCE, 0),
+                Negotiation.Response.OFFERED);
+        assertNull(EncounterOutcome.decide(new EncounterState(state.id(), state.rowVersion(), state.phase(), state.round(), state.cursor(),
+                state.actionPoints(), state.speechUsed(), state.passages(), state.profile(), state.frozenSpace(), state.escapeZones(),
+                state.actions(), state.opening(), state.openingTarget(), state.openingStatus(), state.participants(), state.ammunition(),
+                state.effects(), state.effectsApplied(), state.objectives(), open, null)));
     }
 
     /** A verdict is well formed and its public form states exactly what it holds, in declared order. */
@@ -492,6 +552,27 @@ class EncounterOutcomeTest {
         assertEquals(Set.of("VICTORY", "DEFEAT", "ESCAPE", "OBJECTIVE"), kinds.keySet(), kinds.toString());
     }
 
+    /**
+     * A hundred seeded fights (seed 20261102) over the {@code parley-ground} fixture, whose opponents have no attacks. On top
+     * of the usual candidates, intentions are chosen at random among every social attempt with something declared, the
+     * answers to the offer on the table and words claiming to accept it.
+     * On top of every invariant of the other seeded fights, a surrender and an agreement must come only from the player's
+     * explicit acceptance, a surrendered participant must stay out of the schedule, and an offer must stand only at a decision.
+     * Every negotiated ending and the survive objective must occur, and each fight replays identically from its seed.
+     */
+    @Test
+    void seededNegotiationsOnlyEndByExplicitAcceptance() throws Exception {
+        var random = new java.util.Random(20261102L);
+        var kinds = new TreeMap<String, Integer>();
+        for (int fight = 0; fight < 100; fight++) {
+            long seed = random.nextLong();
+            var first = walk("parley-ground", seed);
+            assertEquals(first, walk("parley-ground", seed), "the same seed replays the same fight");
+            kinds.merge((String) first.getLast().notes().getLast().payload().get("outcome"), 1, Integer::sum);
+        }
+        assertEquals(Set.of("AGREEMENT", "PLAYER_SURRENDER", "HOSTILE_SURRENDER", "OBJECTIVE"), kinds.keySet(), kinds.toString());
+    }
+
     /** One seeded fight to its outcome, checking the invariants at every step; returns its plans. */
     private static List<TacticalPlan> walk(String template, long seed) throws Exception {
         var random = new java.util.Random(seed);
@@ -500,6 +581,7 @@ class EncounterOutcomeTest {
         var state = fixture(template, 8 + random.nextInt(17));
         var plans = new ArrayList<TacticalPlan>();
         var defeated = new HashSet<String>();
+        var surrendered = new HashSet<String>();
         for (int step = 0; step < 600 && state.phase() != EncounterPhase.OUTCOME_PENDING; step++) {
             assertNull(EncounterOutcome.decide(state), "an undecided fight has no verdict: " + state.phase());
             var intent = state.phase() == EncounterPhase.ENTERING ? new TacticalIntent.RollInitiative() : choose(state, random);
@@ -517,20 +599,38 @@ class EncounterOutcomeTest {
                 if (row.actionPoints() != null) {
                     assertTrue(row.actionPoints() >= 0 && row.actionPoints() <= state.profile().actionPoints());
                 }
+                assertTrue(row.openOffer() == null || row.phase() == EncounterPhase.AWAITING_ACTION, "an offer waits only at a decision");
             }
+            boolean accepted = intent instanceof TacticalIntent.AnswerOffer answer && answer.accept();
             for (var note : plan.notes()) {
                 if (note.type().equals("ACTIVATION_STARTED")) {
                     assertFalse(defeated.contains(note.payload().get("participantId")), "a defeated participant takes no activation");
+                    assertFalse(surrendered.contains(note.payload().get("participantId")), "a surrendered participant takes no activation");
                 }
                 if (note.type().equals("PARTICIPANT_DEFEATED")) {
                     assertTrue(defeated.add((String) note.payload().get("participantId")), "a participant falls once");
                 }
+                if (note.type().equals("PARTICIPANT_SURRENDERED")) {
+                    assertTrue(accepted, "only the player's acceptance makes a surrender");
+                    assertTrue(surrendered.add((String) note.payload().get("participantId")), "a participant surrenders once");
+                }
             }
+            var offerBefore = state.openOffer();
             state = after(state, plan);
+            assertTrue(state.agreement() == null || accepted, "only the player's acceptance makes an agreement");
+            boolean spoken = intent instanceof TacticalIntent.Speech;
+            assertTrue(state.openOffer() == null || spoken || intent instanceof TacticalIntent.Interact interact
+                    && state.action(interact.action()).terms() != null, "terms reach the table only as a response");
+            if (spoken) {
+                assertEquals(offerBefore, state.openOffer(), "words neither accept nor withdraw terms");
+            }
             for (var participant : state.participants()) {
                 assertTrue(participant.health() >= 0 && participant.health() <= participant.healthMax());
                 assertEquals(participant.health() == 0, participant.status() == EncounterState.Status.DEFEATED, participant.id());
                 assertEquals(defeated.contains(participant.id()), participant.status() == EncounterState.Status.DEFEATED, participant.id());
+                assertEquals(surrendered.contains(participant.id()), participant.status() == EncounterState.Status.SURRENDERED, participant.id());
+                assertTrue(participant.status() == EncounterState.Status.ACTIVE || participant.effects().isEmpty() && !participant.guarding(),
+                        "stance and effects end with leaving the fight");
             }
             if (state.phase() != EncounterPhase.OUTCOME_PENDING) {
                 assertTrue(state.playerDecision(), "the schedule stops only at a decision or an outcome: " + state.phase());
@@ -562,6 +662,21 @@ class EncounterOutcomeTest {
         }
         candidates.add(new TacticalIntent.Guard());
         candidates.add(new TacticalIntent.EndActivation());
+        // Only a fight with something to negotiate adds candidates, so the other fixtures keep their seeded paths.
+        for (var action : state.actions()) {
+            if (action.check() != null || action.terms() != null) {
+                // Two surrenders must come before any other ending for that ending to occur, so demanding one weighs more.
+                int weight = action.terms() != null && action.terms().kind() == Negotiation.Terms.Kind.RECIPIENT_SURRENDERS ? 12 : 1;
+                for (int copy = 0; copy < weight; copy++) {
+                    state.participants().forEach(participant -> candidates.add(new TacticalIntent.Interact(action.id(), participant.id())));
+                }
+            }
+        }
+        if (state.openOffer() != null) {
+            candidates.add(new TacticalIntent.AnswerOffer(state.openOffer().id(), true));
+            candidates.add(new TacticalIntent.AnswerOffer(state.openOffer().id(), false));
+            candidates.add(new TacticalIntent.Speech(state.openOffer().recipient(), "I accept."));
+        }
         var legal = candidates.stream().filter(intent -> TacticalRules.refusal(state, intent) == null).toList();
         return legal.get(random.nextInt(legal.size()));
     }
@@ -570,12 +685,14 @@ class EncounterOutcomeTest {
 
     /** The entry state of a real fixture template, with its frozen objectives and the surveyor's worn items. */
     private static EncounterState fixture(String template, int health) throws Exception {
-        var rules = EncounterPack.rules(EncounterPack.files());
+        // Words are fought with on the P11.4 variant's ground; the other fights keep the default pack they were written on.
+        boolean talks = template.equals("parley-ground");
+        var rules = EncounterPack.rules(talks ? EncounterPack.tactics() : EncounterPack.files());
         var facts = new FrozenEncounter.PlayerFacts(PLAYER, Map.of("awareness", 2L, "might", 2L),
                 new FrozenEncounter.Pool(health, Math.max(health, 24)), null, List.of("cloak", "sword"), Set.of(),
                 Map.of("bladework", 2L));
-        var frozen = FrozenEncounter.freeze(ID, rules.templates().get(template), rules.profiles().get("sample:armory"), facts, null,
-                rules.gear());
+        var frozen = FrozenEncounter.freeze(ID, rules.templates().get(template),
+                rules.profiles().get(talks ? "sample:armory-tactics" : "sample:armory"), facts, null, rules.library());
         var list = new ArrayList<EncounterState.Combatant>();
         int ordinal = 0;
         for (var participant : frozen.participants()) {
@@ -592,7 +709,7 @@ class EncounterOutcomeTest {
     }
 
     /** Builder of one participant of a fight. */
-    private static final class Builder {
+    static final class Builder {
         private final String id;
         private final EncounterTemplate.Side side;
         private String zone = "ring";
@@ -601,6 +718,7 @@ class EncounterOutcomeTest {
         private int guard = 10;
         private EncounterState.Status status = EncounterState.Status.ACTIVE;
         private List<CombatAttack> attacks = List.of();
+        private List<CombatAbility> abilities = List.of();
         private final List<CombatReaction> reactions = new ArrayList<>();
         private final Map<String, CombatReaction.Policy> policies = new TreeMap<>();
         private List<CombatEffects.Active> effects = List.of();
@@ -616,6 +734,7 @@ class EncounterOutcomeTest {
         Builder guard(int value) { guard = value; return this; }
         Builder status(EncounterState.Status value) { status = value; return this; }
         Builder attacks(CombatAttack... values) { attacks = List.of(values); return this; }
+        Builder abilities(CombatAbility... values) { abilities = List.of(values); return this; }
         Builder react(CombatReaction reaction) { reactions.add(reaction); policies.put(reaction.id(), CombatReaction.Policy.FIRST); return this; }
         Builder holding(CombatEffects.Active... values) { effects = List.of(values); return this; }
         Builder conditions(String... values) { conditions = List.of(values); return this; }
@@ -623,27 +742,27 @@ class EncounterOutcomeTest {
         /** Build at a rank equal to its ordinal, or unranked before initiative. */
         EncounterState.Combatant build(int ordinal, boolean ranked, int budget) {
             var sheet = new EncounterState.Sheet(guard, 10, 0, Map.of("force", side == EncounterTemplate.Side.PLAYER ? 2 : 1,
-                    "finesse", 1, "insight", 1, "resolve", 1), attacks, List.of(), reactions, conditions);
+                    "finesse", 1, "insight", 1, "resolve", 1), attacks, abilities, reactions, conditions);
             return new EncounterState.Combatant(id, ordinal, side == EncounterTemplate.Side.PLAYER ? PLAYER : null, side, zone, status, 1, 2,
                     ranked ? (Integer) (20 - ordinal) : null, ranked ? (Integer) ordinal : null, budget, 0,
                     status == EncounterState.Status.DEFEATED ? 0 : health, healthMax, false, sheet, 0, 0, effects, policies, Map.of());
         }
     }
 
-    private static Builder player() {
+    static Builder player() {
         return new Builder(EncounterTemplate.PLAYER, EncounterTemplate.Side.PLAYER);
     }
 
-    private static Builder foe(String id) {
+    static Builder foe(String id) {
         return new Builder(id, EncounterTemplate.Side.HOSTILE);
     }
 
-    private static Builder ally(String id) {
+    static Builder ally(String id) {
         return new Builder(id, EncounterTemplate.Side.ALLY);
     }
 
     /** A fight at the player's decision of round one, with these objectives; rank order is the argument order. */
-    private static EncounterState fight(List<EncounterObjective> objectives, Builder player, Builder... others) {
+    static EncounterState fight(List<EncounterObjective> objectives, Builder player, Builder... others) {
         return fight(objectives, Map.of(), player, others);
     }
 
@@ -685,6 +804,13 @@ class EncounterOutcomeTest {
         return new ZoneGraph(zones, edges);
     }
 
+    /** The same state with this truce stored. */
+    private static EncounterState agreed(EncounterState s, Negotiation.Agreement truce) {
+        return new EncounterState(s.id(), s.rowVersion(), s.phase(), s.round(), s.cursor(), s.actionPoints(), s.speechUsed(), s.passages(),
+                s.profile(), s.frozenSpace(), s.escapeZones(), s.actions(), s.opening(), s.openingTarget(), s.openingStatus(), s.participants(),
+                s.ammunition(), s.effects(), s.effectsApplied(), s.objectives(), null, truce);
+    }
+
     /** The same state where {@code far} is an escape zone. */
     private static EncounterState escapes(EncounterState s) {
         return new EncounterState(s.id(), s.rowVersion(), s.phase(), s.round(), s.cursor(), s.actionPoints(), s.speechUsed(), s.passages(),
@@ -700,7 +826,7 @@ class EncounterOutcomeTest {
     }
 
     /** The state with these frozen effects. */
-    private static EncounterState library(EncounterState s, CombatEffect... effects) {
+    static EncounterState library(EncounterState s, CombatEffect... effects) {
         var library = new TreeMap<String, CombatEffect>();
         for (CombatEffect effect : effects) {
             library.put(effect.id(), effect);
@@ -711,18 +837,18 @@ class EncounterOutcomeTest {
     }
 
     /** A lasting effect dealing this damage at one phase. */
-    private static CombatEffect tick(String id, CombatEffect.Phase phase, int amount) {
+    static CombatEffect tick(String id, CombatEffect.Phase phase, int amount) {
         return new CombatEffect(id, id, CombatEffect.Stacking.STRONGEST, 1, CombatEffect.Clock.PERSISTENT, 0, false, 0, 0, 0, 0, 0, Set.of(),
                 List.of(new CombatEffect.Tick(phase, amount, false)), false);
     }
 
     /** A sourceless instance of a definition. */
-    private static CombatEffects.Active active(CombatEffect effect, int sequence) {
+    static CombatEffects.Active active(CombatEffect effect, int sequence) {
         return new CombatEffects.Active("e" + sequence, effect.id(), null, sequence, 0, 1, 0, null, false);
     }
 
     /** What the writer stores after a plan. */
-    private static EncounterState after(EncounterState state, TacticalPlan plan) {
+    static EncounterState after(EncounterState state, TacticalPlan plan) {
         var updates = new TreeMap<String, TacticalPlan.ParticipantUpdate>();
         plan.participants().forEach(update -> updates.put(update.participantId(), update));
         var list = new ArrayList<EncounterState.Combatant>();
@@ -737,16 +863,16 @@ class EncounterOutcomeTest {
         return new EncounterState(state.id(), state.rowVersion() + plan.steps().size(), last.phase(), last.round(), last.cursor(),
                 last.actionPoints(), last.speechUsed(), last.passages(), state.profile(), state.frozenSpace(), state.escapeZones(), state.actions(),
                 state.opening(), state.openingTarget(), last.openingStatus(), list, state.ammunition(), state.effects(), last.effectsApplied(),
-                state.objectives());
+                state.objectives(), last.openOffer(), last.agreement());
     }
 
     /** The phases a plan writes, in order. */
-    private static List<EncounterPhase> phases(TacticalPlan plan) {
+    static List<EncounterPhase> phases(TacticalPlan plan) {
         return plan.steps().stream().map(TacticalPlan.Step::phase).toList();
     }
 
     /** Draws in order from a fixed script; running out is a test failure, so a surplus draw cannot pass unseen. */
-    private static CombatScheduler.Dice script(int... values) {
+    static CombatScheduler.Dice script(int... values) {
         var queue = new ArrayDeque<Integer>();
         for (int value : values) {
             queue.add(value);

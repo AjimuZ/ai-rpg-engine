@@ -56,6 +56,7 @@ const ERRORS: Readonly<Record<string, () => string>> = {
   COMMAND_GUARD_UNAVAILABLE: () => $localize`:@@campaign.error.guardUnavailable:You have already taken a guarded stance during this turn. Nothing was changed.`,
   COMMAND_REACTION_UNAVAILABLE: () => $localize`:@@campaign.error.reactionUnavailable:You do not have that reaction. Nothing was changed.`,
   COMMAND_ACTION_PREVENTED: () => $localize`:@@campaign.error.actionPrevented:An effect on you prevents that right now. Nothing was changed.`,
+  COMMAND_OFFER_UNAVAILABLE: () => $localize`:@@campaign.error.offerUnavailable:That offer is no longer on the table. Nothing was changed.`,
   COMMAND_DEPENDENCIES_MISSING: () => $localize`:@@campaign.error.dependenciesMissing:This playthrough is paused because adventure content it depends on is missing or damaged. Nothing was changed.`,
   COMMAND_STORAGE_UNAVAILABLE: () => $localize`:@@campaign.error.storageUnavailable:Storage is unavailable right now. Check the action status before retrying.`,
   CAMPAIGN_READ_STORAGE_UNAVAILABLE: () => $localize`:@@campaign.error.storageUnavailable:Storage is unavailable right now. Check the action status before retrying.`,

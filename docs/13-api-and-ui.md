@@ -291,6 +291,7 @@ operation status is stored progress, not evidence that a worker is currently ali
 | 422 | `COMMAND_GUARD_UNAVAILABLE` | P11.3: the Guard action was already taken in this activation |
 | 422 | `COMMAND_REACTION_UNAVAILABLE` | P11.4: the player's frozen profile has no such reaction |
 | 422 | `COMMAND_ACTION_PREVENTED` | P11.4: an active effect prevents this action, its movement or its Focus cost |
+| 422 | `COMMAND_OFFER_UNAVAILABLE` | P11.5: no offer with this identity is on the table: it was never made, was answered or has lapsed |
 | 429 | `COMMAND_ADMISSION_LIMIT` | Two live mutation permits already belong to this owner |
 | 503 | `COMMAND_STORAGE_UNAVAILABLE` | Required transaction/storage unavailable |
 
@@ -594,9 +595,12 @@ Since P11.2 the backend side of this boundary exists ([ADR 0029](adr/0029-initia
 [turn protocol](07-turn-protocol.md#p112-tactical-intentions)): `COMBAT_SPEAK` stores one bounded speech-only
 utterance per activation at no cost, `INTERACT` attempts a declared social or scene action at its declared cost,
 both only at the player's own decision, and every tactical receipt lists the legal options (moves with costs,
-speech allowance and recipients, declared actions with costs and targets). Generated replies, negotiation
-responses, the panel and the composer remain P11.5 and P12. Since P11.3 ([ADR 0030](adr/0030-attacks-defense-damage-and-healing-with-recorded-draws.md))
+speech allowance and recipients, declared actions with costs and targets). Generated replies, the panel and the
+composer remain P12. Since P11.3 ([ADR 0030](adr/0030-attacks-defense-damage-and-healing-with-recorded-draws.md))
 receipts also show strikes, public standings and attack, Guard and item options; no frontend control uses them yet.
+Since P11.5 ([ADR 0033](adr/0033-negotiation-explicit-answers-and-surrender.md)) a receipt also shows a declared check's result,
+the recipient's response and the offer on the table with what accepting costs, and `ANSWER_OFFER` is the explicit player decision
+this section requires. No frontend control uses them yet, so the preview and confirmation remain P12.2.
 
 ## 8. Loading, empty, error, and recovery states
 

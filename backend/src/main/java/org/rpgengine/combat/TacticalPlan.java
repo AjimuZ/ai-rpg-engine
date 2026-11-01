@@ -74,9 +74,18 @@ public record TacticalPlan(UUID encounterId, long baseRowVersion, List<Step> ste
      * @param passages passage states after this step
      * @param openingStatus {@code NONE}, {@code PENDING} or {@code RESOLVED} after this step
      * @param effectsApplied the encounter's application counter after this step
+     * @param openOffer terms on the table after this step, or null
+     * @param agreement the truce accepted, or null
      */
     public record Step(EncounterPhase phase, int round, Integer cursor, Integer actionPoints, int speechUsed,
-            List<EncounterAction.Passage> passages, String openingStatus, int effectsApplied) {
+            List<EncounterAction.Passage> passages, String openingStatus, int effectsApplied, Negotiation.Offer openOffer,
+            Negotiation.Agreement agreement) {
+        /** Encounter row state of a fight with no negotiation under way. */
+        public Step(EncounterPhase phase, int round, Integer cursor, Integer actionPoints, int speechUsed,
+                List<EncounterAction.Passage> passages, String openingStatus, int effectsApplied) {
+            this(phase, round, cursor, actionPoints, speechUsed, passages, openingStatus, effectsApplied, null, null);
+        }
+
         /** Encounter row state of a fight that has applied no effect, the shape used before P11.4. */
         public Step(EncounterPhase phase, int round, Integer cursor, Integer actionPoints, int speechUsed,
                 List<EncounterAction.Passage> passages, String openingStatus) {

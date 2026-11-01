@@ -230,6 +230,12 @@ the open leases with the database, and the next start takes them over as reconci
 confirms the model is gone. Offline checks cover the V29 manifest/catalog; no live V29 dump/restore rehearsal has been run, and the
 rehearsal below ran on V28 before this table existed.
 
+V30 scope (P11.5-B) adds no table: `encounter` gains `open_offer` and `agreement`, nullable JSON objects with checks that an offer
+exists only at `AWAITING_ACTION` and an agreement only from `OUTCOME_PENDING` on. The `encounter_agreement_once` and
+`encounter_participant_surrender` triggers guard later updates (an accepted agreement never changes, a surrendered participant does
+not return). A restore inserts rows, so only the check constraints apply to restored values. Offline checks cover the V30
+manifest/catalog; no live V30 dump/restore rehearsal has been run.
+
 ## Live two-genre rehearsal (P06.5-B.1, V26)
 
 `tools/container_packaging/test_restore_isolation.py` runs this tool as an operator would on a populated world, then

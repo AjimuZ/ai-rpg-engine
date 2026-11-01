@@ -28,6 +28,9 @@ import tools.jackson.databind.json.JsonMapper;
  * edge; survive and protect objectives) and {@code grove-watch} in the grove (opening {@code first}; a hostile wolf,
  * an allied hound and a reach-zone objective). {@link #tuned()} is the same pack under another ID with a customized profile.
  *
+ * <p>Negotiation (P11.5) is declared only by the {@code parley-ground} template of {@link #tactics()}, so every other frozen
+ * definition keeps its earlier shape.
+ *
  * <p>Declared actions (P11.2): {@code trail-ambush} lets the player taunt a hostile (social, intimidate, the default
  * Interact cost 1) and seal the yard's route to the escape zone from the yard (scene); {@code toll-parley} lets the
  * player demand passage from a hostile (social, negotiate), ask the allied keeper for cover (social, request, 2 AP)
@@ -176,7 +179,33 @@ public final class EncounterPack {
                 "conditions":["poisoned","winded","stunned"],"stats":{"health":999,"guard":0,"resistance":0}},
                 {"id":"reed","name":"Reed","side":"hostile","zone":"pit","brace":{"mode":"off"},
                 "conditions":["poisoned"],"stats":{"health":1,"guard":0,"resistance":0}}],
-              "objectives":[{"id":"last","kind":"survive","rounds":3}]}}""";
+              "objectives":[{"id":"last","kind":"survive","rounds":3}]}},
+            {"id":"parley-ground","kind":"encounter","data":{"name":"Parley Ground","location":"trailhead",
+              "zones":[{"id":"road","name":"Road"},{"id":"bridge","name":"Bridge"}],"edges":[{"from":"road","to":"bridge"}],
+              "playerZone":"road",
+              "participants":[{"id":"captain","name":"Captain","side":"hostile","zone":"road","brace":{"mode":"off"},
+                "conditions":["warded"],"stats":{"health":999,"guard":0,"resistance":12,"insight":3}},
+                {"id":"squire","name":"Squire","side":"hostile","zone":"road","brace":{"mode":"off"},
+                "stats":{"health":999,"guard":0,"resistance":9}}],
+              "objectives":[{"id":"last","kind":"survive","rounds":5}],
+              "actions":[{"id":"hopeless-plea","name":"Hopeless plea","kind":"social","intent":"negotiate",
+                "check":{"attribute":"insight","difficulty":40},
+                "terms":{"id":"let-us-pass","name":"Let us pass","kind":"truce"}},
+                {"id":"offer-peace","name":"Offer peace","kind":"social","intent":"negotiate",
+                "terms":{"id":"open-road","name":"An open road","kind":"truce"}},
+                {"id":"haggle","name":"Haggle","kind":"social","intent":"negotiate",
+                "terms":{"id":"free-pass","name":"Free passage","kind":"truce"},
+                "counteroffer":{"id":"toll","name":"Pay the toll","kind":"truce","cost":2}},
+                {"id":"demand-surrender","name":"Demand surrender","kind":"social","intent":"negotiate",
+                "terms":{"id":"yield","name":"Yield","kind":"recipientSurrenders"}},
+                {"id":"lay-down-arms","name":"Lay down arms","kind":"social","intent":"negotiate",
+                "terms":{"id":"captive","name":"Be taken captive","kind":"playerSurrenders"}},
+                {"id":"sway","name":"Sway","kind":"social","intent":"persuade","recipients":"any",
+                "check":{"attribute":"insight","skill":"bladework"}},
+                {"id":"measured-offer","name":"Measured offer","kind":"social","intent":"negotiate","cost":2,
+                "check":{"attribute":"insight","skill":"bladework","difficulty":14},
+                "terms":{"id":"fair-terms","name":"Fair terms","kind":"truce"},
+                "counteroffer":{"id":"small-toll","name":"A small toll","kind":"truce","cost":1}}]}}""";
 
     private EncounterPack() {
     }
@@ -216,6 +245,10 @@ public final class EncounterPack {
      * its {@code snap} answers a player who leaves the pit with a counter at no cost, and the adder cannot be missed because its
      * Brace is off and its Guard 0. {@code clock-pit} has no attacks, so only clocks act: an {@code idol} enters holding poison,
      * {@code winded} and {@code stunned}, and a {@code reed} of 1 Health enters poisoned, so it falls to the first tick.
+     * {@code parley-ground} has no attacks either, so only words act (P11.5): a {@code captain} holding {@code warded}, which
+     * lasts whatever the initiative order, and a {@code squire} on the player's road. Its {@code hopeless-plea} can never meet difficulty 40, {@code offer-peace},
+     * {@code haggle}, {@code demand-surrender} and {@code lay-down-arms} declare no check, so each has one certain response,
+     * and {@code sway} and {@code measured-offer} add a skill and draw, for cases that follow recorded dice.
      *
      * <p>Conditions: {@code poisoned} (additive up to 3, one damage per stack at each round end, two round ends),
      * {@code warded} (absorption 3, persistent, strongest), {@code winded} (attack -2 until the holder's next activation) and

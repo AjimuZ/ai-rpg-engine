@@ -199,7 +199,15 @@ class EventStatementsTest {
         assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"OBJECTIVE\"}"));
         assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"PEACE\"}"));
         assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{}"));
-        String lapse = "{\"actorId\":\"" + PLAYER + "\",\"targetId\":\"raider\",\"reason\":\"OUT_OF_RANGE\"}";
+        String agreed = "{\"outcome\":\"AGREEMENT\",\"termsId\":\"toll\"}";
+        assertEquals("The terms toll are agreed: the fight ends.", state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", agreed));
+        assertEquals("I termini toll sono concordati: lo scontro termina.", state(SupportedLocale.IT, "ENCOUNTER_OUTCOME_PENDING", agreed));
+        assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"AGREEMENT\"}"));
+        assertEquals("The protagonist surrenders: the fight is over.", state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"PLAYER_SURRENDER\"}"));
+        assertEquals("Il personaggio protagonista si arrende: lo scontro è finito.", state(SupportedLocale.IT, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"PLAYER_SURRENDER\"}"));
+        assertEquals("The opposition has surrendered: the fight is won.", state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"HOSTILE_SURRENDER\"}"));
+        assertEquals("Resa degli avversari: lo scontro è vinto.", state(SupportedLocale.IT, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"HOSTILE_SURRENDER\"}"));
+        String lapse ="{\"actorId\":\"" + PLAYER + "\",\"targetId\":\"raider\",\"reason\":\"OUT_OF_RANGE\"}";
         assertEquals("Mira's opening strike against raider cannot be made.", state(SupportedLocale.EN, "OPENING_STRIKE_LAPSED", lapse));
         assertEquals("L'attacco d'apertura di Mira contro raider non può essere portato.", state(SupportedLocale.IT, "OPENING_STRIKE_LAPSED", lapse));
         String own = "{\"actorId\":\"" + PLAYER + "\",\"definitionId\":\"salve\",\"actionPoints\":2}";
@@ -237,6 +245,55 @@ class EventStatementsTest {
         String kept = "{\"resourceKey\":\"vigor\",\"outcomes\":[{\"actorId\":\"" + PLAYER + "\",\"outcome\":\"NOT_REVIVED\",\"before\":0,\"after\":0}]}";
         assertEquals("Effect: Mira stays defeated (vigor 0).", state(SupportedLocale.EN, "EFFECT_RESOLVED", kept));
         assertEquals("Effetto: Mira resta fuori combattimento (vigor 0).", state(SupportedLocale.IT, "EFFECT_RESOLVED", kept));
+    }
+
+    /**
+     * A check states its total and result and never its difficulty, and every response says that nothing is agreed yet, so
+     * no narration can read one as an agreement. Answers, lapses and surrenders have their own statements (P11.5).
+     */
+    @Test
+    void statesNegotiationEvents() {
+        String check = "{\"actorId\":\"" + PLAYER + "\",\"actionId\":\"parley\",\"targetId\":\"captain\",\"total\":15,\"success\":true}";
+        assertEquals("Mira's check for parley with captain totals 15 and succeeds.", state(SupportedLocale.EN, "SOCIAL_CHECK_RESOLVED", check));
+        assertEquals("La prova di Mira per parley con captain totalizza 15 e riesce.", state(SupportedLocale.IT, "SOCIAL_CHECK_RESOLVED", check));
+        String failed = check.replace("true", "false");
+        assertEquals("Mira's check for parley with captain totals 15 and fails.", state(SupportedLocale.EN, "SOCIAL_CHECK_RESOLVED", failed));
+        assertEquals("La prova di Mira per parley con captain totalizza 15 e fallisce.", state(SupportedLocale.IT, "SOCIAL_CHECK_RESOLVED", failed));
+        assertEquals(null, state(SupportedLocale.EN, "SOCIAL_CHECK_RESOLVED", check.replace("true", "\"yes\"")));
+        assertEquals(null, state(SupportedLocale.EN, "SOCIAL_CHECK_RESOLVED", check.replace("15", "\"15\"")));
+
+        String refused = "{\"participantId\":\"captain\",\"actionId\":\"parley\",\"response\":\"REFUSED\"}";
+        assertEquals("captain refuses parley: the fight goes on.", state(SupportedLocale.EN, "NEGOTIATION_RESPONDED", refused));
+        assertEquals("captain rifiuta parley: lo scontro continua.", state(SupportedLocale.IT, "NEGOTIATION_RESPONDED", refused));
+        String offered = "{\"participantId\":\"captain\",\"actionId\":\"parley\",\"response\":\"OFFERED\",\"termsId\":\"open-road\",\"cost\":0}";
+        assertEquals("captain is open to the terms open-road: nothing is agreed yet.", state(SupportedLocale.EN, "NEGOTIATION_RESPONDED", offered));
+        assertEquals("captain è disponibile ai termini open-road: nulla è ancora concordato.", state(SupportedLocale.IT, "NEGOTIATION_RESPONDED", offered));
+        String countered = "{\"participantId\":\"captain\",\"actionId\":\"parley\",\"response\":\"COUNTEROFFERED\",\"termsId\":\"toll\",\"cost\":2}";
+        assertEquals("captain answers parley with the terms toll (2 action points to accept): nothing is agreed yet.",
+                state(SupportedLocale.EN, "NEGOTIATION_RESPONDED", countered));
+        assertEquals("captain controbatte a parley con i termini toll (2 punti azione per accettare): nulla è ancora concordato.",
+                state(SupportedLocale.IT, "NEGOTIATION_RESPONDED", countered));
+        assertEquals(null, state(SupportedLocale.EN, "NEGOTIATION_RESPONDED", refused.replace("REFUSED", "AGREED")));
+        assertEquals(null, state(SupportedLocale.EN, "NEGOTIATION_RESPONDED", offered.replace("OFFERED", "AGREED")), "an unknown response is never stated");
+        assertEquals(null, state(SupportedLocale.EN, "NEGOTIATION_RESPONDED", offered.replace(",\"termsId\":\"open-road\"", "")));
+        assertEquals(null, state(SupportedLocale.EN, "NEGOTIATION_RESPONDED", countered.replace(",\"cost\":2", "")));
+
+        String accepted = "{\"actorId\":\"" + PLAYER + "\",\"termsId\":\"toll\",\"decision\":\"ACCEPTED\"}";
+        assertEquals("Mira accepts the terms toll.", state(SupportedLocale.EN, "OFFER_ANSWERED", accepted));
+        assertEquals("Mira accetta i termini toll.", state(SupportedLocale.IT, "OFFER_ANSWERED", accepted));
+        String declined = accepted.replace("ACCEPTED", "DECLINED");
+        assertEquals("Mira declines the terms toll.", state(SupportedLocale.EN, "OFFER_ANSWERED", declined));
+        assertEquals("Mira respinge i termini toll.", state(SupportedLocale.IT, "OFFER_ANSWERED", declined));
+        assertEquals(null, state(SupportedLocale.EN, "OFFER_ANSWERED", accepted.replace("ACCEPTED", "MAYBE")));
+
+        String lapsed = "{\"participantId\":\"captain\",\"termsId\":\"toll\",\"reason\":\"ACTIVATION_ENDED\"}";
+        assertEquals("The terms toll from captain lapse unanswered.", state(SupportedLocale.EN, "OFFER_LAPSED", lapsed));
+        assertEquals("I termini toll proposti da captain decadono senza risposta.", state(SupportedLocale.IT, "OFFER_LAPSED", lapsed));
+
+        assertEquals("captain surrenders.", state(SupportedLocale.EN, "PARTICIPANT_SURRENDERED", "{\"participantId\":\"captain\"}"));
+        assertEquals("captain si arrende.", state(SupportedLocale.IT, "PARTICIPANT_SURRENDERED", "{\"participantId\":\"captain\"}"));
+        assertEquals("Mira surrenders.", state(SupportedLocale.EN, "PARTICIPANT_SURRENDERED", "{\"actorId\":\"" + PLAYER + "\"}"));
+        assertEquals(null, state(SupportedLocale.EN, "PARTICIPANT_SURRENDERED", "{}"));
     }
 
     /** Quest events state their transition in both locales, using the canonical quest and outcome identities. */

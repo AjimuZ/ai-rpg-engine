@@ -336,8 +336,83 @@ public final class EventStatements {
                     case "OBJECTIVE" -> objective == null ? null
                             : it ? "L'obiettivo " + objective + " è raggiunto: lo scontro termina."
                             : "Objective " + objective + " is met: the fight ends.";
+                    case "AGREEMENT" -> {
+                        String terms = token(payload, "termsId");
+                        yield terms == null ? null
+                                : it ? "I termini " + terms + " sono concordati: lo scontro termina."
+                                : "The terms " + terms + " are agreed: the fight ends.";
+                    }
+                    case "PLAYER_SURRENDER" -> it ? "Il personaggio protagonista si arrende: lo scontro è finito."
+                            : "The protagonist surrenders: the fight is over.";
+                    case "HOSTILE_SURRENDER" -> it ? "Resa degli avversari: lo scontro è vinto."
+                            : "The opposition has surrendered: the fight is won.";
                     default -> null;
                 };
+            }
+            case "SOCIAL_CHECK_RESOLVED" -> {
+                // P11.5: the public result of a declared check; its difficulty stays internal, as a hidden defense does.
+                String participant = participant(payload, names);
+                String action = token(payload, "actionId");
+                String target = token(payload, "targetId");
+                Long total = number(payload, "total");
+                if (participant == null || action == null || target == null || total == null
+                        || !payload.path("success").isBoolean()) {
+                    yield null;
+                }
+                boolean success = payload.path("success").asBoolean();
+                yield it ? "La prova di " + participant + " per " + action + " con " + target + " totalizza " + total
+                                + (success ? " e riesce." : " e fallisce.")
+                        : participant + "'s check for " + action + " with " + target + " totals " + total
+                                + (success ? " and succeeds." : " and fails.");
+            }
+            case "NEGOTIATION_RESPONDED" -> {
+                // P11.5: every statement says that nothing is agreed, so no narration can read a response as an agreement.
+                String recipient = participant(payload, names);
+                String action = token(payload, "actionId");
+                if (recipient == null || action == null) {
+                    yield null;
+                }
+                String response = token(payload, "response");
+                if ("REFUSED".equals(response)) {
+                    yield it ? recipient + " rifiuta " + action + ": lo scontro continua."
+                            : recipient + " refuses " + action + ": the fight goes on.";
+                }
+                String terms = token(payload, "termsId");
+                Long points = number(payload, "cost");
+                if (terms == null || points == null || !("OFFERED".equals(response) || "COUNTEROFFERED".equals(response))) {
+                    yield null;
+                }
+                String price = points == 0 ? "" : it ? " (" + points(true, points) + " per accettare)"
+                        : " (" + points(false, points) + " to accept)";
+                yield "OFFERED".equals(response)
+                        ? it ? recipient + " è disponibile ai termini " + terms + price + ": nulla è ancora concordato."
+                                : recipient + " is open to the terms " + terms + price + ": nothing is agreed yet."
+                        : it ? recipient + " controbatte a " + action + " con i termini " + terms + price + ": nulla è ancora concordato."
+                                : recipient + " answers " + action + " with the terms " + terms + price + ": nothing is agreed yet.";
+            }
+            case "OFFER_ANSWERED" -> {
+                String participant = participant(payload, names);
+                String terms = token(payload, "termsId");
+                String decision = token(payload, "decision");
+                if (participant == null || terms == null) {
+                    yield null;
+                }
+                yield "ACCEPTED".equals(decision)
+                        ? it ? participant + " accetta i termini " + terms + "." : participant + " accepts the terms " + terms + "."
+                        : "DECLINED".equals(decision)
+                        ? it ? participant + " respinge i termini " + terms + "." : participant + " declines the terms " + terms + "."
+                        : null;
+            }
+            case "OFFER_LAPSED" -> {
+                String recipient = participant(payload, names);
+                String terms = token(payload, "termsId");
+                yield recipient == null || terms == null ? null
+                        : it ? "I termini " + terms + " proposti da " + recipient + " decadono senza risposta."
+                        : "The terms " + terms + " from " + recipient + " lapse unanswered.";
+            }
+            case "PARTICIPANT_SURRENDERED" -> {
+                String participant = participant(payload, names);
+                yield participant == null ? null : it ? participant + " si arrende." : participant + " surrenders.";
             }
             case "COMBAT_ITEM_USED" -> {
                 String participant = participant(payload, names);

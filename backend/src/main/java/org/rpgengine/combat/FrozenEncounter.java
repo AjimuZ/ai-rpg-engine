@@ -365,7 +365,8 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
         }
         return new FrozenEncounter(id, template.id(), template.location(), profile, template.zones(),
                 template.escapeZones(), template.objectives(), template.opening(), openingTarget, participants,
-                template.actions(), reachable(participants, library.effects()));
+                template.actions().stream().map(action -> action.forPlayer(player.skills())).toList(),
+                reachable(participants, library.effects()));
     }
 
     /**

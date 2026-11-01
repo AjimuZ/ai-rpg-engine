@@ -74,6 +74,8 @@ public record CombatProfile(String pack, Map<String, String> roles, String healt
     public static final int ATTACK_FLAT_MAX = 20;
     public static final int ATTACK_PENETRATION_MAX = 10;
     public static final int ATTACK_SKILL_MAX = 10;
+    /** Highest fixed difficulty a social check can declare, the highest defense a participant can store (P11.5). */
+    public static final int CHECK_DIFFICULTY_MAX = 40;
     /** Most attacks a template participant may declare. */
     public static final int ATTACKS_MAX = 4;
     /** Most non-player participants of one encounter. */

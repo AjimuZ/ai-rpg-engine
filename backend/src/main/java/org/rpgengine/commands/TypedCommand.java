@@ -22,7 +22,8 @@ import org.rpgengine.content.PackTextParser;
  * declaring the attack that opens it. Since P11.2 the {@link Tactical} intentions are registered for encounter mode:
  * roll initiative, move to an adjacent zone, end the activation, one bounded speech-only utterance and a declared
  * social or scene action; since P11.3 also strike, the Guard action and using an item; since P11.4 also using a frozen
- * ability and changing a predeclared reaction policy. Unknown types fail closed.
+ * ability and changing a predeclared reaction policy; since P11.5 also answering the offer on the table. Unknown types
+ * fail closed.
  * Structural decoding here
  * is followed by current-state rule validation in {@link CommandRules}; resolution
  * remains backend-owned (P07.4). Every value is immutable and can reproduce its exact
@@ -34,7 +35,8 @@ public sealed interface TypedCommand
         TypedCommand.TradeItems, TypedCommand.AcceptQuest, TypedCommand.SuspendQuest, TypedCommand.ResumeQuest,
         TypedCommand.Rest, TypedCommand.Engage, TypedCommand.RollInitiative, TypedCommand.MoveZone,
         TypedCommand.EndActivation, TypedCommand.CombatSpeak, TypedCommand.Interact, TypedCommand.Strike,
-        TypedCommand.Guard, TypedCommand.CombatUseItem, TypedCommand.CombatUseAbility, TypedCommand.SetReactionPolicy {
+        TypedCommand.Guard, TypedCommand.CombatUseItem, TypedCommand.CombatUseAbility, TypedCommand.SetReactionPolicy,
+        TypedCommand.AnswerOffer {
     /** @return registered, case-sensitive wire identifier */
     String type();
 
@@ -205,6 +207,10 @@ public sealed interface TypedCommand
                     fields(payload, "reactionId", "mode");
                     yield new SetReactionPolicy(text(payload.get("reactionId"), 256), text(payload.get("mode"), 32), 0);
                 }
+                case "ANSWER_OFFER" -> {
+                    fields(payload, "offerId", "decision");
+                    yield new AnswerOffer(text(payload.get("offerId"), 64), text(payload.get("decision"), 16));
+                }
                 default -> throw invalid();
             };
         } catch (IllegalArgumentException | ArithmeticException failure) {
@@ -218,7 +224,7 @@ public sealed interface TypedCommand
         return Set.of("MOVE", "WAIT", "SPEAK", "USE_ABILITY", "USE_ITEM", "EQUIP_ITEM", "UNEQUIP_ITEM",
                 "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST", "ENGAGE",
                 "ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT", "STRIKE", "GUARD",
-                "COMBAT_USE_ITEM", "COMBAT_USE_ABILITY", "SET_REACTION_POLICY").contains(type);
+                "COMBAT_USE_ITEM", "COMBAT_USE_ABILITY", "SET_REACTION_POLICY", "ANSWER_OFFER").contains(type);
     }
 
     /**
@@ -226,7 +232,7 @@ public sealed interface TypedCommand
      * checks, and resolved by the combat scheduler from the frozen encounter rather than from pinned definitions.
      */
     sealed interface Tactical permits RollInitiative, MoveZone, EndActivation, CombatSpeak, Interact, Strike, Guard,
-            CombatUseItem, CombatUseAbility, SetReactionPolicy {
+            CombatUseItem, CombatUseAbility, SetReactionPolicy, AnswerOffer {
         /** @return the combat-layer value of this intention */
         TacticalIntent intent();
     }
@@ -761,5 +767,29 @@ public sealed interface TypedCommand
             }
             return new CombatReaction.Policy(known, value);
         }
+    }
+
+    /**
+     * Answer the terms on the table (P11.5, docs/11 section 7.1): the only way an agreement or a surrender comes about. The
+     * player names the offer it read, so an answer can never reach other terms than those; what the terms do is rule data.
+     * A decision other than the two below is an invalid command, because guessing what it meant would bind the player.
+     *
+     * @param offerId identity of the offer answered
+     * @param decision {@code accept} or {@code decline}
+     */
+    record AnswerOffer(String offerId, String decision) implements TypedCommand, Tactical {
+        /** Require a bounded identity and one of the two decisions. */
+        public AnswerOffer {
+            offerId = text(offerId, 64);
+            if (!"accept".equals(decision) && !"decline".equals(decision)) {
+                throw new IllegalArgumentException("an offer is accepted or declined");
+            }
+        }
+        /** @return the fixed answer identifier */
+        public String type() { return "ANSWER_OFFER"; }
+        /** @return the offer and the decision */
+        public Map<String, Object> payload() { return Map.of("offerId", offerId, "decision", decision); }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.AnswerOffer(offerId, "accept".equals(decision)); }
     }
 }

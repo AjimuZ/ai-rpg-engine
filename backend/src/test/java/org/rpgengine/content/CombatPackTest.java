@@ -186,7 +186,47 @@ class CombatPackTest {
         compile(bytes(files));
     }
 
-    /** The default fixture with an extra attribute {@code nerve} of range {@code 0..max} and the given resolve mapping. */
+    /**
+     * A negotiation's check and terms are closed and bounded: only a negotiation addressing hostiles proposes terms, a
+     * counteroffer answers them and differs from them, accepting fits one activation but may be free, and a check names a role
+     * and a real skill. A pack declaring them all compiles, and its terms are localizable public text.
+     */
+    @Test
+    void refusesBrokenNegotiations() throws Exception {
+        String plain = "\"intent\":\"negotiate\"}";
+        String terms = "\"terms\":{\"id\":\"pass\",\"name\":\"Pass\",\"kind\":\"truce\"}";
+        rejects("SCHEMA", "encounters.json", plain, "\"intent\":\"negotiate\",\"check\":{\"attribute\":\"charm\"}}", false);
+        rejects("SCHEMA", "encounters.json", plain, "\"intent\":\"negotiate\",\"check\":{}}", false);
+        rejects("SCHEMA", "encounters.json", plain, "\"intent\":\"negotiate\",\"check\":{\"attribute\":\"insight\",\"difficulty\":41}}", false);
+        rejects("SCHEMA", "encounters.json", plain, "\"intent\":\"negotiate\",\"check\":{\"attribute\":\"insight\",\"difficulty\":-1}}", false);
+        rejects("SCHEMA", "encounters.json", plain, "\"intent\":\"negotiate\",\"check\":{\"attribute\":\"insight\",\"dice\":3}}", false);
+        rejects("REFERENCE_UNKNOWN", "encounters.json", plain, "\"intent\":\"negotiate\",\"check\":{\"attribute\":\"insight\",\"skill\":\"charm\"}}", false);
+        rejects("REFERENCE_KIND", "encounters.json", plain, "\"intent\":\"negotiate\",\"check\":{\"attribute\":\"insight\",\"skill\":\"sword\"}}", false);
+        rejects("SCHEMA", "encounters.json", plain, "\"intent\":\"negotiate\",\"terms\":{\"id\":\"pass\",\"kind\":\"truce\"}}", false);
+        rejects("SCHEMA", "encounters.json", plain, "\"intent\":\"negotiate\",\"terms\":{\"name\":\"Pass\",\"kind\":\"truce\"}}", false);
+        rejects("SCHEMA", "encounters.json", plain, "\"intent\":\"negotiate\",\"terms\":{\"id\":\"pass\",\"name\":\"Pass\",\"kind\":\"peace\"}}", false);
+        rejects("SCHEMA", "encounters.json", plain, "\"intent\":\"negotiate\",\"terms\":{\"id\":\"pass\",\"name\":\"Pass\",\"kind\":\"truce\",\"cost\":4}}", false);
+        rejects("SCHEMA", "encounters.json", plain, "\"intent\":\"negotiate\",\"terms\":{\"id\":\"pass\",\"name\":\"Pass\",\"kind\":\"truce\",\"cost\":-1}}", false);
+        rejects("SCHEMA", "encounters.json", plain, "\"intent\":\"negotiate\",\"terms\":{\"id\":\"pass\",\"name\":\"Pass\",\"kind\":\"truce\",\"gold\":5}}", false);
+        rejects("CONSTRAINT_CONFLICT", "encounters.json", "\"intent\":\"intimidate\"}", "\"intent\":\"intimidate\"," + terms + "}", false);
+        rejects("CONSTRAINT_CONFLICT", "encounters.json", plain, "\"intent\":\"negotiate\",\"recipients\":\"any\"," + terms + "}", false);
+        rejects("CONSTRAINT_CONFLICT", "encounters.json", plain, "\"intent\":\"negotiate\",\"counteroffer\":{\"id\":\"pass\",\"name\":\"Pass\",\"kind\":\"truce\"}}", false);
+        rejects("DUPLICATE", "encounters.json", plain, "\"intent\":\"negotiate\"," + terms + ",\"counteroffer\":{\"id\":\"pass\",\"name\":\"Toll\",\"kind\":\"truce\"}}", false);
+        rejects("SCHEMA", "encounters.json", "\"kind\":\"scene\",\"zone\":\"gate\",", "\"kind\":\"scene\",\"zone\":\"gate\",\"check\":{\"attribute\":\"insight\"},", false);
+        rejects("SCHEMA", "encounters.json", "\"kind\":\"scene\",\"zone\":\"gate\",", "\"kind\":\"scene\",\"zone\":\"gate\"," + terms + ",", false);
+
+        var files = text(EncounterPack.files());
+        files.put("encounters.json", files.get("encounters.json").replace("\n", "").replaceAll(" {2,}", "").replace(plain,
+                "\"intent\":\"negotiate\",\"check\":{\"attribute\":\"insight\",\"skill\":\"bladework\",\"difficulty\":40}," + terms
+                        + ",\"counteroffer\":{\"id\":\"toll\",\"name\":\"Toll\",\"description\":\"Pay.\",\"kind\":\"playerSurrenders\",\"cost\":3}}"));
+        var localization = compile(bytes(files)).localization();
+        assertEquals("Pass", localization.resolve("toll-parley", "/actions/demand-passage/terms/name", "en").text());
+        assertEquals("Toll", localization.resolve("toll-parley", "/actions/demand-passage/counteroffer/name", "en").text());
+        assertEquals("Pay.", localization.resolve("toll-parley", "/actions/demand-passage/counteroffer/description", "en").text());
+        assertTrue(EncounterPack.rules(EncounterPack.tactics()).templates().get("parley-ground").actions().stream()
+                .anyMatch(action -> action.counteroffer() != null), "and the fixture's reach the projected template");
+    }
+
     /** Template attacks are closed and bounded: dice, sides, range against the profile, unique IDs. */
     @Test
     void refusesBrokenTemplateAttacks() {

@@ -3968,8 +3968,8 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
   - Package A, terminal predicates ([ADR 0032](adr/0032-terminal-predicates-from-committed-state.md)), partial progress of 1 November 2026: pure
     `EncounterOutcome.decide` over `EncounterState`, which now carries the frozen objectives; `CombatScheduler` stops at `OUTCOME_PENDING`
     from `RESOLVING`, `ACTOR_START` and `ROUND_END`; public `ENCOUNTER_OUTCOME_PENDING` with EN/IT statements; receipt `combat.outcome`. No migration.
-  - Remaining for this task, so its box stays unchecked: surrender and agreement predicates, refused, counteroffered and accepted
-    negotiation, the stalemate policy, idempotent settlement, the return to narrative, and the decision on Withdraw, Ready and Assess.
+  - Remaining for this task, so its box stays unchecked: the stalemate policy, idempotent settlement, the return to narrative, and the
+    decision on Withdraw, Ready and Assess. Surrender and agreement predicates and refused, counteroffered and accepted negotiation came with Package B, below.
   - Limits of this package: nothing leaves `OUTCOME_PENDING` until settlement exists, so a campaign whose fight ended stays in encounter
     mode and refuses every command; a round left unfinished adds no world time; the player's status stays `ACTIVE` after an escape; hostiles
     who all escaped or surrendered read as a victory, though no code sets those statuses yet; a surrendered player gets no verdict;
@@ -3995,6 +3995,37 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     which `s-flush` and `s-next-speech` no longer apply, because those two production lines were removed as unneeded.
     Also not proven: `verify.sh containers`; a retry through the HTTP layer; independent review of the four new Italian statements;
     any terminal path back to narrative, which does not exist yet.
+  - Package B, negotiation, surrender and agreement ([ADR 0033](adr/0033-negotiation-explicit-answers-and-surrender.md)), partial progress of 1 November 2026: a social action
+    declares a `check`, and a negotiation addressing hostiles declares `terms` and a `counteroffer`; pure `Negotiation.respond` decides refused, counteroffered or offered from
+    frozen data and recorded dice; any response but a refusal stores one offer on the row and binds nobody; only `ANSWER_OFFER` {offerId, decision} applies a closed term (truce,
+    recipient's surrender, player's surrender) or declines it; an offer lapses at the end of the activation or at any action but speech or a policy change. `EncounterOutcome` gains
+    `PLAYER_SURRENDER`, `HOSTILE_SURRENDER` and `AGREEMENT`, and a player who surrendered fails every objective. V30 adds `open_offer` and `agreement` with guards, and refuses
+    bringing back a surrendered participant; backup schema 30. New refusal `COMMAND_OFFER_UNAVAILABLE` (catalog 516), five new public event types and one internal, each public one with EN/IT statements, and three new outcome statements.
+  - Remaining for this task, so its box stays unchecked: as listed under Package A. Nothing leaves `OUTCOME_PENDING` yet, so an accepted agreement or surrender stays pending there.
+  - Limits of this package: terms cost action points only and cannot transfer items; a check on any intent but `negotiate` records its result and changes nothing else; a truce binds every
+    hostile, and the pack cannot name who may grant it; attempts have no limit beyond their cost; morale, knowledge and objective policies and a recipient proposing terms by itself are not
+    modelled (P12.3/P12.4); the difficulty and margin rule are provisional numbers (P18.3); effects are not converted when a fight ends, and a surrender simply ends those of the participant
+    who left; no generated reply, preview, confirmation or panel (P12); an open offer sits on the row, but the V16 checkpoint still records no encounter (P11.6).
+  - Existing behavior and tests changed: `CombatScheduler.settle`, `advance` and `endRound` lost their branches for a player out of the fight without a verdict, because that state no
+    longer exists. `EncounterOutcomeTest.noActiveOpponentIsAVictory` became `noActiveOpponentIsAVictoryOrTheirSurrender` and `aSurrenderedPlayerIsNotDecidedHere` became
+    `aSurrenderedPlayerHasItsOwnVerdict`, because both pinned limits of Package A that this package removes; its `fixture` now freezes with `rules.library()` so `parley-ground` reaches its
+    entry effect. `italian-variant.spec.ts` counts 516 messages. None was deleted or disabled.
+  - Verification (1 November 2026, JDK 21.0.12.1 and PostgreSQL 18.6 in the images pinned by ADR 0009, on the Windows reference host):
+    `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full` passed on this tree. Backend `clean verify -Ppackaged-ui` ran 1,486 tests with 0 failures, 0 errors and 0 skipped
+    (`PackagedInterfaceTest` included); frontend typecheck, 156 unit tests in 19 files, localization tests, production and locale builds passed with 516 reviewed messages; repository tests
+    40 with 11 skipped, backup 9 with 1 skipped, runtime probe 116 with 18 skipped, Docker requirement 8, hardware profile 12 and Compose 2.x rendering 12 in Linux containers.
+    New: `NegotiationTest` (24, pure: all 100 dice pairs against an independent model, refused, counteroffered and accepted, words accepting nothing, stale and unaffordable answers, ambiguous
+    attempts, every lapse, a tick stopping a paid acceptance, each surrender, frozen forms and options), `NegotiationCommandsTest` (9 on PostgreSQL: refused, counteroffer with explicit
+    acceptance, unaffordable acceptance and decline, lapses, both surrenders, a check following its recorded dice, ambiguous input, the V30 guards; retries of a refusal, an agreement and the player's surrender
+    replay the same receipt and write nothing; every refusal writes nothing), `CampaignCommandHttpTest.aNegotiatedEndingAnswersAndReplays` (through HTTP: 202 then a 200 replay of the
+    identical receipt, `COMMAND_OFFER_UNAVAILABLE`, `COMMAND_INVALID`), `EncounterOutcomeTest.seededNegotiationsOnlyEndByExplicitAcceptance` (100 fights, seed 20261102, reaching all three negotiated
+    outcomes and the survive objective, each replayed), plus `anAgreementComesAfterEveryOtherPredicate`, `anOpenOfferDecidesNothing`, `CombatPackTest.refusesBrokenNegotiations`, `statesNegotiationEvents`,
+    `TypedCommandTest` additions and the V30 step of `CanonicalMigrationUpgradeTest`.
+  - Not proven here: **no deliberate weakening ran.** The session's shell refused the `docker run` again, and it was not retried in another form, so whether each new check fails a test is argued
+    from reading the tests, not observed. That reading closed two gaps: a stance ending with the player's surrender and an unknown response with terms. The catalogue written for this is
+    `.local/scratch/p115b/` (ignored and not committed), with 106 weakenings of pure rules, which the owner or a later session must still run; it covers neither V30 nor the receipts. `s-read-agreement` should survive as
+    equivalent, because no operation runs once an agreement exists. Also not proven: `verify.sh containers`; a live V30 dump and restore; settling a negotiated ending, its lost-response
+    retry beyond the outcome, and any path back to narrative; renewal or restore during a social check (P11.6); independent review of the new Italian message and statements; balance of the difficulty and margins.
 - [ ] P11.6 Persist/recover every combat cursor, partial-round time boundary and combat-dialogue operation/transcript without duplicate social effects or settlement.
 
 **Exit:** seeded fights produce reproducible legal outcomes and all terminal paths return to a valid narrative state. **Checks:** QA-09, QA-11–13, effect properties and restore mid-round. **Suggested commit:** `Implement deterministic turn-based combat`.

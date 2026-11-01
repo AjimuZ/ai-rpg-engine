@@ -161,6 +161,8 @@ public final class OperationAdmissionFailure extends RuntimeException {
         /** The player's frozen profile has no such reaction (HTTP 422, P11.4). */
         REACTION_UNAVAILABLE,
         /** An active effect prevents this action, its movement or its Focus cost (HTTP 422, P11.4). */
-        ACTION_PREVENTED
+        ACTION_PREVENTED,
+        /** No offer with this identity is on the table: it was never made, was answered or has lapsed (HTTP 422, P11.5). */
+        OFFER_UNAVAILABLE
     }
 }
