@@ -2954,7 +2954,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       behaviour under load, the advisor run against this exact profile (the committed fixtures
       are unchanged), and a refreshed `availableMiB` (recorded `null` on Windows). Loading a model
       and measuring it belong to P21.2. With this run every P21.1 exit check is done.
-- [ ] P21.2 Package and qualify the local text backend: a pinned model-server image in router mode with a read-only model volume and no network egress, hash-verified `./start.sh --models fetch` with license display and explicit confirmation, JSON-Schema readiness probes, an English and Italian narration probe set, and recorded measurements (load time, prefill and decode speed, peak VRAM and RAM, context limits, VRAM released by unload) for the default and alternate models.
+- [x] P21.2 Package and qualify the local text backend: a pinned model-server image in router mode with a read-only model volume and no network egress, hash-verified `./start.sh --models fetch` with license display and explicit confirmation, JSON-Schema readiness probes, an English and Italian narration probe set, and recorded measurements (load time, prefill and decode speed, peak VRAM and RAM, context limits, VRAM released by unload) for the default and alternate models.
   - Partial progress (31 October 2026, P21.2-A): the pinned model server is packaged. `compose.yaml`
     gains the service `models` behind the `models` profile: the image by the same digest as
     `MODEL_SERVER_IMAGE` in `start.sh`, `--models-dir /models --models-max 1`, user 65534, read-only
@@ -3272,9 +3272,29 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
         the GPU request, the engine reaching `http://models:8080`, a probe of a real router and the refusal against a real
         listing are all unexecuted; the launcher and rendering tests use a recording Docker stand-in and Compose output only.
         The model-not-listed refusal is proven against a scripted server only. The probes of P21.2-E still need a host re-run.
-    - Remaining for P21.2: a host re-run of the probes (P21.2-E evidence) and a real engine-with-model-server run through
-      `--with-models`. `verify.sh full` and `verify.sh containers` have each passed on the P21.2-F work (see above). The box
-      stays unchecked.
+    - Closing record (1 November 2026, P21.2-G): the host re-run of `model_probe.py` is recorded in
+      `docs/34-inference-backends-and-model-selection.md` section 7. The supervising session ran it on 2026-11-01T16:14:03Z
+      at commit `e98c3df` with the runner paused; this change only records the supervisor's run and executed no probe.
+      The exit checks this line names are met as follows: the pinned router-mode image, the read-only volume and the
+      no-egress network (P21.2-A, B and F), the hash-verified fetch with license display and confirmation (P21.2-B), the
+      schema probes with the English and Italian set (P21.2-C, repaired in P21.2-E), the recorded measurements for the default
+      and alternate models (P21.2-D), and the probes passing on both of those models (this record).
+      - Commands: `docker compose -p measure-models --profile models up --detach --wait models`; `POST /models/load` until
+        `loaded`; `docker run --rm --network measure-models_models -v "$PWD:/w:ro" python:3.15.1-slim-trixie python -B
+        /w/tools/container_packaging/model_probe.py --base-url http://models:8080 --model MODEL`; `POST /models/unload`;
+        `docker compose -p measure-models --profile models down --timeout 35`. `model_probe.py` sha256
+        `fbb38ed4d7d0fd7a41d7f5a7d01940d244700371fd4c6e6a6c5865831fa9ef74`.
+      - Results: `gemma-4-12b-it-qat-q4_0` exit 0, 8 passed, 0 failed, 894 to 2,320 ms; `Qwen3.5-9B-Q4_K_M` exit 0,
+        8 passed, 0 failed, 733 to 2,240 ms. An earlier attempt at 16:11:24Z exited 2 on both because Git Bash rewrote the
+        container path; no probe was sent and it says nothing about the models.
+      - Not proven: probes ran with thinking off; a pass is schema match, not narration quality; one run per model; the
+        other three catalog models were not re-run (last result 0 of 8, before the repair); the service was started by hand,
+        not with `./start.sh --with-models`, which has not run against the real server; no engine ran against this server;
+        router IDs were used. Raw output is in the untracked `.local/measurements/`.
+    - Follow-up outside this line (not proven, not part of the P21.2 exit checks): a real engine-with-model-server run
+      through `./start.sh --with-models` (pull, GPU request, engine reaching `http://models:8080`, refusal against a real
+      listing). The earlier "Remaining for P21.2" notes above are dated history. Their launcher items are covered by the
+      tested launcher; this run is tracked with the engine integration of P21.3 and later.
 - [x] P21.3 Implement slot assignment and the remaining backend adapters behind the runtime-neutral task port: independent `light`, `standard`, `deliberate` and `image` slots, readiness probes with visible results, billing and privacy class badges with acknowledgement on a class change, same-class fallback lists only when configured, per-slot session retirement, and the `gateway` service for owner-key hosted APIs and allowlisted custom endpoints (keys as runtime-only secrets, budgets, bounded redirects and sizes). Expose `GET /api/v1/models/status`, the owner-only settings API and the Settings → Models panel.
   - Partial progress (31 October 2026, P21.3-A): the four slots, class badges, class-change acknowledgement, configured same-class
     fallbacks and stored readiness probes exist in the backend. The P21.3 box stays unchecked: the gateway, the Settings → Models

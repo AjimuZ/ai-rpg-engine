@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Narration probes pass on the default and alternate local models (P21.2-G), 1 November 2026
+
+- The repaired model probe was re-run on the reference host: `gemma-4-12b-it-qat-q4_0` and `Qwen3.5-9B-Q4_K_M` each exited 0
+  with 8 of 8 probes passed (English and Italian). A pass means the reply matched its schema, not that narration is good.
+- The other three catalog models were not re-run. The server was started by hand, not with `./start.sh --with-models`, and
+  no engine ran against it.
+- The local text backend entry (P21.2) is closed on these two models; a real `--with-models` run with the engine is a
+  follow-up.
+
 ## Unreleased — Launcher selection of the local model server (P21.2-F), 1 November 2026
 
 - `./start.sh --with-models` starts the engine as usual and also the optional local model server, and gives the engine its
