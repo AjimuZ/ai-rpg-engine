@@ -2954,7 +2954,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       behaviour under load, the advisor run against this exact profile (the committed fixtures
       are unchanged), and a refreshed `availableMiB` (recorded `null` on Windows). Loading a model
       and measuring it belong to P21.2. With this run every P21.1 exit check is done.
-- [x] P21.2 Package and qualify the local text backend: a pinned model-server image in router mode with a read-only model volume and no network egress, hash-verified `./start.sh --models fetch` with license display and explicit confirmation, JSON-Schema readiness probes, an English and Italian narration probe set, and recorded measurements (load time, prefill and decode speed, peak VRAM and RAM, context limits, VRAM released by unload) for the default and alternate models.
+- [ ] P21.2 Package and qualify the local text backend: a pinned model-server image in router mode with a read-only model volume and no network egress, hash-verified `./start.sh --models fetch` with license display and explicit confirmation, JSON-Schema readiness probes, an English and Italian narration probe set, and recorded measurements (load time, prefill and decode speed, peak VRAM and RAM, context limits, VRAM released by unload) for the default and alternate models.
   - Partial progress (31 October 2026, P21.2-A): the pinned model server is packaged. `compose.yaml`
     gains the service `models` behind the `models` profile: the image by the same digest as
     `MODEL_SERVER_IMAGE` in `start.sh`, `--models-dir /models --models-max 1`, user 65534, read-only
@@ -3205,7 +3205,23 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
         launcher; narration quality was not judged; no engine ran against this server; each model was measured once; no
         probe passed. Router IDs are file stems and differ from catalog IDs for four of five models (`Qwen3.5-9B-Q4_K_M`,
         `gemma-4-E2B_q4_0-it`, `gemma-4-E4B_q4_0-it`, `gemma-4-26B_q4_0-it`); P21.2-F handles it.
-    - Remaining for P21.2: P21.2-E (repair the probe harness so probes can pass) and P21.2-F (router ID mapping). The box stays
+    - Partial progress (1 November 2026, P21.2-E): `tools/container_packaging/model_probe.py` now sends
+      `chat_template_kwargs.enable_thinking=false` in every request, as the engine's local adapter does for the effort `none`.
+      A reply with `finish_reason` `length` and empty or null content fails with `reply cut off at max_tokens (finish_reason
+      length) with no content`, checked before the JSON parse. `reasoning_effort` is not sent. `test_model_probe.py` gained
+      the assertion on the request field and a truncation case (empty and null content) beside the existing schema-violation
+      and malformed-JSON cases.
+      - Command: `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full` on 1 November 2026: exit 0, every stage
+        PASS including `repository-tests` and `runtime-probe-tests`, final line `VERIFY PASSED (full)`. Per-test counts were
+        not printed by the script, and the standalone `python -I -m unittest tools/container_packaging/test_model_probe.py`
+        was refused in this session, so it was not run on its own.
+      - Not proven: nothing beyond the scripted fixture; no real model was probed; a host re-run of `model_probe.py` on the GPU is still needed, and nothing
+        says the probes pass on any model; whether every server honours `chat_template_kwargs` is unknown; a length stop
+        with partial content still goes through the JSON and schema path.
+    - The P21.2 box was unticked in this change: commit 79dfb39 had ticked it in error, because the runner re-ticked it
+      when a task carrying the roadmap source finished. No probe has passed on a real model and P21.2-E, P21.2-F and
+      the host re-run remain, so it reads `[ ]`.
+    - Remaining for P21.2: a host re-run of the probes (P21.2-E evidence) and P21.2-F (router ID mapping). The box stays
       unchecked.
 - [x] P21.3 Implement slot assignment and the remaining backend adapters behind the runtime-neutral task port: independent `light`, `standard`, `deliberate` and `image` slots, readiness probes with visible results, billing and privacy class badges with acknowledgement on a class change, same-class fallback lists only when configured, per-slot session retirement, and the `gateway` service for owner-key hosted APIs and allowlisted custom endpoints (keys as runtime-only secrets, budgets, bounded redirects and sizes). Expose `GET /api/v1/models/status`, the owner-only settings API and the Settings → Models panel.
   - Partial progress (31 October 2026, P21.3-A): the four slots, class badges, class-change acknowledgement, configured same-class

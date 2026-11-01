@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Narration probes independent of the thinking default (P21.2-E), 1 November 2026
+
+- The model probe tool now turns thinking off in each request, so a model that thinks by default no longer spends the whole
+  reply budget before answering.
+- A reply cut off at the token cap with no content now fails with a message saying so, instead of "reply is not valid JSON".
+- No real model was probed in this change; a host re-run is still needed before any probe pass is claimed.
+
 ## Unreleased — Local text backend measurements (P21.2-D), 1 November 2026
 
 - The documentation now records the first measurements of the local text backend on the reference host: load time, prefill and

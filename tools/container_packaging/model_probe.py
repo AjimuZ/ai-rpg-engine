@@ -178,8 +178,9 @@ def run_probe(base_url: str, model: str, probe: dict, timeout: float = 120.0,
 
     The record has `id`, `language`, `status` (`pass` or `fail`), `latencyMs` and `detail`.
     A probe fails, never raises, on a transport error, a non-200 status, a body or reply
-    that is not JSON, or a reply that breaks the probe's schema. Temperature is 0 and the
-    reply length is capped, so a run is comparable with another.
+    that is not JSON, a reply cut off at the token cap with no content, or a reply that
+    breaks the probe's schema. Temperature is 0, thinking is off and the reply length is
+    capped, so a run is comparable with another.
     """
     request_body = {
         "model": model,
@@ -190,6 +191,9 @@ def run_probe(base_url: str, model: str, probe: dict, timeout: float = 120.0,
         "response_format": {"type": "json_schema",
                             "json_schema": {"name": probe["id"].replace("-", "_"), "strict": True,
                                             "schema": probe["schema"]}},
+        # Thinking is on by default in some models and can use all of max_tokens; the engine's
+        # local adapter turns it off for the effort `none`, so the probe does the same.
+        "chat_template_kwargs": {"enable_thinking": False},
     }
     result = {"id": probe["id"], "language": probe["language"], "status": "fail", "latencyMs": None,
               "detail": ""}
@@ -204,8 +208,16 @@ def run_probe(base_url: str, model: str, probe: dict, timeout: float = 120.0,
         result["detail"] = f"HTTP {status}: {body[:120].decode('utf-8', 'replace')}"
         return result
     try:
-        content = json.loads(body)["choices"][0]["message"]["content"]
-    except (ValueError, KeyError, IndexError, TypeError):
+        choice = json.loads(body)["choices"][0]
+        content = choice["message"].get("content")
+        finish_reason = choice.get("finish_reason")
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError):
+        result["detail"] = "response is not a chat completion with message content"
+        return result
+    if finish_reason == "length" and not content:
+        result["detail"] = "reply cut off at max_tokens (finish_reason length) with no content"
+        return result
+    if content is None:
         result["detail"] = "response is not a chat completion with message content"
         return result
     try:

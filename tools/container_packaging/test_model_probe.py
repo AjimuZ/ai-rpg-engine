@@ -318,6 +318,19 @@ class ScriptedServerProbeTest(FixtureCase):
         self.assertEqual(first["schema"], request["response_format"]["json_schema"]["schema"])
         self.assertEqual(["system", "user"], [message["role"] for message in request["messages"]])
         self.assertEqual(first["user"], request["messages"][1]["content"])
+        self.assertIs(False, request["chat_template_kwargs"]["enable_thinking"])
+
+    def test_reply_cut_off_without_content_has_its_own_detail(self) -> None:
+        """finish_reason length with empty or null content reports truncation, not bad JSON."""
+        for content in ("", None):
+            with self.subTest(repr(content)):
+                body = json.dumps({"choices": [{"finish_reason": "length",
+                                                "message": {"role": "assistant", "content": content}}]}).encode()
+                server = self.start(lambda name, request, body=body: (200, body))
+                result = model_probe.run_probe(server.url, "m", self.probe_set["probes"][0], timeout=10)
+                self.assertEqual("fail", result["status"])
+                self.assertIn("finish_reason length", result["detail"])
+                self.assertNotIn("not valid JSON", result["detail"])
 
     def test_schema_violation_fails_only_that_probe(self) -> None:
         """One non-conforming reply fails its probe with the violation; the others still pass."""

@@ -45,15 +45,17 @@ its own checker for a keyword subset (an unsupported keyword raises instead of p
 line per probe with its latency. It exits 0 only when every probe passed, 1 otherwise (including a server that is
 not ready, which yields one `readiness` failure and sends no probe) and 2 for an unreadable probe set. A pass means
 the reply parsed and matched its schema; it never certifies narration quality. It sends no API key, so a server
-started with `--api-key-file` is not yet reachable by it.
+started with `--api-key-file` is not yet reachable by it. Every request carries `chat_template_kwargs.enable_thinking=false`
+(P21.2-E), as the engine's local adapter does for the effort `none`, so a model that thinks by default cannot use the whole
+`max_tokens`; a reply with `finish_reason` `length` and no content fails with its own detail, not as invalid JSON.
 `probes/measurement-sample.json` fixes the measurement record format `rpg-engine.model-measurement/1` (model id and hash,
 date, host, the seven metrics load time, prefill and decode speed, peak VRAM and RAM, maximum context and VRAM released
 by unload, and the probe results). `kind: format-sample` carries only null metrics and is not a measurement;
 `kind: host-measurement` needs a date, a host, the model's SHA-256 and a non-negative number in every metric.
 `measurement_problems` validates both. No measurement exists yet.
 `test_model_probe.py` runs all of this against a scripted loopback HTTP server that replays canned replies. The fixture
-is not a model: its passes show that the probes tell conforming replies from a schema violation, a malformed reply, an
-HTTP error, a server that is not ready and an unreachable server, and nothing about any real model. It needs no Docker,
+is not a model: its passes show that the probes tell conforming replies from a schema violation, a malformed reply, a reply
+cut off at the token cap, an HTTP error, a server that is not ready and an unreachable server, and nothing about any real model. It needs no Docker,
 so hosted CI runs it, and its name is matched by the `test_[!h]*.py` pattern of `verify.sh containers`.
 `test_gateway.py` (P21.3-C.1) runs `docker/gateway/gateway.py` in process against a scripted loopback upstream, which is
 a fixture and not a provider. It checks the allowlist file's refusals, key files, cookies, request and response bounds,
