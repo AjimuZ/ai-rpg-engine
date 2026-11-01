@@ -107,6 +107,14 @@ public final class SlotRoutingTaskPort implements NarrationTaskPort {
         return Optional.ofNullable(routes.get(backend)).map(NarrationTaskPort::status);
     }
 
+    /** @return what the adapter of {@code backend} says about {@code model}, or empty when none is installed */
+    @Override
+    public Optional<Boolean> listsModel(String backend, String model) {
+        Objects.requireNonNull(backend, "backend");
+        Objects.requireNonNull(model, "model");
+        return Optional.ofNullable(routes.get(backend)).flatMap(adapter -> adapter.listsModel(backend, model));
+    }
+
     /** Give every adapter the journal; one that leaves no external work ignores it. */
     @Override
     public void attachJournal(DispatchJournal journal) {

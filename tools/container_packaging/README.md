@@ -27,6 +27,11 @@ and 5.x (`verify.sh probe` runs it on 2.40.3): 2.x omits `bind.create_host_path`
 `config --format json` when false, so a bind's value is read from the rendered form
 when present and otherwise from `compose.yaml`, which must set `create_host_path: false`
 explicitly. A missing setting never passes.
+`test_compose.py` also renders `compose.models.yaml` (P21.2-F) on top of `compose.yaml`: the
+engine gains only `ENGINE_INFERENCE_LOCAL_URL=http://models:8080`, and the default rendering has
+no such variable. `test_launcher.py` runs the real `start.sh` against a recording Docker
+stand-in: a plain start's Compose calls carry no profile or overlay, and `--with-models` puts
+`compose.models.yaml` and `--profile models` on every call. Neither starts a container.
 `test_model_server.py` (P21.2-A) starts the pinned model server in a uniquely named
 project with an empty temporary `MODELS_DIR`, and removes it afterwards. It belongs to
 the default suite, needs no flag and never pulls: it runs wherever the image is on the

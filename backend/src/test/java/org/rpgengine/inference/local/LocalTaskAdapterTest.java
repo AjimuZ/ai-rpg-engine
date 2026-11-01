@@ -236,6 +236,18 @@ class LocalTaskAdapterTest {
     }
 
     @Test
+    void theModelListAnswersProbesFromTheSameListTasksAreResolvedAgainst() throws Exception {
+        assertThat(adapter.listsModel("local", "model-a")).contains(true);
+        // An ID the router does not list, such as a catalog ID where the router names the file stem.
+        assertThat(adapter.listsModel("local", "model-z")).contains(false);
+        assertThat(adapter.listsModel("codex", "model-a")).isEmpty();
+        server.lists("model-b");
+        assertThat(run().errorCode()).isEqualTo("slot-unsupported");
+        assertThat(adapter.listsModel("local", "model-a")).contains(false);
+        assertThat(adapter.listsModel("local", "model-b")).contains(true);
+    }
+
+    @Test
     void everyServerFailureEndsWithAFixedCodeAndNoServerText() throws Exception {
         String error = "{\"error\":{\"message\":\"" + SERVER_SECRET + "\"}}";
         record Case(Runnable script, Status status, String code, boolean provenance) {

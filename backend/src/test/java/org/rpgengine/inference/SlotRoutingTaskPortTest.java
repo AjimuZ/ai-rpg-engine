@@ -23,6 +23,7 @@ class SlotRoutingTaskPortTest {
         String reason;
         int queued;
         int active;
+        Boolean lists;
         final List<TaskRequest> requests = new ArrayList<>();
         final List<UUID> retired = new ArrayList<>();
         final List<String> references = new ArrayList<>();
@@ -46,6 +47,11 @@ class SlotRoutingTaskPortTest {
         @Override
         public RuntimeStatus status() {
             return new RuntimeStatus(runtime, state, reason, queued, active);
+        }
+
+        @Override
+        public Optional<Boolean> listsModel(String backend, String model) {
+            return backend.equals(runtime) ? Optional.ofNullable(lists) : Optional.empty();
         }
 
         @Override
@@ -164,6 +170,18 @@ class SlotRoutingTaskPortTest {
         assertThat(port.statusOf("codex").orElseThrow().state()).isEqualTo(RuntimeStatus.State.UNAVAILABLE);
         assertThat(port.statusOf("claude")).isEmpty();
         assertThat(port.statusOf(SlotRoutingTaskPort.RUNTIME)).isEmpty();
+    }
+
+    @Test
+    void whetherAModelIsListedComesFromTheAdapterOfThatBackendOnly() {
+        var port = port();
+        local.lists = false;
+        codex.lists = null;
+        assertThat(port.listsModel("local", "model-a")).contains(false);
+        assertThat(port.listsModel("codex", "model-a")).isEmpty();
+        assertThat(port.listsModel("claude", "model-a")).isEmpty();
+        local.lists = true;
+        assertThat(port.listsModel("local", "model-a")).contains(true);
     }
 
     @Test

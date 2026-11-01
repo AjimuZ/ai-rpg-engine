@@ -19,9 +19,11 @@ import org.springframework.stereotype.Component;
  * <p>A backend without an adapter in this process is {@code UNREACHABLE} with
  * {@code adapter-not-installed}. For an installed backend the verdict is its adapter's state; a ready
  * one is {@code FAILED} with {@code model-not-approved} when the owner's allowlist for that backend
- * does not list the exact pair. A ready verdict therefore means the adapter is usable (signed in, or
- * the model server listed its models) and the pair is not excluded: it does not prove the account
- * or server serves that model, which only a task proves.
+ * does not list the exact pair, or {@code FAILED} with {@code model-not-listed} when the backend
+ * enumerates its models and its current list lacks the model. A ready verdict therefore means the
+ * adapter is usable (signed in, or the model server listed its models), the pair is not excluded and,
+ * where the backend lists models, the model is listed: it does not prove the account or server can
+ * run that model, which only a task proves.
  */
 @Component
 public class RuntimeBackendProbe implements BackendProbe {
@@ -55,8 +57,15 @@ public class RuntimeBackendProbe implements BackendProbe {
         }
         RuntimeStatus status = installed.get();
         return switch (status.state()) {
-            case READY -> allowlist.configured(backend) && !allowlist.permits(backend, settings)
-                    ? Outcome.failed("model-not-approved") : Outcome.ready();
+            case READY -> {
+                if (allowlist.configured(backend) && !allowlist.permits(backend, settings)) {
+                    yield Outcome.failed("model-not-approved");
+                }
+                // The local router names models by file stem, so an ID copied from the catalog can be
+                // absent from its list; tasks would end slot-unsupported, and the probe says so first.
+                yield port.get().listsModel(backend, settings.model()).orElse(true) ? Outcome.ready()
+                        : Outcome.failed("model-not-listed");
+            }
             case STARTING -> Outcome.unreachable("runtime-starting");
             case DISABLED -> Outcome.unreachable("adapter-not-installed");
             case UNAVAILABLE -> Outcome.unreachable(status.reasonCode() != null

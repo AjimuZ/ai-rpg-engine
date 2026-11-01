@@ -24,18 +24,23 @@ ROOT = Path(__file__).resolve().parents[2]
 class ComposeTest(unittest.TestCase):
     """Validate Compose's resolved configuration; unsafe service boundaries fail."""
 
-    def render(self, *profiles: str) -> dict:
+    def render(self, *profiles: str, overlay: bool = False) -> dict:
         """Return the resolved configuration for exactly these profiles; fail if invalid.
 
-        Host selections are cleared so that only tracked inputs decide the result.
+        With `overlay`, `compose.models.yaml` is merged after `compose.yaml`, as
+        `./start.sh --with-models` does. Host selections are cleared so that only
+        tracked inputs decide the result.
         """
         selection = [argument for profile in profiles for argument in ("--profile", profile)]
+        files = ["--file", str(ROOT / "compose.yaml")]
+        if overlay:
+            files += ["--file", str(ROOT / "compose.models.yaml")]
         environment = {name: value for name, value in os.environ.items()
                        if name not in {"COMPOSE_PROFILES", "MODELS_DIR", "GATEWAY_KEYS_DIR", "GATEWAY_DESTINATIONS_FILE",
                                        "IMAGE_CONTENT_POLICY"}}
         result = subprocess.run(
             ["docker", "compose", "--env-file", str(ROOT / ".env.example"),
-             "--file", str(ROOT / "compose.yaml"), *selection, "config", "--format", "json"],
+             *files, *selection, "config", "--format", "json"],
             capture_output=True, text=True, timeout=30, check=False, env=environment,
         )
         self.assertEqual(0, result.returncode, result.stderr)
@@ -133,6 +138,42 @@ class ComposeTest(unittest.TestCase):
                                                    in selected["services"].items() if name != "models"})
         # A default start must not wait for, or implicitly start, the optional server.
         self.assertNotIn("models", self.config["services"]["engine"]["depends_on"])
+
+    def test_the_default_engine_has_no_local_backend_address(self) -> None:
+        """A plain start configures exactly the packaged database and profile, and no model server."""
+        environment = self.config["services"]["engine"]["environment"]
+        self.assertEqual({"SPRING_PROFILES_ACTIVE", "SPRING_DATASOURCE_URL", "SPRING_DATASOURCE_USERNAME"},
+                         set(environment))
+        self.assertNotIn("ENGINE_INFERENCE_LOCAL_URL", (ROOT / "compose.yaml").read_text(encoding="utf-8"))
+        # The profile alone selects the service and does not give the engine its address.
+        selected = self.render("models")
+        self.assertEqual(environment, selected["services"]["engine"]["environment"])
+
+    def test_the_model_overlay_gives_the_engine_the_service_address_and_changes_nothing_else(self) -> None:
+        """With the overlay the engine gets engine.inference.local.url for `models`; nothing else differs."""
+        baseline = self.render("models")
+        selected = self.render("models", overlay=True)
+        engine = selected["services"]["engine"]
+        url = engine["environment"]["ENGINE_INFERENCE_LOCAL_URL"]
+        # Scheme, host and port only: the adapter refuses a path, and the host is the service name.
+        self.assertEqual("http://models:8080", url)
+        server = selected["services"]["models"]
+        command = server["command"]
+        self.assertEqual("8080", command[command.index("--port") + 1])
+        self.assertIn("models", engine["networks"])
+        self.assertIn("models", server["networks"])
+        self.assertTrue(selected["networks"]["models"]["internal"])
+        expected = dict(baseline["services"]["engine"]["environment"])
+        expected["ENGINE_INFERENCE_LOCAL_URL"] = url
+        self.assertEqual(expected, engine["environment"])
+        self.assertEqual({key: value for key, value in baseline["services"]["engine"].items() if key != "environment"},
+                         {key: value for key, value in engine.items() if key != "environment"})
+        self.assertEqual({name: service for name, service in baseline["services"].items() if name != "engine"},
+                         {name: service for name, service in selected["services"].items() if name != "engine"})
+        self.assertEqual(baseline["networks"], selected["networks"])
+        self.assertEqual(baseline["volumes"], selected["volumes"])
+        # The overlay alone, with no profile, still adds no service.
+        self.assertEqual(set(self.config["services"]), set(self.render(overlay=True)["services"]))
 
     def model_bind_creates_host_path(self, weights: dict, service: str = "models") -> bool:
         """Return whether a bind of `service` may create its host path; fail if it cannot be told.

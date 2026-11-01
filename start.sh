@@ -9,6 +9,8 @@
 #                    | --stop | --models profile [--gpu-check]
 #                    | --models fetch [--accept-license ID[,ID...]] ID... | --help]
 #                    (no argument: validate, build, start)
+#        ./start.sh --with-models
+#                    (the same start, plus the local model server and the engine's address for it)
 #
 # Exit status: 0 success; 1 failure (prerequisite, configuration, build, start,
 # health timeout, or a command that could not run); 2 usage error; 3 only for
@@ -56,6 +58,9 @@ readonly DIAG_TAIL=40
 readonly LOGIN_ARGS=(-c cli_auth_credentials_store=file -c forced_login_method=chatgpt)
 readonly AUTH_DOC_URL="https://learn.chatgpt.com/docs/auth"
 readonly SERVICES="engine postgres codex"
+# Overlay that gives the engine the model server's address (docs/34 section 7). It is
+# merged only by `--with-models`, never by a plain start or by --check.
+readonly MODELS_OVERLAY="compose.models.yaml"
 
 # Resolve the script's own directory so the launcher works from any working
 # directory and when the checkout path contains spaces. All later paths are
@@ -82,6 +87,9 @@ readonly DEFAULT_SECRET_FILE="$SECRET_DIR/postgres-password"
 APP_PORT_VALUE=""
 SECRET_FILE=""
 PROJECT=""
+# Extra Compose arguments chosen by a start option; empty for every command but
+# `--with-models`, so the default selection and configuration are exactly compose.yaml's.
+COMPOSE_SELECTION=()
 
 # --- Output helpers ----------------------------------------------------------
 
@@ -106,7 +114,14 @@ Usage: ./start.sh [COMMAND]
   (no command)  Validate the host, create missing private configuration, build
                 images with the layer cache, start the services, wait for
                 readiness and print the local URL.
-  --check       Inspect prerequisites and configuration; changes nothing.
+  --with-models The same start, and also the local model server (the `models`
+                service, pinned image of about 2.6 GB pulled once, NVIDIA GPU
+                needed) with the engine pointed at it. A plain start neither
+                pulls nor starts it. The server lists only the files in the model
+                directory; install some with --models fetch first, and assign a
+                text slot to the `local` backend with a model ID the server lists
+                (docs/34, section 7). Use --stop to stop it.
+  --check      Inspect prerequisites and configuration; changes nothing.
   --login       Run the supported owner-controlled runtime sign-in (device code).
   --status      Show service health, storage readiness and gameplay readiness.
   --logs [SERVICE] [--no-follow]
@@ -197,7 +212,7 @@ tail_one() { sed -n '$p'; }
 # compose ARGS... - run Compose for this installation. COMPOSE_PROJECT_NAME is
 # exported by use_identity so every call targets exactly one project and never
 # another installation's services or volumes.
-compose() { docker compose --file compose.yaml "$@"; }
+compose() { docker compose --file compose.yaml "${COMPOSE_SELECTION[@]}" "$@"; }
 
 # redact_stream - filter stdin to stdout, masking credential-shaped text and the
 # database password value. Defence in depth: services should not log secrets,
@@ -516,7 +531,12 @@ report_gameplay() {
 
 # cmd_start - the default command: validate, initialize, build, start, wait.
 # Idempotent: every step reuses existing state and a second run only confirms it.
+# With the argument `with-models` the `models` service is selected and the overlay gives
+# the engine its address; without it the Compose selection is compose.yaml's own, so
+# nothing of the model server is pulled, created or started.
 cmd_start() {
+    local with_models=0
+    [ "${1:-}" != with-models ] || with_models=1
     trap on_interrupt INT TERM
     require_utilities
     check_docker
@@ -527,12 +547,23 @@ cmd_start() {
     # .env may have just been created; re-read settings from it.
     resolve_config
     ensure_secret
+    # Selected before the first Compose call, so every call of this start sees the same project.
+    if [ "$with_models" -eq 1 ]; then
+        [ -f "$MODELS_OVERLAY" ] || die "$MODELS_OVERLAY is missing; --with-models needs the file from the checkout."
+        # The model directory is mounted read-only and must exist; an empty one starts a server that lists nothing.
+        resolve_models_dir
+        COMPOSE_SELECTION=(--file "$MODELS_OVERLAY" --profile models)
+        info "local model server selected: the engine will use http://models:8080 (no model is loaded until a task needs one)"
+    fi
     check_port
     info "building images (cached layers are reused; the first build downloads dependencies and can take several minutes)"
     compose build || die "the image build failed; see the build output above. Rerunning reuses cached layers."
     info "starting services"
     if ! compose up --detach --no-build --wait --wait-timeout "$WAIT_TIMEOUT"; then
         diagnostics
+        if [ "$with_models" -eq 1 ]; then
+            info "the model server needs an NVIDIA GPU visible to containers: ./start.sh --models profile --gpu-check tests it. A plain ./start.sh starts without the model server."
+        fi
         die "services did not become healthy. Run ./start.sh --logs for more detail; rerun ./start.sh to retry (data is preserved)."
     fi
     info "waiting for storage readiness (database connection and migrated schema)"
@@ -1230,6 +1261,7 @@ main() {
     local command="${1:-}"
     case "$command" in
         '') cmd_start ;;
+        --with-models) [ "$#" -eq 1 ] || { usage >&2; exit 2; }; cmd_start with-models ;;
         --check) [ "$#" -eq 1 ] || { usage >&2; exit 2; }; cmd_check ;;
         --login) [ "$#" -eq 1 ] || { usage >&2; exit 2; }; cmd_login ;;
         --status) [ "$#" -eq 1 ] || { usage >&2; exit 2; }; cmd_status ;;

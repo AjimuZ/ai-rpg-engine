@@ -2,7 +2,7 @@
 
 ## 1. Status and planning rules
 
-**Current status: 69/130 tasks verified.** The owner withdrew the pending P98 review entry on 30 October 2026, so older records below that count 131 entries or mention a pending P98 follow-up describe the queue as it stood then. The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P05.7, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1, P11.2, P11.3, P11.4 and P21.1. P21.1 is verified: the hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles, and, since 31 October 2026 (P21.1-A), the profile and container GPU check on the reference host (no model was loaded; see the P21.1 entry). P21.2 is in progress and unchecked: the pinned server is packaged in Compose (P21.2-A) and the fixture-tested fetch is implemented (P21.2-B), with launcher selection, a real download, probes and measurements remaining. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P05.7 is checked for its contract, rendering and fallback: no real turn produces presentation cues yet, the asset route is not served, no scene or pose image is drawn, and QA-40's persistent visual and voice identities stay with P17. P06.5 is in progress and its explicit prerequisites are all checked: P05.7 (within those limits), P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
+**Current status: 69/130 tasks verified.** The owner withdrew the pending P98 review entry on 30 October 2026, so older records below that count 131 entries or mention a pending P98 follow-up describe the queue as it stood then. The committed roadmap checks P00, P01.1–P01.7, P02.1–P02.7, P03.1–P03.6, P04.1–P04.6, P05.1–P05.5, P05.7, P06.1–P06.4, P07.1–P07.6, P08.1–P08.7, P09.1–P09.5, P10.1, P10.2, P10.3, P10.4, P10.5, P11.1, P11.2, P11.3, P11.4 and P21.1. P21.1 is verified: the hardware-profile command, pinned model-server image, downloaded-and-hashed catalog, advisor and synthetic profiles, and, since 31 October 2026 (P21.1-A), the profile and container GPU check on the reference host (no model was loaded; see the P21.1 entry). P21.2 is in progress and unchecked: the pinned server is packaged in Compose (P21.2-A) and the fixture-tested fetch is implemented (P21.2-B), with launcher selection since P21.2-F (`./start.sh --with-models`, tested with a Docker stand-in only), and a host re-run of the probes and a real engine-with-model-server run remaining. P05.6 has verified bilingual preview/packaging checkpoints and a read-only real-campaign integration (persisted operation/cursor reload guard, localized errors/receipts, fallback disclosure, `/saved/<uuid>` serving) but remains unchecked: no browser journey ran in the Linux container, the new Italian messages and QA-35 need independent human review. P05.7 is checked for its contract, rendering and fallback: no real turn produces presentation cues yet, the asset route is not served, no scene or pose image is drawn, and QA-40's persistent visual and voice identities stay with P17. P06.5 is in progress and its explicit prerequisites are all checked: P05.7 (within those limits), P08.6 and P09.3 (both complete since 28 October 2026) and P10.2 (presentation events, owner-wide jobs, memory and purchase/equip; P10.2 is complete since 29 October 2026); P07 builds on the completed P06.1–P06.4 foundations, so the corrected graph has no cycle. Task completion does not replace package exit gates: the P01 managed-profile live isolation recheck, full QA-28/QA-35 and other documented acceptance limits remain open. Campaign gameplay and combat are not yet implemented.
 
 The orchestrator follows the first executable task in roadmap order, respecting task/package dependencies. A blocked task stays unchecked; independent eligible packages may advance. An indented `**Requires tasks:** Pnn.n, Pnn.n.` line declares additional exact-task prerequisites, alongside the preceding item in that package and its package dependencies. This permits integration work to wait for later APIs without blocking those APIs behind an entire unfinished UI package. Unknown prerequisites and dependency cycles are invalid. P01.6 and P01.7 are checked against their explicit capability/serialized-inference outcomes; the managed-profile live isolation recheck remains a separate P01 package exit gate. Later package work must still pass its own prerequisites and exit checks.
 
@@ -3221,8 +3221,60 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     - The P21.2 box was unticked in this change: commit 79dfb39 had ticked it in error, because the runner re-ticked it
       when a task carrying the roadmap source finished. No probe has passed on a real model and P21.2-E, P21.2-F and
       the host re-run remain, so it reads `[ ]`.
-    - Remaining for P21.2: a host re-run of the probes (P21.2-E evidence) and P21.2-F (router ID mapping). The box stays
-      unchecked.
+    - Partial progress (1 November 2026, P21.2-F): the launcher selects the model service, the engine is given its address,
+      and a configured model ID the router does not list is refused visibly. The P21.2 box stays unchecked.
+      - Launcher: `./start.sh --with-models` is the ordinary start with `--file compose.models.yaml --profile models` on every
+        Compose call; it creates `MODELS_DIR` when missing. The new tracked file `compose.models.yaml` sets only
+        `ENGINE_INFERENCE_LOCAL_URL=http://models:8080` on the engine. A plain start passes no profile and no overlay.
+        `--help`, the `start.sh` header, docs/22, docs/34 section 7 and the packaging README describe it.
+      - Router IDs: docs/34 section 7 ("Router IDs and catalog IDs") states that the router ID is the catalog file name
+        without `.gguf`, gives the five-row table, and says nothing translates IDs. Backend: `NarrationTaskPort.listsModel`
+        (default empty), implemented by `LocalTaskAdapter` from the list it last read (the field is now `volatile`) and by
+        `SlotRoutingTaskPort`; `RuntimeBackendProbe` returns `failed` with the code `model-not-listed` for a ready adapter
+        whose list lacks the model, after the allowlist check. A task of that slot already ended `FAILED` `slot-unsupported`.
+        The Models panel has no sentence for the new code and shows its generic text with `Not ready`; no reviewed English or
+        Italian message was written.
+      - Tests added: `test_compose.py` two cases (default engine environment is exactly the three packaged keys and
+        `compose.yaml` never names the variable; with the overlay the engine differs only by the variable, and so do no other
+        service, network or volume); `test_launcher.py` three cases (plain start: every Compose call is `compose --file
+        compose.yaml` alone, one `up`, no model directory created; `--with-models`: every call carries the overlay and the
+        profile, the model directory is created, the address is printed; the option takes no extra argument) and `--with-models`
+        in the `--help` assertion; `LocalTaskAdapterTest.theModelListAnswersProbesFromTheSameListTasksAreResolvedAgainst`,
+        `RuntimeBackendProbeTest.aReadyBackendThatDoesNotListTheModelFailsWithAVisibleCode` and
+        `SlotRoutingTaskPortTest.whetherAModelIsListedComesFromTheAdapterOfThatBackendOnly`.
+      - Commands and results: `verify.sh backend -Dtest=LocalTaskAdapterTest,RuntimeBackendProbeTest,SlotRoutingTaskPortTest,TaskPortSelectionTest,SlotSettingsServiceTest`
+        passed, 67 tests (18, 6, 9, 11, 23), 0 failures. `verify.sh repo` passed. `verify.sh containers` ran the
+        container-packaging step to its end (352 tests, 534 s, 6 skipped) with one failure, the new `--with-models` launcher
+        test: `check_port` made a Compose call before the selection was set. The selection was moved before that call. That
+        fix was not re-run: my second `verify.sh containers` was refused because my first one, cut by the session's 10-minute
+        limit, left `.agents/ralph/.run/verify.lock`, which this session may not remove. The runtime-probe step of that run was cut
+        short. `verify.sh full` was not run in this session. The Compose 2.x rendering (`verify.sh probe`) was not run
+        either, so the two new rendering tests are unproven on 2.x; they use only keys that 2.x and 5.x both print.
+        Second attempt (1 November 2026): `verify.sh full` was refused again with "Another verification is running". The lock
+        directory dated 16:20 was still there after about ten minutes, and two `runtime-session` containers stayed up with no
+        other activity, so I took the lock for one left by the cut run; this session may not remove it or the containers. No check
+        ran in that attempt.
+        Third attempt (1 November 2026): `bash .agents/ralph/verify.sh full` passed (`VERIFY PASSED (full)`; 18 stages,
+        `backend-verify` 153 s), with the lock gone. That run includes the stages named `repository-checks`, `compose-v2` and
+        `backend-verify`, but not `verify.sh containers`; I did not check which of the new launcher and rendering tests `full`
+        executes, and the container-packaging step was not re-run after the `start.sh` selection fix.
+        Fourth attempt (1 November 2026, supervisor run on the tree with the `check_port` reorder, runner paused):
+        `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh containers`, run in the background, exit 0, final line
+        `VERIFY PASSED (containers)`. Stage `container-packaging`: 510 s, `Ran 352 tests in 508.568s`, `OK (skipped=6)`. Stage
+        `runtime-probe-docker`: 76 s, `Ran 116 tests in 75.770s`, `OK`. Logs: `.agents/ralph/logs/verify/20261101T165536-11084/`.
+        This is the first passing run after the fix; it replaces the cut run above, and the failure of the earlier killed run
+        (`runtime-probe-docker`, 12 failures, exit code 3221225794, log `20261101T162033-8848`) did not recur and is not cited
+        as evidence. The log prints dots and does not name tests: the three new launcher tests have no skip condition and their
+        file matches the suite's discovery pattern, but I did not see them named as run, and the six skipped tests were not
+        identified. I did not run this stage myself in this attempt and changed neither `start.sh`, the Compose files nor their
+        tests after that run.
+      - Not proven: the engine and the model server did not run together. No real `./start.sh --with-models` ran, so the pull,
+        the GPU request, the engine reaching `http://models:8080`, a probe of a real router and the refusal against a real
+        listing are all unexecuted; the launcher and rendering tests use a recording Docker stand-in and Compose output only.
+        The model-not-listed refusal is proven against a scripted server only. The probes of P21.2-E still need a host re-run.
+    - Remaining for P21.2: a host re-run of the probes (P21.2-E evidence) and a real engine-with-model-server run through
+      `--with-models`. `verify.sh full` and `verify.sh containers` have each passed on the P21.2-F work (see above). The box
+      stays unchecked.
 - [x] P21.3 Implement slot assignment and the remaining backend adapters behind the runtime-neutral task port: independent `light`, `standard`, `deliberate` and `image` slots, readiness probes with visible results, billing and privacy class badges with acknowledgement on a class change, same-class fallback lists only when configured, per-slot session retirement, and the `gateway` service for owner-key hosted APIs and allowlisted custom endpoints (keys as runtime-only secrets, budgets, bounded redirects and sizes). Expose `GET /api/v1/models/status`, the owner-only settings API and the Settings → Models panel.
   - Partial progress (31 October 2026, P21.3-A): the four slots, class badges, class-change acknowledgement, configured same-class
     fallbacks and stored readiness probes exist in the backend. The P21.3 box stays unchecked: the gateway, the Settings → Models

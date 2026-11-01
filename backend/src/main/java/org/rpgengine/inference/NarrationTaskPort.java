@@ -68,6 +68,21 @@ public interface NarrationTaskPort {
     }
 
     /**
+     * Whether a backend's own model list names a model, for probes of a slot assigned to it.
+     *
+     * @param backend protocol adapter name
+     * @param model model ID exactly as the owner assigned it
+     * @return {@code true} or {@code false} when this port runs that backend, it is ready and it
+     *         enumerates its models; empty when the answer is unknown (no such backend, not ready,
+     *         or a backend with no enumerable list, such as the Codex runtime)
+     */
+    default Optional<Boolean> listsModel(String backend, String model) {
+        Objects.requireNonNull(backend, "backend");
+        Objects.requireNonNull(model, "model");
+        return Optional.empty();
+    }
+
+    /**
      * Attach the scheduler's write-ahead journal (P08.6). A port that can leave work running in
      * an external runtime records an opaque reference through it before starting each task and
      * starts nothing when the record fails; the latest attached journal wins. Ports without

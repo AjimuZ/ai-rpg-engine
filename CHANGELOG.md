@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Launcher selection of the local model server (P21.2-F), 1 November 2026
+
+- `./start.sh --with-models` starts the engine as usual and also the optional local model server, and gives the engine its
+  address (`engine.inference.local.url`, through the new `compose.models.yaml`). A plain `./start.sh` is unchanged: it neither
+  pulls nor starts the server, and the engine has no local backend.
+- The model documentation now states that a text slot is assigned the model server's own ID, which is the catalog file name
+  without `.gguf` and differs from the catalog ID for four of the five text models.
+- The readiness probe of a slot now fails with the code `model-not-listed` when the model server does not list the assigned
+  model, instead of reporting it ready. The Models panel shows its generic reason text for this code for now.
+- The engine and the model server were not run together in this change, and the launcher was tested with a Docker stand-in.
+
 ## Unreleased — Narration probes independent of the thinking default (P21.2-E), 1 November 2026
 
 - The model probe tool now turns thinking off in each request, so a model that thinks by default no longer spends the whole

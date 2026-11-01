@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -106,7 +107,8 @@ final class LocalTaskAdapter implements NarrationTaskPort, SmartLifecycle {
 
     // Dispatcher-confined state, apart from the client's creation before the dispatcher starts.
     private HttpClient client;
-    private Set<String> catalog = Set.of();
+    // Replaced whole by the dispatcher and read by probes on other threads, hence volatile.
+    private volatile Set<String> catalog = Set.of();
     private long backoffMillis;
     private long nextCheck;
 
@@ -174,6 +176,23 @@ final class LocalTaskAdapter implements NarrationTaskPort, SmartLifecycle {
         RuntimeStatus.State current = state;
         return new RuntimeStatus(RUNTIME, current, current == RuntimeStatus.State.READY ? null : reason, queue.size(),
                 active != null ? 1 : 0);
+    }
+
+    /**
+     * Answers from the list the server gave at its last catalog read, which is the list a task is
+     * resolved against, so a probe and a task never disagree about a model.
+     *
+     * @return whether the server lists {@code model}; empty for another backend or before the first
+     *         successful read or while the server is not usable, when no list is current
+     */
+    @Override
+    public Optional<Boolean> listsModel(String backend, String model) {
+        Objects.requireNonNull(backend, "backend");
+        Objects.requireNonNull(model, "model");
+        if (!backend.equals(RUNTIME) || state != RuntimeStatus.State.READY) {
+            return Optional.empty();
+        }
+        return Optional.of(catalog.contains(model));
     }
 
     // ---------------------------------------------------------------- lifecycle

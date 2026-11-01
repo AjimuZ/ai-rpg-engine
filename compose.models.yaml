@@ -1,0 +1,9 @@
+# Overlay merged only by `./start.sh --with-models` (P21.2, docs/34 section 7), together with
+# `--profile models`. It gives the engine the address of the `models` service of compose.yaml
+# and changes nothing else: without this file, which a plain start never reads, the engine
+# has no local backend and the rendering of compose.yaml is exactly what it was.
+# The address uses the service name on the internal `models` network the engine already joins.
+services:
+  engine:
+    environment:
+      ENGINE_INFERENCE_LOCAL_URL: http://models:8080

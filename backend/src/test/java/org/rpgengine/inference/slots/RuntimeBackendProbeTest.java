@@ -105,6 +105,42 @@ class RuntimeBackendProbeTest {
     }
 
     @Test
+    void aReadyBackendThatDoesNotListTheModelFailsWithAVisibleCode() {
+        NarrationTaskPort listing = new NarrationTaskPort() {
+            @Override
+            public TaskHandle submit(TaskRequest request) {
+                throw new AssertionError("a probe never submits a task");
+            }
+
+            @Override
+            public void retireSession(UUID sessionId) {
+                throw new AssertionError("a probe never touches a session");
+            }
+
+            @Override
+            public RuntimeStatus status() {
+                return new RuntimeStatus("local", RuntimeStatus.State.READY, null, 0, 0);
+            }
+
+            @Override
+            public Optional<Boolean> listsModel(String backend, String model) {
+                return Optional.of(model.equals("Qwen3.5-9B-Q4_K_M"));
+            }
+        };
+        var probe = new RuntimeBackendProbe(() -> listing, ModelAllowlist.empty());
+        // A catalog ID that is not the router's file stem is refused, not reported ready.
+        assertThat(probe.probe("local", new EffectiveSettings("qwen3.5-9b", "none")))
+                .isEqualTo(BackendProbe.Outcome.failed("model-not-listed"));
+        assertThat(probe.probe("local", new EffectiveSettings("Qwen3.5-9B-Q4_K_M", "none")))
+                .isEqualTo(BackendProbe.Outcome.ready());
+        // The allowlist is checked first, so its verdict is not hidden behind the listing.
+        var narrowed = new RuntimeBackendProbe(() -> listing,
+                ModelAllowlist.of(Map.of("local", List.of(new EffectiveSettings("other", "none")))));
+        assertThat(narrowed.probe("local", new EffectiveSettings("Qwen3.5-9B-Q4_K_M", "none")))
+                .isEqualTo(BackendProbe.Outcome.failed("model-not-approved"));
+    }
+
+    @Test
     void aBackendWithoutAnAdapterIsUnreachable() {
         var probe = new RuntimeBackendProbe(port(status(RuntimeStatus.State.READY, null)), ModelAllowlist.empty());
         assertThat(probe.probe("local", PAIR)).isEqualTo(BackendProbe.Outcome.unreachable("adapter-not-installed"));

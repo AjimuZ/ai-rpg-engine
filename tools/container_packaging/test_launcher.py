@@ -158,7 +158,7 @@ class LauncherCommandSurfaceTest(unittest.TestCase):
         """`--help` exits 0 with every command; unknown or extra arguments exit 2."""
         result = run_bash(str(LAUNCHER), "--help", cwd=Path(tempfile.gettempdir()))
         self.assertEqual(0, result.returncode, result.stderr)
-        for command in ("--check", "--login", "--status", "--logs", "--stop", "--help"):
+        for command in ("--check", "--login", "--status", "--logs", "--stop", "--with-models", "--help"):
             self.assertIn(command, result.stdout)
         self.assertIn("https://learn.chatgpt.com/docs/auth", result.stdout)
         for args in (["--bogus"], ["--stop", "extra"], ["--status", "x"]):
@@ -200,6 +200,76 @@ class LauncherCommandSurfaceTest(unittest.TestCase):
         self.assertEqual(["down", "--timeout", "35"], words[-3:])
         selected = {words[index + 1] for index, word in enumerate(words) if word == "--profile"}
         self.assertEqual(declared - ONE_OFF_PROFILES, selected)
+
+    def start_calls(self, *arguments: str) -> tuple[subprocess.CompletedProcess, list[str]]:
+        """Run a start with a Docker stand-in that logs every Compose call and answers readiness.
+
+        Any Docker command other than Compose, such as a pull or a run, makes the launcher fail,
+        so a start that stays inside the logged calls neither pulls nor starts anything else.
+        Returns the result and the logged Compose calls; `models_directory_created` records
+        whether the start created the model directory in its temporary checkout.
+        """
+        with tempfile.TemporaryDirectory(prefix="launcher start ") as tmp:
+            copy = Path(tmp)
+            for name in ("start.sh", "compose.yaml", "compose.models.yaml", ".env.example"):
+                shutil.copyfile(ROOT / name, copy / name)
+            (copy / ".local" / "secrets").mkdir(parents=True)
+            (copy / ".local" / "installation-id").write_text("0123456789ab\n", encoding="ascii", newline="\n")
+            (copy / ".local" / "secrets" / "postgres-password").write_text("fixture-password", encoding="ascii")
+            log = copy / "docker.log"
+            (copy / "docker-fixture.sh").write_text('''docker() {
+    case "$*" in
+        'context show') printf 'fixture\\n' ;;
+        'info --format '*) printf 'linux 29.0.0\\n' ;;
+        'compose version --short') printf '5.0.0\\n' ;;
+        'buildx version') return 0 ;;
+        'compose '*' exec '*) printf '%s\\n' "$*" >>"$FIXTURE_LOG"; printf '200' ;;
+        'compose '*) printf '%s\\n' "$*" >>"$FIXTURE_LOG" ;;
+        *) printf 'Unexpected Docker call: %s\\n' "$*" >&2; return 97 ;;
+    esac
+}
+''', encoding="utf-8", newline="\n")
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = str(probe.getsockname()[1])
+            result = run_bash(str(copy / "start.sh"), *arguments, cwd=copy, extra_env={
+                "APP_PORT": port, "BASH_ENV": (copy / "docker-fixture.sh").as_posix(),
+                "FIXTURE_LOG": log.as_posix()})
+            calls = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+            self.models_directory_created = (copy / ".local" / "models").is_dir()
+        return result, calls
+
+    def test_a_plain_start_neither_selects_nor_pulls_the_model_server(self) -> None:
+        """Every Compose call of a plain start is compose.yaml alone: no profile and no overlay."""
+        result, calls = self.start_calls()
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertTrue(calls)
+        for call in calls:
+            self.assertTrue(call.startswith("compose --file compose.yaml "), call)
+            self.assertNotIn("--profile", call)
+            self.assertNotIn("compose.models.yaml", call)
+        up = [call for call in calls if " up " in call]
+        self.assertEqual(["compose --file compose.yaml up --detach --no-build --wait --wait-timeout 300"], up)
+        self.assertFalse(self.models_directory_created)
+        self.assertNotIn("models:8080", result.stdout)
+
+    def test_the_models_option_selects_the_service_and_the_engine_address(self) -> None:
+        """`--with-models` adds the overlay and the profile to every Compose call, and nothing else."""
+        result, calls = self.start_calls("--with-models")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        prefix = "compose --file compose.yaml --file compose.models.yaml --profile models "
+        self.assertTrue(calls)
+        for call in calls:
+            self.assertTrue(call.startswith(prefix), call)
+        up = [call for call in calls if " up " in call]
+        self.assertEqual([prefix + "up --detach --no-build --wait --wait-timeout 300"], up)
+        self.assertTrue(self.models_directory_created)
+        self.assertIn("http://models:8080", result.stdout)
+
+    def test_the_models_option_takes_no_further_argument(self) -> None:
+        """An extra argument is a usage error that changes nothing."""
+        failed = run_bash(str(LAUNCHER), "--with-models", "--stop", cwd=ROOT)
+        self.assertEqual(2, failed.returncode, failed.stderr)
 
     def test_old_bash_is_rejected_before_parsing(self) -> None:
         """The version guard text sits before the first Bash-4-only construct."""
