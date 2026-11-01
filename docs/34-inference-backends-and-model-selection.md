@@ -307,7 +307,7 @@ On the 12 GB host one heavy model is GPU-resident at a time. The coordinator of 
 - **Text queue.** Text tasks already pass through the P08.6 fair scheduler, which owns their priority classes, the single text turn permit, quotas and restart reconciliation ([docs/06 section 12](06-codex-integration.md#p086-durable-fair-scheduling)). The coordinator sits behind that permit for text (a text task holds a GPU lease only while it holds the scheduler's permit) and adds image and speech leases beside it; it never creates a second text queue.
 - **Lease.** An image or speech job asks for a lease. The coordinator saves the narration slot's prompt cache, unloads the text model with `POST /models/unload`, confirms the VRAM was freed, runs the batch, reloads with `POST /models/load` and restores the cache. Image batches are grouped to pay the swap once, and a lease has a time cap.
 - **Interruption.** A diffusion job checks for interactive demand between steps and yields. No lease starts while a text request is queued or expected within the reading window.
-- **Profiles.** Admission needs a measured VRAM and load-time profile for the exact model and precision. An unprofiled model is admitted only alone, with extra headroom.
+- **Profiles.** Admission needs a measured VRAM and load-time profile for the exact model and precision. An unprofiled model is admitted only alone, with extra headroom. Implemented for the five measured text models in [P21.4-E.1](#p214-e1-per-model-sizes-and-reference-host-settings).
 - **Unowned contention.** The owner's games or other applications reduce free VRAM. The coordinator rechecks, delays or falls back to text-only play or catalog art. It never terminates another process.
 - **Memory.** Keep models fully on the GPU; CPU offload is slow here. The launcher advises on WSL memory and never changes WSL, Docker or driver settings.
 
@@ -364,7 +364,7 @@ Implemented in `TextResidency` (`org.rpgengine.inference.scheduling`), `TextResi
 - **Switch off, or no bean.** `InferenceScheduler` takes an optional `TextResidency`. No such bean exists unless `engine.inference.admission.enabled` is `true`. Without one, a dispatched task is forwarded at once, as before.
 - **Dependency direction.** The scheduler knows only the neutral `TextResidency`, in its own package. The admission package implements it, and already depended on the scheduling package for `WorkClass`.
 - **Which tasks.** The driver resolves the task's slot as the local adapter does. A slot on another backend, or one the adapter would refuse, needs no residency: its claim is ready at once and the adapter's own result stands. Any other task becomes one text `AdmissionRequest`, with the task's identity and class, its campaign as owner, the resolved model and the configured demand.
-- **Text demand.** `engine.inference.admission.text-gpu-demand-mib` (1 to the GPU budget, default the whole GPU budget) and `text-ram-demand-mib` (0 to the RAM budget, default the whole RAM budget) say what any text model is taken to need. It is one figure for every model, because the catalog holds no measured size. The whole-budget default is the safe side: too large a figure costs waiting or a fallback, and too small a one could overcommit the card.
+- **Text demand.** `engine.inference.admission.text-gpu-demand-mib` (1 to the GPU budget, default the whole GPU budget) and `text-ram-demand-mib` (0 to the RAM budget, default the whole RAM budget) say what a text model without a recorded size is taken to need. Until P21.4-E.1 they were one figure for every model, because nothing held a measured size; since then the five measured models use their own sizes ([P21.4-E.1](#p214-e1-per-model-sizes-and-reference-host-settings)) and these settings size every other model. The whole-budget default is the safe side: too large a figure costs waiting or a fallback, and too small a one could overcommit the card.
 - **Order.** The ledger row moves to `DISPATCHED`, the permit is taken and residency is claimed. On ready the task is forwarded with what remains of its budget. On settlement the claim is released: `finishText` normally, `yieldText` for a turn that ended preempted. The release happens once when the port's result arrives, whatever becomes of the ledger write. An `UNRESOLVED` result keeps the claim until the port confirms that nothing runs, because the model may still be in use.
 - **Ending a wait.** A task waiting for its model holds the permit, and it can still be cancelled (`cancelled`), preempted (`preempted`), timed out (`queue-timeout`, the same budget rule as a queued task) or ended by shutdown (`shutdown`). Each takes effect at once, without a turn or a charge, and withdraws the request from the executor.
 - **Refusals.** A claim that cannot be served ends the task `UNAVAILABLE`, without a turn or a charge: `residency-contention` (patience used up), `residency-load-failed`, `residency-lost` (the admission lapsed before the turn) or `residency-unavailable` (driver stopped, or the request refused). A request the executor put back (`DELAYED`, `SWAP_FAILED`) keeps waiting.
@@ -374,11 +374,11 @@ Implemented in `TextResidency` (`org.rpgengine.inference.scheduling`), `TextResi
 Limits and what is not proven:
 
 - No real server, model, GPU, `nvidia-smi` or PostgreSQL lease store was used with the switch on, and the packaged stack was not started with it. No out-of-memory proof exists.
-- The default settings may never admit a cold load on the reference host. The memory check needs the free reading to cover the demand plus `headroom-mib`. By the section 7 numbers for `gemma-4-12b-it-qat-q4_0`, 12,282 MiB minus the 1,313 MiB in use before its load leaves 10,969 MiB free, and the load adds 10,621 MiB, so with its true size only 348 MiB of headroom would pass, against the default 1,024. This is arithmetic on recorded numbers, not a run, and no working combination of settings has been chosen or tried.
+- The default settings may never admit a cold load on the reference host. The memory check needs the free reading to cover the demand plus `headroom-mib`. By the section 7 numbers for `gemma-4-12b-it-qat-q4_0`, 12,282 MiB minus the 1,313 MiB in use before its load leaves 10,969 MiB free, and the load adds 10,621 MiB, so with its true size only 348 MiB of headroom would pass, against the default 1,024. This is arithmetic on recorded numbers, not a run. P21.4-E.1 below chooses one combination for it (a 256 MiB headroom); that combination has not been tried either.
 - A cold load spends the task's own budget. That load took 107.53 s in section 7, so a task with a shorter budget ends `queue-timeout`. The load still finishes on the worker, so the next task finds the model warm.
 - The adapter resolves the slot again when it dispatches, so a slot changed between the claim and the turn runs on a model with no lease. The packaged service also keeps automatic loading on, so a chat request could load a model outside a lease.
 - A worker busy with a long load delays renewals and passes, which is harmless with the single permit and would need another look with more permits. A lease that outlasts its lifetime during a load ends in `residency-lost` and its model is unloaded.
-- Not built: a source of expected text demand (the executor is still told that none is expected), image and speech controls, speech jobs, per-model sizes, and metrics exposure beyond the in-process map. Image jobs came with P21.4-C.1.2.2.2 below.
+- Not built: a source of expected text demand (the executor is still told that none is expected), image and speech controls, speech jobs, per-model sizes (added by P21.4-E.1 below), and metrics exposure beyond the in-process map. Image jobs came with P21.4-C.1.2.2.2 below.
 
 ### P21.4-C.1.2.2.2 image requests through the lease executor
 
@@ -409,7 +409,7 @@ Implemented in `ImageAdmission`, `LeasedImageAdmission`, `ImageSteppedJob` and `
 
   `image-admission-unavailable` covers a request that could not be accepted, such as a demand above the whole budget, and `image-shutdown` covers a job still open when the path closes, whichever status its batch ended with.
 - **Waiting.** For `DEFERRED`, `DELAYED` and `SWAP_FAILED` the executor asks again itself, so the path never resubmits. With `maxWait` zero, the first such answer gives the fallback and withdraws the request, which is what an image for the scene being read wants. With a longer wait the request stays put back and can still run; when the wait ends it is withdrawn with the last reason as its code. A `maxWait` above `patience` lets contention end it as `FELL_BACK`. Every driver tick also ends the waits that are over and that no batch holds, because a request queued behind a long text lease gets no executor answer at all, and that code is `image-admission-deferred`.
-- **Image demand.** `engine.inference.admission.image-gpu-demand-mib` (1 to the GPU budget, default the whole GPU budget) and `image-ram-demand-mib` (0 to the RAM budget, default the whole RAM budget), with the same reasoning as the text demand. Invalid values stop startup without echoing them.
+- **Image demand.** `engine.inference.admission.image-gpu-demand-mib` (1 to the GPU budget, default the whole GPU budget) and `image-ram-demand-mib` (0 to the RAM budget, default the whole RAM budget), with the same reasoning as the text demand. No image checkpoint has a recorded size, so these two settings size every checkpoint (P21.4-E.1). Invalid values stop startup without echoing them.
 - **Lease model.** A valid checkpoint name is used as it is, and no name becomes `image-current`. A name with characters a lease model may not hold becomes `image-` and a digest, because two checkpoints must not share one lease and its single demand.
 - **No image control without the packaged worker.** Unless P21.4-D below adds the worker's, `AdmissionControls` holds only `TEXT`, so with the switch on an image batch ends `LOAD_FAILED` before anything is touched, and the caller shows catalog art. This is deliberate. The `a1111-http` gateway profile refuses the server's checkpoint routes and its VRAM is not coordinated (section 8), so no control can remove its checkpoint, and a control that reported it gone would free its capacity and let a text model load beside it.
 
@@ -417,7 +417,7 @@ Limits and what is not proven:
 
 - Nothing in the application calls `ImageAdmission`, and no game flow chooses catalog art yet (P17.6). So the running application has no image request to admit, and the only runs through a real `runBatch` to a completed image are in tests: with a stand-in control here, and with a double of the worker in P21.4-D below.
 - No real server, real adapter call, model, GPU, `nvidia-smi` or PostgreSQL lease store was used. How fast a real backend stops after `cancel`, and whether the 1-, 10- and 15-second waits suit it, is unmeasured. No out-of-memory proof exists.
-- The whole-budget default for the image demand has the problem section P21.4-C.1.2.2.1 computes for text: the memory check needs the free reading to cover the demand plus `headroom-mib`, so the default may refuse every load. No working combination of settings has been tried.
+- The whole-budget default for the image demand has the problem section P21.4-C.1.2.2.1 computes for text: the memory check needs the free reading to cover the demand plus `headroom-mib`, so the default may refuse every load. P21.4-E.1 below works this out for the reference host; no combination has been tried on it.
 - Past the 10-second wait the model is unloaded with the backend possibly still working. A long-running step of a real backend could then hold memory the executor believes is free.
 - An unload may take up to 240 status checks, far beyond the 15-second close wait, and after a batch's unload the executor may also bring a text model back. In either case the process can exit before the batch ends, which leaves the lease to the next process.
 - The first grant comes from the next tick, up to 1 second later (a placeholder), since an image submission does not force a pass. With `maxWait` zero the request is judged at that tick.
@@ -453,11 +453,57 @@ Implemented in `WorkerSettings`, `WorkerClient`, `WorkerModelControl`, `WorkerIm
 Limits and what is not proven:
 
 - No real worker has answered. The double follows `image_worker.py` as read, and `tools/container_packaging/test_image_worker.py` pins the same answer shapes on the real class, but no test joins the Java client to that class. No checkpoint has been loaded by this path, and that a real unload frees GPU memory is unmeasured.
-- Nothing submits an image: the port and the path have no caller until P17.6, so the batch runs only in tests. The packaged stack was not started with the switch on, and no working combination of settings was tried. The whole-budget image demand may refuse every load against the default headroom, as computed for text above.
+- Nothing submits an image: the port and the path have no caller until P17.6, so the batch runs only in tests. The packaged stack was not started with the switch on, and no working combination of settings was tried. The whole-budget image demand may refuse every load against the default headroom, as computed for text above; P21.4-E.1 below computes that this is certain on the reference host.
 - The worker answers a load only when it is done, and the executor holds its monitor across server calls, so a real load stops passes, renewals and the metrics route for as long as it lasts. The 4-minute bound sits under the 5-minute lease, but no real load has tried it.
 - An unload's `loaded: null` shows that the worker dropped its pipeline and asked for cached memory back, not that the card reports it free. The executor reads free memory before the next load, not to confirm this unload.
 - A worker restarted during a job looks like an empty worker, and the job's own call fails. A process other than the engine calling the worker is outside this design: the network gives it no other peer.
 - Lease models and catalog IDs are compared as strings, so a catalog ID and its file name are two leases, and the second is refused while the first runs.
+
+### P21.4-E.1 per-model sizes and reference-host settings
+
+Implemented in `ModelSizes`, `AdmissionOptions`, `LeaseExecutor` and `LeaseExecutorSettings`, with `TextResidencyDriver` and `LeasedImageAdmission` taking a size per model (1 November 2026, task open). Tested in `PerModelAdmissionTest` through the production wiring over scripted servers and a scripted free-memory reading. No real card, server, engine or database took part, so every figure here is arithmetic on the section 7 numbers and not a run.
+
+- **Sizes.** The five text models measured by P21.2-D are admitted with their own size, keyed by **router ID** (section 7), not by catalog ID. A size is the GPU memory the load added, the peak reading minus the reading before the load, and the container RAM peak. The delta is used rather than the "released" column because the executor compares the free reading *before* a load with the demand, and the delta is what that load took from such a reading. The two differ by the desktop's own drift: the delta minus "released" is +181 MiB for the 12B model (10,621 against 10,440), −7 for Qwen, +44 for E2B, 0 for E4B and −14 for the 26B model, so for two models the delta is the larger figure, for two it is slightly smaller and for E4B they are equal.
+
+  | Router ID | GPU (peak − before = size, MiB) | RAM (MiB) |
+  | --- | --- | --- |
+  | `gemma-4-12b-it-qat-q4_0` (default) | 11,934 − 1,313 = 10,621 | 6,356 |
+  | `Qwen3.5-9B-Q4_K_M` | 11,522 − 1,271 = 10,251 | 5,749 |
+  | `gemma-4-E2B_q4_0-it` | 3,920 − 1,262 = 2,658 | 1,993 |
+  | `gemma-4-E4B_q4_0-it` | 6,606 − 1,273 = 5,333 | 3,367 |
+  | `gemma-4-26B_q4_0-it` | 11,546 − 1,272 = 10,274 | 5,804 |
+
+  The table is code (`ModelSizes.RECORDED`), not the catalog: the catalog's `measured` stays `null` for every entry, as P21.2-D left it, and the advisor's ranking is unchanged. A size above the owner's budget makes `ModelSizes.demandFor` throw, and the claim ends `UNAVAILABLE` (`residency-unavailable`) without touching a server. The owner cannot add a size yet.
+- **Unmeasured models run alone, with extra headroom.** A text model without a record uses `text-gpu-demand-mib` and `text-ram-demand-mib`, and every image checkpoint (none is measured) uses `image-gpu-demand-mib` and `image-ram-demand-mib`. The defaults are the whole budget, so on paper nothing else holds a lease beside such a model and a request for another model waits until it ends. Before it loads, the free reading must also cover the new `engine.inference.admission.unmeasured-extra-headroom-mib` (0 to 65,536, default 1,024) on top of `headroom-mib`: free ≥ demand + headroom + extra. A measured model is not asked for the extra. If the owner declares a smaller demand for an unmeasured model, it no longer runs alone on paper but still pays the extra margin.
+- **Reference-host combination.** For the host of section 7 (RTX 4070, 12,282 MiB; Docker Desktop with 7,823 MiB of container memory):
+
+  ```
+  engine.inference.admission.enabled=true
+  engine.inference.admission.gpu-budget-mib=10969
+  engine.inference.admission.ram-budget-mib=7000
+  engine.inference.admission.headroom-mib=256
+  ```
+
+  Arithmetic for the default model's cold load, with the 1,313 MiB the desktop held before it:
+
+  | Step | Figures | Result |
+  | --- | --- | --- |
+  | Free GPU memory before the load | 12,282 − 1,313 | 10,969 MiB, which is the budget |
+  | Size requested | 11,934 − 1,313 | 10,621 MiB GPU, 6,356 MiB RAM |
+  | Fits the budget on paper | 10,621 ≤ 10,969 and 6,356 ≤ 7,000 | yes; 7,000 sits under the 7,823 MiB of container memory |
+  | Memory check before the load | free 10,969 ≥ 10,621 + 256 = 10,877 | admitted, 92 MiB to spare |
+  | Same card, default headroom | 10,621 + 1,024 = 11,645 > 10,969 | not admitted: delayed, and after `patience` (2 minutes) `residency-contention` |
+
+  The other measured models pass the same check: Qwen 10,251 + 256 = 10,507; E2B 2,658 + 256 = 2,914; E4B 5,333 + 256 = 5,589; and the 26B model 10,274 + 256 = 10,530, which is 439 MiB under 10,969 (its peak of 11,546 MiB would not fit, but its size is the delta, as for the others). E2B and E4B together need 7,991 MiB of GPU and 5,360 MiB of RAM, inside the budget.
+- **What this combination refuses.** A model without a record cannot load on this host. It would need 10,969 + 256 + 1,024 = 12,249 MiB free, and even with the extra at 0 it needs 11,225 MiB, while the card has 10,969 MiB free at best. So with these settings every image checkpoint and every text model outside the table is delayed and then falls back (catalog art, or `residency-contention`) until it has a recorded size or the owner declares one, for example `image-gpu-demand-mib`, which is then paid with the extra margin. No image checkpoint has been measured, so no such figure exists in this repository (P21.5).
+- **Thin margin.** The 92 MiB of spare is smaller than the 181 MiB by which the desktop's own use varied across the section 7 measurements. A reading 93 MiB lower delays the default model's load; the request asks again every 5 seconds until `patience` ends. Raising it means lowering `headroom-mib` below 256, which trades margin for admission.
+
+Limits and what is not proven:
+
+- Sizes are one sample each on one host: other drivers, contexts (`n_ctx` was the router's choice), concurrent slots and a warm cache can make a load add more, and the RAM column may overstate because `docker stats` can count the mapped model file. Nothing shows the 92 MiB suffices on a real run.
+- The combination was not started: the packaged stack has not run with the switch on, `HostGpuMemoryReading` has never read a real card, and a load of 107.53 s (the default model's) was never driven by the executor.
+- An image checkpoint, speech model and any other text model have no size, so only the fallback applies to them. `ModelSizes` has no speech demand source, since nothing submits speech.
+- The five sizes are not in the catalog schema, so a catalog-driven advisor or a future per-owner measurement does not feed them; replacing the table with the catalog's `measured` data belongs to the story that records a profile there.
 
 Techniques to evaluate in P21 (none is a promised gain): prompt-cache reuse across turns with stable prefixes; constrained JSON with short `max_tokens` for light tasks; thinking only where it pays; quantized KV cache and flash attention; optional draft-model speculative decoding where spare VRAM exists; a warm-up request after reload; image step and resolution presets; idle-time pre-generation of likely portraits; skipping AI entirely for structured player actions.
 

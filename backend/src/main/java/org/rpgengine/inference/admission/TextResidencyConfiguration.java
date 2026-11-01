@@ -54,21 +54,21 @@ class TextResidencyConfiguration {
     /**
      * @param executor runs the batches
      * @param coordinator receives the requests
-     * @param options what an image model is taken to need
+     * @param options what an image model is taken to need; no checkpoint has a recorded size
      * @return the image path, which {@code close} stops. Without the packaged worker's control, each of its batches ends
      *         {@code LOAD_FAILED}, so the caller gets catalog art (docs/34 section 10).
      */
     @Bean
     LeasedImageAdmission imageAdmission(LeaseExecutor executor, AdmissionCoordinator coordinator,
             AdmissionOptions options) {
-        return new LeasedImageAdmission(executor, coordinator, options.imageDemand(), Clock.systemUTC(), IMAGE_STEP_WAIT,
-                IMAGE_STOP_WAIT, IMAGE_CLOSE_WAIT);
+        return new LeasedImageAdmission(executor, coordinator, model -> options.sizes().demandFor(Modality.IMAGE, model),
+                Clock.systemUTC(), IMAGE_STEP_WAIT, IMAGE_STOP_WAIT, IMAGE_CLOSE_WAIT);
     }
 
     /**
      * @param executor the executor this driver starts and passes
      * @param coordinator receives the requests
-     * @param options what a text model is taken to need
+     * @param options what a text model is taken to need, per model
      * @param profiles resolves a task's slot
      * @param port the task port
      * @param images receives the image grants of each pass
@@ -77,7 +77,7 @@ class TextResidencyConfiguration {
     @Bean
     TextResidencyDriver textResidencyDriver(LeaseExecutor executor, AdmissionCoordinator coordinator,
             AdmissionOptions options, ProfileResolver profiles, NarrationTaskPort port, LeasedImageAdmission images) {
-        return new TextResidencyDriver(executor, coordinator, localModels(profiles, port), options.textDemand(),
-                Clock.systemUTC(), TICK, images);
+        return new TextResidencyDriver(executor, coordinator, localModels(profiles, port),
+                model -> options.sizes().demandFor(Modality.TEXT, model), Clock.systemUTC(), TICK, images);
     }
 }

@@ -15,12 +15,18 @@ import org.springframework.core.env.Environment;
  * @param capacity the GPU and RAM the engine allows itself in total, set by the owner below the real totals
  * @param headroomBytes GPU bytes that must stay free beside a model about to load (0 up to 64 GiB)
  * @param patience how long a request may stay delayed by contention before it falls back (above 0, at most 1 hour)
- * @param textDemand what any text model is taken to need, within {@code capacity}. It defaults to the whole
- *        capacity, the same answer the executor gives for a resident model of unknown size, because too large
- *        a figure only costs waiting and too small a one could overcommit the card. The GPU part is at least 1 MiB.
- * @param imageDemand what any image model is taken to need, under the same rules and with the same default
+ * @param textDemand what a text model without a recorded size is taken to need, within {@code capacity}. It defaults
+ *        to the whole capacity, so such a model runs alone, the same answer the executor gives for a resident model
+ *        of unknown size, because too large a figure only costs waiting and too small a one could overcommit the
+ *        card. The GPU part is at least 1 MiB.
+ * @param imageDemand what an image model is taken to need, under the same rules and with the same default. No image
+ *        checkpoint has a recorded size
+ * @param unmeasuredExtraBytes GPU bytes asked on top of {@code headroomBytes} before a model without a recorded size
+ *        loads (0 up to 64 GiB)
+ * @param sizes the recorded size of each measured model, and the two fallbacks above
  */
-record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience, Demand textDemand, Demand imageDemand) {
+record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience, Demand textDemand, Demand imageDemand,
+        long unmeasuredExtraBytes, ModelSizes sizes) {
     static final String PREFIX = "engine.inference.admission.";
     static final String ENABLED = PREFIX + "enabled";
     /** Largest accepted budget or headroom, in MiB: far above any single card, so a typo in the unit fails. */
@@ -28,6 +34,8 @@ record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience, 
     /** RAM is not budgeted unless the owner sets it: the default is the largest accepted value. */
     static final long DEFAULT_RAM_MIB = MAX_MIB;
     static final long DEFAULT_HEADROOM_MIB = 1024;
+    /** Extra margin for a model nobody measured: as large as the headroom itself, a placeholder. */
+    static final long DEFAULT_UNMEASURED_EXTRA_MIB = 1024;
     static final long MAX_HEADROOM_MIB = 64 * 1024;
     static final Duration DEFAULT_PATIENCE = Duration.ofMinutes(2);
     static final Duration MAX_PATIENCE = Duration.ofHours(1);
@@ -71,10 +79,15 @@ record AdmissionOptions(Demand capacity, long headroomBytes, Duration patience, 
         if (headroom < 0 || headroom > MAX_HEADROOM_MIB) {
             throw new IllegalStateException(PREFIX + "headroom-mib out of range");
         }
+        long extra = number(environment, "unmeasured-extra-headroom-mib", DEFAULT_UNMEASURED_EXTRA_MIB);
+        if (extra < 0 || extra > MAX_HEADROOM_MIB) {
+            throw new IllegalStateException(PREFIX + "unmeasured-extra-headroom-mib out of range");
+        }
         Demand textDemand = modelDemand(environment, "text", gpu, ram);
         Demand imageDemand = modelDemand(environment, "image", gpu, ram);
-        return new AdmissionOptions(new Demand(gpu * BYTES_PER_MIB, ram * BYTES_PER_MIB), headroom * BYTES_PER_MIB,
-                patience(environment), textDemand, imageDemand);
+        Demand capacity = new Demand(gpu * BYTES_PER_MIB, ram * BYTES_PER_MIB);
+        return new AdmissionOptions(capacity, headroom * BYTES_PER_MIB, patience(environment), textDemand, imageDemand,
+                extra * BYTES_PER_MIB, ModelSizes.recorded(capacity, textDemand, imageDemand));
     }
 
     private static Demand modelDemand(Environment environment, String kind, long gpu, long ram) {

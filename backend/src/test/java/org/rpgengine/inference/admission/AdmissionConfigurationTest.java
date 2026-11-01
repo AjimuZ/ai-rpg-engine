@@ -109,6 +109,16 @@ class AdmissionConfigurationTest {
     }
 
     @Test
+    void anUnmeasuredModelAsksOneGibOfExtraHeadroomUntilTheOwnerSaysOtherwise() {
+        MockEnvironment environment = new MockEnvironment().withProperty("engine.inference.admission.gpu-budget-mib", "8192");
+        assertThat(AdmissionOptions.from(environment).unmeasuredExtraBytes()).isEqualTo(1024 * MIB);
+        environment.setProperty("engine.inference.admission.unmeasured-extra-headroom-mib", "0");
+        assertThat(AdmissionOptions.from(environment).unmeasuredExtraBytes()).isZero();
+        environment.setProperty("engine.inference.admission.unmeasured-extra-headroom-mib", "512");
+        assertThat(AdmissionOptions.from(environment).unmeasuredExtraBytes()).isEqualTo(512 * MIB);
+    }
+
+    @Test
     void aTextDemandOutsideTheBudgetFailsStartupWithoutEchoingIt() {
         String[][] cases = {
                 {"text-gpu-demand-mib=10241", "text-gpu-demand-mib must be between", "10241"},
@@ -157,6 +167,10 @@ class AdmissionConfigurationTest {
                 {"headroom-mib=-7654321", "headroom-mib out of range", "7654321"},
                 {"headroom-mib=7654321", "headroom-mib out of range", "7654321"},
                 {"headroom-mib=1.5e9", "headroom-mib is not a whole number", "1.5e9"},
+                {"unmeasured-extra-headroom-mib=-7654321", "unmeasured-extra-headroom-mib out of range", "7654321"},
+                {"unmeasured-extra-headroom-mib=7654321", "unmeasured-extra-headroom-mib out of range", "7654321"},
+                {"unmeasured-extra-headroom-mib=secret-extra", "unmeasured-extra-headroom-mib is not a whole number",
+                        "secret-extra"},
                 {"patience=0s", "patience must be between 0 and 1 hour", "0s"},
                 {"patience=-9876s", "patience must be between 0 and 1 hour", "9876"},
                 {"patience=3h", "patience must be between 0 and 1 hour", "3h"},

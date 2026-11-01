@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
 
 import org.rpgengine.inference.ModelControlException;
 import org.rpgengine.inference.ModelServerControl;
@@ -55,7 +56,9 @@ import org.rpgengine.inference.admission.AdmissionMetrics.Counter;
  * headroom, counting what an eviction would free. A low reading delays the requests and, after
  * {@link LeaseExecutorSettings#patience()}, ends them as {@link Status#FELL_BACK}, so the caller uses
  * catalog art or text-only play. An unknown reading refuses a batch but not a text load, because text
- * is what keeps the game playable when the reading source breaks. Nothing here can stop another process.
+ * is what keeps the game playable when the reading source breaks. A lease whose model the {@code measured}
+ * predicate does not recognise must leave {@link LeaseExecutorSettings#unmeasuredExtraBytes()} more free
+ * beside it, because its demand is a guess. Nothing here can stop another process.
  *
  * <p>This class never queues text: text requests reach it through the coordinator while their task
  * holds the scheduler's permit. All decisions run under this object's monitor, including the calls to the
@@ -182,6 +185,7 @@ public final class LeaseExecutor {
     private final LeaseExecutorSettings settings;
     private final Clock clock;
     private final Pause pause;
+    private final Predicate<Lease> measured;
     private final AdmissionMetrics metrics = new AdmissionMetrics();
     private final Map<String, Warm> warm = new LinkedHashMap<>();
     private final Map<String, Evicted> evicted = new LinkedHashMap<>();
@@ -207,6 +211,18 @@ public final class LeaseExecutor {
     public LeaseExecutor(AdmissionCoordinator coordinator, Map<Modality, ModelServerControl> controls,
             GpuMemoryReading reading, BooleanSupplier expectedDemand, LeaseExecutorSettings settings, Clock clock,
             Pause pause) {
+        this(coordinator, controls, reading, expectedDemand, settings, clock, pause, lease -> true);
+    }
+
+    /**
+     * @param measured true for a lease whose demand comes from a recorded measurement; any other lease must leave
+     *        {@link LeaseExecutorSettings#unmeasuredExtraBytes()} free on top of the headroom before its model loads
+     * @see #LeaseExecutor(AdmissionCoordinator, Map, GpuMemoryReading, BooleanSupplier, LeaseExecutorSettings, Clock, Pause)
+     */
+    LeaseExecutor(AdmissionCoordinator coordinator, Map<Modality, ModelServerControl> controls,
+            GpuMemoryReading reading, BooleanSupplier expectedDemand, LeaseExecutorSettings settings, Clock clock,
+            Pause pause, Predicate<Lease> measured) {
+        this.measured = Objects.requireNonNull(measured, "measured");
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
         if (coordinator.expiry() != AdmissionCoordinator.Expiry.HOLDS_UNTIL_UNLOADED) {
             throw new IllegalArgumentException("real residency needs expired capacity held until unloaded");
@@ -309,7 +325,7 @@ public final class LeaseExecutor {
         }
         sync();
         List<Warm> evictions = evictionsFor(lease);
-        if (!memoryFits(lease.demand(), reclaimable(evictions), false)) {
+        if (!memoryFits(lease.demand(), reclaimable(evictions), false, extraFor(lease))) {
             return giveBack(lease, Status.DELAYED, Counter.CONTENTION_DELAYS, true);
         }
         if (!evict(evictions)) {
@@ -497,13 +513,13 @@ public final class LeaseExecutor {
             return giveBack(lease, Status.SWAP_FAILED, Counter.SWAP_FAILURES, true);
         }
         List<Warm> evictions = evictionsFor(lease);
-        if (!memoryFits(lease.demand(), reclaimable(evictions), true)) {
+        if (!memoryFits(lease.demand(), reclaimable(evictions), true, extraFor(lease))) {
             return giveBack(lease, Status.DELAYED, Counter.CONTENTION_DELAYS, true);
         }
         if (!evict(evictions)) {
             return giveBack(lease, Status.SWAP_FAILED, Counter.SWAP_FAILURES, true);
         }
-        if (!evictions.isEmpty() && !memoryConfirmed(lease.demand())) {
+        if (!evictions.isEmpty() && !memoryConfirmed(lease.demand(), extraFor(lease))) {
             return giveBack(lease, Status.DELAYED, Counter.CONTENTION_DELAYS, true);
         }
         try {
@@ -828,7 +844,7 @@ public final class LeaseExecutor {
             boolean wanted = coordinator.waiting().stream().allMatch(request -> request.modality() == Modality.TEXT
                     && request.model().equals(out.model()));
             if (control != null && out.sized() && wanted && !now.isBefore(reloadAt)
-                    && fitsBesideWarm(out.demand()) && memoryFits(out.demand(), 0, false)) {
+                    && fitsBesideWarm(out.demand()) && memoryFits(out.demand(), 0, false, 0)) {
                 try {
                     state = bringBack(control, out.model(), out.demand());
                 } catch (ModelControlException failure) {
@@ -908,8 +924,11 @@ public final class LeaseExecutor {
         return residency == Residency.GONE || residency == Residency.FAILED;
     }
 
-    /** @return true when the demand fits the reading now, counting {@code reclaim} bytes an eviction would free */
-    private boolean memoryFits(Demand demand, long reclaim, boolean strict) {
+    /**
+     * @return true when the demand fits the reading now, counting {@code reclaim} bytes an eviction would free
+     *         and keeping the headroom plus {@code extra} bytes free beside it
+     */
+    private boolean memoryFits(Demand demand, long reclaim, boolean strict, long extra) {
         if (demand.gpuBytes() == 0) {
             return true;
         }
@@ -917,13 +936,18 @@ public final class LeaseExecutor {
         if (free.isEmpty()) {
             return !strict;
         }
-        return free.getAsLong() + reclaim >= demand.gpuBytes() + settings.headroomBytes();
+        return free.getAsLong() + reclaim >= demand.gpuBytes() + settings.headroomBytes() + extra;
+    }
+
+    /** @return the margin beyond the headroom that this lease's model needs: none when its size was measured */
+    private long extraFor(Lease lease) {
+        return measured.test(lease) ? 0 : settings.unmeasuredExtraBytes();
     }
 
     /** Confirm freed memory after an unload, which the server may release a little later. */
-    private boolean memoryConfirmed(Demand demand) {
+    private boolean memoryConfirmed(Demand demand, long extra) {
         for (int attempt = 0; attempt < settings.statusAttempts(); attempt++) {
-            if (memoryFits(demand, 0, true)) {
+            if (memoryFits(demand, 0, true, extra)) {
                 return true;
             }
             try {

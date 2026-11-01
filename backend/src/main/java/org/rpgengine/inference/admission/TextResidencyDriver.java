@@ -88,7 +88,7 @@ final class TextResidencyDriver implements TextResidency, SmartLifecycle {
     private final LeaseExecutor leases;
     private final AdmissionCoordinator coordinator;
     private final Function<InferenceSlot, Optional<String>> models;
-    private final Demand demand;
+    private final Function<String, Demand> demands;
     private final Clock clock;
     private final Duration tick;
     private final LeasedImageAdmission images;
@@ -109,26 +109,39 @@ final class TextResidencyDriver implements TextResidency, SmartLifecycle {
         this(leases, coordinator, models, demand, clock, tick, null);
     }
 
+    /** A driver that takes every model to need the same {@code demand}. */
+    TextResidencyDriver(LeaseExecutor leases, AdmissionCoordinator coordinator,
+            Function<InferenceSlot, Optional<String>> models, Demand demand, Clock clock, Duration tick,
+            LeasedImageAdmission images) {
+        this(leases, coordinator, models, fixed(demand), clock, tick, images);
+    }
+
     /**
      * @param leases the executor; it is started by the first tick
      * @param coordinator receives the requests and the renewals of their leases
      * @param models names the local model that serves a slot now, empty when the slot needs no residency; it
      *        runs on the worker, so it may read settings
-     * @param demand what a text model is taken to need, within the coordinator's capacity
+     * @param demands what the named text model is taken to need, within the coordinator's capacity. A model it
+     *        refuses by throwing ends its claim {@code UNAVAILABLE}, like a model name the request refuses
      * @param clock the coordinator's time source
      * @param tick time between two passes, positive
      * @param images receives every image grant, or null when no image path exists
      */
     TextResidencyDriver(LeaseExecutor leases, AdmissionCoordinator coordinator,
-            Function<InferenceSlot, Optional<String>> models, Demand demand, Clock clock, Duration tick,
-            LeasedImageAdmission images) {
+            Function<InferenceSlot, Optional<String>> models, Function<String, Demand> demands, Clock clock,
+            Duration tick, LeasedImageAdmission images) {
         this.images = images;
         this.leases = Objects.requireNonNull(leases, "leases");
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
         this.models = Objects.requireNonNull(models, "models");
-        this.demand = Objects.requireNonNull(demand, "demand");
+        this.demands = Objects.requireNonNull(demands, "demands");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.tick = Objects.requireNonNull(tick, "tick");
+    }
+
+    private static Function<String, Demand> fixed(Demand demand) {
+        Objects.requireNonNull(demand, "demand");
+        return model -> demand;
     }
 
     /** Enqueue the claim; a stopped driver refuses it through {@code listener}. */
@@ -210,7 +223,8 @@ final class TextResidencyDriver implements TextResidency, SmartLifecycle {
                 return;
             }
             Submission submission = coordinator.submit(new AdmissionRequest(task.taskId(), Modality.TEXT,
-                    task.workClass(), task.scope().campaignId(), model.get(), demand, clock.instant()));
+                    task.workClass(), task.scope().campaignId(), model.get(), demands.apply(model.get()),
+                    clock.instant()));
             if (submission == Submission.ACCEPTED) {
                 entry.state = State.WAITING;
                 entries.put(task.taskId(), entry);

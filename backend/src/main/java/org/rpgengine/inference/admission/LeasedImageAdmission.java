@@ -19,6 +19,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import org.rpgengine.inference.ImageGenerationPort;
 import org.rpgengine.inference.ImageHandle;
@@ -54,7 +55,7 @@ final class LeasedImageAdmission implements ImageAdmission, AutoCloseable {
 
     private final LeaseExecutor leases;
     private final AdmissionCoordinator coordinator;
-    private final Demand demand;
+    private final Function<String, Demand> demands;
     private final Clock clock;
     private final Duration stepWait;
     private final Duration stopWait;
@@ -73,25 +74,37 @@ final class LeasedImageAdmission implements ImageAdmission, AutoCloseable {
     private final Map<UUID, ImageSteppedJob> running = new ConcurrentHashMap<>();
     private volatile boolean closed;
 
+    /** A path that takes every checkpoint to need the same {@code demand}. */
+    LeasedImageAdmission(LeaseExecutor leases, AdmissionCoordinator coordinator, Demand demand, Clock clock,
+            Duration stepWait, Duration stopWait, Duration closeWait) {
+        this(leases, coordinator, fixed(demand), clock, stepWait, stopWait, closeWait);
+    }
+
     /**
      * @param leases the executor
      * @param coordinator receives the requests
-     * @param demand what an image model is taken to need, within the coordinator's capacity
+     * @param demands what the lease model of a request ({@link #leaseModel}) is taken to need, within the
+     *        coordinator's capacity. A model it refuses by throwing ends that job {@code UNAVAILABLE}
      * @param clock the coordinator's time source
      * @param stepWait longest wait of one job step, positive
      * @param stopWait longest wait for a cancelled job before its model is unloaded
      * @param closeWait longest wait in {@link #close} for running batches to end, which should cover one step, the
      *        stop wait and an unload
      */
-    LeasedImageAdmission(LeaseExecutor leases, AdmissionCoordinator coordinator, Demand demand, Clock clock,
-            Duration stepWait, Duration stopWait, Duration closeWait) {
+    LeasedImageAdmission(LeaseExecutor leases, AdmissionCoordinator coordinator, Function<String, Demand> demands,
+            Clock clock, Duration stepWait, Duration stopWait, Duration closeWait) {
         this.leases = Objects.requireNonNull(leases, "leases");
         this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
-        this.demand = Objects.requireNonNull(demand, "demand");
+        this.demands = Objects.requireNonNull(demands, "demands");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.stepWait = Objects.requireNonNull(stepWait, "stepWait");
         this.stopWait = Objects.requireNonNull(stopWait, "stopWait");
         this.closeWait = Objects.requireNonNull(closeWait, "closeWait");
+    }
+
+    private static Function<String, Demand> fixed(Demand demand) {
+        Objects.requireNonNull(demand, "demand");
+        return model -> demand;
     }
 
     /** {@inheritDoc} After {@link #close} the job ends {@code image-shutdown}. */
@@ -108,8 +121,9 @@ final class LeasedImageAdmission implements ImageAdmission, AutoCloseable {
         images.put(image.id(), image);
         image.result().whenComplete((result, failure) -> images.remove(image.id()));
         try {
+            String model = leaseModel(request);
             Submission submission = coordinator.submit(new AdmissionRequest(image.id(), Modality.IMAGE, ticket.workClass(),
-                    ticket.owner(), leaseModel(request), demand, now));
+                    ticket.owner(), model, demands.apply(model), now));
             if (submission != Submission.ACCEPTED) {
                 image.finish(ImageResult.failed(UNAVAILABLE));
             }

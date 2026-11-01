@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Per-model sizes and reference-host settings for admission (P21.4-E.1), 1 November 2026
+
+- With `engine.inference.admission.enabled` on, each of the five measured catalog text models is now admitted with its own size
+  from the recorded host measurements (the GPU memory its load added and its container RAM peak), not the whole budget. Any
+  other model, including every image checkpoint, still runs alone (it takes the whole budget unless `text-gpu-demand-mib` or
+  `image-gpu-demand-mib` says otherwise) and must now also leave the new `engine.inference.admission.unmeasured-extra-headroom-mib`
+  (default 1,024) free on top of `headroom-mib` before it loads. A measured model larger than the owner's budget ends its task
+  `UNAVAILABLE` (`residency-unavailable`). The `text-*` and `image-*` demand settings now size only models without a record.
+- [docs/34](docs/34-inference-backends-and-model-selection.md#p214-e1-per-model-sizes-and-reference-host-settings) gives one
+  settings combination for the reference host and the arithmetic showing the default text model's cold load is admitted under
+  it. The sizes are arithmetic on one sample each, tested against scripted servers and readings only: no real card, server or
+  engine run took part.
+
 ## Unreleased — Packaged image worker behind the lease executor (P21.4-D), 1 November 2026
 
 - New setting `engine.inference.image-worker.url`. With it and `engine.inference.admission.enabled` on, an image batch can

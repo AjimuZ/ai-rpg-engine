@@ -15,12 +15,20 @@ import java.time.Duration;
  *        is retried, positive
  * @param patience how long a request may stay delayed by contention before it falls back, positive
  * @param timeCap longest time one job may hold its lease, positive
+ * @param unmeasuredExtraBytes GPU bytes added to {@code headroomBytes} for a model whose size was never measured
+ *        (docs/34 section 10), not negative; 0 means no extra margin
  */
 public record LeaseExecutorSettings(int slot, long headroomBytes, long runningFloorBytes, int statusAttempts,
-        Duration statusDelay, Duration recheck, Duration patience, Duration timeCap) {
+        Duration statusDelay, Duration recheck, Duration patience, Duration timeCap, long unmeasuredExtraBytes) {
+    /** The settings with no extra margin for unmeasured models. */
+    public LeaseExecutorSettings(int slot, long headroomBytes, long runningFloorBytes, int statusAttempts,
+            Duration statusDelay, Duration recheck, Duration patience, Duration timeCap) {
+        this(slot, headroomBytes, runningFloorBytes, statusAttempts, statusDelay, recheck, patience, timeCap, 0);
+    }
+
     /** Validate every value. */
     public LeaseExecutorSettings {
-        if (slot < 0 || headroomBytes < 0 || runningFloorBytes < 0 || statusAttempts < 1) {
+        if (slot < 0 || headroomBytes < 0 || runningFloorBytes < 0 || statusAttempts < 1 || unmeasuredExtraBytes < 0) {
             throw new IllegalArgumentException("lease executor setting out of range");
         }
         for (Duration duration : new Duration[] {statusDelay, recheck, patience, timeCap}) {

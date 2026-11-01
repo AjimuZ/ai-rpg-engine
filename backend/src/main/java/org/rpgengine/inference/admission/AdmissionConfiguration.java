@@ -108,8 +108,9 @@ class AdmissionConfiguration {
     LeaseExecutor leaseExecutor(AdmissionCoordinator coordinator, AdmissionControls controls, GpuMemoryReading reading,
             AdmissionOptions options) {
         LeaseExecutorSettings settings = new LeaseExecutorSettings(0, options.headroomBytes(), 0, STATUS_ATTEMPTS,
-                STATUS_DELAY, RECHECK, options.patience(), TIME_CAP);
+                STATUS_DELAY, RECHECK, options.patience(), TIME_CAP, options.unmeasuredExtraBytes());
         return new LeaseExecutor(coordinator, controls.byModality(), reading, () -> false, settings, Clock.systemUTC(),
-                duration -> Thread.sleep(duration.toMillis()));
+                duration -> Thread.sleep(duration.toMillis()),
+                lease -> options.sizes().isMeasured(lease.modality(), lease.model()));
     }
 }
