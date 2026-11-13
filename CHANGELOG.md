@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — The resume card shows the fight in progress (P11.6-B), 14 November 2026
+
+- The resume card (`GET /api/v1/campaigns/{id}/resume`) now fills its `encounter` field during a fight, so a client that
+  reconnects can see where the fight stands instead of guessing or resending what it had typed. The field shows the encounter
+  and its template, the phase and round, whose activation it is with the points left, whether the player may act now, the
+  speech left in this activation, any offer waiting for an explicit `ANSWER_OFFER`, and, once the fight has ended, the outcome
+  waiting for an explicit `SETTLE_ENCOUNTER`. It never shows another participant's Health, defenses, effect clocks or
+  reaction policies, or a check's difficulty. Reading the card still changes nothing, and outside a fight the field is still null.
+- Reconnecting during a negotiation or after an accepted agreement cannot repeat what was said or done. The server keeps no
+  draft, so a reconnect has nothing to send. Retrying a lost response returns the original result. A request still held from
+  before the reconnect is refused as out of date, or because the speech limit was reached. A negotiation interrupted before it
+  was saved rolls the same dice when it is asked again, and the agreement and its settlement each happen once. This was
+  already the behavior; it is now tested through restores, session renewals and reconnects.
+- No migration and no change to receipts or events. The interface does not read the new field yet: its card still shows
+  "None" for the encounter, during a fight too, as before (P12.1). See
+  [ADR 0038](docs/adr/0038-combat-dialogue-recovery-and-the-resume-card-encounter.md).
+
 ## Unreleased — Checkpoints of a fight in progress (P11.6-A), 14 November 2026
 
 - The operational checkpoint now records the fight in progress: its phase, round, whose activation it is, the action points

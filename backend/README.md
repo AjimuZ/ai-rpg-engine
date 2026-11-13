@@ -1282,8 +1282,26 @@ recorded cursors; a simulated restore inside a round, with a strike cut off befo
 the same points, round, clocks and draws; renewals around every round end of a poisoned fight; a fight decided inside a round settled
 once at its recorded boundary after a restore) and the V32 step of `CanonicalMigrationUpgradeTest`.
 
-Limits: combat-dialogue operations and transcripts are not covered yet (P11.6, P12); the restore in the test runs the backup tool's
-retirement statement and the startup passes on the same database, not a dump and reload.
+Limits: combat-dialogue operations and transcripts were not covered by this story (see P11.6-B below); the restore in the test
+runs the backup tool's retirement statement and the startup passes on the same database, not a dump and reload.
+
+## Combat dialogue recovery and the resume card's encounter (P11.6-B)
+
+`ResumeCards` now fills the card's `encounter` member with `ResumeCards.Encounter`, read in the card's snapshot through
+`EncounterWriter.active` and `EncounterWriter.state`
+([ADR 0038](../docs/adr/0038-combat-dialogue-recovery-and-the-resume-card-encounter.md)): encounter and template identity, phase,
+round, the acting participant with its points (null once the fight has a verdict), `playerDecision`, `speechRemaining`, the
+`offer` waiting for `ANSWER_OFFER`, and at `OUTCOME_PENDING` the `outcome` decided again from stored state by `EncounterOutcome.decide`.
+Nothing the receipt hides is included. An active encounter that cannot be read back makes the card fail closed with 503.
+No migration, command, rule, receipt or event changes, and no recovery state is added: combat dialogue recovers through the
+existing replays, shared draw streams and journal recovery. Tests: two more `CombatRecoveryTest` cases on `parley-ground`
+(PostgreSQL): a social check cut off by a crash that leaves its operation `VALIDATING` (an injected trigger refuses the commit and
+the failure bookkeeping), recovered by a simulated restore, renewed, reconnected and asked again with its reserved dice; and an
+accepted counteroffer settled once through two restores, renewals and every reconnect read. `MemoryContinuityTest` still
+checks the null member outside a fight.
+
+Limits: the frontend does not read the member yet (P12.1); renewals are prepared through `SessionRehydration`, not a running
+runtime session; the restore is simulated on the same database.
 
 ## Interface reload contract (P05.6)
 
@@ -1694,7 +1712,7 @@ No migration. Nothing here writes canonical state, the transcript or a counter.
   `Integer.MAX_VALUE - 4096`: after every startup recovery, before HTTP and the workers.
 - **`ResumeCards` / `ResumeCardController`**: `GET /api/v1/campaigns/{id}/resume?adventureId=…`
   returns the resume card (location with its public localized name, actors the player last saw
-  there, resources, a null encounter, the pending decision kind, up to 16 actions awaiting
+  there, resources, the active encounter or null (filled since P11.6-B), the pending decision kind, up to 16 actions awaiting
   narration with receipts and presentation state, the dependency diagnosis and continuity codes).
 - Freshness gains the `rolled-back` reason (summary source revision or event high-water above the
   campaign's counters).

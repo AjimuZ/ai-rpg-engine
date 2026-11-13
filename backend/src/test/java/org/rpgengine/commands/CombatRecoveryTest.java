@@ -1,8 +1,11 @@
 package org.rpgengine.commands;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -36,7 +39,9 @@ import org.rpgengine.memory.MemoryReconciliation;
 import org.rpgengine.memory.OperationalCheckpoints;
 import org.rpgengine.memory.OperationalCheckpoints.Capture;
 import org.rpgengine.memory.OperationalCheckpoints.Verification;
+import org.rpgengine.memory.ResumeCards;
 import org.rpgengine.memory.SessionRehydration;
+import org.rpgengine.panels.PlayPanels;
 import org.rpgengine.presentation.PresentationJobService;
 import org.rpgengine.presentation.SupportedLocale;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,12 +61,22 @@ import tools.jackson.databind.json.JsonMapper;
  * clock ticks once per round end and a retried commit ticks nothing again; a fight decided inside a round settles that round's
  * seconds once, at the boundary its checkpoint recorded. The rows are not dumped and reloaded here: that is the backup tool's
  * own rehearsal, which holds no encounter.
+ *
+ * <p>P11.6-B adds the combat dialogue (QA-09, QA-13, docs/11 section 7.1, docs/13 section 7.1) on {@code parley-ground}: a
+ * social check cut off by a crash that leaves its operation unresolved, and an accepted agreement with its settlement, each
+ * through a simulated restore, renewals and every read a reconnecting client makes (the resume card, the public stream, the
+ * journal panel, the operation status and the lost-response retry). None of those reads writes or submits anything, the
+ * server holds no draft to submit, a held draft is refused as stale or over the speech limit, the attempt asked again finds
+ * its reserved dice, and each social effect, answer and settlement happens once, with the public transcript unchanged.
  */
 @SpringBootTest
 class CombatRecoveryTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String PACK_HASH = "c".repeat(64);
     private static final String POLICY_HASH = "d".repeat(64);
+    /** Public event types of the combat conversation and its ending, as the journal lists them. */
+    private static final List<String> DIALOGUE = List.of("COMBAT_SPEECH", "INTERACTION_ATTEMPTED", "SOCIAL_CHECK_RESOLVED",
+            "NEGOTIATION_RESPONDED", "OFFER_ANSWERED", "OFFER_LAPSED", "ENCOUNTER_OUTCOME_PENDING", "ENCOUNTER_SETTLED");
     @Autowired private CommandExecutionService executions;
     @Autowired private CampaignCreationService creation;
     @Autowired private PackRegistry registry;
@@ -73,6 +88,9 @@ class CombatRecoveryTest {
     @Autowired private JournalRecoveryService journal;
     @Autowired private PresentationJobService presentation;
     @Autowired private SessionRehydration rehydration;
+    @Autowired private ResumeCards cards;
+    @Autowired private PublicStreamService streams;
+    @Autowired private PlayPanels panels;
     private UUID owner;
     private UUID adventure;
     private UUID campaign;
@@ -108,6 +126,8 @@ class CombatRecoveryTest {
     void clear() {
         jdbc.execute("drop trigger if exists test_recovery_cut on campaign_event");
         jdbc.execute("drop function if exists test_recovery_cut()");
+        jdbc.execute("drop trigger if exists test_recovery_crash on operation_journal");
+        jdbc.execute("drop function if exists test_recovery_crash()");
         jdbc.execute("truncate encounter_participant, encounter, quest_objective, quest_state, location_visit, item_creation, "
                 + "equipment_assignment, actor_condition, ai_session_record, memory_invalidation, memory_summary, "
                 + "memory_summary_job, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, "
@@ -317,6 +337,213 @@ class CombatRecoveryTest {
         assertTrue(latestSnapshot().path("encounter").isNull(), "a settled fight leaves the checkpoint");
     }
 
+    /**
+     * QA-09 during a social check: a negotiation's check is cut off by a crash after its dice are reserved, leaving the
+     * operation {@code VALIDATING} with its permit held, as a killed process would. The restore's startup passes end it
+     * {@code FAILED_BEFORE_COMMIT} without resolving it, and the renewed narrator's verified checkpoint holds the spent
+     * speech and the unspent points. No read of the reconnecting client writes anything: the card shows the decision, the
+     * stream asks for a reload, and the lost-response retry replays the terminal status instead of running the attempt. The
+     * speech still held as a draft is refused, the check asked again finds the reserved dice and answers once, and its own
+     * lost response, after a second restore and renewal, replays the same receipt with the conversation listed once.
+     */
+    @Test
+    void aSocialCheckCutByACrashKeepsItsDiceThroughRestoreRenewalAndReconnect() {
+        begin("parley-ground");
+        var words = new TypedCommand.CombatSpeak("captain", "Hear me out.");
+        execute(words);
+        long drafted = revision;
+        var check = envelope(new TypedCommand.Interact("measured-offer", "captain"));
+        String cursor = streams.read(owner, adventure, campaign, null).last();
+        crash(check);
+        UUID cut = jdbc.queryForObject("select id from operation_journal where campaign_id = ? and idempotency_key = ?",
+                UUID.class, campaign, check.requestId());
+        assertEquals("VALIDATING", journalStatus(cut), "the crash left the attempt unresolved");
+        String reserved = draws(cut);
+        assertEquals(2, values(cut).size(), "the check's two dice were reserved before the commit");
+        var world = world();
+        var transcript = transcript();
+
+        restore();
+
+        assertEquals("FAILED_BEFORE_COMMIT", journalStatus(cut), "startup recovery ends the attempt without resolving it");
+        assertEquals(reserved, draws(cut));
+        assertEquals(world, world(), "neither the restore nor the startup passes change the fight");
+        reconciliation.reconcile(campaign);
+        JsonNode fight = snapshot(renew()).path("encounter");
+        assertEquals(1, fight.path("speechUsed").asInt(), "the renewal's checkpoint holds the spent speech");
+        assertEquals(3, fight.path("actionPoints").asInt(), "and the points the cut attempt never spent");
+        assertTrue(fight.path("openOffer").isNull());
+
+        var quiet = quiet();
+        var card = cards.read(owner, adventure, campaign).encounter();
+        var batch = streams.read(owner, adventure, campaign, cursor);
+        var lost = executions.execute(owner, adventure, campaign, check);
+        var status = executions.status(owner, adventure, campaign, cut);
+        assertEquals(transcript, transcript(), "the journal lists the same conversation");
+        assertEquals(quiet, quiet(), "no read of a reconnecting client writes or submits anything");
+        assertTrue(lost.replayed());
+        assertEquals(OperationStatus.FAILED_BEFORE_COMMIT, lost.operation().status(), "a retry replays and never resumes");
+        assertNull(lost.receipt());
+        assertEquals(OperationStatus.FAILED_BEFORE_COMMIT, status.operation().status());
+        assertEquals(List.of("stream.reset"), batch.messages().stream().map(PublicStreamService.Message::type).toList());
+        assertEquals("GENERATION_CHANGED", batch.messages().getFirst().data().get("reason"), "the client reloads");
+        assertEquals("AWAITING_ACTION", card.phase());
+        assertEquals("player", card.acting());
+        assertTrue(card.playerDecision());
+        assertEquals(3, card.actionPoints());
+        assertEquals(0, card.speechRemaining());
+        assertNull(card.offer());
+        assertNull(card.outcome());
+        rejects(OperationAdmissionFailure.Kind.SPEECH_LIMIT_REACHED, envelope(words));
+
+        var asked = envelope(new TypedCommand.Interact("measured-offer", "captain"));
+        var resolved = executions.execute(owner, adventure, campaign, asked);
+        assertEquals(OperationStatus.COMMITTED, resolved.operation().status());
+        revision = resolved.operation().committedRevision();
+        UUID answered = resolved.operation().operationId();
+        assertEquals(reserved, draws(answered), "a crash and a restore are not a reroll");
+        JsonNode rolled = latest("SOCIAL_CHECK_RESOLVED");
+        var dice = values(answered);
+        assertEquals(dice, List.of(rolled.path("dice").get(0).asInt(), rolled.path("dice").get(1).asInt()));
+        int rank = JSON.readTree(jdbc.queryForObject("select definition::text from encounter", String.class)).path("actions")
+                .get(6).path("check").path("rank").asInt();
+        int total = dice.get(0) + dice.get(1) + 2 + rank;
+        assertEquals(total, rolled.path("total").asInt(), "dice, the surveyor's awareness and the frozen rank");
+        String expected = total < 14 ? "REFUSED" : total - 14 >= 6 ? "OFFERED" : "COUNTEROFFERED";
+        assertEquals(expected, ((Map<?, ?>) combat(resolved).get("social")).get("response"));
+        assertEquals(1, state().actionPoints(), "the declared two of three points, paid once");
+        var after = cards.read(owner, adventure, campaign).encounter();
+        if (expected.equals("REFUSED")) {
+            assertNull(after.offer());
+        } else {
+            var listed = (Map<?, ?>) ((Map<?, ?>) combat(resolved).get("options")).get("offer");
+            var terms = (Map<?, ?>) listed.get("terms");
+            assertEquals(new ResumeCards.Offer((String) listed.get("offerId"), "captain", expected, (String) terms.get("termsId"),
+                    "truce", ((Number) terms.get("cost")).intValue()), after.offer(), "the card lists the offer as the receipt did");
+            assertEquals(expected.equals("OFFERED") ? "fair-terms" : "small-toll", after.offer().termsId());
+        }
+        rejects(OperationAdmissionFailure.Kind.STALE_REVISION, new OperationAdmissionService.Command(
+                UUID.randomUUID().toString(), drafted, words.type(), words.payload()));
+
+        restore();
+        reconciliation.reconcile(campaign);
+        renew();
+        var held = quiet();
+        var replay = executions.execute(owner, adventure, campaign, asked);
+        assertTrue(replay.replayed());
+        assertEquals(resolved.receipt(), replay.receipt(), "the lost response replays its receipt");
+        assertEquals(held, quiet(), "and pays, draws and answers nothing again");
+        assertEquals(List.of("COMBAT_SPEECH", "INTERACTION_ATTEMPTED", "SOCIAL_CHECK_RESOLVED", "NEGOTIATION_RESPONDED"),
+                dialogue(transcript()), "each line of the conversation once, in order");
+        assertEquals(expected, latest("NEGOTIATION_RESPONDED").path("response").asString());
+    }
+
+    /**
+     * QA-09 and QA-13 after an accepted agreement: the counteroffer the card lists waits through a renewal, the explicit
+     * acceptance commits once, and a restore, a renewal and every reconnect read leave its verdict waiting for the explicit
+     * settlement, which the card names without making. The lost acceptance replays and a fresh or held answer is refused.
+     * The settlement adds the unfinished round's seconds once, at the boundary the checkpoint recorded, and after another
+     * restore and renewal its lost response and the acceptance's replay without settling, paying or answering again.
+     */
+    @Test
+    void anAcceptedAgreementSettlesOnceThroughRestoreRenewalAndReconnect() {
+        execute(new TypedCommand.Engage("parley-ground", null));
+        var entering = cards.read(owner, adventure, campaign).encounter();
+        var stored = EncounterWriter.active(jdbc, campaign).orElseThrow();
+        assertEquals(stored.id(), entering.encounterId());
+        assertEquals("parley-ground", entering.templateId());
+        assertEquals(stored.phase().name(), entering.phase());
+        assertEquals(0, entering.round());
+        assertNull(entering.acting());
+        assertNull(entering.actionPoints());
+        assertFalse(entering.playerDecision(), "before initiative only the roll is legal");
+        assertNull(entering.speechRemaining());
+        execute(new TypedCommand.RollInitiative());
+
+        var countered = execute(new TypedCommand.Interact("haggle", "captain"));
+        long drafted = revision;
+        String offer = (String) ((Map<?, ?>) ((Map<?, ?>) combat(countered).get("options")).get("offer")).get("offerId");
+        var waiting = cards.read(owner, adventure, campaign).encounter();
+        assertEquals(new ResumeCards.Offer(offer, "captain", "COUNTEROFFERED", "toll", "truce", 2), waiting.offer());
+        assertTrue(waiting.playerDecision());
+        assertEquals(2, waiting.actionPoints(), "three less the attempt's one");
+        assertEquals(1, waiting.speechRemaining());
+        assertEquals(offer, snapshot(renew()).path("encounter").path("openOffer").path("id").asString(),
+                "the renewal's checkpoint holds the offer on the table");
+
+        var answer = envelope(new TypedCommand.AnswerOffer(offer, "accept"));
+        String cursor = streams.read(owner, adventure, campaign, null).last();
+        var accepted = executions.execute(owner, adventure, campaign, answer);
+        assertEquals(OperationStatus.COMMITTED, accepted.operation().status());
+        revision = accepted.operation().committedRevision();
+        var delivered = streams.read(owner, adventure, campaign, cursor);
+        assertEquals(delivered, streams.read(owner, adventure, campaign, cursor), "a reconnect in one generation sees the same");
+        assertEquals(List.of(accepted.receipt()), delivered.messages().stream().filter(m -> m.type().equals("state.committed"))
+                .map(m -> m.data().get("receipt")).toList());
+        var world = world();
+
+        restore();
+
+        assertEquals(world, world());
+        reconciliation.reconcile(campaign);
+        JsonNode fight = snapshot(renew()).path("encounter");
+        assertEquals("OUTCOME_PENDING", fight.path("phase").asString());
+        assertEquals("toll", fight.path("agreement").path("termsId").asString());
+        assertTrue(fight.path("openOffer").isNull());
+        long boundary = fight.path("roundEndsAt").asLong();
+        assertEquals(clock() + 8, boundary, "the agreement came inside the round");
+
+        var quiet = quiet();
+        var transcript = transcript();
+        var decided = cards.read(owner, adventure, campaign).encounter();
+        var reset = streams.read(owner, adventure, campaign, cursor);
+        var lost = executions.execute(owner, adventure, campaign, answer);
+        assertEquals(transcript, transcript());
+        assertEquals(quiet, quiet(), "no read of a reconnecting client writes, answers or settles anything");
+        assertEquals("OUTCOME_PENDING", decided.phase());
+        assertEquals("AGREEMENT", decided.outcome(), "the card names the verdict the settlement would finalize");
+        assertNull(decided.acting());
+        assertNull(decided.actionPoints());
+        assertFalse(decided.playerDecision());
+        assertNull(decided.speechRemaining());
+        assertNull(decided.offer());
+        assertEquals("GENERATION_CHANGED", reset.messages().getFirst().data().get("reason"));
+        assertTrue(lost.replayed());
+        assertEquals(accepted.receipt(), lost.receipt());
+        rejects(OperationAdmissionFailure.Kind.TURN_UNAVAILABLE, envelope(new TypedCommand.AnswerOffer(offer, "accept")));
+        var held = new TypedCommand.AnswerOffer(offer, "accept");
+        rejects(OperationAdmissionFailure.Kind.STALE_REVISION, new OperationAdmissionService.Command(
+                UUID.randomUUID().toString(), drafted, held.type(), held.payload()));
+
+        var settle = envelope(new TypedCommand.SettleEncounter(decided.encounterId()));
+        var settled = executions.execute(owner, adventure, campaign, settle);
+        assertEquals(OperationStatus.COMMITTED, settled.operation().status());
+        revision = settled.operation().committedRevision();
+        assertEquals(boundary, clock(), "the unfinished round's seconds, once");
+        var ended = transcript();
+
+        restore();
+        reconciliation.reconcile(campaign);
+        assertTrue(snapshot(renew()).path("encounter").isNull(), "a settled fight leaves the checkpoint");
+        var calm = quiet();
+        var card = cards.read(owner, adventure, campaign);
+        var again = executions.execute(owner, adventure, campaign, settle);
+        var late = executions.execute(owner, adventure, campaign, answer);
+        assertEquals(calm, quiet(), "neither lost response settles, pays or answers again");
+        assertTrue(again.replayed());
+        assertEquals(settled.receipt(), again.receipt());
+        assertTrue(late.replayed());
+        assertEquals(accepted.receipt(), late.receipt());
+        assertEquals("EXPLORATION", card.mode());
+        assertNull(card.encounter(), "a settled fight leaves the card");
+        assertEquals(ended, transcript());
+        rejects(OperationAdmissionFailure.Kind.MODE_ILLEGAL, envelope(new TypedCommand.SettleEncounter(decided.encounterId())));
+        rejects(OperationAdmissionFailure.Kind.MODE_ILLEGAL, envelope(new TypedCommand.AnswerOffer(offer, "accept")));
+        assertEquals(boundary, clock());
+        assertEquals(List.of("INTERACTION_ATTEMPTED", "NEGOTIATION_RESPONDED", "OFFER_ANSWERED", "ENCOUNTER_OUTCOME_PENDING",
+                "ENCOUNTER_SETTLED"), dialogue(transcript()), "each line of the negotiated ending once, in order");
+    }
+
     // ---- helpers ------------------------------------------------------------------------------------------------
 
     /** Enter a template and roll initiative. */
@@ -356,6 +583,34 @@ class CombatRecoveryTest {
             jdbc.execute("drop trigger if exists test_recovery_cut on campaign_event");
             jdbc.execute("drop function if exists test_recovery_cut()");
         }
+    }
+
+    /**
+     * Submit a command whose commit and whose failure bookkeeping both fail after its draws are reserved, as when the
+     * process dies between them: the operation stays {@code VALIDATING} with its permit held, and only a restart's journal
+     * recovery can end it. The injected trigger refuses every update that moves an operation out of {@code VALIDATING}.
+     */
+    private void crash(OperationAdmissionService.Command request) {
+        jdbc.execute("create or replace function test_recovery_crash() returns trigger language plpgsql as "
+                + "$$ begin raise exception 'injected crash'; end $$");
+        jdbc.execute("create trigger test_recovery_crash before update on operation_journal for each row "
+                + "when (old.status = 'VALIDATING' and new.status <> 'VALIDATING') execute function test_recovery_crash()");
+        try {
+            var failure = assertThrows(RuntimeException.class, () -> executions.execute(owner, adventure, campaign, request));
+            assertFalse(failure instanceof OperationAdmissionFailure, "an infrastructure failure, not a refusal");
+        } finally {
+            jdbc.execute("drop trigger if exists test_recovery_crash on operation_journal");
+            jdbc.execute("drop function if exists test_recovery_crash()");
+        }
+    }
+
+    /** Submit a request that must be refused at admission with the given category and change nothing. */
+    private void rejects(OperationAdmissionFailure.Kind kind, OperationAdmissionService.Command request) {
+        var before = quiet();
+        var failure = assertThrows(OperationAdmissionFailure.class, () -> executions.execute(owner, adventure, campaign,
+                request), request.commandType());
+        assertEquals(kind, failure.kind(), request.commandType());
+        assertEquals(before, quiet(), "a refusal writes nothing: " + request.commandType());
     }
 
     /**
@@ -446,6 +701,32 @@ class CombatRecoveryTest {
                 + "from operation_random_draw where operation_id = ?", String.class, operation);
     }
 
+    /** One operation's draw values in ordinal order. */
+    private List<Integer> values(UUID operation) {
+        return jdbc.queryForList("select value from operation_random_draw where operation_id = ? order by ordinal",
+                Integer.class, operation);
+    }
+
+    private String journalStatus(UUID operation) {
+        return jdbc.queryForObject("select status from operation_journal where id = ?", String.class, operation);
+    }
+
+    /** The public transcript as the journal panel lists it, newest first: every worded public event with its time. */
+    private List<PlayPanels.Entry> transcript() {
+        var journal = panels.read(owner, adventure, campaign, null, PlayPanels.MAX_EVENT_PAGE).journal();
+        assertNull(journal.nextBefore(), "the whole transcript fits one page");
+        return journal.entries();
+    }
+
+    /** The conversation's lines of a transcript, oldest first, by event type. */
+    private static List<String> dialogue(List<PlayPanels.Entry> transcript) {
+        return transcript.reversed().stream().map(PlayPanels.Entry::type).filter(DIALOGUE::contains).toList();
+    }
+
+    private static Map<?, ?> combat(CommandExecutionService.Execution execution) {
+        return (Map<?, ?>) execution.receipt().get("combat");
+    }
+
     private long drawCount() {
         return jdbc.queryForObject("select count(*) from operation_random_draw where campaign_id = ?", Long.class, campaign);
     }
@@ -526,6 +807,20 @@ class CombatRecoveryTest {
     private Map<String, List<String>> everything() {
         var tables = world();
         for (String table : List.of("campaign", "operation_journal", "canonical_outbox", "narration_publication")) {
+            tables.put(table, jdbc.queryForList("select to_jsonb(t)::text from " + table + " t order by 1", String.class));
+        }
+        return tables;
+    }
+
+    /**
+     * Every row a reconnecting client's reads must leave alone: the canonical rows above, plus the derived and delivery
+     * rows a read could be tempted to touch (checkpoints, the public stream, presentation, summaries, sessions, permits).
+     */
+    private Map<String, List<String>> quiet() {
+        var tables = everything();
+        for (String table : List.of("campaign_checkpoint", "campaign_stream_message", "campaign_stream_head",
+                "presentation_job", "presentation_event", "memory_summary_job", "ai_session_record",
+                "campaign_mutation_lease")) {
             tables.put(table, jdbc.queryForList("select to_jsonb(t)::text from " + table + " t order by 1", String.class));
         }
         return tables;

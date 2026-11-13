@@ -4415,7 +4415,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
   - Not proven here: `verify.sh full` and `verify.sh containers` were not run by this story's sessions (the runner runs the plan before committing); a settlement retry through the HTTP layer; two different settlement requests racing (they serialize on the campaign lock and the
     loser's mode check is re-read under it, but no test races them); independent review of the new Italian statement; QA-13 is therefore recorded as met
     for the backend only ([quality](15-quality-and-acceptance.md)).
-- [ ] P11.6 Persist/recover every combat cursor, partial-round time boundary and combat-dialogue operation/transcript without duplicate social effects or settlement.
+- [x] P11.6 Persist/recover every combat cursor, partial-round time boundary and combat-dialogue operation/transcript without duplicate social effects or settlement.
   - P11.6-A, combat cursors and partial-round time in the checkpoint ([ADR 0037](adr/0037-the-operational-checkpoint-records-the-active-encounter.md)),
     14 November 2026. Every combat fact was already a stored row (P11.1 to P11.5), so no state was added. V32 replaces
     `memory_operational_snapshot`, so that the checkpoint's `encounter` member, null since V16, holds the active encounter: phase, round,
@@ -4465,6 +4465,60 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     renewals call `SessionRehydration.prepare` directly); a retry through HTTP; deliberate weakenings, none of which were run. The
     resume card's `encounter` field is still always null. QA-12 is recorded as met for the backend only; QA-09 stays open
     ([quality](15-quality-and-acceptance.md)).
+  - P11.6-B, combat-dialogue operations and transcripts ([ADR 0038](adr/0038-combat-dialogue-recovery-and-the-resume-card-encounter.md)),
+    14 November 2026. No state, migration, command, rule, receipt or event was added. Speech, a social attempt with its check
+    and response, an answer and the settlement are ordinary commits; their public events are the transcript, which the journal
+    panel words; the offer, the truce and the speech count are encounter columns that the V32 checkpoint records. Recovery uses
+    the existing replays, shared draw streams and journal recovery, and the server holds no draft. The production change is the
+    resume card: its `encounter` member, always null since P09.5, now holds `ResumeCards.Encounter` during a fight. That is
+    identity, template, phase, round, `acting` with its points (while an activation is in progress and no verdict exists),
+    `playerDecision`, `speechRemaining`, the `offer` waiting for `ANSWER_OFFER`, and at `OUTCOME_PENDING` the `outcome` decided
+    again from stored state. Nothing the receipt hides is included, and an active encounter that cannot be read back fails the
+    card closed (503).
+  - Box: left for the runner. With P11.6-A this story covers every clause of P11.6's statement on the backend; the browser half
+    of the reconnect checks (draft preservation, no submission of a draft held in the page) is P12.5.
+  - New: two `CombatRecoveryTest` cases (real PostgreSQL, `parley-ground`):
+    - A speech, then `measured-offer` cut off by an injected trigger that refuses every update moving an operation out of
+      `VALIDATING`. The commit and its failure bookkeeping both fail, so the attempt stays `VALIDATING` with its permit and two
+      reserved dice, as after a killed process. The simulated restore ends it `FAILED_BEFORE_COMMIT` and changes no row of the
+      fight, and a renewal rests on a `VALID` checkpoint holding speech 1 and 3 points. These reads write nothing: the resume
+      card, the stream read with the old cursor (`stream.reset`, `GENERATION_CHANGED`), the journal panel, the operation status
+      and the lost-response retry (replayed, `FAILED_BEFORE_COMMIT`, no receipt). The comparison covers the canonical, journal,
+      outbox, narration, checkpoint, stream, presentation, summary-job, session and permit rows. The held speech is refused
+      `SPEECH_LIMIT_REACHED`, and after the check `STALE_REVISION`. The check asked again rolls exactly the reserved dice, its
+      total and response match an independent reading of the rule, it leaves 1 of 3 points, and the card lists any resulting
+      offer as the receipt did. After a second restore and renewal its lost response replays the receipt and writes nothing,
+      and the journal lists speech, attempt, check and response once, in order.
+    - `ENGAGE`, with the card before initiative at round 0 with no acting participant and no decision; then `haggle`, after which
+      the card lists the counteroffer (`toll`, truce, 2 points) with 2 points and 1 speech left, and the renewal's checkpoint holds
+      it. The explicit acceptance follows; its `state.committed` stream message equals the receipt and is identical on a second
+      read. After a restore and a renewal the same reconnect reads write nothing. The card shows `OUTCOME_PENDING` with
+      `AGREEMENT` and no acting participant, decision or offer. The lost acceptance replays; a fresh answer is refused
+      `TURN_UNAVAILABLE` and a held one `STALE_REVISION`. The settlement moves the clock to the checkpoint's `roundEndsAt` once.
+      After another restore and renewal the checkpoint and the card hold no encounter, the lost settlement and the acceptance
+      replay without writing, fresh ones are refused `MODE_ILLEGAL`, and the journal lists attempt, response, answer, outcome and
+      settlement once, in order.
+  - Existing tests changed: none. `CombatRecoveryTest` gained the two cases and their helpers; `MemoryContinuityTest` still checks
+    the null member outside a fight.
+  - P11 package exit (seeded fights reproduce legal outcomes and every terminal path returns to a valid state): no new seeded
+    test was written. The evidence is existing tests that passed again in the run below: `EncounterOutcomeTest` (33 tests,
+    including its 300 seeded fights, each replaying identically and settling once to its verdict), `SettlementTest` (5) and
+    `SettlementCommandsTest` (7: every ending settled once on PostgreSQL, with the campaign back in exploration), plus the
+    negotiated ending through recovery above.
+  - Verification (14 November 2026, JDK 21 and PostgreSQL 18.6 in the images pinned by ADR 0009, on the Windows reference host):
+    `sh .agents/ralph/verify.sh backend -Dtest=CombatRecoveryTest,MemoryContinuityTest` passed 19 tests (6 and 13) with 0
+    failures, 0 errors and 0 skipped, after a first run that failed to compile (a local name used twice in `ResumeCards`, then
+    renamed). `sh .agents/ralph/verify.sh backend "-Dtest=org.rpgengine.combat.**,CombatRecoveryTest,SettlementCommandsTest,SettlementTest,WithdrawCommandsTest,EncounterCommandsTest,TacticalCommandsTest,StrikeCommandsTest,ReactionCommandsTest,NegotiationCommandsTest,OutcomeCommandsTest,ReadyAssessCommandsTest,CampaignCommandHttpTest,MemoryContinuityTest,MemoryStartupReconciliationTest,AdventureIsolationTest,WorldClockQueriesTest,CampaignCreationHttpTest,CampaignInterfaceContractTest,CodexFixtureReplayTest,CodexTaskAdapterTest,EngineApplicationTest,CanonicalMigrationUpgradeTest"`
+    passed 382 tests with 0 failures, 0 errors and 0 skipped. `sh .agents/ralph/verify.sh repo` passed (diff check, line
+    endings, repository checks, repository tests 40 run with 11 skipped, backup tests 9 run with 1 skipped) once the documents
+    were written. After those runs the card's helper method was made private, and
+    `sh .agents/ralph/verify.sh backend -Dtest=CombatRecoveryTest,MemoryContinuityTest` passed 19 tests again with 0 failures,
+    0 errors and 0 skipped on that final source tree; besides that, only these sentences changed after the runs.
+  - Not proven: `verify.sh full` and `verify.sh containers` were not run by this session; no deliberate weakening ran; the card
+    in a fight through HTTP (no test reads the new member's JSON); the browser path (P12.5); renewal of a running runtime session
+    (renewals call `SessionRehydration.prepare` directly); a live dump and reload of a fight. The check's dice come from each
+    campaign's random seed, so a run exercises one of the refused, counteroffered and offered branches, and which one ran is not
+    recorded. QA-09's backend half is recorded as met; QA-09 stays open for the browser path ([quality](15-quality-and-acceptance.md)).
 
 **Exit:** seeded fights produce reproducible legal outcomes and all terminal paths return to a valid narrative state. **Checks:** QA-09, QA-11–13, effect properties and restore mid-round. **Suggested commit:** `Implement deterministic turn-based combat`.
 

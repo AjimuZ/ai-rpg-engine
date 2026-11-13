@@ -6,6 +6,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
+import org.rpgengine.combat.EncounterOutcome;
+import org.rpgengine.combat.EncounterPhase;
+import org.rpgengine.combat.EncounterState;
+import org.rpgengine.combat.EncounterWriter;
+import org.rpgengine.combat.Negotiation;
 import org.rpgengine.commands.CommandReceipts;
 import org.rpgengine.commands.OperationStatus;
 import org.rpgengine.content.CampaignDependencies;
@@ -29,7 +34,8 @@ import tools.jackson.databind.json.JsonMapper;
  * <p><b>Content.</b> The player's current location (its public display name when the pinned root
  * pack has one), the actors the player last saw there and has not since found absent (the
  * player's knowledge, never the actors' real positions), the player's resources, the active
- * encounter (always null until P11), the pending decision ({@code STARTING_SITUATION},
+ * encounter (null without one; since P11.6-B its cursor and the explicit decision it waits for, see
+ * {@link Encounter}), the pending decision ({@code STARTING_SITUATION},
  * {@code FREE_INPUT} or {@code OTHER}, without its stored payload), the committed actions still
  * awaiting narration with their player-safe receipts and presentation state, the pinned content
  * diagnosis with whether mutation is paused, and continuity diagnostics (checkpoint verification
@@ -105,8 +111,8 @@ public class ResumeCards {
         Continuity continuity = Objects.requireNonNull(snapshot.execute(status -> new Continuity(
                 verification.status().name(), summaryState(campaign, Audience.PUBLIC))));
         return new ResumeCard(new Scope(adventure, campaign, state.revisionId(), state.stateRevision()), state.title(),
-                state.mode(), state.gameTurn(), state.worldTime(), location, state.present(), state.resources(), null,
-                state.decision(), state.awaitingTotal(), state.awaiting(),
+                state.mode(), state.gameTurn(), state.worldTime(), location, state.present(), state.resources(),
+                state.encounter(), state.decision(), state.awaitingTotal(), state.awaiting(),
                 new Dependencies(content.status().name(), content.pausesMutation(), content.issues().stream()
                         .map(issue -> new DependencyIssue(issue.code().name(), issue.packId(), issue.packVersion()))
                         .toList()),
@@ -175,9 +181,38 @@ public class ResumeCards {
             var view = PresentationJobService.Presentation.of(OperationStatus.valueOf(entry.status()), rounds, null);
             presented.add(entry.with(new Narration(view.mode().name(), view.reason(), view.retriesRemaining())));
         }
+        // The active fight in the same snapshot (P11.6-B), so a reconnecting client sees the decision it waits for.
+        var fight = EncounterWriter.active(jdbc, campaign);
+        Encounter encounter = fight.isEmpty() ? null : encounter(fight.get(), EncounterWriter.state(jdbc, campaign)
+                .orElseThrow(() -> new IllegalStateException("active encounter unreadable in the card snapshot")));
         return new Canonical((String) row[0], (String) row[1], (long) row[2], (long) row[3], (long) row[4],
-                (UUID) row[5], decision, SupportedLocale.fromTag((String) row[7]), here, present, resources, total,
-                List.copyOf(presented));
+                (UUID) row[5], decision, SupportedLocale.fromTag((String) row[7]), here, present, resources, encounter,
+                total, List.copyOf(presented));
+    }
+
+    /**
+     * The player's view of a stored fight, holding only what every tactical receipt already shows the player: no other
+     * participant's Health, defenses, effect clocks or reaction policies, no check difficulty and no counteroffer not yet
+     * made. The acting participant and its points follow the receipt's rule (set while an activation is in progress and
+     * the fight has no verdict). The verdict is decided again from the stored state, as settlement does, so the card
+     * names the outcome that {@code SETTLE_ENCOUNTER} would finalize.
+     *
+     * @param stored the active encounter's summary row
+     * @param state its tactical state, read in the same snapshot
+     * @return the card's encounter
+     */
+    private static Encounter encounter(EncounterWriter.Stored stored, EncounterState state) {
+        boolean decided = state.phase() == EncounterPhase.OUTCOME_PENDING;
+        EncounterState.Combatant acting = decided ? null : state.acting();
+        boolean decision = state.playerDecision();
+        Negotiation.Offer open = state.openOffer();
+        EncounterOutcome verdict = decided ? EncounterOutcome.decide(state) : null;
+        return new Encounter(state.id(), stored.templateId(), state.phase().name(), state.round(),
+                acting == null ? null : acting.id(), acting == null ? null : state.actionPoints(), decision,
+                decision ? Math.max(0, state.profile().value("speechPerActivation") - state.speechUsed()) : null,
+                open == null ? null : new Offer(open.id(), open.recipient(), open.response().name(), open.terms().id(),
+                        open.terms().kind().wire(), open.terms().cost()),
+                verdict == null ? null : verdict.kind().name());
     }
 
     /** @return the audience's summary state, read in the caller's snapshot */
@@ -203,7 +238,7 @@ public class ResumeCards {
     /** Canonical part of the card, read in one snapshot. */
     private record Canonical(String title, String mode, long stateRevision, long gameTurn, long worldTime,
             UUID revisionId, String decision, SupportedLocale locale, String locationId, List<PresentActor> present,
-            List<Resource> resources, int awaitingTotal, List<Awaiting> awaiting) {
+            List<Resource> resources, Encounter encounter, int awaitingTotal, List<Awaiting> awaiting) {
     }
 
     /**
@@ -217,7 +252,7 @@ public class ResumeCards {
      * @param location the player's current location, null without a creation player or location
      * @param presentActors actors the player knows to be here, by name
      * @param resources the player's resources with exact bounds
-     * @param encounter the active encounter, always null until P11
+     * @param encounter the active encounter, or null without one (always null before P11.6-B)
      * @param pendingDecision {@code STARTING_SITUATION}, {@code FREE_INPUT} or {@code OTHER}
      * @param awaitingNarrationTotal committed actions whose narration is not published
      * @param awaitingNarration the newest {@value #MAX_AWAITING} of them
@@ -225,9 +260,43 @@ public class ResumeCards {
      * @param continuity checkpoint and summary codes
      */
     public record ResumeCard(Scope scope, String title, String mode, long gameTurn, long worldTimeSeconds,
-            Location location, List<PresentActor> presentActors, List<Resource> resources, Object encounter,
+            Location location, List<PresentActor> presentActors, List<Resource> resources, Encounter encounter,
             String pendingDecision, int awaitingNarrationTotal, List<Awaiting> awaitingNarration,
             Dependencies dependencies, Continuity continuity) {
+    }
+
+    /**
+     * The active encounter on the card (P11.6-B): where the fight stands and which explicit player decision it waits for.
+     * It is a display: reading it submits, settles or answers nothing, and no draft exists on the server to submit.
+     *
+     * @param encounterId encounter identity, the one {@code SETTLE_ENCOUNTER} names
+     * @param templateId template the fight was entered from
+     * @param phase stored lifecycle phase
+     * @param round current round, 0 before initiative
+     * @param acting participant whose activation is in progress, null between activations and once the fight has a verdict
+     * @param actionPoints the acting participant's remaining points, null whenever {@code acting} is
+     * @param playerDecision true only at the player's own {@code AWAITING_ACTION}, the one state that accepts a tactical
+     *        intention other than the initiative roll and the settlement
+     * @param speechRemaining speech-only utterances still allowed in this activation, null unless {@code playerDecision}
+     * @param offer terms waiting for the player's explicit {@code ANSWER_OFFER}, or null
+     * @param outcome verdict waiting for the player's explicit {@code SETTLE_ENCOUNTER} at {@code OUTCOME_PENDING}
+     *        ({@link EncounterOutcome.Kind} name), otherwise null
+     */
+    public record Encounter(UUID encounterId, String templateId, String phase, int round, String acting,
+            Integer actionPoints, boolean playerDecision, Integer speechRemaining, Offer offer, String outcome) {
+    }
+
+    /**
+     * Terms on the table, as the receipt that made them lists them.
+     *
+     * @param offerId offer identity {@code ANSWER_OFFER} names
+     * @param recipientId participant who answered the player's attempt
+     * @param response {@code COUNTEROFFERED} or {@code OFFERED}
+     * @param termsId declared terms
+     * @param termsKind {@code truce}, {@code recipientSurrenders} or {@code playerSurrenders}
+     * @param cost action points accepting costs
+     */
+    public record Offer(String offerId, String recipientId, String response, String termsId, String termsKind, int cost) {
     }
 
     /**

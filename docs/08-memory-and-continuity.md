@@ -669,7 +669,7 @@ reads, in one snapshot after authorizing the exact owner, adventure and campaign
 | `location` | The player's current location id with its public display name in the narrative language (`nameLocale`, `nameFallback`); null name when the pinned root has none or cannot be loaded, or the name is not public |
 | `presentActors` | Actors the player last saw at that location and has not since found absent (the player's knowledge, as in the context envelope), never real positions |
 | `resources` | The player's resources with exact bounds |
-| `encounter` | Always null until P11 |
+| `encounter` | Null without an active encounter. Since P11.6-B ([ADR 0038](adr/0038-combat-dialogue-recovery-and-the-resume-card-encounter.md)) the active encounter: `encounterId`, `templateId`, `phase`, `round`, `acting` and its `actionPoints` (set while an activation is in progress and the fight has no verdict), `playerDecision` (the player's own `AWAITING_ACTION`), `speechRemaining` (only then), `offer` waiting for an explicit `ANSWER_OFFER` (`offerId`, `recipientId`, `response`, `termsId`, `termsKind`, `cost`), and at `OUTCOME_PENDING` the `outcome` that `SETTLE_ENCOUNTER` would finalize. Never another participant's Health, defenses, effect clocks or policies, or a check's difficulty |
 | `pendingDecision` | `STARTING_SITUATION`, `FREE_INPUT` or `OTHER`, never the stored payload |
 | `awaitingNarrationTotal`, `awaitingNarration` | Committed actions without published narration (newest 16): command type, journal status, committed revision, the player-safe receipt as the mechanical recap, and the presentation state (`IN_PROGRESS` resumes by itself, or `RECEIPT` with its reason and remaining narration-only retries) |
 | `dependencies` | `status`, `mutationPaused` and the issues above |
@@ -685,6 +685,10 @@ Decisions and limits:
   computed where they are used, so a skipped pass costs only repairs of derived data.
 - The resume card is a display; it does not resume anything by itself. Narration-only retry and
   renewal remain separate owner actions (P08.5, P09.4); the interface still has no control for them.
+- Its `encounter` member (P11.6-B) answers, settles and submits nothing, and lists no legal actions:
+  the receipt of the last command keeps that role. The server holds no draft, so a reconnect has
+  nothing to resubmit. A card whose active encounter cannot be read back fails closed (503). The
+  interface does not read the member yet and still shows "None" (P12.1).
 - A missing dependency is detected only from the database: packs are stored in PostgreSQL (P04.4),
   so the realistic causes are an engine upgrade with another ruleset, storage corruption and a
   partial manual restore. Restoring a full backup brings its packs with it.

@@ -1740,6 +1740,24 @@ restore. With P11.4's defeat evidence, QA-12 is recorded as met for the backend 
 a fight; renewal and reconnect during a social check, the combat-dialogue operation and transcript, and no draft submission on
 reconnect (the rest of P11.6 and P12).
 
+P11.6-B (14 November 2026) adds the dialogue half of QA-09 and the recovery of QA-13's negotiated ending
+([ADR 0038](adr/0038-combat-dialogue-recovery-and-the-resume-card-encounter.md)), on two real PostgreSQL cases of
+`CombatRecoveryTest` over `parley-ground`. A negotiation's check cut off by a crash after its dice were reserved is left
+`VALIDATING` with its permit held. A simulated restore's startup passes end it `FAILED_BEFORE_COMMIT` and change no row of the
+fight, and a renewal is prepared from a verified checkpoint holding the spent speech and the unspent points. Every read of a
+reconnecting client writes nothing: the resume card, the public stream (a reset after the generation change), the journal
+panel, the operation status and the lost-response retry, which replays the terminal status instead of running the attempt. A
+held speech is refused by the speech limit, and later as a stale revision. The check asked again rolls exactly the reserved
+dice, pays once and answers as an independent reading of the rule expects. Its own lost response, after a second restore and
+renewal, replays the receipt and writes nothing. After an accepted counteroffer, a restore, a renewal and the same reads
+leave the agreement waiting for settlement, which the card names; a fresh answer is refused as out of turn and a held one as stale.
+The settlement adds the unfinished round's seconds once, at the boundary the checkpoint recorded, and after another restore
+and renewal its lost response and the acceptance's replay without writing. In both cases the journal lists every line of the
+conversation once, in order, and unchanged. With P11.6-A, QA-09's backend half is met: initiative, points, reactions, effects,
+resources, the draw cursor and the dialogue operation and transcript survive renewal and restore, and a reconnect submits and
+repeats nothing. QA-09 stays open for the browser path (P12.5): draft preservation, no submission of a draft held in the page,
+and renewal of a running runtime session. Also not proven: a live dump and reload of a fight.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

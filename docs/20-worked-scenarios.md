@@ -100,8 +100,12 @@ offer and the explicit `ANSWER_OFFER`: a refusal, a counteroffer and the player'
 acceptance are tested on the `parley-ground` fixture. Since P11.5-C.3 the
 explicit `SETTLE_ENCOUNTER` settles the accepted agreement once and returns the
 campaign to exploration; lost responses of the acceptance and of the settlement
-replay their receipts. Generated replies, the conversation shown after the fight
-and the composer's preview are still to come.
+replay their receipts. Since P11.6-B the same holds through a restore, session
+renewals and a reconnect: a social check cut off before its commit rolls its
+reserved dice when asked again, nothing on the server holds a draft to send, the
+resume card shows the offer or verdict still waiting for the player, and every
+line of the conversation is listed once. Generated replies, the conversation
+shown after the fight and the composer's preview are still to come.
 The player is active with 3 AP. Mira and a hostile captain are known participants
 in communicating range. The frozen encounter permits a negotiated ending and
 defines an interaction with an existing dock gate; no new ability is improvised.

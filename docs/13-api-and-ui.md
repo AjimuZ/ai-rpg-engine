@@ -421,7 +421,10 @@ answers 200 with exactly `scope` (adventure, campaign and content revision IDs, 
 `title`, `mode`, `gameTurn`, `worldTimeSeconds`, `location` (`id`, nullable public `name` in the
 narrative language with `nameLocale` and `nameFallback`; null for a legacy save without a player
 location), `presentActors` (`actorId`, `name` of actors the player last saw there and has not since
-found absent), `resources` (`key`, `minimum`, `current`, `maximum`), `encounter` (null until P11),
+found absent), `resources` (`key`, `minimum`, `current`, `maximum`), `encounter` (null without an
+active encounter; since P11.6-B `encounterId`, `templateId`, `phase`, `round`, `acting`, `actionPoints`,
+`playerDecision`, `speechRemaining`, `offer` with `offerId`, `recipientId`, `response`, `termsId`,
+`termsKind` and `cost`, and `outcome` at `OUTCOME_PENDING`; see [docs/08](08-memory-and-continuity.md#p095-restart-reconciliation-missing-dependencies-and-the-resume-card)),
 `pendingDecision` (`STARTING_SITUATION`, `FREE_INPUT` or `OTHER`), `awaitingNarrationTotal`,
 `awaitingNarration` (newest 16 committed actions without published narration: `operationId`,
 `commandType`, `status`, `committedRevision`, the player-safe `receipt` and `narration` with `mode`
@@ -612,6 +615,12 @@ backend: `SETTLE_ENCOUNTER` {encounterId} is the player's explicit confirmation 
 `NARRATIVE_RESUME`, the verdict, the final standings and `settlement` {seconds, effectsEnded}, and the campaign accepts exploration
 commands again. A lost response of the settlement, or of the negotiated ending before it, replays its own receipt. No frontend
 control sends it yet (P12), so the outcome review and its confirmation are still to be designed in the UI.
+Since P11.6-B ([ADR 0038](adr/0038-combat-dialogue-recovery-and-the-resume-card-encounter.md)) the resume card's `encounter`
+shows a reconnecting client the fight's cursor, whether the player may act, the speech left, the offer waiting for an explicit
+answer and the verdict waiting for an explicit settlement; reading it submits nothing. The server keeps no draft. A request held
+from before the reconnect is refused as a stale revision or by the rule it now breaks, an attempt cut off before its commit rolls
+its reserved dice when asked again, and the conversation's public lines are unchanged through restore, renewal and reconnect.
+No frontend control reads the member yet (P12.1), and draft preservation in the page remains P12.5.
 
 ## 8. Loading, empty, error, and recovery states
 
