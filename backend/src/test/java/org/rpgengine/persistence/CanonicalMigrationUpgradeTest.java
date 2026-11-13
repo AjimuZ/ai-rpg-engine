@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V31 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V32 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -799,6 +799,46 @@ class CanonicalMigrationUpgradeTest {
                     assertThrows(DataAccessException.class, () -> jdbc.update(ready, null, "player"), "readied values are never removed");
                     assertEquals(1, jdbc.update(ready, gear.replace("12", "13"), "player"), "but the next action replaces them");
                     assertEquals(0, v31.migrate().migrationsExecuted);
+                    // V32 records the active encounter in the operational snapshot: the applied migrations keep their
+                    // checksums, no row changes, every other member of the snapshot keeps its form, the fight waiting at
+                    // the player's decision is recorded with its cursor and roster, and a settled fight leaves it again.
+                    String withoutFight = "select (memory_operational_snapshot(?) - 'encounter')::text";
+                    String recorded = "select memory_operational_snapshot(?) #>> cast(? as text[])";
+                    assertNull(jdbc.queryForObject(recorded, String.class, campaign, "{encounter}"), "V16 records no encounter");
+                    String v31Rest = jdbc.queryForObject(withoutFight, String.class, campaign);
+                    String v31Rows = jdbc.queryForObject("select (select to_jsonb(c)::text from campaign c) || (select "
+                            + "jsonb_agg(to_jsonb(e))::text from encounter e) || (" + roster + ")", String.class);
+                    String v31Checksums = "select string_agg(version || ':' || checksum, ',' order by installed_rank) "
+                            + "from flyway_schema_history where version::int <= 31";
+                    String beforeV32 = jdbc.queryForObject(v31Checksums, String.class);
+                    Flyway v32 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("32").load();
+                    assertEquals(1, v32.migrate().migrationsExecuted);
+                    assertTrue(v32.validateWithResult().validationSuccessful);
+                    assertEquals(beforeV32, jdbc.queryForObject(v31Checksums, String.class));
+                    assertEquals(v31Rows, jdbc.queryForObject("select (select to_jsonb(c)::text from campaign c) || (select "
+                            + "jsonb_agg(to_jsonb(e))::text from encounter e) || (" + roster + ")", String.class));
+                    assertEquals(v31Rest, jdbc.queryForObject(withoutFight, String.class, campaign));
+                    assertEquals(fight.toString(), jdbc.queryForObject(recorded, String.class, campaign, "{encounter,id}"));
+                    assertEquals("AWAITING_ACTION", jdbc.queryForObject(recorded, String.class, campaign, "{encounter,phase}"));
+                    assertEquals("1|0|2|1", String.join("|", List.of("round", "actorCursor", "actionPoints", "speechUsed")
+                            .stream().map(key -> jdbc.queryForObject(recorded, String.class, campaign, "{encounter," + key + "}"))
+                            .toList()));
+                    assertEquals("player:12:0:ACTIVE,raider:9:1:SURRENDERED,rival::DEFEATED", jdbc.queryForObject("select "
+                            + "string_agg(concat_ws(':', p ->> 'id', coalesce(p ->> 'initiative', ''), p ->> 'initiativeRank', "
+                            + "p ->> 'status'), ',' order by (p ->> 'ordinal')::int) from jsonb_array_elements("
+                            + "memory_operational_snapshot(?) #> '{encounter,participants}') p", String.class, campaign));
+                    assertEquals("13", jdbc.queryForObject(recorded, String.class, campaign,
+                            "{encounter,participants,0,readied,guard}"), "the readied values are recorded too");
+                    String settleStep = "update encounter set phase = ?, row_version = row_version + 1";
+                    assertEquals(1, jdbc.update(settleStep, "RESOLVING"));
+                    assertEquals(1, jdbc.update(settleStep, "OUTCOME_PENDING"));
+                    assertEquals("OUTCOME_PENDING", jdbc.queryForObject(recorded, String.class, campaign, "{encounter,phase}"),
+                            "a fight waiting for its settlement is still recorded");
+                    assertEquals(1, jdbc.update(settleStep, "SETTLED"));
+                    assertNull(jdbc.queryForObject(recorded, String.class, campaign, "{encounter}"),
+                            "a settled fight is history, not a cursor to resume");
+                    assertEquals(0, v32.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

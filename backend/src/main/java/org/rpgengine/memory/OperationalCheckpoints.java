@@ -21,10 +21,13 @@ import org.springframework.transaction.support.TransactionTemplate;
  * summary and regenerated from canonical rows, never from a chat transcript.
  *
  * <p><b>Content.</b> The snapshot is built by the database function
- * {@code memory_operational_snapshot} (V16): counters, mode, pending decision, the player
- * character, every actor with its real location, resources, items, abilities, known quests, open
- * commitments, operations whose narration is still pending, and the RNG cursor (algorithm and draw
- * count, never the seed). It is privileged backend data and is never rendered to a limited audience.
+ * {@code memory_operational_snapshot} (V16, replaced by V32): counters, mode, pending decision, the
+ * player character, every actor with its real location, resources, items, abilities, known quests,
+ * open commitments, operations whose narration is still pending, the RNG cursor (algorithm and draw
+ * count, never the seed) and, since P11.6, the active encounter: phase, round, actor cursor, action
+ * points, speech count, the world time at which the round in progress ends, the negotiation on the
+ * table and every participant's initiative, reaction budget, local pools, stance and effect clocks
+ * (ADR 0037). It is privileged backend data and is never rendered to a limited audience.
  *
  * <p><b>Hash.</b> The snapshot is a {@code jsonb} value and its hash is the SHA-256 of PostgreSQL's
  * canonical {@code jsonb} text, computed in SQL. Equal canonical state therefore always yields the
@@ -42,8 +45,12 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Service
 public class OperationalCheckpoints {
-    /** Layout version of {@code memory_operational_snapshot}. */
-    public static final int SNAPSHOT_SCHEMA_VERSION = 1;
+    /**
+     * Layout version of {@code memory_operational_snapshot}: 1 for V16, whose encounter was always
+     * null, 2 since V32 records the active encounter. A checkpoint of another version verifies as
+     * {@code UNSUPPORTED}, never as {@code DIVERGED}, so a layout change cannot invalidate summaries.
+     */
+    public static final int SNAPSHOT_SCHEMA_VERSION = 2;
     /** SQL of the canonical snapshot hash over a jsonb expression {@code s}. */
     private static final String HASH = "encode(sha256(convert_to(s::text, 'UTF8')), 'hex')";
 
@@ -75,9 +82,9 @@ public class OperationalCheckpoints {
      *
      * @param campaign campaign identity
      * @return CAPTURED with a new checkpoint, EXISTING when this revision already has an identical
-     *         one, UNSAFE_BOUNDARY when a commit may be in progress (nothing written), or MISMATCH
-     *         when a stored checkpoint of this revision differs from canonical state (nothing
-     *         written; {@link #verify} reports the details)
+     *         one of the current layout, UNSAFE_BOUNDARY when a commit may be in progress (nothing
+     *         written), or MISMATCH when a stored checkpoint of this revision differs from canonical
+     *         state or has another layout (nothing written; {@link #verify} reports the details)
      * @throws IllegalArgumentException for an unknown campaign
      * @throws IllegalStateException inside an ambient transaction
      * @throws org.springframework.dao.DataAccessException for storage failures, including a
@@ -104,9 +111,11 @@ public class OperationalCheckpoints {
             if ((live != null && live > 0) || (committing != null && committing > 0)) {
                 return new Capture(Capture.Outcome.UNSAFE_BOUNDARY, null, revision);
             }
-            var existing = jdbc.query("select id, snapshot = memory_operational_snapshot(campaign_id) from "
-                    + "campaign_checkpoint where campaign_id = ? and state_revision = ?", (row, index) -> new Object[] {
-                            row.getObject(1, UUID.class), row.getBoolean(2)}, campaign, revision);
+            // An older layout at this revision is not the same checkpoint even when its text happens to match.
+            var existing = jdbc.query("select id, snapshot_schema_version = ? and snapshot = "
+                    + "memory_operational_snapshot(campaign_id) from campaign_checkpoint where campaign_id = ? and "
+                    + "state_revision = ?", (row, index) -> new Object[] {row.getObject(1, UUID.class),
+                            row.getBoolean(2)}, SNAPSHOT_SCHEMA_VERSION, campaign, revision);
             if (!existing.isEmpty()) {
                 return new Capture((boolean) existing.getFirst()[1] ? Capture.Outcome.EXISTING : Capture.Outcome.MISMATCH,
                         (UUID) existing.getFirst()[0], revision);

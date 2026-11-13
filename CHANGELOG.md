@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Checkpoints of a fight in progress (P11.6-A), 14 November 2026
+
+- The operational checkpoint now records the fight in progress: its phase, round, whose activation it is, the action points
+  left, the speech count, the world time at which the round in progress ends, any offer or truce, and every participant's
+  initiative, reactions, local Health and Focus, Guard stance, effect clocks, ability uses and readied equipment. A fight
+  changed outside a command is therefore detected at restart, and a renewed narrator session is prepared from a checkpoint
+  that includes the fight. Nothing in the fight itself changes: renewals still write no game state, and a fight that ended
+  inside a round still counts that round's seconds once when it is settled.
+- Migration V32 replaces the snapshot function and adds no table. Checkpoints taken by earlier versions are replaced at the next
+  start without marking any summary stale. Backups require schema 32, so an archive made by an earlier version is refused by this
+  tool. See [ADR 0037](docs/adr/0037-the-operational-checkpoint-records-the-active-encounter.md) and
+  [tools/database_backup/README.md](tools/database_backup/README.md).
+
 ## Unreleased — Settling a fight and returning to the story (P11.5-C.3), 13 November 2026
 
 - A fight that has ended no longer leaves the campaign stuck in combat. Once the outcome is shown, the player confirms it with

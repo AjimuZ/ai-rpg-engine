@@ -434,7 +434,7 @@ invalidation advances the revision, the game turn, world time or the event seque
 
 **Operational checkpoint.** `OperationalCheckpoints.capture` stores one row of the existing
 `campaign_checkpoint` table per revision. The snapshot is the `jsonb` value of the database
-function `memory_operational_snapshot` (V16), built only from canonical rows:
+function `memory_operational_snapshot` (V16, replaced by V32), built only from canonical rows:
 
 - the counters, mode and pending decision of the campaign;
 - the player character and every actor with its real location;
@@ -443,13 +443,21 @@ function `memory_operational_snapshot` (V16), built only from canonical rows:
 - operations whose narration is still pending (`COMMITTED`, `NARRATING`,
   `COMMITTED_NARRATION_PENDING`);
 - the RNG cursor: algorithm, version and number of recorded draws, never the seed;
-- `encounter`, always null until P11.
+- `encounter`: null without an active encounter. Since V32 (P11.6-A,
+  [ADR 0037](adr/0037-the-operational-checkpoint-records-the-active-encounter.md)) it holds the active
+  encounter: phase, round, actor cursor, action points, speech count, offer and truce, `roundEndsAt`
+  (the world time at which the round in progress ends, while the cursor is set), and per participant its
+  initiative, reactions, local pools, stance, effect clocks, ability uses and readied values.
+
+The layout version is 2 since V32 (1 before). A checkpoint of another version verifies `UNSUPPORTED`,
+so restart reconciliation replaces it without invalidating summaries.
 
 The hash is the SHA-256 of PostgreSQL's canonical `jsonb` text, computed in SQL, so equal state
 always gives an equal snapshot and hash. A capture runs in one repeatable-read transaction and
 returns `UNSAFE_BOUNDARY` without writing while a mutation lease is live or an operation is
 `COMMITTING` (never inside an unresolved commit race, section 7). A second capture of the same
-revision returns `EXISTING`, or `MISMATCH` when the stored row differs from canonical state.
+revision returns `EXISTING`, or `MISMATCH` when the stored row differs from canonical state or has
+another layout version.
 `verify` reports `NONE`, `CORRUPT` (snapshot no longer matches its hash), `UNSUPPORTED` (another
 layout), `INCOMPATIBLE` (pinned content or ruleset hash changed), `DIVERGED` (ahead of the campaign,
 or different at the same revision), `OUTDATED` (valid but older) or `VALID`. The snapshot is

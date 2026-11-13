@@ -1248,14 +1248,18 @@ class MemoryContinuityTest {
         return jdbc.queryForObject("select count(*) from " + table + " where campaign_id = ?", Integer.class, campaign);
     }
 
-    /** Insert a checkpoint row at the current revision with the given snapshot and hash (null: its true hash). */
+    /**
+     * Insert a checkpoint row of the current layout at the current revision with the given snapshot and
+     * hash (null: its true hash).
+     */
     private void forge(String snapshot, String hash) {
         jdbc.update("insert into campaign_checkpoint (id, campaign_id, state_revision, event_high_water, game_turn, "
                 + "world_time_seconds, content_hash, ruleset_hash, snapshot_schema_version, snapshot_hash, snapshot, "
                 + "created_at) select ?, c.id, c.state_revision, c.event_sequence, c.game_turn, c.world_time_seconds, "
-                + "r.content_hash, r.ruleset_hash, 1, coalesce(?, encode(sha256(convert_to(cast(? as jsonb)::text, "
+                + "r.content_hash, r.ruleset_hash, ?, coalesce(?, encode(sha256(convert_to(cast(? as jsonb)::text, "
                 + "'UTF8')), 'hex')), cast(? as jsonb), now() from campaign c join content_revision r on "
-                + "r.id = c.content_revision_id where c.id = ?", UUID.randomUUID(), hash, snapshot, snapshot, campaign);
+                + "r.id = c.content_revision_id where c.id = ?", UUID.randomUUID(),
+                OperationalCheckpoints.SNAPSHOT_SCHEMA_VERSION, hash, snapshot, snapshot, campaign);
     }
 
     /** @return a new NPC of the campaign */

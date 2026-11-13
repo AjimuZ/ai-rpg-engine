@@ -4416,6 +4416,55 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     loser's mode check is re-read under it, but no test races them); independent review of the new Italian statement; QA-13 is therefore recorded as met
     for the backend only ([quality](15-quality-and-acceptance.md)).
 - [ ] P11.6 Persist/recover every combat cursor, partial-round time boundary and combat-dialogue operation/transcript without duplicate social effects or settlement.
+  - P11.6-A, combat cursors and partial-round time in the checkpoint ([ADR 0037](adr/0037-the-operational-checkpoint-records-the-active-encounter.md)),
+    14 November 2026. Every combat fact was already a stored row (P11.1 to P11.5), so no state was added. V32 replaces
+    `memory_operational_snapshot`, so that the checkpoint's `encounter` member, null since V16, holds the active encounter: phase, round,
+    actor cursor, action points, speech count, opening status, passages, application counter, offer and truce, the frozen hashes, row
+    version, `roundSeconds`, and `roundEndsAt` (world time plus `roundSeconds` while the cursor is set, otherwise null, mirroring
+    `CombatScheduler`). Per participant in roster order it holds zone, standing, local Health and Focus, initiative and rank, reactions,
+    stance, effect instances, reaction policies, ability uses, readied values and row version. A campaign without an active encounter
+    keeps the V16 snapshot exactly. `OperationalCheckpoints.SNAPSHOT_SCHEMA_VERSION` is now 2, and `capture` no longer counts a
+    checkpoint of another layout as the existing one, so a V16–V31 checkpoint verifies `UNSUPPORTED` and is replaced without
+    invalidating summaries. No command, rule, receipt, event, table or column changes. The backup tool requires schema 32
+    ([README](../tools/database_backup/README.md), V32 scope).
+  - Box: unchecked. This story covers combat cursors and partial-round time. Still open in P11.6: the combat-dialogue
+    operation and transcript, renewal and reconnect during a social check, and duplicate-safe social effects across them.
+  - Observed while testing (existing behavior, unchanged): after a restore, the presentation startup pass retires narration that was
+    still queued, and the snapshot has listed that narration's status since V16. A checkpoint taken while narration was queued is
+    therefore discarded as `DIVERGED` and captured again, which also writes a `CHECKPOINT_DIVERGED` invalidation for summaries the new
+    generation has already made stale. `CombatRecoveryTest` checks that `pendingNarration` is the only member that differs.
+  - Existing tests changed: the `forge` helper of `MemoryContinuityTest` now inserts the current layout version instead of a literal
+    1, so its forged rows still reach the checks they were written for. Its cases are unchanged. `CanonicalMigrationUpgradeTest` gained
+    the V32 step: checksums of V1–V31 unchanged, no row changed, every other snapshot member unchanged, the synthetic fight recorded
+    with its cursor, roster, initiative, standings and readied Guard, and absent once it reaches `SETTLED`. None was deleted or disabled.
+  - New: `CombatRecoveryTest` 4 (real PostgreSQL, tactics fixture):
+    - the checkpoint of `venom-pit` inside round 2 after a Guard records every cursor equal to `EncounterWriter.state`, and an effect
+      clock changed outside a command verifies `DIVERGED` and is replaced;
+    - a simulated restore inside a round, with a strike cut off before its commit by an injected `campaign_event` failure: the backup
+      tool's retirement statement, then `JournalRecoveryService`, `PresentationJobService.reconcile` and `MemoryReconciliation`. No row
+      of the campaign (beyond its generation and row version), actors, pools, conditions, equipment, items, abilities, events, draws or
+      fight changes. The strike asked again gets the cut attempt's draws exactly and leaves 1 of 3 points, the restored round is the one
+      that ends, the player's poison ticks once there, and initiative is unchanged;
+    - `clock-pit` over three round ends with a renewal before each and two between each commit and its retry: each renewal is
+      `Ready` on a `VALID` checkpoint holding the stored clocks and writes no canonical row; the idol ticks 2 times with distinct
+      keys, the reed once, retries tick nothing, and the clock moves 8 seconds per round end; at the outcome `roundEndsAt` is null
+      and the settlement adds no time;
+    - a `close-rush` victory inside a round records `roundEndsAt` = clock + 8, keeps it through a simulated restore, and settles to
+      exactly that time once; the retried settlement replays and adds nothing.
+  - Verification (14 November 2026, JDK 21 and PostgreSQL 18.6 in the images pinned by ADR 0009, on the Windows reference host):
+    `sh .agents/ralph/verify.sh backend -Dtest=CombatRecoveryTest,CanonicalMigrationUpgradeTest,MemoryContinuityTest` passed 18 tests
+    (4, 1 and 13) with 0 failures, 0 errors and 0 skipped. After the divergence assertions were added to `CombatRecoveryTest`,
+    `sh .agents/ralph/verify.sh backend -Dtest=CombatRecoveryTest` passed 4 of 4, and
+    `sh .agents/ralph/verify.sh backend -Dtest=AdventureIsolationTest,MemoryStartupReconciliationTest,CampaignCreationHttpTest,CanonicalFoundationsPersistenceTest,SettlementCommandsTest,EngineApplicationTest`
+    passed 52 tests with 0 failures, 0 errors and 0 skipped. `sh .agents/ralph/verify.sh repo` passed (diff check, line endings,
+    repository checks, repository tests 40 run with 11 skipped, backup tests 9 run with 1 skipped, including
+    `test_scope_matches_backend_migrations` at schema 32).
+  - Not proven: `verify.sh full` and `verify.sh containers` were not run by this session; a live dump and reload of a fight (the
+    restore rehearsal holds no encounter); an operation left `VALIDATING` by a crash (the cut attempt fails inside its own commit and
+    ends `FAILED_BEFORE_COMMIT` directly, the state journal recovery would give it); renewal of a running runtime session (the
+    renewals call `SessionRehydration.prepare` directly); a retry through HTTP; deliberate weakenings, none of which were run. The
+    resume card's `encounter` field is still always null. QA-12 is recorded as met for the backend only; QA-09 stays open
+    ([quality](15-quality-and-acceptance.md)).
 
 **Exit:** seeded fights produce reproducible legal outcomes and all terminal paths return to a valid narrative state. **Checks:** QA-09, QA-11–13, effect properties and restore mid-round. **Suggested commit:** `Implement deterministic turn-based combat`.
 

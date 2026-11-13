@@ -242,6 +242,19 @@ JSON types and to belong only to an actor-backed participant. The `encounter_par
 updates (readied values are replaced, never removed). A restore inserts rows, so only the check constraints apply to restored
 values. Offline checks cover the V31 manifest/catalog; no live V31 dump/restore rehearsal has been run.
 
+V32 scope (P11.6-A) adds no table and changes no row: it replaces the `memory_operational_snapshot` function so that an
+operational checkpoint also records the campaign's active encounter (phase, round, actor cursor, action points, speech count,
+the world time at which the round in progress ends, the offer and truce, and every participant's initiative, reaction budget and
+policies, local pools, stance, effect instances, ability uses and readied values). This is snapshot layout version 2. A restore
+brings `campaign_checkpoint` rows back as they were, and the retirement step above changes only columns the snapshot does not
+read. Startup then retires narration that was still queued, and the snapshot has listed that narration's status since V16, so a
+checkpoint taken while narration was queued is discarded as `DIVERGED` (which also invalidates the summaries that the new
+generation has already made stale) and captured again. Its encounter, resources, items and RNG members stay the same. A checkpoint
+of layout version 1 (from V16–V31) verifies `UNSUPPORTED`, and startup reconciliation discards it without invalidating any summary,
+then captures a new one. Offline checks cover the V32 manifest/catalog. `CombatRecoveryTest` runs the retirement statement and the
+journal, presentation and memory startup passes on a fight stopped inside a round, on the same database rather than a dump, and the
+fight continues from the same cursors. No live V32 dump/restore rehearsal has been run, and the rehearsal below holds no encounter.
+
 ## Live two-genre rehearsal (P06.5-B.1, V26)
 
 `tools/container_packaging/test_restore_isolation.py` runs this tool as an operator would on a populated world, then

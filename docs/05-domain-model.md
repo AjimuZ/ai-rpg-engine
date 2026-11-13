@@ -366,7 +366,9 @@ docs/11 state machine (a trigger mirrors `EncounterPhase`), and a campaign has a
 `encounter_participant` holds the roster: the player at ordinal 0 backed by its actor (Health and Focus stay in
 `actor_resource`) and each template participant with encounter-local Health and Focus, a side, a zone and a
 status (`ACTIVE`, `DEFEATED`, `ESCAPED`, `SURRENDERED`). Initiative, activations, action points, reactions and
-effect timers were added by P11.2 to P11.4; the V16 checkpoint still records `"encounter": null` until P11.6.
+effect timers were added by P11.2 to P11.4. Since V32 (P11.6-A, [ADR 0037](adr/0037-the-operational-checkpoint-records-the-active-encounter.md))
+the operational checkpoint records the active encounter with all of these and the world time at which the round in progress ends;
+a campaign without an active encounter still records `"encounter": null`.
 Since P11.5 ([ADR 0032](adr/0032-terminal-predicates-from-committed-state.md)) the scheduler stores `OUTCOME_PENDING` when
 a terminal predicate holds. No column stores the outcome: it follows from the row and is stated by a public event. The cursor
 stays set when the fight ended inside a round, and is empty when it ended at a round end. Since V30

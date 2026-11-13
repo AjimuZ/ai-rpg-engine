@@ -51,6 +51,8 @@ Before entry, persist a validated roster, profiles, zones, equipment, conditions
 
 **Since P11.5-C.3** ([ADR 0036](adr/0036-explicit-settlement-and-the-return-to-narrative.md)) the last two arrows run: the player's explicit `SETTLE_ENCOUNTER` writes `SETTLED` and then `NARRATIVE_RESUME` as two checked row versions, with no activation cursor, and returns the campaign to exploration in the same commit (section 14). Both phases are inactive, so the campaign can enter another encounter afterwards. No column or migration was needed.
 
+**Since P11.6-A** ([ADR 0037](adr/0037-the-operational-checkpoint-records-the-active-encounter.md)) the operational checkpoint records the active encounter (V32): phase, round, actor cursor, remaining action points, speech count, the offer and truce, `roundEndsAt` (the world time at which the round in progress ends, set while the cursor is set), and per participant its initiative, rank, reaction budget and policies, local pools, stance, effect instances with their clocks, ability uses and readied values. No state was added for this: every fact above was already a stored row, so a restart, a restore or an AI renewal keeps the fight by keeping its rows, and the checkpoint lets restart reconciliation detect a fight changed outside a command. Combat-dialogue operations and transcripts remain for the rest of P11.6.
+
 ## 3. Encounter entry
 
 A committed action, world trigger, or player-confirmed hostile intent can request combat. A mere narrative mention of a monster does not start a fight. Codex may propose an encounter when appropriate, but the engine validates it before any attack or resource loss.

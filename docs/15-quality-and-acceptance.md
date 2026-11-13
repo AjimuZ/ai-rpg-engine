@@ -1725,6 +1725,21 @@ With refused negotiation, the counteroffer and explicit acceptance from P11.5-B,
 two different settlement requests racing (they serialize on the campaign lock, and the loser's mode check is re-read under it, but no
 concurrency test exists), a settlement retry through HTTP, and the browser path (P12); so QA-13 is recorded as met for the backend only.
 
+P11.6-A (14 November 2026) adds the restore and renewal halves of QA-09 for combat state and the renewal half of QA-12
+([ADR 0037](adr/0037-the-operational-checkpoint-records-the-active-encounter.md)), on `CombatRecoveryTest` (real PostgreSQL) and the V32
+step of `CanonicalMigrationUpgradeTest`. The operational checkpoint now records a fight inside a round with its phase, round, cursor,
+action points, the world time at which the round ends, and each participant's initiative, rank, reactions, stance, effect clocks and
+local Health, beside the player's pool and the draw count. A simulated restore inside a round (the backup tool's retirement statement,
+then the journal, presentation and memory startup passes, on the same database) changes no row of the fight, pools, items, events or
+draws. The fight then continues from the same points and round, a strike cut off before its commit gets its reserved dice again, the
+poison held through the restore ticks once at that round's end, and nobody rolls initiative again. Around each of three round ends,
+renewals prepared from a verified checkpoint write no canonical row, each effect clock ticks once per round end, and a retried commit
+ticks nothing again. A fight decided inside a round settles its eight seconds once, at the boundary its checkpoint recorded, after a
+restore. With P11.4's defeat evidence, QA-12 is recorded as met for the backend only: the renewals were prepared directly through
+`SessionRehydration`, not by a scheduled renewal of a running runtime session. QA-09 stays open. Not proven: a live dump and reload of
+a fight; renewal and reconnect during a social check, the combat-dialogue operation and transcript, and no draft submission on
+reconnect (the rest of P11.6 and P12).
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

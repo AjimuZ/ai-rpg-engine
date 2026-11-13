@@ -1267,6 +1267,24 @@ the catalogues of its packages A and B, fails a test; the roadmap entry lists th
 Limits: no reward, loot, recovery rule, effect conversion or escape destination exists yet (P13); a fight that ended inside a round
 cannot settle within one round of the clock's end; no frontend control sends the command yet (P12).
 
+## Checkpoints of a fight in progress (P11.6-A)
+
+Migration V32 replaces `memory_operational_snapshot`, so that the `encounter` member of an operational checkpoint holds the
+campaign's active encounter instead of null
+([ADR 0037](../docs/adr/0037-the-operational-checkpoint-records-the-active-encounter.md)). It records the phase, round, actor cursor,
+action points, speech count, opening status, passages, application counter, offer and truce, the frozen hashes, and `roundSeconds`
+with `roundEndsAt`: the world time at which the round in progress ends, set only while the cursor is set. Per participant, in roster
+order, it records the zone, standing, local Health and Focus, initiative and rank, reactions, stance, effect instances, reaction
+policies, ability uses and readied values. `OperationalCheckpoints.SNAPSHOT_SCHEMA_VERSION` is 2, and `capture` no longer takes a
+checkpoint of another layout for the existing one, so a version 1 checkpoint verifies `UNSUPPORTED` and restart reconciliation
+replaces it without invalidating summaries. No command, rule, receipt or event changes. Tests: `CombatRecoveryTest` (PostgreSQL: the
+recorded cursors; a simulated restore inside a round, with a strike cut off before its commit, after which the fight continues from
+the same points, round, clocks and draws; renewals around every round end of a poisoned fight; a fight decided inside a round settled
+once at its recorded boundary after a restore) and the V32 step of `CanonicalMigrationUpgradeTest`.
+
+Limits: combat-dialogue operations and transcripts are not covered yet (P11.6, P12); the restore in the test runs the backup tool's
+retirement statement and the startup passes on the same database, not a dump and reload.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.
