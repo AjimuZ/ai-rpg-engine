@@ -1219,6 +1219,22 @@ Limits: nothing leaves `OUTCOME_PENDING` until settlement exists; terms cost poi
 intent but `negotiate` records its result and changes nothing else; morale, knowledge and objective policies and a recipient
 proposing terms by itself are not modelled (P12.3/P12.4); no generated reply, preview, confirmation or panel yet (P12).
 
+## Ready/equip and Assess (P11.5)
+
+`READY_ITEM` {itemInstanceId, change} and `ASSESS` {targetId} are tactical commands
+([ADR 0034](../docs/adr/0034-ready-equip-and-assess-in-a-fight.md)). `TacticalRules` checks the turn, prevention, the Assess target
+(`canAssess`) and `readyCost`/`assessCost`; `CommandRules` then applies the exploration equipment rules to a readied item and refuses
+a weapon whose hit applies an effect the fight did not freeze. `LocalActionResolver` computes the player's new Guard, armor and
+attacks with `ReadiedGear.of` (the same `EncounterGear.worn` arithmetic as entry), and `CombatScheduler.ready` charges the action
+and takes them over; the equipment change is the commit's item effect, written only when the scheduler readied the item.
+`CombatScheduler` resolves `ASSESS` as a recorded `2d10 + insight` check against the target's effective Resistance. V31 adds
+`encounter_participant.readied`, which `EncounterWriter.state` reads in place of the frozen values; the backup tool covers schema 31.
+`READY_ITEM` is in the catalog preload set of `CommandRuleCatalogs`, like `COMBAT_USE_ITEM`. Tests: `ReadyAssessTest` (pure) and
+`ReadyAssessCommandsTest` (PostgreSQL).
+
+Limits: one item per action and no swap; non-player participants neither ready nor assess (P12.3/P12.4); revealed values are kept
+only in the event and that receipt; Withdraw, the stalemate policy and settlement remain.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

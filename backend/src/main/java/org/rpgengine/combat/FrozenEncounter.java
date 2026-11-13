@@ -314,24 +314,11 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
             roles.put(role, value);
         }
         var focus = profile.focus() == null || player.focus() == null ? new Pool(0, 0) : player.focus();
-        long guard = 0;
-        long armor = 0;
-        var attacks = new ArrayList<CombatAttack>();
-        // Sorted and distinct, so the frozen attacks and their order follow from what is worn, not from storage order.
-        for (String item : new java.util.TreeSet<>(player.worn())) {
-            EncounterGear worn = gear.get(item);
-            if (worn != null) {
-                guard += worn.guard() * java.util.Collections.frequency(player.worn(), item);
-                armor += worn.armor() * java.util.Collections.frequency(player.worn(), item);
-                if (worn.attack() != null) {
-                    long rank = worn.skill() == null ? 0 : player.skills().getOrDefault(worn.skill(), 0L);
-                    attacks.add(worn.attack().forWearer(item, Math.toIntExact(
-                            Math.min(rank, CombatProfile.ATTACK_SKILL_MAX))));
-                }
-            }
-        }
-        guard = Math.min(guard, profile.value("equipmentGuardCap"));
-        armor = Math.min(armor, profile.value("armorMax"));
+        // The same combination a Ready/equip action recomputes later (P11.5), so both agree on one set's worth.
+        var wornGear = EncounterGear.worn(player.worn(), gear, player.skills(), profile);
+        long guard = wornGear.guard();
+        long armor = wornGear.armor();
+        var attacks = wornGear.attacks();
         // Sorted, so the frozen form follows from what is learned, not from storage order. Brace needs no learning.
         var abilities = new ArrayList<CombatAbility>();
         var reactions = new ArrayList<CombatReaction>();

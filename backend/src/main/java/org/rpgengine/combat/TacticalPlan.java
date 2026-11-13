@@ -16,7 +16,8 @@ import java.util.UUID;
  * whose tactical facts changed, each guarded by the row version read. Since P11.3 a plan also carries what an attack
  * changes outside the encounter row: the player's Health, as a delta for the commit's resource effects, and the
  * ammunition consumed, as item effects. Since P11.4 the player's Focus moves the same way, and each participant's update
- * holds its active effects, reaction policies and ability uses.
+ * holds its active effects, reaction policies and ability uses. Since P11.5 the player's update can also hold the
+ * {@link ReadiedGear} a Ready/equip action computed; the equipment assignment itself is the commands layer's item effect.
  *
  * @param encounterId the active encounter
  * @param baseRowVersion encounter row version the plan was calculated from
@@ -119,11 +120,22 @@ public record TacticalPlan(UUID encounterId, long baseRowVersion, List<Step> ste
      * @param effects active effect instances after the operation
      * @param policies reaction policies after the operation
      * @param uses ability uses after the operation
+     * @param readied the player's equipment-derived values a Ready/equip action of this operation set (P11.5), or null when
+     *        the operation readied nothing, which keeps whatever the row holds
      */
     public record ParticipantUpdate(String participantId, long expectedRowVersion, String zone, Integer initiative,
             Integer rank, int reactions, EncounterState.Status status, Integer health, boolean guarding, Integer focus,
             List<CombatEffects.Active> effects, Map<String, CombatReaction.Policy> policies,
-            Map<String, CombatAbility.Use> uses) {
+            Map<String, CombatAbility.Use> uses, ReadiedGear readied) {
+        /** Final facts of an operation that readied nothing, the shape used before P11.5. */
+        public ParticipantUpdate(String participantId, long expectedRowVersion, String zone, Integer initiative,
+                Integer rank, int reactions, EncounterState.Status status, Integer health, boolean guarding, Integer focus,
+                List<CombatEffects.Active> effects, Map<String, CombatReaction.Policy> policies,
+                Map<String, CombatAbility.Use> uses) {
+            this(participantId, expectedRowVersion, zone, initiative, rank, reactions, status, health, guarding, focus, effects,
+                    policies, uses, null);
+        }
+
         /** Require identities; copy the collections. */
         public ParticipantUpdate {
             Objects.requireNonNull(participantId, "participantId");

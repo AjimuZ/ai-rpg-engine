@@ -373,7 +373,10 @@ stays set when the fight ended inside a round, and is empty when it ended at a r
 ([ADR 0033](adr/0033-negotiation-explicit-answers-and-surrender.md)) the row also holds `open_offer`, the one set of terms waiting
 for the player's explicit answer, only at `AWAITING_ACTION`, and `agreement`, the accepted truce, only with the outcome it causes
 and never changed. `SURRENDERED` is set only by accepted terms and is never undone; a surrendered participant keeps its Health and
-holds no stance or effect.
+holds no stance or effect. Since V31 ([ADR 0034](adr/0034-ready-equip-and-assess-in-a-fight.md)) the player's participant row also
+holds `readied`, the Guard, armor, attacks and worn items its last Ready/equip action left, which replace the frozen values for the
+rest of the fight; only an actor-backed participant can hold it, and once set it is replaced, never removed. The equipment
+assignment itself stays in `equipment_assignment`, changed by the same commit.
 
 Since P11.2 (V23, [ADR 0029](adr/0029-initiative-rounds-activations-and-bounded-combat-dialogue.md)) the
 encounter row also holds the tactical cursor: `actor_cursor` (initiative rank of the acting participant) and

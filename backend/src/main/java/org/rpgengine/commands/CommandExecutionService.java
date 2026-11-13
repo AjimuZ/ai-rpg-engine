@@ -266,13 +266,16 @@ public class CommandExecutionService {
         // Learned abilities, whose combat forms an encounter entry freezes (P11.4).
         var learned = new java.util.HashSet<>(jdbc.queryForList("select definition_id from learned_ability "
                 + "where campaign_id = ? and actor_id = ?", String.class, campaign, player));
+        // The worn instances themselves, so readying in a fight knows which stacks stay spendable (P11.5).
+        var wornInstances = new java.util.HashSet<>(jdbc.queryForList("select item_instance_id from equipment_assignment "
+                + "where campaign_id = ? and actor_id = ?", UUID.class, campaign, player));
         // The active encounter's tactical state, read only for a tactical intention (P11.2).
         var encounter = tactical ? EncounterWriter.state(jdbc, campaign).orElseThrow(
                 () -> new IllegalStateException("validated tactical intention has no active encounter")) : null;
         return new LocalActionResolver.Snapshot(player, actor.getKey().orElse(null), actor.getValue(),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[0]),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[1]), pools, vocabularies, operation, stacks,
-                stored, clock, conditions, worn, encounter, learned);
+                stored, clock, conditions, worn, encounter, learned, wornInstances);
     }
 
     /**
@@ -280,11 +283,12 @@ public class CommandExecutionService {
      * quest commands, rest, and movement (a new visit or its duration can satisfy a quest objective).
      * Waiting needs it too since P10.4, because a clock predicate can become true as time passes. Speech
      * changes no fact a quest predicate reads, and a tactical intention (P11.2) reads only the frozen
-     * encounter, so a fight in progress never depends on reloading the pinned pack. The exception is using
-     * an item in a fight (P11.3): its use contract is pinned pack data, like outside a fight.
+     * encounter, so a fight in progress never depends on reloading the pinned pack. The exceptions are the two item
+     * intentions of a fight: using an item (P11.3), whose use contract is pinned pack data like outside a fight, and
+     * readying one (P11.5), whose slot, hands and combat data are too.
      */
     private static boolean needsCatalog(TypedCommand command) {
-        return command instanceof TypedCommand.CombatUseItem
+        return command instanceof TypedCommand.CombatUseItem || command instanceof TypedCommand.ReadyItem
                 || !(command instanceof TypedCommand.Speak) && !(command instanceof TypedCommand.Tactical);
     }
 

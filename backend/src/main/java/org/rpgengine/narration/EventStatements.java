@@ -431,6 +431,45 @@ public final class EventStatements {
                 yield it ? participant + " usa " + item + on + " (" + points(true, points) + ")" + restored + "."
                         : participant + " uses " + item + on + " for " + points(false, points) + restored + ".";
             }
+            case "ITEM_READIED" -> {
+                // P11.5: one equipment change in a fight; the player's own Guard and armor stay in the receipt.
+                String participant = participant(payload, names);
+                String item = token(payload, "definitionId");
+                String slot = token(payload, "slot");
+                String change = token(payload, "change");
+                Long points = number(payload, "actionPoints");
+                if (participant == null || item == null || slot == null || points == null
+                        || !("EQUIPPED".equals(change) || "UNEQUIPPED".equals(change))) {
+                    yield null;
+                }
+                boolean on = "EQUIPPED".equals(change);
+                yield it ? participant + (on ? " prepara " : " ripone ") + item + " (" + slot + ", " + points(true, points) + ")."
+                        : participant + (on ? " readies " : " stows ") + item + " (" + slot + ") for " + points(false, points) + ".";
+            }
+            case "ASSESSMENT_RESOLVED" -> {
+                // P11.5: the values appear only after a success, and only those the event carries; the difficulty stays internal.
+                String participant = participant(payload, names);
+                String target = token(payload, "targetId");
+                Long total = number(payload, "total");
+                if (participant == null || target == null || total == null || !payload.path("success").isBoolean()) {
+                    yield null;
+                }
+                if (!payload.path("success").asBoolean()) {
+                    yield it ? participant + " valuta " + target + " (totale " + total + ") senza scoprire nulla."
+                            : participant + " assesses " + target + " (total " + total + ") and learns nothing.";
+                }
+                JsonNode revealed = payload.path("revealed");
+                Long health = number(revealed, "health");
+                Long maximum = number(revealed, "healthMax");
+                Long guard = number(revealed, "guard");
+                Long resistance = number(revealed, "resistance");
+                Long armor = number(revealed, "armor");
+                yield health == null || maximum == null || guard == null || resistance == null || armor == null ? null
+                        : it ? participant + " valuta " + target + " (totale " + total + "): Salute " + health + " su " + maximum
+                                + ", Guardia " + guard + ", Resistenza " + resistance + ", armatura " + armor + "."
+                        : participant + " assesses " + target + " (total " + total + "): Health " + health + " of " + maximum
+                                + ", Guard " + guard + ", Resistance " + resistance + ", armor " + armor + ".";
+            }
             case "REACTION_RESOLVED" -> {
                 // P11.4: which predeclared reaction fired; its Focus, budget and effect on a hidden defense stay unstated.
                 String participant = participant(payload, names);

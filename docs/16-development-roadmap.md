@@ -4188,7 +4188,8 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     `EncounterOutcome.decide` over `EncounterState`, which now carries the frozen objectives; `CombatScheduler` stops at `OUTCOME_PENDING`
     from `RESOLVING`, `ACTOR_START` and `ROUND_END`; public `ENCOUNTER_OUTCOME_PENDING` with EN/IT statements; receipt `combat.outcome`. No migration.
   - Remaining for this task, so its box stays unchecked: the stalemate policy, idempotent settlement, the return to narrative, and the
-    decision on Withdraw, Ready and Assess. Surrender and agreement predicates and refused, counteroffered and accepted negotiation came with Package B, below.
+    decision on Withdraw, Ready and Assess. Surrender and agreement predicates and refused, counteroffered and accepted negotiation came with Package B, below;
+    Ready/equip and Assess came with P11.5-C.1, below.
   - Limits of this package: nothing leaves `OUTCOME_PENDING` until settlement exists, so a campaign whose fight ended stays in encounter
     mode and refuses every command; a round left unfinished adds no world time; the player's status stays `ACTIVE` after an escape; hostiles
     who all escaped or surrendered read as a victory, though no code sets those statuses yet; a surrendered player gets no verdict;
@@ -4245,6 +4246,45 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     `.local/scratch/p115b/` (ignored and not committed), with 106 weakenings of pure rules, which the owner or a later session must still run; it covers neither V30 nor the receipts. `s-read-agreement` should survive as
     equivalent, because no operation runs once an agreement exists. Also not proven: `verify.sh containers`; a live V30 dump and restore; settling a negotiated ending, its lost-response
     retry beyond the outcome, and any path back to narrative; renewal or restore during a social check (P11.6); independent review of the new Italian message and statements; balance of the difficulty and margins.
+  - P11.5-C.1, Ready/equip and Assess ([ADR 0034](adr/0034-ready-equip-and-assess-in-a-fight.md)), partial progress of 13 November 2026: `READY_ITEM` {itemInstanceId,
+    change: `equip` | `unequip`} for `readyCost` changes one real equipment assignment under the `EQUIP_ITEM`/`UNEQUIP_ITEM` rules, refuses a full slot or too few hands
+    instead of emptying one, and refuses a weapon whose hit applies an effect the fight did not freeze (`EFFECT_UNSUPPORTED`); the player's new Guard, armor and attacks
+    are computed once with entry's arithmetic (`EncounterGear.worn`, now shared with `FrozenEncounter.freeze`) and stored beside the frozen profile in V31
+    `encounter_participant.readied`. `ASSESS` {targetId} for `assessCost` draws `2d10 + insight` against the target's effective Resistance and reveals its current and
+    maximum Health, Guard, Resistance and armor only on success. Both pass through `RESOLVING`, run declared-action ticks, lapse an offer and are refused while prevented.
+    Public `ITEM_READIED` and `ASSESSMENT_RESOLVED` with EN/IT statements, internal `ASSESSMENT_CALCULATED`, receipt `combat.readied`, `combat.assessment`,
+    `options.ready` and `options.assess`; `READY_ITEM` joins the catalog preload set; backup schema 31. No new refusal category or message.
+  - Remaining for this task, so its box stays unchecked: Withdraw, the stalemate policy, idempotent settlement and the return to narrative.
+  - Limits of this story: one item per action and no swap; non-player participants neither ready nor assess (P12.3/P12.4); revealed values live only in the event and that
+    receipt; the Insight check against Resistance is a provisional rule (P18.3); no frontend control (P12).
+  - Existing behavior and tests changed: every tactical receipt's `options` gains `ready` and `assess`; the `sample:armory-tactics` fixture gains a `venom-blade` item and
+    a `searing` condition (99 damage at each declared action). Existing
+    test classes only gained cases (`TypedCommandTest`, `EventStatementsTest`, the V31 step of `CanonicalMigrationUpgradeTest`; a comment in `EngineApplicationTest`); none
+    was changed, deleted or disabled.
+  - Verification (13 November 2026, JDK 21.0.12.1 and PostgreSQL 18.6 in the images pinned by ADR 0009, on the Windows reference host), each with
+    `sh .agents/ralph/verify.sh backend -Dtest=…`: `ReadyAssessTest` 12 (pure: all 100 dice pairs against an independent model, a Resistance effect raising the bar, every
+    target rule, sight from inside an obscured zone, offer lapse, prevention and turn, a fall on the declared tick, readied values taken over with their ammunition, stowing,
+    cost and contradiction, entry-equal arithmetic with both caps and the rank cap, the readied sheet) and `ReadyAssessCommandsTest` 8 (PostgreSQL: the shield-for-caster
+    swap, a shot with the readied weapon, a stowed sword refused, the cloak's armor removed, a replayed retry writing nothing, every illegal, unaffordable and ambiguous
+    readying writing nothing, the frozen-effect rule in two fights, a fall on the declared tick changing no equipment, assessments revealing only on success with hidden
+    difficulty and no new draw on retry, illegal assessments, the V31 guards) passed, as did `TypedCommandTest` 20, `EventStatementsTest` 10,
+    `CanonicalMigrationUpgradeTest` 1 and `EngineApplicationTest` 3. A run of the `commands`, `content`, `narration`, `persistence`, `panels`, `characters`, `combat` and
+    `rules` test packages passed 883 tests with 0 failures before the fall case and its fixture condition were added; after them, `ReadyAssessCommandsTest`, every
+    `combat` test class, `CombatPackTest`, `ReactionCommandsTest` and `NegotiationCommandsTest` passed 245 tests with 0 failures.
+    `py -B -m unittest discover -s tools/database_backup` ran 9 tests, OK, 1 skipped, and `sh .agents/ralph/verify.sh repo` passed (diff check, line endings, repository
+    checks, repository tests, backup tests) on the final tree; only the wording of this sentence changed after that run.
+  - Weakenings: 38 on an exported copy (`.local/scratch/p115c1/copy`, ignored), each run with `sh .agents/ralph/verify.sh backend` from the copy after a passing
+    baseline and restored before the next; the copy then matched the live `backend/src` exactly (`diff -rq`, no output). All 38 failed at least one test, none by a compile
+    error: Ready and Assess costs, every `canAssess` clause, prevention, effects in the difficulty, revealing on failure, the role, payment, offer lapse, the declared-tick
+    guard, readied values, ammunition, the working sheet, the contradiction check, `Working.changed`, finesse in Guard, both counts in `EncounterGear.worn`, the frozen-effect,
+    unequip and equip rules, the equipment write, the readied write and read, the three V31 guards (run with `CanonicalMigrationUpgradeTest` on a fresh database), the
+    catalog preload, the receipt's revealed values, the exact `change` values and a statement with a missing value. The 38th, writing the equipment change even when the
+    scheduler readied nothing, first survived because no fixture could fell the player on a declared-action tick through PostgreSQL; the `searing` condition and
+    `ReadyAssessCommandsTest.aFallOnTheDeclaredTickReadiesNothing` were added, and on a fresh export it failed that test. The first 37 were not rerun after that
+    addition, which only added a test and a fixture condition.
+  - Not proven here: `verify.sh full` and `verify.sh containers` were not run by this session (the runner runs the plan); ammunition excluded when worn, which no
+    fixture exercises; a retry through the HTTP layer; a live V31 dump and restore; independent review of the four new Italian statements;
+    balance of the Insight check.
 - [ ] P11.6 Persist/recover every combat cursor, partial-round time boundary and combat-dialogue operation/transcript without duplicate social effects or settlement.
 
 **Exit:** seeded fights produce reproducible legal outcomes and all terminal paths return to a valid narrative state. **Checks:** QA-09, QA-11–13, effect properties and restore mid-round. **Suggested commit:** `Implement deterministic turn-based combat`.

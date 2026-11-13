@@ -352,6 +352,30 @@ class TypedCommandTest {
         assertInvalid("COMBAT_USE_ITEM", Map.of("itemInstanceId", "not-a-uuid"));
         assertInvalid("COMBAT_USE_ITEM", Map.of("itemInstanceId", instance.toString(), "targetId", ""));
         assertInvalid("COMBAT_USE_ITEM", Map.of("itemInstanceId", instance.toString(), "healed", 8));
+        // P11.5: readying names the instance and says which change it means; nothing toggles. Assessing names a target.
+        for (String type : List.of("READY_ITEM", "ASSESS")) {
+            assertTrue(TypedCommand.registered(type), type);
+        }
+        assertEquals(new TypedCommand.ReadyItem(instance, "equip"),
+                decode("READY_ITEM", Map.of("itemInstanceId", instance.toString(), "change", "equip")));
+        assertEquals(new TypedCommand.ReadyItem(instance, "unequip"),
+                decode("READY_ITEM", Map.of("itemInstanceId", instance.toString(), "change", "unequip")));
+        assertEquals(Map.of("itemInstanceId", instance.toString(), "change", "equip"), new TypedCommand.ReadyItem(instance, "equip").payload());
+        assertEquals(new org.rpgengine.combat.TacticalIntent.Ready(true), new TypedCommand.ReadyItem(instance, "equip").intent());
+        assertEquals(new org.rpgengine.combat.TacticalIntent.Ready(false), new TypedCommand.ReadyItem(instance, "unequip").intent());
+        assertInvalid("READY_ITEM", Map.of("itemInstanceId", instance.toString()));
+        assertInvalid("READY_ITEM", Map.of("change", "equip"));
+        assertInvalid("READY_ITEM", Map.of("itemInstanceId", instance.toString(), "change", "toggle"));
+        assertInvalid("READY_ITEM", Map.of("itemInstanceId", instance.toString(), "change", "EQUIP"));
+        assertInvalid("READY_ITEM", Map.of("itemInstanceId", "not-a-uuid", "change", "equip"));
+        assertInvalid("READY_ITEM", Map.of("itemInstanceId", instance.toString(), "change", "equip", "slot", "off-hand"));
+        assertEquals(new TypedCommand.Assess("raider"), decode("ASSESS", Map.of("targetId", "raider")));
+        assertEquals(new org.rpgengine.combat.TacticalIntent.Assess("raider"), new TypedCommand.Assess("raider").intent());
+        assertEquals(Map.of("targetId", "raider"), new TypedCommand.Assess("raider").payload());
+        assertInvalid("ASSESS", Map.of());
+        assertInvalid("ASSESS", Map.of("targetId", ""));
+        assertInvalid("ASSESS", Map.of("targetId", "x".repeat(129)));
+        assertInvalid("ASSESS", Map.of("targetId", "raider", "reveal", "health"));
         assertEquals(500, decodeSpeech("x".repeat(500)).text().length());
         assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.MoveZone(null));
         assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.Interact("taunt", " "));

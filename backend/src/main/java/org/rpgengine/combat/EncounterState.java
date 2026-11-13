@@ -138,6 +138,16 @@ public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int
             conditions = List.copyOf(conditions);
         }
 
+        /**
+         * @param readied the values a Ready/equip action computed (P11.5)
+         * @return the same sheet with the readied Guard, armor and attacks; roles, Resistance, abilities, reactions and
+         *         entry conditions do not depend on equipment and stay as frozen
+         */
+        public Sheet withGear(ReadiedGear readied) {
+            return new Sheet(readied.guard(), resistance, readied.armor(), roles, readied.attacks(), abilities, reactions,
+                    conditions);
+        }
+
         /** @return the frozen ability with this ID, or null */
         public CombatAbility ability(String id) {
             return abilities.stream().filter(ability -> ability.id().equals(id)).findFirst().orElse(null);
@@ -224,7 +234,8 @@ public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int
      * @param health current Health above the pool's minimum (P11.3)
      * @param healthMax Health maximum above the pool's minimum
      * @param guarding whether its Guard action holds until the start of its next activation
-     * @param sheet frozen fighting values
+     * @param sheet frozen fighting values; since P11.5 the player's Guard, armor and attacks are its {@link ReadiedGear}
+     *        once a Ready/equip action changed what it wears
      * @param focus current Focus above the pool's minimum, 0 without a Focus mechanic (P11.4)
      * @param focusMax Focus maximum above the pool's minimum (P11.4)
      * @param effects active effect instances in application order (P11.4)

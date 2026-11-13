@@ -174,7 +174,9 @@ public final class CommandReceipts {
      * public standing with any effects it holds, the operation's strikes (never a hidden defense, armor or Health value) and the legal options
      * (moves, speech allowance and recipients, declared actions, attacks with costs, targets and disabled reasons, Guard
      * and item use), and the terminal verdict once the fight has one. Since P11.5 also what a social attempt or an answer
-     * did and the offer on the table, never a check's difficulty or margin.
+     * did and the offer on the table, never a check's difficulty or margin; what a Ready/equip action changed with the
+     * player's own new Guard, armor and attacks; what an assessment found, the target's values only after a success; and
+     * the prices of readying and assessing with the participants that can be assessed.
      */
     private static Map<String, Object> combat(JsonNode combat) {
         var entry = new LinkedHashMap<String, Object>();
@@ -246,6 +248,35 @@ public final class CommandReceipts {
                 line.put("success", social.path("success").asBoolean());
             }
             entry.put("social", java.util.Collections.unmodifiableMap(line));
+        }
+        // Since P11.5, only for an operation that readied an item: the player's own new Guard, armor and attacks.
+        JsonNode readied = combat.path("readied");
+        if (readied.isObject()) {
+            var line = new LinkedHashMap<String, Object>();
+            line.put("itemInstanceId", readied.path("itemInstanceId").asString());
+            line.put("definitionId", readied.path("definitionId").asString());
+            line.put("change", readied.path("change").asString());
+            line.put("guard", readied.path("guard").asInt());
+            line.put("armor", readied.path("armor").asInt());
+            line.put("attacks", strings(readied.path("attacks")));
+            entry.put("readied", java.util.Collections.unmodifiableMap(line));
+        }
+        // Since P11.5, only for an operation with an assessment; the values exist only when it succeeded.
+        JsonNode assessment = combat.path("assessment");
+        if (assessment.isObject()) {
+            var line = new LinkedHashMap<String, Object>();
+            line.put("targetId", assessment.path("targetId").asString());
+            line.put("total", assessment.path("total").asInt());
+            line.put("success", assessment.path("success").asBoolean());
+            JsonNode revealed = assessment.path("revealed");
+            if (revealed.isObject()) {
+                var values = new LinkedHashMap<String, Object>();
+                for (String member : List.of("health", "healthMax", "guard", "resistance", "armor")) {
+                    values.put(member, revealed.path(member).asInt());
+                }
+                line.put("revealed", java.util.Collections.unmodifiableMap(values));
+            }
+            entry.put("assessment", java.util.Collections.unmodifiableMap(line));
         }
         JsonNode verdict = combat.path("outcome");
         if (verdict.isObject()) {
@@ -357,6 +388,19 @@ public final class CommandReceipts {
                 }
                 view.put("reactions", List.copyOf(reactions));
                 view.put("reactionsLeft", options.path("reactionsLeft").asInt());
+            }
+            // Since P11.5, and only in a receipt that has them.
+            if (options.path("ready").isObject()) {
+                var line = new LinkedHashMap<String, Object>();
+                line.put("cost", options.path("ready").path("cost").asInt());
+                line.put("available", options.path("ready").path("available").asBoolean());
+                view.put("ready", java.util.Collections.unmodifiableMap(line));
+            }
+            if (options.path("assess").isObject()) {
+                var line = new LinkedHashMap<String, Object>();
+                line.put("cost", options.path("assess").path("cost").asInt());
+                line.put("targets", strings(options.path("assess").path("targets")));
+                view.put("assess", java.util.Collections.unmodifiableMap(line));
             }
             view.put("endActivation", options.path("endActivation").asBoolean());
             entry.put("options", java.util.Collections.unmodifiableMap(view));

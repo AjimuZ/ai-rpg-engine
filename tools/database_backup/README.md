@@ -236,6 +236,12 @@ exists only at `AWAITING_ACTION` and an agreement only from `OUTCOME_PENDING` on
 not return). A restore inserts rows, so only the check constraints apply to restored values. Offline checks cover the V30
 manifest/catalog; no live V30 dump/restore rehearsal has been run.
 
+V31 scope (P11.5-C.1) adds no table: `encounter_participant` gains `readied`, a nullable JSON object with the Guard, armor,
+attacks and worn items of the player's last Ready/equip action, checked to be an object with those four members of the right
+JSON types and to belong only to an actor-backed participant. The `encounter_participant_readied_kept` trigger guards later
+updates (readied values are replaced, never removed). A restore inserts rows, so only the check constraints apply to restored
+values. Offline checks cover the V31 manifest/catalog; no live V31 dump/restore rehearsal has been run.
+
 ## Live two-genre rehearsal (P06.5-B.1, V26)
 
 `tools/container_packaging/test_restore_isolation.py` runs this tool as an operator would on a populated world, then

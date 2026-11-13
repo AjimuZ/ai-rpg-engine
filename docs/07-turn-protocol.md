@@ -494,6 +494,27 @@ cost}, canAccept} while one stands. `options.actions[]` gains `check` {attribute
 declared; neither a difficulty nor a counteroffer not yet made is listed. A retry replays the same receipt, with no second draw, cost
 or effect.
 
+### P11.5 Ready/equip and Assess
+
+Two more tactical intentions follow the same gates ([ADR 0034](adr/0034-ready-equip-and-assess-in-a-fight.md)):
+
+| Intention | Payload | Legal when | Refusal |
+| --- | --- | --- | --- |
+| `READY_ITEM` | `itemInstanceId` (UUID) and `change` (exactly `equip` or `unequip`; anything else is `INVALID_COMMAND`) | The player's decision; not prevented; `readyCost` points left; then the `EQUIP_ITEM` or `UNEQUIP_ITEM` rules: a held instance whose slot, tags, slot capacity and hands allow it, or one the player wears. A full slot is refused, never emptied for the player. A weapon whose hit applies an effect the fight did not freeze is refused | `TURN_UNAVAILABLE`, `ACTION_PREVENTED`, `ACTION_POINTS_INSUFFICIENT`, `ITEM_UNAVAILABLE`, `EQUIPMENT_ILLEGAL`, `EFFECT_UNSUPPORTED` |
+| `ASSESS` | `targetId` (1..128) | The player's decision; not prevented; a different standing participant within `maxRangeEdges` range bands, and from another zone not in an obscured zone; `assessCost` points left | `TURN_UNAVAILABLE`, `ACTION_PREVENTED`, `TARGET_ILLEGAL`, `ACTION_POINTS_INSUFFICIENT` |
+
+Both pass through `RESOLVING`, run declared-action ticks, lapse an offer on the table with `ACTION_TAKEN` and return to the
+decision; a tick that fells the player first does neither, and the fight ends with that fall. Readying writes the equipment change
+as the commit's item effect and the public `ITEM_READIED` {encounterId, round, participantId, actorId, itemInstanceId, definitionId,
+change: `EQUIPPED` | `UNEQUIPPED`, slot, actionPoints, remainingActionPoints, guard, armor, attacks}: the player's own new Guard,
+armor and attack IDs. Assessing draws two d10 and writes the public `ASSESSMENT_RESOLVED` {…, targetId, actionPoints,
+remainingActionPoints, dice, total, success, drawOrdinals, revealed?}, where `revealed` {health, healthMax, guard, resistance, armor}
+appears only on a success, and the internal `ASSESSMENT_CALCULATED`, which adds the role, its value, the difficulty (the target's
+effective Resistance), the margin and whether it was strong. The receipt's `combat` gains `readied` {itemInstanceId, definitionId,
+change, guard, armor, attacks} or `assessment` {targetId, total, success, revealed?} for such an operation, and `options` gains
+`ready` {cost, available} and `assess` {cost, targets}. Neither takes world time. A retry replays the same receipt with no second
+draw or equipment change.
+
 ### P11.4 reactions, effects and abilities
 
 Two more tactical intentions follow the same gates ([ADR 0031](adr/0031-predeclared-reactions-effect-phases-and-cooldowns.md)):

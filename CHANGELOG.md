@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Ready/equip and Assess in a fight (P11.5-C.1), 13 November 2026
+
+- During their own activation the player can ready or stow one held item with `READY_ITEM` {itemInstanceId, change: `equip` or
+  `unequip`} for `readyCost` (1 by default). It changes the real equipment under the same slot, tag, capacity and hand rules as
+  outside a fight, never takes another item off for the player, and from then on the fight uses the new Guard, armor and attacks.
+  A weapon whose hit applies an effect the fight did not prepare is refused.
+- `ASSESS` {targetId} for `assessCost` (1 by default) looks at a standing participant in range and in sight and rolls
+  `2d10 + insight` against its effective Resistance. A success shows its current and maximum Health, Guard, Resistance and armor;
+  a failure shows nothing.
+- Either action is refused before anything is spent when it is not legal or not affordable, and any `change` other than `equip`
+  or `unequip` is an invalid command. Both have public statements in English and Italian. PostgreSQL stores the readied values
+  (migration V31), and backups require schema 31. No frontend control uses these commands yet. See
+  [ADR 0034](docs/adr/0034-ready-equip-and-assess-in-a-fight.md) and [docs/11](docs/11-combat-system.md#7-action-economy).
+
 ## Unreleased — Contention harness can drive its load through the engine's entry point (P21.4-F.2), 2 November 2026
 
 - `tools/gpu_contention/contention.py --via-entry-point` sends its load through the owner-only

@@ -296,6 +296,36 @@ class EventStatementsTest {
         assertEquals(null, state(SupportedLocale.EN, "PARTICIPANT_SURRENDERED", "{}"));
     }
 
+    /**
+     * Readying and assessing (P11.5) are stated in both locales. An assessment states values only when it succeeded and carries
+     * them all; a malformed or unknown change, or a success without its values, is never stated.
+     */
+    @Test
+    void statesReadyAndAssessEvents() {
+        String readied = "{\"actorId\":\"" + PLAYER + "\",\"definitionId\":\"bolt-caster\",\"slot\":\"off-hand\",\"change\":\"EQUIPPED\","
+                + "\"actionPoints\":1,\"guard\":12,\"armor\":1}";
+        assertEquals("Mira readies bolt-caster (off-hand) for 1 action point.", state(SupportedLocale.EN, "ITEM_READIED", readied));
+        assertEquals("Mira prepara bolt-caster (off-hand, 1 punto azione).", state(SupportedLocale.IT, "ITEM_READIED", readied));
+        String stowed = readied.replace("EQUIPPED", "UNEQUIPPED");
+        assertEquals("Mira stows bolt-caster (off-hand) for 1 action point.", state(SupportedLocale.EN, "ITEM_READIED", stowed));
+        assertEquals("Mira ripone bolt-caster (off-hand, 1 punto azione).", state(SupportedLocale.IT, "ITEM_READIED", stowed));
+        assertEquals(null, state(SupportedLocale.EN, "ITEM_READIED", readied.replace("EQUIPPED", "SWAPPED")));
+        assertEquals(null, state(SupportedLocale.EN, "ITEM_READIED", readied.replace("\"slot\":\"off-hand\",", "")));
+
+        String failed = "{\"actorId\":\"" + PLAYER + "\",\"targetId\":\"raider\",\"total\":9,\"success\":false}";
+        assertEquals("Mira assesses raider (total 9) and learns nothing.", state(SupportedLocale.EN, "ASSESSMENT_RESOLVED", failed));
+        assertEquals("Mira valuta raider (totale 9) senza scoprire nulla.", state(SupportedLocale.IT, "ASSESSMENT_RESOLVED", failed));
+        String found = "{\"actorId\":\"" + PLAYER + "\",\"targetId\":\"raider\",\"total\":15,\"success\":true,"
+                + "\"revealed\":{\"health\":9,\"healthMax\":14,\"guard\":12,\"resistance\":11,\"armor\":1}}";
+        assertEquals("Mira assesses raider (total 15): Health 9 of 14, Guard 12, Resistance 11, armor 1.",
+                state(SupportedLocale.EN, "ASSESSMENT_RESOLVED", found));
+        assertEquals("Mira valuta raider (totale 15): Salute 9 su 14, Guardia 12, Resistenza 11, armatura 1.",
+                state(SupportedLocale.IT, "ASSESSMENT_RESOLVED", found));
+        assertEquals(null, state(SupportedLocale.EN, "ASSESSMENT_RESOLVED", found.replace(",\"armor\":1", "")),
+                "a success without all its values is not stated");
+        assertEquals(null, state(SupportedLocale.EN, "ASSESSMENT_RESOLVED", failed.replace("false", "\"no\"")));
+    }
+
     /** Quest events state their transition in both locales, using the canonical quest and outcome identities. */
     @Test
     void statesQuestEvents() {

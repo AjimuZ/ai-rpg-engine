@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Upgrade populated V1 through V30 on real PostgreSQL; migration errors fail without changing the public schema. */
+/** Upgrade populated V1 through V31 on real PostgreSQL; migration errors fail without changing the public schema. */
 @SpringBootTest
 class CanonicalMigrationUpgradeTest {
     @Autowired
@@ -769,6 +769,36 @@ class CanonicalMigrationUpgradeTest {
                     assertThrows(DataAccessException.class, () -> jdbc.update(surrendered, "ACTIVE"), "a surrender is not undone");
                     assertThrows(DataAccessException.class, () -> jdbc.update(surrendered, "DEFEATED"), "nor turned into a defeat");
                     assertEquals(0, v30.migrate().migrationsExecuted);
+                    // V31 adds the player's readied equipment: every upgraded row reads null, so a fight frozen earlier keeps
+                    // its frozen Guard, armor and attacks and every other value, and the checks hold from here on.
+                    String roster = "select jsonb_agg(to_jsonb(p) order by p.ordinal)::text from encounter_participant p";
+                    String v30Roster = jdbc.queryForObject(roster, String.class);
+                    String v30Checksums = "select string_agg(version || ':' || checksum, ',' order by installed_rank) "
+                            + "from flyway_schema_history where version::int <= 30";
+                    String beforeV31 = jdbc.queryForObject(v30Checksums, String.class);
+                    Flyway v31 = Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema)
+                            .locations("classpath:db/migration").target("31").load();
+                    assertEquals(1, v31.migrate().migrationsExecuted);
+                    assertTrue(v31.validateWithResult().validationSuccessful);
+                    assertEquals(beforeV31, jdbc.queryForObject(v30Checksums, String.class));
+                    assertEquals(v30Roster, jdbc.queryForObject("select jsonb_agg(to_jsonb(p) - 'readied' order by p.ordinal)::text "
+                            + "from encounter_participant p", String.class));
+                    assertEquals(0L, jdbc.queryForObject("select count(*) from encounter_participant where readied is not null",
+                            Long.class));
+                    String ready = "update encounter_participant set readied = ?::jsonb, row_version = row_version + 1 "
+                            + "where participant_id = ?";
+                    String gear = "{\"guard\":12,\"armor\":1,\"attacks\":[],\"equipment\":[\"cloak\"]}";
+                    assertThrows(DataAccessException.class, () -> jdbc.update(ready, gear, "raider"),
+                            "only an actor-backed participant wears campaign items");
+                    assertThrows(DataAccessException.class, () -> jdbc.update(ready, "[]", "player"), "readied values are an object");
+                    assertThrows(DataAccessException.class, () -> jdbc.update(ready, "{\"guard\":12,\"armor\":1,\"attacks\":[]}",
+                            "player"), "with all four members");
+                    assertThrows(DataAccessException.class, () -> jdbc.update(ready, gear.replace("12", "\"12\""), "player"),
+                            "of their JSON types");
+                    assertEquals(1, jdbc.update(ready, gear, "player"));
+                    assertThrows(DataAccessException.class, () -> jdbc.update(ready, null, "player"), "readied values are never removed");
+                    assertEquals(1, jdbc.update(ready, gear.replace("12", "13"), "player"), "but the next action replaces them");
+                    assertEquals(0, v31.migrate().migrationsExecuted);
                     // Restore the pooled connection's scope before it is returned to other tests.
                 } finally {
                     connection.setSchema(originalSchema);

@@ -47,6 +47,11 @@ import org.rpgengine.rules.ZoneGraph;
  *   <li><b>Negotiation</b> (P11.5) — an action that proposes terms needs a recipient still standing, because a surrendered
  *       one has nothing left to agree. An answer names the one offer on the table by its identity, so a stale or unknown one
  *       is refused. Declining is free, and accepting costs what the terms declare, which a prevented player cannot pay.</li>
+ *   <li><b>Ready/equip</b> (P11.5, ADR 0034) — {@code readyCost}. Which item, its slot, hands and tags are pinned item data
+ *       the commands layer checks with the same equipment rules as exploration.</li>
+ *   <li><b>Assess</b> (P11.5, {@link #canAssess}) — a different standing participant within {@code maxRangeEdges} range
+ *       bands whom the player can see: from another zone, an obscured zone hides its occupants. Cover does not stop a look.
+ *       It costs {@code assessCost}.</li>
  * </ul>
  */
 public final class TacticalRules {
@@ -197,7 +202,34 @@ public final class TacticalRules {
                 yield cost > 0 && state.prevented(player, CombatEffect.Prevents.ACTIONS) ? Refusal.PREVENTED
                         : cost > state.actionPoints() ? Refusal.ACTION_POINTS : null;
             }
+            case TacticalIntent.Ready ready ->
+                    state.profile().value("readyCost") > state.actionPoints() ? Refusal.ACTION_POINTS : null;
+            case TacticalIntent.Assess assess -> {
+                var target = state.participant(assess.target());
+                if (target == null || !canAssess(state.space(), state.profile(), player, target)) {
+                    yield Refusal.TARGET;
+                }
+                yield state.profile().value("assessCost") > state.actionPoints() ? Refusal.ACTION_POINTS : null;
+            }
         };
+    }
+
+    /**
+     * Whether one participant can assess another now (P11.5).
+     *
+     * @param space the current zone graph
+     * @param profile frozen profile supplying {@code maxRangeEdges}
+     * @param observer the participant looking
+     * @param target the participant looked at
+     * @return true for a different, standing target within range bands of a standing observer and in its sight: from another
+     *         zone an obscured zone hides its occupants, as it does from an attack; range ignores blocked edges, as a voice does
+     */
+    public static boolean canAssess(ZoneGraph space, CombatProfile profile, EncounterState.Combatant observer,
+            EncounterState.Combatant target) {
+        return !observer.id().equals(target.id()) && observer.status() == EncounterState.Status.ACTIVE
+                && target.status() == EncounterState.Status.ACTIVE
+                && space.distance(observer.zone(), target.zone()) <= profile.value("maxRangeEdges")
+                && (observer.zone().equals(target.zone()) || !space.zones().get(target.zone()).obscured());
     }
 
     /**
@@ -402,8 +434,9 @@ public final class TacticalRules {
      * with its cost and admissible recipients and, since P11.3, each frozen attack with its cost, its reachable targets
      * and the reason it cannot be used now, the Guard action and the price of using an item. Since P11.5 a declared
      * action also lists its check and proposed terms, and the offer on the table is listed with what accepting costs. A
-     * check's difficulty and a counteroffer not yet made are absent. Everything listed is public: every participant is
-     * observable.
+     * check's difficulty and a counteroffer not yet made are absent. Also since P11.5 the price of readying an item and
+     * whether it can be paid, and the price of assessing with the participants that can be assessed. Everything listed is
+     * public: every participant is observable.
      *
      * @param state encounter state at the player's decision
      * @return ordered canonical values, or an empty map when the player has no decision now
@@ -521,6 +554,21 @@ public final class TacticalRules {
         options.put("abilities", abilities);
         options.put("reactions", reactions);
         options.put("reactionsLeft", player.reactions());
+        // Since P11.5: which item can be readied is pinned item data the commands layer checks, so only the price is listed.
+        var ready = new LinkedHashMap<String, Object>();
+        ready.put("cost", state.profile().value("readyCost"));
+        ready.put("available", refusal(state, new TacticalIntent.Ready(true)) == null);
+        options.put("ready", ready);
+        var observed = new ArrayList<Object>();
+        for (var participant : state.participants()) {
+            if (refusal(state, new TacticalIntent.Assess(participant.id())) == null) {
+                observed.add(participant.id());
+            }
+        }
+        var assess = new LinkedHashMap<String, Object>();
+        assess.put("cost", state.profile().value("assessCost"));
+        assess.put("targets", observed);
+        options.put("assess", assess);
         options.put("endActivation", true);
         var offer = state.openOffer();
         if (offer != null) {

@@ -86,6 +86,13 @@ import org.rpgengine.rules.CombatProfile;
  * declare, then applies them. A truce is stored for the terminal predicates, and a surrender leaves the fight as a defeat
  * would, without the zero Health: stance and held effects end, and it takes no further activation. A surrendered
  * participant stays addressable by voice but can no longer be attacked or agree to more.
+ *
+ * <p><b>Ready/equip and Assess</b> (P11.5, docs/11 section 7, ADR 0034) are player actions like the others: they pay their
+ * cost, pass through {@code RESOLVING}, run the declared-action ticks, take an offer off the table and return to the decision.
+ * Readying takes over the equipment-derived values the commands layer computed ({@link #ready}); a tick that fells the
+ * player first readies nothing. An assessment draws two recorded dice against the target's effective Resistance and reveals
+ * the target's fighting values only on success, in a public {@code ASSESSMENT_RESOLVED}, with the difficulty and margin in
+ * an internal {@code ASSESSMENT_CALCULATED}. Neither provokes a reaction.
  */
 public final class CombatScheduler {
     /** Sides of each initiative die (kernel). */
@@ -124,7 +131,7 @@ public final class CombatScheduler {
      *
      * @param state the encounter as read under the campaign lock
      * @param intent an intention {@link TacticalRules#refusal} accepts for {@code state}
-     * @param dice recorded draws, used by the initiative roll and by attacks
+     * @param dice recorded draws, used by the initiative roll, attacks, social checks and assessments
      * @return the complete plan
      * @throws IllegalStateException when the intention is refused (the rule gate should have stopped it) or a draw
      *         lies outside its die
@@ -154,8 +161,59 @@ public final class CombatScheduler {
             case TacticalIntent.UseAbility use -> run.playerAbility(use);
             case TacticalIntent.SetReactionPolicy policy -> run.setPolicy(policy);
             case TacticalIntent.AnswerOffer answer -> run.answer(answer);
+            case TacticalIntent.Assess assess -> run.assess(assess);
             case TacticalIntent.UseItem use -> throw new IllegalStateException("an item use needs its resolved outcome");
+            case TacticalIntent.Ready ready -> throw new IllegalStateException("readying needs its resolved equipment");
         }
+        return run.plan();
+    }
+
+    /**
+     * What a Ready/equip action changes, as the commands layer resolved it from the pinned item data and the player's
+     * equipment rows (P11.5). The scheduler only charges the action and takes over these values; it reads no pack data.
+     *
+     * @param instance item instance put on or taken off
+     * @param definition its canonical item definition
+     * @param slot the equipment slot it occupies or leaves
+     * @param equip true when it is put on
+     * @param gear the player's equipment-derived values once the change is made
+     * @param ammunition the player's unworn stacks of what the readied attacks consume, in identity order, once the change is
+     *        made, so this operation's options already show the new weapons' ammunition
+     */
+    public record ReadyOutcome(java.util.UUID instance, String definition, String slot, boolean equip, ReadiedGear gear,
+            List<EncounterState.Ammunition> ammunition) {
+        /** Require identities; copy the stacks. */
+        public ReadyOutcome {
+            java.util.Objects.requireNonNull(instance, "instance");
+            java.util.Objects.requireNonNull(definition, "definition");
+            java.util.Objects.requireNonNull(slot, "slot");
+            java.util.Objects.requireNonNull(gear, "gear");
+            ammunition = List.copyOf(ammunition);
+        }
+    }
+
+    /**
+     * Resolve a Ready/equip action whose equipment change the commands layer already checked.
+     *
+     * @param state the encounter as read under the campaign lock
+     * @param intent an intention {@link TacticalRules#refusal} accepts for {@code state}
+     * @param outcome the resolved change, which must say the same thing as the intention
+     * @param dice recorded draws for the run; nothing draws today, because readying provokes no reaction
+     * @return the complete plan; the player's update holds the new values unless a declared-action tick felled the player
+     *         first, in which case nothing was readied and the plan stops at {@code OUTCOME_PENDING} with that fall
+     * @throws IllegalStateException when the intention is refused or contradicts the outcome
+     */
+    public static TacticalPlan ready(EncounterState state, TacticalIntent.Ready intent, ReadyOutcome outcome, Dice dice) {
+        var refusal = TacticalRules.refusal(state, intent);
+        if (refusal != null) {
+            throw new IllegalStateException("validated tactical intention is refused: " + refusal);
+        }
+        if (intent.equip() != outcome.equip()) {
+            throw new IllegalStateException("the resolved equipment change contradicts the intention");
+        }
+        var run = new Run(state);
+        run.draws(dice);
+        run.ready(outcome);
         return run.plan();
     }
 
@@ -251,6 +309,10 @@ public final class CombatScheduler {
         private Negotiation.Agreement agreement;
         /** What this operation's social attempt or answer did, for the receipt; null without one. */
         private Map<String, Object> social;
+        /** What this operation's Ready/equip action changed, for the receipt; null without one. */
+        private Map<String, Object> readiedLine;
+        /** What this operation's assessment found, for the receipt; null without one. */
+        private Map<String, Object> assessment;
 
         /** Give the run the operation's draws. */
         void draws(Dice source) {
@@ -786,6 +848,92 @@ public final class CombatScheduler {
             if (declare(player)) {
                 strike(player, player.source.sheet().attack(intent.attack()), participants.get(intent.target()), cost, true,
                         false);
+            }
+            settle();
+        }
+
+        /**
+         * The player's Ready/equip action: pay {@code readyCost}, run the declared-action ticks, then take over the readied
+         * values. A tick that fells the player first leaves the equipment as it was, so the caller writes no assignment
+         * change. Readying provokes no reaction and returns to the decision, so nothing later in this operation reads the
+         * player's attacks except the options of the receipt, which see the new ones and their ammunition.
+         */
+        void ready(ReadyOutcome outcome) {
+            Working player = participants.get(EncounterTemplate.PLAYER);
+            int cost = profile.value("readyCost");
+            lapseOffer("ACTION_TAKEN");
+            points -= cost;
+            step(EncounterPhase.RESOLVING);
+            if (declare(player)) {
+                player.sheet = player.source.sheet().withGear(outcome.gear());
+                player.readied = outcome.gear();
+                ammunition.clear();
+                ammunition.addAll(outcome.ammunition());
+                var attacks = outcome.gear().attacks().stream().map(attack -> (Object) attack.id()).toList();
+                String change = outcome.equip() ? "EQUIPPED" : "UNEQUIPPED";
+                // The player may see its own Guard and armor; nobody else's appear here.
+                note("ITEM_READIED", activation(player).put("itemInstanceId", outcome.instance().toString())
+                        .put("definitionId", outcome.definition()).put("change", change).put("slot", outcome.slot())
+                        .put("actionPoints", cost).put("remainingActionPoints", points).put("guard", outcome.gear().guard())
+                        .put("armor", outcome.gear().armor()).put("attacks", attacks).build(), true);
+                readiedLine = new TreeMap<>();
+                readiedLine.put("itemInstanceId", outcome.instance().toString());
+                readiedLine.put("definitionId", outcome.definition());
+                readiedLine.put("change", change);
+                readiedLine.put("guard", outcome.gear().guard());
+                readiedLine.put("armor", outcome.gear().armor());
+                readiedLine.put("attacks", attacks);
+            }
+            settle();
+        }
+
+        /**
+         * The player's assessment: pay {@code assessCost}, run the declared-action ticks, then draw a recorded check of
+         * {@code 2d10 + insight} against the target's effective Resistance, the same score and margin as a social check with
+         * no fixed difficulty. A success reveals the target's current and maximum Health, Guard, Resistance and armor as they
+         * stand in its sheet, before any stance, cover or effect, in the public record; a failure reveals nothing. A strong
+         * result adds nothing, because the action declares no strong-success benefit (docs/11 section 8). The difficulty and
+         * margin stay internal, as a hidden defense does. Nothing about the target's Focus, reactions, policies, attacks or
+         * abilities is ever revealed.
+         */
+        void assess(TacticalIntent.Assess intent) {
+            Working player = participants.get(EncounterTemplate.PLAYER);
+            Working target = participants.get(intent.target());
+            int cost = profile.value("assessCost");
+            lapseOffer("ACTION_TAKEN");
+            points -= cost;
+            step(EncounterPhase.RESOLVING);
+            if (declare(player)) {
+                int difficulty = CombatMath.resistance(target.sheet.resistance(),
+                        CombatEffects.resistance(target.effects, library), profile.value("situationalGuardCap"));
+                var ordinals = new ArrayList<Object>();
+                int first = recorded(INITIATIVE_SIDES, ordinals);
+                int second = recorded(INITIATIVE_SIDES, ordinals);
+                int insight = player.sheet.role("insight");
+                var roll = CombatMath.attack(first, second, insight, 0, 0, profile.value("situationalModifierCap"), difficulty,
+                        profile.value("strongHitMargin"), true);
+                var shown = activation(player).put("targetId", target.source.id()).put("actionPoints", cost)
+                        .put("remainingActionPoints", points).put("dice", List.of(first, second)).put("total", roll.total())
+                        .put("success", roll.hit()).put("drawOrdinals", ordinals);
+                assessment = new TreeMap<>();
+                assessment.put("targetId", target.source.id());
+                assessment.put("total", roll.total());
+                assessment.put("success", roll.hit());
+                if (roll.hit()) {
+                    var revealed = new TreeMap<String, Object>();
+                    revealed.put("health", target.health);
+                    revealed.put("healthMax", target.source.healthMax());
+                    revealed.put("guard", target.sheet.guard());
+                    revealed.put("resistance", target.sheet.resistance());
+                    revealed.put("armor", target.sheet.armor());
+                    shown.put("revealed", revealed);
+                    assessment.put("revealed", revealed);
+                }
+                note("ASSESSMENT_RESOLVED", shown.build(), true);
+                notes.add(new TacticalPlan.Note("ASSESSMENT_CALCULATED", activation(player).put("targetId", target.source.id())
+                        .put("drawOrdinals", ordinals).put("attributeRole", "insight").put("attributeValue", insight)
+                        .put("total", roll.total()).put("difficulty", difficulty).put("margin", roll.margin())
+                        .put("success", roll.hit()).put("strong", roll.strong()).build(), true, true));
             }
             settle();
         }
@@ -1545,7 +1693,7 @@ public final class CombatScheduler {
                             participant.reactions, participant.status,
                             participant.source.player() ? null : (Integer) participant.health, participant.guarding,
                             participant.source.player() ? null : (Integer) participant.focus, participant.effects,
-                            participant.policies, participant.uses));
+                            participant.policies, participant.uses, participant.readied));
                 }
             }
             flush("operation");
@@ -1596,6 +1744,13 @@ public final class CombatScheduler {
             if (social != null) {
                 summary.put("social", social);
             }
+            // Since P11.5, only for an operation with a Ready/equip action or an assessment.
+            if (readiedLine != null) {
+                summary.put("readied", readiedLine);
+            }
+            if (assessment != null) {
+                summary.put("assessment", assessment);
+            }
             var options = TacticalRules.options(after);
             if (!options.isEmpty()) {
                 summary.put("options", options);
@@ -1610,7 +1765,7 @@ public final class CombatScheduler {
                 var s = w.source;
                 list.add(new EncounterState.Combatant(s.id(), s.ordinal(), s.actorId(), s.side(), w.zone, w.status,
                         s.finesse(), s.initiativeModifier(), w.initiative, w.rank, w.reactions, s.rowVersion(), w.health,
-                        s.healthMax(), w.guarding, s.sheet(), w.focus, s.focusMax(), w.effects, w.policies, w.uses));
+                        s.healthMax(), w.guarding, w.sheet, w.focus, s.focusMax(), w.effects, w.policies, w.uses));
             }
             return new EncounterState(base.id(), base.rowVersion(), phase, round, cursor, points, speech, passages,
                     profile, base.frozenSpace(), base.escapeZones(), base.actions(), base.opening(),
@@ -1681,10 +1836,15 @@ public final class CombatScheduler {
         private List<CombatEffects.Active> effects;
         private final Map<String, CombatReaction.Policy> policies;
         private final Map<String, CombatAbility.Use> uses;
+        /** Current fighting values: the stored sheet, or the readied one once this operation readied an item. */
+        private EncounterState.Sheet sheet;
+        /** The values this operation's Ready/equip action set; null when it readied nothing. */
+        private ReadiedGear readied;
 
         /** Start from the stored facts. */
         Working(EncounterState.Combatant source) {
             this.source = source;
+            sheet = source.sheet();
             zone = source.zone();
             initiative = source.initiative();
             rank = source.rank();
@@ -1709,7 +1869,7 @@ public final class CombatScheduler {
                     || !java.util.Objects.equals(rank, source.rank()) || reactions != source.reactions()
                     || status != source.status() || health != source.health() || guarding != source.guarding()
                     || focus != source.focus() || !effects.equals(source.effects()) || !policies.equals(source.policies())
-                    || !uses.equals(source.uses());
+                    || !uses.equals(source.uses()) || readied != null;
         }
     }
 

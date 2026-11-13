@@ -5,7 +5,7 @@ import java.util.Objects;
 /**
  * Closed vocabulary of the player's tactical intentions inside an encounter (P11.2 to P11.5, docs/11 sections 6-13).
  * Each value names only what the player decides: a destination zone, a recipient, a declared action, an attack and
- * its target. Costs, legality and every effect come from the frozen encounter through {@link TacticalRules} and
+ * its target, whether to put an item on or take it off, a participant to assess. Costs, legality and every effect come from the frozen encounter through {@link TacticalRules} and
  * {@link CombatScheduler}; the commands layer decodes the wire payloads and hands these values over.
  */
 public sealed interface TacticalIntent {
@@ -81,6 +81,28 @@ public sealed interface TacticalIntent {
      * @param target participant the item is used on, or null for the player's own use
      */
     record UseItem(String target) implements TacticalIntent {
+    }
+
+    /**
+     * Ready or stow one item the player holds (P11.5, docs/11 section 7, ADR 0034): one change of one equipment assignment.
+     * Which instance, its slot, hands and combat data are the commands layer's to check, because they are pinned item data;
+     * the combat rules check the turn, prevention and {@code readyCost}.
+     *
+     * @param equip true to put the item on, false to take it off; the player always says which, nothing toggles
+     */
+    record Ready(boolean equip) implements TacticalIntent {
+    }
+
+    /**
+     * Assess one participant (P11.5, docs/11 section 7): a recorded check that reveals its fighting values on success.
+     *
+     * @param target participant ID observed
+     */
+    record Assess(String target) implements TacticalIntent {
+        /** Require the target. */
+        public Assess {
+            Objects.requireNonNull(target, "target");
+        }
     }
 
     /**

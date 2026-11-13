@@ -100,7 +100,10 @@ import tools.jackson.databind.node.ObjectNode;
  * of the same plan.
  *
  * <p>Social checks and negotiation (P11.5): {@code INTERACT} draws a declared check through the same recorded source, and
- * {@code ANSWER_OFFER} applies terms from the frozen encounter. Neither reads the pinned catalog.
+ * {@code ANSWER_OFFER} applies terms from the frozen encounter. Neither reads the pinned catalog. {@code ASSESS} draws its
+ * check the same way from frozen values. {@code READY_ITEM} is the second tactical intention that reads the pinned catalog:
+ * its equipment change becomes the commit's item effect, and the Guard, armor and attacks it leaves are computed once here
+ * and stored with the encounter (ADR 0034).
  *
  * <p>Rest (P10.4): the pinned policy restores its resources up to each pool's maximum and, when not
  * interrupted, ends the listed conditions the player has. An interruption is one recorded percentile
@@ -163,11 +166,22 @@ final class LocalActionResolver {
      * @param worn canonical item definitions the player wears, recorded by an encounter entry (P11.1)
      * @param encounter tactical state of the active encounter, read for tactical intentions only (P11.2), or null
      * @param learned canonical abilities the player has learned, recorded by an encounter entry (P11.4)
+     * @param wornInstances item instances the player wears, read for readying in a fight (P11.5)
      */
     record Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
             Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
             UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored, long worldTimeSeconds,
-            Set<String> conditions, List<String> worn, EncounterState encounter, Set<String> learned) {
+            Set<String> conditions, List<String> worn, EncounterState encounter, Set<String> learned,
+            Set<UUID> wornInstances) {
+        /** Snapshot without worn instance identities, the shape used before P11.5. */
+        Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
+                Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
+                UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored, long worldTimeSeconds,
+                Set<String> conditions, List<String> worn, EncounterState encounter, Set<String> learned) {
+            this(player, location, playerRowVersion, attributes, skills, pools, vocabularies, operationId, stacks,
+                    stored, worldTimeSeconds, conditions, worn, encounter, learned, Set.of());
+        }
+
         /** Snapshot without learned abilities, the shape used before P11.4. */
         Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
                 Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
@@ -235,6 +249,7 @@ final class LocalActionResolver {
             conditions = Set.copyOf(conditions);
             worn = List.copyOf(worn);
             learned = Set.copyOf(learned);
+            wornInstances = Set.copyOf(wornInstances);
         }
     }
 
@@ -447,9 +462,11 @@ final class LocalActionResolver {
             if (state == null) {
                 throw new IllegalStateException("validated tactical intention has no encounter state");
             }
-            progress = tactical instanceof TypedCommand.CombatUseItem use
-                    ? combatItem(use, state, Objects.requireNonNull(catalog, "catalog"))
-                    : CombatScheduler.apply(state, tactical.intent(), draws::value);
+            progress = switch (tactical) {
+                case TypedCommand.CombatUseItem use -> combatItem(use, state, Objects.requireNonNull(catalog, "catalog"));
+                case TypedCommand.ReadyItem ready -> readyItem(ready, state, Objects.requireNonNull(catalog, "catalog"));
+                default -> CombatScheduler.apply(state, tactical.intent(), draws::value);
+            };
             mode = CampaignMode.ENCOUNTER;
             elapsed = progress.elapsedSeconds();
             // The player's Health lives in its pool: the plan's net change becomes the commit's resource effect.
@@ -503,6 +520,55 @@ final class LocalActionResolver {
                     ally ? allyHealth - combatAlly.health() : 0);
             return CombatScheduler.useItem(state, (org.rpgengine.combat.TacticalIntent.UseItem) use.intent(), outcome,
                     draws::value, nextOrdinal);
+        }
+
+        /**
+         * Ready or stow an item in a fight (P11.5, ADR 0034). The rule gate proved the equipment rules on the same rows. The
+         * player's new Guard, armor and attacks are computed here, once, from the pinned item data with the same arithmetic as
+         * entry, and the scheduler takes them over with the action's cost. The assignment changes only when the scheduler
+         * readied the item: a declared-action tick that fells the player first leaves the equipment as it was.
+         */
+        private TacticalPlan readyItem(TypedCommand.ReadyItem ready, EncounterState state, CommandRuleCatalog catalog) {
+            var stack = inventory.find(ready.itemInstanceId())
+                    .orElseThrow(() -> new IllegalStateException("validated item instance is missing"));
+            var item = catalog.characters().items().get(stack.definition());
+            if (item == null || item.gear().slot() == null) {
+                throw new IllegalStateException("validated equipment is missing from the pinned catalog");
+            }
+            boolean equip = "equip".equals(ready.change());
+            var worn = new ArrayList<>(snapshot.worn());
+            var wornInstances = new java.util.HashSet<>(snapshot.wornInstances());
+            if (equip) {
+                worn.add(stack.definition());
+                wornInstances.add(stack.id());
+            } else if (!worn.remove(stack.definition()) || !wornInstances.remove(stack.id())) {
+                throw new IllegalStateException("validated worn item is not worn");
+            }
+            var gear = org.rpgengine.combat.ReadiedGear.of(state.profile(), state.player().sheet(), worn,
+                    catalog.combat().library().gear(), snapshot.skills());
+            // The unworn stacks the new attacks can spend, in the identity order the stored state reads them in.
+            var consumed = new TreeSet<String>();
+            gear.attacks().forEach(attack -> {
+                if (attack.ammunition() != null) {
+                    consumed.add(attack.ammunition());
+                }
+            });
+            var ammunition = snapshot.stacks().stream().filter(held -> held.owner().equals(snapshot.player())
+                            && consumed.contains(held.definition()) && !wornInstances.contains(held.id()) && held.quantity() > 0)
+                    .map(held -> new EncounterState.Ammunition(held.id(), held.definition(), held.quantity())).toList();
+            var outcome = new CombatScheduler.ReadyOutcome(stack.id(), stack.definition(), item.gear().slot(), equip, gear,
+                    ammunition);
+            var plan = CombatScheduler.ready(state, (org.rpgengine.combat.TacticalIntent.Ready) ready.intent(), outcome,
+                    draws::value);
+            boolean readied = plan.participants().stream().anyMatch(update -> update.readied() != null);
+            if (readied) {
+                equipment.add(equip ? new ItemPlan.Equip(snapshot.player(), stack.id())
+                        : new ItemPlan.Unequip(snapshot.player(), stack.id()));
+                details.put("itemInstanceId", stack.id().toString());
+                details.put("definitionId", stack.definition());
+                line(equip ? "EQUIPPED" : "UNEQUIPPED", stack.definition(), stack.id(), 1);
+            }
+            return plan;
         }
 
         /**

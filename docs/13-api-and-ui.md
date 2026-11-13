@@ -601,6 +601,9 @@ receipts also show strikes, public standings and attack, Guard and item options;
 Since P11.5 ([ADR 0033](adr/0033-negotiation-explicit-answers-and-surrender.md)) a receipt also shows a declared check's result,
 the recipient's response and the offer on the table with what accepting costs, and `ANSWER_OFFER` is the explicit player decision
 this section requires. No frontend control uses them yet, so the preview and confirmation remain P12.2.
+Since P11.5-C.1 ([ADR 0034](adr/0034-ready-equip-and-assess-in-a-fight.md)) a receipt also shows what a Ready/equip action changed,
+with the player's own new Guard, armor and attacks, what an assessment found (a target's values only after a success), and the
+prices of readying and assessing with the participants that can be assessed. No frontend control uses them yet (P12.1/P12.2).
 
 ## 8. Loading, empty, error, and recovery states
 

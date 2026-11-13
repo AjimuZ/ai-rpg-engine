@@ -29,7 +29,9 @@ import tools.jackson.databind.json.JsonMapper;
  * racing write rolls the whole commit back. {@link #active} reads the current encounter summary for rules and tests.
  * Since P11.4 each participant row also stores its active effects, reaction policies and ability uses as canonical JSON,
  * and the encounter row its application counter; V25 bounds them and refuses a counter that goes back. Since P11.5 the
- * encounter row also stores the offer on the table and the accepted truce as canonical JSON, under the V30 guards.
+ * encounter row also stores the offer on the table and the accepted truce as canonical JSON, under the V30 guards, and the
+ * player's row the {@link ReadiedGear} of its last Ready/equip action (V31), which {@link #state} reads in place of the
+ * frozen Guard, armor and attacks.
  */
 public final class EncounterWriter {
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -152,7 +154,7 @@ public final class EncounterWriter {
                             // Likewise its Focus; a profile without Focus, or a player without the pool, reads as none.
                             + "coalesce(p.focus_current, f.current_value - f.minimum_value, 0), "
                             + "coalesce(f.maximum_value - f.minimum_value, 0), p.effects::text, p.reaction_policies::text, "
-                            + "p.ability_uses::text from encounter_participant p "
+                            + "p.ability_uses::text, p.readied::text from encounter_participant p "
                             + "left join actor_resource r on r.campaign_id = p.campaign_id and r.actor_id = p.actor_id "
                             + "and r.resource_key = ? "
                             + "left join actor_resource f on f.campaign_id = p.campaign_id and f.actor_id = p.actor_id "
@@ -173,6 +175,12 @@ public final class EncounterWriter {
                                 uses.put((String) ability, new CombatAbility.Use(
                                         ((Number) ((Map<?, ?>) use).get("lastRound")).intValue(),
                                         ((Number) ((Map<?, ?>) use).get("uses")).intValue())));
+                        // Since P11.5 a Ready/equip action replaces the frozen Guard, armor and attacks of the player.
+                        var sheet = EncounterState.Sheet.fromCanonical(frozen);
+                        String readied = participant.getString(20);
+                        if (readied != null) {
+                            sheet = sheet.withGear(ReadiedGear.fromCanonical(JSON.readValue(readied, Map.class)));
+                        }
                         return new EncounterState.Combatant(participant.getString(1), participant.getInt(2),
                                 participant.getObject(3, UUID.class),
                                 EncounterTemplate.Side.valueOf(participant.getString(4)), participant.getString(5),
@@ -182,7 +190,7 @@ public final class EncounterWriter {
                                 participant.getObject(7, Integer.class), participant.getObject(8, Integer.class),
                                 participant.getInt(9), participant.getLong(10), participant.getInt(12),
                                 local ? ((Number) frozen.get("healthMax")).intValue() : participant.getInt(13),
-                                participant.getBoolean(14), EncounterState.Sheet.fromCanonical(frozen),
+                                participant.getBoolean(14), sheet,
                                 participant.getInt(15),
                                 local ? ((Number) frozen.get("focusMax")).intValue() : participant.getInt(16), held, policies,
                                 uses);
@@ -227,16 +235,18 @@ public final class EncounterWriter {
         for (TacticalPlan.ParticipantUpdate update : plan.participants()) {
             var uses = new java.util.TreeMap<String, Object>();
             update.uses().forEach((ability, use) -> uses.put(ability, use.canonicalForm()));
+            // An update without readied values keeps what the row holds: a readied set is replaced, never cleared.
             if (jdbc.update("update encounter_participant set zone_id = ?, initiative = ?, initiative_rank = ?, "
                             + "reactions = ?, status = ?, health_current = ?, guarding = ?, focus_current = ?, "
                             + "effects = ?::jsonb, reaction_policies = ?::jsonb, ability_uses = ?::jsonb, "
-                            + "row_version = row_version + 1 "
+                            + "readied = coalesce(?::jsonb, readied), row_version = row_version + 1 "
                             + "where encounter_id = ? and campaign_id = ? and participant_id = ? and row_version = ?",
                     update.zone(), update.initiative(), update.rank(), update.reactions(), update.status().name(),
                     update.health(), update.guarding(), update.focus(),
                     CanonicalJson.write(update.effects().stream().map(active -> (Object) active.canonicalForm()).toList()),
-                    policies(update.policies()), CanonicalJson.write(uses), plan.encounterId(), campaign,
-                    update.participantId(), update.expectedRowVersion()) != 1) {
+                    policies(update.policies()), CanonicalJson.write(uses),
+                    update.readied() == null ? null : CanonicalJson.write(update.readied().canonicalForm()),
+                    plan.encounterId(), campaign, update.participantId(), update.expectedRowVersion()) != 1) {
                 throw new IllegalStateException("stale encounter participant");
             }
         }

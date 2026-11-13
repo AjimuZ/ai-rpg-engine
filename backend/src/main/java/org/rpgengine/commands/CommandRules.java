@@ -72,7 +72,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       offer and action points over the stored tactical state ({@code TURN_UNAVAILABLE},
  *       {@code ZONE_UNAVAILABLE}, {@code TARGET_ILLEGAL}, {@code SPEECH_LIMIT_REACHED}, {@code INTERACTION_UNAVAILABLE},
  *       {@code OFFER_UNAVAILABLE}, {@code ACTION_POINTS_INSUFFICIENT}). The initiative roll and the end of an activation may close a round, so
- *       the clock must be able to take one round's seconds ({@code TIME_ILLEGAL}).</li>
+ *       the clock must be able to take one round's seconds ({@code TIME_ILLEGAL}). Since P11.5 {@code READY_ITEM} also applies the
+ *       {@code EQUIP_ITEM}/{@code UNEQUIP_ITEM} rules ({@code ITEM_UNAVAILABLE}, {@code EQUIPMENT_ILLEGAL}) and refuses a weapon whose
+ *       hit applies an effect the fight did not freeze ({@code EFFECT_UNSUPPORTED}).</li>
  *   <li><b>Causal attribution</b> — at commit, resolved effects may only touch the participants
  *       this intention lawfully involves ({@link #requireAttributed}).</li>
  * </ul>
@@ -506,6 +508,9 @@ final class CommandRules {
             if (tactical instanceof TypedCommand.CombatUseItem use) {
                 combatItem(use, state);
             }
+            if (tactical instanceof TypedCommand.ReadyItem ready) {
+                readyItem(ready, state);
+            }
             if (tactical.intent() instanceof TacticalIntent.EndActivation
                     || tactical.intent() instanceof TacticalIntent.RollInitiative) {
                 timeFits(state.profile().roundSeconds());
@@ -537,6 +542,25 @@ final class CommandRules {
             boolean ally = targeted && !use.targetId().equals(state.player().id());
             if (EffectProgram.maxDraws(contract.effects()) > MAX_COMBAT_ITEM_DRAWS
                     || (ally && EffectProgram.maxCreatedUnits(contract.effects()) > 0)) {
+                throw fail(OperationAdmissionFailure.Kind.EFFECT_UNSUPPORTED);
+            }
+        }
+
+        /**
+         * Readying an item in a fight (P11.5, ADR 0034): exactly the exploration rules of {@link #equip} and {@link #unequip},
+         * so a full slot or too few free hands is refused and never resolved by taking something else off. A weapon whose
+         * attack applies an effect this fight did not freeze is refused as unsupported, because the fight could not resolve
+         * its hit without reading the pack.
+         */
+        private void readyItem(TypedCommand.ReadyItem ready, org.rpgengine.combat.EncounterState state) {
+            if (!"equip".equals(ready.change())) {
+                unequip(ready.itemInstanceId());
+                return;
+            }
+            equip(ready.itemInstanceId());
+            var gear = catalog().combat().library().gear().get(held(ready.itemInstanceId(), player).definition());
+            if (gear != null && gear.attack() != null && gear.attack().onHit().stream()
+                    .anyMatch(effect -> !state.effects().containsKey(effect.effectId()))) {
                 throw fail(OperationAdmissionFailure.Kind.EFFECT_UNSUPPORTED);
             }
         }

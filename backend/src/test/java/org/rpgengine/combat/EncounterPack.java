@@ -159,7 +159,17 @@ public final class EncounterPack {
             {"id":"winded","kind":"condition","data":{"name":"Winded","description":"Short of breath.","durationRounds":1,
               "combat":{"attack":-2,"duration":{"clock":"nextActivation"}}}},
             {"id":"stunned","kind":"condition","data":{"name":"Stunned","description":"Cannot act.","durationRounds":1,
-              "combat":{"prevents":["actions"],"duration":{"clock":"activations","count":1}}}}""";
+              "combat":{"prevents":["actions"],"duration":{"clock":"activations","count":1}}}},
+            {"id":"searing","kind":"condition","data":{"name":"Searing","description":"Burns at every action.","durationRounds":1,
+              "combat":{"duration":{"clock":"persistent"},"ticks":[{"phase":"actionDeclared","damage":99}]}}}""";
+
+    /** Items only the P11.4 variant has: a blade whose hit poisons, so its effect exists only in that variant. */
+    private static final String TACTIC_ITEMS = """
+            ,{"id":"venom-blade","kind":"item","data":{"name":"Venom Blade","description":"Coated.","itemType":"weapon",
+              "slot":"main-hand","hands":1,"tags":["weapon"],"rarity":"ordinary",
+              "combat":{"attack":{"attribute":"force","damage":{"count":1,"sides":4},
+                "onHit":[{"condition":"poisoned","phase":"postDamage"}]}},
+              "appearance":{"id":"blade.venom","summary":"A green edge."}}}""";
 
     /** The encounters added by {@link #tactics()}. */
     private static final String TACTIC_ENCOUNTERS = """
@@ -251,9 +261,11 @@ public final class EncounterPack {
      * and {@code sway} and {@code measured-offer} add a skill and draw, for cases that follow recorded dice.
      *
      * <p>Conditions: {@code poisoned} (additive up to 3, one damage per stack at each round end, two round ends),
-     * {@code warded} (absorption 3, persistent, strongest), {@code winded} (attack -2 until the holder's next activation) and
-     * {@code stunned} (prevents actions for one activation). Abilities: {@code steady} (1 point, 1 Focus, cooldown 2,
-     * heals 2), {@code riposte} as a reaction (a counter on a hit) and {@code ward} (free, once per encounter).
+     * {@code warded} (absorption 3, persistent, strongest), {@code winded} (attack -2 until the holder's next activation),
+     * {@code stunned} (prevents actions for one activation) and {@code searing} (99 damage whenever its holder declares an
+     * action, so a player who enters the fight holding it falls at its first paid action; P11.5). Abilities: {@code steady} (1 point, 1 Focus, cooldown 2,
+     * heals 2), {@code riposte} as a reaction (a counter on a hit) and {@code ward} (free, once per encounter). Item (P11.5):
+     * a {@code venom-blade} whose damaging hit poisons, so it can be readied only in a fight that froze {@code poisoned}.
      *
      * @return file index ready for staging
      */
@@ -281,6 +293,9 @@ public final class EncounterPack {
         end = encounters.lastIndexOf("]}");
         files.put("encounters.json", (encounters.substring(0, end) + TACTIC_ENCOUNTERS + encounters.substring(end))
                 .getBytes(StandardCharsets.UTF_8));
+        String items = new String(files.get("items.json"), StandardCharsets.UTF_8);
+        end = items.lastIndexOf("]}");
+        files.put("items.json", (items.substring(0, end) + TACTIC_ITEMS + items.substring(end)).getBytes(StandardCharsets.UTF_8));
         return files;
     }
 

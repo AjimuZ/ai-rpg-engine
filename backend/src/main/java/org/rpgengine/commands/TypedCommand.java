@@ -22,8 +22,8 @@ import org.rpgengine.content.PackTextParser;
  * declaring the attack that opens it. Since P11.2 the {@link Tactical} intentions are registered for encounter mode:
  * roll initiative, move to an adjacent zone, end the activation, one bounded speech-only utterance and a declared
  * social or scene action; since P11.3 also strike, the Guard action and using an item; since P11.4 also using a frozen
- * ability and changing a predeclared reaction policy; since P11.5 also answering the offer on the table. Unknown types
- * fail closed.
+ * ability and changing a predeclared reaction policy; since P11.5 also answering the offer on the table, readying or
+ * stowing one held item and assessing one participant. Unknown types fail closed.
  * Structural decoding here
  * is followed by current-state rule validation in {@link CommandRules}; resolution
  * remains backend-owned (P07.4). Every value is immutable and can reproduce its exact
@@ -36,7 +36,7 @@ public sealed interface TypedCommand
         TypedCommand.Rest, TypedCommand.Engage, TypedCommand.RollInitiative, TypedCommand.MoveZone,
         TypedCommand.EndActivation, TypedCommand.CombatSpeak, TypedCommand.Interact, TypedCommand.Strike,
         TypedCommand.Guard, TypedCommand.CombatUseItem, TypedCommand.CombatUseAbility, TypedCommand.SetReactionPolicy,
-        TypedCommand.AnswerOffer {
+        TypedCommand.AnswerOffer, TypedCommand.ReadyItem, TypedCommand.Assess {
     /** @return registered, case-sensitive wire identifier */
     String type();
 
@@ -211,6 +211,14 @@ public sealed interface TypedCommand
                     fields(payload, "offerId", "decision");
                     yield new AnswerOffer(text(payload.get("offerId"), 64), text(payload.get("decision"), 16));
                 }
+                case "READY_ITEM" -> {
+                    fields(payload, "itemInstanceId", "change");
+                    yield new ReadyItem(CampaignCommandJson.uuid(payload.get("itemInstanceId")), text(payload.get("change"), 16));
+                }
+                case "ASSESS" -> {
+                    fields(payload, "targetId");
+                    yield new Assess(text(payload.get("targetId"), 128));
+                }
                 default -> throw invalid();
             };
         } catch (IllegalArgumentException | ArithmeticException failure) {
@@ -224,15 +232,17 @@ public sealed interface TypedCommand
         return Set.of("MOVE", "WAIT", "SPEAK", "USE_ABILITY", "USE_ITEM", "EQUIP_ITEM", "UNEQUIP_ITEM",
                 "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST", "ENGAGE",
                 "ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT", "STRIKE", "GUARD",
-                "COMBAT_USE_ITEM", "COMBAT_USE_ABILITY", "SET_REACTION_POLICY", "ANSWER_OFFER").contains(type);
+                "COMBAT_USE_ITEM", "COMBAT_USE_ABILITY", "SET_REACTION_POLICY", "ANSWER_OFFER", "READY_ITEM", "ASSESS")
+                .contains(type);
     }
 
     /**
      * Tactical intentions (P11.2): legal only in encounter mode, at the decision boundary {@code TacticalRules}
-     * checks, and resolved by the combat scheduler from the frozen encounter rather than from pinned definitions.
+     * checks, and resolved by the combat scheduler from the frozen encounter rather than from pinned definitions. The
+     * exceptions are the two item intentions, {@link CombatUseItem} and {@link ReadyItem}, whose items are pinned data.
      */
     sealed interface Tactical permits RollInitiative, MoveZone, EndActivation, CombatSpeak, Interact, Strike, Guard,
-            CombatUseItem, CombatUseAbility, SetReactionPolicy, AnswerOffer {
+            CombatUseItem, CombatUseAbility, SetReactionPolicy, AnswerOffer, ReadyItem, Assess {
         /** @return the combat-layer value of this intention */
         TacticalIntent intent();
     }
@@ -791,5 +801,47 @@ public sealed interface TypedCommand
         public Map<String, Object> payload() { return Map.of("offerId", offerId, "decision", decision); }
         /** @return the combat-layer intention */
         public TacticalIntent intent() { return new TacticalIntent.AnswerOffer(offerId, "accept".equals(decision)); }
+    }
+
+    /**
+     * Ready or stow one held item during the player's activation (P11.5, docs/11 section 7, ADR 0034): one change of one
+     * equipment assignment for {@code readyCost}. The player says which change it means, because a toggle would read
+     * the same request as opposite actions depending on state; any other value is an invalid command. Slot, hands, tags and
+     * combat data come from the pinned definition, and a full slot is refused rather than emptied for the player.
+     *
+     * @param itemInstanceId held instance
+     * @param change {@code equip} to put it on or {@code unequip} to take it off
+     */
+    record ReadyItem(UUID itemInstanceId, String change) implements TypedCommand, Tactical {
+        /** Require the instance and one of the two changes. */
+        public ReadyItem {
+            java.util.Objects.requireNonNull(itemInstanceId, "itemInstanceId");
+            if (!"equip".equals(change) && !"unequip".equals(change)) {
+                throw new IllegalArgumentException("an item is equipped or unequipped");
+            }
+        }
+        /** @return the fixed readying identifier */
+        public String type() { return "READY_ITEM"; }
+        /** @return the instance and the change */
+        public Map<String, Object> payload() { return Map.of("itemInstanceId", itemInstanceId.toString(), "change", change); }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.Ready("equip".equals(change)); }
+    }
+
+    /**
+     * Assess one participant during the player's activation (P11.5, docs/11 section 7): a recorded check for
+     * {@code assessCost} that reveals the target's fighting values only on success. The intention names the target alone.
+     *
+     * @param targetId participant observed
+     */
+    record Assess(String targetId) implements TypedCommand, Tactical {
+        /** Require a bounded participant identity. */
+        public Assess { targetId = text(targetId, 128); }
+        /** @return the fixed assessment identifier */
+        public String type() { return "ASSESS"; }
+        /** @return the single target field */
+        public Map<String, Object> payload() { return Map.of("targetId", targetId); }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.Assess(targetId); }
     }
 }
