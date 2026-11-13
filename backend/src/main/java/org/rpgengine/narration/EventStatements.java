@@ -244,6 +244,18 @@ public final class EventStatements {
                         : participant + " moves from zone " + from + " to zone " + to + " for "
                                 + points(false, points) + ".";
             }
+            case "PARTICIPANT_WITHDREW" -> {
+                // P11.5: a careful move toward a way out; which reactions it kept from firing is never stated.
+                String participant = participant(payload, names);
+                String from = token(payload, "from");
+                String to = token(payload, "to");
+                Long points = number(payload, "actionPoints");
+                yield participant == null || from == null || to == null || points == null ? null
+                        : it ? participant + " ripiega con cautela dalla zona " + from + " alla zona " + to + " ("
+                                + points(true, points) + ")."
+                        : participant + " withdraws carefully from zone " + from + " to zone " + to + " for "
+                                + points(false, points) + ".";
+            }
             case "COMBAT_SPEECH" -> {
                 String speaker = participant(payload, names);
                 String recipient = token(payload, "recipientId");
@@ -326,6 +338,17 @@ public final class EventStatements {
                 // P11.5: the verdict of the terminal predicates; settlement and its consequences are later events.
                 String outcome = token(payload, "outcome");
                 String objective = token(payload, "objectiveId");
+                // Since P11.5 the round cap can decide a fight; it says so, because no way out was reached.
+                boolean capped = payload.path("roundCap").isBoolean() && payload.path("roundCap").asBoolean();
+                if (capped) {
+                    yield switch (outcome == null ? "" : outcome) {
+                        case "STALEMATE" -> it ? "Il limite di round è raggiunto senza un esito: lo scontro finisce in stallo."
+                                : "The round limit is reached with no result: the fight ends in a stalemate.";
+                        case "ESCAPE" -> it ? "Il limite di round è raggiunto: le parti si separano e il personaggio protagonista si allontana."
+                                : "The round limit is reached: the sides break off and the protagonist gets away.";
+                        default -> null;
+                    };
+                }
                 yield switch (outcome == null ? "" : outcome) {
                     case "VICTORY" -> it ? "Nessun avversario resta in combattimento: lo scontro è vinto."
                             : "No opponent remains in the fight: it is won.";

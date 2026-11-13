@@ -175,8 +175,9 @@ public final class CommandReceipts {
      * (moves, speech allowance and recipients, declared actions, attacks with costs, targets and disabled reasons, Guard
      * and item use), and the terminal verdict once the fight has one. Since P11.5 also what a social attempt or an answer
      * did and the offer on the table, never a check's difficulty or margin; what a Ready/equip action changed with the
-     * player's own new Guard, armor and attacks; what an assessment found, the target's values only after a success; and
-     * the prices of readying and assessing with the participants that can be assessed.
+     * player's own new Guard, armor and attacks; what an assessment found, the target's values only after a success; the
+     * prices of readying and assessing with the participants that can be assessed; each zone the player can withdraw to
+     * with its price; and whether the round cap gave the verdict.
      */
     private static Map<String, Object> combat(JsonNode combat) {
         var entry = new LinkedHashMap<String, Object>();
@@ -285,6 +286,10 @@ public final class CommandReceipts {
             outcome.put("objectiveId", verdict.path("objectiveId").isString() ? verdict.path("objectiveId").asString() : null);
             if (verdict.path("termsId").isString()) {
                 outcome.put("termsId", verdict.path("termsId").asString());
+            }
+            // Since P11.5, and only for a verdict the round cap gave.
+            if (verdict.path("roundCap").isBoolean() && verdict.path("roundCap").asBoolean()) {
+                outcome.put("roundCap", true);
             }
             var statuses = new ArrayList<Map<String, Object>>();
             for (JsonNode line : verdict.path("objectives")) {
@@ -401,6 +406,16 @@ public final class CommandReceipts {
                 line.put("cost", options.path("assess").path("cost").asInt());
                 line.put("targets", strings(options.path("assess").path("targets")));
                 view.put("assess", java.util.Collections.unmodifiableMap(line));
+            }
+            if (options.path("withdraw").isArray()) {
+                var withdrawals = new ArrayList<Map<String, Object>>();
+                for (JsonNode withdrawal : options.path("withdraw")) {
+                    var line = new LinkedHashMap<String, Object>();
+                    line.put("zone", withdrawal.path("zone").asString());
+                    line.put("cost", withdrawal.path("cost").asInt());
+                    withdrawals.add(line);
+                }
+                view.put("withdraw", List.copyOf(withdrawals));
             }
             view.put("endActivation", options.path("endActivation").asBoolean());
             entry.put("options", java.util.Collections.unmodifiableMap(view));

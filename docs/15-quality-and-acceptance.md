@@ -1707,6 +1707,11 @@ twice; only the outcome is proven, because that ending does not settle yet. A hu
 only by the player's explicit acceptance, and replay identically. Settling once, the return to narrative, renewal and restore during a social check (P11.6),
 generated replies and the browser path (P12) stay open, so QA-11 and QA-13 are not met.
 
+P11.5-C.2 (13 November 2026) adds Withdraw and the round cap to QA-13's detection half, on `WithdrawStalemateTest` and
+`WithdrawCommandsTest`: a withdrawal that only a closer escape zone allows, its price, no `leavesZone` reaction answering it, and an
+escape only through the predicates; and, at the end of the last allowed round, a stalemate or the declared escape after every other
+predicate, changing nobody, on real PostgreSQL over 30 rounds. Settling once and the return to narrative stay open, so QA-13 is not met.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

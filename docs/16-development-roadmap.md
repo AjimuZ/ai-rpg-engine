@@ -4189,7 +4189,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     from `RESOLVING`, `ACTOR_START` and `ROUND_END`; public `ENCOUNTER_OUTCOME_PENDING` with EN/IT statements; receipt `combat.outcome`. No migration.
   - Remaining for this task, so its box stays unchecked: the stalemate policy, idempotent settlement, the return to narrative, and the
     decision on Withdraw, Ready and Assess. Surrender and agreement predicates and refused, counteroffered and accepted negotiation came with Package B, below;
-    Ready/equip and Assess came with P11.5-C.1, below.
+    Ready/equip and Assess came with P11.5-C.1, and Withdraw and the stalemate policy with P11.5-C.2, below.
   - Limits of this package: nothing leaves `OUTCOME_PENDING` until settlement exists, so a campaign whose fight ended stays in encounter
     mode and refuses every command; a round left unfinished adds no world time; the player's status stays `ACTIVE` after an escape; hostiles
     who all escaped or surrendered read as a victory, though no code sets those statuses yet; a surrendered player gets no verdict;
@@ -4285,6 +4285,47 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
   - Not proven here: `verify.sh full` and `verify.sh containers` were not run by this session (the runner runs the plan); ammunition excluded when worn, which no
     fixture exercises; a retry through the HTTP layer; a live V31 dump and restore; independent review of the four new Italian statements;
     balance of the Insight check.
+  - P11.5-C.2, Withdraw and the round cap ([ADR 0035](adr/0035-withdraw-and-the-round-cap.md)), partial progress of 13 November 2026: `WITHDRAW` {zoneId}
+    crosses one edge a `MOVE_ZONE` could cross whose destination's cheapest walk to an escape zone, over the current passages, is strictly shorter than from
+    the player's zone (`TacticalRules.withdrawCost`), for `withdrawCost` or the edge's Move price when that is higher; it runs declared-action ticks, lapses an
+    offer, is refused while movement or actions are prevented, considers no `leavesZone` reaction and writes the public `PARTICIPANT_WITHDREW`; it sets no
+    standing, so an escape comes only from `EncounterOutcome.decide`. The round cap is now the last predicate: after `roundCap` completed rounds an undecided
+    fight moves from `ROUND_END` to `OUTCOME_PENDING` as `STALEMATE` (new outcome) or, under an encounter's declared `"disengagement": "escape"`, `ESCAPE`, both
+    marked `roundCap: true`, changing no participant. Pack contract: encounter `disengagement` (`stalemate` | `escape`, `SCHEMA` otherwise), frozen into the
+    definition only when not the default and read back by `EncounterWriter.state`. Receipt: `options.withdraw` [{zone, cost}] and `combat.outcome.roundCap`. EN/IT
+    statements for the withdrawal, the stalemate and the cap escape. No migration, backup schema change, refusal category or message.
+  - Remaining for this task, so its box stays unchecked: idempotent settlement and the return to narrative.
+  - Limits of this story: non-player participants never withdraw (P12.3/P12.4); a cap escape needs settlement to say where the player goes; an encounter stored
+    at its round end at the cap before this change stays there, because no command can move it; the numbers stay provisional (P18.3).
+  - Existing behavior and tests changed because they pinned the pause that ADR 0035 removes: `EncounterOutcomeTest.theRoundCapStaysAPause` became
+    `theRoundCapEndsAnUndecidedFight` and `CombatSchedulerTest.theRoundCapStopsTheSchedule` now expects `ROUND_END` then `OUTCOME_PENDING` with `STALEMATE`.
+    `CombatScheduler.advance` lost its `round >= roundCap` stop, which the predicate replaces. Every tactical receipt's `options` gains `withdraw`; the
+    `sample:armory-tactics` fixture gains `ridge-retreat`, `stand-off` and `watch-post`. `TypedCommandTest`, `EventStatementsTest` and `CombatPackTest` only gained
+    cases; none was deleted or disabled.
+  - Verification (13 November 2026, JDK 21.0.12.1 and PostgreSQL 18.6 in the images pinned by ADR 0009, on the Windows reference host):
+    `sh .agents/ralph/verify.sh backend "-Dtest=org.rpgengine.combat.**,WithdrawCommandsTest,EncounterCommandsTest,TacticalCommandsTest,StrikeCommandsTest,ReactionCommandsTest,NegotiationCommandsTest,OutcomeCommandsTest,ReadyAssessCommandsTest,CampaignCommandHttpTest,EventStatementsTest,TypedCommandTest,CombatPackTest,EngineApplicationTest,CanonicalMigrationUpgradeTest"`
+    passed 350 tests with 0 failures, 0 errors and 0 skipped on the final source tree. New: `WithdrawStalemateTest` 11 (pure: legal and illegal destinations,
+    a closed passage, no escape zone, the price on normal, cheap and steep profiles, as charged by the scheduler, a move answered by a `leavesZone` counter and the
+    same withdrawal answered by nothing with no draw, the exact public payload, half way being no escape, a reach-zone objective on the exit first, a fall on the
+    declared tick, prevention, turn, offer lapse, the cap's stalemate with its time, mark and unchanged participants, the declared escape moving nobody, the cap
+    after an objective, a lethal round-end tick, an accepted truce and a reached exit, a round-end tick equal under caps 1 and 2, the record's own guards, the
+    policy compiled and frozen) and `WithdrawCommandsTest` 4 (PostgreSQL: a withdrawal provoking nothing and drawing nothing, its replayed retry writing nothing,
+    illegal, unaffordable and malformed withdrawals writing nothing, an escape at the pass with the sentry beside the player and the standing left `ACTIVE`, the
+    same edge as a move answered by `snap`, 30 rounds of `stand-off` ending in a stalemate with 30 round starts and ends and unchanged Health, zones and
+    statuses, 30 rounds of `watch-post` ending in an escape with the policy read back from the stored definition and the decisive retry writing nothing).
+    `sh .agents/ralph/verify.sh repo` passed (diff check, line endings, repository checks, repository tests, backup tests) on the final tree; only this
+    sentence changed after that run.
+  - Weakenings: 30 on an exported copy (`.local/scratch/p115c2/copy`, ignored), each run with `sh .agents/ralph/verify.sh backend -Dtest=…` from the copy after a
+    passing baseline and restored before the next; the copy then matched the live `backend/src` exactly (`diff -rq`, no output). All 30 failed at least one test,
+    none by a compile error (the first form of the options weakening did not compile and was rewritten): the "closer" check, the edge-price floor, the declared
+    price, movement prevention, the points check, the option list, passages in the distance, a `leavesZone` reaction on withdrawing, the offer lapse, the
+    declared-action tick, a withdrawal setting `ESCAPED`, the scheduler's charge, no cap predicate, the cap off by one, the policy ignored, the cap before an
+    objective, the cap before an agreement, the public mark, the record's guards, the scheduler's working state, the writer's read, the definition's write,
+    the freeze, the projection, a free-text policy in the compiler, both receipt members, `WITHDRAW` decoded as a move, the capped statement and an incomplete
+    withdrawal statement. The cap-before-agreement weakening was found untested by reading, so the truce and reached-exit cases were added (to the live
+    tree and the copy) before it ran; the 16 weakenings run before that test-only addition were not rerun after it, and the 13 after it ran against it.
+  - Not proven here: `verify.sh full` and `verify.sh containers` were not run by this session (the runner runs the plan); a retry through the HTTP layer;
+    settling either cap outcome; an encounter already stored at its round end at the cap; independent review of the three new Italian statements; balance.
 - [ ] P11.6 Persist/recover every combat cursor, partial-round time boundary and combat-dialogue operation/transcript without duplicate social effects or settlement.
 
 **Exit:** seeded fights produce reproducible legal outcomes and all terminal paths return to a valid narrative state. **Checks:** QA-09, QA-11–13, effect properties and restore mid-round. **Suggested commit:** `Implement deterministic turn-based combat`.

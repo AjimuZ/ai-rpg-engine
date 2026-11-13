@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — Withdraw and the round cap in a fight (P11.5-C.2), 13 November 2026
+
+- During their own activation the player can withdraw with `WITHDRAW` {zoneId}: one edge toward an escape zone, for
+  `withdrawCost` (2 by default) or the edge's Move price when that is higher. Nobody's "leaves the zone" reaction answers it, and
+  the receipt lists the zones the player can withdraw to with their price. A destination that does not get closer to an escape
+  zone, or a fight without one, is refused before anything is spent. Reaching an escape zone this way ends the fight as an escape
+  exactly as walking there does.
+- A fight that nothing has decided by the end of its last allowed round (30 by default) now ends there instead of waiting forever:
+  as a stalemate, or as an escape where the encounter declares `"disengagement": "escape"`. The outcome says the round limit decided
+  it, and nobody's Health, standing, position or effects change. Any other `disengagement` value is refused when the pack is
+  compiled.
+- Both have public statements in English and Italian. No migration, and nothing changes for receipts written earlier. No frontend
+  control uses these commands yet, and a fight that has ended still waits for settlement. A fight stored at the end of its last
+  round by an earlier version stays there. See [ADR 0035](docs/adr/0035-withdraw-and-the-round-cap.md) and
+  [docs/11](docs/11-combat-system.md#13-terminal-conditions).
+
 ## Unreleased — Ready/equip and Assess in a fight (P11.5-C.1), 13 November 2026
 
 - During their own activation the player can ready or stow one held item with `READY_ITEM` {itemInstanceId, change: `equip` or

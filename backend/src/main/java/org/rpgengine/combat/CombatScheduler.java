@@ -22,8 +22,9 @@ import org.rpgengine.rules.CombatProfile;
  * budget once. Activations run in rank order over active participants only (defeated, escaped and surrendered
  * participants are skipped). An activation start grants the profile's action points and resets the speech
  * allowance; its end expires unused points. After the last activation the round ends and adds
- * {@code roundSeconds} of world time. The scheduler then opens the next round, unless the fight is over or the round
- * cap is reached (the stalemate policy of a later P11.5 story decides that encounter).
+ * {@code roundSeconds} of world time. The scheduler then opens the next round, unless the fight is over. Since P11.5 the
+ * end of round {@code roundCap} always ends it: the frozen disengagement policy makes an undecided fight a stalemate or an
+ * escape ({@link EncounterOutcome}), so no fight waits at its round end and none runs past the cap.
  *
  * <p><b>Terminal predicates</b> (P11.5, docs/11 section 13): {@link EncounterOutcome#decide} is checked after each resolved
  * action, at each activation start and at each round end, and a verdict moves the encounter to {@code OUTCOME_PENDING} with
@@ -93,6 +94,11 @@ import org.rpgengine.rules.CombatProfile;
  * player first readies nothing. An assessment draws two recorded dice against the target's effective Resistance and reveals
  * the target's fighting values only on success, in a public {@code ASSESSMENT_RESOLVED}, with the difficulty and margin in
  * an internal {@code ASSESSMENT_CALCULATED}. Neither provokes a reaction.
+ *
+ * <p><b>Withdraw</b> (P11.5, docs/11 section 7, ADR 0035) is a move toward an escape zone at {@link TacticalRules#withdrawCost}:
+ * it pays, runs the declared-action ticks and takes an offer off the table like a move, but no {@code leavesZone} reaction is
+ * considered for it, so nobody answers the player leaving. It sets no status and decides nothing itself: arriving in an
+ * escape zone ends the fight only through {@link EncounterOutcome#decide}, in its usual order.
  */
 public final class CombatScheduler {
     /** Sides of each initiative die (kernel). */
@@ -154,6 +160,7 @@ public final class CombatScheduler {
                 run.advance();
             }
             case TacticalIntent.MoveZone move -> run.move(move.zone());
+            case TacticalIntent.Withdraw withdraw -> run.withdraw(withdraw.zone());
             case TacticalIntent.Speech speech -> run.speak(speech);
             case TacticalIntent.Interact interact -> run.interact(interact);
             case TacticalIntent.Strike strike -> run.playerStrike(strike);
@@ -443,8 +450,9 @@ public final class CombatScheduler {
         }
 
         /**
-         * Continue the schedule until the player's decision, a terminal predicate or the round cap. A player out of the fight
-         * always has a verdict, so the schedule never runs on without one.
+         * Continue the schedule until the player's decision or a terminal predicate. A player out of the fight always has a
+         * verdict, and so does a fight at the end of its last allowed round (the round cap is a predicate since P11.5), so the
+         * schedule never runs on without one and never opens a round beyond the cap.
          */
         void advance() {
             for (int guard = 0; guard < TacticalPlan.MAX_STEPS; guard++) {
@@ -463,7 +471,7 @@ public final class CombatScheduler {
                     }
                     case ACTOR_END -> next(cursor);
                     case ROUND_END -> {
-                        if (concluded() || round >= profile.roundCap()) {
+                        if (concluded()) {
                             return;
                         }
                         openRound();
@@ -620,6 +628,27 @@ public final class CombatScheduler {
             points -= cost;
             step(EncounterPhase.RESOLVING);
             traverse(player, zone, cost, true);
+            settle();
+        }
+
+        /**
+         * The player's Withdraw action (P11.5, ADR 0035): pay its price and cross one edge toward an escape zone. It runs the
+         * declared-action ticks like any paid action, then arrives without considering any {@code leavesZone} reaction, which
+         * is the only movement trigger the kernel supports; the public event names no reaction, so an opponent's hidden
+         * reactions stay hidden. Reaching an escape zone is decided afterwards by the terminal predicates alone.
+         */
+        void withdraw(String zone) {
+            Working player = participants.get(EncounterTemplate.PLAYER);
+            int cost = TacticalRules.withdrawCost(base, zone);
+            lapseOffer("ACTION_TAKEN");
+            points -= cost;
+            step(EncounterPhase.RESOLVING);
+            String from = player.zone;
+            if (declare(player)) {
+                player.zone = zone;
+                note("PARTICIPANT_WITHDREW", activation(player).put("from", from).put("to", zone).put("actionPoints", cost)
+                        .put("remainingActionPoints", points).build(), true);
+            }
             settle();
         }
 
@@ -1770,7 +1799,7 @@ public final class CombatScheduler {
             return new EncounterState(base.id(), base.rowVersion(), phase, round, cursor, points, speech, passages,
                     profile, base.frozenSpace(), base.escapeZones(), base.actions(), base.opening(),
                     base.openingTarget(), openingStatus, list, ammunition, library, effectsApplied, base.objectives(), offer,
-                    agreement);
+                    agreement, base.disengagement());
         }
 
         /** Record the current encounter row state after checking its arrow. */

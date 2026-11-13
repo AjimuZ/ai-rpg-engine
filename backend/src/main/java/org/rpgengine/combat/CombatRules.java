@@ -338,7 +338,8 @@ public record CombatRules(Map<String, CombatProfile> profiles, Map<String, Encou
         String location = snapshot.resolve(pack, (String) data.get("location"), "location").id();
         return new EncounterTemplate(id, packId, location, new ZoneGraph(zones, edges), (String) data.get("playerZone"),
                 new TreeSet<>(strings(data.get("escapeZones"))), participants, objectives,
-                OpeningPolicy.parse(text(data.get("opening"), "initiative")), actions);
+                OpeningPolicy.parse(text(data.get("opening"), "initiative")), actions,
+                Disengagement.parse(text(data.get("disengagement"), "stalemate")));
     }
 
     /** Declared terms of a validated negotiation, or null when it declares none; an omitted cost is a free decision. */

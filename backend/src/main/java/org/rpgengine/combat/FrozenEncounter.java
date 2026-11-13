@@ -42,10 +42,12 @@ import org.rpgengine.rules.ZoneGraph;
  * @param participants the player first, then template participants in authored order
  * @param actions declared social and scene actions (P11.2), possibly none
  * @param effects frozen definitions of every effect the encounter can reach (P11.4), by canonical ID
+ * @param disengagement what an undecided fight becomes at the round cap (P11.5)
  */
 public record FrozenEncounter(UUID id, String templateId, String location, CombatProfile profile, ZoneGraph zones,
         Set<String> escapeZones, List<EncounterObjective> objectives, OpeningPolicy opening, String openingTarget,
-        List<Participant> participants, List<EncounterAction> actions, Map<String, CombatEffect> effects) {
+        List<Participant> participants, List<EncounterAction> actions, Map<String, CombatEffect> effects,
+        Disengagement disengagement) {
     /** The only defeat policy of the default ruleset: zero Health incapacitates, it never kills (docs/11 section 13). */
     public static final String DEFEAT_POLICY = "incapacitated";
 
@@ -220,6 +222,14 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
                 actions, Map.of());
     }
 
+    /** Encounter with the default disengagement policy, the shape used before P11.5. */
+    public FrozenEncounter(UUID id, String templateId, String location, CombatProfile profile, ZoneGraph zones,
+            Set<String> escapeZones, List<EncounterObjective> objectives, OpeningPolicy opening, String openingTarget,
+            List<Participant> participants, List<EncounterAction> actions, Map<String, CombatEffect> effects) {
+        this(id, templateId, location, profile, zones, escapeZones, objectives, opening, openingTarget, participants,
+                actions, effects, Disengagement.STALEMATE);
+    }
+
     /** Copy the collections; the freeze step established every other invariant. */
     public FrozenEncounter {
         Objects.requireNonNull(id, "id");
@@ -227,6 +237,7 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
         Objects.requireNonNull(profile, "profile");
         Objects.requireNonNull(zones, "zones");
         Objects.requireNonNull(opening, "opening");
+        Objects.requireNonNull(disengagement, "disengagement");
         escapeZones = java.util.Collections.unmodifiableSet(new java.util.TreeSet<>(escapeZones));
         objectives = List.copyOf(objectives);
         participants = List.copyOf(participants);
@@ -353,7 +364,7 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
         return new FrozenEncounter(id, template.id(), template.location(), profile, template.zones(),
                 template.escapeZones(), template.objectives(), template.opening(), openingTarget, participants,
                 template.actions().stream().map(action -> action.forPlayer(player.skills())).toList(),
-                reachable(participants, library.effects()));
+                reachable(participants, library.effects()), template.disengagement());
     }
 
     /**
@@ -394,7 +405,9 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
     /**
      * Frozen definition as canonical JSON: template, location, kernel, profile hash, zones, escape zones,
      * objectives, opening, defeat policy, roster and, only when the template declares any, its social and scene
-     * actions (P11.2; omitting an empty list keeps definitions of action-free templates byte-identical to P11.1).
+     * actions (P11.2; omitting an empty list keeps definitions of action-free templates byte-identical to P11.1). Since
+     * P11.5 a disengagement policy other than the default stalemate is recorded as {@code disengagement}; the default is
+     * omitted, so a definition without the member reads as a stalemate, as every one frozen before P11.5 does.
      * This text and its hash are stored at entry and never change; the tactical scheduler reads its zones, escape
      * zones and actions back from it.
      *
@@ -423,6 +436,9 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
         // Likewise for effects (P11.4), so a fight that can reach none keeps its earlier definition text.
         if (!effects.isEmpty()) {
             form.put("effects", effects.values().stream().map(effect -> (Object) effect.canonicalForm()).toList());
+        }
+        if (disengagement != Disengagement.STALEMATE) {
+            form.put("disengagement", disengagement.wire());
         }
         return CanonicalJson.write(form);
     }

@@ -23,7 +23,7 @@ import org.rpgengine.content.PackTextParser;
  * roll initiative, move to an adjacent zone, end the activation, one bounded speech-only utterance and a declared
  * social or scene action; since P11.3 also strike, the Guard action and using an item; since P11.4 also using a frozen
  * ability and changing a predeclared reaction policy; since P11.5 also answering the offer on the table, readying or
- * stowing one held item and assessing one participant. Unknown types fail closed.
+ * stowing one held item, assessing one participant and withdrawing toward an escape zone. Unknown types fail closed.
  * Structural decoding here
  * is followed by current-state rule validation in {@link CommandRules}; resolution
  * remains backend-owned (P07.4). Every value is immutable and can reproduce its exact
@@ -36,7 +36,7 @@ public sealed interface TypedCommand
         TypedCommand.Rest, TypedCommand.Engage, TypedCommand.RollInitiative, TypedCommand.MoveZone,
         TypedCommand.EndActivation, TypedCommand.CombatSpeak, TypedCommand.Interact, TypedCommand.Strike,
         TypedCommand.Guard, TypedCommand.CombatUseItem, TypedCommand.CombatUseAbility, TypedCommand.SetReactionPolicy,
-        TypedCommand.AnswerOffer, TypedCommand.ReadyItem, TypedCommand.Assess {
+        TypedCommand.AnswerOffer, TypedCommand.ReadyItem, TypedCommand.Assess, TypedCommand.Withdraw {
     /** @return registered, case-sensitive wire identifier */
     String type();
 
@@ -219,6 +219,10 @@ public sealed interface TypedCommand
                     fields(payload, "targetId");
                     yield new Assess(text(payload.get("targetId"), 128));
                 }
+                case "WITHDRAW" -> {
+                    fields(payload, "zoneId");
+                    yield new Withdraw(text(payload.get("zoneId"), 128));
+                }
                 default -> throw invalid();
             };
         } catch (IllegalArgumentException | ArithmeticException failure) {
@@ -232,8 +236,8 @@ public sealed interface TypedCommand
         return Set.of("MOVE", "WAIT", "SPEAK", "USE_ABILITY", "USE_ITEM", "EQUIP_ITEM", "UNEQUIP_ITEM",
                 "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST", "ENGAGE",
                 "ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT", "STRIKE", "GUARD",
-                "COMBAT_USE_ITEM", "COMBAT_USE_ABILITY", "SET_REACTION_POLICY", "ANSWER_OFFER", "READY_ITEM", "ASSESS")
-                .contains(type);
+                "COMBAT_USE_ITEM", "COMBAT_USE_ABILITY", "SET_REACTION_POLICY", "ANSWER_OFFER", "READY_ITEM", "ASSESS",
+                "WITHDRAW").contains(type);
     }
 
     /**
@@ -242,7 +246,7 @@ public sealed interface TypedCommand
      * exceptions are the two item intentions, {@link CombatUseItem} and {@link ReadyItem}, whose items are pinned data.
      */
     sealed interface Tactical permits RollInitiative, MoveZone, EndActivation, CombatSpeak, Interact, Strike, Guard,
-            CombatUseItem, CombatUseAbility, SetReactionPolicy, AnswerOffer, ReadyItem, Assess {
+            CombatUseItem, CombatUseAbility, SetReactionPolicy, AnswerOffer, ReadyItem, Assess, Withdraw {
         /** @return the combat-layer value of this intention */
         TacticalIntent intent();
     }
@@ -843,5 +847,23 @@ public sealed interface TypedCommand
         public Map<String, Object> payload() { return Map.of("targetId", targetId); }
         /** @return the combat-layer intention */
         public TacticalIntent intent() { return new TacticalIntent.Assess(targetId); }
+    }
+
+    /**
+     * Withdraw across one edge toward an escape zone during the player's activation (P11.5, docs/11 section 7, ADR 0035).
+     * The price, the edge, the escape zones and which reactions it suppresses are rule data; the intention names only the
+     * destination, and reaching an escape zone is decided by the terminal predicates, never by this command.
+     *
+     * @param zoneId destination zone of the frozen encounter
+     */
+    record Withdraw(String zoneId) implements TypedCommand, Tactical {
+        /** Require a bounded zone identity. */
+        public Withdraw { zoneId = text(zoneId, 128); }
+        /** @return the fixed withdrawal identifier */
+        public String type() { return "WITHDRAW"; }
+        /** @return the single destination field */
+        public Map<String, Object> payload() { return Map.of("zoneId", zoneId); }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.Withdraw(zoneId); }
     }
 }

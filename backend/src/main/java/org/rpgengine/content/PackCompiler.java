@@ -968,6 +968,8 @@ public final class PackCompiler {
                 }
             }
             f.choice("opening", Set.of("initiative", "first", "forbidden"), "initiative");
+            // What an undecided fight becomes at the round cap (P11.5, docs/11 section 13): never a harm to anybody.
+            f.choice("disengagement", Set.of("stalemate", "escape"), "stalemate");
             // Declared social and scene actions (P11.2, docs/11 section 7.1): words change a fight only through these.
             var actions = new HashSet<String>();
             for (Fields action : f.objects("actions", 0, 8)) {

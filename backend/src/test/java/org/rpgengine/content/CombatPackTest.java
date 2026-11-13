@@ -152,6 +152,9 @@ class CombatPackTest {
         rejects("CONSTRAINT_CONFLICT", "encounters.json", "{\"id\":\"gate\",\"name\":\"Gate\"}",
                 "{\"id\":\"gate\",\"name\":\"Gate\",\"capacity\":1}", false);
         rejects("SCHEMA", "encounters.json", "\"opening\":\"first\"", "\"opening\":\"ambush\"", false);
+        // P11.5: the disengagement policy at the round cap is a closed choice; nothing else can follow the cap.
+        rejects("SCHEMA", "encounters.json", "\"opening\":\"first\"", "\"opening\":\"first\",\"disengagement\":\"retreat\"", false);
+        rejects("SCHEMA", "encounters.json", "\"opening\":\"first\"", "\"opening\":\"first\",\"disengagement\":\"defeat\"", false);
     }
 
     /**

@@ -1201,8 +1201,8 @@ reach-zone, survive or protect objective, then no active hostile, then an escape
 `ACTOR_START` and `ROUND_END`, stores `OUTCOME_PENDING` and writes `ENCOUNTER_OUTCOME_PENDING`; `CommandReceipts` allowlists
 `combat.outcome`. No migration was needed. Tests: `EncounterOutcomeTest` (pure) and `OutcomeCommandsTest` (PostgreSQL).
 
-Limits: the stalemate policy, Withdraw and settlement are not implemented, so nothing leaves `OUTCOME_PENDING` and the campaign
-stays in encounter mode there; a round left unfinished adds no time.
+Limits at that package: the stalemate policy, Withdraw and settlement were not implemented (the first two came with P11.5-C.2,
+below), so nothing leaves `OUTCOME_PENDING` and the campaign stays in encounter mode there; a round left unfinished adds no time.
 
 ## Negotiation, surrender and agreement (P11.5)
 
@@ -1233,7 +1233,22 @@ and takes them over; the equipment change is the commit's item effect, written o
 `ReadyAssessCommandsTest` (PostgreSQL).
 
 Limits: one item per action and no swap; non-player participants neither ready nor assess (P12.3/P12.4); revealed values are kept
-only in the event and that receipt; Withdraw, the stalemate policy and settlement remain.
+only in the event and that receipt; Withdraw and the stalemate policy came with P11.5-C.2, below; settlement remains.
+
+## Withdraw and the round cap (P11.5)
+
+`WITHDRAW` {zoneId} is a tactical command ([ADR 0035](../docs/adr/0035-withdraw-and-the-round-cap.md)).
+`TacticalRules.withdrawCost` accepts a legal move whose destination is strictly closer, in action points over the current passages,
+to an escape zone, priced `withdrawCost` or the edge's Move price when that is higher; `TacticalRules.options` lists `withdraw`.
+`CombatScheduler` moves the player like a move but considers no `leavesZone` reaction and writes `PARTICIPANT_WITHDREW`.
+`EncounterOutcome.decide` ends the predicate order with the round cap: after `roundCap` completed rounds it returns `STALEMATE` or,
+under the template's `Disengagement.ESCAPE`, `ESCAPE`, both marked `roundCap`. The policy is pack data (`disengagement` on an
+encounter, compiled by `PackCompiler`, projected by `CombatRules`), frozen into the definition by `FrozenEncounter` only when not
+the default and read back by `EncounterWriter.state`; no migration. `CommandReceipts` allowlists `options.withdraw` and
+`combat.outcome.roundCap`. Tests: `WithdrawStalemateTest` (pure) and `WithdrawCommandsTest` (PostgreSQL).
+
+Limits: non-player participants never withdraw (P12.3/P12.4); settlement and the return to narrative remain, so a capped fight
+stays at `OUTCOME_PENDING`; an encounter stored at its round end at the cap before this change cannot move.
 
 ## Interface reload contract (P05.6)
 

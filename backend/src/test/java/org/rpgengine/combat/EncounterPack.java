@@ -215,7 +215,29 @@ public final class EncounterPack {
                 {"id":"measured-offer","name":"Measured offer","kind":"social","intent":"negotiate","cost":2,
                 "check":{"attribute":"insight","skill":"bladework","difficulty":14},
                 "terms":{"id":"fair-terms","name":"Fair terms","kind":"truce"},
-                "counteroffer":{"id":"small-toll","name":"A small toll","kind":"truce","cost":1}}]}}""";
+                "counteroffer":{"id":"small-toll","name":"A small toll","kind":"truce","cost":1}}]}},
+            {"id":"ridge-retreat","kind":"encounter","data":{"name":"Ridge Retreat","location":"trailhead",
+              "zones":[{"id":"camp","name":"Camp"},{"id":"ridge","name":"Ridge"},{"id":"gully","name":"Gully"},
+                {"id":"pass","name":"Pass"}],
+              "edges":[{"from":"camp","to":"ridge"},{"from":"camp","to":"gully"},{"from":"ridge","to":"pass"}],
+              "playerZone":"camp","escapeZones":["pass"],
+              "participants":[{"id":"sentry","name":"Sentry","side":"hostile","zone":"camp","brace":{"mode":"off"},
+                "stats":{"health":999,"guard":0,"resistance":0},
+                "attacks":[{"id":"jab","attribute":"force","strongHit":false,"damage":{"count":1,"sides":2,"attribute":"none"}}],
+                "reactions":[{"id":"snap","trigger":"leavesZone","effect":{"type":"counter","attack":"jab"}}]}],
+              "objectives":[{"id":"away","name":"Get away","kind":"escape"}]}},
+            {"id":"stand-off","kind":"encounter","data":{"name":"Stand-off","location":"trailhead",
+              "zones":[{"id":"bank","name":"Bank"},{"id":"ford","name":"Ford"}],"edges":[{"from":"bank","to":"ford"}],
+              "playerZone":"bank",
+              "participants":[{"id":"watcher","name":"Watcher","side":"hostile","zone":"ford","brace":{"mode":"off"},
+                "stats":{"health":999,"guard":40,"resistance":40}}],
+              "objectives":[{"id":"rout","kind":"defeatHostiles"}]}},
+            {"id":"watch-post","kind":"encounter","data":{"name":"Watch Post","location":"trailhead","disengagement":"escape",
+              "zones":[{"id":"bank","name":"Bank"},{"id":"ford","name":"Ford"}],"edges":[{"from":"bank","to":"ford"}],
+              "playerZone":"bank",
+              "participants":[{"id":"watcher","name":"Watcher","side":"hostile","zone":"ford","brace":{"mode":"off"},
+                "stats":{"health":999,"guard":40,"resistance":40}}],
+              "objectives":[{"id":"rout","kind":"defeatHostiles"}]}}""";
 
     private EncounterPack() {
     }
@@ -259,6 +281,11 @@ public final class EncounterPack {
      * lasts whatever the initiative order, and a {@code squire} on the player's road. Its {@code hopeless-plea} can never meet difficulty 40, {@code offer-peace},
      * {@code haggle}, {@code demand-surrender} and {@code lay-down-arms} declare no check, so each has one certain response,
      * and {@code sway} and {@code measured-offer} add a skill and draw, for cases that follow recorded dice.
+     * {@code ridge-retreat} (P11.5, Withdraw) puts a {@code sentry} in the player's camp whose {@code snap} answers anyone leaving
+     * it with a weak {@code jab} counter; the ridge leads to the escape zone {@code pass}, the gully is a dead end.
+     * {@code stand-off} and {@code watch-post} (P11.5, the round cap) set an unarmed, unbeatable {@code watcher} across a ford, so
+     * nothing can end the fight before the cap; {@code watch-post} declares the {@code escape} disengagement policy and
+     * {@code stand-off} keeps the default stalemate.
      *
      * <p>Conditions: {@code poisoned} (additive up to 3, one damage per stack at each round end, two round ends),
      * {@code warded} (absorption 3, persistent, strongest), {@code winded} (attack -2 until the holder's next activation),

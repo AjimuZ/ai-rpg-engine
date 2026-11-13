@@ -52,6 +52,9 @@ import org.rpgengine.rules.ZoneGraph;
  *   <li><b>Assess</b> (P11.5, {@link #canAssess}) — a different standing participant within {@code maxRangeEdges} range
  *       bands whom the player can see: from another zone, an obscured zone hides its occupants. Cover does not stop a look.
  *       It costs {@code assessCost}.</li>
+ *   <li><b>Withdraw</b> (P11.5, {@link #withdrawCost}) — a legal move whose destination's cheapest walk to an escape zone is
+ *       strictly shorter than from the player's zone, for {@code withdrawCost} or the edge's Move price when that is higher.
+ *       An effect that prevents movement or actions refuses it, as it refuses a move.</li>
  * </ul>
  */
 public final class TacticalRules {
@@ -65,7 +68,10 @@ public final class TacticalRules {
         TURN,
         /** The intention costs more action points than remain in the activation. */
         ACTION_POINTS,
-        /** The destination is unknown, the current zone, not one unblocked edge away or full. */
+        /**
+         * The destination is unknown, the current zone, not one unblocked edge away or full, or, for a withdrawal, no closer
+         * to an escape zone.
+         */
         ZONE,
         /** The recipient or target is missing, the player, of the wrong side, not standing or out of range. */
         TARGET,
@@ -125,8 +131,9 @@ public final class TacticalRules {
             return Refusal.TURN;
         }
         var player = state.player();
+        boolean moving = intent instanceof TacticalIntent.MoveZone || intent instanceof TacticalIntent.Withdraw;
         if (costsPoints(intent) && state.prevented(player, CombatEffect.Prevents.ACTIONS)
-                || intent instanceof TacticalIntent.MoveZone && state.prevented(player, CombatEffect.Prevents.MOVEMENT)) {
+                || moving && state.prevented(player, CombatEffect.Prevents.MOVEMENT)) {
             return Refusal.PREVENTED;
         }
         return switch (intent) {
@@ -136,6 +143,10 @@ public final class TacticalRules {
             case TacticalIntent.EndActivation end -> null;
             case TacticalIntent.MoveZone move -> {
                 int cost = moveCost(state, move.zone());
+                yield cost < 0 ? Refusal.ZONE : cost > state.actionPoints() ? Refusal.ACTION_POINTS : null;
+            }
+            case TacticalIntent.Withdraw withdraw -> {
+                int cost = withdrawCost(state, withdraw.zone());
                 yield cost < 0 ? Refusal.ZONE : cost > state.actionPoints() ? Refusal.ACTION_POINTS : null;
             }
             case TacticalIntent.Speech speech -> {
@@ -410,6 +421,43 @@ public final class TacticalRules {
     }
 
     /**
+     * Action-point cost of the player's withdrawal to a zone (P11.5, ADR 0035), ignoring the points available.
+     *
+     * @param state encounter state at the player's decision
+     * @param zone destination zone ID
+     * @return {@code withdrawCost}, raised to the edge's Move price when that is higher, so withdrawing never makes a crossing
+     *         cheaper than walking it; or -1 when the encounter has no escape zone or the destination is not a legal move
+     *         ({@link #moveCost}) whose cheapest walk to an escape zone, along the current unblocked edges, is strictly shorter
+     *         than from the player's zone
+     */
+    public static int withdrawCost(EncounterState state, String zone) {
+        int step = moveCost(state, zone);
+        if (step < 0) {
+            return -1;
+        }
+        int here = escapeDistance(state, state.player().zone());
+        int there = escapeDistance(state, zone);
+        // A legal step into a zone that can reach an escape zone means the player's zone can reach one too.
+        if (there < 0 || there >= here) {
+            return -1;
+        }
+        return Math.max(step, state.profile().value("withdrawCost"));
+    }
+
+    /** @return the fewest action points of walking from a zone to the nearest escape zone, or -1 when none can be reached */
+    private static int escapeDistance(EncounterState state, String zone) {
+        var space = state.space();
+        int best = -1;
+        for (String escape : state.escapeZones()) {
+            int cost = space.travelCost(zone, escape, state.profile());
+            if (cost >= 0 && (best < 0 || cost < best)) {
+                best = cost;
+            }
+        }
+        return best;
+    }
+
+    /**
      * Action-point cost of any participant's move between two zones, ignoring the points available.
      *
      * @param state encounter state
@@ -435,8 +483,8 @@ public final class TacticalRules {
      * and the reason it cannot be used now, the Guard action and the price of using an item. Since P11.5 a declared
      * action also lists its check and proposed terms, and the offer on the table is listed with what accepting costs. A
      * check's difficulty and a counteroffer not yet made are absent. Also since P11.5 the price of readying an item and
-     * whether it can be paid, and the price of assessing with the participants that can be assessed. Everything listed is
-     * public: every participant is observable.
+     * whether it can be paid, the price of assessing with the participants that can be assessed, and each zone the player
+     * can withdraw to with its price. Everything listed is public: every participant is observable.
      *
      * @param state encounter state at the player's decision
      * @return ordered canonical values, or an empty map when the player has no decision now
@@ -569,6 +617,17 @@ public final class TacticalRules {
         assess.put("cost", state.profile().value("assessCost"));
         assess.put("targets", observed);
         options.put("assess", assess);
+        // Since P11.5: each zone the player can withdraw to now, with its price.
+        var withdrawals = new ArrayList<Object>();
+        for (String zone : space.zones().keySet()) {
+            if (refusal(state, new TacticalIntent.Withdraw(zone)) == null) {
+                var line = new LinkedHashMap<String, Object>();
+                line.put("zone", zone);
+                line.put("cost", withdrawCost(state, zone));
+                withdrawals.add(line);
+            }
+        }
+        options.put("withdraw", withdrawals);
         options.put("endActivation", true);
         var offer = state.openOffer();
         if (offer != null) {

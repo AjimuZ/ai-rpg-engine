@@ -5,7 +5,7 @@ import java.util.Objects;
 /**
  * Closed vocabulary of the player's tactical intentions inside an encounter (P11.2 to P11.5, docs/11 sections 6-13).
  * Each value names only what the player decides: a destination zone, a recipient, a declared action, an attack and
- * its target, whether to put an item on or take it off, a participant to assess. Costs, legality and every effect come from the frozen encounter through {@link TacticalRules} and
+ * its target, whether to put an item on or take it off, a participant to assess, a zone to withdraw to. Costs, legality and every effect come from the frozen encounter through {@link TacticalRules} and
  * {@link CombatScheduler}; the commands layer decodes the wire payloads and hands these values over.
  */
 public sealed interface TacticalIntent {
@@ -21,6 +21,20 @@ public sealed interface TacticalIntent {
     record MoveZone(String zone) implements TacticalIntent {
         /** Require a destination. */
         public MoveZone {
+            Objects.requireNonNull(zone, "zone");
+        }
+    }
+
+    /**
+     * Withdraw across one edge toward an escape zone (P11.5, docs/11 section 7, ADR 0035): a move priced by
+     * {@code withdrawCost} that no movement-trigger reaction answers. It is never an escape by itself: only the terminal
+     * predicates read the zone it reaches.
+     *
+     * @param zone destination zone ID
+     */
+    record Withdraw(String zone) implements TacticalIntent {
+        /** Require a destination. */
+        public Withdraw {
             Objects.requireNonNull(zone, "zone");
         }
     }

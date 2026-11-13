@@ -376,6 +376,15 @@ class TypedCommandTest {
         assertInvalid("ASSESS", Map.of("targetId", ""));
         assertInvalid("ASSESS", Map.of("targetId", "x".repeat(129)));
         assertInvalid("ASSESS", Map.of("targetId", "raider", "reveal", "health"));
+        // P11.5: a withdrawal names its destination alone; its price and the reactions it suppresses are rule data.
+        assertTrue(TypedCommand.registered("WITHDRAW"));
+        assertEquals(new TypedCommand.Withdraw("yard"), decode("WITHDRAW", Map.of("zoneId", "yard")));
+        assertEquals(new org.rpgengine.combat.TacticalIntent.Withdraw("yard"), new TypedCommand.Withdraw("yard").intent());
+        assertEquals(Map.of("zoneId", "yard"), new TypedCommand.Withdraw("yard").payload());
+        assertInvalid("WITHDRAW", Map.of());
+        assertInvalid("WITHDRAW", Map.of("zoneId", ""));
+        assertInvalid("WITHDRAW", Map.of("zoneId", "x".repeat(129)));
+        assertInvalid("WITHDRAW", Map.of("zoneId", "yard", "escape", true));
         assertEquals(500, decodeSpeech("x".repeat(500)).text().length());
         assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.MoveZone(null));
         assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.Interact("taunt", " "));

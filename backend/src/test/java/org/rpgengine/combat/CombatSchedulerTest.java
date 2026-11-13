@@ -119,14 +119,19 @@ class CombatSchedulerTest {
         assertSteps(state, plan);
     }
 
-    /** At the round cap the schedule stops at the round's end; nothing is legal until the stalemate policy (P11.5). */
+    /**
+     * At the round cap the schedule stops after the round's end, at the stalemate the template's default policy names
+     * (P11.5); nothing is legal afterwards. Until P11.5 it paused at the round end.
+     */
     @Test
     void theRoundCapStopsTheSchedule() throws Exception {
         var state = rolled("trail-ambush", 6, 7, 5, 6);
         state = with(state, CombatProfile.resolve(state.profile().pack(), state.profile().roles(), state.profile().health(),
                 null, Map.of("roundCap", 1)));
         var plan = CombatScheduler.apply(state, new TacticalIntent.EndActivation(), dice());
-        assertEquals(EncounterPhase.ROUND_END, plan.last().phase());
+        assertEquals(List.of(EncounterPhase.ROUND_END, EncounterPhase.OUTCOME_PENDING),
+                phases(plan).subList(phases(plan).size() - 2, phases(plan).size()));
+        assertEquals("STALEMATE", plan.notes().getLast().payload().get("outcome"));
         assertNull(plan.last().cursor());
         assertEquals(8L, plan.elapsedSeconds());
         assertFalse(plan.summary().containsKey("options"));

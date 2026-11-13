@@ -326,6 +326,35 @@ class EventStatementsTest {
         assertEquals(null, state(SupportedLocale.EN, "ASSESSMENT_RESOLVED", failed.replace("false", "\"no\"")));
     }
 
+    /**
+     * A withdrawal and the verdicts of the round cap (P11.5) are stated in both locales. A cap escape says no way out was
+     * reached, unlike a reached escape zone, and a stalemate exists only as the cap's verdict.
+     */
+    @Test
+    void statesWithdrawalAndRoundCapEvents() {
+        String withdrew = "{\"actorId\":\"" + PLAYER + "\",\"from\":\"camp\",\"to\":\"ridge\",\"actionPoints\":2}";
+        assertEquals("Mira withdraws carefully from zone camp to zone ridge for 2 action points.",
+                state(SupportedLocale.EN, "PARTICIPANT_WITHDREW", withdrew));
+        assertEquals("Mira ripiega con cautela dalla zona camp alla zona ridge (2 punti azione).",
+                state(SupportedLocale.IT, "PARTICIPANT_WITHDREW", withdrew));
+        assertEquals(null, state(SupportedLocale.EN, "PARTICIPANT_WITHDREW", withdrew.replace(",\"to\":\"ridge\"", "")));
+
+        String stalemate = "{\"outcome\":\"STALEMATE\",\"roundCap\":true}";
+        assertEquals("The round limit is reached with no result: the fight ends in a stalemate.",
+                state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", stalemate));
+        assertEquals("Il limite di round è raggiunto senza un esito: lo scontro finisce in stallo.",
+                state(SupportedLocale.IT, "ENCOUNTER_OUTCOME_PENDING", stalemate));
+        assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"STALEMATE\"}"),
+                "a stalemate the cap did not give is not stated");
+        String released = "{\"outcome\":\"ESCAPE\",\"roundCap\":true}";
+        assertEquals("The round limit is reached: the sides break off and the protagonist gets away.",
+                state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", released));
+        assertEquals("Il limite di round è raggiunto: le parti si separano e il personaggio protagonista si allontana.",
+                state(SupportedLocale.IT, "ENCOUNTER_OUTCOME_PENDING", released));
+        assertEquals("The way out is reached: the fight is left behind.",
+                state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"ESCAPE\"}"));
+    }
+
     /** Quest events state their transition in both locales, using the canonical quest and outcome identities. */
     @Test
     void statesQuestEvents() {

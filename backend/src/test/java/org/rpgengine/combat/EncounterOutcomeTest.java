@@ -436,14 +436,21 @@ class EncounterOutcomeTest {
                 "the stored state gives the same verdict");
     }
 
-    /** At the round cap a decided fight has its outcome; an undecided one still only pauses. */
+    /**
+     * At the round cap a decided fight has its own outcome; an undecided one ends in the stalemate of the default policy.
+     * Until P11.5 the undecided one only paused at its round end.
+     */
     @Test
-    void theRoundCapStaysAPause() {
+    void theRoundCapEndsAnUndecidedFight() {
         var capped = fight(List.of(WIN), Map.of("roundCap", 1), player(), foe("foe"));
-        assertEquals(EncounterPhase.ROUND_END, CombatScheduler.apply(capped, new TacticalIntent.EndActivation(), script()).last().phase());
+        var plan = CombatScheduler.apply(capped, new TacticalIntent.EndActivation(), script());
+        assertEquals(EncounterPhase.OUTCOME_PENDING, plan.last().phase());
+        assertEquals("STALEMATE", plan.notes().getLast().payload().get("outcome"));
         var decided = fight(List.of(new EncounterObjective("hold", EncounterObjective.Kind.SURVIVE, null, null, 1)),
                 Map.of("roundCap", 1), player(), foe("foe"));
-        assertEquals(EncounterPhase.OUTCOME_PENDING, CombatScheduler.apply(decided, new TacticalIntent.EndActivation(), script()).last().phase());
+        var held = CombatScheduler.apply(decided, new TacticalIntent.EndActivation(), script());
+        assertEquals(EncounterPhase.OUTCOME_PENDING, held.last().phase());
+        assertEquals("OBJECTIVE", held.notes().getLast().payload().get("outcome"), "an objective comes before the cap");
     }
 
     /** Walking into an escape zone ends the fight there; the player's standing is left for settlement to record. */

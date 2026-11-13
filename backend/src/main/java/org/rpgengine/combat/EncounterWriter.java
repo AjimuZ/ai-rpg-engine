@@ -31,7 +31,8 @@ import tools.jackson.databind.json.JsonMapper;
  * and the encounter row its application counter; V25 bounds them and refuses a counter that goes back. Since P11.5 the
  * encounter row also stores the offer on the table and the accepted truce as canonical JSON, under the V30 guards, and the
  * player's row the {@link ReadiedGear} of its last Ready/equip action (V31), which {@link #state} reads in place of the
- * frozen Guard, armor and attacks.
+ * frozen Guard, armor and attacks. The disengagement policy at the round cap is read from the frozen definition and needs no
+ * column.
  */
 public final class EncounterWriter {
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -213,7 +214,10 @@ public final class EncounterWriter {
                     OpeningPolicy.parse((String) row[10]), (String) row[11], (String) row[12], participants, ammunition,
                     effects, (Integer) row[13], objectives,
                     row[14] == null ? null : Negotiation.Offer.fromCanonical(JSON.readValue((String) row[14], Map.class)),
-                    row[15] == null ? null : Negotiation.Agreement.fromCanonical(JSON.readValue((String) row[15], Map.class))));
+                    row[15] == null ? null : Negotiation.Agreement.fromCanonical(JSON.readValue((String) row[15], Map.class)),
+                    // A definition without the member is a stalemate, as every one frozen before P11.5.
+                    definition.get("disengagement") == null ? Disengagement.STALEMATE
+                            : Disengagement.parse((String) definition.get("disengagement"))));
         } catch (RuntimeException unreadable) {
             throw new IllegalStateException("stored encounter " + id + " cannot be read back", unreadable);
         }

@@ -14,8 +14,8 @@ import org.rpgengine.rules.ZoneGraph;
 /**
  * Detached tactical state of one active encounter as read under the campaign lock (P11.2): the lifecycle cursor
  * (phase, round, acting initiative rank, remaining action points, speech used in the current activation), the
- * passage states changed by scene actions, the frozen profile, space, escape zones and declared actions read back
- * from the stored canonical definition, and every participant's mutable tactical facts. It is a value: the pure
+ * passage states changed by scene actions, the frozen profile, space, escape zones, declared actions and disengagement
+ * policy read back from the stored canonical definition, and every participant's mutable tactical facts. It is a value: the pure
  * {@link TacticalRules} and {@link CombatScheduler} read it and the canonical commit writes their plan guarded by
  * the row versions recorded here.
  *
@@ -46,13 +46,26 @@ import org.rpgengine.rules.ZoneGraph;
  * @param objectives frozen objectives in declared order (P11.5)
  * @param openOffer terms waiting for the player's explicit answer, or null; set only at the player's decision (P11.5)
  * @param agreement the truce the player accepted, or null; set only once the fight has its outcome (P11.5)
+ * @param disengagement frozen policy of an undecided fight at the round cap (P11.5)
  */
 public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int round, Integer cursor,
         Integer actionPoints, int speechUsed, List<EncounterAction.Passage> passages, CombatProfile profile,
         ZoneGraph frozenSpace, Set<String> escapeZones, List<EncounterAction> actions, OpeningPolicy opening,
         String openingTarget, String openingStatus, List<Combatant> participants, List<Ammunition> ammunition,
         Map<String, CombatEffect> effects, int effectsApplied, List<EncounterObjective> objectives,
-        Negotiation.Offer openOffer, Negotiation.Agreement agreement) {
+        Negotiation.Offer openOffer, Negotiation.Agreement agreement, Disengagement disengagement) {
+    /** Tactical state under the default stalemate at the round cap, the shape used before the policy existed. */
+    public EncounterState(UUID id, long rowVersion, EncounterPhase phase, int round, Integer cursor,
+            Integer actionPoints, int speechUsed, List<EncounterAction.Passage> passages, CombatProfile profile,
+            ZoneGraph frozenSpace, Set<String> escapeZones, List<EncounterAction> actions, OpeningPolicy opening,
+            String openingTarget, String openingStatus, List<Combatant> participants, List<Ammunition> ammunition,
+            Map<String, CombatEffect> effects, int effectsApplied, List<EncounterObjective> objectives,
+            Negotiation.Offer openOffer, Negotiation.Agreement agreement) {
+        this(id, rowVersion, phase, round, cursor, actionPoints, speechUsed, passages, profile, frozenSpace, escapeZones,
+                actions, opening, openingTarget, openingStatus, participants, ammunition, effects, effectsApplied, objectives,
+                openOffer, agreement, Disengagement.STALEMATE);
+    }
+
     /** Tactical state with no negotiation under way, the shape of a fight without one. */
     public EncounterState(UUID id, long rowVersion, EncounterPhase phase, int round, Integer cursor,
             Integer actionPoints, int speechUsed, List<EncounterAction.Passage> passages, CombatProfile profile,
@@ -312,6 +325,7 @@ public record EncounterState(UUID id, long rowVersion, EncounterPhase phase, int
         Objects.requireNonNull(profile, "profile");
         Objects.requireNonNull(frozenSpace, "frozenSpace");
         Objects.requireNonNull(opening, "opening");
+        Objects.requireNonNull(disengagement, "disengagement");
         passages = List.copyOf(passages);
         escapeZones = java.util.Collections.unmodifiableSet(new TreeSet<>(escapeZones));
         actions = List.copyOf(actions);

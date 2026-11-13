@@ -15,7 +15,7 @@ import org.rpgengine.rules.ZoneGraph;
 /**
  * Prose-free projection of one pack {@code encounter} definition (P11.1, docs/09 section 4): where the encounter
  * can start, its zone graph, the starting zones, the participants with their explicit validated statistics,
- * the objectives and the opening-action policy. Names and descriptions stay in the pack's localized text; this
+ * the objectives, the opening-action policy and, since P11.5, the disengagement policy at the round cap. Names and descriptions stay in the pack's localized text; this
  * value carries only what the rules read.
  *
  * <p>The pack compiler has already reported every authoring error with a located diagnostic; the constructor
@@ -32,10 +32,11 @@ import org.rpgengine.rules.ZoneGraph;
  * @param objectives objectives in authored order, at least one
  * @param opening opening-action policy
  * @param actions declared social and scene actions in authored order (P11.2), possibly none
+ * @param disengagement what an undecided fight becomes at the round cap (P11.5); {@link Disengagement#STALEMATE} by default
  */
 public record EncounterTemplate(String id, String pack, String location, ZoneGraph zones, String playerZone,
         Set<String> escapeZones, List<Participant> participants, List<EncounterObjective> objectives,
-        OpeningPolicy opening, List<EncounterAction> actions) {
+        OpeningPolicy opening, List<EncounterAction> actions, Disengagement disengagement) {
     /** Participant ID reserved for the player in a frozen roster. */
     public static final String PLAYER = "player";
     /** Most non-player participants of one template. */
@@ -151,6 +152,14 @@ public record EncounterTemplate(String id, String pack, String location, ZoneGra
         this(id, pack, location, zones, playerZone, escapeZones, participants, objectives, opening, List.of());
     }
 
+    /** Template with the default disengagement policy, the shape used before P11.5. */
+    public EncounterTemplate(String id, String pack, String location, ZoneGraph zones, String playerZone,
+            Set<String> escapeZones, List<Participant> participants, List<EncounterObjective> objectives,
+            OpeningPolicy opening, List<EncounterAction> actions) {
+        this(id, pack, location, zones, playerZone, escapeZones, participants, objectives, opening, actions,
+                Disengagement.STALEMATE);
+    }
+
     /** Check the structural invariants and freeze the collections. */
     public EncounterTemplate {
         Objects.requireNonNull(id, "id");
@@ -158,6 +167,7 @@ public record EncounterTemplate(String id, String pack, String location, ZoneGra
         Objects.requireNonNull(location, "location");
         Objects.requireNonNull(zones, "zones");
         Objects.requireNonNull(opening, "opening");
+        Objects.requireNonNull(disengagement, "disengagement");
         zone(zones, playerZone, "player zone");
         escapeZones = Collections.unmodifiableSet(new TreeSet<>(escapeZones));
         for (String zone : escapeZones) {

@@ -25,26 +25,39 @@ import java.util.TreeMap;
  *   <li>{@link Kind#ESCAPE}: the player has escaped or stands in one of the encounter's escape zones.</li>
  *   <li>{@link Kind#AGREEMENT}: the player accepted a truce. The stored acceptance is the only way here: speech, a
  *       response or an open offer never reach this predicate.</li>
+ *   <li>The round cap: once the profile's {@code roundCap} rounds have completed, the frozen {@link Disengagement} policy
+ *       names the outcome, {@link Kind#STALEMATE} by default or {@link Kind#ESCAPE}, marked {@link #roundCap}. It reads the
+ *       round count and changes nothing, so the cap harms no participant; the last round's own end, ticks included, comes
+ *       first, as every round's does.</li>
  * </ol>
  * The defeat-hostiles and escape objectives read the same facts as {@link Kind#VICTORY} and {@link Kind#ESCAPE}, and keep
  * those outcomes and their place in the order. A failed objective ends nothing by itself: the fight can still be won, lost or
- * left, and {@link #objectives} reports every status for settlement. Stalemate and settlement are later P11.5 work, so the
- * round cap stays a pause.
+ * left, and {@link #objectives} reports every status for settlement. An escape the cap grants moves nobody, so an escape
+ * objective keeps the status the player's zone gives it. A Withdraw action is a move like any other here: only the zone it
+ * reaches can make an escape. Settlement is later P11.5 work.
  *
  * @param kind how the fight ends
  * @param objective the objective met for {@link Kind#OBJECTIVE}, otherwise null
  * @param terms the terms accepted for {@link Kind#AGREEMENT}, otherwise null
  * @param objectives every objective's status in declared order
+ * @param roundCap whether the round cap decided the fight: always for {@link Kind#STALEMATE}, for {@link Kind#ESCAPE} under
+ *        the {@code escape} policy, never otherwise
  */
-public record EncounterOutcome(Kind kind, String objective, String terms, Map<String, EncounterObjective.Status> objectives) {
+public record EncounterOutcome(Kind kind, String objective, String terms, Map<String, EncounterObjective.Status> objectives,
+        boolean roundCap) {
     /** How a fight ends. */
     public enum Kind {
-        VICTORY, DEFEAT, ESCAPE, OBJECTIVE, PLAYER_SURRENDER, HOSTILE_SURRENDER, AGREEMENT
+        VICTORY, DEFEAT, ESCAPE, OBJECTIVE, PLAYER_SURRENDER, HOSTILE_SURRENDER, AGREEMENT, STALEMATE
     }
 
     /** A verdict that names no accepted terms. */
     public EncounterOutcome(Kind kind, String objective, Map<String, EncounterObjective.Status> objectives) {
         this(kind, objective, null, objectives);
+    }
+
+    /** A verdict the round cap did not decide. */
+    public EncounterOutcome(Kind kind, String objective, String terms, Map<String, EncounterObjective.Status> objectives) {
+        this(kind, objective, terms, objectives, false);
     }
 
     /** Require the kind and keep the objective order. */
@@ -55,6 +68,9 @@ public record EncounterOutcome(Kind kind, String objective, String terms, Map<St
         }
         if ((kind == Kind.AGREEMENT) != (terms != null)) {
             throw new IllegalArgumentException("only an agreement names its terms");
+        }
+        if (kind == Kind.STALEMATE && !roundCap || roundCap && kind != Kind.STALEMATE && kind != Kind.ESCAPE) {
+            throw new IllegalArgumentException("only the round cap makes a stalemate, and it makes nothing but that or an escape");
         }
         objectives = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(objectives));
     }
@@ -98,6 +114,10 @@ public record EncounterOutcome(Kind kind, String objective, String terms, Map<St
         }
         if (state.agreement() != null) {
             return new EncounterOutcome(Kind.AGREEMENT, null, state.agreement().terms(), statuses);
+        }
+        if (completedRounds(state) >= state.profile().roundCap()) {
+            var kind = state.disengagement() == Disengagement.ESCAPE ? Kind.ESCAPE : Kind.STALEMATE;
+            return new EncounterOutcome(kind, null, null, statuses, true);
         }
         return null;
     }
@@ -162,7 +182,10 @@ public record EncounterOutcome(Kind kind, String objective, String terms, Map<St
         return closed ? state.round() : Math.max(0, state.round() - 1);
     }
 
-    /** @return the public form of this verdict: outcome, the objective met or terms accepted if any and each objective's status */
+    /**
+     * @return the public form of this verdict: outcome, the objective met or terms accepted if any, {@code roundCap: true} only
+     *         when the cap decided it (so every earlier verdict keeps its form) and each objective's status
+     */
     public Map<String, Object> publicForm() {
         var form = new TreeMap<String, Object>();
         form.put("outcome", kind.name());
@@ -171,6 +194,9 @@ public record EncounterOutcome(Kind kind, String objective, String terms, Map<St
         }
         if (terms != null) {
             form.put("termsId", terms);
+        }
+        if (roundCap) {
+            form.put("roundCap", true);
         }
         var lines = new ArrayList<Object>();
         objectives.forEach((id, status) -> {

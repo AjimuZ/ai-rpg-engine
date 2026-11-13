@@ -411,8 +411,8 @@ Continuing the schedule: start the next active participant by rank (`ACTIVATION_
 run a non-player activation (below; `ACTIVATION_ENDED`), end the round after the last
 activation (`ROUND_ENDED` {encounterId, round, seconds}, adding `roundSeconds` of world time) and open the next
 one (`ROUND_STARTED` {encounterId, round}, refreshing reaction budgets), until the player's own activation waits
-for an action. The schedule stops instead at a round end when the round cap is reached, or, since P11.5, wherever a
-terminal predicate holds (below). Each phase step is its own row version, so an operation adds at most one round's seconds. Every tactical
+for an action. Since P11.5 the schedule stops instead wherever a terminal predicate holds (below), and the end of round
+`roundCap` is one: no fight waits at a round end any more. Each phase step is its own row version, so an operation adds at most one round's seconds. Every tactical
 intention advances the game turn. The receipt gains `combat` {encounterId, phase, round, zone, acting,
 actionPoints, initiative: [{participantId, initiative}], options?: {moves: [{zone, cost}], speech: {remaining,
 recipients}, actions: [{actionId, kind, cost, targets}], endActivation}}; `options` appears only at the player's
@@ -452,7 +452,7 @@ exploration command evaluates the possession facts they change.
 Any operation can end a fight ([ADR 0032](adr/0032-terminal-predicates-from-committed-state.md)). When committed state
 satisfies a terminal predicate the operation moves to `OUTCOME_PENDING` and writes the public `ENCOUNTER_OUTCOME_PENDING`
 {encounterId, round, outcome: `VICTORY` | `DEFEAT` | `ESCAPE` | `OBJECTIVE` | `PLAYER_SURRENDER` | `HOSTILE_SURRENDER` |
-`AGREEMENT`, objectiveId?, termsId?, objectives: [{objectiveId,
+`AGREEMENT` | `STALEMATE`, objectiveId?, termsId?, roundCap?, objectives: [{objectiveId,
 status: `pending` | `met` | `failed`}]}. That operation's receipt has `combat.outcome` {outcome, objectiveId, termsId?, objectives} and
 no acting participant, action points or `options`. A retry replays the same receipt. Every later
 tactical intention is refused with `TURN_UNAVAILABLE` and exploration stays `MODE_ILLEGAL`, writing nothing, until
@@ -514,6 +514,25 @@ effective Resistance), the margin and whether it was strong. The receipt's `comb
 change, guard, armor, attacks} or `assessment` {targetId, total, success, revealed?} for such an operation, and `options` gains
 `ready` {cost, available} and `assess` {cost, targets}. Neither takes world time. A retry replays the same receipt with no second
 draw or equipment change.
+
+### P11.5 Withdraw and the round cap
+
+One more tactical intention follows the same gates ([ADR 0035](adr/0035-withdraw-and-the-round-cap.md)):
+
+| Intention | Payload | Legal when | Refusal |
+| --- | --- | --- | --- |
+| `WITHDRAW` | `zoneId` (1..128) | The player's decision; neither movement nor actions prevented; a legal `MOVE_ZONE` destination (one unblocked edge, below its capacity) whose cheapest walk to an escape zone, over the current passages, is strictly shorter than from the player's zone; its price left: `withdrawCost`, or the edge's Move price when that is higher | `TURN_UNAVAILABLE`, `ACTION_PREVENTED`, `ZONE_UNAVAILABLE`, `ACTION_POINTS_INSUFFICIENT` |
+
+A withdrawal passes through `RESOLVING`, runs declared-action ticks and lapses an offer with `ACTION_TAKEN`, like a move, but no
+`leavesZone` reaction is considered for it. It writes the public `PARTICIPANT_WITHDREW` {encounterId, round, participantId, actorId,
+from, to, actionPoints, remainingActionPoints}, which names no reaction, and draws nothing. It sets no standing: an escape zone it
+reaches ends the fight through the terminal predicates, in their order, and a tick that fells the player first leaves it where it
+was. The receipt's `options` gains `withdraw` [{zone, cost}]. It takes no world time, and a retry replays the same receipt.
+
+When round `roundCap` ends with no other predicate holding, the fight moves from `ROUND_END` to `OUTCOME_PENDING` with the
+template's declared `disengagement`: `ENCOUNTER_OUTCOME_PENDING` carries `outcome: STALEMATE` (default) or `ESCAPE`, and
+`roundCap: true`; the receipt's `combat.outcome` repeats `roundCap`. No other verdict carries the member. Nothing changes any
+participant's Health, standing, zone or effects at the cap; the last round's own end, with its ticks and seconds, comes first.
 
 ### P11.4 reactions, effects and abilities
 
