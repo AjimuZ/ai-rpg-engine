@@ -11,6 +11,7 @@ import org.rpgengine.campaign.Campaign;
 import org.rpgengine.campaign.CampaignEvent;
 import org.rpgengine.characters.ActorResource;
 import org.rpgengine.characters.CharacterService;
+import org.rpgengine.combat.EncounterPhase;
 import org.rpgengine.combat.EncounterWriter;
 import org.rpgengine.campaign.CampaignMode;
 import org.rpgengine.content.ContentRevision;
@@ -56,7 +57,8 @@ import tools.jackson.databind.json.JsonMapper;
  * (P11.1) is stored beside the event that announces it; a plan may move the campaign from exploration into
  * encounter mode only together with that entry. Tactical progress (P11.2) is written after the events, as the
  * participants' final facts and then each encounter row state in order, every write guarded by the row version
- * the scheduler read, while the V22/V23 triggers check each step.
+ * the scheduler read, while the V22/V23 triggers check each step. Since P11.5 the campaign leaves encounter mode only with
+ * a settlement's progress, which ends its own active encounter at {@code NARRATIVE_RESUME}; the V22 arrows allow that once.
  * This internal service has no controller, network port or callback.
  * Any validation, persistence, timeout or commit failure rolls back all its writes.
  */
@@ -168,6 +170,11 @@ public class CanonicalCommitService {
         if (campaign.getMode() == CampaignMode.EXPLORATION && plan.world().mode() == CampaignMode.ENCOUNTER
                 && plan.encounter() == null) {
             throw new IllegalStateException("encounter mode requires an encounter entry");
+        }
+        // And left only by settling the encounter that holds it (P11.5, ADR 0036); attribution proved it is the active one.
+        if (campaign.getMode() == CampaignMode.ENCOUNTER && plan.world().mode() != CampaignMode.ENCOUNTER
+                && (plan.progress() == null || plan.progress().last().phase() != EncounterPhase.NARRATIVE_RESUME)) {
+            throw new IllegalStateException("leaving encounter mode requires settling the encounter");
         }
         ContentRevision content = entities.find(ContentRevision.class, campaign.getContentRevisionId());
         Instant now = Instant.now();

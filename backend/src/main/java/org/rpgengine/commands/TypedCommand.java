@@ -23,7 +23,8 @@ import org.rpgengine.content.PackTextParser;
  * roll initiative, move to an adjacent zone, end the activation, one bounded speech-only utterance and a declared
  * social or scene action; since P11.3 also strike, the Guard action and using an item; since P11.4 also using a frozen
  * ability and changing a predeclared reaction policy; since P11.5 also answering the offer on the table, readying or
- * stowing one held item, assessing one participant and withdrawing toward an escape zone. Unknown types fail closed.
+ * stowing one held item, assessing one participant, withdrawing toward an escape zone and settling a decided fight, which
+ * returns the campaign to exploration. Unknown types fail closed.
  * Structural decoding here
  * is followed by current-state rule validation in {@link CommandRules}; resolution
  * remains backend-owned (P07.4). Every value is immutable and can reproduce its exact
@@ -36,7 +37,8 @@ public sealed interface TypedCommand
         TypedCommand.Rest, TypedCommand.Engage, TypedCommand.RollInitiative, TypedCommand.MoveZone,
         TypedCommand.EndActivation, TypedCommand.CombatSpeak, TypedCommand.Interact, TypedCommand.Strike,
         TypedCommand.Guard, TypedCommand.CombatUseItem, TypedCommand.CombatUseAbility, TypedCommand.SetReactionPolicy,
-        TypedCommand.AnswerOffer, TypedCommand.ReadyItem, TypedCommand.Assess, TypedCommand.Withdraw {
+        TypedCommand.AnswerOffer, TypedCommand.ReadyItem, TypedCommand.Assess, TypedCommand.Withdraw,
+        TypedCommand.SettleEncounter {
     /** @return registered, case-sensitive wire identifier */
     String type();
 
@@ -223,6 +225,10 @@ public sealed interface TypedCommand
                     fields(payload, "zoneId");
                     yield new Withdraw(text(payload.get("zoneId"), 128));
                 }
+                case "SETTLE_ENCOUNTER" -> {
+                    fields(payload, "encounterId");
+                    yield new SettleEncounter(CampaignCommandJson.uuid(payload.get("encounterId")));
+                }
                 default -> throw invalid();
             };
         } catch (IllegalArgumentException | ArithmeticException failure) {
@@ -237,7 +243,7 @@ public sealed interface TypedCommand
                 "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST", "ENGAGE",
                 "ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT", "STRIKE", "GUARD",
                 "COMBAT_USE_ITEM", "COMBAT_USE_ABILITY", "SET_REACTION_POLICY", "ANSWER_OFFER", "READY_ITEM", "ASSESS",
-                "WITHDRAW").contains(type);
+                "WITHDRAW", "SETTLE_ENCOUNTER").contains(type);
     }
 
     /**
@@ -246,7 +252,7 @@ public sealed interface TypedCommand
      * exceptions are the two item intentions, {@link CombatUseItem} and {@link ReadyItem}, whose items are pinned data.
      */
     sealed interface Tactical permits RollInitiative, MoveZone, EndActivation, CombatSpeak, Interact, Strike, Guard,
-            CombatUseItem, CombatUseAbility, SetReactionPolicy, AnswerOffer, ReadyItem, Assess, Withdraw {
+            CombatUseItem, CombatUseAbility, SetReactionPolicy, AnswerOffer, ReadyItem, Assess, Withdraw, SettleEncounter {
         /** @return the combat-layer value of this intention */
         TacticalIntent intent();
     }
@@ -865,5 +871,25 @@ public sealed interface TypedCommand
         public Map<String, Object> payload() { return Map.of("zoneId", zoneId); }
         /** @return the combat-layer intention */
         public TacticalIntent intent() { return new TacticalIntent.Withdraw(zoneId); }
+    }
+
+    /**
+     * Settle the fight that waits at its outcome and return to exploration (P11.5, docs/11 section 14, ADR 0036). It is the
+     * one tactical intention accepted at {@code OUTCOME_PENDING}, and the only command that leaves encounter mode. The
+     * intention names the encounter the player reviewed, so a stale request can never settle another fight; how the fight
+     * ended is read from committed state, never from this command. A lost response is retried with the same request ID and
+     * replays the receipt, because a second settlement cannot exist.
+     *
+     * @param encounterId identity of the encounter, as its receipts and outcome event state it
+     */
+    record SettleEncounter(UUID encounterId) implements TypedCommand, Tactical {
+        /** Require the identity. */
+        public SettleEncounter { if (encounterId == null) { throw invalid(); } }
+        /** @return the fixed settlement identifier */
+        public String type() { return "SETTLE_ENCOUNTER"; }
+        /** @return the single encounter field */
+        public Map<String, Object> payload() { return Map.of("encounterId", encounterId.toString()); }
+        /** @return the combat-layer intention */
+        public TacticalIntent intent() { return new TacticalIntent.Settle(encounterId.toString()); }
     }
 }

@@ -177,7 +177,8 @@ public final class CommandReceipts {
      * did and the offer on the table, never a check's difficulty or margin; what a Ready/equip action changed with the
      * player's own new Guard, armor and attacks; what an assessment found, the target's values only after a success; the
      * prices of readying and assessing with the participants that can be assessed; each zone the player can withdraw to
-     * with its price; and whether the round cap gave the verdict.
+     * with its price; whether the round cap gave the verdict; and, for a settlement, the seconds it added and the combat
+     * effects that ended with the fight, which participants' standings already showed.
      */
     private static Map<String, Object> combat(JsonNode combat) {
         var entry = new LinkedHashMap<String, Object>();
@@ -278,6 +279,22 @@ public final class CommandReceipts {
                 line.put("revealed", java.util.Collections.unmodifiableMap(values));
             }
             entry.put("assessment", java.util.Collections.unmodifiableMap(line));
+        }
+        // Since P11.5, only for a settlement: the seconds its unfinished round added and the combat effects the fight ended.
+        JsonNode settlement = combat.path("settlement");
+        if (settlement.isObject()) {
+            var line = new LinkedHashMap<String, Object>();
+            line.put("seconds", settlement.path("seconds").asLong());
+            var ended = new ArrayList<Map<String, Object>>();
+            for (JsonNode effect : settlement.path("effectsEnded")) {
+                var active = new LinkedHashMap<String, Object>();
+                active.put("participantId", effect.path("participantId").asString());
+                active.put("effectId", effect.path("effectId").asString());
+                active.put("stacks", effect.path("stacks").asInt());
+                ended.add(active);
+            }
+            line.put("effectsEnded", List.copyOf(ended));
+            entry.put("settlement", java.util.Collections.unmodifiableMap(line));
         }
         JsonNode verdict = combat.path("outcome");
         if (verdict.isObject()) {

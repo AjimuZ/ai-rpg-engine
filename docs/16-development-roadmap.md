@@ -4183,13 +4183,14 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     Not proven here: effects through renewal and restore (QA-09 and the renewal half of QA-12, P11.6); terminal outcomes
     (P11.5); the Docker-dependent probe cases and `verify.sh containers`; a live V25 dump and restore; balance of the provisional
     numbers (P18.3); independent review of the two new Italian messages. Frontend weakenings do not apply: no frontend logic changed.
-- [ ] P11.5 Implement defeat, escape, surrender/agreement predicates, refused/counteroffered/explicitly accepted negotiation, stalemate policy and idempotent settlement; prose alone cannot establish an outcome.
+- [x] P11.5 Implement defeat, escape, surrender/agreement predicates, refused/counteroffered/explicitly accepted negotiation, stalemate policy and idempotent settlement; prose alone cannot establish an outcome.
   - Package A, terminal predicates ([ADR 0032](adr/0032-terminal-predicates-from-committed-state.md)), partial progress of 1 November 2026: pure
     `EncounterOutcome.decide` over `EncounterState`, which now carries the frozen objectives; `CombatScheduler` stops at `OUTCOME_PENDING`
     from `RESOLVING`, `ACTOR_START` and `ROUND_END`; public `ENCOUNTER_OUTCOME_PENDING` with EN/IT statements; receipt `combat.outcome`. No migration.
-  - Remaining for this task, so its box stays unchecked: the stalemate policy, idempotent settlement, the return to narrative, and the
+  - Remaining for this task then, so its box stayed unchecked: the stalemate policy, idempotent settlement, the return to narrative, and the
     decision on Withdraw, Ready and Assess. Surrender and agreement predicates and refused, counteroffered and accepted negotiation came with Package B, below;
-    Ready/equip and Assess came with P11.5-C.1, and Withdraw and the stalemate policy with P11.5-C.2, below.
+    Ready/equip and Assess came with P11.5-C.1, Withdraw and the stalemate policy with P11.5-C.2, and settlement and the return to narrative with
+    P11.5-C.3, below.
   - Limits of this package: nothing leaves `OUTCOME_PENDING` until settlement exists, so a campaign whose fight ended stays in encounter
     mode and refuses every command; a round left unfinished adds no world time; the player's status stays `ACTIVE` after an escape; hostiles
     who all escaped or surrendered read as a victory, though no code sets those statuses yet; a surrendered player gets no verdict;
@@ -4212,8 +4213,8 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
   - Not proven here: **no deliberate weakening ran.** The session's shell refused the `docker run` that would have applied them to a copy inside
     a throw-away container, so whether each new check fails a test is argued from reading the tests, not observed; a later session or the
     owner must still run them. The runner written for this is `.local/scratch/p115a/` (ignored and not committed); it lists 57 weakenings, of
-    which `s-flush` and `s-next-speech` no longer apply, because those two production lines were removed as unneeded.
-    Also not proven: `verify.sh containers`; a retry through the HTTP layer; independent review of the four new Italian statements;
+    which `s-flush` and `s-next-speech` no longer apply, because those two production lines were removed as unneeded. The
+    catalogue ran on 13 November 2026 with P11.5-C.3, below. Also not proven: `verify.sh containers`; a retry through the HTTP layer; independent review of the four new Italian statements;
     any terminal path back to narrative, which does not exist yet.
   - Package B, negotiation, surrender and agreement ([ADR 0033](adr/0033-negotiation-explicit-answers-and-surrender.md)), partial progress of 1 November 2026: a social action
     declares a `check`, and a negotiation addressing hostiles declares `terms` and a `counteroffer`; pure `Negotiation.respond` decides refused, counteroffered or offered from
@@ -4221,7 +4222,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     recipient's surrender, player's surrender) or declines it; an offer lapses at the end of the activation or at any action but speech or a policy change. `EncounterOutcome` gains
     `PLAYER_SURRENDER`, `HOSTILE_SURRENDER` and `AGREEMENT`, and a player who surrendered fails every objective. V30 adds `open_offer` and `agreement` with guards, and refuses
     bringing back a surrendered participant; backup schema 30. New refusal `COMMAND_OFFER_UNAVAILABLE` (catalog 516), five new public event types and one internal, each public one with EN/IT statements, and three new outcome statements.
-  - Remaining for this task, so its box stays unchecked: as listed under Package A. Nothing leaves `OUTCOME_PENDING` yet, so an accepted agreement or surrender stays pending there.
+  - Remaining for this task then, so its box stayed unchecked: as listed under Package A. Nothing left `OUTCOME_PENDING` yet, so an accepted agreement or surrender stayed pending there.
   - Limits of this package: terms cost action points only and cannot transfer items; a check on any intent but `negotiate` records its result and changes nothing else; a truce binds every
     hostile, and the pack cannot name who may grant it; attempts have no limit beyond their cost; morale, knowledge and objective policies and a recipient proposing terms by itself are not
     modelled (P12.3/P12.4); the difficulty and margin rule are provisional numbers (P18.3); effects are not converted when a fight ends, and a surrender simply ends those of the participant
@@ -4244,7 +4245,8 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
   - Not proven here: **no deliberate weakening ran.** The session's shell refused the `docker run` again, and it was not retried in another form, so whether each new check fails a test is argued
     from reading the tests, not observed. That reading closed two gaps: a stance ending with the player's surrender and an unknown response with terms. The catalogue written for this is
     `.local/scratch/p115b/` (ignored and not committed), with 106 weakenings of pure rules, which the owner or a later session must still run; it covers neither V30 nor the receipts. `s-read-agreement` should survive as
-    equivalent, because no operation runs once an agreement exists. Also not proven: `verify.sh containers`; a live V30 dump and restore; settling a negotiated ending, its lost-response
+    equivalent, because no operation runs once an agreement exists. The catalogue ran on 13 November 2026 with P11.5-C.3, below, where
+    `s-read-agreement` failed a test after all, because settlement decides the verdict again from the stored row. Also not proven: `verify.sh containers`; a live V30 dump and restore; settling a negotiated ending, its lost-response
     retry beyond the outcome, and any path back to narrative; renewal or restore during a social check (P11.6); independent review of the new Italian message and statements; balance of the difficulty and margins.
   - P11.5-C.1, Ready/equip and Assess ([ADR 0034](adr/0034-ready-equip-and-assess-in-a-fight.md)), partial progress of 13 November 2026: `READY_ITEM` {itemInstanceId,
     change: `equip` | `unequip`} for `readyCost` changes one real equipment assignment under the `EQUIP_ITEM`/`UNEQUIP_ITEM` rules, refuses a full slot or too few hands
@@ -4254,7 +4256,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     maximum Health, Guard, Resistance and armor only on success. Both pass through `RESOLVING`, run declared-action ticks, lapse an offer and are refused while prevented.
     Public `ITEM_READIED` and `ASSESSMENT_RESOLVED` with EN/IT statements, internal `ASSESSMENT_CALCULATED`, receipt `combat.readied`, `combat.assessment`,
     `options.ready` and `options.assess`; `READY_ITEM` joins the catalog preload set; backup schema 31. No new refusal category or message.
-  - Remaining for this task, so its box stays unchecked: Withdraw, the stalemate policy, idempotent settlement and the return to narrative.
+  - Remaining for this task then, so its box stayed unchecked: Withdraw, the stalemate policy, idempotent settlement and the return to narrative.
   - Limits of this story: one item per action and no swap; non-player participants neither ready nor assess (P12.3/P12.4); revealed values live only in the event and that
     receipt; the Insight check against Resistance is a provisional rule (P18.3); no frontend control (P12).
   - Existing behavior and tests changed: every tactical receipt's `options` gains `ready` and `assess`; the `sample:armory-tactics` fixture gains a `venom-blade` item and
@@ -4294,7 +4296,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     marked `roundCap: true`, changing no participant. Pack contract: encounter `disengagement` (`stalemate` | `escape`, `SCHEMA` otherwise), frozen into the
     definition only when not the default and read back by `EncounterWriter.state`. Receipt: `options.withdraw` [{zone, cost}] and `combat.outcome.roundCap`. EN/IT
     statements for the withdrawal, the stalemate and the cap escape. No migration, backup schema change, refusal category or message.
-  - Remaining for this task, so its box stays unchecked: idempotent settlement and the return to narrative.
+  - Remaining for this task then, so its box stayed unchecked: idempotent settlement and the return to narrative.
   - Limits of this story: non-player participants never withdraw (P12.3/P12.4); a cap escape needs settlement to say where the player goes; an encounter stored
     at its round end at the cap before this change stays there, because no command can move it; the numbers stay provisional (P18.3).
   - Existing behavior and tests changed because they pinned the pause that ADR 0035 removes: `EncounterOutcomeTest.theRoundCapStaysAPause` became
@@ -4326,6 +4328,93 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     tree and the copy) before it ran; the 16 weakenings run before that test-only addition were not rerun after it, and the 13 after it ran against it.
   - Not proven here: `verify.sh full` and `verify.sh containers` were not run by this session (the runner runs the plan); a retry through the HTTP layer;
     settling either cap outcome; an encounter already stored at its round end at the cap; independent review of the three new Italian statements; balance.
+  - P11.5-C.3, idempotent settlement and the return to narrative ([ADR 0036](adr/0036-explicit-settlement-and-the-return-to-narrative.md)), completing
+    P11.5 on 13 November 2026: `SETTLE_ENCOUNTER` {encounterId} (`TacticalIntent.Settle`) is the player's explicit confirmation, legal only while that encounter
+    waits at `OUTCOME_PENDING` (`TURN_UNAVAILABLE` otherwise, `TIME_ILLEGAL` when a mid-round ending's round does not fit the clock). `CombatScheduler`
+    decides the verdict again from stored state, adds `roundSeconds` once when the cursor shows an unfinished round (no effect phase runs), ends every
+    combat effect and Guard stance, writes `SETTLED` then `NARRATIVE_RESUME` with no cursor and the public `ENCOUNTER_SETTLED` (verdict, round, seconds,
+    final standings, ended effects; EN/IT statements), and the same commit returns the campaign to `EXPLORATION` with no pending decision. Nothing is
+    refilled, moved, awarded or converted into an exploration condition. `ResolvedCommit` allows exploration mode with tactical progress only for a plan
+    ending at `NARRATIVE_RESUME` and requires it there; `CanonicalCommitService` refuses any plan leaving encounter mode without one. Receipt
+    `combat.settlement` {seconds, effectsEnded}. The V22 arrows keep it to once; no migration, backup schema change, refusal category or message.
+  - Box: checked, because nothing of P11.5 remains. Every item of the task is implemented, and every deliberate weakening that still
+    applies fails a test: those of Packages A and B and of what their catalogue left out (below), and those of C.1 to C.3. The one that
+    survived was an equivalent check, now removed. A first attempt at this story left the two catalogues unrun; this attempt ran them.
+  - Weakening catalogues of Packages A and B, run on 13 November 2026 on an exported copy (`.local/scratch/p115c/copy`, made with
+    `mkdir`, `tar -cf` and `tar -xf` as separate commands; ignored and not committed) by `.local/scratch/p115c/drive.py` (ignored), which applies one
+    case, runs one `sh .agents/ralph/verify.sh backend -Dtest=…` from the copy (18 to 33 seconds each), restores the file and compares it
+    byte for byte with the live one before the next case. Baselines on the unchanged copy passed: the pure set alone, and the other four
+    sets in one run. Test sets: the pure
+    `org.rpgengine.combat.**` (215 tests) for combat sources; `OutcomeCommandsTest,SettlementCommandsTest,NegotiationCommandsTest` (23, on
+    PostgreSQL) for `EncounterWriter` and `CommandReceipts`; `CombatPackTest,PackLocalizationTest` (56) for `PackCompiler` and
+    `PackLocalization`; `TypedCommandTest` (20); `EventStatementsTest` (12). Each case's text was first checked against the current sources:
+    - Package A (`.local/scratch/p115a/Probes.java`, 57 cases): `s-flush` and `s-next-speech` do not apply (their lines were removed in
+      Package A). 47 apply as written; 8 were rewritten in `.local/scratch/p115c/Adapted.java` with the same name and intent: `s-round-end`,
+      `s-settle`, `s-working-objectives` and `d-writer-objectives` because their code moved, `s-cap-first` because the cap moved into
+      `EncounterOutcome` in C.2 (now: the cap ahead of defeat), and `o-hostile-side`, `s-receipt-verdict` and `s-note-id` because their text
+      now also occurs in code added later, which a replace-all would have weakened too. Results: 46 of the 47 and all 8 failed at least one
+      test. `s-tactic-approach` survived the 215 pure tests and also a run of the combat package with `SettlementCommandsTest`,
+      `WithdrawCommandsTest`, `EncounterCommandsTest`, `TacticalCommandsTest`, `StrikeCommandsTest`, `ReactionCommandsTest`,
+      `NegotiationCommandsTest`, `OutcomeCommandsTest`, `ReadyAssessCommandsTest` and `CampaignCommandHttpTest`. It is equivalent: reactions
+      never chain, so during an opponent's approach only the mover can change, and every later step of its tactic already requires the mover
+      to stand. That outcome check after `approach` was removed from `CombatScheduler.tactic` as unneeded, with a comment, as Package A did for
+      its two lines; the case no longer applies.
+    - Package B (`.local/scratch/p115b/Probes.java`, 106 cases): 101 apply as written; 5 were rewritten: `s-state-offer`, `s-state-agreement`
+      and `t-registered` because C.1 and C.2 appended to their lines, and `s-response-binds` and `s-internal-public` because their text now
+      also occurs in the answer and in the assessment. All 106 failed at least one test, including `s-read-agreement`, which Package B
+      expected to survive as equivalent: settlement now decides the verdict again from the stored row.
+    - In total 161 cases ran (148 as written, 13 rewritten): 160 failed at least one test, none by a compile error and none by an
+      infrastructure failure; 1 survived as equivalent and its line was removed. The 156 cases away from that line were not rerun after the
+      removal, which changes no behavior; the four beside it (`s-tactic-after`, `s-tactic-strike`, `s-tactic-guard`, `s-approach`) were rerun
+      and failed again.
+    - What Package B's catalogue left out, V30 and the negotiation members of the receipt: 17 more cases (`.local/scratch/p115c/Storage.java`,
+      ignored), run the same way with `NegotiationCommandsTest,SettlementCommandsTest,OutcomeCommandsTest,CampaignCommandHttpTest,CanonicalMigrationUpgradeTest`
+      (34 tests, baseline passed; V30 edited only in the copy, which every run migrates into a fresh database): the offer's phase check, the
+      agreement's phase check, that check without `SETTLED` and `NARRATIVE_RESUME`, the agreement-once trigger, the surrender trigger, the offer's
+      and the agreement's object checks; the receipt's social block, its offer, terms and decision members, its total, its success, the listed
+      offer, its `canAccept`, its response, its terms, the terms' cost and the outcome's `termsId`. 15 failed a test; the agreement's object
+      check and `canAccept` copied as always true survived, so `NegotiationCommandsTest` gained two assertions (below), after which both
+      failed it. The other 15 were not rerun after that test-only addition.
+    - Afterwards the copy matched the live `backend/src` exactly (`diff -rq`, no output).
+  - Limits of this story: no reward, loot, recovery rule, effect conversion or escape destination is declarable (P13); a fight that ended inside a round
+    cannot settle within one round of the clock's end; an encounter stored at its round end at the cap before P11.5-C.2 still cannot move; the checkpoint
+    still records no encounter (P11.6); no frontend control or generated outcome narration (P12).
+  - Existing behavior and tests changed: `CombatScheduler.tactic` lost its outcome check after an approach, an equivalent line found by the
+    Package A catalogue (above); behavior is unchanged. The shared `walk` helper of `EncounterOutcomeTest` now also settles each seeded fight and checks the result (both seeded
+    tests gained assertions only); `ResolvedCommitTest`, `CanonicalCommitServiceTest`, `TypedCommandTest` and `EventStatementsTest` only gained cases.
+    `NegotiationCommandsTest` gained two assertions found missing by the weakenings above: `anUnaffordableAcceptanceChangesNothing` checks that the
+    receipt lists the unpayable terms with `canAccept: false`, and `thePlayersSurrenderNeedsTheExplicitAnswer` checks that the database refuses a
+    non-object agreement at that outcome, the one state where only V30's type check can refuse it. `OutcomeCommandsTest` still passes unchanged: its
+    refused commands never included the settlement. None was deleted or disabled.
+  - Verification (13 November 2026, JDK 21.0.12.1 and PostgreSQL 18.6 in the images pinned by ADR 0009, on the Windows reference host):
+    `sh .agents/ralph/verify.sh backend -Dtest=SettlementCommandsTest,SettlementTest,TypedCommandTest,EventStatementsTest,ResolvedCommitTest,CanonicalCommitServiceTest`
+    passed 103 tests with 0 failures, 0 errors and 0 skipped, and
+    `sh .agents/ralph/verify.sh backend "-Dtest=org.rpgengine.combat.**,SettlementCommandsTest,WithdrawCommandsTest,EncounterCommandsTest,TacticalCommandsTest,StrikeCommandsTest,ReactionCommandsTest,NegotiationCommandsTest,OutcomeCommandsTest,ReadyAssessCommandsTest,CampaignCommandHttpTest,EventStatementsTest,TypedCommandTest,ResolvedCommitTest,CanonicalCommitServiceTest,CombatPackTest,EngineApplicationTest,CanonicalMigrationUpgradeTest"`
+    passed 422 tests with 0 failures, 0 errors and 0 skipped on the first attempt's tree, and again on the final source tree, after the equivalent
+    check was removed and the two assertions were added: 422 with 0 failures, 0 errors and 0 skipped (`NegotiationCommandsTest` alone: 9 of 9).
+    New: `SettlementTest` 5 (pure: the exact steps, time, recap and
+    receipt of a mid-round victory, no participant or pool change and no draw; only the named fight at its outcome settles and nothing follows; an outcome
+    without verdict fails; both cap verdicts settle with no time and move nobody; effects and stances end, listed in roster order, with no tick) and
+    `SettlementCommandsTest` 7 (PostgreSQL: a victory settled once with its 8 seconds, two checked row versions, a public event of the player, a narration
+    job, a replayed retry writing nothing, fresh requests refused as out of mode, the database refusing every arrow back, then a wait and a new fight; a
+    defeat left at minimum Health with conditions unchanged and entry refused; a negotiated ending whose acceptance is retried before and after the
+    settlement and whose settlement is retried, each replaying and writing nothing, the truce kept and the captain's ward ended; an escape, the player's
+    surrender, the opponents' surrender, survived rounds and a reached zone settled one after another in one campaign; 30 rounds of `stand-off` and
+    `watch-post` settled with no time and nobody moved; a mid-round ending refused at seven seconds from the clock's end; a round-end ending settled at the
+    clock's end). Every one of the 300 seeded fights of `EncounterOutcomeTest` settles once to its verdict. `sh .agents/ralph/verify.sh repo` passed
+    (diff check, line endings, repository checks, repository tests, backup tests) on the final tree.
+  - Weakenings of this story: 26 on an exported copy (`.local/scratch/p115c3/copy`, ignored), each run with `sh .agents/ralph/verify.sh backend -Dtest=…` from the copy
+    after a passing baseline and restored before the next; the copy then matched the live `backend/src` exactly (`diff -rq`, no output). All 26 failed at
+    least one test, none by a compile error: the rule's phase check, its encounter identity, the missing-verdict guard, the time always added, the time
+    never added, effects kept, the stance kept, the cursor kept, the ended effects unlisted, the recap not attributed to the player, the verdict missing from
+    the receipt, the standings missing from the recap, the receipt's settlement block missing from the summary, the resolver keeping encounter mode, a
+    settlement allowed to keep encounter mode, any progress allowed to leave it, the commit service's guard removed, the clock check removed, the clock
+    check applied to a round-end ending, an extra payload member accepted, the type unregistered, the projection's settlement block dropped, the projection's
+    ended effects dropped, a statement without `effectsEnded`, the seconds never stated and the settlement stopping at `SETTLED`.
+    They ran on the first attempt's tree and were not rerun after the equivalent check, which is outside the settlement code, was removed.
+  - Not proven here: `verify.sh full` and `verify.sh containers` were not run by this story's sessions (the runner runs the plan before committing); a settlement retry through the HTTP layer; two different settlement requests racing (they serialize on the campaign lock and the
+    loser's mode check is re-read under it, but no test races them); independent review of the new Italian statement; QA-13 is therefore recorded as met
+    for the backend only ([quality](15-quality-and-acceptance.md)).
 - [ ] P11.6 Persist/recover every combat cursor, partial-round time boundary and combat-dialogue operation/transcript without duplicate social effects or settlement.
 
 **Exit:** seeded fights produce reproducible legal outcomes and all terminal paths return to a valid narrative state. **Checks:** QA-09, QA-11–13, effect properties and restore mid-round. **Suggested commit:** `Implement deterministic turn-based combat`.

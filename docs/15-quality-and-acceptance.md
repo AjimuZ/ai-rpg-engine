@@ -1712,6 +1712,19 @@ P11.5-C.2 (13 November 2026) adds Withdraw and the round cap to QA-13's detectio
 escape only through the predicates; and, at the end of the last allowed round, a stalemate or the declared escape after every other
 predicate, changing nobody, on real PostgreSQL over 30 rounds. Settling once and the return to narrative stay open, so QA-13 is not met.
 
+P11.5-C.3 (13 November 2026) adds the settlement half of QA-13 ([ADR 0036](adr/0036-explicit-settlement-and-the-return-to-narrative.md)) on
+`SettlementTest`, `SettlementCommandsTest`, the seeded fights of `EncounterOutcomeTest`, `ResolvedCommitTest` and `CanonicalCommitServiceTest`.
+Victory, defeat, escape, both surrenders, an agreement, two objectives, the stalemate and the cap's escape each settle once on real PostgreSQL,
+returning the campaign to exploration, after which it waits, travels and enters a new fight; every one of the 300 seeded fights settles once
+to the verdict it reached and nothing is legal afterwards. A negotiated ending's lost responses are retried before and after its settlement,
+and the settlement's own lost response is retried: each replays its receipt and writes nothing, and a fresh settlement is refused. An
+unfinished round adds its seconds once without a tick, nothing is refilled, and a plan leaving encounter mode without a settlement is refused.
+The weakening catalogues of P11.5-A and P11.5-B, and 17 more cases for V30 and the negotiation receipt, ran with this story: every case
+that still applies fails a test, after two assertions were added and one equivalent scheduler check was removed (roadmap P11.5).
+With refused negotiation, the counteroffer and explicit acceptance from P11.5-B, every case QA-13 names now passes on the backend. Not proven:
+two different settlement requests racing (they serialize on the campaign lock, and the loser's mode check is re-read under it, but no
+concurrency test exists), a settlement retry through HTTP, and the browser path (P12); so QA-13 is recorded as met for the backend only.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

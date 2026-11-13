@@ -651,6 +651,26 @@ class EncounterOutcomeTest {
         for (var intent : List.of(new TacticalIntent.EndActivation(), new TacticalIntent.Guard(), new TacticalIntent.RollInitiative())) {
             assertEquals(TacticalRules.Refusal.TURN, TacticalRules.refusal(state, intent));
         }
+        // P11.5 (ADR 0036): every decided fight settles once, to the verdict it reached, drawing nothing, adding an unfinished
+        // round's seconds only, and nothing is legal afterwards. The settlement is checked, not returned, so the plans stay as they were.
+        var settle = new TacticalIntent.Settle(state.id().toString());
+        var settlement = CombatScheduler.apply(state, settle, script());
+        assertEquals(List.of(EncounterPhase.SETTLED, EncounterPhase.NARRATIVE_RESUME), phases(settlement));
+        assertEquals(state.cursor() == null ? 0 : state.profile().roundSeconds(), settlement.elapsedSeconds());
+        assertEquals(0, settlement.playerHealthDelta());
+        var recap = settlement.notes().getFirst();
+        assertEquals(List.of("ENCOUNTER_SETTLED"), settlement.notes().stream().map(TacticalPlan.Note::type).toList());
+        verdict.publicForm().forEach((key, value) -> assertEquals(value, recap.payload().get(key), key));
+        var settled = after(state, settlement);
+        for (var participant : settled.participants()) {
+            var before = state.participant(participant.id());
+            assertEquals(before.zone(), participant.zone(), "settlement moves nobody");
+            assertEquals(before.status(), participant.status());
+            assertTrue(participant.effects().isEmpty() && !participant.guarding(), "combat effects and stances end");
+        }
+        for (var intent : List.of(settle, new TacticalIntent.EndActivation(), new TacticalIntent.RollInitiative())) {
+            assertEquals(TacticalRules.Refusal.TURN, TacticalRules.refusal(settled, intent), "nothing follows a settlement");
+        }
         return plans;
     }
 

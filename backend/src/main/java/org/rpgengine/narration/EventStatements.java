@@ -372,6 +372,21 @@ public final class EventStatements {
                     default -> null;
                 };
             }
+            case "ENCOUNTER_SETTLED" -> {
+                // P11.5 (ADR 0036): the return to narrative. It names the outcome already stated and says only what settlement
+                // itself did: the seconds of an unfinished round and the end of combat effects; it awards and moves nothing.
+                String outcome = token(payload, "outcome");
+                Long seconds = number(payload, "seconds");
+                if (outcome == null || seconds == null || !payload.path("effectsEnded").isArray()) {
+                    yield null;
+                }
+                String round = seconds == 0 ? "" : it ? " Il round interrotto conta per intero: " + span(true, seconds) + "."
+                        : " The unfinished round counts in full: " + span(false, seconds) + ".";
+                String effects = payload.path("effectsEnded").isEmpty() ? ""
+                        : it ? " Gli effetti di combattimento ancora attivi terminano." : " The combat effects still active end.";
+                yield it ? "Lo scontro è concluso (esito " + outcome + ") e la storia riprende." + round + effects
+                        : "The fight is settled (outcome " + outcome + ") and the story resumes." + round + effects;
+            }
             case "SOCIAL_CHECK_RESOLVED" -> {
                 // P11.5: the public result of a declared check; its difficulty stays internal, as a hidden defense does.
                 String participant = participant(payload, names);

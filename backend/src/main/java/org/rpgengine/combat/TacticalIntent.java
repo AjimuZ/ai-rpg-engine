@@ -5,7 +5,8 @@ import java.util.Objects;
 /**
  * Closed vocabulary of the player's tactical intentions inside an encounter (P11.2 to P11.5, docs/11 sections 6-13).
  * Each value names only what the player decides: a destination zone, a recipient, a declared action, an attack and
- * its target, whether to put an item on or take it off, a participant to assess, a zone to withdraw to. Costs, legality and every effect come from the frozen encounter through {@link TacticalRules} and
+ * its target, whether to put an item on or take it off, a participant to assess, a zone to withdraw to, the decided fight
+ * to settle. Costs, legality and every effect come from the frozen encounter through {@link TacticalRules} and
  * {@link CombatScheduler}; the commands layer decodes the wire payloads and hands these values over.
  */
 public sealed interface TacticalIntent {
@@ -144,6 +145,20 @@ public sealed interface TacticalIntent {
         /** Require the offer. */
         public AnswerOffer {
             Objects.requireNonNull(offer, "offer");
+        }
+    }
+
+    /**
+     * Settle the decided fight and return to narrative play (P11.5, docs/11 section 14, ADR 0036): legal only while the named
+     * encounter waits at {@code OUTCOME_PENDING}. The verdict is read again from the committed state, never from this value,
+     * so the player only confirms that the reviewed fight is over.
+     *
+     * @param encounter identity of the encounter the player reviewed
+     */
+    record Settle(String encounter) implements TacticalIntent {
+        /** Require the encounter. */
+        public Settle {
+            Objects.requireNonNull(encounter, "encounter");
         }
     }
 

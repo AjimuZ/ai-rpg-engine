@@ -190,12 +190,17 @@ class NegotiationCommandsTest {
         assertEquals(EncounterPhase.OUTCOME_PENDING, EncounterWriter.active(jdbc, campaign).orElseThrow().phase());
     }
 
-    /** Accepting terms the activation cannot pay is refused and leaves them on the table; declining stays free and final. */
+    /**
+     * Accepting terms the activation cannot pay is refused and leaves them on the table, and the receipt already says so;
+     * declining stays free and final.
+     */
     @Test
     void anUnaffordableAcceptanceChangesNothing() {
         execute(new TypedCommand.Guard());
         execute(new TypedCommand.Interact("hopeless-plea", "captain"));
-        var id = (String) offer(execute(new TypedCommand.Interact("haggle", "captain"))).get("offerId");
+        var listed = offer(execute(new TypedCommand.Interact("haggle", "captain")));
+        var id = (String) listed.get("offerId");
+        assertEquals(false, listed.get("canAccept"), "the receipt says the terms cannot be paid");
         assertEquals(0, points());
         rejects(OperationAdmissionFailure.Kind.ACTION_POINTS_INSUFFICIENT, new TypedCommand.AnswerOffer(id, "accept"));
         assertEquals(id, JSON.readTree(column("open_offer")).get("id").asString());
@@ -263,7 +268,8 @@ class NegotiationCommandsTest {
 
     /**
      * The player's surrender needs the same explicit answer: offering it, or being offered it, changes no standing. Accepted, it
-     * ends the fight, fails every objective and keeps the player's Health; a retry replays it.
+     * ends the fight, fails every objective and keeps the player's Health; a retry replays it. That outcome, pending with no
+     * agreement, is the one state where only V30's type check can refuse an agreement that is not an object.
      */
     @Test
     void thePlayersSurrenderNeedsTheExplicitAnswer() {
@@ -285,6 +291,10 @@ class NegotiationCommandsTest {
         assertEquals(surrendered.receipt(), again.receipt());
         assertEquals(before, world());
         refusesEverything();
+        assertNull(column("agreement"), "a surrender is no agreement");
+        assertThrows(DataAccessException.class, () -> jdbc.update("update encounter set agreement = '[]'::jsonb, "
+                + "row_version = row_version + 1"), "an agreement is an object");
+        assertEquals(before, world());
     }
 
     /**

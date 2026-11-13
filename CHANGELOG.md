@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — Settling a fight and returning to the story (P11.5-C.3), 13 November 2026
+
+- A fight that has ended no longer leaves the campaign stuck in combat. Once the outcome is shown, the player confirms it with
+  `SETTLE_ENCOUNTER` {encounterId}, and the campaign returns to exploration: waiting, travelling, resting and starting another
+  fight work again. The outcome is the one the fight reached; the command cannot change it. Every ending settles this way:
+  victory, defeat, escape, either side's surrender, an accepted agreement, a met objective, a stalemate and the round limit's escape.
+- Settlement happens once. Retrying a lost response with the same request returns the same receipt and changes nothing, also
+  for the answer that accepted an agreement just before; a new settlement request, or any combat command, is then refused.
+- A fight that ended in the middle of a round counts that round's 8 seconds (by default) once, with no extra effect tick. Combat
+  effects and Guard stances end with the fight. Nothing is refilled: a defeated character stays at minimum Health and must
+  recover before fighting again. Nobody is moved, no exploration condition is added or removed, and no reward is given yet.
+- The settlement has a public statement in English and Italian. No migration, and nothing changes for receipts written
+  earlier. No frontend control sends the command yet. See
+  [ADR 0036](docs/adr/0036-explicit-settlement-and-the-return-to-narrative.md) and
+  [docs/11](docs/11-combat-system.md#14-settlement-and-return-to-narrative).
+
 ## Unreleased — Withdraw and the round cap in a fight (P11.5-C.2), 13 November 2026
 
 - During their own activation the player can withdraw with `WITHDRAW` {zoneId}: one edge toward an escape zone, for

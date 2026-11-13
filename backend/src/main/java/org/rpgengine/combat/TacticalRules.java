@@ -55,6 +55,8 @@ import org.rpgengine.rules.ZoneGraph;
  *   <li><b>Withdraw</b> (P11.5, {@link #withdrawCost}) — a legal move whose destination's cheapest walk to an escape zone is
  *       strictly shorter than from the player's zone, for {@code withdrawCost} or the edge's Move price when that is higher.
  *       An effect that prevents movement or actions refuses it, as it refuses a move.</li>
+ *   <li><b>Settlement</b> (P11.5, ADR 0036) — only at {@code OUTCOME_PENDING}, naming that encounter; it costs nothing and no
+ *       effect prevents it, because the fight is over. Every other intention is refused there as out of turn.</li>
  * </ul>
  */
 public final class TacticalRules {
@@ -120,6 +122,11 @@ public final class TacticalRules {
         if (intent instanceof TacticalIntent.RollInitiative) {
             return state.phase() == EncounterPhase.ENTERING ? null : Refusal.TURN;
         }
+        if (intent instanceof TacticalIntent.Settle settle) {
+            // The one intention of a decided fight: no turn, cost or prevention applies, and it names the fight reviewed.
+            return state.phase() == EncounterPhase.OUTCOME_PENDING && state.id().toString().equals(settle.encounter())
+                    ? null : Refusal.TURN;
+        }
         if (intent instanceof TacticalIntent.SetReactionPolicy policy) {
             // Before any roll, or at the player's own decision: never during another participant's action.
             if (state.phase() != EncounterPhase.ENTERING && !state.playerDecision()) {
@@ -139,6 +146,7 @@ public final class TacticalRules {
         return switch (intent) {
             case TacticalIntent.RollInitiative roll -> throw new IllegalStateException("handled above");
             case TacticalIntent.SetReactionPolicy policy -> throw new IllegalStateException("handled above");
+            case TacticalIntent.Settle settle -> throw new IllegalStateException("handled above");
             case TacticalIntent.UseAbility use -> ability(state, player, use);
             case TacticalIntent.EndActivation end -> null;
             case TacticalIntent.MoveZone move -> {

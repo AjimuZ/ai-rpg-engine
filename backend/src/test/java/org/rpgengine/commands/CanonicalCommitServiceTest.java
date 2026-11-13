@@ -136,6 +136,21 @@ class CanonicalCommitServiceTest {
         assertEquals("EXPLORATION", jdbc.queryForObject("select mode from campaign", String.class));
     }
 
+    /**
+     * Nor can a plan take a campaign out of encounter mode without settling the encounter that holds it (P11.5, ADR 0036):
+     * a trusted internal plan returning to exploration is refused and writes nothing.
+     */
+    @Test
+    void encounterModeIsLeftOnlyBySettling() {
+        jdbc.update("update campaign set mode = 'ENCOUNTER', row_version = row_version + 1");
+        var exploring = plan(fixture, fixture.operation());
+        var before = snapshot();
+        var failure = assertThrows(IllegalStateException.class, () -> commits.commit(exploring));
+        assertEquals("leaving encounter mode requires settling the encounter", failure.getMessage());
+        assertEquals(before, snapshot());
+        assertEquals("ENCOUNTER", jdbc.queryForObject("select mode from campaign", String.class));
+    }
+
     /** A critical outbox intent cannot commit while its origin is only VALIDATING. */
     @Test
     void criticalJobRequiresCommittedOriginAtTransactionEnd() {

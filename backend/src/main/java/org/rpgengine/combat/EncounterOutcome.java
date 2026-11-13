@@ -34,7 +34,8 @@ import java.util.TreeMap;
  * those outcomes and their place in the order. A failed objective ends nothing by itself: the fight can still be won, lost or
  * left, and {@link #objectives} reports every status for settlement. An escape the cap grants moves nobody, so an escape
  * objective keeps the status the player's zone gives it. A Withdraw action is a move like any other here: only the zone it
- * reaches can make an escape. Settlement is later P11.5 work.
+ * reaches can make an escape. Settlement (ADR 0036) decides again on the state stored at {@code OUTCOME_PENDING} and
+ * finalizes that verdict, so the request that settles a fight cannot choose how it ended.
  *
  * @param kind how the fight ends
  * @param objective the objective met for {@link Kind#OBJECTIVE}, otherwise null

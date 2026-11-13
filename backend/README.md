@@ -1201,8 +1201,8 @@ reach-zone, survive or protect objective, then no active hostile, then an escape
 `ACTOR_START` and `ROUND_END`, stores `OUTCOME_PENDING` and writes `ENCOUNTER_OUTCOME_PENDING`; `CommandReceipts` allowlists
 `combat.outcome`. No migration was needed. Tests: `EncounterOutcomeTest` (pure) and `OutcomeCommandsTest` (PostgreSQL).
 
-Limits at that package: the stalemate policy, Withdraw and settlement were not implemented (the first two came with P11.5-C.2,
-below), so nothing leaves `OUTCOME_PENDING` and the campaign stays in encounter mode there; a round left unfinished adds no time.
+Limits at that package: the stalemate policy, Withdraw and settlement were not implemented (the first two came with P11.5-C.2
+and settlement, which also adds an unfinished round's time, with P11.5-C.3, below), so nothing left `OUTCOME_PENDING` then.
 
 ## Negotiation, surrender and agreement (P11.5)
 
@@ -1215,7 +1215,7 @@ them, and refuses bringing a surrendered participant back; the backup tool cover
 `counteroffer` on a social action. Refusal: `OFFER_UNAVAILABLE` (`COMMAND_OFFER_UNAVAILABLE`, HTTP 422). Tests: `NegotiationTest`
 (pure), `NegotiationCommandsTest` (PostgreSQL) and `CampaignCommandHttpTest.aNegotiatedEndingAnswersAndReplays` (HTTP).
 
-Limits: nothing leaves `OUTCOME_PENDING` until settlement exists; terms cost points only and cannot transfer items; a check on any
+Limits at that package: nothing left `OUTCOME_PENDING` until settlement came with P11.5-C.3, below; terms cost points only and cannot transfer items; a check on any
 intent but `negotiate` records its result and changes nothing else; morale, knowledge and objective policies and a recipient
 proposing terms by itself are not modelled (P12.3/P12.4); no generated reply, preview, confirmation or panel yet (P12).
 
@@ -1233,7 +1233,7 @@ and takes them over; the equipment change is the commit's item effect, written o
 `ReadyAssessCommandsTest` (PostgreSQL).
 
 Limits: one item per action and no swap; non-player participants neither ready nor assess (P12.3/P12.4); revealed values are kept
-only in the event and that receipt; Withdraw and the stalemate policy came with P11.5-C.2, below; settlement remains.
+only in the event and that receipt; Withdraw and the stalemate policy came with P11.5-C.2 and settlement with P11.5-C.3, below.
 
 ## Withdraw and the round cap (P11.5)
 
@@ -1247,8 +1247,25 @@ encounter, compiled by `PackCompiler`, projected by `CombatRules`), frozen into 
 the default and read back by `EncounterWriter.state`; no migration. `CommandReceipts` allowlists `options.withdraw` and
 `combat.outcome.roundCap`. Tests: `WithdrawStalemateTest` (pure) and `WithdrawCommandsTest` (PostgreSQL).
 
-Limits: non-player participants never withdraw (P12.3/P12.4); settlement and the return to narrative remain, so a capped fight
-stays at `OUTCOME_PENDING`; an encounter stored at its round end at the cap before this change cannot move.
+Limits: non-player participants never withdraw (P12.3/P12.4); settlement and the return to narrative came with P11.5-C.3, below;
+an encounter stored at its round end at the cap before this change cannot move.
+
+## Settlement and the return to narrative (P11.5)
+
+`SETTLE_ENCOUNTER` {encounterId} is the last tactical command
+([ADR 0036](../docs/adr/0036-explicit-settlement-and-the-return-to-narrative.md)). `TacticalRules` accepts `TacticalIntent.Settle`
+only at `OUTCOME_PENDING` for that encounter; `CommandRules` adds the clock check when the fight ended inside a round.
+`CombatScheduler` decides the verdict again with `EncounterOutcome.decide`, adds that round's `roundSeconds` once, ends every effect
+and Guard stance, writes `SETTLED` and `NARRATIVE_RESUME` and the public `ENCOUNTER_SETTLED`; `LocalActionResolver` returns the
+campaign to `EXPLORATION` for a plan ending at `NARRATIVE_RESUME`. `ResolvedCommit` accepts tactical progress in exploration mode only
+for such a plan and requires it there, and `CanonicalCommitService` refuses any plan leaving encounter mode without one.
+`CommandReceipts` allowlists `combat.settlement` {seconds, effectsEnded}; `EventStatements` states the new event. No migration: the
+V22 arrows allow the settlement once. Tests: `SettlementTest` (pure), the settlement checks in the seeded fights of
+`EncounterOutcomeTest`, and `SettlementCommandsTest` (PostgreSQL). Every deliberate weakening of P11.5 that still applies, including
+the catalogues of its packages A and B, fails a test; the roadmap entry lists them.
+
+Limits: no reward, loot, recovery rule, effect conversion or escape destination exists yet (P13); a fight that ended inside a round
+cannot settle within one round of the clock's end; no frontend control sends the command yet (P12).
 
 ## Interface reload contract (P05.6)
 

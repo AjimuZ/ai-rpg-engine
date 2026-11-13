@@ -455,8 +455,8 @@ satisfies a terminal predicate the operation moves to `OUTCOME_PENDING` and writ
 `AGREEMENT` | `STALEMATE`, objectiveId?, termsId?, roundCap?, objectives: [{objectiveId,
 status: `pending` | `met` | `failed`}]}. That operation's receipt has `combat.outcome` {outcome, objectiveId, termsId?, objectives} and
 no acting participant, action points or `options`. A retry replays the same receipt. Every later
-tactical intention is refused with `TURN_UNAVAILABLE` and exploration stays `MODE_ILLEGAL`, writing nothing, until
-settlement exists. A declared opening strike still waiting lapses with `ATTACKER_DOWN` or `ENCOUNTER_ENDED`.
+tactical intention but `SETTLE_ENCOUNTER` is refused with `TURN_UNAVAILABLE` and exploration stays `MODE_ILLEGAL`, writing
+nothing, until the player settles (below). A declared opening strike still waiting lapses with `ATTACKER_DOWN` or `ENCOUNTER_ENDED`.
 
 ### P11.5 social checks, negotiation and surrender
 
@@ -533,6 +533,25 @@ When round `roundCap` ends with no other predicate holding, the fight moves from
 template's declared `disengagement`: `ENCOUNTER_OUTCOME_PENDING` carries `outcome: STALEMATE` (default) or `ESCAPE`, and
 `roundCap: true`; the receipt's `combat.outcome` repeats `roundCap`. No other verdict carries the member. Nothing changes any
 participant's Health, standing, zone or effects at the cap; the last round's own end, with its ticks and seconds, comes first.
+
+### P11.5 settlement and the return to narrative
+
+The last tactical intention leaves the fight ([ADR 0036](adr/0036-explicit-settlement-and-the-return-to-narrative.md)):
+
+| Intention | Payload | Legal when | Refusal |
+| --- | --- | --- | --- |
+| `SETTLE_ENCOUNTER` | `encounterId` (canonical UUID text) | Encounter mode; the campaign's active encounter is the one named, waits at `OUTCOME_PENDING` and is played by this player; when it ended inside a round (cursor still set), the clock can take `roundSeconds` | `MODE_ILLEGAL`, `TURN_UNAVAILABLE`, `ACTOR_UNAVAILABLE`, `TIME_ILLEGAL` |
+
+It costs nothing, draws nothing and is never prevented. The verdict is decided again from the stored state. The operation writes
+`SETTLED` and then `NARRATIVE_RESUME`, both with no cursor, adds `roundSeconds` once when the fight ended inside a round (no effect
+phase runs for it), ends every combat effect and Guard stance still held, and writes the public `ENCOUNTER_SETTLED` {encounterId,
+round, seconds, the verdict's outcome, objectiveId?, termsId?, roundCap?, objectives, participants: [{participantId, side, zone,
+status}], effectsEnded: [{participantId, effectId, stacks}]}, attributed to the player. In the same commit the campaign returns to
+`EXPLORATION` with no pending decision; nothing is refilled, moved, awarded or converted to an exploration condition, and no quest step
+runs. The receipt's `combat` shows `phase: NARRATIVE_RESUME`, the outcome, the final standings and `settlement` {seconds, effectsEnded},
+with no `options`. Like every command it owes narration. A lost response is retried with the same request ID and replays the stored
+receipt, writing nothing; a fresh request, and every other tactical intention, is then `MODE_ILLEGAL`. The campaign accepts exploration
+commands and a new `ENGAGE` at once. The canonical commit refuses any plan that leaves encounter mode without such a settlement.
 
 ### P11.4 reactions, effects and abilities
 

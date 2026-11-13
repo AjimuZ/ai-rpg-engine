@@ -20,7 +20,7 @@ If the client loses the response and resends `example-heal-1` with the same payl
 
 ## 3. A complete two-round fight
 
-Since P11.4 ([ADR 0031](adr/0031-predeclared-reactions-effect-phases-and-cooldowns.md)) `CombatStrikeTest` plays this fight from these recorded dice exactly as written, Brace included. Settlement and advancement remain P11.5 and P13.
+Since P11.4 ([ADR 0031](adr/0031-predeclared-reactions-effect-phases-and-cooldowns.md)) `CombatStrikeTest` plays this fight from these recorded dice exactly as written, Brace included. Since P11.5-C.3 ([ADR 0036](adr/0036-explicit-settlement-and-the-return-to-narrative.md)) the player's explicit `SETTLE_ENCOUNTER` performs the time and state part of the settlement below (the unfinished round's seconds once, no tick, nothing refilled), tested on other fixtures rather than on this fight; the XP award and advancement remain P13.
 
 ### Starting state
 
@@ -97,8 +97,11 @@ An author changes a weapon formula in pack version 1.1. A campaign pinned to 1.0
 This example specifies future P11/P12 behavior, not a runnable encounter fixture.
 Since P11.5-B the backend implements steps 2 and 3 up to the outcome, with a stored
 offer and the explicit `ANSWER_OFFER`: a refusal, a counteroffer and the player's
-acceptance are tested on the `parley-ground` fixture. Settlement, the return to
-narrative, generated replies and the composer's preview are still to come.
+acceptance are tested on the `parley-ground` fixture. Since P11.5-C.3 the
+explicit `SETTLE_ENCOUNTER` settles the accepted agreement once and returns the
+campaign to exploration; lost responses of the acceptance and of the settlement
+replay their receipts. Generated replies, the conversation shown after the fight
+and the composer's preview are still to come.
 The player is active with 3 AP. Mira and a hostile captain are known participants
 in communicating range. The frozen encounter permits a negotiated ending and
 defines an interaction with an existing dock gate; no new ability is improvised.

@@ -99,6 +99,12 @@ import org.rpgengine.rules.CombatProfile;
  * it pays, runs the declared-action ticks and takes an offer off the table like a move, but no {@code leavesZone} reaction is
  * considered for it, so nobody answers the player leaving. It sets no status and decides nothing itself: arriving in an
  * escape zone ends the fight only through {@link EncounterOutcome#decide}, in its usual order.
+ *
+ * <p><b>Settlement</b> (P11.5, docs/11 section 14, ADR 0036) is the player's explicit confirmation of a fight waiting at
+ * {@code OUTCOME_PENDING}. It decides the verdict again from the committed state, adds the unfinished round's seconds once
+ * when the fight ended inside a round, ends every combat effect and stance, and passes {@code SETTLED} to stop at
+ * {@code NARRATIVE_RESUME} with one public {@code ENCOUNTER_SETTLED} event. It draws nothing, runs no effect phase and changes
+ * no pool, zone or standing.
  */
 public final class CombatScheduler {
     /** Sides of each initiative die (kernel). */
@@ -169,6 +175,7 @@ public final class CombatScheduler {
             case TacticalIntent.SetReactionPolicy policy -> run.setPolicy(policy);
             case TacticalIntent.AnswerOffer answer -> run.answer(answer);
             case TacticalIntent.Assess assess -> run.assess(assess);
+            case TacticalIntent.Settle settle -> run.settleEncounter();
             case TacticalIntent.UseItem use -> throw new IllegalStateException("an item use needs its resolved outcome");
             case TacticalIntent.Ready ready -> throw new IllegalStateException("readying needs its resolved equipment");
         }
@@ -320,6 +327,8 @@ public final class CombatScheduler {
         private Map<String, Object> readiedLine;
         /** What this operation's assessment found, for the receipt; null without one. */
         private Map<String, Object> assessment;
+        /** What this operation's settlement finalized, for the receipt; null without one. */
+        private Map<String, Object> settlement;
 
         /** Give the run the operation's draws. */
         void draws(Dice source) {
@@ -512,6 +521,49 @@ public final class CombatScheduler {
             payload.put("encounterId", base.id().toString());
             payload.put("round", round);
             note("ENCOUNTER_OUTCOME_PENDING", payload, false);
+        }
+
+        /**
+         * Settle the decided fight once (ADR 0036). The verdict comes from the committed state, so the stored fight, never the
+         * request, says how it ended; a state without one breaks the guarantee that only a verdict reaches the outcome. A cursor
+         * still set means the fight ended inside a round, which runs to its boundary here once: its seconds are added and no
+         * phase runs, so no effect ticks for them. Every combat effect and Guard stance ends with the fight and is listed, since
+         * no pack declares a conversion to exploration. Pools, zones and standings stay exactly as the fight left them.
+         *
+         * @throws IllegalStateException when the stored fight has no verdict
+         */
+        void settleEncounter() {
+            var verdict = EncounterOutcome.decide(state());
+            if (verdict == null) {
+                throw new IllegalStateException("a fight waiting for settlement has no verdict");
+            }
+            outcome = verdict;
+            elapsed = cursor != null ? profile.roundSeconds() : 0;
+            var ended = new ArrayList<Object>();
+            var standing = new ArrayList<Object>();
+            for (Working participant : participants.values()) {
+                for (CombatEffects.Active active : participant.effects) {
+                    ended.add(Map.of("participantId", participant.source.id(), "effectId", active.effectId(),
+                            "stacks", active.stacks()));
+                }
+                participant.effects = new ArrayList<>();
+                participant.guarding = false;
+                standing.add(Map.of("participantId", participant.source.id(), "side", participant.source.side().wire(),
+                        "zone", participant.zone, "status", participant.status.name()));
+            }
+            // No activation outlives the fight.
+            cursor = null;
+            points = null;
+            step(EncounterPhase.SETTLED);
+            var payload = new TreeMap<String, Object>(verdict.publicForm());
+            payload.put("encounterId", base.id().toString());
+            payload.put("round", round);
+            payload.put("seconds", elapsed);
+            payload.put("participants", standing);
+            payload.put("effectsEnded", ended);
+            note("ENCOUNTER_SETTLED", payload, true);
+            settlement = Map.of("seconds", elapsed, "effectsEnded", List.copyOf(ended));
+            step(EncounterPhase.NARRATIVE_RESUME);
         }
 
         /**
@@ -1113,10 +1165,10 @@ public final class CombatScheduler {
             }
             int strikeCost = profile.value("strikeCost");
             if (reach(actor) == null && !CombatEffects.prevents(actor.effects, library, CombatEffect.Prevents.MOVEMENT)) {
+                // No outcome check is needed after the approach: reactions never chain, so only the mover can change
+                // during it, and a fight it ends has felled the mover, whom every later step requires standing. Should
+                // that ever change, the next step's arrow out of OUTCOME_PENDING is refused rather than run.
                 approach(actor);
-                if (phase == EncounterPhase.OUTCOME_PENDING) {
-                    return;
-                }
             }
             var reach = actor.status == EncounterState.Status.ACTIVE ? reach(actor) : null;
             if (reach != null && points >= strikeCost) {
@@ -1779,6 +1831,10 @@ public final class CombatScheduler {
             }
             if (assessment != null) {
                 summary.put("assessment", assessment);
+            }
+            // Only for the settlement, whose receipt also carries the verdict and the final standings above.
+            if (settlement != null) {
+                summary.put("settlement", settlement);
             }
             var options = TacticalRules.options(after);
             if (!options.isEmpty()) {

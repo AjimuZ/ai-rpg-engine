@@ -1,6 +1,6 @@
 # ADR 0033: Negotiation by declared checks, stored offers and explicit answers
 
-- Status: Accepted; implemented in P11.5-B (1 November 2026). Stalemate, settlement and the return to narrative are P11.5-C and build on it.
+- Status: Accepted; implemented in P11.5-B (1 November 2026). The stalemate came with [ADR 0035](0035-withdraw-and-the-round-cap.md) (P11.5-C.2), and settlement and the return to narrative, which settle an accepted agreement or surrender once, with [ADR 0036](0036-explicit-settlement-and-the-return-to-narrative.md) (P11.5-C.3).
 - Date: 1 November 2026
 - Builds on: [ADR 0029](0029-initiative-rounds-activations-and-bounded-combat-dialogue.md) (declared social actions), [ADR 0030](0030-attacks-defense-damage-and-healing-with-recorded-draws.md) (recorded draws), [ADR 0032](0032-terminal-predicates-from-committed-state.md) (terminal predicates), which it extends for surrender and agreement.
 

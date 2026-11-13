@@ -18,6 +18,7 @@ import org.rpgengine.campaign.CampaignMode;
 import org.rpgengine.campaign.EventVisibility;
 import org.rpgengine.combat.CombatMath;
 import org.rpgengine.combat.CombatScheduler;
+import org.rpgengine.combat.EncounterPhase;
 import org.rpgengine.combat.EncounterState;
 import org.rpgengine.combat.FrozenEncounter;
 import org.rpgengine.combat.TacticalPlan;
@@ -104,6 +105,11 @@ import tools.jackson.databind.node.ObjectNode;
  * check the same way from frozen values. {@code READY_ITEM} is the second tactical intention that reads the pinned catalog:
  * its equipment change becomes the commit's item effect, and the Guard, armor and attacks it leaves are computed once here
  * and stored with the encounter (ADR 0034).
+ *
+ * <p>Settlement (P11.5, ADR 0036): {@code SETTLE_ENCOUNTER} reads only the frozen encounter. Its plan ends the encounter at
+ * {@code NARRATIVE_RESUME}, adds the unfinished round's seconds when there is one and moves the campaign back to exploration
+ * with no pending decision; it changes no pool, item, location or exploration condition, and runs no quest step, so the next
+ * exploration command evaluates what the fight changed, as after any tactical command.
  *
  * <p>Rest (P10.4): the pinned policy restores its resources up to each pool's maximum and, when not
  * interrupted, ends the listed conditions the player has. An interruption is one recorded percentile
@@ -344,7 +350,7 @@ final class LocalActionResolver {
         private QuestChanges questChanges = QuestChanges.NONE;
         private final List<ResolvedCommit.ConditionRemoval> removals = new ArrayList<>();
         private long elapsed;
-        /** Mode the commit leaves the campaign in; only an encounter entry changes it. */
+        /** Mode the commit leaves the campaign in: encounter after an entry or a tactical step, exploration otherwise. */
         private CampaignMode mode = CampaignMode.EXPLORATION;
         private ResolvedCommit.EncounterEntry encounter;
         private TacticalPlan progress;
@@ -455,7 +461,8 @@ final class LocalActionResolver {
         /**
          * Resolve a tactical intention with the combat scheduler over the stored encounter state. The rule gate
          * accepted it on the same rows; a refusal here is a resolver failure. Events keep the scheduler's order; the
-         * round time it reports is the elapsed world time and the campaign stays in encounter mode.
+         * round time it reports is the elapsed world time and the campaign stays in encounter mode, except after a
+         * settlement, which returns it to exploration with no pending decision.
          */
         private void tactical(TypedCommand.Tactical tactical, CommandRuleCatalog catalog) {
             var state = snapshot.encounter();
@@ -467,7 +474,9 @@ final class LocalActionResolver {
                 case TypedCommand.ReadyItem ready -> readyItem(ready, state, Objects.requireNonNull(catalog, "catalog"));
                 default -> CombatScheduler.apply(state, tactical.intent(), draws::value);
             };
-            mode = CampaignMode.ENCOUNTER;
+            // Only a settlement reaches NARRATIVE_RESUME, and it is the one way back to exploration (ADR 0036).
+            mode = progress.last().phase() == EncounterPhase.NARRATIVE_RESUME ? CampaignMode.EXPLORATION
+                    : CampaignMode.ENCOUNTER;
             elapsed = progress.elapsedSeconds();
             // The player's Health lives in its pool: the plan's net change becomes the commit's resource effect.
             String health = state.profile().health();

@@ -385,6 +385,19 @@ class TypedCommandTest {
         assertInvalid("WITHDRAW", Map.of("zoneId", ""));
         assertInvalid("WITHDRAW", Map.of("zoneId", "x".repeat(129)));
         assertInvalid("WITHDRAW", Map.of("zoneId", "yard", "escape", true));
+        // P11.5 (ADR 0036): a settlement names the encounter alone, as canonical UUID text; the outcome is never part of it.
+        var encounter = java.util.UUID.fromString("0f8c5e2a-3b1d-4c7e-9a6f-2d4b8e1c7a90");
+        assertTrue(TypedCommand.registered("SETTLE_ENCOUNTER"));
+        assertEquals(new TypedCommand.SettleEncounter(encounter), decode("SETTLE_ENCOUNTER", Map.of("encounterId", encounter.toString())));
+        assertEquals(new org.rpgengine.combat.TacticalIntent.Settle(encounter.toString()),
+                new TypedCommand.SettleEncounter(encounter).intent());
+        assertEquals(Map.of("encounterId", encounter.toString()), new TypedCommand.SettleEncounter(encounter).payload());
+        assertTrue(new TypedCommand.SettleEncounter(encounter) instanceof TypedCommand.Tactical, "legal only in encounter mode");
+        assertInvalid("SETTLE_ENCOUNTER", Map.of());
+        assertInvalid("SETTLE_ENCOUNTER", Map.of("encounterId", "0F8C5E2A-3B1D-4C7E-9A6F-2D4B8E1C7A90"));
+        assertInvalid("SETTLE_ENCOUNTER", Map.of("encounterId", "trail-ambush"));
+        assertInvalid("SETTLE_ENCOUNTER", Map.of("encounterId", encounter.toString(), "outcome", "VICTORY"));
+        assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.SettleEncounter(null));
         assertEquals(500, decodeSpeech("x".repeat(500)).text().length());
         assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.MoveZone(null));
         assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.Interact("taunt", " "));

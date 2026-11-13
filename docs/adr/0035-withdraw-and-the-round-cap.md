@@ -1,6 +1,6 @@
 # ADR 0035: Withdraw moves toward an escape without reactions, and the round cap names a harmless outcome
 
-- Status: Accepted; implemented in P11.5-C.2 (13 November 2026). Supersedes decision 9 of [ADR 0032](0032-terminal-predicates-from-committed-state.md) ("the round cap stays a pause"). Settlement and the return to narrative remain for the rest of P11.5.
+- Status: Accepted; implemented in P11.5-C.2 (13 November 2026). Supersedes decision 9 of [ADR 0032](0032-terminal-predicates-from-committed-state.md) ("the round cap stays a pause"). Settlement and the return to narrative came with [ADR 0036](0036-explicit-settlement-and-the-return-to-narrative.md) (P11.5-C.3).
 - Date: 13 November 2026
 - Builds on: [ADR 0029](0029-initiative-rounds-activations-and-bounded-combat-dialogue.md) (movement and the scheduler), [ADR 0031](0031-predeclared-reactions-effect-phases-and-cooldowns.md) (`leavesZone` reactions), [ADR 0032](0032-terminal-predicates-from-committed-state.md) (terminal predicates), [ADR 0033](0033-negotiation-explicit-answers-and-surrender.md) (lapsing offers).
 

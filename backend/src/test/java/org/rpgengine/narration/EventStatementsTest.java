@@ -355,6 +355,29 @@ class EventStatementsTest {
                 state(SupportedLocale.EN, "ENCOUNTER_OUTCOME_PENDING", "{\"outcome\":\"ESCAPE\"}"));
     }
 
+    /**
+     * Settlement (P11.5, ADR 0036) states the return to the story, the seconds of an unfinished round only when there are
+     * any and the end of combat effects only when any ended; it states no award or move, and a payload missing a member is
+     * not stated.
+     */
+    @Test
+    void statesTheSettlement() {
+        String closed = "{\"outcome\":\"STALEMATE\",\"roundCap\":true,\"seconds\":0,\"effectsEnded\":[]}";
+        assertEquals("The fight is settled (outcome STALEMATE) and the story resumes.",
+                state(SupportedLocale.EN, "ENCOUNTER_SETTLED", closed));
+        assertEquals("Lo scontro è concluso (esito STALEMATE) e la storia riprende.",
+                state(SupportedLocale.IT, "ENCOUNTER_SETTLED", closed));
+        String inside = "{\"outcome\":\"AGREEMENT\",\"termsId\":\"toll\",\"seconds\":8,"
+                + "\"effectsEnded\":[{\"participantId\":\"captain\",\"effectId\":\"warded\",\"stacks\":1}]}";
+        assertEquals("The fight is settled (outcome AGREEMENT) and the story resumes. The unfinished round counts in full: "
+                + "8 seconds. The combat effects still active end.", state(SupportedLocale.EN, "ENCOUNTER_SETTLED", inside));
+        assertEquals("Lo scontro è concluso (esito AGREEMENT) e la storia riprende. Il round interrotto conta per intero: "
+                + "8 secondi. Gli effetti di combattimento ancora attivi terminano.", state(SupportedLocale.IT, "ENCOUNTER_SETTLED", inside));
+        assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_SETTLED", "{\"outcome\":\"VICTORY\",\"effectsEnded\":[]}"));
+        assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_SETTLED", "{\"seconds\":0,\"effectsEnded\":[]}"));
+        assertEquals(null, state(SupportedLocale.EN, "ENCOUNTER_SETTLED", "{\"outcome\":\"VICTORY\",\"seconds\":0}"));
+    }
+
     /** Quest events state their transition in both locales, using the canonical quest and outcome identities. */
     @Test
     void statesQuestEvents() {

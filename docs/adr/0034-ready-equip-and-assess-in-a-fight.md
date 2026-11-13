@@ -1,6 +1,6 @@
 # ADR 0034: Ready/equip changes real equipment and Assess reveals sheet values on a recorded check
 
-- Status: Accepted; implemented in P11.5-C.1 (13 November 2026). Withdraw, the stalemate policy and settlement remain for the rest of P11.5.
+- Status: Accepted; implemented in P11.5-C.1 (13 November 2026). Withdraw and the stalemate policy came with [ADR 0035](0035-withdraw-and-the-round-cap.md) (P11.5-C.2) and settlement with [ADR 0036](0036-explicit-settlement-and-the-return-to-narrative.md) (P11.5-C.3).
 - Date: 13 November 2026
 - Builds on: [ADR 0023](0023-character-rules-and-equipment-constraints.md) (slot and hand rules), [ADR 0030](0030-attacks-defense-damage-and-healing-with-recorded-draws.md) (worn gear frozen at entry), [ADR 0033](0033-negotiation-explicit-answers-and-surrender.md) (recorded checks and lapsing offers).
 

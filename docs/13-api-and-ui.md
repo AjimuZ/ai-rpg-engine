@@ -607,6 +607,11 @@ prices of readying and assessing with the participants that can be assessed. No 
 Since P11.5-C.2 ([ADR 0035](adr/0035-withdraw-and-the-round-cap.md)) a receipt also lists the zones the player can withdraw to with
 their price, and an outcome the round limit decided says so (`roundCap`); a stalemate exists only that way. No frontend control
 uses them yet (P12.1/P12.2).
+Since P11.5-C.3 ([ADR 0036](adr/0036-explicit-settlement-and-the-return-to-narrative.md)) the return-to-story path exists on the
+backend: `SETTLE_ENCOUNTER` {encounterId} is the player's explicit confirmation of a fight waiting at its outcome, its receipt shows
+`NARRATIVE_RESUME`, the verdict, the final standings and `settlement` {seconds, effectsEnded}, and the campaign accepts exploration
+commands again. A lost response of the settlement, or of the negotiated ending before it, replays its own receipt. No frontend
+control sends it yet (P12), so the outcome review and its confirmation are still to be designed in the UI.
 
 ## 8. Loading, empty, error, and recovery states
 

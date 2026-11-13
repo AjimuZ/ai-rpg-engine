@@ -115,6 +115,36 @@ class ResolvedCommitTest {
                 List.of(), List.of(event), List.of(), "{}", false).progress());
     }
 
+    /**
+     * A settlement's progress, which ends at {@code NARRATIVE_RESUME}, is the one tactical progress that returns the campaign
+     * to exploration, and it must; it still carries its own time (P11.5, ADR 0036).
+     */
+    @Test
+    void onlyASettlementLeavesEncounterMode() {
+        var context = new ResolvedCommit.Context(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                UUID.randomUUID(), "a".repeat(64), 0, 2, new MutationLeaseService.Token(UUID.randomUUID(), 1));
+        var event = new ResolvedCommit.Event(null, null, EventVisibility.PUBLIC,
+                new CampaignEvent.Body("ENCOUNTER_SETTLED", 1, 1, "{}"));
+        var settlement = new org.rpgengine.combat.TacticalPlan(UUID.randomUUID(), 9, List.of(
+                new org.rpgengine.combat.TacticalPlan.Step(org.rpgengine.combat.EncounterPhase.SETTLED, 2, null, null, 0, List.of(), "NONE"),
+                new org.rpgengine.combat.TacticalPlan.Step(org.rpgengine.combat.EncounterPhase.NARRATIVE_RESUME, 2, null, null, 0, List.of(),
+                        "NONE")), List.of(),
+                List.of(new org.rpgengine.combat.TacticalPlan.Note("ENCOUNTER_SETTLED", java.util.Map.of("round", 2), true)), 8,
+                java.util.Map.of());
+        var plan = new ResolvedCommit(context, new ResolvedCommit.WorldChange(true, 8, CampaignMode.EXPLORATION, null),
+                List.of(), List.of(event), List.of(), "{}", false, ResolvedCommit.Preparation.NONE, null, List.of(),
+                List.of(), org.rpgengine.inventory.ItemPlan.NONE, org.rpgengine.quests.QuestChanges.NONE, List.of(), null,
+                settlement);
+        assertEquals(CampaignMode.EXPLORATION, plan.world().mode());
+        for (var world : List.of(new ResolvedCommit.WorldChange(true, 8, CampaignMode.ENCOUNTER, null),
+                new ResolvedCommit.WorldChange(true, 0, CampaignMode.EXPLORATION, null))) {
+            assertThrows(IllegalArgumentException.class, () -> new ResolvedCommit(context, world, List.of(),
+                    List.of(event), List.of(), "{}", false, ResolvedCommit.Preparation.NONE, null, List.of(), List.of(),
+                    org.rpgengine.inventory.ItemPlan.NONE, org.rpgengine.quests.QuestChanges.NONE, List.of(), null,
+                    settlement), world.toString());
+        }
+    }
+
     /** Reject unbounded/ambiguous effects before acquiring locks, and isolate a plan from caller list mutation. */
     @Test
     void boundsAndFreezesResolvedEffects() {

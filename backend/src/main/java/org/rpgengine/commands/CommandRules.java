@@ -74,7 +74,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       {@code OFFER_UNAVAILABLE}, {@code ACTION_POINTS_INSUFFICIENT}). The initiative roll and the end of an activation may close a round, so
  *       the clock must be able to take one round's seconds ({@code TIME_ILLEGAL}). Since P11.5 {@code READY_ITEM} also applies the
  *       {@code EQUIP_ITEM}/{@code UNEQUIP_ITEM} rules ({@code ITEM_UNAVAILABLE}, {@code EQUIPMENT_ILLEGAL}) and refuses a weapon whose
- *       hit applies an effect the fight did not freeze ({@code EFFECT_UNSUPPORTED}).</li>
+ *       hit applies an effect the fight did not freeze ({@code EFFECT_UNSUPPORTED}), and {@code SETTLE_ENCOUNTER} needs the
+ *       fight it names at its outcome ({@code TURN_UNAVAILABLE}) and, when that fight ended inside a round, room on the clock
+ *       for the round's seconds ({@code TIME_ILLEGAL}).</li>
  *   <li><b>Causal attribution</b> — at commit, resolved effects may only touch the participants
  *       this intention lawfully involves ({@link #requireAttributed}).</li>
  * </ul>
@@ -513,6 +515,10 @@ final class CommandRules {
             }
             if (tactical.intent() instanceof TacticalIntent.EndActivation
                     || tactical.intent() instanceof TacticalIntent.RollInitiative) {
+                timeFits(state.profile().roundSeconds());
+            }
+            // Settling a fight that ended inside a round runs that round to its boundary (ADR 0036).
+            if (tactical.intent() instanceof TacticalIntent.Settle && state.cursor() != null) {
                 timeFits(state.profile().roundSeconds());
             }
         }

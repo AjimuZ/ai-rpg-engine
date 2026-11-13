@@ -379,7 +379,11 @@ rest of the fight; only an actor-backed participant can hold it, and once set it
 assignment itself stays in `equipment_assignment`, changed by the same commit. Since P11.5-C.2
 ([ADR 0035](adr/0035-withdraw-and-the-round-cap.md)) the frozen `definition` also holds the template's `disengagement` when it is
 not the default stalemate, and the end of round `roundCap` is itself a terminal predicate, so no row waits at a round end; a
-withdrawal changes only the player's zone, never a status.
+withdrawal changes only the player's zone, never a status. Since P11.5-C.3
+([ADR 0036](adr/0036-explicit-settlement-and-the-return-to-narrative.md)) the player's settlement moves the row from
+`OUTCOME_PENDING` through `SETTLED` to `NARRATIVE_RESUME`, clearing the cursor, and clears every participant's effects and stance; the
+row then stays as history, inactive, and the campaign returns to `EXPLORATION` in the same commit. Still no column stores the outcome:
+the public `ENCOUNTER_SETTLED` event records it with the final standings and the effects that ended.
 
 Since P11.2 (V23, [ADR 0029](adr/0029-initiative-rounds-activations-and-bounded-combat-dialogue.md)) the
 encounter row also holds the tactical cursor: `actor_cursor` (initiative rank of the acting participant) and
