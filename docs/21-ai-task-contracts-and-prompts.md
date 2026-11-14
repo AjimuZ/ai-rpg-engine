@@ -512,10 +512,49 @@ caller falls back.
 **Not proven.**
 
 - No live model output has been evaluated.
-- No caller exists: no activation, commit revalidation, fallback or player notice uses the contract.
+- No caller exists: no activation, commit revalidation or player notice uses the contract. The fallback decision exists
+  since P12.4-A (section 15c) but is not called by a gameplay path either.
 - The beliefs are supplied by the caller and no knowledge-view reader fills them yet.
 - A zone full of hidden occupants is left out of `move`, so its capacity leaks indirectly.
 - Paraphrased secrets are not detectable mechanically.
+
+## 15c. Implemented: tactic fallback and interruption notice (P12.4-A)
+
+**Status (14 November 2026): implemented as a pure decision, tested against `ScriptedTaskPort` and the scheduler. No gameplay
+path calls it.**
+
+`TacticFallback.decide(outcome, committed)` turns the terminal `ContractOutcome<TacticProposal>` of one tactic call and the
+acting participant's menu, read again from the committed state, into a `Decision`:
+
+| Outcome | Decision | Cause and detail code |
+| --- | --- | --- |
+| `Accepted` choice that the committed menu admits | `Proposed` | none |
+| `Accepted` choice the committed menu no longer admits | `Fallback` | `TACTIC_INVALID`, `stale-choice` |
+| `Accepted` `cannot-complete` | `Fallback` | `TACTIC_INVALID`, `missing-information` |
+| `Rejected` (invalid after the single repair) | `Fallback` | `TACTIC_INVALID`, the first violation code |
+| `Refused` (guarded secret in the context) | `Fallback` | `TACTIC_INVALID`, `context-scope` |
+| `NotCompleted` other than cancelled (no runtime, failure, timeout, unconfirmed result, admission refusal) | `Fallback` | `PROVIDER_UNAVAILABLE`, the fixed error code |
+| `NotCompleted` cancelled | `Fallback` | `INTERRUPTED`, the fixed error code |
+
+- A `Fallback` means the fixed tactic of `CombatScheduler` plays the activation: approach the nearest opponent when none is in
+  reach, at most one strike at the first reachable opponent (nearest, then roster order), Guard with what is left, and
+  otherwise end the activation. It reads the committed state only and does not depend on the runtime, so a failing runtime
+  never stalls a fight. No declared objective is pursued, because non-player participants carry none.
+- Each fallback carries a `Notice`: a stable code (`tactic-fallback.invalid`, `.unavailable`, `.interrupted`), the binding's
+  narrative language (English or Italian) and one public sentence. The sentence names no participant, candidate, target, reason
+  code or rejected text. The detail code is for logs and receipts and is never part of the notice.
+- Whether the notice is shown, and where it is stored, belongs to the caller: docs/11 section 12 says the player is told only
+  when the fallback materially changes the experience.
+
+**Evidence.** `TacticFallbackTest` (7 cases, one parameterized over both languages): a scripted runtime that stays invalid
+through the repair, each of the six non-completed task statuses through the real `ContractRunner` (one request each, never
+repaired), a legal choice kept as a proposal, a stale choice refused, `cannot-complete` and a refused context, and notice texts
+without participant or candidate names. After each failing outcome the same test runs `CombatScheduler.apply` from the player's
+end of activation and checks that every non-player participant acts and the plan stops at the player's next decision.
+
+**Not proven.** No live runtime and no timing under the campaign lock: no code asks for a choice during an activation, so the
+choice is not yet awaited, committed or stored with the fallback marker. The notice is not persisted, sent through the API or
+shown in the frontend. The scheduler's tactic is the only fallback and is not ranked against a declared objective.
 
 ## 16. Neutral protocol proof (P01.1)
 

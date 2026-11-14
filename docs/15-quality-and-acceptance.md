@@ -1791,8 +1791,14 @@ P12.3-A (14 November 2026) adds `TacticCandidatesTest` (5) and `TacticContractTe
 secrets are absent from the rendered request: a hidden participant, its attack, and the player's attack, ammunition and
 campaign actor. A context carrying a guarded secret is refused before submission. Each illegal proposal is rejected with its
 code. A scripted runtime is repaired once and then rejected, or repaired into a legal choice that the menu admits again. This
-is QA-16 evidence for the tactic context only (see the P12.3 roadmap entry for results and limits). The tactic-invalid and
-provider-unavailable fallback is not implemented, no activation calls the contract, and no live model output was evaluated.
+is QA-16 evidence for the tactic context only (see the P12.3 roadmap entry for results and limits). No activation calls the
+contract, and no live model output was evaluated.
+
+P12.4-A (14 November 2026) adds `TacticFallbackTest` (7): an invalid tactic output after the repair and each of the six
+non-completed task statuses give a fallback decision with a public notice in English or Italian, a stale choice is refused,
+and after each failure the scheduler still carries the fight to the player's next decision. It is evidence for the pure
+fallback decision only (see the P12.4 roadmap entry). The fallback is not called by any activation, the notice is not stored
+or shown, and no live runtime was used.
 
 ## 4. Long-campaign evaluation
 

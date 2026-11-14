@@ -4710,6 +4710,39 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       scheduler cannot perform them for non-player participants.
     - Not run by this session: `verify.sh full`, `verify.sh containers` and deliberate weakenings.
 - [ ] P12.4 Add deterministic tactic fallback, interruption messages, bounded knowledge-scoped combat replies and outcome narration; dialogue failure leaves committed state and tactical controls available.
+  - P12.4-A, deterministic tactic fallback and interruption messages, 14 November 2026 (the P12.4 box stays unchecked: this
+    story does not finish it).
+    - **Decision.** New pure `inference/contract/TacticFallback.decide(outcome, committedMenu)`:
+      - an accepted choice that the menu rebuilt from the committed state still admits is `Proposed`;
+      - everything else is a `Fallback`, which means the scheduler's fixed tactic plays the activation (approach, at most one
+        strike, Guard, end). That tactic reads the committed state only, so a failing runtime cannot stall a fight.
+      - Causes: `TACTIC_INVALID` (invalid after the single repair, `cannot-complete`, a context refused before submission, a
+        stale choice), `PROVIDER_UNAVAILABLE` (any task status other than completed and cancelled) and `INTERRUPTED`
+        (cancelled).
+    - **Notice.** Each fallback carries a public notice with a stable code, the binding's language (English or Italian) and
+      one sentence that names no participant, candidate, target or reason. The fixed detail code stays out of the notice.
+    - **Unchanged.** No migration, route, command, receipt, scheduler or frontend behavior changed. No declared objective is
+      pursued, because non-player participants carry none.
+    - Details: [contract](21-ai-task-contracts-and-prompts.md#15c-implemented-tactic-fallback-and-interruption-notice-p124-a)
+      and [combat](11-combat-system.md#12-legal-actions-and-ai-tactics).
+  - Tests: `TacticFallbackTest` (7 new, no existing assertion changed):
+    - an output invalid through the repair, in both languages, through the real `ContractRunner`;
+    - each of the six non-completed task statuses (one request, never repaired);
+    - a legal choice kept as a proposal, and a stale choice refused;
+    - `cannot-complete` and a refused context;
+    - notice texts without participant or candidate names;
+    - after each failing outcome, `CombatScheduler.apply` from the player's end of activation reaches the player's next
+      decision with the bandit having acted.
+  - Verification (14 November 2026, Windows reference host): `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh
+    backend -Dtest=TacticFallbackTest,TacticContractTest,TacticCandidatesTest` printed `VERIFY PASSED`. The focused Maven log
+    reports 20 tests, 0 failures, errors or skips: `TacticCandidatesTest` 5, `TacticFallbackTest` 7 and `TacticContractTest` 8.
+  - Not proven:
+    - No activation calls the contract or the decision, so no tactic choice is awaited, committed or stored, and the notice is
+      not persisted, sent through the API or shown in the frontend.
+    - No live runtime was used, and no timing under the campaign lock was measured.
+    - The scheduler's fixed tactic is the only fallback and is not ranked against a declared objective.
+    - Bounded combat replies, outcome narration and "dialogue failure leaves tactical controls available" remain open in P12.4.
+    - Not run by this session: `verify.sh full`, `verify.sh containers` and deliberate weakenings.
 - [ ] P12.5 Verify mobile/keyboard play, chat/tactics switching, draft preservation, no out-of-turn/automatic submission and session renewal/reconnect inside a fight, including negotiated settlement retries.
 
 **Requirement update (24 October 2026):** the owner requests free-input chat during

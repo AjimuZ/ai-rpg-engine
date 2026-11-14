@@ -1347,8 +1347,19 @@ Tests:
 - The tactic case of `ContractSchemaTest`.
 
 Limits: nothing calls the contract yet, and `CombatScheduler`'s fixed tactic still decides every non-player activation.
-Commit revalidation, the deterministic fallback and the player notice are later P12 work. No migration, route or command
-changed.
+Commit revalidation and the player notice in play are later P12 work. No migration, route or command changed.
+
+### Tactic fallback and interruption notice (P12.4-A)
+
+`inference/contract/TacticFallback.decide(outcome, committedMenu)` is pure. It returns `Proposed` for an accepted choice that
+the menu rebuilt from the committed state still admits, and otherwise `Fallback` with a cause (`TACTIC_INVALID`,
+`PROVIDER_UNAVAILABLE` or `INTERRUPTED`), a fixed detail code and a public `Notice` in the binding's language (English or
+Italian). A fallback means the scheduler's fixed tactic plays the activation, which depends on the committed state alone. The
+table of outcomes is in [docs/21 section 15c](../docs/21-ai-task-contracts-and-prompts.md#15c-implemented-tactic-fallback-and-interruption-notice-p124-a).
+
+Test: `TacticFallbackTest` (7), through the scripted runtime and the real `ContractRunner`, then `CombatScheduler.apply`.
+
+Limits: no activation calls the decision, so no notice is stored, sent or shown. No migration, route or command changed.
 
 ## Interface reload contract (P05.6)
 

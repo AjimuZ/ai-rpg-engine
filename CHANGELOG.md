@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Standard tactic when a tactic choice cannot be used (P12.4-A), 14 November 2026
+
+- When the choice for an opponent or companion cannot be used, its turn is played by the standard tactic instead, so the
+  fight keeps moving. That covers an answer that stays invalid after the one correction attempt, no answer to use, a choice
+  the saved fight no longer allows, no runtime being available, a timeout, and an interruption.
+- Each such turn carries a short public notice in the campaign language (English or Italian): the tactic choice could not
+  be used, assistance is unavailable, or assistance was interrupted. The notice names no participant, action or reason, so
+  it reveals no hidden plan.
+- Nothing changes in play yet: no turn asks for a choice, so no notice is shown. This is the decision and the notice that a
+  later task connects. No database migration, route or page changed.
+
 ## Unreleased — Knowledge-scoped tactic choices for opponents and companions (P12.3-A), 14 November 2026
 
 - New `tactic` task contract for the narration runtime: an opponent or companion whose turn it is can be asked to pick one of
