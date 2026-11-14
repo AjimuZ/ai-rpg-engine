@@ -24,7 +24,8 @@ import org.rpgengine.inference.session.SessionScope;
  * both are {@link WorkClass#CONTINUITY} background work. The tactic kind (P12.3) is the first
  * character-audience kind: its audience is the acting participant's, so it has no fixed
  * {@link #audience()} and its contract derives the audience from the context; it is interactive,
- * because the player waits for the opponents' turns.
+ * because the player waits for the opponents' turns. The combat-reply kind (P12.4-B) is the second
+ * one, in the player-facing {@link AiRole#CHARACTER_VOICE} role.
  */
 public enum TaskKind {
     /** Free-text player declaration to one typed intention: a proposal only. */
@@ -43,7 +44,13 @@ public enum TaskKind {
      * One acting non-player participant's observations and legal candidates to one candidate choice (P12.3): a proposal the
      * rules revalidate, never an effect. It runs in that participant's own character audience, taken from its context.
      */
-    TACTIC("tactic", AiRole.TACTICIAN, 30);
+    TACTIC("tactic", AiRole.TACTICIAN, 30),
+    /**
+     * One addressed non-player participant's bounded in-character reply to the player's words or to a resolved social outcome
+     * (P12.4-B): presentation only, never an effect. It runs in that participant's own character audience, taken from its
+     * context, so the reply is grounded in what the character knows rather than in everything the player knows.
+     */
+    COMBAT_REPLY("combat-reply", AiRole.CHARACTER_VOICE, 30);
 
     private final String wire;
     private final AiRole role;
@@ -90,7 +97,7 @@ public enum TaskKind {
      * @return the disclosure audience: public for the P08.2 kinds and {@link #SUMMARY}, privileged
      *         for the planner kinds, whose context may hold hidden canon ({@link AiRole#QUEST_PLANNER}
      *         permits nothing else), and for {@link #SUMMARY_PRIVILEGED}
-     * @throws IllegalStateException for {@link #TACTIC}, whose audience is one character's and so
+     * @throws IllegalStateException for {@link #TACTIC} and {@link #COMBAT_REPLY}, whose audience is one character's and so
      *         depends on the task's context ({@code TaskContract#audience})
      */
     public Audience audience() {
@@ -100,9 +107,12 @@ public enum TaskKind {
         return role == AiRole.QUEST_PLANNER || this == SUMMARY_PRIVILEGED ? Audience.PRIVILEGED : Audience.PUBLIC;
     }
 
-    /** @return true when each task runs in the audience of one character named by its context ({@link #TACTIC}) */
+    /**
+     * @return true when each task runs in the audience of one character named by its context ({@link #TACTIC},
+     *         {@link #COMBAT_REPLY})
+     */
     public boolean characterAudience() {
-        return role == AiRole.TACTICIAN;
+        return role == AiRole.TACTICIAN || role == AiRole.CHARACTER_VOICE;
     }
 
     /**

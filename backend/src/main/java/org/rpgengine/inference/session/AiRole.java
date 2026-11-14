@@ -15,8 +15,9 @@ import java.util.Set;
  * public, so no scope (and therefore no session) can serve both.
  *
  * <p>{@link #INTERPRETER} and {@link #NARRATOR} have implemented contracts since P08.2,
- * {@link #QUEST_PLANNER} since P08.7, {@link #SUMMARIZER} since P09.3 and {@link #TACTICIAN} since
- * P12.3 (the {@code tactic} contract, in the acting character's audience). The other roles fix their
+ * {@link #QUEST_PLANNER} since P08.7, {@link #SUMMARIZER} since P09.3, {@link #TACTICIAN} since
+ * P12.3 (the {@code tactic} contract, in the acting character's audience) and {@link #CHARACTER_VOICE}
+ * since P12.4-B (the {@code combat-reply} contract, in the replying character's audience). The other roles fix their
  * audience rules now so that later contracts (P15 guides, P13 encounters) inherit the separation
  * instead of inventing it.
  */
@@ -29,6 +30,12 @@ public enum AiRole {
     GUIDE("guide", true, EnumSet.of(Audience.Kind.CHARACTER)),
     /** One NPC or companion choosing among legal candidates from its own observations. */
     TACTICIAN("tactician", false, EnumSet.of(Audience.Kind.CHARACTER)),
+    /**
+     * One non-player character's in-character reply from its own knowledge; shown to the player (P12.4-B). It is separate from
+     * {@link #NARRATOR}, whose public session holds everything the player knows, and from {@link #TACTICIAN}, whose output is
+     * never shown, so a reply neither inherits the player's knowledge nor a tactician's conversation.
+     */
+    CHARACTER_VOICE("character-voice", true, EnumSet.of(Audience.Kind.CHARACTER)),
     /**
      * Memory summary; a summary has exactly the audience of its inputs (docs/08 section 8). Since
      * P09.3 the {@code summary} and {@code summary-privileged} contracts run in this role.

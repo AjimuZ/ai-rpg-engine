@@ -27,7 +27,8 @@ class SessionScopeTest {
     @Test
     void noPlayerFacingRolePermitsThePrivilegedAudience() {
         List<AiRole> playerFacing = Arrays.stream(AiRole.values()).filter(AiRole::playerFacing).toList();
-        assertThat(playerFacing).containsExactlyInAnyOrder(AiRole.INTERPRETER, AiRole.NARRATOR, AiRole.GUIDE);
+        assertThat(playerFacing).containsExactlyInAnyOrder(AiRole.INTERPRETER, AiRole.NARRATOR, AiRole.GUIDE,
+                AiRole.CHARACTER_VOICE);
         for (AiRole role : AiRole.values()) {
             if (role.playerFacing()) {
                 assertThat(role.permits(Audience.PRIVILEGED)).as(role.wire()).isFalse();
@@ -55,6 +56,8 @@ class SessionScopeTest {
         assertThat(scope(AiRole.TACTICIAN, Audience.character("npc.mara")).audience().wire())
                 .isEqualTo("character:npc.mara");
         assertThat(scope(AiRole.GUIDE, Audience.character("guide.lumen")).role().playerFacing()).isTrue();
+        assertThatThrownBy(() -> scope(AiRole.CHARACTER_VOICE, Audience.PUBLIC)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(scope(AiRole.CHARACTER_VOICE, Audience.character("npc.mara")).role().playerFacing()).isTrue();
         // A summary keeps the audience of its inputs, whichever it is.
         for (Audience audience : List.of(Audience.PUBLIC, Audience.character("npc.mara"), Audience.PRIVILEGED)) {
             assertThat(scope(AiRole.SUMMARIZER, audience).audience()).isEqualTo(audience);

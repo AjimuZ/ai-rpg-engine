@@ -1361,6 +1361,28 @@ Test: `TacticFallbackTest` (7), through the scripted runtime and the real `Contr
 
 Limits: no activation calls the decision, so no notice is stored, sent or shown. No migration, route or command changed.
 
+### Knowledge-scoped combat replies (P12.4-B)
+
+`inference/contract/CombatReplyContract` (kind `combat-reply`, new player-facing role `character-voice`, schema
+`ai-contract/1/combat-reply.schema.json`) asks the narration runtime for one addressed non-player participant's in-character
+reply: `speech` and/or `narration` (a visible reaction), each at most 300 characters and 450 together, citing the heard words,
+every outcome statement and any beliefs it relies on. `CombatReplyContext.of(binding, state, speakerId, ...)` reads the
+speaker's knowledge from the committed encounter (its own standing and the participants it can see) and adds to the guard the
+roster ID of every participant hidden from it and every other participant's campaign actor. Each task runs in the speaker's
+own `character:<subject>` session, apart from the narrator and from the same character's tactician session.
+
+`CombatReplyFallback.decide(outcome, committedRevision)` is pure: `Shown` for an accepted reply still at its revision,
+otherwise `Silent` with a cause (`REPLY_INVALID`, `PROVIDER_UNAVAILABLE`, `INTERRUPTED`, `STALE`) and a log-only detail code. It
+takes no encounter and writes nothing, so a failed reply leaves the committed fight and the player's legal actions unchanged.
+Rules and codes are in [docs/21 section 15d](../docs/21-ai-task-contracts-and-prompts.md#15d-implemented-knowledge-scoped-combat-replies-p124-b);
+the role decision is [ADR 0039](../docs/adr/0039-a-character-voice-role-for-combat-replies.md).
+
+Tests: `CombatReplyContractTest` (6), `CombatReplyFallbackTest` (4), the combat-reply case of `ContractSchemaTest`, and the
+new role in `SessionScopeTest`'s role matrix.
+
+Limits: no command or presentation job calls the contract or the decision yet, so no reply is generated, stored, sent or shown.
+No migration, route or command changed.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

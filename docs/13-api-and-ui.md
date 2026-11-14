@@ -600,8 +600,10 @@ is tied to its encounter: another fight starts with an empty draft.
   cleared only once a newer revision arrives with no refusal and nothing in flight, or by the player's own "Clear words".
 
 Not implemented: speech input, a separate mobile dialogue/tactics switch (the section is a collapsible `details`), paging older
-conversation, narrator and per-command receipt lines as separate entries, generated replies (P12.4), draft persistence across a
-reload or reconnect (P12.5), and the settlement of a verdict.
+conversation, narrator and per-command receipt lines as separate entries, generated replies (P12.4; since P12.4-B the backend has
+the [`combat-reply` contract](21-ai-task-contracts-and-prompts.md#15d-implemented-knowledge-scoped-combat-replies-p124-b), but
+no route sends a reply and the page shows none), draft persistence across a reload or reconnect (P12.5), and the settlement of a
+verdict.
 
 ## 4. Stream contract
 

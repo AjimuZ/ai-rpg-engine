@@ -1800,6 +1800,18 @@ and after each failure the scheduler still carries the fight to the player's nex
 fallback decision only (see the P12.4 roadmap entry). The fallback is not called by any activation, the notice is not stored
 or shown, and no live runtime was used.
 
+P12.4-B (14 November 2026) adds `CombatReplyContractTest` (6) and `CombatReplyFallbackTest` (4), plus a combat-reply case in
+`ContractSchemaTest`. For QA-16 they check that an addressed participant's reply context holds only what it can see and
+heard: five seeded secrets (a participant hidden from it, that participant's attack, and the player's attack, ammunition and
+campaign actor) are absent from the rendered request, the guard is completed from the encounter, a reply naming a hidden
+participant or the player's private attack is `scope-leak`, and a context carrying a hidden name is refused with no request.
+For QA-07 they check only the mechanical part: a reply has no field to accept, refuse or change terms, pay, move or end the
+fight, must cite every outcome statement and may use only supplied numbers. Each failure of the call (six task statuses, an
+output invalid after the repair, a declined reply, a refused context) and a reply older than the committed revision show
+nothing generated, and the committed state and the player's legal actions are unchanged. See the P12.4 roadmap entry for
+results and limits. No command calls the contract, no reply is shown in play, an acceptance implied in free words is not
+detectable mechanically, and no live model output was evaluated.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

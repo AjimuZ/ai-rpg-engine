@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — Knowledge-scoped combat replies (P12.4-B), 14 November 2026
+
+- New `combat-reply` task contract for the narration runtime: an opponent or companion you spoke to, or whose terms were just
+  resolved, can be asked for a short in-character reply. A reply is at most two short lines (its words and a visible reaction,
+  300 characters each and 450 together), must cite what you said and every resolved result, and may only use numbers already
+  in what it was given.
+- The request holds only what that participant knows: its own zone and standing, the participants it can see, the words it
+  heard and the public results. A reply that names someone hidden from it or another participant's campaign identity is
+  rejected, as is one naming any other secret listed for it (such as your private attack or items), and a request holding
+  such a name is never sent.
+- Each participant answers in its own runtime conversation, separate from the narrator, the planner, other participants and
+  its own tactic choices.
+- A reply cannot change anything: it has no field to accept, refuse or alter terms, pay, move or end the fight. When it is
+  invalid after the one correction attempt, declined, unavailable, interrupted or late, simply no reply is shown, and the
+  saved fight, the open offer and your available actions stay exactly as they were.
+- Nothing changes in play yet: no turn asks for a reply, so none is shown. No database migration, route or page changed.
+
 ## Unreleased — Standard tactic when a tactic choice cannot be used (P12.4-A), 14 November 2026
 
 - When the choice for an opponent or companion cannot be used, its turn is played by the standard tactic instead, so the

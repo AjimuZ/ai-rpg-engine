@@ -4709,7 +4709,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     - Abilities, items, speech, social and scene actions, readying, assessing and withdrawing are not candidates, because the
       scheduler cannot perform them for non-player participants.
     - Not run by this session: `verify.sh full`, `verify.sh containers` and deliberate weakenings.
-- [ ] P12.4 Add deterministic tactic fallback, interruption messages, bounded knowledge-scoped combat replies and outcome narration; dialogue failure leaves committed state and tactical controls available.
+- [x] P12.4 Add deterministic tactic fallback, interruption messages, bounded knowledge-scoped combat replies and outcome narration; dialogue failure leaves committed state and tactical controls available.
   - P12.4-A, deterministic tactic fallback and interruption messages, 14 November 2026 (the P12.4 box stays unchecked: this
     story does not finish it).
     - **Decision.** New pure `inference/contract/TacticFallback.decide(outcome, committedMenu)`:
@@ -4742,6 +4742,58 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     - No live runtime was used, and no timing under the campaign lock was measured.
     - The scheduler's fixed tactic is the only fallback and is not ranked against a declared objective.
     - Bounded combat replies, outcome narration and "dialogue failure leaves tactical controls available" remain open in P12.4.
+    - Not run by this session: `verify.sh full`, `verify.sh containers` and deliberate weakenings.
+  - P12.4-B, bounded knowledge-scoped combat replies, 14 November 2026 (the P12.4 box stays unchecked: nothing calls the reply
+    or the tactic fallback in play yet).
+    - **Role.** New player-facing `AiRole.CHARACTER_VOICE` (`character-voice`), permitted only in the `character` audience,
+      and `TaskKind.COMBAT_REPLY` (`combat-reply`, `INTERACTIVE`, provisional 30 s). A reply runs in the speaker's own
+      `character:<subject>` session, apart from the narrator's public session and from the same character's tactician session
+      ([ADR 0039](adr/0039-a-character-voice-role-for-combat-replies.md)).
+    - **Context.** New `inference/contract` `CombatReplyContext.of(binding, state, speakerId, ...)` reads, from the committed
+      encounter, the speaker's own standing, the participants it can see, the player's words to it, up to 8 public outcome
+      statements and up to 16 beliefs. The guard gets the roster ID of each participant hidden from the speaker and every other
+      participant's campaign actor. Only a standing or surrendered non-player participant can reply.
+    - **Contract.** `CombatReplyContract`, `CombatReplyProposal` and `ai-contract/1/combat-reply.schema.json`: `speech` and
+      `narration` of at most 300 characters each and 450 together, one to eight references that must include every outcome
+      statement, only supplied numbers, no guard marker. There is no field for an action, an answer to an offer, a cost or a
+      state change.
+    - **Presentation.** Pure `CombatReplyFallback.decide(outcome, committedRevision)`: `Shown` for an accepted reply still at
+      its revision, otherwise `Silent` (`REPLY_INVALID`, `PROVIDER_UNAVAILABLE`, `INTERRUPTED`, `STALE`) with a log-only detail
+      code and no notice. It takes no encounter and writes nothing.
+    - **Unchanged.** No migration, route, command, receipt, scheduler or frontend behavior changed. Stored role names already
+      accept `character-voice`.
+    - Details: [contract](21-ai-task-contracts-and-prompts.md#15d-implemented-knowledge-scoped-combat-replies-p124-b) and
+      [combat](11-combat-system.md#71-dialogue-and-scene-changing-intent-during-combat).
+  - Tests:
+    - `CombatReplyContractTest` (5 new methods, 6 cases): five seeded secrets absent from the rendered request and the guard
+      completed from the encounter; exact context fields; a bounded reply accepted in English and Italian; one rejection per
+      rule (`unknown-reference`, `event-not-narrated`, `unsupported-number`, `scope-leak` twice, `out-of-bounds` three times,
+      `missing-value`, `status-field-conflict` twice, `unexpected-type`, `field-set`); a scripted runtime repaired once and then
+      rejected, both attempts in the bandit's own session, which differs from its tactic session; the kind's role and audience.
+    - `CombatReplyFallbackTest` (4 new): speech leaves the player at the same decision with the same points; each of the six
+      non-completed task statuses is silent after one request; an output invalid after the repair, a declined reply and a
+      context holding a hidden name (no request) are silent; after each failure the committed state is equal to the original
+      and the player's legal actions (end activation, move, speech, and the refused Guard and strike) are the same; an accepted
+      reply is shown at its revision and silent after a newer one.
+    - `ContractSchemaTest` gained one case (combat-reply schema field sets, reasons and bounds) and checks the new instruction
+      is ASCII.
+    - Existing assertion changed: `SessionScopeTest`'s list of player-facing roles now includes `CHARACTER_VOICE`, and the
+      matrix test gained two checks for it.
+  - Verification (14 November 2026, Windows reference host): `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh
+    backend -Dtest=CombatReplyContractTest,CombatReplyFallbackTest,ContractSchemaTest,SessionScopeTest,TacticContractTest,TacticFallbackTest`
+    printed `VERIFY PASSED`. The focused Maven log reports 36 tests, 0 failures, errors or skips: `ContractSchemaTest` 7,
+    `CombatReplyContractTest` 6, `TacticFallbackTest` 7, `TacticContractTest` 8, `CombatReplyFallbackTest` 4 and
+    `SessionScopeTest` 4. The first run of the same command failed 2 tests because the fixture's player already guards; the
+    assertion was corrected to expect the `GUARD` refusal.
+  - Not proven:
+    - No command or presentation job calls the reply contract or its decision, so no reply is generated, stored, sent or shown
+      in the combat chat, and "tactical controls stay available" is shown on the pure decision and the rules, not on the real
+      API or page.
+    - Outcome narration of a combat operation is still the public narration job (P08.5) over its public events; it lists no
+      combat participant as a speaker, and no test checks that every public combat event has a statement.
+    - No live runtime or model output was used; the beliefs and outcome statements are caller-supplied.
+    - A roster ID shorter than four characters cannot be a guard marker; an implied acceptance in free words and paraphrased
+      secrets are not detectable mechanically (QA-07 is covered only for its mechanical part).
     - Not run by this session: `verify.sh full`, `verify.sh containers` and deliberate weakenings.
 - [ ] P12.5 Verify mobile/keyboard play, chat/tactics switching, draft preservation, no out-of-turn/automatic submission and session renewal/reconnect inside a fight, including negotiated settlement retries.
 

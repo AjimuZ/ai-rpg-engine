@@ -2,7 +2,7 @@
 
 ## 1. Purpose and status
 
-This document specifies the application-level contracts that sit above the runtime protocols and are identical for the selected runtime, Codex or Claude ([ADR 0020](adr/0020-selectable-narration-runtime.md)). P08.2 implements the intent (section 4) and resolved narration/quick-reply (section 8) contracts as versioned Java types, bundled schemas, English templates and independent validators; [section 14](#14-implemented-intent-and-narration-contracts-p082) records exactly what exists. P12.3-A implements the tactic choice (section 7) as the `tactic` contract; [section 15b](#15b-implemented-tactic-choice-contract-p123-a) records what exists and what does not call it yet. The other task kinds remain specifications until their packages implement them.
+This document specifies the application-level contracts that sit above the runtime protocols and are identical for the selected runtime, Codex or Claude ([ADR 0020](adr/0020-selectable-narration-runtime.md)). P08.2 implements the intent (section 4) and resolved narration/quick-reply (section 8) contracts as versioned Java types, bundled schemas, English templates and independent validators; [section 14](#14-implemented-intent-and-narration-contracts-p082) records exactly what exists. P12.3-A implements the tactic choice (section 7) as the `tactic` contract; [section 15b](#15b-implemented-tactic-choice-contract-p123-a) records what exists and what does not call it yet. P12.4-B implements combat conversation replies (section 8) as the `combat-reply` contract; [section 15d](#15d-implemented-knowledge-scoped-combat-replies-p124-b) records what exists, and nothing calls it yet either. The other task kinds remain specifications until their packages implement them.
 
 Prompt design must preserve the same authority boundaries as the backend. A precise prompt reduces mistakes; it never substitutes for validation, permissions, transactions, or audience isolation.
 
@@ -77,7 +77,7 @@ Since P12.3-A this body is implemented as `candidateActionId`, `targetId`, `dest
 
 The input is a public resolved-event bundle: action cause, visible participants, known outcome, exact resource changes permitted to display, discoveries, current scene, and next decision. Include authoritative display snippets for important calculations so the narrator does not need to recompute them.
 
-Combat conversation replies are attributed to their known speaker and grounded in that recipient's authorized knowledge plus the resolved dialogue/social outcome. Do not manufacture the protagonist's acceptance, NPC compliance, a morale modifier, movement, new participant or combat ending in the reply. A public refusal or counteroffer returns the pending decision to the player. Optional dialogue generation never holds a database transaction open, advances the scheduler, or prevents inspecting committed combat state when unavailable.
+Combat conversation replies are attributed to their known speaker and grounded in that recipient's authorized knowledge plus the resolved dialogue/social outcome. Do not manufacture the protagonist's acceptance, NPC compliance, a morale modifier, movement, new participant or combat ending in the reply. A public refusal or counteroffer returns the pending decision to the player. Optional dialogue generation never holds a database transaction open, advances the scheduler, or prevents inspecting committed combat state when unavailable. Since P12.4-B such a reply is its own `combat-reply` contract in the speaker's character audience rather than a narration passage; see [section 15d](#15d-implemented-knowledge-scoped-combat-replies-p124-b).
 
 The body includes ordered bounded passages with a stable message ID, kind (`narration` or `characterSpeech`), optional known public speaker ID, text and referenced public event/fact IDs. Display names/portraits resolve from the authorized projection. Player passages are derived from submitted player text/command identity, not invented by the narrator. Mechanical UI values are rendered from the receipt, not parsed back out of prose.
 
@@ -555,6 +555,88 @@ end of activation and checks that every non-player participant acts and the plan
 **Not proven.** No live runtime and no timing under the campaign lock: no code asks for a choice during an activation, so the
 choice is not yet awaited, committed or stored with the fallback marker. The notice is not persisted, sent through the API or
 shown in the frontend. The scheduler's tactic is the only fallback and is not ranked against a declared objective.
+
+## 15d. Implemented: knowledge-scoped combat replies (P12.4-B)
+
+**Status (14 November 2026): implemented and tested against `ScriptedTaskPort`. No gameplay path calls it.** No command or
+presentation job asks for a reply, so none is generated, stored, sent or shown. The decision is [ADR 0039](adr/0039-a-character-voice-role-for-combat-replies.md).
+
+**Context (`CombatReplyContext.of(binding, state, speakerId, name, heard, outcome, beliefs, glossary, secrets)`).** It is
+read from the committed encounter for one addressed non-player participant that is standing or surrendered
+(`canReply`); a defeated or escaped one says nothing.
+
+- **What the speaker knows.** Its own roster ID, display name, side relative to the player, zone and status. For each other
+  participant it can see (same zone, or a zone that is not obscured), only the roster ID, `ally` or `opponent`, zone, status
+  and stance. The player's words addressed to it (`heard`, optional), up to 8 public `outcome` statements and up to 16 of its
+  own `beliefs`. At least one of `heard` and `outcome` is required.
+- **What it never learns.** Anyone's Health, Focus, defenses, attacks, abilities, effects, reaction policies or campaign
+  actor; items; offers not yet made; check difficulties and margins; the encounter identity.
+- **Guard.** The caller's `secrets`, plus the roster ID of every participant the speaker cannot see and the campaign actor of
+  every other participant. A marker in the rendered context ends the call `Refused(context-scope)` with nothing submitted; a
+  marker in the reply is `scope-leak`.
+
+**Contract (`CombatReplyContract`, `CombatReplyProposal`, schema `ai-contract/1/combat-reply.schema.json`).**
+
+| Aspect | Value |
+| --- | --- |
+| Kind, role | `combat-reply`, `character-voice` (player-facing, `character` audience only) |
+| Audience | `character:<subject>` of the speaker, the same subject rule as the tactic contract. It is a different role, so a character's replies and tactic choices never share a session |
+| Work class, budget | `INTERACTIVE`, 30 s for both attempts (provisional) |
+| Context | `speaker`, `observed`, `heard`, `outcome`, `beliefs`, `glossary` |
+| Body | `speech`, `narration`, `references`, `reasonCode` |
+| Statuses | `proposed`; `cannot-complete` with `missing-information` or `out-of-scope` and every other field null or empty |
+| Accepted result | `Replied(speech, narration, references)` or `CannotReply(reasonCode)` |
+
+**Rules of a proposed reply,** on top of the shared envelope and structure checks:
+
+- Bounds: `speech` and `narration` are each at most 300 characters and 450 together; at least one is present
+  (`missing-value`); plain text only; one to eight `references` (`out-of-bounds`).
+- Grounding: each reference is a supplied heard, outcome or belief identity (`unknown-reference`); every outcome statement is
+  cited (`event-not-narrated`); each number already occurs in supplied text (`unsupported-number`).
+- Knowledge scope and language: `scope-leak`, `glossary-mismatch` and `locale-mismatch`, as for narration.
+- `reasonCode` filled in a proposal, or a line in `cannot-complete`: `status-field-conflict`. An extra field such as
+  `acceptsOffer`: `field-set`.
+
+Rejected output gets the runner's single repair, which contains only codes and pointers.
+
+**Presentation (`CombatReplyFallback.decide(outcome, committedRevision)`).** Pure.
+
+| Outcome | Decision | Cause and detail code |
+| --- | --- | --- |
+| `Accepted` reply at the committed revision | `Shown` | none |
+| `Accepted` reply after a newer commit | `Silent` | `STALE`, `stale-revision` |
+| `Accepted` `cannot-complete` | `Silent` | `REPLY_INVALID`, the reason code |
+| `Rejected` | `Silent` | `REPLY_INVALID`, the first violation code |
+| `Refused` | `Silent` | `REPLY_INVALID`, `context-scope` |
+| `NotCompleted` other than cancelled | `Silent` | `PROVIDER_UNAVAILABLE`, the fixed error code |
+| `NotCompleted` cancelled | `Silent` | `INTERRUPTED`, the fixed error code |
+
+`Silent` shows no generated line and no notice. The decision takes no encounter, writes nothing and returns no intention, so the
+committed events and their rule-driven statements, the open offer and the player's legal actions stay exactly as they were.
+The caller attributes a shown reply to the speaker of its trusted context; the reply carries no speaker.
+
+**Evidence.**
+
+- `CombatReplyContractTest` (6 cases, one parameterized over both languages): the guard holds the hidden participant and the
+  player's campaign actor, and five seeded secrets are absent from the rendered request, whose context has exactly the fields
+  above; a bounded reply is accepted in English and Italian, with words only and as `cannot-complete`; one rejection per rule;
+  a scripted runtime leaking a hidden participant is repaired once and then rejected, both attempts in the bandit's own
+  session, which differs from its tactic session; the kind's role, audience and work class.
+- `CombatReplyFallbackTest` (4 cases): speech leaves the player at the same decision with the same points; each of the six
+  non-completed task statuses is silent after one request; invalid, declined and refused replies are silent, the refused one
+  with no request; after each failure the committed state is unchanged and its legal actions are the same; an accepted reply
+  is shown at its revision and silent after a newer one.
+- `ContractSchemaTest` checks the schema against the validator field sets and the instruction is ASCII.
+
+**Not proven.**
+
+- No caller: no command or presentation job asks for a reply, and no reply is stored or shown in the combat chat.
+- Outcome narration of a combat operation is still the public narration job (P08.5) over its public events; it lists no
+  combat participant as a speaker, so it cannot voice a reply. No test checks that every public combat event has a statement.
+- No live model output was evaluated.
+- The beliefs and outcome statements are supplied by the caller, and no knowledge-view reader fills them.
+- A roster ID shorter than four characters cannot be a guard marker; an implied acceptance or compliance in free words and
+  paraphrased secrets are not detectable mechanically.
 
 ## 16. Neutral protocol proof (P01.1)
 

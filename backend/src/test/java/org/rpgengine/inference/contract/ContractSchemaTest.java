@@ -126,6 +126,30 @@ class ContractSchemaTest {
     }
 
     @Test
+    void combatReplySchemaMatchesTheValidatorFieldSets() {
+        JsonNode root = schema(new CombatReplyContract());
+        assertClosedObject(root, ContractEnvelope.RESPONSE_FIELDS);
+        JsonNode body = root.path("properties").path("body");
+        assertClosedObject(body, CombatReplyContract.BODY_FIELDS);
+        var kinds = new ArrayList<String>();
+        root.path("properties").path("taskKind").path("enum").forEach(v -> kinds.add(v.asString()));
+        assertThat(kinds).containsExactly(TaskKind.COMBAT_REPLY.wire());
+        var statuses = new ArrayList<String>();
+        root.path("properties").path("status").path("enum").forEach(v -> statuses.add(v.asString()));
+        assertThat(statuses).containsExactlyInAnyOrderElementsOf(CombatReplyContract.STATUSES);
+        var reasons = new ArrayList<String>();
+        body.path("properties").path("reasonCode").path("enum").forEach(v -> reasons.add(v.isNull() ? null : v.asString()));
+        var expected = new ArrayList<String>(CombatReplyContract.REASONS);
+        expected.add(null);
+        assertThat(reasons).containsExactlyInAnyOrderElementsOf(expected);
+        for (String line : List.of("speech", "narration")) {
+            assertThat(body.path("properties").path(line).path("maxLength").asInt()).isEqualTo(CombatReplyContract.MAX_LINE);
+        }
+        assertThat(body.path("properties").path("references").path("maxItems").asInt())
+                .isEqualTo(CombatReplyContract.MAX_REFERENCES);
+    }
+
+    @Test
     void templatesAreVersionedEnglishAndHashed() {
         var intent = new IntentContract();
         var narration = new NarrationContract();
@@ -135,7 +159,7 @@ class ContractSchemaTest {
         // Technical templates stay English whatever the output locale; only output strings switch.
         for (String text : List.of(ContractEnvelope.SHARED_INSTRUCTION, IntentContract.TASK_INSTRUCTION,
                 NarrationContract.TASK_INSTRUCTION, QuestPlanContract.PLAN_INSTRUCTION,
-                QuestPlanContract.REFINE_INSTRUCTION, TacticContract.TASK_INSTRUCTION)) {
+                QuestPlanContract.REFINE_INSTRUCTION, TacticContract.TASK_INSTRUCTION, CombatReplyContract.TASK_INSTRUCTION)) {
             assertThat(Pattern.compile("[^\\x20-\\x7E\\n]").matcher(text).find()).isFalse();
         }
     }

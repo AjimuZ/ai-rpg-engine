@@ -166,6 +166,7 @@ P08.3 implements this scoping in `org.rpgengine.inference.session`, above the ne
   | --- | --- | --- |
   | `interpreter`, `narrator` | yes | `public` |
   | `guide` | yes | `character` |
+  | `character-voice` (since P12.4-B, [ADR 0039](adr/0039-a-character-voice-role-for-combat-replies.md)) | yes | `character` |
   | `tactician` | no | `character` |
   | `summarizer` | no | any (the audience of its inputs) |
   | `content-proposer`, `encounter-proposer`, `quest-planner`, `world-director`, `plan-reviewer` | no | `privileged` |
@@ -304,7 +305,7 @@ Implemented (28 October 2026) in the runtime-neutral `org.rpgengine.inference.sc
 Not part of P08.6:
 
 - Live qualification of more than one active turn, live quota behavior, service priority and cancellation latency. These need an authorized account-backed experiment (QA-37 live part); no account was used.
-- Background task kinds and their owners: since P08.7 the quest planner's `quest-plan` and `quest-plan-refine` kinds submit through this queue as `PREPARATION` work in the `quest-planner`/`privileged` session (section 13); since P09.3 the `summary` and `summary-privileged` kinds submit as `CONTINUITY` work in the `summarizer` role's public or privileged session ([docs/08](08-memory-and-continuity.md#p093-checkpoints-summaries-freshness-and-bounded-jobs)); since P12.3-A the `tactic` kind is defined as `INTERACTIVE` work in the `tactician` role and the acting participant's own `character:<subject>` audience, though no gameplay path submits it yet ([docs/21 section 15b](21-ai-task-contracts-and-prompts.md#15b-implemented-tactic-choice-contract-p123-a)); guides (P15) will follow with their own class.
+- Background task kinds and their owners: since P08.7 the quest planner's `quest-plan` and `quest-plan-refine` kinds submit through this queue as `PREPARATION` work in the `quest-planner`/`privileged` session (section 13); since P09.3 the `summary` and `summary-privileged` kinds submit as `CONTINUITY` work in the `summarizer` role's public or privileged session ([docs/08](08-memory-and-continuity.md#p093-checkpoints-summaries-freshness-and-bounded-jobs)); since P12.3-A the `tactic` kind is defined as `INTERACTIVE` work in the `tactician` role and the acting participant's own `character:<subject>` audience, though no gameplay path submits it yet ([docs/21 section 15b](21-ai-task-contracts-and-prompts.md#15b-implemented-tactic-choice-contract-p123-a)); since P12.4-B the `combat-reply` kind is likewise defined as `INTERACTIVE` work in the `character-voice` role and the replying participant's own `character:<subject>` audience, also not yet submitted by any gameplay path ([docs/21 section 15d](21-ai-task-contracts-and-prompts.md#15d-implemented-knowledge-scoped-combat-replies-p124-b)); guides (P15) will follow with their own class.
 - Owner-facing status and settings (P21.3), observed token accounting from a runtime, and the GPU/RAM admission coordinator for local backends (P21.4), which must sit behind this permit rather than beside it, as the opt-in residency link above does.
 - Supported deployment is one backend process per database. A second process is safe because of the single-turn index and ownership fencing, but its startup reconciliation takes over the rows of a still-running first process.
 
