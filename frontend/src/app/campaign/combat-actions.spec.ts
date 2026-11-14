@@ -59,7 +59,8 @@ describe('Tactical choice validation', /** A choice that the projection does not
       expect(resolveChoice(decided, choice)).toEqual({ ok: false, refusal: 'NOT_YOUR_TURN' });
       expect(resolveChoice(null, choice)).toEqual({ ok: false, refusal: 'NOT_YOUR_TURN' });
     }
-    expect(tacticalEntries(decided)).toEqual([]);
+    // At the verdict the only legal choice is the explicit settlement (P12.5-B); it is never a tactical choice.
+    expect(tacticalEntries(decided).map((entry) => entry.key)).toEqual(['settle']);
     const waiting = fight((body) => { body['encounter']['playerDecision'] = false; body['encounter']['acting'] = 'sentry'; });
     expect(tacticalEntries(waiting)).toEqual([]);
     expect(resolveChoice(waiting, { kind: 'end' })).toEqual({ ok: false, refusal: 'NOT_YOUR_TURN' });
@@ -214,13 +215,14 @@ describe('Named actions in the playthrough view', /** Review first, send only on
     expect(server.commands[1].body['requestId']).toBe(server.commands[0].body['requestId']);
   });
 
-  it('offers nothing to send once the fight is decided', /** Out of turn: no entries, no request. */ async () => {
+  it('offers only the explicit settlement once the fight is decided, and sends nothing by itself', /** No tactical entry, no request. */ async () => {
     server.encounterBody = encounterBody({ verdict: true });
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl(`/saved/${ADVENTURE}?playthrough=${CAMPAIGN}`);
     const root = harness.routeNativeElement as HTMLElement;
-    await settle(harness, () => root.querySelector('[data-none-to-send]') !== null);
-    expect(root.querySelectorAll('[data-send-list] button').length).toBe(0);
+    await settle(harness, () => root.querySelector('[data-send-list] button') !== null);
+    expect([...root.querySelectorAll('[data-send-list] button')].map((button) => button.getAttribute('data-choice'))).toEqual(['settle']);
+    expect(root.querySelector('[data-none-to-send]')).toBeNull();
     expect(server.commands).toEqual([]);
   });
 });

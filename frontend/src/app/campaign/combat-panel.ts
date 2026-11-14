@@ -21,6 +21,7 @@
  */
 import { ChangeDetectionStrategy, Component, computed, inject, input, LOCALE_ID, output, signal } from '@angular/core';
 import { CombatEncounter, CombatParticipant, CombatView, JournalEntry } from './campaign-protocol';
+import { CampaignScope } from './campaign-session';
 import { CombatChat } from './combat-chat';
 import { resolveChoice, TacticalChoice, tacticalEntries } from './combat-actions';
 import {
@@ -249,7 +250,8 @@ import {
                 <h5 id="combat-review-title">{{ t.previewTitle }}</h5>
                 <p data-review-action><strong>{{ label(shown.preview.choice) }}</strong></p>
                 <ul>
-                  <li data-review-points>{{ shown.preview.endsTurn ? endsTurnText(shown.preview.points) : spendText(shown.preview.points, shown.preview.pointsAfter) }}</li>
+                  @if (shown.preview.settles) { <li data-review-settles>{{ t.settleBinds }}</li> }
+                  @else { <li data-review-points>{{ shown.preview.endsTurn ? endsTurnText(shown.preview.points) : spendText(shown.preview.points, shown.preview.pointsAfter) }}</li> }
                   @if (shown.preview.focus > 0) { <li data-review-focus>{{ spendFocusText(shown.preview.focus, shown.preview.focusAfter) }}</li> }
                   @if (shown.preview.check; as check) { <li data-review-check>{{ checkText(check) }}</li> }
                   @if (shown.preview.terms; as terms) { <li data-review-terms>{{ termsText(terms) }}</li> }
@@ -269,7 +271,7 @@ import {
         <p class="muted">{{ t.readOnly }}</p>
       </section>
     }
-    <app-combat-chat [view]="view()" [journal]="journal()" [journalLocale]="journalLocale()" [sending]="sending()" [problem]="problem()"
+    <app-combat-chat [view]="view()" [journal]="journal()" [journalLocale]="journalLocale()" [scope]="scope()" [sending]="sending()" [problem]="problem()"
       (confirmed)="confirmed.emit($event)" (dismissed)="dismissed.emit()" />
   `,
 })
@@ -284,6 +286,8 @@ export class CombatPanel {
   readonly journal = input<readonly JournalEntry[] | null>(null);
   /** Language of the journal's sentences. */
   readonly journalLocale = input<'en' | 'it' | null>(null);
+  /** The playthrough whose chat draft is kept on this device (P12.5-B); null keeps it in the page only. */
+  readonly scope = input<CampaignScope | null>(null);
   /** The player confirmed the reviewed action; the host validates it again against its newest projection and sends it. */
   readonly confirmed = output<TacticalChoice>();
   /** The player started a new review or backed out, so the host forgets the last refusal. */

@@ -1,6 +1,7 @@
 /**
  * Combat chat (P12.2-B): speech and offer-answer validation against the projection, the public transcript, and the chat's review
  * before anything is sent. Writing, choosing a recipient and filling a quick reply never send, and a refusal keeps the draft.
+ * P12.5-B adds the explicit settlement of a decided fight (with its retry under one identity) and the draft kept on the device.
  */
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -12,7 +13,7 @@ import { STORY_DRAFT_STORAGE } from '../preview/story-input-state';
 import { CombatEncounter, JournalEntry, parseCombatView } from './campaign-protocol';
 import { resolveChoice, tacticalEntries } from './combat-actions';
 import { transcript } from './combat-chat';
-import { ADVENTURE, CAMPAIGN, CampaignServer, encounterBody, json, MemoryStore, operation, OP1, panelsBody, resumeCard, syncProvider } from './fixtures';
+import { ADVENTURE, CAMPAIGN, CampaignServer, encounterBody, json, MemoryStore, operation, OP1, OP2, panelsBody, resumeCard, syncProvider } from './fixtures';
 
 /** The fixture fight parsed as the page parses it, optionally changed first. */
 function fight(change: (body: Record<string, any>) => void = () => undefined, offer = false): CombatEncounter {
@@ -82,9 +83,34 @@ describe('Combat chat rules', /** Speech and answers are validated like every ot
   });
 });
 
+describe('Settlement rules', /** The one choice of a decided fight is built only from a decided projection. */ () => {
+  const decided = () => parseCombatView(encounterBody({ verdict: true }), ADVENTURE, CAMPAIGN).encounter!;
+
+  it('builds SETTLE_ENCOUNTER with the fight\'s own identity only at its verdict and lists nothing else there', /** Closed payload. */ () => {
+    const resolved = resolveChoice(decided(), { kind: 'settle' });
+    if (!resolved.ok) throw new Error(resolved.refusal);
+    expect(resolved.command).toEqual({ commandType: 'SETTLE_ENCOUNTER', payload: { encounterId: OP2 } });
+    expect([resolved.preview.points, resolved.preview.endsTurn, resolved.preview.settles]).toEqual([0, false, true]);
+    expect(tacticalEntries(decided()).map((entry) => entry.key)).toEqual(['settle']);
+  });
+
+  it('refuses settlement in an undecided fight and every tactical choice or speech at the verdict', /** No out-of-turn command. */ () => {
+    expect(resolveChoice(fight(), { kind: 'settle' })).toEqual({ ok: false, refusal: 'NOT_LISTED' });
+    expect(resolveChoice(null, { kind: 'settle' })).toEqual({ ok: false, refusal: 'NOT_LISTED' });
+    expect(resolveChoice(decided(), { kind: 'end' })).toEqual({ ok: false, refusal: 'NOT_YOUR_TURN' });
+    expect(resolveChoice(decided(), { kind: 'speak', recipientId: 'sentry', text: 'Hello' })).toEqual({ ok: false, refusal: 'NOT_YOUR_TURN' });
+    expect(tacticalEntries(fight()).some((entry) => entry.key === 'settle')).toBe(false);
+  });
+});
+
 describe('Combat chat in the playthrough view', /** Draft first, review next, send only on confirmation. */ () => {
   let server: CampaignServer;
+  /** The device storage, shared by the page loads of one test so a reload sees what the first load kept. */
+  let device: MemoryStore;
+  const providers = () => [provideRouter(routes), { provide: LIBRARY_FETCH, useValue: server.fetch },
+    { provide: STORY_DRAFT_STORAGE, useValue: device }, syncProvider(new MemoryStore())];
   beforeEach(/** Fresh server and router per test, in a fight with a short conversation. */ () => {
+    device = new MemoryStore();
     server = new CampaignServer();
     server.resumeBody = resumeCard({ fight: true });
     server.encounterBody = encounterBody();
@@ -93,8 +119,7 @@ describe('Combat chat in the playthrough view', /** Draft first, review next, se
       { sequence: 12, type: 'NEGOTIATION_RESPONDED', stateRevision: 2, clock: panels['journal']['entries'][0]['clock'], statement: 'sentry refuses plead: the fight goes on.' },
       { sequence: 11, type: 'COMBAT_SPEECH', stateRevision: 2, clock: panels['journal']['entries'][0]['clock'], statement: 'Mara says to sentry: "Stand down."' }];
     server.panelsBody = panels;
-    TestBed.configureTestingModule({ providers: [provideRouter(routes), { provide: LIBRARY_FETCH, useValue: server.fetch },
-      { provide: STORY_DRAFT_STORAGE, useValue: new MemoryStore() }, syncProvider(new MemoryStore())] });
+    TestBed.configureTestingModule({ providers: providers() });
   });
   afterEach(/** Destroying the fixture aborts the long-poll follower. */ () => TestBed.resetTestingModule());
 
@@ -268,5 +293,105 @@ describe('Combat chat in the playthrough view', /** Draft first, review next, se
     await settle(harness, () => server.commands.length === 1);
     expect(server.commands[0].body['commandType']).toBe('ANSWER_OFFER');
     expect(server.commands[0].body['payload']).toEqual({ offerId: 'offer-1', decision: 'accept' });
+  });
+
+  /** The record the device holds for the playthrough's combat draft, or null. */
+  const kept = () => {
+    const raw = [...device.values].find(([key]) => key.startsWith('engine.combat-draft.v1:'))?.[1];
+    return raw === undefined ? null : JSON.parse(raw) as { encounterId: string; recipient: string; text: string };
+  };
+
+  it('keeps the draft on the device and restores recipient and words after a reload, sending nothing', /** Same guarantee as the narrative draft. */ async () => {
+    const first = await open();
+    await choose(first.harness, first.root, 'sentry');
+    await write(first.harness, first.root, 'Hold on, let us talk.');
+    expect(kept()).toEqual({ version: 1, encounterId: OP2, recipient: 'sentry', text: 'Hold on, let us talk.' });
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: providers() });
+    const { harness, root } = await open();
+    expect(words(root)).toBe('Hold on, let us talk.');
+    expect((root.querySelector('#combat-chat-recipient') as HTMLSelectElement).value).toBe('sentry');
+    expect((root.querySelector('[data-chat-review]') as HTMLButtonElement).disabled).toBe(false);
+    expect(root.querySelector('[data-chat-review-region] section')).toBeNull();
+    expect(server.commands).toEqual([]);
+    await tick(harness);
+    expect(server.commands).toEqual([]);
+  });
+
+  it('never restores a draft written for another fight and ignores a malformed record', /** Drafts are tied to their encounter. */ async () => {
+    const key = `engine.combat-draft.v1:${JSON.stringify([ADVENTURE, CAMPAIGN])}`;
+    device.setItem(key, JSON.stringify({ version: 1, encounterId: 'another-fight', recipient: 'sentry', text: 'Old words' }));
+    const other = await open();
+    expect(words(other.root)).toBe('');
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: providers() });
+    device.setItem(key, '{"version":1,"encounterId":');
+    const { root } = await open();
+    expect(words(root)).toBe('');
+    expect(server.commands).toEqual([]);
+  });
+
+  it('empties the device copy only after the words are accepted and keeps it when they are refused', /** Cleared on acceptance only. */ async () => {
+    server.commandReply = () => json({ code: 'COMMAND_SPEECH_LIMIT_REACHED' }, 422);
+    const { harness, root } = await open();
+    await choose(harness, root, 'sentry');
+    await write(harness, root, 'One more thing.');
+    await press(harness, root, '[data-chat-review]');
+    await press(harness, root, '[data-chat-confirm]');
+    await settle(harness, () => root.querySelector('[data-chat-problem]') !== null);
+    expect(kept()?.text).toBe('One more thing.');
+    server.commandReply = () => {
+      const next = JSON.parse(JSON.stringify(encounterBody())) as Record<string, any>;
+      next['scope']['stateRevision'] = 3;
+      server.encounterBody = next;
+      return json(operation(OP1, 'COMMITTED', 1, true), 202);
+    };
+    await press(harness, root, '[data-chat-confirm]');
+    await settle(harness, () => server.commands.length === 2 && words(root) === '');
+    expect(kept()?.text).toBe('');
+  });
+
+  it('keeps writing in the page when the device refuses storage', /** Storage faults never discard words. */ async () => {
+    device.denied = true;
+    const { harness, root } = await open();
+    await choose(harness, root, 'sentry');
+    await write(harness, root, 'Still here.');
+    expect(words(root)).toBe('Still here.');
+    expect(kept()).toBeNull();
+    expect(server.commands).toEqual([]);
+  });
+
+  it('settles a decided fight only after review and an explicit confirmation, and retries a lost reply with the same identity', /** Explicit settlement. */ async () => {
+    server.encounterBody = encounterBody({ verdict: true });
+    let calls = 0;
+    server.commandReply = () => {
+      calls++;
+      if (calls === 1) throw new TypeError('network');
+      return json(operation(OP1, 'COMMITTED', 1, true), 202);
+    };
+    const { harness, root } = await open();
+    expect(text(root, '[data-phase]')).toContain('waits for you to settle it');
+    expect([...root.querySelectorAll('[data-send-list] button')].map((b) => b.getAttribute('data-choice'))).toEqual(['settle']);
+    await tick(harness);
+    await tick(harness);
+    expect(server.commands).toEqual([]);
+    await press(harness, root, '[data-choice="settle"]');
+    expect(text(root, '[data-review-action]')).toBe('Settle the fight');
+    expect(text(root, '[data-review-settles]')).toContain('cannot be taken back');
+    expect(server.commands).toEqual([]);
+    await press(harness, root, '[data-confirm]');
+    await settle(harness, () => server.commands.length === 1 && root.querySelector('[data-problem]') !== null);
+    await press(harness, root, '[data-confirm]');
+    await settle(harness, () => server.commands.length === 2);
+    expect(server.commands.map((sent) => sent.body['commandType'])).toEqual(['SETTLE_ENCOUNTER', 'SETTLE_ENCOUNTER']);
+    expect(server.commands[1].body['payload']).toEqual({ encounterId: OP2 });
+    expect(server.commands[1].body['requestId']).toBe(server.commands[0].body['requestId']);
+    expect(server.commands[1].body['expectedRevision']).toBe(2);
+  });
+
+  it('offers no settlement while the fight is still undecided', /** Never out of turn. */ async () => {
+    const { root } = await open();
+    expect(root.querySelector('[data-choice="settle"]')).toBeNull();
+    expect(server.commands).toEqual([]);
   });
 });

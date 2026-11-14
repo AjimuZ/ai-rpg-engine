@@ -5334,6 +5334,24 @@
       <target>Conferma e invia</target>
       </segment>
     </unit>
+    <unit id="combat.settleOption">
+      <segment>
+        <source>Settle the fight</source>
+      <target>Concludi lo scontro</target>
+      </segment>
+    </unit>
+    <unit id="combat.settleBinds">
+      <segment>
+        <source>Settling confirms the verdict, ends the fight and returns you to the story. It cannot be taken back.</source>
+      <target>Concludere conferma il verdetto, chiude lo scontro e ti riporta alla storia. Non si può annullare.</target>
+      </segment>
+    </unit>
+    <unit id="combat.draftKept">
+      <segment>
+        <source>Your unsent words stay on this device through a reload or reconnect and are never sent automatically.</source>
+      <target>Le tue parole non inviate restano su questo dispositivo dopo un ricaricamento o una riconnessione e non vengono mai inviate in automatico.</target>
+      </segment>
+    </unit>
     <unit id="combat.cancel">
       <segment>
         <source>Do not send</source>

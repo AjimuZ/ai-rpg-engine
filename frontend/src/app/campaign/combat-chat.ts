@@ -9,10 +9,13 @@
  * "Replace my words". Words are speech-only: they establish no agreement, a recipient's refusal or counteroffer is the server's
  * receipt, and only an explicit answer to the offer on the table binds the player. The draft is held here, outside any one
  * projection, so a re-read, a newer revision or a lost reply never replaces it; it is tied to its encounter and dropped for another.
+ * Since P12.5-B every edit is also kept on the device ({@link CombatDraftStore}), so a reload or reconnect restores it.
  * Nothing is queued for a later turn: outside the player's decision the composer stays editable and only the review is unavailable.
  */
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, LOCALE_ID, output, signal, untracked } from '@angular/core';
 import { CombatEncounter, CombatView, JournalEntry } from './campaign-protocol';
+import { CampaignScope } from './campaign-session';
+import { CombatDraftStore } from './combat-draft';
 import { choiceKey, MAX_SPEECH_TEXT, resolveChoice, TacticalChoice, tacticalEntries, TacticalEntry } from './combat-actions';
 import {
   charactersMessage, checkMessage, chatBlockMessage, choiceMessage, combatLabels, offerMessage, participantName, priceMessage,
@@ -99,6 +102,7 @@ export function knownRecipients(fight: CombatEncounter): string[] {
           aria-describedby="combat-chat-count combat-chat-block" (input)="write(words.value)"></textarea>
         <p id="combat-chat-count" class="muted" data-chat-count>{{ countText() }}</p>
         <p id="combat-chat-block" class="muted" role="status" data-chat-block>{{ blockText() }}</p>
+        <p class="muted" data-chat-kept>{{ t.draftKept }}</p>
         <p>
           <button type="button" data-chat-review [disabled]="blocked() !== null || sending()" (click)="prepare(choice())">{{ t.reviewSend }}</button>
           <button type="button" data-chat-clear [disabled]="text() === ''" (click)="clear()">{{ t.clearDraft }}</button>
@@ -176,6 +180,8 @@ export class CombatChat {
   readonly journal = input<readonly JournalEntry[] | null>(null);
   /** Language of the journal's sentences, so they are announced correctly. */
   readonly journalLocale = input<'en' | 'it' | null>(null);
+  /** The playthrough the draft is kept for on this device (P12.5-B); without it the draft lives in the page only. */
+  readonly scope = input<CampaignScope | null>(null);
   /** True while the host sends a confirmed choice; nothing here can start another meanwhile. */
   readonly sending = input(false);
   /** Stable code of the host's last refusal, or null. */
@@ -186,6 +192,7 @@ export class CombatChat {
   readonly dismissed = output<void>();
 
   private readonly numbers = new Intl.NumberFormat(inject(LOCALE_ID), { maximumFractionDigits: 0 });
+  private readonly drafts = inject(CombatDraftStore);
   readonly t = combatLabels();
   readonly maxText = MAX_SPEECH_TEXT;
   readonly fight = computed(() => this.view()?.encounter ?? null);
@@ -200,9 +207,18 @@ export class CombatChat {
 
   readonly lines = computed(() => transcript(this.journal()));
   readonly recipients = computed(() => { const fight = this.fight(); return fight === null ? [] : knownRecipients(fight); });
+  /**
+   * The draft of the shown fight: the one held here, otherwise the one the device kept from before a reload or reconnect. The device
+   * copy is read only while nothing is held for this fight, and it is never read for another fight.
+   */
   private readonly draft = computed(() => {
+    const fight = this.fight();
+    if (fight === null) return null;
     const kept = this.stored();
-    return kept !== null && kept.encounterId === this.fight()?.encounterId ? kept : null;
+    if (kept !== null && kept.encounterId === fight.encounterId) return kept;
+    const scope = this.scope();
+    const saved = scope === null ? null : this.drafts.read(scope.adventureId, scope.campaignId, fight.encounterId);
+    return saved === null ? null : { encounterId: fight.encounterId, ...saved };
   });
   /** The chosen recipient, or empty: a recipient who left the known list is never silently replaced by another. */
   readonly recipient = computed(() => { const id = this.draft()?.recipient ?? ''; return this.recipients().includes(id) ? id : ''; });
@@ -257,7 +273,8 @@ export class CombatChat {
         this.submitted = null;
         this.reviewing.set(null);
         const kept = this.stored();
-        if (sent.choice.kind === 'speak' && kept !== null && kept.text === sent.choice.text) this.stored.set({ ...kept, text: '' });
+        // Only here, after the server accepted the words, is the draft emptied, on the device as well as in the page.
+        if (sent.choice.kind === 'speak' && kept !== null && kept.text === sent.choice.text) this.keep({ text: '' });
       });
     });
   }
@@ -283,7 +300,11 @@ export class CombatChat {
     const fight = this.fight();
     if (fight === null) return;
     const now = this.draft();
-    this.stored.set({ encounterId: fight.encounterId, recipient: change.recipient ?? now?.recipient ?? '', text: change.text ?? now?.text ?? '' });
+    const next = { encounterId: fight.encounterId, recipient: change.recipient ?? now?.recipient ?? '', text: change.text ?? now?.text ?? '' };
+    this.stored.set(next);
+    // Every edit is kept on the device at once, so a reload or a lost connection never costs the words; a refusal keeps the page copy.
+    const scope = this.scope();
+    if (scope !== null) this.drafts.write(scope.adventureId, scope.campaignId, next.encounterId, next);
   }
 
   /** Choose who the words are for; a changed recipient discards a review of the earlier one. */

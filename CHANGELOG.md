@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Settling a decided fight and keeping the combat chat draft (P12.5-B), 14 November 2026
+
+- When a fight is decided, the combat panel lists one action, "Settle the fight". Choosing it opens a review that says settling
+  confirms the verdict, ends the fight and returns you to the story, and cannot be taken back; only "Confirm and send" sends it.
+  If the reply is lost, confirming again repeats the same request instead of settling twice. Nothing settles by itself.
+- The recipient and words you write in the combat chat are now kept on this device as you type, so they are still there after a
+  reload or a reconnect. They are emptied only after the game accepted them, or when you clear them; a refused or lost
+  send keeps them. Another fight never shows them.
+- Starting a fight from the page is not connected: the page does not yet know which encounters you can start.
+- New Italian messages bring the reviewed catalog to 701. No backend, database migration or route changed.
+
 ## Unreleased — Knowledge-scoped combat replies (P12.4-B), 14 November 2026
 
 - New `combat-reply` task contract for the narration runtime: an opponent or companion you spoke to, or whose terms were just

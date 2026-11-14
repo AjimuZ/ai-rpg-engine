@@ -600,10 +600,29 @@ is tied to its encounter: another fight starts with an empty draft.
   cleared only once a newer revision arrives with no refusal and nothing in flight, or by the player's own "Clear words".
 
 Not implemented: speech input, a separate mobile dialogue/tactics switch (the section is a collapsible `details`), paging older
-conversation, narrator and per-command receipt lines as separate entries, generated replies (P12.4; since P12.4-B the backend has
-the [`combat-reply` contract](21-ai-task-contracts-and-prompts.md#15d-implemented-knowledge-scoped-combat-replies-p124-b), but
-no route sends a reply and the page shows none), draft persistence across a reload or reconnect (P12.5), and the settlement of a
-verdict.
+conversation, narrator and per-command receipt lines as separate entries, and generated replies (P12.4; since P12.4-B the backend
+has the [`combat-reply` contract](21-ai-task-contracts-and-prompts.md#15d-implemented-knowledge-scoped-combat-replies-p124-b), but
+no route sends a reply and the page shows none). Draft persistence and the settlement of a verdict exist since P12.5-B, below.
+
+### P12.5-B settlement and the kept combat draft
+
+- **Settlement.** When the projection shows the fight at `OUTCOME_PENDING` with a verdict, "Send an action" lists exactly one
+  choice, "Settle the fight" (`combat-actions.ts`, key `settle`), and no tactical choice or speech is valid then. It goes through
+  the same review as every named action: the review says that settling confirms the verdict, ends the fight and returns the player
+  to the story, and cannot be taken back. Only "Confirm and send" sends `SETTLE_ENCOUNTER` `{encounterId}`, the identity taken from
+  the projection. The page never sends it by itself, on a newer projection, on a reconnect or from the chat. A lost reply keeps the
+  request identity (same choice at the same revision), so pressing confirm again replays the stored operation instead of settling
+  twice; a refusal by the server is final for that identity.
+- **Kept draft.** The chat's recipient and words are stored on the device with every edit (`combat-draft.ts`, key
+  `engine.combat-draft.v1:["<adventureId>","<campaignId>"]`, the same storage port as the narrative draft), one record per
+  playthrough tagged with the encounter it was written in. After a reload or a reconnect the same fight shows them again; another
+  fight never does, and a malformed or foreign record is ignored. The copy is emptied only when a newer revision arrives with no
+  refusal after the player confirmed those exact words, or by the player's own "Clear words"; a refusal or a lost reply keeps it.
+  If the page is reloaded while the words are being sent, they return as a draft and are not sent again. Refused storage keeps
+  the draft in the page only.
+- **Starting a fight (`ENGAGE`) is not connected.** No projection the page reads names an encounter the player may start (the
+  resume card's `encounter` is the active fight only), so the page has no encounter identity to send and sends none. A read model
+  of the encounters offered at the player's location, and the decision on how much of it the player may see, are still needed.
 
 ## 4. Stream contract
 
@@ -726,7 +745,7 @@ agreement. See section 13 for the proposed input boundary.
 This is a P11/P12 contract. The P05.1 preview shells do not implement playable combat chat. Since P12.2-B the playthrough page
 implements the recipient selector, composer with a separate review-and-send, editable quick replies, attributed transcript and
 the talk, negotiation, scene and offer-answer intents ([combat chat](#p122-b-combat-chat)); the mobile dialogue/tactics switch,
-speech input, generated replies and draft persistence across reconnect are not implemented.
+speech input and generated replies are not implemented; the draft persists across a reload since P12.5-B.
 
 Since P11.2 the backend side of this boundary exists ([ADR 0029](adr/0029-initiative-rounds-activations-and-bounded-combat-dialogue.md),
 [turn protocol](07-turn-protocol.md#p112-tactical-intentions)): `COMBAT_SPEAK` stores one bounded speech-only
@@ -747,21 +766,22 @@ uses them yet (P12.1/P12.2).
 Since P11.5-C.3 ([ADR 0036](adr/0036-explicit-settlement-and-the-return-to-narrative.md)) the return-to-story path exists on the
 backend: `SETTLE_ENCOUNTER` {encounterId} is the player's explicit confirmation of a fight waiting at its outcome, its receipt shows
 `NARRATIVE_RESUME`, the verdict, the final standings and `settlement` {seconds, effectsEnded}, and the campaign accepts exploration
-commands again. A lost response of the settlement, or of the negotiated ending before it, replays its own receipt. No frontend
-control sends it yet (P12), so the outcome review and its confirmation are still to be designed in the UI.
+commands again. A lost response of the settlement, or of the negotiated ending before it, replays its own receipt. Since P12.5-B
+the page sends it from an explicit, reviewed "Settle the fight" confirmation ([settlement](#p125-b-settlement-and-the-kept-combat-draft)).
 Since P11.6-B ([ADR 0038](adr/0038-combat-dialogue-recovery-and-the-resume-card-encounter.md)) the resume card's `encounter`
 shows a reconnecting client the fight's cursor, whether the player may act, the speech left, the offer waiting for an explicit
 answer and the verdict waiting for an explicit settlement; reading it submits nothing. The server keeps no draft. A request held
 from before the reconnect is refused as a stale revision or by the rule it now breaks, an attempt cut off before its commit rolls
 its reserved dice when asked again, and the conversation's public lines are unchanged through restore, renewal and reconnect.
 Since P12.1-B the page uses the member only to know that a fight is active (its "Encounter" line, and the decision to read the
-combat projection); draft preservation in the page remains P12.5.
+combat projection); since P12.5-B the chat draft is kept on the device across a reload and reconnect.
 Since P12.1-A the backend side of the panel exists: `GET /api/v1/campaigns/{id}/encounter` ([combat projection](#p121-a-combat-projection))
 shows the active actor, initiative order, remaining points, zones and passages, known conditions, the player's own values,
 defenses revealed only by an assessment, objectives and the candidates with their known costs and targets, without hidden
 values. Since P12.1-B the page renders it read-only ([combat panel](#p121-b-combat-panel)); since P12.2-A the controls that send
 the named tactical actions exist ([tactical actions](#p122-a-tactical-actions)); since P12.2-B the dialogue chat and the answer to
-an offer exist ([combat chat](#p122-b-combat-chat)); the other candidates and the confirmation of the verdict remain P12.2 and later.
+an offer exist ([combat chat](#p122-b-combat-chat)); since P12.5-B the confirmation of the verdict exists, while the other
+candidates and starting a fight remain later work.
 
 ## 8. Loading, empty, error, and recovery states
 

@@ -4796,6 +4796,46 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
       secrets are not detectable mechanically (QA-07 is covered only for its mechanical part).
     - Not run by this session: `verify.sh full`, `verify.sh containers` and deliberate weakenings.
 - [ ] P12.5 Verify mobile/keyboard play, chat/tactics switching, draft preservation, no out-of-turn/automatic submission and session renewal/reconnect inside a fight, including negotiated settlement retries.
+  - P12.5-B, settlement control and kept combat draft, 14 November 2026 (the P12.5 box stays unchecked: this story does not
+    finish it, and the `ENGAGE` half of P12.5-B is not done).
+    - **Settlement.** New `settle` choice in `combat-actions.ts`: listed, and valid, only while the projection shows
+      `OUTCOME_PENDING` with a verdict; it builds `SETTLE_ENCOUNTER` `{encounterId}` from the projection, goes through the existing
+      review and confirm flow and the host's `send`, and so reuses the identity rule of the named actions (same choice at the same
+      revision keeps its `requestId`). At the verdict every tactical choice and speech is refused (`NOT_YOUR_TURN`).
+    - **Kept draft.** New `combat-draft.ts` stores the chat's recipient and words under
+      `engine.combat-draft.v1:["<adventureId>","<campaignId>"]` with the encounter id, through the narrative draft's storage port, on
+      every edit. The chat reads it when it holds nothing for the shown fight; it is emptied only in the existing accepted-revision
+      path or by "Clear words". Malformed, oversized or foreign records are ignored; storage refusal keeps the page copy.
+    - **Not done: `ENGAGE`.** No projection the page reads names an encounter the player may start (the resume card's `encounter`
+      is the active fight only, and the backend refuses an entry without confirming that a template exists elsewhere), so the page
+      has no encounter id to send. Needs a product decision and a read model of the encounters offered at the player's location;
+      nothing was added for it.
+    - **Unchanged.** No backend, migration, route or command changed. Three new messages (`combat.settleOption`,
+      `combat.settleBinds`, `combat.draftKept`) with Italian entries; the catalog moved from 698 to 701.
+  - Tests (`combat-chat.spec.ts`, 7 new; `combat-actions.spec.ts`, 2 existing tests changed):
+    - rules: `SETTLE_ENCOUNTER` built with the fight's own id at the verdict and the only entry there; refused in an undecided
+      fight, with a null fight, and every tactical choice or speech refused at the verdict;
+    - page: a stored recipient and words restored after a reload with no request sent; a draft of another fight and a
+      malformed record not restored; the device copy kept after a refusal and emptied only after the accepted revision; refused
+      storage keeps the words in the page; settlement reviewed, nothing sent before confirm, a lost first reply retried with the
+      same `requestId`, payload and expected revision; no settlement offered in an undecided fight.
+    - Existing assertions changed: "refuses everything outside the player's own decision" and "offers nothing to send once the
+      fight is decided" asserted an empty list at the verdict and now assert the single `settle` entry (with no request). The
+      Italian catalog count in `italian-variant.spec.ts` moved from 698 to 701.
+  - Verification (14 November 2026, Windows reference host): `sh .agents/ralph/verify.sh frontend` printed `VERIFY PASSED
+    (frontend)`: install, typecheck, `ng test` (22 files, 213 tests passed), `test:i18n` (5 tests), build and locale builds all
+    passed. The first run failed 2 tests, the two old assertions above, before they were updated. A second attempt of this story
+    (14 November 2026) reran `sh .agents/ralph/verify.sh frontend` on the restored tree and it printed `VERIFY PASSED (frontend)`
+    again (install, typecheck, test, i18n, build, locales all PASS); its test counts were not printed in the tail that was read.
+  - Not proven:
+    - `ENGAGE` is not sent anywhere, so the criterion "starts a fight on an explicit action" is unmet.
+    - Nothing ran against the real backend: `SETTLE_ENCOUNTER` was sent only to the scripted server, so the envelope, the receipt
+      and the return to exploration were not seen end to end.
+    - A request identity is kept in the page only, so it does not survive a reload; after a reload a settlement that was
+      already committed is seen as a finished fight, not replayed.
+    - No browser, keyboard, 320 px, focus-order, axe or screen-reader check, no bundle-size measurement and no review of the
+      three Italian sentences by a second person.
+    - Not run by this session: `verify.sh full`, `verify.sh containers`.
 
 **Requirement update (24 October 2026):** the owner requests free-input chat during
 combat to talk to participants and influence subsequent events. The design now
