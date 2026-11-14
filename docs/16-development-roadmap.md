@@ -4660,7 +4660,55 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     input, the verdict settlement, items, readying, assessing, withdrawing, reactions and multi-target abilities remain
     unsent; draft persistence across a reload or reconnect (P12.5) was not added, the draft lives in the page only; free text
     in the main composer is still not sent. The two stale "Sending actions is not connected yet" sentences are unchanged.
-- [ ] P12.3 Provide actor-knowledge-scoped legal candidates to Codex for NPC/companion choices.
+- [x] P12.3 Provide actor-knowledge-scoped legal candidates to Codex for NPC/companion choices.
+  - P12.3-A, knowledge-scoped candidates and the tactic contract, 14 November 2026 (the box is left for the orchestrator).
+    - **Candidates.** New pure `combat/TacticCandidates.menu(state)` for a standing non-player participant at its
+      `AWAITING_ACTION`, opponent or companion. The menu holds:
+      - the actor's own zone, points, Health, Focus and stance;
+      - for each other participant it can see (same zone, or a zone that is not obscured), only the roster ID, ally or
+        opponent, zone, status and stance;
+      - the legal candidates, in a fixed order: `move` (affordable zones one edge away), `strike:<attackId>` (reachable
+        observed opponents, nearest first), `guard` and `end-activation`.
+    - **Revalidation.** `Menu.admits(intent)` accepts only a listed candidate with a listed parameter.
+    - **Contract.** New `inference/contract` `TacticContract`, `TacticContext`, `TacticProposal` and
+      `ai-contract/1/tactic.schema.json`. The task kind is `tactic`, in the `tactician` role, as `INTERACTIVE` work with a
+      provisional 30 s budget.
+      - Each task runs in the acting character's own `character:<subject>` audience, so `TaskContract` gained
+        `audience(context)`, used by `ContractRunner` and the envelope, and `TaskKind` gained `scope(binding, audience)`.
+      - Codes: `unknown-candidate`, `target-not-permitted`, `destination-not-permitted`, `missing-value`,
+        `status-field-conflict`.
+      - A guarded secret in the rendered context refuses the task before submission.
+      - Details: [contract](21-ai-task-contracts-and-prompts.md#15b-implemented-tactic-choice-contract-p123-a) and
+        [combat](11-combat-system.md#12-legal-actions-and-ai-tactics).
+    - **Unchanged.** No migration, route, command, receipt or scheduler behavior changed.
+  - Tests:
+    - `TacticCandidatesTest` (5 new) over the new `TacticStates` fixture.
+    - `TacticContractTest` (8 new):
+      - five seeded secrets absent from the rendered request, and the exact context field sets;
+      - each candidate kind accepted in English and Italian;
+      - one rejection per code;
+      - a scripted runtime (`ScriptedTaskPort` through `ContractRunner`) repaired once and then `Rejected`, both attempts in
+        the bandit's own session;
+      - a scripted runtime repaired into a legal, re-admitted choice;
+      - a leaking belief refused with no request;
+      - separate character scopes for two participants.
+    - `ContractSchemaTest` gained one case (tactic schema field sets, reasons, bound) and checks the new instruction is ASCII.
+    - No existing assertion changed.
+  - Verification (14 November 2026, Windows reference host): `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh
+    backend -Dtest=TacticCandidatesTest,TacticContractTest,ContractSchemaTest,ContractRunnerTest,ContractSessionScopeTest,SummaryContractTest,QuestPlanContractTest`
+    printed `VERIFY PASSED`. The focused Maven log reports 79 tests, 0 failures, errors or skips: `TacticCandidatesTest` 5,
+    `ContractSchemaTest` 6, `ContractRunnerTest` 9, `SummaryContractTest` 8, `ContractSessionScopeTest` 5,
+    `QuestPlanContractTest` 38 and `TacticContractTest` 8.
+  - Not proven:
+    - No activation calls the contract: `CombatScheduler`'s fixed tactic still decides every non-player turn, so commit
+      revalidation of a runtime choice, the deterministic fallback and the player notice remain P12.4 or a later P12.3 slice.
+    - No live model output was evaluated.
+    - The beliefs are caller-supplied, and no `KnowledgeView` reader fills them.
+    - A zone full of hidden occupants is left out of `move`, an indirect capacity leak.
+    - Paraphrased secrets are not detectable.
+    - Abilities, items, speech, social and scene actions, readying, assessing and withdrawing are not candidates, because the
+      scheduler cannot perform them for non-player participants.
+    - Not run by this session: `verify.sh full`, `verify.sh containers` and deliberate weakenings.
 - [ ] P12.4 Add deterministic tactic fallback, interruption messages, bounded knowledge-scoped combat replies and outcome narration; dialogue failure leaves committed state and tactical controls available.
 - [ ] P12.5 Verify mobile/keyboard play, chat/tactics switching, draft preservation, no out-of-turn/automatic submission and session renewal/reconnect inside a fight, including negotiated settlement retries.
 

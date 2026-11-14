@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.rpgengine.inference.TaskRequest;
+import org.rpgengine.inference.session.Audience;
 import org.rpgengine.presentation.SupportedLocale;
 
 import tools.jackson.databind.json.JsonMapper;
@@ -103,6 +104,24 @@ final class ContractEnvelope {
      */
     static TaskContract.RenderedTask render(TaskKind kind, ContractContext context, String taskInstruction,
             Map<String, Object> contextData, List<ContractViolation> repair) {
+        return render(kind, kind.audience(), context, taskInstruction, contextData, repair);
+    }
+
+    /**
+     * Render the full instructions in an explicit audience, for a character-audience kind.
+     *
+     * @param kind task kind
+     * @param audience the task's audience, rendered as the envelope's {@code audience}
+     * @param context trusted context
+     * @param taskInstruction task-specific English instruction
+     * @param contextData ordered context tree; its JSON is digested and rendered verbatim
+     * @param repair violations of the previous attempt, empty for the first attempt
+     * @return instructions and context digest
+     * @throws ContextScopeException when the rendered context contains a guard marker
+     * @throws IllegalArgumentException when the instructions exceed the task port bound
+     */
+    static TaskContract.RenderedTask render(TaskKind kind, Audience audience, ContractContext context,
+            String taskInstruction, Map<String, Object> contextData, List<ContractViolation> repair) {
         String contextJson = json(contextData);
         if (context.guard().leaks(contextJson)) {
             throw new ContextScopeException();
@@ -114,7 +133,7 @@ final class ContractEnvelope {
         envelope.put("taskId", binding.taskId().toString());
         envelope.put("taskKind", kind.wire());
         envelope.put("role", kind.role().wire());
-        envelope.put("audience", kind.audience().wire());
+        envelope.put("audience", audience.wire());
         envelope.put("adventureId", binding.adventureId().toString());
         envelope.put("campaignId", binding.campaignId().toString());
         envelope.put("campaignGeneration", binding.campaignGeneration());

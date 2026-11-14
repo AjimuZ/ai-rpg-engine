@@ -7,12 +7,15 @@
  * public resolved-event bundle into attributed narration passages plus at most three editable
  * quick-reply suggestions. Each contract owns a versioned English instruction template, a bundled
  * JSON output schema (constraining generation only) and an independent Java validator that
- * performs the structural and semantic checks; the schema is never trusted as validation.
+ * performs the structural and semantic checks; the schema is never trusted as validation. Later
+ * packages added the quest-plan (P08.7), continuity-summary (P09.3) and tactic-choice (P12.3)
+ * contracts; {@link org.rpgengine.inference.contract.TacticContract} is the first that runs in one
+ * character's audience, which it takes from its context through {@code TaskContract#audience}.
  *
  * <p>{@link org.rpgengine.inference.contract.ContractRunner} submits one contract task through
  * the fair {@link org.rpgengine.inference.scheduling.InferenceScheduler} (P08.6), which dispatches
  * it through {@link org.rpgengine.inference.session.ScopedSessions} in the session scope derived from the
- * task kind's role and audience and the binding's campaign, generation and hashes (P08.3), so no
+ * task kind's role, the contract's audience for the context and the binding's campaign, generation and hashes (P08.3), so no
  * caller chooses a session, validates the untrusted output and allows exactly one bounded repair
  * with the same canonical context. Every result keeps the presentation
  * binding (locale, locale revision, glossary revision) it was generated for, so a caller can

@@ -15,9 +15,10 @@ import java.util.Set;
  * public, so no scope (and therefore no session) can serve both.
  *
  * <p>{@link #INTERPRETER} and {@link #NARRATOR} have implemented contracts since P08.2,
- * {@link #QUEST_PLANNER} since P08.7 and {@link #SUMMARIZER} since P09.3. The other roles fix their
- * audience rules now so that later contracts (P12 tactics, P15 guides, P13 encounters) inherit the
- * separation instead of inventing it.
+ * {@link #QUEST_PLANNER} since P08.7, {@link #SUMMARIZER} since P09.3 and {@link #TACTICIAN} since
+ * P12.3 (the {@code tactic} contract, in the acting character's audience). The other roles fix their
+ * audience rules now so that later contracts (P15 guides, P13 encounters) inherit the separation
+ * instead of inventing it.
  */
 public enum AiRole {
     /** Free-text declaration to a typed intention; the clarification is shown to the player. */

@@ -2,7 +2,7 @@
 
 ## 1. Purpose and status
 
-This document specifies the application-level contracts that sit above the runtime protocols and are identical for the selected runtime, Codex or Claude ([ADR 0020](adr/0020-selectable-narration-runtime.md)). P08.2 implements the intent (section 4) and resolved narration/quick-reply (section 8) contracts as versioned Java types, bundled schemas, English templates and independent validators; [section 14](#14-implemented-intent-and-narration-contracts-p082) records exactly what exists. The other task kinds remain specifications until their packages implement them.
+This document specifies the application-level contracts that sit above the runtime protocols and are identical for the selected runtime, Codex or Claude ([ADR 0020](adr/0020-selectable-narration-runtime.md)). P08.2 implements the intent (section 4) and resolved narration/quick-reply (section 8) contracts as versioned Java types, bundled schemas, English templates and independent validators; [section 14](#14-implemented-intent-and-narration-contracts-p082) records exactly what exists. P12.3-A implements the tactic choice (section 7) as the `tactic` contract; [section 15b](#15b-implemented-tactic-choice-contract-p123-a) records what exists and what does not call it yet. The other task kinds remain specifications until their packages implement them.
 
 Prompt design must preserve the same authority boundaries as the backend. A precise prompt reduces mistakes; it never substitutes for validation, permissions, transactions, or audience isolation.
 
@@ -70,6 +70,8 @@ It may not supply unchecked threat weights, grant the party equipment, erase inj
 The body contains `candidateActionId`, selected permitted target/destination values, and an optional short `reasonCode` from a bounded enum such as protect-objective, pressure-known-target, support-ally, conserve-resource, or retreat.
 
 Do not request or publish chain-of-thought. The action candidates already contain legal mechanical choices. A rationale is optional diagnostic metadata and cannot authorize new effects. Unknown candidates or invalid targets cause one bounded repair, then deterministic fallback. Stale candidate sets are regenerated from state rather than forcibly applied.
+
+Since P12.3-A this body is implemented as `candidateActionId`, `targetId`, `destinationId` and `reasonCode`; see [section 15b](#15b-implemented-tactic-choice-contract-p123-a).
 
 ## 8. Resolved narration
 
@@ -429,6 +431,91 @@ single-aspect change; `ContractSchemaTest` checks the schema against the validat
 Calling a promise fulfilled in new words, or inventing a fact by paraphrase, is not detectable
 mechanically and stays a human-rubric evaluation (section 13). No live model output has been
 evaluated.
+
+## 15b. Implemented tactic-choice contract (P12.3-A)
+
+**Status (14 November 2026): implemented and tested against the deterministic `ScriptedTaskPort`. No gameplay path calls
+it yet.** Non-player participants still follow the scheduler's fixed tactic (docs/11 section 12). Calling the contract at a
+non-player activation, revalidating at commit and the deterministic fallback are later P12 work.
+
+**Candidates (`org.rpgengine.combat.TacticCandidates`).** `TacticCandidates.menu(state)` is pure. It returns a menu only at
+the `AWAITING_ACTION` of a standing non-player participant (an opponent or a companion), and null otherwise.
+
+- **What the actor knows.** Its own zone, action points, Health, Focus and stance. For each other participant still in the
+  space that it can see (same zone, or a zone that is not obscured), only the roster ID, `ally` or `opponent`, zone, status
+  and stance.
+- **What it never learns.** Anyone else's Health, Focus, defenses, attacks, abilities, effects, reaction policies or campaign
+  actor; the player's ammunition and items; the declared actions, objectives, offers and initiative totals. A participant
+  hidden in an obscured zone appears nowhere, neither as an observation nor as a target.
+- **Candidates, in a fixed order.**
+  1. `move` with every affordable zone one legal edge away.
+  2. `strike:<attackId>` for each frozen attack with the observed opponents it reaches now, nearest first, when
+     `strikeCost` is affordable.
+  3. `guard`, once per activation.
+  4. `end-activation`, always.
+- **What removes candidates.** An effect that prevents actions leaves only `end-activation`. One that prevents movement
+  removes `move`. A candidate with no destination or target is not listed.
+- **Not offered yet.** Abilities, items, speech, social and scene actions, readying, assessing and withdrawing, because the
+  scheduler does not perform them for non-player participants.
+- **Revalidation.** `Menu.admits(intent)` accepts only a listed candidate with a listed parameter. A caller rebuilds the menu
+  from the committed state and asks it.
+
+**Contract (`TacticContract`, `TacticContext`, `TacticProposal`, schema `ai-contract/1/tactic.schema.json`).**
+
+| Aspect | Value |
+| --- | --- |
+| Kind, role | `tactic`, `tactician` |
+| Audience | `character:<subject>` for the acting participant. The subject is `actor:<uuid>` for a participant portraying a campaign actor, otherwise `combatant:<encounter>:<rosterId>`. Two participants never share a session, and none shares one with the narrator or a planner |
+| Work class, budget | `INTERACTIVE`, 30 s for both attempts (provisional) |
+| Context | `round`, `actor`, `observed`, `candidates`, up to 16 of the character's own `beliefs`, and `reasonCodes`. The encounter identity and row version are not rendered; the binding carries the revision |
+| Disclosure guard | Phrases the character must not know, such as a hidden participant's ID. If one occurs in the rendered context, the call ends `Refused(context-scope)` and nothing is submitted |
+| Body | `candidateActionId`, `targetId` (strike only), `destinationId` (move only), `reasonCode` |
+| Statuses | `proposed`; `cannot-complete` with `missing-information` and every other field null |
+| Accepted result | `Chosen(candidateId, intent, reasonCode)`, where `intent` is a `TacticalIntent` (`MoveZone`, `Strike`, `Guard` or `EndActivation`), or `CannotChoose` |
+
+The optional `reasonCode` of a proposal is `protect-objective`, `pressure-known-target`, `support-ally`, `conserve-resource`
+or `retreat`. It is diagnostic only and authorizes nothing.
+
+To support a character audience, `TaskContract` gained `audience(context)`. It defaults to the kind's fixed audience;
+`ContractRunner` derives the session scope from it, and the request envelope renders it. `TaskKind.TACTIC.audience()` throws,
+because the audience depends on the context.
+
+**Codes.** These come on top of the shared envelope and structure checks:
+
+- `unknown-candidate`: a candidate that was not supplied, such as the player's attack, an ability or a made-up one.
+- `target-not-permitted`: a target outside the strike's list, such as a hidden participant, one out of reach or an ally.
+- `destination-not-permitted`: a zone outside the move's list, such as the current zone or one two edges away.
+- `missing-value`: a strike without a target or a move without a destination.
+- `status-field-conflict`: a parameter the chosen kind does not own (for example a strike that also names a destination), or
+  a filled field in `cannot-complete`.
+- `unsupported-value`: a reason code outside its set.
+- `field-set`: an extra field such as `damage`.
+
+Rejected output gets the runner's single repair, which contains only codes and pointers. The repair's outcome is final, and the
+caller falls back.
+
+**Evidence.**
+
+- `TacticCandidatesTest` (5 cases) covers what an opponent and a companion observe, candidate order, spent points, a held
+  stance, prevention, admitted and refused choices, and no menu at the player's decision.
+- `TacticContractTest` (8 cases):
+  - The rendered request contains none of five seeded secrets: a hidden participant, its attack, the player's attack,
+    ammunition and campaign actor. Its context has exactly the fields listed above.
+  - Each candidate kind is accepted in English and Italian.
+  - One rejection case per code.
+  - A scripted runtime makes two illegal proposals: one repair, then `Rejected`, both attempts in the bandit's own session.
+  - A scripted runtime makes an illegal proposal and then a legal repair, which is accepted and admitted again.
+  - A belief carrying a secret is refused before submission.
+  - Each participant gets a separate character scope.
+- `ContractSchemaTest` checks the schema against the validator field sets.
+
+**Not proven.**
+
+- No live model output has been evaluated.
+- No caller exists: no activation, commit revalidation, fallback or player notice uses the contract.
+- The beliefs are supplied by the caller and no knowledge-view reader fills them yet.
+- A zone full of hidden occupants is left out of `move`, so its capacity leaks indirectly.
+- Paraphrased secrets are not detectable mechanically.
 
 ## 16. Neutral protocol proof (P01.1)
 

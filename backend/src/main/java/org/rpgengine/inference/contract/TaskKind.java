@@ -10,7 +10,7 @@ import org.rpgengine.inference.session.SessionScope;
 /**
  * Application task kinds implemented as typed contracts. Each kind fixes its wire name, its
  * logical {@link AiRole}, its {@link Audience}, its scheduling {@link WorkClass} and its default
- * local budget (docs/06 section 10); the remaining docs/21 kinds (content, encounter, tactic, guide,
+ * local budget (docs/06 section 10); the remaining docs/21 kinds (content, encounter, guide,
  * world direction, plan review) acquire contracts in later packages.
  *
  * <p>Role and audience are properties of the kind, not of the caller: {@link #scope} derives the
@@ -21,7 +21,10 @@ import org.rpgengine.inference.session.SessionScope;
  * runs only when no interactive task waits and preempts for any player turn. The two summary kinds
  * (P09.3) belong to the {@link AiRole#SUMMARIZER}, whose sessions take exactly the audience of their
  * inputs; one kind per audience keeps a public and a privileged summary in separate sessions, and
- * both are {@link WorkClass#CONTINUITY} background work.
+ * both are {@link WorkClass#CONTINUITY} background work. The tactic kind (P12.3) is the first
+ * character-audience kind: its audience is the acting participant's, so it has no fixed
+ * {@link #audience()} and its contract derives the audience from the context; it is interactive,
+ * because the player waits for the opponents' turns.
  */
 public enum TaskKind {
     /** Free-text player declaration to one typed intention: a proposal only. */
@@ -35,7 +38,12 @@ public enum TaskKind {
     /** Public events and the player's knowledge to a source-linked continuity summary for the player audience. */
     SUMMARY("summary", AiRole.SUMMARIZER, 60),
     /** Public events and the privileged record to a source-linked continuity summary for privileged tasks. */
-    SUMMARY_PRIVILEGED("summary-privileged", AiRole.SUMMARIZER, 60);
+    SUMMARY_PRIVILEGED("summary-privileged", AiRole.SUMMARIZER, 60),
+    /**
+     * One acting non-player participant's observations and legal candidates to one candidate choice (P12.3): a proposal the
+     * rules revalidate, never an effect. It runs in that participant's own character audience, taken from its context.
+     */
+    TACTIC("tactic", AiRole.TACTICIAN, 30);
 
     private final String wire;
     private final AiRole role;
@@ -82,21 +90,44 @@ public enum TaskKind {
      * @return the disclosure audience: public for the P08.2 kinds and {@link #SUMMARY}, privileged
      *         for the planner kinds, whose context may hold hidden canon ({@link AiRole#QUEST_PLANNER}
      *         permits nothing else), and for {@link #SUMMARY_PRIVILEGED}
+     * @throws IllegalStateException for {@link #TACTIC}, whose audience is one character's and so
+     *         depends on the task's context ({@code TaskContract#audience})
      */
     public Audience audience() {
+        if (characterAudience()) {
+            throw new IllegalStateException("a character-audience kind takes its subject from its context");
+        }
         return role == AiRole.QUEST_PLANNER || this == SUMMARY_PRIVILEGED ? Audience.PRIVILEGED : Audience.PUBLIC;
     }
 
+    /** @return true when each task runs in the audience of one character named by its context ({@link #TACTIC}) */
+    public boolean characterAudience() {
+        return role == AiRole.TACTICIAN;
+    }
+
     /**
-     * Derive the session scope of one task of this kind.
+     * Derive the session scope of one task of a kind with a fixed audience.
      *
      * @param binding the task's trusted binding
      * @return scope keyed by the binding's campaign, generation and hashes and this kind's role
      *         and audience
+     * @throws IllegalStateException for a character-audience kind, see {@link #scope(TaskBinding, Audience)}
      */
     public SessionScope scope(TaskBinding binding) {
+        return scope(binding, audience());
+    }
+
+    /**
+     * Derive the session scope of one task in an explicit audience.
+     *
+     * @param binding the task's trusted binding
+     * @param audience the task's audience; for a character-audience kind, that character's
+     * @return scope keyed by the binding's campaign, generation and hashes, this kind's role and the audience
+     * @throws IllegalArgumentException when this kind's role may not run in the audience
+     */
+    public SessionScope scope(TaskBinding binding, Audience audience) {
         return new SessionScope(binding.adventureId(), binding.campaignId(), binding.campaignGeneration(), role,
-                audience(), binding.packHash(), binding.policyHash());
+                audience, binding.packHash(), binding.policyHash());
     }
 
     /** @return the default budget from submission to the last attempt, including one repair */

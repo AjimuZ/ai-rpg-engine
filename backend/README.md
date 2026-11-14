@@ -1324,6 +1324,32 @@ checks the null member outside a fight.
 Limits: the frontend does not read the member yet (P12.1); renewals are prepared through `SessionRehydration`, not a running
 runtime session; the restore is simulated on the same database.
 
+## Knowledge-scoped tactic candidates and the tactic contract (P12.3-A)
+
+`combat/TacticCandidates.menu(state)` is a pure function of an `EncounterState` at a standing non-player participant's
+`AWAITING_ACTION`, for an opponent or a companion. It returns the participant's own values and the public standing of each
+participant it can see (same zone, or a zone that is not obscured). It also returns the legal candidates, in a fixed order:
+`move` (destinations one edge away), `strike:<attackId>` (reachable observed opponents), `guard` and `end-activation`.
+`Menu.admits(intent)` revalidates a choice against a menu rebuilt from the committed state.
+
+`inference/contract/TacticContract` (kind `tactic`, role `tactician`, schema `ai-contract/1/tactic.schema.json`) asks the
+narration runtime for one of those candidates. Each task runs in the acting character's own session
+(`character:actor:<uuid>` or `character:combatant:<encounter>:<rosterId>`). To make that possible, `TaskContract` gained
+`audience(context)`, which `ContractRunner` and the request envelope use, and `TaskKind` gained `scope(binding, audience)`.
+
+Rules and codes are in [docs/21 section 15b](../docs/21-ai-task-contracts-and-prompts.md#15b-implemented-tactic-choice-contract-p123-a).
+
+Tests:
+
+- `TacticCandidatesTest` (5), over the `TacticStates` fixture.
+- `TacticContractTest` (8): seeded secrets absent from the rendered request, each candidate kind, one rejection per code, and
+  a scripted runtime through `ContractRunner` with one repair and a refused leaking context.
+- The tactic case of `ContractSchemaTest`.
+
+Limits: nothing calls the contract yet, and `CombatScheduler`'s fixed tactic still decides every non-player activation.
+Commit revalidation, the deterministic fallback and the player notice are later P12 work. No migration, route or command
+changed.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

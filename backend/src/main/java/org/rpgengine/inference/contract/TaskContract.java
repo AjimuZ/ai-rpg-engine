@@ -2,6 +2,8 @@ package org.rpgengine.inference.contract;
 
 import java.util.List;
 
+import org.rpgengine.inference.session.Audience;
+
 /**
  * One versioned application task contract: instruction template, output schema and independent
  * validator for a context type {@code C} and typed proposal {@code T}.
@@ -18,6 +20,17 @@ public interface TaskContract<C extends ContractContext, T> {
 
     /** @return task kind, role and default budget */
     TaskKind kind();
+
+    /**
+     * Audience of one task, which with the kind's role and the binding makes its session scope.
+     *
+     * @param context trusted context
+     * @return the kind's fixed audience; a character-audience kind ({@link TaskKind#characterAudience()})
+     *         overrides this with the character its context names
+     */
+    default Audience audience(C context) {
+        return kind().audience();
+    }
 
     /** @return JSON Schema text supplied as the task output schema; constrains generation only */
     String outputSchema();

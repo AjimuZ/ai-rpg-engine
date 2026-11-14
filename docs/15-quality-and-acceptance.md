@@ -1786,6 +1786,14 @@ only fill an editable draft, a reviewed speech sent once, a refusal that keeps t
 without a request, social actions by recipient and an explicit accept (see the P12.2 roadmap entry for results and limits). The
 real backend, the browser, a screen reader and draft preservation across reconnect (P12.5) were not exercised.
 
+P12.3-A (14 November 2026) adds `TacticCandidatesTest` (5) and `TacticContractTest` (8), plus a tactic case in
+`ContractSchemaTest`. They check that a non-player participant's candidates and context hold only what it can see. Five seeded
+secrets are absent from the rendered request: a hidden participant, its attack, and the player's attack, ammunition and
+campaign actor. A context carrying a guarded secret is refused before submission. Each illegal proposal is rejected with its
+code. A scripted runtime is repaired once and then rejected, or repaired into a legal choice that the menu admits again. This
+is QA-16 evidence for the tactic context only (see the P12.3 roadmap entry for results and limits). The tactic-invalid and
+provider-unavailable fallback is not implemented, no activation calls the contract, and no live model output was evaluated.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Knowledge-scoped tactic choices for opponents and companions (P12.3-A), 14 November 2026
+
+- New `tactic` task contract for the narration runtime: an opponent or companion whose turn it is can be asked to pick one of
+  its legal choices (move one zone, strike a target in reach, take the Guard action or end its turn). The request holds only
+  what that participant knows: its own Health, Focus and action points, plus the zone, side, standing and stance of each
+  participant it can see. Anyone hidden in an obscured zone, other participants' hidden values, the player's items and
+  ammunition and the encounter's plans are left out. If a secret listed for that participant somehow appears in its context,
+  nothing is sent.
+- Each participant gets its own runtime conversation, separate from the narrator, the planner and the other participants.
+- An answer naming a choice, target or zone that was not offered, or one that adds an extra action, is rejected. The runtime
+  gets one correction attempt, and a choice is accepted only if it is still on the list rebuilt from the saved fight.
+- Nothing changes in play yet: opponents still follow the fixed tactic, and the choice will be connected, with its fallback,
+  in later tasks. No database migration, route or page changed.
+
 ## Unreleased — A persistent combat conversation (P12.2-B), 14 November 2026
 
 - During a fight the page now has a "Conversation" section under the combat panel. It lists what has been said and answered

@@ -28,5 +28,9 @@
  * explicit {@code TacticalIntent.AnswerOffer} applies terms, and {@code EncounterWriter} stores the offer and an accepted truce.
  * The player's explicit {@code TacticalIntent.Settle} (ADR 0036) completes the fight: the scheduler finalizes the stored
  * verdict and leaves the encounter at {@code NARRATIVE_RESUME}.
+ *
+ * <p>Since P12.3 {@code TacticCandidates} is the pure, knowledge-scoped menu of a non-player participant's decision: what it
+ * observes and its legal candidates, which the tactic contract of {@code org.rpgengine.inference.contract} offers to the
+ * narration runtime and which revalidates a choice. The scheduler's fixed tactic still decides every non-player activation.
  */
 package org.rpgengine.combat;

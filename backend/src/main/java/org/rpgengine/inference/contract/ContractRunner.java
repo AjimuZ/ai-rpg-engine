@@ -25,7 +25,9 @@ import org.rpgengine.inference.session.SessionScope;
  * repair (docs/07 section 9, docs/21 section 8), in the session of the task's own scope (P08.3).
  *
  * <p>Session scoping: the caller never names a session. The runner derives the
- * {@link SessionScope} from the contract's kind (role and audience) and the context's binding
+ * {@link SessionScope} from the contract's kind (role), its audience for the context
+ * ({@link TaskContract#audience}: the kind's fixed audience, or the acting character's for a tactic) and the
+ * context's binding
  * (adventure, campaign, generation, pack and policy hashes) and submits through the
  * installation's {@link InferenceScheduler} (P08.6), which dispatches it in the scope's session of
  * {@link ScopedSessions}, so an interpreter and a narrator, two campaigns, or a public and a
@@ -87,7 +89,7 @@ public final class ContractRunner {
         if (budget.compareTo(TaskRequest.MIN_TIMEOUT) < 0 || budget.compareTo(TaskRequest.MAX_TIMEOUT) > 0) {
             throw new IllegalArgumentException("budget outside the supported range");
         }
-        SessionScope scope = contract.kind().scope(context.binding());
+        SessionScope scope = contract.kind().scope(context.binding(), contract.audience(context));
         var call = new Call<>(contract, context, scope, slot, clock.instant().plus(budget));
         TaskContract.RenderedTask first;
         try {

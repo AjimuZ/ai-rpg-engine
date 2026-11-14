@@ -104,6 +104,28 @@ class ContractSchemaTest {
     }
 
     @Test
+    void tacticSchemaMatchesTheValidatorFieldSets() {
+        JsonNode root = schema(new TacticContract());
+        assertClosedObject(root, ContractEnvelope.RESPONSE_FIELDS);
+        assertClosedObject(root.path("properties").path("body"), TacticContract.BODY_FIELDS);
+        var kinds = new ArrayList<String>();
+        root.path("properties").path("taskKind").path("enum").forEach(v -> kinds.add(v.asString()));
+        assertThat(kinds).containsExactly(TaskKind.TACTIC.wire());
+        var statuses = new ArrayList<String>();
+        root.path("properties").path("status").path("enum").forEach(v -> statuses.add(v.asString()));
+        assertThat(statuses).containsExactlyInAnyOrderElementsOf(TacticContract.STATUSES);
+        var reasons = new ArrayList<String>();
+        root.path("properties").path("body").path("properties").path("reasonCode").path("enum")
+                .forEach(v -> reasons.add(v.isNull() ? null : v.asString()));
+        var expected = new ArrayList<String>(TacticContract.TACTIC_REASONS);
+        expected.addAll(TacticContract.CANNOT_REASONS);
+        expected.add(null);
+        assertThat(reasons).containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(root.path("properties").path("body").path("properties").path("candidateActionId").path("maxLength").asInt())
+                .isEqualTo(TacticContract.MAX_CANDIDATE_ID);
+    }
+
+    @Test
     void templatesAreVersionedEnglishAndHashed() {
         var intent = new IntentContract();
         var narration = new NarrationContract();
@@ -113,7 +135,7 @@ class ContractSchemaTest {
         // Technical templates stay English whatever the output locale; only output strings switch.
         for (String text : List.of(ContractEnvelope.SHARED_INSTRUCTION, IntentContract.TASK_INSTRUCTION,
                 NarrationContract.TASK_INSTRUCTION, QuestPlanContract.PLAN_INSTRUCTION,
-                QuestPlanContract.REFINE_INSTRUCTION)) {
+                QuestPlanContract.REFINE_INSTRUCTION, TacticContract.TASK_INSTRUCTION)) {
             assertThat(Pattern.compile("[^\\x20-\\x7E\\n]").matcher(text).find()).isFalse();
         }
     }
