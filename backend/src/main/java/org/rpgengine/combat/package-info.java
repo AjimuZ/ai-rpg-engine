@@ -37,5 +37,10 @@
  * reading of the party's capabilities before entry, {@code EncounterDifficulty} the selected band and {@code ThreatBudget}
  * the docs/12 section 4 capacity, threat band and hostile-body limit, whose {@code check} admits or refuses a proposed
  * hostile roster with every finding. Nothing calls them yet; no encounter is planned, proposed or entered through them.
+ *
+ * <p>Since P13.2-A (ADR 0041) {@code EncounterOption} is one eligible authored template at a costed level: the starting zones
+ * and hostile limit a composition must respect, the composition of a variant that only selects and places the template's
+ * hostile participants, and the deterministic fallback to the first authored template that fits the budget. The
+ * {@code encounter} contract of {@code org.rpgengine.inference.contract} proposes such compositions; nothing calls either yet.
  */
 package org.rpgengine.combat;

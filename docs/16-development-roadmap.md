@@ -4909,6 +4909,55 @@ this update. No combat runtime/browser result is claimed.
     - Calibration finding: one fresh level-1 actor has a Gentle band of 4.8–6.4 that no level-1 cost meets (P18.3).
     - Not run by this session: `verify.sh full`, `verify.sh containers` and deliberate weakenings.
 - [ ] P13.2 Implement template-bounded Codex encounter proposals, one repair, and safe fallback.
+  - P13.2-A, template-bounded encounter proposals with one repair and a safe fallback, 14 November 2026
+    ([ADR 0041](adr/0041-template-bounded-encounter-compositions-and-an-authored-fallback.md)).
+    - **Options.** New pure `combat/EncounterOption`: one eligible authored template at a caller-supplied level.
+      - `startZones()` is every zone except the escape zones.
+      - `hostileLimit(budget)` is the lower of the budget's limit and the template's own (player + allies + 2).
+      - `compose(placements)` keeps only the placed hostile participants in their placed zones, in authored order; allies,
+        statistics, objectives, escape zones, zones, opening policy and declared actions are unchanged.
+      - `fallback(options, budget)` is the first option whose authored roster passes `ThreatBudget.check`, or null.
+    - **Contract.** New `TaskKind.ENCOUNTER` (`encounter`, role `encounter-proposer`, `privileged`, provisional `INTERACTIVE`
+      and 60 s), `EncounterContext`, `EncounterContract`, `EncounterProposal` and schema `ai-contract/1/encounter.schema.json`.
+      - The body is `snapshotHash`, `templateId`, `roster` (`participantId` and `zoneId`) and `reasonCode`.
+      - The validator checks the offered template, hostile participants, duplicates, starting zones, zone capacity, the hostile
+        limit, the threat band and the snapshot echo, with the codes listed in docs/21 section 15e.
+      - The runner's single repair names those codes; nothing changed in `ContractRunner`.
+    - **Fallback.** New pure `EncounterFallback.decide(outcome, current)`: `Proposed` only for an accepted composition whose
+      template is still offered at the same snapshot hash; otherwise `Fallback` with the first fitting authored template,
+      unchanged, or `NoEncounter`. Causes `PROPOSAL_INVALID`, `PROVIDER_UNAVAILABLE` and `INTERRUPTED`; no player notice.
+    - **Unchanged.** No migration, command, route or page changed. `TaskKind.audience()` now also returns `privileged` for the
+      `encounter-proposer` role.
+    - **Documents.** CHANGELOG, backend README, docs/06 (role matrix and background kinds), docs/12 sections 1 and 3, docs/21
+      sections 1 and 6 and new section 15e, ADR 0041 and its index, the combat and contract package documentation, and a dated
+      P13.2-A paragraph in [docs/15 section 3](15-quality-and-acceptance.md#3-mandatory-scenario-register) naming the new tests
+      as QA-14 evidence for invalid and over-budget proposed rosters only.
+  - Tests (new): `EncounterOptionTest` (2), `EncounterContractTest` (9, one parameterized over English and Italian), and the
+    encounter case of `ContractSchemaTest` (now 8). The scripted-runtime cases run through the real `ContractRunner` and
+    scheduler:
+    - valid: a first composition accepted without repair and kept as `Proposed`, in the encounter proposer's privileged session;
+    - repaired: an over-budget composition, one repair request carrying `- over-budget at /body/roster` in the same session,
+      then an admitted composition kept as `Proposed`;
+    - fallback: output invalid after the repair (`unknown-participant`, then `zone-not-permitted`) gives the authored patrol
+      unchanged, or `NoEncounter` when only the over-budget ambush is offered; each of the six non-completed task statuses gives
+      one request and a fallback (`INTERRUPTED` for cancelled); stale-snapshot, stale-option, declined and refused outcomes fall
+      back.
+  - Verification (14 November 2026, Windows reference host):
+    `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=EncounterOptionTest,EncounterContractTest,ContractSchemaTest,TacticContractTest,SessionScopeTest`
+    printed `VERIFY PASSED` (backend-sources, backend-database and backend-focused all PASS). The focused Maven log reports
+    `Tests run: 31, Failures: 0, Errors: 0, Skipped: 0` (2 + 8 + 9 + 8 + 4) and `BUILD SUCCESS`. The same command, run again
+    after the final source-comment edits, printed the same `VERIFY PASSED` and the same Maven counts. After the documentation
+    changes, `py -B tools/repository_checks/checks.py all` printed `all: 0 finding(s)`, and `git diff --check HEAD` printed
+    nothing.
+  - Not proven:
+    - No planning path calls the contract or the decision: nothing decides eligibility, reads a campaign into a snapshot, or
+      freezes, stores or enters a composed encounter. Authored templates entered with `ENGAGE` are still not budget-checked.
+    - Objective, motivation, visibility, retreat behavior, reward sources, reinforcement phases, objective reachability, hard
+      counters and campaign-scoped identities are not proposed or checked (P13.3, P13.4). QA-14 is not met.
+    - Levels are caller-supplied (P13.4), and there are no statistic bands per tier.
+    - With the provisional numbers, small parties often have no fitting authored roster, so `NoEncounter` may be common (P18.3).
+    - No live model output was evaluated. Not run by this session: `verify.sh full`, `verify.sh containers` and deliberate
+      weakenings.
 - [ ] P13.3 Freeze admitted content; validate reinforcement phases, objectives, escape, and hard counters.
 - [ ] P13.4 Implement challenge-source rewards, loot ownership, cumulative thresholds, training, unlocks, and pending purchases.
 - [ ] P13.5 Add advancement preview and comparison without automatic player build changes.

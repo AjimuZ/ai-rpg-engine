@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Bounded encounter proposals with one repair and a safe fallback (P13.2-A), 14 November 2026
+
+- New `encounter` task contract for the narration runtime: given the party's capabilities, the chosen difficulty and the
+  encounters the author wrote for a place, it can propose which of an encounter's opponents take part and where each starts.
+  It cannot invent opponents, change their statistics, remove allies or objectives, or start an opponent at an escape point.
+- A proposal is refused when it names someone who is not an opponent of that encounter, repeats one, overcrowds a zone, has
+  too many opponents, or is harder or easier than the chosen difficulty allows. It gets one correction attempt.
+- When the proposal is still unusable, the runtime is unavailable or interrupted, or the party changed in the meantime, the
+  engine uses the first authored encounter whose own opponents fit the difficulty, unchanged. If none fits, no fight starts:
+  the engine never invents one to fill the gap.
+- The request runs in its own private planning conversation, separate from narration, and its output is never shown.
+- Nothing changes in play yet: no fight is planned this way, and fights you start from the story are unchanged. No database
+  migration, route or page changed.
+
 ## Unreleased — Capability snapshot and threat limits for encounter planning (P13.1-A), 14 November 2026
 
 - The engine can now record a fingerprint of what the party can do before a planned fight: each member's level, Health,

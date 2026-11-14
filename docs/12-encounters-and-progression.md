@@ -10,6 +10,8 @@ Since P11.1 authored encounter templates exist as pack data (location, zones, ro
 
 Since P13.1-A the inputs and limits of planning exist as pure, deterministic code that nothing calls yet ([ADR 0040](adr/0040-capability-snapshot-and-a-versioned-threat-heuristic.md)). `CapabilitySnapshot` implements part of section 2. `ThreatBudget` with `EncounterDifficulty` implements the capacity, band, cost and hostile-body rules of section 4 and refuses an invalid or out-of-band hostile roster. No campaign is read into a snapshot, no encounter is planned or proposed, and an authored template entered with `ENGAGE` is not budget-checked.
 
+Since P13.2-A the proposal step exists as a contract and a pure decision that nothing calls yet ([ADR 0041](adr/0041-template-bounded-encounter-compositions-and-an-authored-fallback.md), [docs/21 section 15e](21-ai-task-contracts-and-prompts.md#15e-implemented-template-bounded-encounter-proposals-p132-a)). A proposal only selects among authored content; see section 3.
+
 ## 2. Encounter input snapshot
 
 Capture pack/ruleset hashes, source revision, scene tags, known threats, participating actors, health and resource ratios, conditions, equipped and accessible items, ammunition, learned abilities, skill ranks, party size, mobility, damage/defense coverage, escape options, objective, recent challenge history, and selected difficulty policy.
@@ -38,6 +40,8 @@ Its canonical JSON does not depend on input order, and its SHA-256 is the snapsh
 8. Assign stable campaign-scoped identities to admitted generated content.
 9. Freeze the encounter and show observable stakes before the first irreversible action where possible.
 10. Execute using the combat module and settle exactly once.
+
+**Implemented (P13.2-A), steps 4–7 only and not yet called.** The caller supplies the eligible authored templates (step 4), each as an `EncounterOption` with the level its hostile participants are costed at, together with the capability snapshot. The `encounter` contract asks the runtime to choose one template, a subset of its hostile participants and a starting zone for each (step 5). The validator checks the offered template, the participants, the starting zones (never an escape zone), zone capacities, the hostile-body limit and the threat band of section 4 (step 6). At most one repair follows, then `EncounterFallback` takes the first offered authored template whose unchanged roster fits the band, or reports that no valid encounter exists (step 7). An accepted composition is kept only while a fresh reading has the same snapshot hash. Not implemented: deciding eligibility (step 1), objective and stakes (step 2), motivation, visibility, retreat behavior and reward sources in the proposal (step 5), solvability, reachability and canon checks (step 6), campaign-scoped identities and freezing (steps 8–9, P13.3).
 
 ## 4. Initial threat heuristic
 

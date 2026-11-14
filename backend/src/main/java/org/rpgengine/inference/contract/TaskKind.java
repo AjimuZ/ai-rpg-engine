@@ -10,8 +10,8 @@ import org.rpgengine.inference.session.SessionScope;
 /**
  * Application task kinds implemented as typed contracts. Each kind fixes its wire name, its
  * logical {@link AiRole}, its {@link Audience}, its scheduling {@link WorkClass} and its default
- * local budget (docs/06 section 10); the remaining docs/21 kinds (content, encounter, guide,
- * world direction, plan review) acquire contracts in later packages.
+ * local budget (docs/06 section 10); the remaining docs/21 kinds (content, guide, world
+ * direction, plan review) acquire contracts in later packages.
  *
  * <p>Role and audience are properties of the kind, not of the caller: {@link #scope} derives the
  * whole session scope from the kind and the task binding, so a caller cannot run a contract in
@@ -25,7 +25,9 @@ import org.rpgengine.inference.session.SessionScope;
  * character-audience kind: its audience is the acting participant's, so it has no fixed
  * {@link #audience()} and its contract derives the audience from the context; it is interactive,
  * because the player waits for the opponents' turns. The combat-reply kind (P12.4-B) is the second
- * one, in the player-facing {@link AiRole#CHARACTER_VOICE} role.
+ * one, in the player-facing {@link AiRole#CHARACTER_VOICE} role. The encounter kind (P13.2-A) runs in the
+ * {@link AiRole#ENCOUNTER_PROPOSER} role's privileged audience and is interactive: a proposal is asked for when an
+ * encounter becomes eligible, and the player waits for the fight to start (provisional).
  */
 public enum TaskKind {
     /** Free-text player declaration to one typed intention: a proposal only. */
@@ -50,7 +52,13 @@ public enum TaskKind {
      * (P12.4-B): presentation only, never an effect. It runs in that participant's own character audience, taken from its
      * context, so the reply is grounded in what the character knows rather than in everything the player knows.
      */
-    COMBAT_REPLY("combat-reply", AiRole.CHARACTER_VOICE, 30);
+    COMBAT_REPLY("combat-reply", AiRole.CHARACTER_VOICE, 30),
+    /**
+     * A capability snapshot, its threat budget and the eligible authored templates to one composition of a template's hostile
+     * roster and starting zones (P13.2-A): a proposal the engine checks against the template and the budget, never a frozen
+     * encounter. It runs in the privileged encounter-proposer session; its output is never shown.
+     */
+    ENCOUNTER("encounter", AiRole.ENCOUNTER_PROPOSER, 60);
 
     private final String wire;
     private final AiRole role;
@@ -80,7 +88,8 @@ public enum TaskKind {
 
     /**
      * @return the scheduling class (P08.6); intent interpretation and the narration of a committed
-     *         player action are what the player waits for, so both are interactive; quest planning
+     *         player action are what the player waits for, so both are interactive, and so are tactic
+     *         choices, combat replies and encounter proposals; quest planning
      *         prepares an accepted quest and is {@link WorkClass#PREPARATION} background work;
      *         summaries are bounded {@link WorkClass#CONTINUITY} work that later turns may use but
      *         never wait for
@@ -96,7 +105,8 @@ public enum TaskKind {
     /**
      * @return the disclosure audience: public for the P08.2 kinds and {@link #SUMMARY}, privileged
      *         for the planner kinds, whose context may hold hidden canon ({@link AiRole#QUEST_PLANNER}
-     *         permits nothing else), and for {@link #SUMMARY_PRIVILEGED}
+     *         permits nothing else), for {@link #ENCOUNTER} ({@link AiRole#ENCOUNTER_PROPOSER} permits
+     *         nothing else either) and for {@link #SUMMARY_PRIVILEGED}
      * @throws IllegalStateException for {@link #TACTIC} and {@link #COMBAT_REPLY}, whose audience is one character's and so
      *         depends on the task's context ({@code TaskContract#audience})
      */
@@ -104,7 +114,8 @@ public enum TaskKind {
         if (characterAudience()) {
             throw new IllegalStateException("a character-audience kind takes its subject from its context");
         }
-        return role == AiRole.QUEST_PLANNER || this == SUMMARY_PRIVILEGED ? Audience.PRIVILEGED : Audience.PUBLIC;
+        return role == AiRole.QUEST_PLANNER || role == AiRole.ENCOUNTER_PROPOSER || this == SUMMARY_PRIVILEGED
+                ? Audience.PRIVILEGED : Audience.PUBLIC;
     }
 
     /**

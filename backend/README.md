@@ -1406,6 +1406,29 @@ Test: `ThreatBudgetTest` (10).
 Limits: nothing reads a campaign into a snapshot or calls the check, so no encounter is planned or refused by it. There are no
 catalog statistic bands per tier, control, area or burst caps, or reinforcement phases. No migration, route or command changed.
 
+### Template-bounded encounter proposals (P13.2-A)
+
+`combat/EncounterOption` is one eligible authored template with the level its hostile participants are costed at. It lists the
+starting zones (every zone except the escape zones), the hostile limit (the lower of the budget's and the template's own), and
+composes a variant that keeps only the placed hostile participants in their placed zones, in authored order, with everything
+else unchanged. `EncounterOption.fallback(options, budget)` returns the first option whose authored roster passes the threat
+check, or null.
+
+`inference/contract/EncounterContract` (kind `encounter`, role `encounter-proposer`, privileged audience, schema
+`ai-contract/1/encounter.schema.json`) asks the narration runtime to choose one offered template, a subset of its hostile
+participants and a starting zone for each, echoing the snapshot hash. `EncounterContext` holds the binding, the
+`CapabilitySnapshot` and 1–8 options at the snapshot's location. `EncounterFallback.decide(outcome, current)` is pure: it keeps
+an accepted composition while the context read again before entry offers the same option at the same snapshot hash, and
+otherwise returns `Fallback` with the first fitting authored template or `NoEncounter`. Rules and codes are in
+[docs/21 section 15e](../docs/21-ai-task-contracts-and-prompts.md#15e-implemented-template-bounded-encounter-proposals-p132-a);
+the decision is [ADR 0041](../docs/adr/0041-template-bounded-encounter-compositions-and-an-authored-fallback.md).
+
+Tests: `EncounterOptionTest` (2), `EncounterContractTest` (9, through the scripted runtime and the real `ContractRunner`), the
+encounter case of `ContractSchemaTest`, and the shared `combat/PlanningFixtures`.
+
+Limits: no planning path calls the contract or the decision, so no encounter is proposed, entered or stored this way. No
+migration, route or command changed.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

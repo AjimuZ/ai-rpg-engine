@@ -1,0 +1,37 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "taskId", "taskKind", "baseRevision", "contextDigest", "outputLocale", "status", "body"],
+  "properties": {
+    "contractVersion": {"type": "integer", "enum": [1]},
+    "taskId": {"type": "string", "maxLength": 36},
+    "taskKind": {"type": "string", "enum": ["encounter"]},
+    "baseRevision": {"type": "integer"},
+    "contextDigest": {"type": "string", "maxLength": 64},
+    "outputLocale": {"type": "string", "enum": ["en", "it"]},
+    "status": {"type": "string", "enum": ["proposed", "cannot-complete"]},
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["snapshotHash", "templateId", "roster", "reasonCode"],
+      "properties": {
+        "snapshotHash": {"type": ["string", "null"], "maxLength": 64},
+        "templateId": {"type": ["string", "null"], "maxLength": 257},
+        "roster": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["participantId", "zoneId"],
+            "properties": {
+              "participantId": {"type": "string", "maxLength": 128},
+              "zoneId": {"type": "string", "maxLength": 128}
+            }
+          }
+        },
+        "reasonCode": {"type": ["string", "null"], "enum": ["no-fitting-roster", "missing-information", null]}
+      }
+    }
+  }
+}

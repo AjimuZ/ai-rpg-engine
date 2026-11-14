@@ -2,7 +2,7 @@
 
 ## 1. Purpose and status
 
-This document specifies the application-level contracts that sit above the runtime protocols and are identical for the selected runtime, Codex or Claude ([ADR 0020](adr/0020-selectable-narration-runtime.md)). P08.2 implements the intent (section 4) and resolved narration/quick-reply (section 8) contracts as versioned Java types, bundled schemas, English templates and independent validators; [section 14](#14-implemented-intent-and-narration-contracts-p082) records exactly what exists. P12.3-A implements the tactic choice (section 7) as the `tactic` contract; [section 15b](#15b-implemented-tactic-choice-contract-p123-a) records what exists and what does not call it yet. P12.4-B implements combat conversation replies (section 8) as the `combat-reply` contract; [section 15d](#15d-implemented-knowledge-scoped-combat-replies-p124-b) records what exists, and nothing calls it yet either. The other task kinds remain specifications until their packages implement them.
+This document specifies the application-level contracts that sit above the runtime protocols and are identical for the selected runtime, Codex or Claude ([ADR 0020](adr/0020-selectable-narration-runtime.md)). P08.2 implements the intent (section 4) and resolved narration/quick-reply (section 8) contracts as versioned Java types, bundled schemas, English templates and independent validators; [section 14](#14-implemented-intent-and-narration-contracts-p082) records exactly what exists. P12.3-A implements the tactic choice (section 7) as the `tactic` contract; [section 15b](#15b-implemented-tactic-choice-contract-p123-a) records what exists and what does not call it yet. P12.4-B implements combat conversation replies (section 8) as the `combat-reply` contract; [section 15d](#15d-implemented-knowledge-scoped-combat-replies-p124-b) records what exists, and nothing calls it yet either. P13.2-A implements a template-bounded subset of the encounter proposal (section 6) as the `encounter` contract with its deterministic fallback; [section 15e](#15e-implemented-template-bounded-encounter-proposals-p132-a) records what exists, and no planning path calls it yet. The other task kinds remain specifications until their packages implement them.
 
 Prompt design must preserve the same authority boundaries as the backend. A precise prompt reduces mistakes; it never substitutes for validation, permissions, transactions, or audience isolation.
 
@@ -64,6 +64,8 @@ The backend resolves identities against existing canon, rejects conflicts, enfor
 The body includes objective, motivation, roster template IDs and allowed variants, zone graph, initial positions/visibility, prebudgeted phases, retreat/surrender policies, and reward-source policy. It echoes the engine-supplied party snapshot and budget IDs.
 
 It may not supply unchecked threat weights, grant the party equipment, erase injuries, create unregistered immunity, or infer enemy knowledge from the entire GM plan. Proposed mechanics must compile against supported rules and pass feasibility checks before entry.
+
+Since P13.2-A version 1 of this body is implemented as `snapshotHash` (the echoed snapshot), `templateId` and `roster` (hostile participants of that template with starting zones) and `reasonCode`. Objective, motivation, variants, visibility, phases, retreat and reward policies are not part of it yet; see [section 15e](#15e-implemented-template-bounded-encounter-proposals-p132-a).
 
 ## 7. Tactic choice
 
@@ -637,6 +639,94 @@ The caller attributes a shown reply to the speaker of its trusted context; the r
 - The beliefs and outcome statements are supplied by the caller, and no knowledge-view reader fills them.
 - A roster ID shorter than four characters cannot be a guard marker; an implied acceptance or compliance in free words and
   paraphrased secrets are not detectable mechanically.
+
+## 15e. Implemented: template-bounded encounter proposals (P13.2-A)
+
+**Status (14 November 2026): implemented and tested against `ScriptedTaskPort`. No planning path calls it.** Nothing decides
+that an encounter is eligible, reads a campaign into a snapshot or enters a composed encounter. The decision is
+[ADR 0041](adr/0041-template-bounded-encounter-compositions-and-an-authored-fallback.md).
+
+**Options (`org.rpgengine.combat.EncounterOption`).** One eligible authored template with the level its hostile participants
+are costed at (caller-supplied until P13.4). Pure.
+
+- `startZones()`: every declared zone except the escape zones, so a composition never blocks the declared escape.
+- `hostileLimit(budget)`: the budget's limit (party size + 2, at most 8), and never more than the template's own limit (the
+  player, its allies and 2).
+- `compose(placements)`: the template with only the placed hostile participants, each in its placed zone, in authored order.
+  Allies, statistics, attacks, reactions, conditions, objectives, escape zones, the zone graph, the opening policy and declared
+  actions are unchanged. It refuses an unknown or repeated participant, a zone outside `startZones()`, an overfilled zone and
+  anything the template constructor refuses.
+- `fallback(options, budget)`: the first option, in the caller's order, whose authored roster passes `ThreatBudget.check`;
+  null when none does.
+
+**Contract (`EncounterContract`, `EncounterContext`, `EncounterProposal`, schema `ai-contract/1/encounter.schema.json`).**
+
+| Aspect | Value |
+| --- | --- |
+| Kind, role | `encounter`, `encounter-proposer` |
+| Audience | `privileged`, the only audience the role permits; the output is never shown |
+| Work class, budget | `INTERACTIVE`, 60 s for both attempts (both provisional) |
+| Context | `snapshotHash`, `heuristic`, `difficulty`, `partySize`, `capacity`, `threatMinimum`, `threatMaximum`, `options` and `reasonCodes`. Per option: `templateId`, `level`, `hostileLimit`, `playerZone`, `escapeZones`, `startZones`, `zones` (capacity, cover, obscured), `edges`, `hostiles` (ID, tier, cost, authored zone), `allies` and `objectives` (ID and kind). No statistic is rendered |
+| Context rules | 1–8 options, distinct templates, all at the snapshot's location; the snapshot's pack hash is the binding's; the party has a contributing actor |
+| Body | `snapshotHash`, `templateId`, `roster` (0–8 entries of `participantId` and `zoneId`), `reasonCode` |
+| Statuses | `proposed` with 1–8 roster entries and `reasonCode` null; `cannot-complete` with `no-fitting-roster` or `missing-information`, both identities null and an empty roster |
+| Accepted result | `Composed(snapshotHash, option, placements, encounter, verdict)` or `CannotCompose(reasonCode)` |
+
+**Codes.** These come on top of the shared envelope and structure checks:
+
+- `unknown-template`: a template that was not offered.
+- `unknown-participant`: not a hostile participant of the chosen template, such as an ally, the player or another template's
+  participant.
+- `duplicate-participant`: the same participant twice.
+- `zone-not-permitted`: an escape zone or an undeclared zone.
+- `zone-capacity`: a zone would start with more occupants than its capacity, counting the player and the allies.
+- `too-many-hostiles`: more entries than the option's `hostileLimit`.
+- `over-budget`, `under-budget`: the roster's cost is outside the band; any other `ThreatBudget` finding uses the same
+  lowercase form.
+- `echo-mismatch`: a `snapshotHash` other than the context's.
+- `status-field-conflict`: a `reasonCode` in a proposal, or an identity or roster entry in `cannot-complete`.
+- `template-invalid`: the composed template is refused although every check above passed (a guard for future template rules).
+- `field-set`: an extra field such as a participant's `health` or a `threatCost`.
+
+Rejected output gets the runner's single repair, which contains only codes and pointers.
+
+**Fallback (`EncounterFallback.decide(outcome, current)`).** Pure. `current` is the context read again before entry.
+
+| Outcome | Decision | Cause and detail code |
+| --- | --- | --- |
+| `Accepted` composition, same snapshot hash, template still offered | `Proposed` | none |
+| `Accepted` composition with another snapshot hash | fallback | `PROPOSAL_INVALID`, `stale-snapshot` |
+| `Accepted` composition whose template is no longer offered | fallback | `PROPOSAL_INVALID`, `stale-option` |
+| `Accepted` `cannot-complete` | fallback | `PROPOSAL_INVALID`, the reason code |
+| `Rejected` (invalid after the single repair) | fallback | `PROPOSAL_INVALID`, the first violation code |
+| `Refused` | fallback | `PROPOSAL_INVALID`, the refusal code |
+| `NotCompleted` other than cancelled | fallback | `PROVIDER_UNAVAILABLE`, the fixed error code |
+| `NotCompleted` cancelled | fallback | `INTERRUPTED`, the fixed error code |
+
+A fallback is `Fallback(cause, detail, authored)` with the first offered authored template that fits the current budget,
+unchanged, or `NoEncounter(cause, detail)` when none fits: no fight starts, and nothing is invented to fill the gap. No player
+notice is produced.
+
+**Evidence.**
+
+- `EncounterOptionTest` (2 cases): a composition keeps the authored order, the allies, statistics, zones and objectives, and
+  only selects and places hostile participants; refused compositions; the fallback takes the first fitting authored template,
+  respects levels, and returns none for an over-budget template or a party without a contributing actor.
+- `EncounterContractTest` (9 cases, one parameterized over both languages): the privileged request has exactly the fields
+  above and no statistic; compositions accepted in English and Italian; one rejection per code; through `ContractRunner` and a
+  scripted runtime, a valid composition kept as `Proposed`, an over-budget composition repaired once into `Proposed`, an output
+  invalid after the repair falling back to the authored patrol or to `NoEncounter`, each of the six non-completed task statuses
+  falling back after one request, and stale, declined and refused outcomes falling back.
+- `ContractSchemaTest` checks the schema against the validator field sets and the instruction is ASCII.
+
+**Not proven.**
+
+- No caller: nothing decides eligibility, assembles the context from a campaign, freezes a composed encounter or stores the
+  decision. Authored templates entered with `ENGAGE` are still not budget-checked.
+- No live model output was evaluated.
+- Objective, motivation, visibility, retreat behavior, reward sources, reinforcement phases, objective reachability, hard
+  counters and campaign-scoped identities are not proposed or checked (P13.3, P13.4).
+- With the provisional numbers, small parties often have no fitting authored roster, so `NoEncounter` may be common (P18.3).
 
 ## 16. Neutral protocol proof (P01.1)
 

@@ -11,6 +11,9 @@
  * packages added the quest-plan (P08.7), continuity-summary (P09.3) and tactic-choice (P12.3)
  * contracts; {@link org.rpgengine.inference.contract.TacticContract} is the first that runs in one
  * character's audience, which it takes from its context through {@code TaskContract#audience}.
+ * The combat-reply (P12.4-B) and encounter-proposal (P13.2-A) contracts followed;
+ * {@link org.rpgengine.inference.contract.EncounterFallback} turns an encounter call's outcome into
+ * the runtime's checked composition, the first fitting authored template, or no encounter.
  *
  * <p>{@link org.rpgengine.inference.contract.ContractRunner} submits one contract task through
  * the fair {@link org.rpgengine.inference.scheduling.InferenceScheduler} (P08.6), which dispatches

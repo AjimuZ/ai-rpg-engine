@@ -150,6 +150,36 @@ class ContractSchemaTest {
     }
 
     @Test
+    void encounterSchemaMatchesTheValidatorFieldSets() {
+        JsonNode root = schema(new EncounterContract());
+        assertClosedObject(root, ContractEnvelope.RESPONSE_FIELDS);
+        JsonNode body = root.path("properties").path("body");
+        assertClosedObject(body, EncounterContract.BODY_FIELDS);
+        JsonNode roster = body.path("properties").path("roster");
+        assertClosedObject(roster.path("items"), EncounterContract.ROSTER_FIELDS);
+        assertThat(roster.path("maxItems").asInt()).isEqualTo(EncounterContract.MAX_ROSTER);
+        assertThat(body.path("properties").path("templateId").path("maxLength").asInt())
+                .isEqualTo(EncounterContract.MAX_TEMPLATE_ID);
+        assertThat(body.path("properties").path("snapshotHash").path("maxLength").asInt())
+                .isEqualTo(EncounterContract.HASH_LENGTH);
+        for (String field : EncounterContract.ROSTER_FIELDS) {
+            assertThat(roster.path("items").path("properties").path(field).path("maxLength").asInt())
+                    .isEqualTo(EncounterContract.MAX_ID);
+        }
+        var kinds = new ArrayList<String>();
+        root.path("properties").path("taskKind").path("enum").forEach(v -> kinds.add(v.asString()));
+        assertThat(kinds).containsExactly(TaskKind.ENCOUNTER.wire());
+        var statuses = new ArrayList<String>();
+        root.path("properties").path("status").path("enum").forEach(v -> statuses.add(v.asString()));
+        assertThat(statuses).containsExactlyInAnyOrderElementsOf(EncounterContract.STATUSES);
+        var reasons = new ArrayList<String>();
+        body.path("properties").path("reasonCode").path("enum").forEach(v -> reasons.add(v.isNull() ? null : v.asString()));
+        var expected = new ArrayList<String>(EncounterContract.CANNOT_REASONS);
+        expected.add(null);
+        assertThat(reasons).containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    @Test
     void templatesAreVersionedEnglishAndHashed() {
         var intent = new IntentContract();
         var narration = new NarrationContract();
@@ -159,7 +189,8 @@ class ContractSchemaTest {
         // Technical templates stay English whatever the output locale; only output strings switch.
         for (String text : List.of(ContractEnvelope.SHARED_INSTRUCTION, IntentContract.TASK_INSTRUCTION,
                 NarrationContract.TASK_INSTRUCTION, QuestPlanContract.PLAN_INSTRUCTION,
-                QuestPlanContract.REFINE_INSTRUCTION, TacticContract.TASK_INSTRUCTION, CombatReplyContract.TASK_INSTRUCTION)) {
+                QuestPlanContract.REFINE_INSTRUCTION, TacticContract.TASK_INSTRUCTION, CombatReplyContract.TASK_INSTRUCTION,
+                EncounterContract.TASK_INSTRUCTION)) {
             assertThat(Pattern.compile("[^\\x20-\\x7E\\n]").matcher(text).find()).isFalse();
         }
     }

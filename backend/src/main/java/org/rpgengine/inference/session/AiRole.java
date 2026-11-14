@@ -17,9 +17,9 @@ import java.util.Set;
  * <p>{@link #INTERPRETER} and {@link #NARRATOR} have implemented contracts since P08.2,
  * {@link #QUEST_PLANNER} since P08.7, {@link #SUMMARIZER} since P09.3, {@link #TACTICIAN} since
  * P12.3 (the {@code tactic} contract, in the acting character's audience) and {@link #CHARACTER_VOICE}
- * since P12.4-B (the {@code combat-reply} contract, in the replying character's audience). The other roles fix their
- * audience rules now so that later contracts (P15 guides, P13 encounters) inherit the separation
- * instead of inventing it.
+ * since P12.4-B (the {@code combat-reply} contract, in the replying character's audience) and {@link #ENCOUNTER_PROPOSER}
+ * since P13.2-A (the {@code encounter} contract, privileged). The other roles fix their audience rules now so that later
+ * contracts (P15 guides) inherit the separation instead of inventing it.
  */
 public enum AiRole {
     /** Free-text declaration to a typed intention; the clarification is shown to the player. */

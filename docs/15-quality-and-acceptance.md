@@ -1822,6 +1822,18 @@ objective, a hidden hard counter and an over-budget phase or reinforcement (P13.
 bands per tier, so a strong body declared "minor" passes. Nothing calls the check yet, so no encounter is planned, proposed or
 refused by it, and no deliberate weakening ran.
 
+P13.2-A (14 November 2026) adds `EncounterOptionTest` (2) and `EncounterContractTest` (9), plus an encounter case in
+`ContractSchemaTest`. They are QA-14 evidence for the invalid-roster and over-budget-roster clauses applied to runtime
+proposals ([docs/21 section 15e](21-ai-task-contracts-and-prompts.md#15e-implemented-template-bounded-encounter-proposals-p132-a)).
+A proposed roster is rejected, with one code each, when it names an ally, the player or another template's participant, repeats
+a participant, starts one in an escape or undeclared zone, overfills a zone, exceeds the hostile limit, or costs more or less
+than the band; an extra statistic field is rejected too. Through the real `ContractRunner` and a scripted runtime, an invalid
+composition is repaired once, and output still invalid after the repair is never used: the decision is the first authored
+template that fits, unchanged, or no encounter. See the P13.2 roadmap entry for results and limits. QA-14 is not met: an
+unreachable objective, a hidden hard counter and an over-budget phase or reinforcement (P13.3) are not checked, there are still
+no statistic bands per tier, and no planning path calls the contract, so no campaign encounter is proposed or refused this way.
+No live model output was evaluated and no deliberate weakening ran.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.
