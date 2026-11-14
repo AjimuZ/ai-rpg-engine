@@ -4584,5 +4584,719 @@
       <target>Riprova</target>
       </segment>
     </unit>
+    <unit id="campaign.resume.inFight">
+      <segment>
+        <source>In progress</source>
+      <target>In corso</target>
+      </segment>
+    </unit>
+    <unit id="combat.title">
+      <segment>
+        <source>Combat</source>
+      <target>Combattimento</target>
+      </segment>
+    </unit>
+    <unit id="combat.initiative">
+      <segment>
+        <source>Initiative order</source>
+      <target>Ordine di iniziativa</target>
+      </segment>
+    </unit>
+    <unit id="combat.noInitiative">
+      <segment>
+        <source>Initiative has not been rolled yet.</source>
+      <target>L’iniziativa non è ancora stata tirata.</target>
+      </segment>
+    </unit>
+    <unit id="combat.zones">
+      <segment>
+        <source>Zones and passages</source>
+      <target>Zone e passaggi</target>
+      </segment>
+    </unit>
+    <unit id="combat.escape">
+      <segment>
+        <source>Escape zones</source>
+      <target>Zone di fuga</target>
+      </segment>
+    </unit>
+    <unit id="combat.noEscape">
+      <segment>
+        <source>This fight has no escape zones.</source>
+      <target>Questo scontro non ha zone di fuga.</target>
+      </segment>
+    </unit>
+    <unit id="combat.participants">
+      <segment>
+        <source>Participants</source>
+      <target>Partecipanti</target>
+      </segment>
+    </unit>
+    <unit id="combat.you">
+      <segment>
+        <source>You</source>
+      <target>Tu</target>
+      </segment>
+    </unit>
+    <unit id="combat.yourValues">
+      <segment>
+        <source>Your fighting values</source>
+      <target>I tuoi valori di combattimento</target>
+      </segment>
+    </unit>
+    <unit id="combat.sheetNote">
+      <segment>
+        <source>Guard, Resistance and armor are the sheet values, before stance, cover and effects.</source>
+      <target>Guardia, Resistenza e armatura sono i valori della scheda, prima di postura, copertura ed effetti.</target>
+      </segment>
+    </unit>
+    <unit id="combat.health">
+      <segment>
+        <source>Health</source>
+      <target>Salute</target>
+      </segment>
+    </unit>
+    <unit id="combat.focus">
+      <segment>
+        <source>Focus</source>
+      <target>Concentrazione</target>
+      </segment>
+    </unit>
+    <unit id="combat.guard">
+      <segment>
+        <source>Guard</source>
+      <target>Guardia</target>
+      </segment>
+    </unit>
+    <unit id="combat.resistance">
+      <segment>
+        <source>Resistance</source>
+      <target>Resistenza</target>
+      </segment>
+    </unit>
+    <unit id="combat.armor">
+      <segment>
+        <source>Armor</source>
+      <target>Armatura</target>
+      </segment>
+    </unit>
+    <unit id="combat.stance">
+      <segment>
+        <source>Guard stance</source>
+      <target>Postura di guardia</target>
+      </segment>
+    </unit>
+    <unit id="combat.stanceHeld">
+      <segment>
+        <source>Held until your next turn</source>
+      <target>Mantenuta fino al tuo prossimo turno</target>
+      </segment>
+    </unit>
+    <unit id="combat.stanceNone">
+      <segment>
+        <source>Not held</source>
+      <target>Non mantenuta</target>
+      </segment>
+    </unit>
+    <unit id="combat.reactionsLeft">
+      <segment>
+        <source>Reactions left this round</source>
+      <target>Reazioni rimaste in questo round</target>
+      </segment>
+    </unit>
+    <unit id="combat.effects">
+      <segment>
+        <source>Effects</source>
+      <target>Effetti</target>
+      </segment>
+    </unit>
+    <unit id="combat.noEffects">
+      <segment>
+        <source>No active effects.</source>
+      <target>Nessun effetto attivo.</target>
+      </segment>
+    </unit>
+    <unit id="combat.known">
+      <segment>
+        <source>Known defenses</source>
+      <target>Difese note</target>
+      </segment>
+    </unit>
+    <unit id="combat.notAssessed">
+      <segment>
+        <source>Not assessed yet.</source>
+      <target>Non ancora valutato.</target>
+      </segment>
+    </unit>
+    <unit id="combat.objectives">
+      <segment>
+        <source>Objectives</source>
+      <target>Obiettivi</target>
+      </segment>
+    </unit>
+    <unit id="combat.noObjectives">
+      <segment>
+        <source>This fight has no objectives.</source>
+      <target>Questo scontro non ha obiettivi.</target>
+      </segment>
+    </unit>
+    <unit id="combat.options">
+      <segment>
+        <source>What you can do now</source>
+      <target>Cosa puoi fare adesso</target>
+      </segment>
+    </unit>
+    <unit id="combat.noDecision">
+      <segment>
+        <source>Nothing is waiting for you to decide right now.</source>
+      <target>Al momento nessuna decisione attende te.</target>
+      </segment>
+    </unit>
+    <unit id="combat.movement">
+      <segment>
+        <source>Movement</source>
+      <target>Movimento</target>
+      </segment>
+    </unit>
+    <unit id="combat.attacks">
+      <segment>
+        <source>Attacks</source>
+      <target>Attacchi</target>
+      </segment>
+    </unit>
+    <unit id="combat.abilities">
+      <segment>
+        <source>Abilities</source>
+      <target>Abilità</target>
+      </segment>
+    </unit>
+    <unit id="combat.declared">
+      <segment>
+        <source>Social and scene actions</source>
+      <target>Azioni sociali e di scena</target>
+      </segment>
+    </unit>
+    <unit id="combat.other">
+      <segment>
+        <source>Other actions</source>
+      <target>Altre azioni</target>
+      </segment>
+    </unit>
+    <unit id="combat.reactions">
+      <segment>
+        <source>Reactions</source>
+      <target>Reazioni</target>
+      </segment>
+    </unit>
+    <unit id="combat.guardOption">
+      <segment>
+        <source>Take a guarded stance</source>
+      <target>Assumi una postura di guardia</target>
+      </segment>
+    </unit>
+    <unit id="combat.itemOption">
+      <segment>
+        <source>Use an item</source>
+      <target>Usa un oggetto</target>
+      </segment>
+    </unit>
+    <unit id="combat.readyOption">
+      <segment>
+        <source>Ready or change equipment</source>
+      <target>Prepara o cambia l’equipaggiamento</target>
+      </segment>
+    </unit>
+    <unit id="combat.assessOption">
+      <segment>
+        <source>Assess a participant</source>
+      <target>Valuta un partecipante</target>
+      </segment>
+    </unit>
+    <unit id="combat.endOption">
+      <segment>
+        <source>End your turn</source>
+      <target>Termina il tuo turno</target>
+      </segment>
+    </unit>
+    <unit id="combat.offer">
+      <segment>
+        <source>Offer on the table</source>
+      <target>Offerta sul tavolo</target>
+      </segment>
+    </unit>
+    <unit id="combat.canAccept">
+      <segment>
+        <source>You can accept it.</source>
+      <target>Puoi accettarla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.cannotAccept">
+      <segment>
+        <source>You cannot accept it right now.</source>
+      <target>Al momento non puoi accettarla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.verdict">
+      <segment>
+        <source>Verdict awaiting settlement</source>
+      <target>Verdetto in attesa di conclusione</target>
+      </segment>
+    </unit>
+    <unit id="combat.verdictHelp">
+      <segment>
+        <source>The fight is decided. Nothing more changes until you settle it.</source>
+      <target>Lo scontro è deciso. Non cambierà più nulla finché non lo concludi.</target>
+      </segment>
+    </unit>
+    <unit id="combat.roundCapNote">
+      <segment>
+        <source>Decided by the round limit.</source>
+      <target>Deciso dal limite di round.</target>
+      </segment>
+    </unit>
+    <unit id="combat.unavailable">
+      <segment>
+        <source>Not available now</source>
+      <target>Non disponibile ora</target>
+      </segment>
+    </unit>
+    <unit id="combat.passable">
+      <segment>
+        <source>Open</source>
+      <target>Libero</target>
+      </segment>
+    </unit>
+    <unit id="combat.blocked">
+      <segment>
+        <source>Blocked</source>
+      <target>Bloccato</target>
+      </segment>
+    </unit>
+    <unit id="combat.difficult">
+      <segment>
+        <source>Difficult terrain</source>
+      <target>Terreno difficile</target>
+      </segment>
+    </unit>
+    <unit id="combat.obscured">
+      <segment>
+        <source>Obscured</source>
+      <target>Visibilità ridotta</target>
+      </segment>
+    </unit>
+    <unit id="combat.unlimited">
+      <segment>
+        <source>No occupant limit</source>
+      <target>Nessun limite di occupanti</target>
+      </segment>
+    </unit>
+    <unit id="combat.readOnly">
+      <segment>
+        <source>This panel shows the saved state only. Reading it does not advance time or send anything.</source>
+      <target>Questo pannello mostra solo lo stato salvato. Leggerlo non fa avanzare il tempo e non invia nulla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.mapRegion">
+      <segment>
+        <source>Zones and passages, scrollable</source>
+      <target>Zone e passaggi, scorrevoli</target>
+      </segment>
+    </unit>
+    <unit id="combat.phaseSetup">
+      <segment>
+        <source>The fight is being set up.</source>
+      <target>Lo scontro si sta preparando.</target>
+      </segment>
+    </unit>
+    <unit id="combat.phaseRound">
+      <segment>
+        <source>The round is being played.</source>
+      <target>Il round è in corso.</target>
+      </segment>
+    </unit>
+    <unit id="combat.phaseYourTurn">
+      <segment>
+        <source>Your turn: choose what to do.</source>
+      <target>Tocca a te: scegli cosa fare.</target>
+      </segment>
+    </unit>
+    <unit id="combat.phaseWaiting">
+      <segment>
+        <source>Waiting for an action.</source>
+      <target>In attesa di un’azione.</target>
+      </segment>
+    </unit>
+    <unit id="combat.phaseDecided">
+      <segment>
+        <source>The fight is decided and waits for you to settle it.</source>
+      <target>Lo scontro è deciso e attende che tu lo concluda.</target>
+      </segment>
+    </unit>
+    <unit id="combat.phaseEnded">
+      <segment>
+        <source>The fight has ended.</source>
+      <target>Lo scontro è finito.</target>
+      </segment>
+    </unit>
+    <unit id="combat.round">
+      <segment>
+        <source>Round <ph id="0" equiv="round" disp="round" /> of <ph id="1" equiv="cap" disp="cap" /></source>
+      <target>Round <ph id="0" equiv="round" disp="round" /> di <ph id="1" equiv="cap" disp="cap" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.beforeRound">
+      <segment>
+        <source>Before the first round</source>
+      <target>Prima del primo round</target>
+      </segment>
+    </unit>
+    <unit id="combat.acting">
+      <segment>
+        <source>Acting: <ph id="0" equiv="who" disp="who" />, <ph id="1" equiv="points" disp="points" /> of <ph id="2" equiv="total" disp="total" /> action points left</source>
+      <target>In azione: <ph id="0" equiv="who" disp="who" />, restano <ph id="1" equiv="points" disp="points" /> punti azione su <ph id="2" equiv="total" disp="total" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.initiativeValue">
+      <segment>
+        <source>Initiative <ph id="0" equiv="value" disp="value" /></source>
+      <target>Iniziativa <ph id="0" equiv="value" disp="value" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.sidePlayer">
+      <segment>
+        <source>Your side</source>
+      <target>La tua squadra</target>
+      </segment>
+    </unit>
+    <unit id="combat.sideAlly">
+      <segment>
+        <source>Ally</source>
+      <target>Alleato</target>
+      </segment>
+    </unit>
+    <unit id="combat.sideHostile">
+      <segment>
+        <source>Hostile</source>
+      <target>Ostile</target>
+      </segment>
+    </unit>
+    <unit id="combat.standingActive">
+      <segment>
+        <source>Active</source>
+      <target>Attivo</target>
+      </segment>
+    </unit>
+    <unit id="combat.standingDefeated">
+      <segment>
+        <source>Defeated</source>
+      <target>Sconfitto</target>
+      </segment>
+    </unit>
+    <unit id="combat.standingEscaped">
+      <segment>
+        <source>Escaped</source>
+      <target>Fuggito</target>
+      </segment>
+    </unit>
+    <unit id="combat.standingSurrendered">
+      <segment>
+        <source>Surrendered</source>
+      <target>Arreso</target>
+      </segment>
+    </unit>
+    <unit id="combat.coverNone">
+      <segment>
+        <source>No cover</source>
+      <target>Nessuna copertura</target>
+      </segment>
+    </unit>
+    <unit id="combat.coverPartial">
+      <segment>
+        <source>Partial cover</source>
+      <target>Copertura parziale</target>
+      </segment>
+    </unit>
+    <unit id="combat.coverFull">
+      <segment>
+        <source>Full cover</source>
+      <target>Copertura totale</target>
+      </segment>
+    </unit>
+    <unit id="combat.capacity">
+      <segment>
+        <source>Holds at most <ph id="0" equiv="limit" disp="limit" /></source>
+      <target>Ospita al massimo <ph id="0" equiv="limit" disp="limit" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.crossing">
+      <segment>
+        <source>Action points to cross: <ph id="0" equiv="cost" disp="cost" /></source>
+      <target>Punti azione per attraversare: <ph id="0" equiv="cost" disp="cost" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.price">
+      <segment>
+        <source>Action points: <ph id="0" equiv="cost" disp="cost" /></source>
+      <target>Punti azione: <ph id="0" equiv="cost" disp="cost" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.learned">
+      <segment>
+        <source>Learned in round <ph id="0" equiv="round" disp="round" /> (revision <ph id="1" equiv="revision" disp="revision" />). Health may have changed since.</source>
+      <target>Appreso nel round <ph id="0" equiv="round" disp="round" /> (revisione <ph id="1" equiv="revision" disp="revision" />). La Salute potrebbe essere cambiata da allora.</target>
+      </segment>
+    </unit>
+    <unit id="combat.objectiveDefeat">
+      <segment>
+        <source>Defeat every hostile participant</source>
+      <target>Sconfiggi ogni partecipante ostile</target>
+      </segment>
+    </unit>
+    <unit id="combat.objectiveEscape">
+      <segment>
+        <source>Escape from the fight</source>
+      <target>Fuggi dallo scontro</target>
+      </segment>
+    </unit>
+    <unit id="combat.objectiveReach">
+      <segment>
+        <source>Reach zone <ph id="0" equiv="zone" disp="zone" /></source>
+      <target>Raggiungi la zona <ph id="0" equiv="zone" disp="zone" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.objectiveSurvive">
+      <segment>
+        <source>Survive <ph id="0" equiv="rounds" disp="rounds" /> rounds</source>
+      <target>Sopravvivi per <ph id="0" equiv="rounds" disp="rounds" /> round</target>
+      </segment>
+    </unit>
+    <unit id="combat.objectiveProtect">
+      <segment>
+        <source>Protect <ph id="0" equiv="who" disp="who" /></source>
+      <target>Proteggi <ph id="0" equiv="who" disp="who" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.statusPending">
+      <segment>
+        <source>Pending</source>
+      <target>Da compiere</target>
+      </segment>
+    </unit>
+    <unit id="combat.statusMet">
+      <segment>
+        <source>Met</source>
+      <target>Raggiunto</target>
+      </segment>
+    </unit>
+    <unit id="combat.statusFailed">
+      <segment>
+        <source>Failed</source>
+      <target>Fallito</target>
+      </segment>
+    </unit>
+    <unit id="combat.outcomeVictory">
+      <segment>
+        <source>Victory</source>
+      <target>Vittoria</target>
+      </segment>
+    </unit>
+    <unit id="combat.outcomeDefeat">
+      <segment>
+        <source>Defeat</source>
+      <target>Sconfitta</target>
+      </segment>
+    </unit>
+    <unit id="combat.outcomeEscape">
+      <segment>
+        <source>Escape</source>
+      <target>Fuga</target>
+      </segment>
+    </unit>
+    <unit id="combat.outcomeObjective">
+      <segment>
+        <source>Objective achieved</source>
+      <target>Obiettivo raggiunto</target>
+      </segment>
+    </unit>
+    <unit id="combat.outcomePlayerSurrender">
+      <segment>
+        <source>You surrendered</source>
+      <target>Ti sei arreso</target>
+      </segment>
+    </unit>
+    <unit id="combat.outcomeHostileSurrender">
+      <segment>
+        <source>The opposition surrendered</source>
+      <target>Gli avversari si sono arresi</target>
+      </segment>
+    </unit>
+    <unit id="combat.outcomeAgreement">
+      <segment>
+        <source>Agreement reached</source>
+      <target>Accordo raggiunto</target>
+      </segment>
+    </unit>
+    <unit id="combat.outcomeStalemate">
+      <segment>
+        <source>Stalemate</source>
+      <target>Stallo</target>
+      </segment>
+    </unit>
+    <unit id="combat.disabledAmmunition">
+      <segment>
+        <source>No ammunition left</source>
+      <target>Munizioni esaurite</target>
+      </segment>
+    </unit>
+    <unit id="combat.disabledTarget">
+      <segment>
+        <source>No target in reach</source>
+      <target>Nessun bersaglio a portata</target>
+      </segment>
+    </unit>
+    <unit id="combat.disabledPoints">
+      <segment>
+        <source>Not enough action points</source>
+      <target>Punti azione insufficienti</target>
+      </segment>
+    </unit>
+    <unit id="combat.disabledPrevented">
+      <segment>
+        <source>An effect prevents this</source>
+      <target>Un effetto lo impedisce</target>
+      </segment>
+    </unit>
+    <unit id="combat.disabledFocus">
+      <segment>
+        <source>Not enough Focus</source>
+      <target>Concentrazione insufficiente</target>
+      </segment>
+    </unit>
+    <unit id="combat.disabledLimit">
+      <segment>
+        <source>Already used as often as allowed</source>
+      <target>Già usata il massimo di volte consentito</target>
+      </segment>
+    </unit>
+    <unit id="combat.disabledCooldown">
+      <segment>
+        <source>Still recovering</source>
+      <target>Ancora in ricarica</target>
+      </segment>
+    </unit>
+    <unit id="combat.move">
+      <segment>
+        <source>Move to <ph id="0" equiv="zone" disp="zone" /></source>
+      <target>Spostati in <ph id="0" equiv="zone" disp="zone" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.withdraw">
+      <segment>
+        <source>Withdraw to <ph id="0" equiv="zone" disp="zone" /></source>
+      <target>Ritirati in <ph id="0" equiv="zone" disp="zone" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.strike">
+      <segment>
+        <source>Attack with <ph id="0" equiv="attack" disp="attack" /></source>
+      <target>Attacca con <ph id="0" equiv="attack" disp="attack" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.ability">
+      <segment>
+        <source>Use the ability <ph id="0" equiv="ability" disp="ability" /></source>
+      <target>Usa l’abilità <ph id="0" equiv="ability" disp="ability" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.focusCost">
+      <segment>
+        <source>Focus: <ph id="0" equiv="focus" disp="focus" /></source>
+      <target>Concentrazione: <ph id="0" equiv="focus" disp="focus" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.maxTargets">
+      <segment>
+        <source>Targets at most: <ph id="0" equiv="most" disp="most" /></source>
+      <target>Bersagli al massimo: <ph id="0" equiv="most" disp="most" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.targets">
+      <segment>
+        <source>Targets: <ph id="0" equiv="targets" disp="targets" /></source>
+      <target>Bersagli: <ph id="0" equiv="targets" disp="targets" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.recipients">
+      <segment>
+        <source>Recipients: <ph id="0" equiv="recipients" disp="recipients" /></source>
+      <target>Destinatari: <ph id="0" equiv="recipients" disp="recipients" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.speech">
+      <segment>
+        <source>Speak: <ph id="0" equiv="left" disp="left" /> left this turn</source>
+      <target>Parlare: ancora <ph id="0" equiv="left" disp="left" /> in questo turno</target>
+      </segment>
+    </unit>
+    <unit id="combat.social">
+      <segment>
+        <source>Social action <ph id="0" equiv="action" disp="action" /></source>
+      <target>Azione sociale <ph id="0" equiv="action" disp="action" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.scene">
+      <segment>
+        <source>Scene action <ph id="0" equiv="action" disp="action" /></source>
+      <target>Azione di scena <ph id="0" equiv="action" disp="action" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.check">
+      <segment>
+        <source>Check on <ph id="0" equiv="attribute" disp="attribute" />, rank <ph id="1" equiv="rank" disp="rank" /></source>
+      <target>Prova su <ph id="0" equiv="attribute" disp="attribute" />, grado <ph id="1" equiv="rank" disp="rank" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.checkSkill">
+      <segment>
+        <source>Check on <ph id="0" equiv="attribute" disp="attribute" /> and <ph id="1" equiv="skill" disp="skill" />, rank <ph id="2" equiv="rank" disp="rank" /></source>
+      <target>Prova su <ph id="0" equiv="attribute" disp="attribute" /> e <ph id="1" equiv="skill" disp="skill" />, grado <ph id="2" equiv="rank" disp="rank" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.terms">
+      <segment>
+        <source>Terms <ph id="0" equiv="terms" disp="terms" /> (<ph id="1" equiv="kind" disp="kind" />), cost <ph id="2" equiv="cost" disp="cost" /></source>
+      <target>Condizioni <ph id="0" equiv="terms" disp="terms" /> (<ph id="1" equiv="kind" disp="kind" />), costo <ph id="2" equiv="cost" disp="cost" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.offerLine">
+      <segment>
+        <source>Terms <ph id="0" equiv="terms" disp="terms" /> are on the table with <ph id="1" equiv="recipient" disp="recipient" />.</source>
+      <target>Le condizioni <ph id="0" equiv="terms" disp="terms" /> sono sul tavolo con <ph id="1" equiv="recipient" disp="recipient" />.</target>
+      </segment>
+    </unit>
+    <unit id="combat.policyOff">
+      <segment>
+        <source>Never used</source>
+      <target>Mai usata</target>
+      </segment>
+    </unit>
+    <unit id="combat.policyFirst">
+      <segment>
+        <source>Used at the first chance</source>
+      <target>Usata alla prima occasione</target>
+      </segment>
+    </unit>
+    <unit id="combat.policyHealth">
+      <segment>
+        <source>Used when Health is at most <ph id="0" equiv="value" disp="value" /> percent</source>
+      <target>Usata quando la Salute è al massimo <ph id="0" equiv="value" disp="value" /> percento</target>
+      </segment>
+    </unit>
+    <unit id="combat.policyFocus">
+      <segment>
+        <source>Used when Focus is at least <ph id="0" equiv="value" disp="value" /></source>
+      <target>Usata quando la Concentrazione è almeno <ph id="0" equiv="value" disp="value" /></target>
+      </segment>
+    </unit>
   </file>
 </xliff>

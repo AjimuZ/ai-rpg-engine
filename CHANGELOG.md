@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — A combat panel in English and Italian (P12.1-B), 14 November 2026
+
+- During a fight the playthrough page now shows a read-only combat panel: whose turn it is with the round and the action
+  points left, the initiative order, the zones with cover, obscuring and capacity, each passage with its state and crossing
+  price, the escape zones, every participant's side, standing, zone and effects, the objectives with their status, your own
+  Health, Focus, Guard, Resistance, armor, stance and reactions, what you can do now with each cost, target and the reason
+  something is unavailable, and the verdict waiting for you to settle the fight.
+- What you learned about another participant by assessing it is shown with the round and revision it was learned at, or as
+  "not assessed yet". Nothing else about it is shown. The panel has no button: it cannot send anything.
+- The resume card's "Encounter" line now says "In progress" during a fight instead of always "None".
+- The panel is available in English and Italian (119 new reviewed messages, 635 in the catalog). Sections are native
+  `details` elements, reachable and toggled by keyboard, and the layout reflows at 320 px.
+- Outside a fight the page makes no extra request. The panel's code is a separate lazy chunk. Sending combat actions is still
+  not connected (P12.2).
+
 ## Unreleased — A player-safe view of the fight for the combat panel (P12.1-A), 14 November 2026
 
 - New read-only route `GET /api/v1/campaigns/{id}/encounter?adventureId=…` describes the active fight at one revision: the

@@ -16,8 +16,9 @@
  */
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, input, LOCALE_ID, signal, untracked } from '@angular/core';
 import { StoryInputState } from '../preview/story-input-state';
-import { CampaignProtocolError, CampaignView, isPending, JournalEntry, PlayPanels, ResumeCard } from './campaign-protocol';
+import { CampaignProtocolError, CampaignView, CombatView, isPending, JournalEntry, PlayPanels, ResumeCard } from './campaign-protocol';
 import { CampaignPanels } from './campaign-panels';
+import { CombatPanel } from './combat-panel';
 import { CampaignCues } from './campaign-cues';
 import {
   awaitingMessage, campaignErrorMessage, commandTypeLabel, decisionMessage, dependencyIssueMessage, fallbackNotice, languageName,
@@ -42,7 +43,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 
 /** Show a playthrough's authorized public projection and follow its resumable stream while mounted. */
 @Component({
-  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CampaignPanels, CampaignCues],
+  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CampaignPanels, CampaignCues, CombatPanel],
   template: `
     <section class="panel campaign-playthrough" [attr.data-campaign-id]="campaignId()" aria-labelledby="campaign-title">
       @if (view(); as current) {
@@ -76,7 +77,8 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
               <dt i18n="@@campaign.resume.resources">Resources</dt>
               <dd data-resources>{{ resourceText(card).join(' · ') }}</dd>
               <dt i18n="@@campaign.resume.encounter">Encounter</dt>
-              <dd i18n="@@campaign.resume.noEncounter">None</dd>
+              @if (card.inFight) { <dd data-encounter i18n="@@campaign.resume.inFight">In progress</dd> }
+              @else { <dd i18n="@@campaign.resume.noEncounter">None</dd> }
               <dt i18n="@@campaign.resume.decision">Next decision</dt>
               <dd data-decision>{{ decisionText(card.pendingDecision) }}</dd>
             </dl>
@@ -98,6 +100,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
             <p class="muted" i18n="@@campaign.resume.readOnly">This summary is read from the last saved state; reading it does not advance time.</p>
           </section>
         }
+        @defer (when combat()?.encounter != null) { <app-combat-panel [view]="combat()" /> }
         <app-campaign-panels [panels]="panels()" [older]="older()" [nextBefore]="cursor()" [loadingOlder]="loadingOlder()" (olderRequested)="loadOlder()" />
       } @else if (failure()) { <p class="notice" role="alert" data-error>{{ failure() }}</p>
       } @else { <p role="status" i18n="@@campaign.view.loading">Loading the playthrough…</p> }
@@ -152,6 +155,8 @@ export class CampaignPlaythrough {
   readonly resume = signal<ResumeCard | null>(null);
   /** Panels and journal of the shown revision (P10.5); null until read. */
   readonly panels = signal<PlayPanels | null>(null);
+  /** Combat projection of the shown revision (P12.1-B); read only while the resume card reports a fight, null otherwise. */
+  readonly combat = signal<CombatView | null>(null);
   /** Older journal pages fetched on request, newest first; cleared whenever the first page is re-read. */
   readonly older = signal<readonly JournalEntry[]>([]);
   /** Cursor of the next older journal page, or null at the oldest event. */
@@ -197,6 +202,7 @@ export class CampaignPlaythrough {
     this.view.set(null);
     this.resume.set(null);
     this.panels.set(null);
+    this.combat.set(null);
     this.older.set([]);
     this.cursor.set(null);
     this.failure.set('');
@@ -223,9 +229,12 @@ export class CampaignPlaythrough {
         if (!loaded) {
           // State and resume card describe the same scope; both are re-read after any newer revision.
           this.view.set(await this.transport.state(scope, signal));
-          this.resume.set(await this.transport.resume(scope, signal));
+          const card = await this.transport.resume(scope, signal);
+          this.resume.set(card);
           const panels = await this.transport.panels(scope, signal);
           this.panels.set(panels);
+          // The combat projection is read only during a fight, so a playthrough without one issues no extra request.
+          this.combat.set(card.inFight ? await this.transport.encounter(scope, signal) : null);
           this.older.set([]);
           this.cursor.set(panels.nextBefore);
           loaded = true;

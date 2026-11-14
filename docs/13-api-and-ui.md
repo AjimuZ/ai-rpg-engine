@@ -501,7 +501,33 @@ admission). It answers 200 with one repeatable-read snapshot: `scope` (adventure
 Another participant's current Health, Focus, defenses, stance, reactions, policies, attacks, abilities and role values,
 any effect clock, absorption or source, a check's difficulty or margin, a counteroffer not yet made and anything from an
 `INTERNAL` event or another encounter's event are never returned (QA-16, `CombatPanelTest`). Reading the projection writes
-nothing and submits nothing. No frontend control reads it yet (P12.1).
+nothing and submits nothing. The playthrough page reads it since P12.1-B
+([combat panel](#p121-b-combat-panel)).
+
+### P12.1-B combat panel
+
+`CombatPanel` (`frontend/src/app/campaign/combat-panel.ts`) renders the projection above; `parseCombatView` validates it
+(unknown phase, side, standing, cover, objective kind or status, reaction mode or outcome, a non-integer or negative number,
+an oversized list or a foreign scope reject the whole body) and `combat-messages.ts` words it. The page reads
+`GET …/encounter` only when the resume card reports a fight (`inFight`, the card's `encounter` member being non-null), after
+the panels and in the same re-read, so a playthrough outside a fight issues no extra request; a read refused by the server or
+failing validation shows the usual localized error and no panel. The component is loaded lazily when the first projection with a
+fight arrives.
+
+It shows, in order: the phase sentence, the round of the cap and the acting participant with the points left; the verdict at
+`OUTCOME_PENDING`; the initiative order (the acting participant carries `aria-current`); zones and passages with the crossing
+price (a blocked passage has none) and the escape zones; each participant's side, standing, zone and effects, and for another
+participant its known defenses with the round and revision they were learned at, or "not assessed yet"; the player's own values;
+the objectives; and, only while `playerDecision` is true, the candidates grouped as movement, attacks, abilities, social and scene
+actions, other actions (guard, item, ready, assess, withdraw, speech, end turn) and reactions, each with its price, targets and
+the wording of its disabled reason. The reasons are a closed table (`NO_AMMUNITION`, `NO_TARGET_IN_REACH`, `ACTION_POINTS`,
+`PREVENTED`, `FOCUS`, `LIMIT`, `COOLDOWN`); an unknown reason shows a generic sentence, never its code. Participants, zones,
+attacks, abilities, effects and terms are shown by their pack identifier because frozen fights carry no display names. The panel
+never computes a cost or a legality and has no control that submits anything: sending a combat action is P12.2.
+
+Keyboard and narrow screens: each section is a native `details` element (open by default; Tab reaches each summary, Space or
+Enter toggles it), the zone map sits in a labelled, focusable scroll region, long identifiers wrap, and the layout holds at 320 px.
+Strings are `combat.*` messages with reviewed Italian targets and the usual ID and placeholder parity check.
 
 ## 4. Stream contract
 
@@ -649,11 +675,13 @@ shows a reconnecting client the fight's cursor, whether the player may act, the 
 answer and the verdict waiting for an explicit settlement; reading it submits nothing. The server keeps no draft. A request held
 from before the reconnect is refused as a stale revision or by the rule it now breaks, an attempt cut off before its commit rolls
 its reserved dice when asked again, and the conversation's public lines are unchanged through restore, renewal and reconnect.
-No frontend control reads the member yet (P12.1), and draft preservation in the page remains P12.5.
+Since P12.1-B the page uses the member only to know that a fight is active (its "Encounter" line, and the decision to read the
+combat projection); draft preservation in the page remains P12.5.
 Since P12.1-A the backend side of the panel exists: `GET /api/v1/campaigns/{id}/encounter` ([combat projection](#p121-a-combat-projection))
 shows the active actor, initiative order, remaining points, zones and passages, known conditions, the player's own values,
 defenses revealed only by an assessment, objectives and the candidates with their known costs and targets, without hidden
-values. The panel that renders it is still to be built (P12.1).
+values. Since P12.1-B the page renders it read-only ([combat panel](#p121-b-combat-panel)); the controls that send these
+candidates, the action chat and the confirmation of the verdict remain P12.2 and later.
 
 ## 8. Loading, empty, error, and recovery states
 

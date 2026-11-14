@@ -444,6 +444,8 @@ export interface ResumeCard {
   readonly location: { readonly id: string; readonly name: string | null; readonly nameLocale: 'en' | 'it' | null; readonly nameFallback: boolean } | null;
   readonly presentActors: readonly { readonly actorId: string; readonly name: string }[];
   readonly resources: readonly { readonly key: string; readonly minimum: number; readonly current: number; readonly maximum: number }[];
+  /** True while a fight is active; only then does the page read the combat projection (P12.1-B). */
+  readonly inFight: boolean;
   readonly pendingDecision: DecisionKind;
   readonly awaitingNarrationTotal: number;
   readonly awaitingNarration: readonly AwaitingNarration[];
@@ -509,6 +511,7 @@ export function parseResumeCard(value: unknown, adventureId: string, campaignId:
       const row = record(entry, 'resources');
       return { key: token(row, 'key'), minimum: integer(row, 'minimum'), current: integer(row, 'current'), maximum: integer(row, 'maximum') };
     }),
+    inFight: source['encounter'] !== null && source['encounter'] !== undefined,
     pendingDecision: choice(source, 'pendingDecision', DECISION_KINDS),
     awaitingNarrationTotal: total,
     awaitingNarration: awaiting,
@@ -743,5 +746,246 @@ export function parsePlayPanels(value: unknown, adventureId: string, campaignId:
     discoveriesTotal, discoveries, promisesTotal, promises,
     journal: entries,
     nextBefore: (next as number | null | undefined) ?? null,
+  };
+}
+
+/** Lifecycle phases, sides, standings and objective states of the combat projection (docs/11, docs/13 "P12.1-A"). */
+export const COMBAT_PHASES = ['PROPOSED', 'VALIDATED', 'REJECTED', 'ENTERING', 'ROUND_OPEN', 'ACTOR_START', 'AWAITING_ACTION', 'RESOLVING',
+  'ACTOR_END', 'ROUND_END', 'OUTCOME_PENDING', 'SETTLED', 'NARRATIVE_RESUME'] as const;
+export const COMBAT_SIDES = ['player', 'ally', 'hostile'] as const;
+export const COMBAT_STATUSES = ['ACTIVE', 'DEFEATED', 'ESCAPED', 'SURRENDERED'] as const;
+export const COMBAT_COVER = ['none', 'partial', 'full'] as const;
+export const COMBAT_OBJECTIVE_KINDS = ['defeatHostiles', 'escape', 'reachZone', 'survive', 'protect'] as const;
+export const COMBAT_OBJECTIVE_STATUSES = ['pending', 'met', 'failed'] as const;
+export const COMBAT_OUTCOMES = ['VICTORY', 'DEFEAT', 'ESCAPE', 'OBJECTIVE', 'PLAYER_SURRENDER', 'HOSTILE_SURRENDER', 'AGREEMENT', 'STALEMATE'] as const;
+export const COMBAT_ACTION_KINDS = ['social', 'scene'] as const;
+export const COMBAT_REACTION_MODES = ['off', 'first', 'healthAtMost', 'focusAtLeast'] as const;
+/** Most rows of any list of the projection; a larger list is refused as invalid. */
+const MAX_COMBAT_ROWS = 256;
+
+export interface CombatInitiative { readonly rank: number; readonly participantId: string; readonly initiative: number }
+export interface CombatZone { readonly id: string; readonly cover: (typeof COMBAT_COVER)[number]; readonly obscured: boolean; readonly capacity: number }
+/** A directed edge; `cost` is null while the passage is blocked. */
+export interface CombatEdge { readonly from: string; readonly to: string; readonly difficult: boolean; readonly blocked: boolean; readonly cost: number | null }
+export interface CombatEffect { readonly effectId: string; readonly stacks: number }
+/** What the player learned by assessing a participant, with the round and revision it was learned at. */
+export interface CombatKnown {
+  readonly health: number; readonly healthMax: number; readonly guard: number; readonly resistance: number; readonly armor: number;
+  readonly round: number; readonly stateRevision: number;
+}
+export interface CombatParticipant {
+  readonly participantId: string;
+  readonly side: (typeof COMBAT_SIDES)[number];
+  readonly zone: string;
+  readonly status: (typeof COMBAT_STATUSES)[number];
+  readonly effects: readonly CombatEffect[];
+  readonly known: CombatKnown | null;
+}
+export interface CombatPlayer {
+  readonly health: number; readonly healthMax: number; readonly focus: number; readonly focusMax: number; readonly guard: number;
+  readonly resistance: number; readonly armor: number; readonly guarding: boolean; readonly reactionsLeft: number;
+}
+export interface CombatObjective {
+  readonly objectiveId: string; readonly kind: (typeof COMBAT_OBJECTIVE_KINDS)[number]; readonly zone: string | null;
+  readonly participantId: string | null; readonly rounds: number | null; readonly status: (typeof COMBAT_OBJECTIVE_STATUSES)[number];
+}
+export interface CombatCost { readonly cost: number; readonly available: boolean }
+export interface CombatTerms { readonly termsId: string; readonly kind: string; readonly cost: number }
+export interface CombatActionOption {
+  readonly actionId: string; readonly kind: (typeof COMBAT_ACTION_KINDS)[number]; readonly cost: number; readonly targets: readonly string[];
+  readonly check: { readonly attribute: string; readonly skill: string | null; readonly rank: number } | null;
+  readonly terms: CombatTerms | null;
+}
+export interface CombatStrikeOption { readonly attackId: string; readonly cost: number; readonly targets: readonly string[]; readonly disabled: string | null }
+export interface CombatAbilityOption {
+  readonly abilityId: string; readonly cost: number; readonly focus: number; readonly targets: readonly string[]; readonly maxTargets: number;
+  readonly disabled: string | null;
+}
+export interface CombatReactionOption { readonly reactionId: string; readonly mode: (typeof COMBAT_REACTION_MODES)[number]; readonly value: number }
+export interface CombatOffer {
+  readonly offerId: string; readonly actionId: string; readonly recipientId: string; readonly response: string; readonly terms: CombatTerms;
+  readonly canAccept: boolean;
+}
+/** The player's legal candidates with costs, targets and stable disabled reasons, as a tactical receipt lists them. */
+export interface CombatOptions {
+  readonly moves: readonly { readonly zone: string; readonly cost: number }[];
+  readonly speechRemaining: number;
+  readonly speechRecipients: readonly string[];
+  readonly actions: readonly CombatActionOption[];
+  readonly strikes: readonly CombatStrikeOption[];
+  readonly guard: CombatCost | null;
+  readonly useItem: CombatCost | null;
+  readonly abilities: readonly CombatAbilityOption[];
+  readonly reactions: readonly CombatReactionOption[];
+  readonly ready: CombatCost | null;
+  readonly assess: { readonly cost: number; readonly targets: readonly string[] } | null;
+  readonly withdraw: readonly { readonly zone: string; readonly cost: number }[];
+  readonly endActivation: boolean;
+  readonly offer: CombatOffer | null;
+}
+/** The verdict waiting for the player's explicit settlement. */
+export interface CombatVerdict {
+  readonly outcome: (typeof COMBAT_OUTCOMES)[number]; readonly objectiveId: string | null; readonly termsId: string | null;
+  readonly roundCap: boolean; readonly objectives: readonly { readonly objectiveId: string; readonly status: (typeof COMBAT_OBJECTIVE_STATUSES)[number] }[];
+}
+export interface CombatEncounter {
+  readonly encounterId: string;
+  readonly phase: (typeof COMBAT_PHASES)[number];
+  readonly round: number;
+  readonly roundCap: number;
+  readonly acting: string | null;
+  readonly actionPoints: number | null;
+  readonly actionPointsPerActivation: number;
+  readonly playerDecision: boolean;
+  readonly initiative: readonly CombatInitiative[];
+  readonly zones: readonly CombatZone[];
+  readonly edges: readonly CombatEdge[];
+  readonly escapeZones: readonly string[];
+  readonly participants: readonly CombatParticipant[];
+  readonly player: CombatPlayer;
+  readonly objectives: readonly CombatObjective[];
+  readonly options: CombatOptions | null;
+  readonly outcome: CombatVerdict | null;
+}
+/** The combat projection at one committed revision; `encounter` is null outside a fight. */
+export interface CombatView { readonly stateRevision: number; readonly encounter: CombatEncounter | null }
+
+/** Read an array of bounded identifiers. */
+function identifiers(source: Record<string, unknown>, field: string): string[] {
+  return list(source, field, MAX_COMBAT_ROWS).map((entry) => typeof entry === 'string' && entry.length > 0 && entry.length <= 200 ? entry : invalid(field));
+}
+
+/** Read a nullable stable reason code; only uppercase words are accepted, and display text never comes from it. */
+function reason(source: Record<string, unknown>, field: string): string | null {
+  const value = source[field];
+  if (value === null || value === undefined) return null;
+  return typeof value === 'string' && /^[A-Z][A-Z_]{1,40}$/.test(value) ? value : invalid(field);
+}
+
+/** Read a nullable integer. */
+function optionalCount(source: Record<string, unknown>, field: string): number | null {
+  return source[field] === null || source[field] === undefined ? null : count(source, field);
+}
+
+/** Read rows of objects. */
+function rowsOf(source: Record<string, unknown>, field: string): Record<string, unknown>[] {
+  return list(source, field, MAX_COMBAT_ROWS).map((entry) => record(entry, field));
+}
+
+/** Read declared terms: identity, kind and cost. */
+function terms(value: unknown): CombatTerms {
+  const row = record(value, 'terms');
+  return { termsId: token(row, 'termsId', 200), kind: token(row, 'kind', 64), cost: count(row, 'cost') };
+}
+
+/** Read an optional `{cost, available}` member. */
+function priced(source: Record<string, unknown>, field: string): CombatCost | null {
+  if (source[field] === undefined) return null;
+  const row = record(source[field], field);
+  return { cost: count(row, 'cost'), available: flag(row, 'available') };
+}
+
+/** Read the options a receipt lists; an empty object means the player has no decision now. */
+function parseCombatOptions(value: unknown): CombatOptions | null {
+  const source = record(value, 'options');
+  if (Object.keys(source).length === 0) return null;
+  const speech = record(source['speech'], 'speech');
+  const assess = source['assess'] === undefined ? null : record(source['assess'], 'assess');
+  const offer = source['offer'] === undefined ? null : record(source['offer'], 'offer');
+  return {
+    moves: rowsOf(source, 'moves').map((row) => ({ zone: token(row, 'zone', 200), cost: count(row, 'cost') })),
+    speechRemaining: count(speech, 'remaining'),
+    speechRecipients: identifiers(speech, 'recipients'),
+    actions: rowsOf(source, 'actions').map((row): CombatActionOption => {
+      const check = row['check'] === undefined ? null : record(row['check'], 'check');
+      return {
+        actionId: token(row, 'actionId', 200), kind: choice(row, 'kind', COMBAT_ACTION_KINDS), cost: count(row, 'cost'), targets: identifiers(row, 'targets'),
+        check: check ? { attribute: token(check, 'attribute', 200), skill: optionalToken(check, 'skill', 200), rank: count(check, 'rank') } : null,
+        terms: row['terms'] === undefined ? null : terms(row['terms']),
+      };
+    }),
+    strikes: (source['strikes'] === undefined ? [] : rowsOf(source, 'strikes')).map((row) => ({
+      attackId: token(row, 'attackId', 200), cost: count(row, 'cost'), targets: identifiers(row, 'targets'), disabled: reason(row, 'disabled') })),
+    guard: priced(source, 'guard'),
+    useItem: priced(source, 'useItem'),
+    abilities: (source['abilities'] === undefined ? [] : rowsOf(source, 'abilities')).map((row) => ({
+      abilityId: token(row, 'abilityId', 200), cost: count(row, 'cost'), focus: count(row, 'focus'), targets: identifiers(row, 'targets'),
+      maxTargets: count(row, 'maxTargets'), disabled: reason(row, 'disabled') })),
+    reactions: (source['reactions'] === undefined ? [] : rowsOf(source, 'reactions')).map((row) => {
+      const policy = record(row['policy'], 'policy');
+      return { reactionId: token(row, 'reactionId', 200), mode: choice(policy, 'mode', COMBAT_REACTION_MODES), value: count(policy, 'value') };
+    }),
+    ready: priced(source, 'ready'),
+    assess: assess ? { cost: count(assess, 'cost'), targets: identifiers(assess, 'targets') } : null,
+    withdraw: (source['withdraw'] === undefined ? [] : rowsOf(source, 'withdraw')).map((row) => ({ zone: token(row, 'zone', 200), cost: count(row, 'cost') })),
+    endActivation: flag(source, 'endActivation'),
+    offer: offer ? {
+      offerId: token(offer, 'offerId', 200), actionId: token(offer, 'actionId', 200), recipientId: token(offer, 'recipientId', 200),
+      response: token(offer, 'response', 64), terms: terms(offer['terms']), canAccept: flag(offer, 'canAccept'),
+    } : null,
+  };
+}
+
+/** Read the verdict at `OUTCOME_PENDING`. */
+function parseCombatVerdict(value: unknown): CombatVerdict {
+  const source = record(value, 'outcome');
+  return {
+    outcome: choice(source, 'outcome', COMBAT_OUTCOMES), objectiveId: optionalToken(source, 'objectiveId', 200),
+    termsId: optionalToken(source, 'termsId', 200), roundCap: source['roundCap'] === true,
+    objectives: rowsOf(source, 'objectives').map((row) => ({ objectiveId: token(row, 'objectiveId', 200), status: choice(row, 'status', COMBAT_OBJECTIVE_STATUSES) })),
+  };
+}
+
+/**
+ * Validate a combat projection body against the route's scope (docs/13 "P12.1-A combat projection").
+ *
+ * @param value decoded JSON body of the encounter endpoint
+ * @param adventureId adventure requested by the route
+ * @param campaignId campaign requested by the route
+ * @throws CampaignProtocolError `invalid` for a foreign scope, an unknown enumeration or an oversized list
+ */
+export function parseCombatView(value: unknown, adventureId: string, campaignId: string): CombatView {
+  const source = record(value, 'encounter');
+  const scope = record(source['scope'], 'scope');
+  if (uuid(scope, 'adventureId') !== adventureId || uuid(scope, 'campaignId') !== campaignId) invalid('scope');
+  const stateRevision = count(scope, 'stateRevision');
+  if (source['encounter'] === null || source['encounter'] === undefined) return { stateRevision, encounter: null };
+  const fight = record(source['encounter'], 'encounter');
+  const player = record(fight['player'], 'player');
+  const acting = optionalToken(fight, 'acting', 200);
+  const actionPoints = optionalCount(fight, 'actionPoints');
+  if ((acting === null) !== (actionPoints === null)) invalid('actionPoints');
+  const playerDecision = flag(fight, 'playerDecision');
+  const options = parseCombatOptions(fight['options'] ?? {});
+  return {
+    stateRevision,
+    encounter: {
+      encounterId: uuid(fight, 'encounterId'), phase: choice(fight, 'phase', COMBAT_PHASES), round: count(fight, 'round'), roundCap: count(fight, 'roundCap'),
+      acting, actionPoints, actionPointsPerActivation: count(fight, 'actionPointsPerActivation'), playerDecision,
+      initiative: rowsOf(fight, 'initiative').map((row) => ({ rank: count(row, 'rank'), participantId: token(row, 'participantId', 200), initiative: integer(row, 'initiative') })),
+      zones: rowsOf(fight, 'zones').map((row) => ({ id: token(row, 'id', 200), cover: choice(row, 'cover', COMBAT_COVER), obscured: flag(row, 'obscured'), capacity: count(row, 'capacity') })),
+      edges: rowsOf(fight, 'edges').map((row) => {
+        return { from: token(row, 'from', 200), to: token(row, 'to', 200), difficult: flag(row, 'difficult'), blocked: flag(row, 'blocked'), cost: optionalCount(row, 'cost') };
+      }),
+      escapeZones: identifiers(fight, 'escapeZones'),
+      participants: rowsOf(fight, 'participants').map((row): CombatParticipant => {
+        const known = row['known'] === null || row['known'] === undefined ? null : record(row['known'], 'known');
+        return {
+          participantId: token(row, 'participantId', 200), side: choice(row, 'side', COMBAT_SIDES), zone: token(row, 'zone', 200),
+          status: choice(row, 'status', COMBAT_STATUSES),
+          effects: rowsOf(row, 'effects').map((effect) => ({ effectId: token(effect, 'effectId', 200), stacks: count(effect, 'stacks') })),
+          known: known ? { health: integer(known, 'health'), healthMax: count(known, 'healthMax'), guard: integer(known, 'guard'),
+            resistance: integer(known, 'resistance'), armor: integer(known, 'armor'), round: count(known, 'round'), stateRevision: count(known, 'stateRevision') } : null,
+        };
+      }),
+      player: { health: integer(player, 'health'), healthMax: count(player, 'healthMax'), focus: integer(player, 'focus'), focusMax: count(player, 'focusMax'),
+        guard: integer(player, 'guard'), resistance: integer(player, 'resistance'), armor: integer(player, 'armor'), guarding: flag(player, 'guarding'),
+        reactionsLeft: count(player, 'reactionsLeft') },
+      objectives: rowsOf(fight, 'objectives').map((row) => ({
+        objectiveId: token(row, 'objectiveId', 200), kind: choice(row, 'kind', COMBAT_OBJECTIVE_KINDS), zone: optionalToken(row, 'zone', 200),
+        participantId: optionalToken(row, 'participantId', 200), rounds: optionalCount(row, 'rounds'), status: choice(row, 'status', COMBAT_OBJECTIVE_STATUSES) })),
+      options,
+      outcome: fight['outcome'] === null || fight['outcome'] === undefined ? null : parseCombatVerdict(fight['outcome']),
+    },
   };
 }

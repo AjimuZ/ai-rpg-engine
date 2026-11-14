@@ -53,14 +53,55 @@ export function state(options: { fallback?: boolean; locale?: string; situation?
     pendingDecision: null };
 }
 
-/** Resume card body (P09.5); `paused` adds a missing-content diagnosis, `awaiting` one owed narration. */
-export function resumeCard(options: { paused?: boolean; awaiting?: boolean; decision?: string } = {}) {
+/**
+ * Combat projection body (P12.1) as the backend writes it: round 2 of a fight at the player's own decision, two zones and a
+ * blocked tower, a hostile sentry whose defenses the player assessed in round 1, an ally, and one candidate of each family
+ * including disabled ones. `verdict` shows the fight decided and waiting for settlement; `none` is the body outside a fight.
+ */
+export function encounterBody(options: { verdict?: boolean; none?: boolean } = {}) {
+  const scope = { adventureId: ADVENTURE, campaignId: CAMPAIGN, contentRevisionId: OP2, stateRevision: 2 };
+  if (options.none) return { scope, mode: 'EXPLORATION', encounter: null };
+  const decided = options.verdict === true;
+  return { scope, mode: 'ENCOUNTER', encounter: {
+    encounterId: OP2, templateId: 'gate-fight', phase: decided ? 'OUTCOME_PENDING' : 'AWAITING_ACTION', round: 2, roundCap: 8,
+    acting: decided ? null : 'player', actionPoints: decided ? null : 2, actionPointsPerActivation: 3, playerDecision: !decided,
+    initiative: [{ rank: 0, participantId: 'player', initiative: 14 }, { rank: 1, participantId: 'sentry', initiative: 9 }, { rank: 2, participantId: 'scout', initiative: 7 }],
+    zones: [{ id: 'gate', cover: 'none', obscured: false, capacity: 0 }, { id: 'yard', cover: 'partial', obscured: true, capacity: 2 }, { id: 'tower', cover: 'full', obscured: false, capacity: 1 }],
+    edges: [{ from: 'gate', to: 'yard', difficult: false, blocked: false, cost: 1 }, { from: 'yard', to: 'gate', difficult: true, blocked: false, cost: 2 },
+      { from: 'yard', to: 'tower', difficult: false, blocked: true, cost: null }, { from: 'tower', to: 'yard', difficult: false, blocked: true, cost: null }],
+    escapeZones: ['gate'],
+    participants: [
+      { participantId: 'player', side: 'player', zone: 'gate', status: 'ACTIVE', effects: [], known: null },
+      { participantId: 'sentry', side: 'hostile', zone: 'yard', status: 'ACTIVE', effects: [{ effectId: 'dazed', stacks: 1 }],
+        known: { health: 6, healthMax: 10, guard: 3, resistance: 1, armor: 2, round: 1, stateRevision: 2 } },
+      { participantId: 'scout', side: 'ally', zone: 'gate', status: 'ACTIVE', effects: [], known: null }],
+    player: { health: 14, healthMax: 20, focus: 3, focusMax: 5, guard: 4, resistance: 2, armor: 1, guarding: false, reactionsLeft: 1 },
+    objectives: [{ objectiveId: 'clear', kind: 'defeatHostiles', zone: null, participantId: null, rounds: null, status: decided ? 'met' : 'pending' },
+      { objectiveId: 'hold', kind: 'survive', zone: null, participantId: null, rounds: 8, status: 'pending' },
+      { objectiveId: 'cover', kind: 'protect', zone: null, participantId: 'scout', rounds: null, status: 'pending' }],
+    options: decided ? {} : {
+      moves: [{ zone: 'yard', cost: 1 }], speech: { remaining: 1, recipients: ['sentry'] },
+      actions: [{ actionId: 'plead', kind: 'social', cost: 1, targets: ['sentry'], check: { attribute: 'presence', skill: null, rank: 1 },
+        terms: { termsId: 'toll', kind: 'pay', cost: 1 } }],
+      strikes: [{ attackId: 'blade', cost: 2, targets: ['sentry'], disabled: null }, { attackId: 'bow', cost: 2, targets: [], disabled: 'NO_AMMUNITION' }],
+      guard: { cost: 1, available: true }, useItem: { cost: 1, available: false },
+      abilities: [{ abilityId: 'rally', cost: 1, focus: 2, targets: ['player'], maxTargets: 1, disabled: null },
+        { abilityId: 'surge', cost: 3, focus: 9, targets: [], maxTargets: 1, disabled: 'FOCUS' }],
+      reactions: [{ reactionId: 'parry', policy: { mode: 'healthAtMost', value: 50 } }], reactionsLeft: 1,
+      ready: { cost: 1, available: true }, assess: { cost: 1, targets: ['sentry'] }, withdraw: [{ zone: 'gate', cost: 1 }], endActivation: true },
+    outcome: decided ? { outcome: 'VICTORY', objectiveId: null, objectives: [{ objectiveId: 'clear', status: 'met' }] } : null } };
+}
+
+/** Resume card body (P09.5); `paused` adds a missing-content diagnosis, `awaiting` one owed narration, `fight` an active encounter. */
+export function resumeCard(options: { paused?: boolean; awaiting?: boolean; decision?: string; fight?: boolean } = {}) {
   return { scope: { adventureId: ADVENTURE, campaignId: CAMPAIGN, contentRevisionId: OP2, stateRevision: 2 },
     title: 'Mara', mode: 'EXPLORATION', gameTurn: 3, worldTimeSeconds: 0,
     location: { id: 'trailhead', name: 'Lantern Shelter', nameLocale: 'en', nameFallback: false },
     presentActors: [{ actorId: OP1, name: 'Warden' }],
     resources: [{ key: 'vigor', minimum: 0, current: 11000, maximum: 12000 }],
-    encounter: null, pendingDecision: options.decision ?? 'FREE_INPUT',
+    encounter: options.fight ? { encounterId: OP2, templateId: 'gate-fight', phase: 'AWAITING_ACTION', round: 2, acting: 'player', actionPoints: 2,
+      playerDecision: true, speechRemaining: 1, offer: null, outcome: null } : null,
+    pendingDecision: options.decision ?? 'FREE_INPUT',
     awaitingNarrationTotal: options.awaiting ? 1 : 0,
     awaitingNarration: options.awaiting ? [{ operationId: OP1, commandType: 'USE_ABILITY', status: 'COMMITTED_NARRATION_PENDING',
       committedRevision: 2, receipt: receipt(), narration: { mode: 'RECEIPT', reason: 'NARRATION_UNAVAILABLE', retriesRemaining: 3 } }] : [],
@@ -112,6 +153,7 @@ export class CampaignServer {
   stateBody: unknown = state();
   resumeBody: unknown = resumeCard();
   panelsBody: unknown = panelsBody();
+  encounterBody: unknown = encounterBody({ none: true });
   /** Journal pages served for `before=` requests, keyed by cursor. */
   olderPages = new Map<number, unknown>();
   failStream = 0;
@@ -131,6 +173,7 @@ export class CampaignServer {
     if (this.errorCode) return Promise.resolve(json({ code: this.errorCode }, this.statusCode));
     if (url.includes('/state?')) return Promise.resolve(json(this.stateBody));
     if (url.includes('/resume?')) return Promise.resolve(json(this.resumeBody));
+    if (url.includes('/encounter?')) return Promise.resolve(json(this.encounterBody));
     if (url.includes('/panels?')) {
       const before = /[?&]before=(\d+)/.exec(url);
       return Promise.resolve(json(before ? this.olderPages.get(Number(before[1])) ?? { code: 'CAMPAIGN_SCOPE_UNAVAILABLE' } : this.panelsBody));

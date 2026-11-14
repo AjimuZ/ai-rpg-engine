@@ -1766,6 +1766,13 @@ successful public assessment of the same encounter, while a newer forged `INTERN
 assessment are ignored. QA-16 stays open: the HTTP route itself, the narrative, guide, media metadata and UI diagnostics are
 not covered by this case, and no deliberate weakening ran.
 
+P12.1-B (14 November 2026) adds the frontend half: `combat-panel.spec.ts` (25 tests) checks strict parsing, wording of every
+enumeration and rendering of every projection field, `italian-variant.spec.ts` renders the panel with the reviewed Italian
+catalog, and a headless-Chrome journey with scripted API replies checked keyboard use and 320/390/1280 px layouts in both
+locales (see the P12.1 roadmap entry for results and limits). The panel shows only what the projection carries, so QA-16 for
+the UI relies on the backend allowlist; no test feeds the panel hostile hidden data. QA-07 and QA-09 stay open for the real
+backend and the full combat path (P12.5).
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

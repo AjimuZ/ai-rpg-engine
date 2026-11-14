@@ -317,7 +317,7 @@ const MODELS_STATUS = JSON.stringify({ slots: [
  * recorded adventure so the library cards render, the model status with the fixture above, and
  * every other request goes to the strict replay.
  */
-function configure(server: TranscriptServer): void {
+function configure(server: { readonly fetch: TranscriptServer['fetch'] }): void {
   const json = (body: string) => Promise.resolve(new Response(body, { headers: { 'Content-Type': 'application/json' } }));
   const fetcher = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => String(input).startsWith('/api/v1/adventures?')
     ? json(`{"adventures":[${RECORDED_ADVENTURE}],"nextAfter":null}`)
@@ -364,7 +364,7 @@ describe('Italian variant with the reviewed catalog', /** Register Italian rende
   afterEach(/** Destroying fixtures aborts long polls. */ () => TestBed.resetTestingModule());
 
   it('loads every reviewed message and detects English leftovers', /** The detector itself must have something to find. */ () => {
-    expect(CATALOG.size).toBe(516);
+    expect(CATALOG.size).toBe(635);
     expect(ENGLISH_MESSAGES.has('Send')).toBe(true);
     expect(ENGLISH_RUNS).toContain(message('campaign.view.composerHelp', {}, 'source'));
     // ICU branches are checked too: an untranslated plural would show "One passage".
@@ -546,6 +546,35 @@ describe('Italian variant with the reviewed catalog', /** Register Italian rende
     await until(page, () => page.nativeElement.querySelector('[role="alert"]') !== null, 'foreign playthrough');
     expect(normalize(page.nativeElement.querySelector('[role="alert"]').textContent)).toBe(message('saved.unknownPlaythrough'));
     expect(page.nativeElement.querySelector(`[data-campaign-id="${CAMPAIGN}"]`)).not.toBeNull();
+  });
+
+  it('renders the combat panel with the reviewed Italian wording and no English leftovers', /** P12.1-B. */ async () => {
+    const { fixtures } = modules;
+    const server = new fixtures.CampaignServer();
+    server.resumeBody = fixtures.resumeCard({ fight: true });
+    server.encounterBody = fixtures.encounterBody();
+    configure(server);
+    const fixture = await shell(`/saved/${fixtures.ADVENTURE}?playthrough=${fixtures.CAMPAIGN}`);
+    const root = fixture.nativeElement as HTMLElement;
+    await until(fixture, () => root.querySelector('[data-combat]') !== null, 'combat panel');
+    const panel = root.querySelector('[data-combat]')!;
+    const text = (selector: string) => normalize(panel.querySelector(selector)?.textContent ?? '');
+    expect(text('#combat-title')).toBe(message('combat.title'));
+    expect(text('[data-phase]')).toBe(message('combat.phaseYourTurn'));
+    expect(text('[data-round]')).toBe(message('combat.round', { round: '2', cap: '8' }));
+    expect(text('[data-acting]')).toBe(message('combat.acting', { who: message('combat.you'), points: '2', total: '3' }));
+    const sentry = text('[data-participants] [data-participant="sentry"]');
+    expect(sentry).toContain(message('combat.sideHostile'));
+    expect(sentry).toContain(message('combat.learned', { round: '1', revision: '2' }));
+    expect(text('[data-participants] [data-participant="scout"]')).toContain(message('combat.notAssessed'));
+    expect(text('[data-edge="yard>tower"]')).toContain(message('combat.blocked'));
+    expect(text('[data-edge="yard>gate"]')).toContain(message('combat.crossing', { cost: '2' }));
+    expect(text('[data-objective="hold"]')).toContain(message('combat.objectiveSurvive', { rounds: '8' }));
+    expect(text('[data-attack="bow"]')).toContain(message('combat.disabledAmmunition'));
+    expect(text('[data-ability="surge"]')).toContain(message('combat.disabledFocus'));
+    expect(text('[data-reaction="parry"]')).toContain(message('combat.policyHealth', { value: '50' }));
+    expect([...englishLeftovers(panel), ...englishText(panel)]).toEqual([]);
+    expect(accessibilityProblems(panel)).toEqual([]);
   });
 
   it('formats Italian receipts with the committed numbers and only locale digit grouping', /** Same mechanics as English. */ () => {

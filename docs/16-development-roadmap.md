@@ -4526,7 +4526,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
 
 **Depends on:** P11 and P08; UI foundation P05. **Areas:** legal-action API, combat panels, NPC task contract.
 
-- [ ] P12.1 Show initiative, AP, zones, known defenses/conditions, costs, targets, and objective without leaking hidden data.
+- [x] P12.1 Show initiative, AP, zones, known defenses/conditions, costs, targets, and objective without leaking hidden data.
   - P12.1-A, player-safe combat projection, 14 November 2026 (partial: the backend half; the box stays unchecked because no
     frontend panel renders it yet). `GET /api/v1/campaigns/{id}/encounter?adventureId=…`, the route docs/13 already reserved,
     is served by `CombatPanels` and `CombatPanelsController` (package `org.rpgengine.panels`) in one read-only repeatable-read
@@ -4560,6 +4560,36 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     the tests call the service and serialize with a default mapper); the projection during an activation of another
     participant, with active effects or with a blocked passage; a fight at `OUTCOME_PENDING` other than an agreement.
     Participants are named by roster ID only. The frontend panel, reason labels and the browser path remain P12.1 and P12.5.
+  - P12.1-B, combat panel in English and Italian, 14 November 2026 (the read-only panel is built; the box is left for the
+    orchestrator). `CombatPanel` (`combat-panel.ts`, lazy chunk), `parseCombatView` and `combat-messages.ts` render every field
+    of the projection ([UI](13-api-and-ui.md#p121-b-combat-panel)). The page reads `GET …/encounter` only when the resume card's
+    `encounter` is non-null (`ResumeCard.inFight`), so a playthrough outside a fight makes no extra request and the recorded
+    transcript stays valid; the card's "Encounter" line now says "In progress" during a fight. Wording is 119 new reviewed
+    messages (`combat.*` and `campaign.resume.inFight`, 635 in the catalog), disabled reasons come from a closed table with a
+    generic fallback, and participants, zones, attacks and effects show their pack identifier. No control submits anything.
+  - Tests: `combat-panel.spec.ts` (25: complete and empty bodies, 15 refused shapes, exhaustive wording, the rendered fields at
+    the player's decision and at a verdict, no `/commands` request, a malformed body reported as the usual error) and one
+    case in `italian-variant.spec.ts` rendering the panel with the Italian catalog (no English leftovers, no unnamed controls);
+    its catalog count moved from 516 to 635. Existing tests changed: only that count and `configure`'s parameter type.
+  - Verification (14 November 2026, Node 24.22.1, on the Windows reference host): `npm --prefix frontend run typecheck` passed;
+    `npm --prefix frontend test` passed 182 tests in 20 files (after a first build error on an attribute binding, fixed);
+    `npm --prefix frontend run check:i18n` printed "Localization parity: 635 reviewed messages";
+    `npm --prefix frontend run build:locales` built both locales. Browser: a script under `.local/scratch/` served that
+    built bundle with scripted API replies (the fixtures' bodies; one very long roster ID) to headless Chrome through
+    `.agents/ralph/browser/browser.mjs`, in `en` and `it` at 320, 390 and 1280 px. Results: no horizontal page overflow and no
+    element past the viewport; Tab visits the six `summary` elements and the zone-map region, each with a 3 px outline;
+    Space then Enter on the first summary closed and reopened it; axe reported no violation at 390 px in either locale (one
+    `heading-order` violation was found on the first run and fixed); no console error or page error. The only requests were GETs.
+  - Not proven: the real backend route and the real page together (the browser run used scripted replies, so the HTTP route
+    is still unexercised, as in P12.1-A); a fight in any other state than the player's decision in the browser (a decided fight and
+    other phases are covered in jsdom only); keyboard scrolling of the zone map (nothing overflowed, so the region never scrolled);
+    a screen reader (axe and Chrome's tree are not a review); zoom, forced colors and touch; independent review of the Italian
+    wording; that hidden values cannot reach the UI, which rests on the backend allowlist (no test feeds the panel hostile data);
+    `verify.sh full`, `verify.sh containers` and deliberate weakenings were not run by this session. The production
+    initial bundle is 529.59 kB, over the 500 kB warning budget (a warning, the error budget is 1 MB); the lazy panel chunk is 25.50 kB
+    and the size before this change was not measured on this tree (the last recorded log, 30 October, shows 468.62 kB).
+    Sending combat actions, labelled names, the action chat and the verdict confirmation remain P12.2 and later; mobile and
+    reconnect behavior inside a real fight remain P12.5.
 - [ ] P12.2 Allow named actions and a persistent combat dialogue/action chat with known recipients, attributed replies and editable quick replies; validate talk, negotiation and scene-changing intent, preview consequential costs and preserve explicit player submission/decisions.
 - [ ] P12.3 Provide actor-knowledge-scoped legal candidates to Codex for NPC/companion choices.
 - [ ] P12.4 Add deterministic tactic fallback, interruption messages, bounded knowledge-scoped combat replies and outcome narration; dialogue failure leaves committed state and tactical controls available.
