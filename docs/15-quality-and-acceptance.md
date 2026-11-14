@@ -1779,6 +1779,13 @@ previews, no request until the confirm button, one request with the CSRF proof a
 its code, and a lost reply repeated with the same request identity (see the P12.2 roadmap entry for results and limits). The
 real backend, the browser and no-automatic-submission across reconnect and session renewal (P12.5) were not exercised.
 
+P12.2-B (14 November 2026) adds `combat-chat.spec.ts` (12 tests): speech validation (exact words, no recipient, a recipient the
+projection does not list, spent allowance, blank, over-500 and unstorable text, out of turn), answers to an offer with their
+previews and refusals, the transcript selection, and in the page the attributed lines, no invented recipient, quick replies that
+only fill an editable draft, a reviewed speech sent once, a refusal that keeps the draft, writing outside the player's turn
+without a request, social actions by recipient and an explicit accept (see the P12.2 roadmap entry for results and limits). The
+real backend, the browser, a screen reader and draft preservation across reconnect (P12.5) were not exercised.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

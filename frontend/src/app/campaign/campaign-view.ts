@@ -103,7 +103,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
           </section>
         }
         @defer (when combat()?.encounter != null) {
-          <app-combat-panel [view]="combat()" [sending]="sending()" [problem]="problem()" (confirmed)="send($event)" (dismissed)="problem.set(null)" />
+          <app-combat-panel [view]="combat()" [journal]="panels()?.journal ?? null" [journalLocale]="panels()?.locale ?? null" [sending]="sending()" [problem]="problem()" (confirmed)="send($event)" (dismissed)="problem.set(null)" />
         }
         <app-campaign-panels [panels]="panels()" [older]="older()" [nextBefore]="cursor()" [loadingOlder]="loadingOlder()" (olderRequested)="loadOlder()" />
       } @else if (failure()) { <p class="notice" role="alert" data-error>{{ failure() }}</p>

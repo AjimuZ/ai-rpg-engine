@@ -58,7 +58,7 @@ export function state(options: { fallback?: boolean; locale?: string; situation?
  * blocked tower, a hostile sentry whose defenses the player assessed in round 1, an ally, and one candidate of each family
  * including disabled ones. `verdict` shows the fight decided and waiting for settlement; `none` is the body outside a fight.
  */
-export function encounterBody(options: { verdict?: boolean; none?: boolean } = {}) {
+export function encounterBody(options: { verdict?: boolean; none?: boolean; offer?: boolean } = {}) {
   const scope = { adventureId: ADVENTURE, campaignId: CAMPAIGN, contentRevisionId: OP2, stateRevision: 2 };
   if (options.none) return { scope, mode: 'EXPLORATION', encounter: null };
   const decided = options.verdict === true;
@@ -88,7 +88,9 @@ export function encounterBody(options: { verdict?: boolean; none?: boolean } = {
       abilities: [{ abilityId: 'rally', cost: 1, focus: 2, targets: ['player'], maxTargets: 1, disabled: null },
         { abilityId: 'surge', cost: 3, focus: 9, targets: [], maxTargets: 1, disabled: 'FOCUS' }],
       reactions: [{ reactionId: 'parry', policy: { mode: 'healthAtMost', value: 50 } }], reactionsLeft: 1,
-      ready: { cost: 1, available: true }, assess: { cost: 1, targets: ['sentry'] }, withdraw: [{ zone: 'gate', cost: 1 }], endActivation: true },
+      ready: { cost: 1, available: true }, assess: { cost: 1, targets: ['sentry'] }, withdraw: [{ zone: 'gate', cost: 1 }], endActivation: true,
+      ...(options.offer ? { offer: { offerId: 'offer-1', actionId: 'plead', recipientId: 'sentry', response: 'OFFERED',
+        terms: { termsId: 'toll', kind: 'pay', cost: 1 }, canAccept: true } } : {}) },
     outcome: decided ? { outcome: 'VICTORY', objectiveId: null, objectives: [{ objectiveId: 'clear', status: 'met' }] } : null } };
 }
 

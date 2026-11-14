@@ -9,8 +9,9 @@
  * roster, zone, attack, ability and effect identifiers stay literal because frozen fights carry no display names.
  */
 import {
-  CombatObjective, CombatOptions, CombatParticipant, CombatReactionOption, CombatVerdict, COMBAT_PHASES,
+  CombatEncounter, CombatObjective, CombatOptions, CombatParticipant, CombatReactionOption, CombatVerdict, COMBAT_PHASES,
 } from './campaign-protocol';
+import { TacticalChoice } from './combat-actions';
 
 type Phase = (typeof COMBAT_PHASES)[number];
 
@@ -77,7 +78,111 @@ export function combatLabels() {
     cancel: $localize`:@@combat.cancel:Do not send`,
     sending: $localize`:@@combat.sending:Sending…`,
     mapRegion: $localize`:@@combat.mapRegion:Zones and passages, scrollable`,
+    chatTitle: $localize`:@@combat.chatTitle:Conversation`,
+    chatHelp: $localize`:@@combat.chatHelp:Write to someone in the fight. Words alone change nothing and agree to nothing, and nothing is sent until you review and confirm it.`,
+    transcriptTitle: $localize`:@@combat.transcriptTitle:What has been said and answered`,
+    noTranscript: $localize`:@@combat.noTranscript:Nothing has been said in this fight yet.`,
+    recipientLabel: $localize`:@@combat.recipientLabel:Speaking to`,
+    noRecipient: $localize`:@@combat.noRecipient:Nobody chosen`,
+    draftLabel: $localize`:@@combat.draftLabel:Your words`,
+    reviewSend: $localize`:@@combat.reviewSend:Review and send`,
+    clearDraft: $localize`:@@combat.clearDraft:Clear words`,
+    quickTitle: $localize`:@@combat.quickTitle:Suggestions that only fill your words`,
+    quickNeedsRecipient: $localize`:@@combat.quickNeedsRecipient:Choose who you are speaking to to see suggestions.`,
+    replace: $localize`:@@combat.replace:Replace my words`,
+    keep: $localize`:@@combat.keep:Keep my words`,
+    intentsTitle: $localize`:@@combat.intentsTitle:Talk, negotiate or change the scene`,
+    intentsNeedRecipient: $localize`:@@combat.intentsNeedRecipient:Choose who you are speaking to to see the social actions for them.`,
+    noIntents: $localize`:@@combat.noIntents:No social or scene action is available now.`,
+    acceptBinds: $localize`:@@combat.acceptBinds:Accepting binds you to these terms and cannot be taken back.`,
+    declineFree: $localize`:@@combat.declineFree:Declining costs nothing and leaves the fight as it is.`,
   };
+}
+
+/** Return the reason the draft cannot be sent now, or null when it can; the draft itself is never touched. */
+export function chatBlockMessage(refusal: string): string | null {
+  switch (refusal) {
+    case 'NOT_YOUR_TURN': return $localize`:@@combat.blockTurn:It is not your turn. You can keep writing; nothing is queued or sent for you.`;
+    case 'NO_RECIPIENT': case 'NOT_ADDRESSABLE': return $localize`:@@combat.blockRecipient:Choose someone who can hear you now.`;
+    case 'SPEECH_LIMIT': return $localize`:@@combat.blockSpeech:You have already spoken this turn.`;
+    case 'EMPTY_TEXT': case 'TEXT_TOO_LONG': case 'TEXT_INVALID': return $localize`:@@combat.blockText:Write between 1 and 500 characters.`;
+    default: return null;
+  }
+}
+
+/** Return how much of the longest allowed text is used. */
+export function charactersMessage(used: string, most: string): string {
+  return $localize`:@@combat.characters:${used}:used: of ${most}:most: characters`;
+}
+
+/** Return the sentence that says whose words were wanted: a quick reply fills this and nothing else. */
+export function replaceMessage(words: string): string {
+  return $localize`:@@combat.replaceAsk:Replace your words with “${words}:words:”?`;
+}
+
+/** Return the player's exact words in a review. */
+export function wordsMessage(words: string): string {
+  return $localize`:@@combat.words:Your words: “${words}:words:”`;
+}
+
+/** Return what speaking costs: no action points, and the allowance left afterwards. */
+export function speechSpendMessage(recipient: string, left: string): string {
+  return $localize`:@@combat.speechSpend:Speaks to ${recipient}:recipient:. No action points are spent; speeches left this turn afterwards: ${left}:left:.`;
+}
+
+/**
+ * Return up to three suggested sentences for speaking to a participant of one side. They fill an editable draft and mean nothing
+ * until the player sends them; they name no object, place or agreement the projection does not show.
+ */
+export function quickReplies(side: CombatParticipant['side']): string[] {
+  switch (side) {
+    case 'hostile': return [
+      $localize`:@@combat.quickWhy:Why are you attacking us?`,
+      $localize`:@@combat.quickNegotiate:Let's negotiate.`,
+      $localize`:@@combat.quickOther:Is there another way to settle this?`,
+    ];
+    case 'ally': return [
+      $localize`:@@combat.quickStay:Stay close to me.`,
+      $localize`:@@combat.quickCover:Cover me.`,
+      $localize`:@@combat.quickHold:Hold your position.`,
+    ];
+    case 'player': return [];
+  }
+}
+
+/** Return the label of a transcript line's kind, so speaker and role never depend on color. */
+export function transcriptKindMessage(kind: 'said' | 'attempt' | 'reply' | 'decision' | 'result'): string {
+  switch (kind) {
+    case 'said': return $localize`:@@combat.kindSaid:Said`;
+    case 'attempt': return $localize`:@@combat.kindAttempt:Attempt`;
+    case 'reply': return $localize`:@@combat.kindReply:Reply`;
+    case 'decision': return $localize`:@@combat.kindDecision:Decision`;
+    case 'result': return $localize`:@@combat.kindResult:Result`;
+  }
+}
+
+/** Return the answer to an offer as a button label, naming the terms it concerns. */
+export function answerMessage(decision: 'accept' | 'decline', terms: string): string {
+  return decision === 'accept' ? $localize`:@@combat.answerAccept:Accept the terms ${terms}:terms:` : $localize`:@@combat.answerDecline:Decline the terms ${terms}:terms:`;
+}
+
+/** Return the named action as the player reads it: its name and target, from the same sentences as the candidate lists. */
+export function choiceMessage(choice: TacticalChoice, fight: CombatEncounter | null): string {
+  switch (choice.kind) {
+    case 'move': return moveMessage(choice.zone);
+    case 'strike': return `${strikeMessage(choice.attackId)} · ${targetsMessage(participantName(choice.targetId))}`;
+    case 'ability': return choice.targetIds.length === 0 ? abilityMessage(choice.abilityId)
+      : `${abilityMessage(choice.abilityId)} · ${targetsMessage(choice.targetIds.map(participantName).join(', '))}`;
+    case 'interact': {
+      const social = fight?.options?.actions.find((action) => action.actionId === choice.actionId)?.kind === 'social';
+      const name = social ? socialMessage(choice.actionId) : sceneMessage(choice.actionId);
+      return choice.targetId === null ? name : `${name} · ${targetsMessage(participantName(choice.targetId))}`;
+    }
+    case 'guard': return $localize`:@@combat.guardOption:Take a guarded stance`;
+    case 'end': return $localize`:@@combat.endOption:End your turn`;
+    case 'speak': return $localize`:@@combat.speakTo:Speak to ${participantName(choice.recipientId)}:recipient:`;
+    case 'answer': return answerMessage(choice.decision, fight?.options?.offer?.terms.termsId ?? '?');
+  }
 }
 
 /** One-line state of the fight for a phase; `playerDecision` marks the player's own decision point. */
@@ -239,6 +344,14 @@ export function refusalMessage(code: string | null): string {
       return $localize`:@@combat.refusedFocus:You do not have enough Focus for that. Nothing changed.`;
     case 'COMMAND_STALE_REVISION':
       return $localize`:@@combat.refusedStale:The fight moved on while you were deciding. Review the updated choices. Nothing changed.`;
+    case 'NO_RECIPIENT': case 'NOT_ADDRESSABLE':
+      return $localize`:@@combat.refusedRecipient:Nobody who can hear you was chosen. Nothing changed.`;
+    case 'SPEECH_LIMIT': case 'COMMAND_SPEECH_LIMIT_REACHED':
+      return $localize`:@@combat.refusedSpeech:You have already spoken this turn. Nothing changed.`;
+    case 'EMPTY_TEXT': case 'TEXT_TOO_LONG': case 'TEXT_INVALID':
+      return $localize`:@@combat.refusedText:Those words cannot be sent: write between 1 and 500 characters. Nothing changed.`;
+    case 'COMMAND_OFFER_UNAVAILABLE':
+      return $localize`:@@combat.refusedOffer:That offer is no longer on the table. Nothing changed.`;
     case 'COMMAND_CAMPAIGN_BUSY': case 'COMMAND_ADMISSION_LIMIT':
       return $localize`:@@combat.refusedBusy:The game is busy with another action. Try again in a moment. Nothing changed.`;
     case 'LOST':

@@ -16,11 +16,22 @@ export type TacticalChoice =
   | { readonly kind: 'ability'; readonly abilityId: string; readonly targetIds: readonly string[] }
   | { readonly kind: 'interact'; readonly actionId: string; readonly targetId: string | null }
   | { readonly kind: 'guard' }
-  | { readonly kind: 'end' };
+  | { readonly kind: 'end' }
+  /** Speech-only words to one participant (P12.2-B): `recipientId` is empty while the player has chosen nobody. */
+  | { readonly kind: 'speak'; readonly recipientId: string; readonly text: string }
+  /** The player's explicit answer to the offer on the table; the offer's identity comes from the projection, never from the page. */
+  | { readonly kind: 'answer'; readonly decision: 'accept' | 'decline' };
+
+/** Longest utterance the server accepts, in UTF-16 units (docs/07 P11.2). */
+export const MAX_SPEECH_TEXT = 500;
 
 /** Stable refusal codes of the page's own validation; they never carry server text. */
-export const TACTICAL_REFUSALS = ['NOT_YOUR_TURN', 'NOT_LISTED', 'DISABLED', 'ACTION_POINTS', 'FOCUS'] as const;
+export const TACTICAL_REFUSALS = ['NOT_YOUR_TURN', 'NOT_LISTED', 'DISABLED', 'ACTION_POINTS', 'FOCUS', 'NO_RECIPIENT', 'NOT_ADDRESSABLE',
+  'SPEECH_LIMIT', 'EMPTY_TEXT', 'TEXT_TOO_LONG', 'TEXT_INVALID'] as const;
 export type TacticalRefusal = (typeof TACTICAL_REFUSALS)[number];
+
+/** The server refuses U+0000 and unpaired surrogates, which no stored text can hold. */
+const UNSTORABLE = /\u0000|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 
 /** What a choice costs and changes in the player's own turn, taken from the projection (never computed from rules). */
 export interface TacticalPreview {
@@ -34,6 +45,10 @@ export interface TacticalPreview {
   readonly endsTurn: boolean;
   readonly check: { readonly attribute: string; readonly skill: string | null; readonly rank: number } | null;
   readonly terms: { readonly termsId: string; readonly kind: string; readonly cost: number } | null;
+  /** For speech: the words, their recipient and the speech allowance left afterwards; speech spends no action points. */
+  readonly speech: { readonly recipientId: string; readonly text: string; readonly remainingAfter: number } | null;
+  /** For an answer to an offer: the decision the player is about to make; accepting binds the player to `terms`. */
+  readonly decision: 'accept' | 'decline' | null;
 }
 
 /** The typed command a choice becomes. */
@@ -56,6 +71,8 @@ export function choiceKey(choice: TacticalChoice): string {
     case 'interact': return `interact:${choice.actionId}:${choice.targetId ?? ''}`;
     case 'guard': return 'guard';
     case 'end': return 'end';
+    case 'speak': return `speak:${choice.recipientId}:${choice.text}`;
+    case 'answer': return `answer:${choice.decision}`;
   }
 }
 
@@ -82,6 +99,10 @@ export function tacticalEntries(fight: CombatEncounter): TacticalEntry[] {
     if (action.targets.length === 0) add({ kind: 'interact', actionId: action.actionId, targetId: null });
     else for (const target of action.targets) add({ kind: 'interact', actionId: action.actionId, targetId: target });
   }
+  if (options.offer !== null) {
+    add({ kind: 'answer', decision: 'accept' }, options.offer.canAccept ? null : 'UNAVAILABLE');
+    add({ kind: 'answer', decision: 'decline' });
+  }
   if (options.guard !== null) add({ kind: 'guard' }, options.guard.available ? null : 'UNAVAILABLE');
   if (options.endActivation) add({ kind: 'end' });
   return entries;
@@ -106,6 +127,8 @@ export function resolveChoice(fight: CombatEncounter | null, choice: TacticalCho
   let endsTurn = false;
   let check: TacticalPreview['check'] = null;
   let terms: TacticalPreview['terms'] = null;
+  let speech: TacticalPreview['speech'] = null;
+  let decision: TacticalPreview['decision'] = null;
   let command: TacticalCommand;
   switch (choice.kind) {
     case 'move': {
@@ -157,10 +180,33 @@ export function resolveChoice(fight: CombatEncounter | null, choice: TacticalCho
       command = { commandType: 'END_ACTIVATION', payload: {} };
       break;
     }
+    case 'speak': {
+      // Order matters: the first failing rule is the one the player is told about, and none of them reads the words' meaning.
+      if (choice.recipientId === '') return refuse('NO_RECIPIENT');
+      if (!options.speechRecipients.includes(choice.recipientId)) return refuse('NOT_ADDRESSABLE');
+      if (options.speechRemaining <= 0) return refuse('SPEECH_LIMIT');
+      if (choice.text.trim() === '') return refuse('EMPTY_TEXT');
+      if (choice.text.length > MAX_SPEECH_TEXT) return refuse('TEXT_TOO_LONG');
+      if (UNSTORABLE.test(choice.text)) return refuse('TEXT_INVALID');
+      speech = { recipientId: choice.recipientId, text: choice.text, remainingAfter: options.speechRemaining - 1 };
+      command = { commandType: 'COMBAT_SPEAK', payload: { recipientId: choice.recipientId, text: choice.text } };
+      break;
+    }
+    case 'answer': {
+      const offer = options.offer;
+      if (offer === null) return refuse('NOT_LISTED');
+      if (choice.decision === 'accept' && !offer.canAccept) return refuse('DISABLED');
+      // Declining is always free; accepting pays the terms' declared points, which the server repeats on its own state.
+      points = choice.decision === 'accept' ? offer.terms.cost : 0;
+      terms = offer.terms;
+      decision = choice.decision;
+      command = { commandType: 'ANSWER_OFFER', payload: { offerId: offer.offerId, decision: choice.decision } };
+      break;
+    }
   }
   if (!endsTurn && points > left) return refuse('ACTION_POINTS');
   if (focus > focusLeft) return refuse('FOCUS');
-  return { ok: true, command, preview: { choice, points, pointsAfter: endsTurn ? 0 : left - points, focus, focusAfter: focusLeft - focus, endsTurn, check, terms } };
+  return { ok: true, command, preview: { choice, points, pointsAfter: endsTurn ? 0 : left - points, focus, focusAfter: focusLeft - focus, endsTurn, check, terms, speech, decision } };
 }
 
 /** The request body of one command: the closed envelope of docs/13 section 3. */

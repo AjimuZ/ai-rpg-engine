@@ -4590,7 +4590,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     and the size before this change was not measured on this tree (the last recorded log, 30 October, shows 468.62 kB).
     Sending combat actions, labelled names, the action chat and the verdict confirmation remain P12.2 and later; mobile and
     reconnect behavior inside a real fight remain P12.5.
-- [ ] P12.2 Allow named actions and a persistent combat dialogue/action chat with known recipients, attributed replies and editable quick replies; validate talk, negotiation and scene-changing intent, preview consequential costs and preserve explicit player submission/decisions.
+- [x] P12.2 Allow named actions and a persistent combat dialogue/action chat with known recipients, attributed replies and editable quick replies; validate talk, negotiation and scene-changing intent, preview consequential costs and preserve explicit player submission/decisions.
   - P12.2-A, named actions with cost previews, 14 November 2026 (partial: the box stays unchecked; the action chat, quick
     replies, talk and negotiation intent and the other candidates remain). The combat panel's "Send an action" section
     (`combat-actions.ts`) lists the projection's legal candidates as buttons (move, attack, ability with one or no target,
@@ -4621,6 +4621,45 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     attack is not previewed because the projection does not carry it. The composer sentence "Sending actions is not
     connected yet" and the saved-screen notice with the same claim were left unchanged (free text is still not sent), so
     both now understate tactical sending.
+  - P12.2-B, persistent combat chat, 14 November 2026 (the box stays unchecked: the owner of the roadmap ticks it after review).
+    New `combat-chat.ts` (`CombatChat`, hosted by the combat panel outside the fight's section so the unsent draft survives a
+    re-read) adds: an attributed transcript (the server's own journal sentences of the newest fight, each with a text label —
+    Said, Attempt, Reply, Decision or Result — never by color alone); a recipient selector of known participants (name and
+    side; none is chosen by default and none is invented for ambiguous text); a free-text composer (500-character limit, count)
+    with a separate "Review and send" control; up to three editable quick replies per recipient side that only fill the draft,
+    and replace a draft the player wrote only after "Replace my words"; social actions shown only for the chosen recipient and
+    scene actions always; and the offer on the table with "Accept the terms" and "Decline the terms". `resolveChoice` gained
+    `speak` (`COMBAT_SPEAK` {recipientId, text}, refused without a recipient, for a recipient outside the projection's speech
+    recipients, when no speech is left, for blank, over-500 or unstorable text, or out of turn) and `answer` (`ANSWER_OFFER`
+    {offerId from the projection, decision}; accept refused when the projection says it cannot be accepted or costs more points
+    than remain; decline is free). Every choice opens a review (words and recipient, "no action points are spent" and the speech
+    left afterwards, or points, check, terms, and "accepting binds you … cannot be taken back") and only "Confirm and send"
+    emits it to the existing host `send`, with the same idempotent request identity. Outside the player's decision the draft
+    stays editable, review is disabled with the reason, and nothing is queued. A refusal keeps the draft; the draft is cleared
+    only when a newer revision arrives with no refusal and nothing in flight. 44 new reviewed messages (698 in the catalog).
+    No backend, migration or command contract changed ([UI](13-api-and-ui.md#p122-b-combat-chat)).
+  - Tests: `combat-chat.spec.ts` (12 new: speech payload with the exact words and zero points, each speech refusal, answers with
+    their previews and refusals, transcript selection, then in the page: attributed lines and recipients, no invented
+    recipient with the reason shown, quick replies that fill and replace only on request, a reviewed speech sent once with the
+    draft cleared after a committed revision, a refusal that keeps the draft, writing outside the player's turn with no request,
+    social actions by recipient with check and terms, and an explicit accept of an offer). Existing tests changed: the Italian
+    catalog count moved from 654 to 698 and the `encounterBody` fixture can carry an offer.
+  - Verification (14 November 2026, Windows reference host): `npm --prefix frontend run typecheck` passed;
+    `npm --prefix frontend test` passed 205 tests in 22 files; `npm --prefix frontend run check:i18n` printed "Localization
+    parity: 698 reviewed messages"; `npm --prefix frontend run build:locales` built both locales. The production initial bundle
+    is 536.54 kB (535.32 kB after P12.2-A; budget warning 500 kB, error 1 MB) and the lazy panel chunk 52.38 kB (33.10 kB).
+  - Not proven: the real backend with the chat (scripted server only; no `COMBAT_SPEAK` or `ANSWER_OFFER` was sent to a real
+    route from the page, so the envelope, the codes `COMMAND_SPEECH_LIMIT_REACHED` and `COMMAND_OFFER_UNAVAILABLE` and the
+    committed revision were not seen end to end); a browser run (no keyboard, 320 px, focus-order or axe check of the chat; the
+    "dialogue/tactics switch" of docs/13 is only a collapsible `details`, with no separate mobile layout); a screen reader;
+    independent review of the 44 Italian messages; `verify.sh full` and `verify.sh containers`. Limits: the backend produces no
+    generated reply (P12.4), so the "replies" are the server's rule-driven sentences (`NEGOTIATION_RESPONDED`, `OFFER_ANSWERED`
+    and the like), attributed by the sentence itself and not by a structured speaker; the transcript reads only the newest
+    journal page and does not page back; narrator descriptions and a mechanical receipt line per command are not separate
+    entries; quick replies are static, localized sentences chosen by recipient side, not generated from the situation; speech
+    input, the verdict settlement, items, readying, assessing, withdrawing, reactions and multi-target abilities remain
+    unsent; draft persistence across a reload or reconnect (P12.5) was not added, the draft lives in the page only; free text
+    in the main composer is still not sent. The two stale "Sending actions is not connected yet" sentences are unchanged.
 - [ ] P12.3 Provide actor-knowledge-scoped legal candidates to Codex for NPC/companion choices.
 - [ ] P12.4 Add deterministic tactic fallback, interruption messages, bounded knowledge-scoped combat replies and outcome narration; dialogue failure leaves committed state and tactical controls available.
 - [ ] P12.5 Verify mobile/keyboard play, chat/tactics switching, draft preservation, no out-of-turn/automatic submission and session renewal/reconnect inside a fight, including negotiated settlement retries.

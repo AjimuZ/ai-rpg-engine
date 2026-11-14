@@ -535,7 +535,8 @@ The "Send an action" section of the panel (`combat-actions.ts`) turns the projec
 action and target: move to a zone, attack with a named attack on a target, use an ability (one listed target, or none), a
 declared social or scene action, take a guarded stance, and end the turn. They exist only while `playerDecision` is true. A
 disabled candidate stays listed with its stable reason and cannot be chosen. Not offered yet: items, readying, assessing,
-withdrawing, speech, reactions, the answer to an offer, the settlement of a verdict, abilities with several targets, and free text.
+withdrawing, reactions, the settlement of a verdict and abilities with several targets. Speech, free text and the answer to an
+offer are sent from the [combat chat](#p122-b-combat-chat) (the two answers are also listed here when an offer stands).
 
 Choosing an action sends nothing. It opens a review that states, from the projection and without computing any rule, the
 action's name and target, the action points it spends and how many remain, the Focus it spends and how many remain, a declared
@@ -563,6 +564,44 @@ state. A reply that never arrives keeps the request identity, so confirming the 
 stored operation instead of playing it twice. After an answer the page tracks the operation like any other (the "Actions" list and
 the stream) and re-reads the projection. The server still decides legality and every effect; the page's check only avoids
 sending what the projection already shows to be illegal.
+
+### P12.2-B combat chat
+
+Below the combat panel, a "Conversation" section (`combat-chat.ts`, [combat chat](#71-combat-chat)) keeps the fight's talk beside
+the tactical controls. It sits outside the fight's own section, so an unsent draft survives a re-read of the projection, and it
+is tied to its encounter: another fight starts with an empty draft.
+
+- **Attributed transcript.** The public lines of the newest fight in the journal's first page (`COMBAT_SPEECH`,
+  `INTERACTION_ATTEMPTED`, `NEGOTIATION_RESPONDED`, `OFFER_ANSWERED`, `SOCIAL_CHECK_RESOLVED`, `OFFER_LAPSED`,
+  `PARTICIPANT_SURRENDERED`), oldest first, at most 40. Each line is the server's own sentence, which names who spoke or answered,
+  preceded by a text label (Said, Attempt, Reply, Decision, Result), so roles do not depend on color. The log is a focusable,
+  labelled, polite live region in the journal's language. The backend generates no reply yet (P12.4): a "Reply" is the rule-driven
+  response of a recipient to a social action, and nothing is invented by the page.
+- **Recipient.** A selector of the known participants other than the player that are active or have surrendered, shown with their
+  side. Nobody is chosen by default and a recipient is never inferred from the words. Speech is accepted only for the projection's
+  speech recipients, otherwise the draft is refused with a reason.
+- **Composer and send.** A text area (500 characters, with a count) and a separate "Review and send" control. Speech is speech-only:
+  `COMBAT_SPEAK` `{recipientId, text}` with the exact words as typed, at no action points and within the speech left this turn. The
+  review states the words, the recipient, that no action points are spent and the speech left afterwards; only "Confirm and send"
+  sends, through the same host `send` as the named actions (fresh `requestId` per distinct words and revision, reused after a lost
+  reply). Outside the player's decision, after the allowance is spent, without a recipient, or for blank, too long or unstorable
+  text the review is disabled with the reason; the draft stays editable and is never queued.
+- **Quick replies.** At most three suggestions for the chosen recipient's side (a hostile: "Why are you attacking us?", "Let's
+  negotiate.", "Is there another way to settle this?"; an ally: "Stay close to me.", "Cover me.", "Hold your position."). Choosing
+  one only fills the draft; a draft the player wrote is replaced only after an explicit "Replace my words" ("Keep my words"
+  declines). They are static localized sentences, not generated from the situation, and name no object or place.
+- **Talk, negotiation and scene intents.** The projection's declared social actions are listed for the chosen recipient only,
+  scene actions always, as named buttons that open the same cost review as P12.2-A (points before and after, declared check and
+  terms) and send `INTERACT`. The offer on the table shows "Accept the terms" and "Decline the terms" (`ANSWER_OFFER`
+  `{offerId, decision}`, the offer identity taken from the projection): accepting is refused when the projection says it cannot be
+  accepted or costs more points than remain, its review says that it binds the player and cannot be taken back, and declining is
+  free. Words never accept anything; only this answer does. The two answers also appear in "Send an action".
+- **Failure.** A refusal by the server or the page keeps the draft and shows a sentence ending "Nothing changed". The draft is
+  cleared only once a newer revision arrives with no refusal and nothing in flight, or by the player's own "Clear words".
+
+Not implemented: speech input, a separate mobile dialogue/tactics switch (the section is a collapsible `details`), paging older
+conversation, narrator and per-command receipt lines as separate entries, generated replies (P12.4), draft persistence across a
+reload or reconnect (P12.5), and the settlement of a verdict.
 
 ## 4. Stream contract
 
@@ -682,18 +721,21 @@ same dialogue/action drafts, with voice-only preview, correction, confirmation a
 cancel. It cannot change turn eligibility, auto-submit next turn or force an NPC
 agreement. See section 13 for the proposed input boundary.
 
-This is a planned P11/P12 contract. The P05.1 preview shells do not implement playable combat chat.
+This is a P11/P12 contract. The P05.1 preview shells do not implement playable combat chat. Since P12.2-B the playthrough page
+implements the recipient selector, composer with a separate review-and-send, editable quick replies, attributed transcript and
+the talk, negotiation, scene and offer-answer intents ([combat chat](#p122-b-combat-chat)); the mobile dialogue/tactics switch,
+speech input, generated replies and draft persistence across reconnect are not implemented.
 
 Since P11.2 the backend side of this boundary exists ([ADR 0029](adr/0029-initiative-rounds-activations-and-bounded-combat-dialogue.md),
 [turn protocol](07-turn-protocol.md#p112-tactical-intentions)): `COMBAT_SPEAK` stores one bounded speech-only
 utterance per activation at no cost, `INTERACT` attempts a declared social or scene action at its declared cost,
 both only at the player's own decision, and every tactical receipt lists the legal options (moves with costs,
-speech allowance and recipients, declared actions with costs and targets). Generated replies, the panel and the
-composer remain P12. Since P11.3 ([ADR 0030](adr/0030-attacks-defense-damage-and-healing-with-recorded-draws.md))
+speech allowance and recipients, declared actions with costs and targets). Generated replies remain P12.4; the panel and the
+composer exist since P12.1-B and P12.2-B. Since P11.3 ([ADR 0030](adr/0030-attacks-defense-damage-and-healing-with-recorded-draws.md))
 receipts also show strikes, public standings and attack, Guard and item options; no frontend control uses them yet.
 Since P11.5 ([ADR 0033](adr/0033-negotiation-explicit-answers-and-surrender.md)) a receipt also shows a declared check's result,
 the recipient's response and the offer on the table with what accepting costs, and `ANSWER_OFFER` is the explicit player decision
-this section requires. No frontend control uses them yet, so the preview and confirmation remain P12.2.
+this section requires. Since P12.2-B the chat previews and sends that answer after an explicit confirmation.
 Since P11.5-C.1 ([ADR 0034](adr/0034-ready-equip-and-assess-in-a-fight.md)) a receipt also shows what a Ready/equip action changed,
 with the player's own new Guard, armor and attacks, what an assessment found (a target's values only after a success), and the
 prices of readying and assessing with the participants that can be assessed. No frontend control uses them yet (P12.1/P12.2).
@@ -716,8 +758,8 @@ Since P12.1-A the backend side of the panel exists: `GET /api/v1/campaigns/{id}/
 shows the active actor, initiative order, remaining points, zones and passages, known conditions, the player's own values,
 defenses revealed only by an assessment, objectives and the candidates with their known costs and targets, without hidden
 values. Since P12.1-B the page renders it read-only ([combat panel](#p121-b-combat-panel)); since P12.2-A the controls that send
-the named tactical actions exist ([tactical actions](#p122-a-tactical-actions)); the action chat, the other candidates and the
-confirmation of the verdict remain P12.2 and later.
+the named tactical actions exist ([tactical actions](#p122-a-tactical-actions)); since P12.2-B the dialogue chat and the answer to
+an offer exist ([combat chat](#p122-b-combat-chat)); the other candidates and the confirmation of the verdict remain P12.2 and later.
 
 ## 8. Loading, empty, error, and recovery states
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — A persistent combat conversation (P12.2-B), 14 November 2026
+
+- During a fight the page now has a "Conversation" section under the combat panel. It lists what has been said and answered
+  in this fight, each line labelled Said, Attempt, Reply, Decision or Result, so the speaker's role never depends on color.
+- You can choose who you are speaking to (nobody is chosen for you), write words of up to 500 characters and use a separate
+  "Review and send". The review shows your exact words, that speech spends no action points and how many speeches remain.
+  Nothing is sent until you press "Confirm and send". Outside your turn you can keep writing, but review is disabled with the
+  reason and nothing is queued for later.
+- Up to three suggestions for the chosen participant only fill your words; a draft you wrote is replaced only after you press
+  "Replace my words". A refused message keeps your words and says "Nothing changed".
+- Social actions for the chosen participant and scene actions open the same cost review as other actions. An offer on the table
+  can be accepted or declined from the chat: accepting says that it binds you and cannot be taken back, and words alone never
+  accept anything.
+- 44 new reviewed messages in English and Italian (698 in the catalog). Not yet: speech input, a separate mobile switch,
+  generated replies, older conversation paging, keeping the draft across a reload, and settling a decided fight.
+
 ## Unreleased — Named combat actions with a cost review (P12.2-A), 14 November 2026
 
 - During your turn in a fight the combat panel now has a "Send an action" section with a button for each move, attack,

@@ -15,12 +15,16 @@
  * review of the action's costs from the projection; the single `confirmed` output fires from the review's confirm button, never
  * from choosing, from a newer projection or from anything else, and a review is discarded as soon as the projection moves to
  * another revision or no longer allows the action. The host validates and sends; this component sends nothing itself.
+ *
+ * Combat chat (P12.2-B): the panel also hosts {@link CombatChat}, whose own review and confirm button emit through the same
+ * `confirmed` and `dismissed` outputs. It is placed outside the fight's section so its unsent draft survives a re-read.
  */
 import { ChangeDetectionStrategy, Component, computed, inject, input, LOCALE_ID, output, signal } from '@angular/core';
-import { CombatEncounter, CombatParticipant, CombatView } from './campaign-protocol';
+import { CombatEncounter, CombatParticipant, CombatView, JournalEntry } from './campaign-protocol';
+import { CombatChat } from './combat-chat';
 import { resolveChoice, TacticalChoice, tacticalEntries } from './combat-actions';
 import {
-  abilityMessage, actingMessage, capacityMessage, checkMessage, combatLabels, coverMessage, crossingMessage, disabledMessage,
+  abilityMessage, actingMessage, capacityMessage, checkMessage, choiceMessage, combatLabels, coverMessage, crossingMessage, disabledMessage,
   endsTurnMessage, focusCostMessage, hasChoices, initiativeMessage, learnedMessage, maxTargetsMessage, moveMessage, objectiveMessage,
   objectiveStatusMessage, offerMessage, participantName, phaseMessage, priceMessage, reactionPolicyMessage, recipientsMessage,
   refusalMessage, roundMessage, sceneMessage, sideMessage, socialMessage, speechMessage, spendFocusMessage, spendMessage,
@@ -29,7 +33,7 @@ import {
 
 /** Show the combat projection of one revision; renders nothing outside a fight. */
 @Component({
-  selector: 'app-combat-panel', changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-combat-panel', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CombatChat],
   styles: `
     :host { display: block; }
     .combat-panel { margin-block: 1.5rem; }
@@ -249,6 +253,8 @@ import {
                   @if (shown.preview.focus > 0) { <li data-review-focus>{{ spendFocusText(shown.preview.focus, shown.preview.focusAfter) }}</li> }
                   @if (shown.preview.check; as check) { <li data-review-check>{{ checkText(check) }}</li> }
                   @if (shown.preview.terms; as terms) { <li data-review-terms>{{ termsText(terms) }}</li> }
+                  @if (shown.preview.decision === 'accept') { <li data-review-binding>{{ t.acceptBinds }}</li> }
+                  @if (shown.preview.decision === 'decline') { <li data-review-binding>{{ t.declineFree }}</li> }
                   <li class="muted">{{ t.previewFinal }}</li>
                 </ul>
                 <p class="review-actions">
@@ -263,6 +269,8 @@ import {
         <p class="muted">{{ t.readOnly }}</p>
       </section>
     }
+    <app-combat-chat [view]="view()" [journal]="journal()" [journalLocale]="journalLocale()" [sending]="sending()" [problem]="problem()"
+      (confirmed)="confirmed.emit($event)" (dismissed)="dismissed.emit()" />
   `,
 })
 export class CombatPanel {
@@ -272,6 +280,10 @@ export class CombatPanel {
   readonly sending = input(false);
   /** Stable code of the last refusal the host met (the page's own or the server's), or null; shown as a sentence, never as a code. */
   readonly problem = input<string | null>(null);
+  /** The newest journal page the chat reads its public conversation from (P12.2-B); null before it is read. */
+  readonly journal = input<readonly JournalEntry[] | null>(null);
+  /** Language of the journal's sentences. */
+  readonly journalLocale = input<'en' | 'it' | null>(null);
   /** The player confirmed the reviewed action; the host validates it again against its newest projection and sends it. */
   readonly confirmed = output<TacticalChoice>();
   /** The player started a new review or backed out, so the host forgets the last refusal. */
@@ -340,20 +352,7 @@ export class CombatPanel {
   endsTurnText(points: number): string { return endsTurnMessage(this.n(points)); }
 
   /** The named action as the player reads it: its name and target, from the same sentences as the candidate lists. */
-  label(choice: TacticalChoice): string {
-    switch (choice.kind) {
-      case 'move': return moveMessage(choice.zone);
-      case 'strike': return `${strikeMessage(choice.attackId)} · ${this.targetsText([choice.targetId])}`;
-      case 'ability': return choice.targetIds.length === 0 ? abilityMessage(choice.abilityId) : `${abilityMessage(choice.abilityId)} · ${this.targetsText(choice.targetIds)}`;
-      case 'interact': {
-        const social = this.fight()?.options?.actions.find((action) => action.actionId === choice.actionId)?.kind === 'social';
-        const name = social ? socialMessage(choice.actionId) : sceneMessage(choice.actionId);
-        return choice.targetId === null ? name : `${name} · ${this.targetsText([choice.targetId])}`;
-      }
-      case 'guard': return this.t.guardOption;
-      case 'end': return this.t.endOption;
-    }
-  }
+  label(choice: TacticalChoice): string { return choiceMessage(choice, this.fight()); }
 
   /** Review one listed action: this only previews its costs and sends nothing. */
   prepare(key: string): void {

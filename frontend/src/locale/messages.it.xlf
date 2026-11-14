@@ -5412,5 +5412,269 @@
       <target>Il gioco ha rifiutato l’azione. Non è cambiato nulla.</target>
       </segment>
     </unit>
+    <unit id="combat.chatTitle">
+      <segment>
+        <source>Conversation</source>
+      <target>Conversazione</target>
+      </segment>
+    </unit>
+    <unit id="combat.chatHelp">
+      <segment>
+        <source>Write to someone in the fight. Words alone change nothing and agree to nothing, and nothing is sent until you review and confirm it.</source>
+      <target>Scrivi a qualcuno nello scontro. Le parole da sole non cambiano nulla e non concordano nulla, e niente viene inviato finché non lo controlli e lo confermi.</target>
+      </segment>
+    </unit>
+    <unit id="combat.transcriptTitle">
+      <segment>
+        <source>What has been said and answered</source>
+      <target>Cosa è stato detto e risposto</target>
+      </segment>
+    </unit>
+    <unit id="combat.noTranscript">
+      <segment>
+        <source>Nothing has been said in this fight yet.</source>
+      <target>In questo scontro non è stato ancora detto nulla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.recipientLabel">
+      <segment>
+        <source>Speaking to</source>
+      <target>Parli a</target>
+      </segment>
+    </unit>
+    <unit id="combat.noRecipient">
+      <segment>
+        <source>Nobody chosen</source>
+      <target>Nessuno scelto</target>
+      </segment>
+    </unit>
+    <unit id="combat.draftLabel">
+      <segment>
+        <source>Your words</source>
+      <target>Le tue parole</target>
+      </segment>
+    </unit>
+    <unit id="combat.reviewSend">
+      <segment>
+        <source>Review and send</source>
+      <target>Controlla e invia</target>
+      </segment>
+    </unit>
+    <unit id="combat.clearDraft">
+      <segment>
+        <source>Clear words</source>
+      <target>Cancella le parole</target>
+      </segment>
+    </unit>
+    <unit id="combat.quickTitle">
+      <segment>
+        <source>Suggestions that only fill your words</source>
+      <target>Suggerimenti che riempiono soltanto le tue parole</target>
+      </segment>
+    </unit>
+    <unit id="combat.quickNeedsRecipient">
+      <segment>
+        <source>Choose who you are speaking to to see suggestions.</source>
+      <target>Scegli a chi parli per vedere i suggerimenti.</target>
+      </segment>
+    </unit>
+    <unit id="combat.replace">
+      <segment>
+        <source>Replace my words</source>
+      <target>Sostituisci le mie parole</target>
+      </segment>
+    </unit>
+    <unit id="combat.keep">
+      <segment>
+        <source>Keep my words</source>
+      <target>Mantieni le mie parole</target>
+      </segment>
+    </unit>
+    <unit id="combat.intentsTitle">
+      <segment>
+        <source>Talk, negotiate or change the scene</source>
+      <target>Parla, negozia o cambia la scena</target>
+      </segment>
+    </unit>
+    <unit id="combat.intentsNeedRecipient">
+      <segment>
+        <source>Choose who you are speaking to to see the social actions for them.</source>
+      <target>Scegli a chi parli per vedere le azioni sociali possibili con quella persona.</target>
+      </segment>
+    </unit>
+    <unit id="combat.noIntents">
+      <segment>
+        <source>No social or scene action is available now.</source>
+      <target>Nessuna azione sociale o di scena è disponibile ora.</target>
+      </segment>
+    </unit>
+    <unit id="combat.acceptBinds">
+      <segment>
+        <source>Accepting binds you to these terms and cannot be taken back.</source>
+      <target>Accettare ti vincola a queste condizioni e non si può annullare.</target>
+      </segment>
+    </unit>
+    <unit id="combat.declineFree">
+      <segment>
+        <source>Declining costs nothing and leaves the fight as it is.</source>
+      <target>Rifiutare non costa nulla e lascia lo scontro com’è.</target>
+      </segment>
+    </unit>
+    <unit id="combat.blockTurn">
+      <segment>
+        <source>It is not your turn. You can keep writing; nothing is queued or sent for you.</source>
+      <target>Non è il tuo turno. Puoi continuare a scrivere; nulla viene messo in coda o inviato al posto tuo.</target>
+      </segment>
+    </unit>
+    <unit id="combat.blockRecipient">
+      <segment>
+        <source>Choose someone who can hear you now.</source>
+      <target>Scegli qualcuno che possa sentirti ora.</target>
+      </segment>
+    </unit>
+    <unit id="combat.blockSpeech">
+      <segment>
+        <source>You have already spoken this turn.</source>
+      <target>Hai già parlato in questo turno.</target>
+      </segment>
+    </unit>
+    <unit id="combat.blockText">
+      <segment>
+        <source>Write between 1 and 500 characters.</source>
+      <target>Scrivi tra 1 e 500 caratteri.</target>
+      </segment>
+    </unit>
+    <unit id="combat.characters">
+      <segment>
+        <source><ph id="0" equiv="used" disp="used" /> of <ph id="1" equiv="most" disp="most" /> characters</source>
+      <target><ph id="0" equiv="used" disp="used" /> di <ph id="1" equiv="most" disp="most" /> caratteri</target>
+      </segment>
+    </unit>
+    <unit id="combat.replaceAsk">
+      <segment>
+        <source>Replace your words with “<ph id="0" equiv="words" disp="words" />”?</source>
+      <target>Sostituire le tue parole con “<ph id="0" equiv="words" disp="words" />”?</target>
+      </segment>
+    </unit>
+    <unit id="combat.words">
+      <segment>
+        <source>Your words: “<ph id="0" equiv="words" disp="words" />”</source>
+      <target>Le tue parole: “<ph id="0" equiv="words" disp="words" />”</target>
+      </segment>
+    </unit>
+    <unit id="combat.speechSpend">
+      <segment>
+        <source>Speaks to <ph id="0" equiv="recipient" disp="recipient" />. No action points are spent; speeches left this turn afterwards: <ph id="1" equiv="left" disp="left" />.</source>
+      <target>Parla a <ph id="0" equiv="recipient" disp="recipient" />. Non si spendono punti azione; discorsi rimasti in questo turno dopo questo: <ph id="1" equiv="left" disp="left" />.</target>
+      </segment>
+    </unit>
+    <unit id="combat.quickWhy">
+      <segment>
+        <source>Why are you attacking us?</source>
+      <target>Perché ci attacchi?</target>
+      </segment>
+    </unit>
+    <unit id="combat.quickNegotiate">
+      <segment>
+        <source>Let's negotiate.</source>
+      <target>Negoziamo.</target>
+      </segment>
+    </unit>
+    <unit id="combat.quickOther">
+      <segment>
+        <source>Is there another way to settle this?</source>
+      <target>C’è un altro modo per risolvere la questione?</target>
+      </segment>
+    </unit>
+    <unit id="combat.quickStay">
+      <segment>
+        <source>Stay close to me.</source>
+      <target>Resta vicino a me.</target>
+      </segment>
+    </unit>
+    <unit id="combat.quickCover">
+      <segment>
+        <source>Cover me.</source>
+      <target>Coprimi.</target>
+      </segment>
+    </unit>
+    <unit id="combat.quickHold">
+      <segment>
+        <source>Hold your position.</source>
+      <target>Mantieni la posizione.</target>
+      </segment>
+    </unit>
+    <unit id="combat.kindSaid">
+      <segment>
+        <source>Said</source>
+      <target>Detto</target>
+      </segment>
+    </unit>
+    <unit id="combat.kindAttempt">
+      <segment>
+        <source>Attempt</source>
+      <target>Tentativo</target>
+      </segment>
+    </unit>
+    <unit id="combat.kindReply">
+      <segment>
+        <source>Reply</source>
+      <target>Risposta</target>
+      </segment>
+    </unit>
+    <unit id="combat.kindDecision">
+      <segment>
+        <source>Decision</source>
+      <target>Decisione</target>
+      </segment>
+    </unit>
+    <unit id="combat.kindResult">
+      <segment>
+        <source>Result</source>
+      <target>Esito</target>
+      </segment>
+    </unit>
+    <unit id="combat.answerAccept">
+      <segment>
+        <source>Accept the terms <ph id="0" equiv="terms" disp="terms" /></source>
+      <target>Accetta le condizioni <ph id="0" equiv="terms" disp="terms" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.answerDecline">
+      <segment>
+        <source>Decline the terms <ph id="0" equiv="terms" disp="terms" /></source>
+      <target>Rifiuta le condizioni <ph id="0" equiv="terms" disp="terms" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.speakTo">
+      <segment>
+        <source>Speak to <ph id="0" equiv="recipient" disp="recipient" /></source>
+      <target>Parla a <ph id="0" equiv="recipient" disp="recipient" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.refusedRecipient">
+      <segment>
+        <source>Nobody who can hear you was chosen. Nothing changed.</source>
+      <target>Non è stato scelto nessuno che possa sentirti. Non è cambiato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.refusedSpeech">
+      <segment>
+        <source>You have already spoken this turn. Nothing changed.</source>
+      <target>Hai già parlato in questo turno. Non è cambiato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.refusedText">
+      <segment>
+        <source>Those words cannot be sent: write between 1 and 500 characters. Nothing changed.</source>
+      <target>Queste parole non possono essere inviate: scrivi tra 1 e 500 caratteri. Non è cambiato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.refusedOffer">
+      <segment>
+        <source>That offer is no longer on the table. Nothing changed.</source>
+      <target>Quell’offerta non è più sul tavolo. Non è cambiato nulla.</target>
+      </segment>
+    </unit>
   </file>
 </xliff>
