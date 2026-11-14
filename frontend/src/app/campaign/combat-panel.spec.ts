@@ -198,7 +198,7 @@ describe('Combat panel in the playthrough view', /** The routed view shows the s
     expect(text(root, '[data-objective="clear"]')).toContain('Met');
   });
 
-  it('is operable by keyboard and never sends a command', /** Native details and one focusable scroll region; only GETs are issued. */ async () => {
+  it('is operable by keyboard and sends no command by itself', /** Native details and one focusable scroll region; only GETs are issued. */ async () => {
     server.resumeBody = resumeCard({ fight: true });
     server.encounterBody = encounterBody();
     const root = await open();
@@ -212,8 +212,12 @@ describe('Combat panel in the playthrough view', /** The routed view shows the s
     expect(region.getAttribute('tabindex')).toBe('0');
     expect(region.getAttribute('aria-label')).toBe('Zones and passages, scrollable');
     expect(root.querySelector('[data-combat]')!.getAttribute('aria-labelledby')).toBe('combat-title');
-    // The panel has no button of its own: it cannot submit anything.
-    expect(root.querySelectorAll('[data-combat] button').length).toBe(0);
+    // Since P12.2-A the panel has buttons that only open a review; none is a submit button and nothing was sent by rendering.
+    // The review and confirmation behavior is in combat-actions.spec.ts.
+    const buttons = [...root.querySelectorAll('[data-combat] button')];
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const button of buttons) expect(button.getAttribute('type')).toBe('button');
+    expect(root.querySelector('[data-confirm]')).toBeNull();
     expect(server.calls.some((url) => url.includes('/commands'))).toBe(false);
   });
 

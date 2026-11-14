@@ -10,7 +10,8 @@
  * cursor. Delivery is deduplicated by cursor and operation version, so replays after a reload
  * never apply a message twice, including presentation cues, which take the same path and are then kept
  * in memory by {@link CueState} (ordered, deduplicated by delivery identity and never persisted, so a
- * reload does not replay them). Nothing in this module submits a command or a draft.
+ * reload does not replay them). The only write is {@link CampaignTransport.submit}, called after an explicit confirmation of a
+ * previewed tactical action (P12.2-A); nothing here submits a draft or anything on its own.
  */
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { SavedLibraryClient, LIBRARY_FETCH } from '../library/saved-library-client';
@@ -19,6 +20,7 @@ import {
   OperationStatus, OperationView, parseCampaignView, parseCombatView, parseCursor, parseOperation, parsePlayPanels, parseResumeCard, PlayPanels, PublicReceipt, ResumeCard,
   PresentationCue, StreamEvent,
 } from './campaign-protocol';
+import { CommandEnvelope } from './combat-actions';
 import { CueState } from './presentation-cues';
 
 /** Adventure and campaign identity; display names never address a record. */
@@ -85,6 +87,30 @@ export class CampaignTransport {
     return parseCombatView(body, scope.adventureId, scope.campaignId);
   }
 
+  /**
+   * Submit one typed command (P12.2-A) and return the operation the server created or replayed.
+   *
+   * The only write of this module and the only caller of it is an explicit confirmation in the combat panel. Retrying with the same
+   * `requestId` and body returns the stored operation instead of running it again, so a lost reply is recovered by repeating this
+   * call. A 403 renews the session once and repeats, since a denied request was refused before it was processed.
+   *
+   * @throws CampaignProtocolError `api` with the stable error code for every refusal (nothing was changed), `unavailable` when the
+   *   request could not be made or the reply is lost (the operation may exist: repeat with the same identity), `invalid` for a
+   *   reply that is not a valid operation of this campaign
+   */
+  async submit(scope: CampaignScope, command: CommandEnvelope, signal: AbortSignal): Promise<OperationView> {
+    const path = `/api/v1/campaigns/${scope.campaignId}/commands?adventureId=${scope.adventureId}`;
+    let response = await this.post(path, command, await this.csrf(false, signal), signal);
+    if (response.status === 403) response = await this.post(path, command, await this.csrf(true, signal), signal);
+    if (response.status !== 200 && response.status !== 202) throw await this.failure(response);
+    if (!(response.headers.get('Content-Type') ?? '').toLowerCase().startsWith('application/json')) {
+      throw new CampaignProtocolError('invalid', 'Reply is not JSON');
+    }
+    let body: unknown;
+    try { body = await response.json(); } catch { throw new CampaignProtocolError('invalid', 'Reply is not valid JSON'); }
+    return parseOperation(body, scope.campaignId);
+  }
+
   /** Read one operation's current status by identity; the safe query after a reload or a lost reply. */
   async operation(scope: CampaignScope, operationId: string, signal: AbortSignal): Promise<OperationView> {
     const body = await this.json(`/api/v1/campaigns/${scope.campaignId}/operations/${operationId}?adventureId=${scope.adventureId}`, signal);
@@ -144,6 +170,38 @@ export class CampaignTransport {
     try {
       await this.library.ensureSession(renew);
       return await this.fetcher(path, { method: 'GET', credentials: 'same-origin', cache: 'no-store', signal, headers: { Accept: accept } });
+    } catch {
+      throw new CampaignProtocolError(signal.aborted ? 'aborted' : 'unavailable', 'Campaign request failed');
+    }
+  }
+
+  /** CSRF proof of the current session, shared by concurrent writes; forgotten when its bootstrap fails. */
+  private proof: Promise<string> | undefined;
+
+  /** Bootstrap the session once, or again after a denial, and return the CSRF proof its reply carries. */
+  private csrf(renew: boolean, signal: AbortSignal): Promise<string> {
+    if (renew || !this.proof) {
+      const attempt = this.fetcher('/api/v1/session', { method: 'GET', credentials: 'same-origin', cache: 'no-store', signal, headers: { Accept: 'application/json' } })
+        .catch(/** A failed bootstrap request is an unavailable server, never a denial. */ () => {
+          throw new CampaignProtocolError(signal.aborted ? 'aborted' : 'unavailable', 'Campaign request failed');
+        }).then(async (response) => {
+          const body = response.status === 200 ? await response.json().catch(/** An unreadable session reply proves nothing. */ () => undefined) as { csrfToken?: unknown } | undefined : undefined;
+          if (typeof body?.csrfToken !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.csrfToken)) throw await this.failure(response);
+          return body.csrfToken;
+        });
+      attempt.catch(/** A failed bootstrap is not inherited by the next write. */ () => { if (this.proof === attempt) this.proof = undefined; });
+      this.proof = attempt;
+    }
+    return this.proof;
+  }
+
+  /** Issue one admitted JSON POST with the CSRF proof; network failures become `unavailable`. */
+  private async post(path: string, body: unknown, proof: string, signal: AbortSignal): Promise<Response> {
+    try {
+      return await this.fetcher(path, {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store', signal, body: JSON.stringify(body),
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-Token': proof },
+      });
     } catch {
       throw new CampaignProtocolError(signal.aborted ? 'aborted' : 'unavailable', 'Campaign request failed');
     }

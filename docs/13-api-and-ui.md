@@ -523,11 +523,46 @@ actions, other actions (guard, item, ready, assess, withdraw, speech, end turn) 
 the wording of its disabled reason. The reasons are a closed table (`NO_AMMUNITION`, `NO_TARGET_IN_REACH`, `ACTION_POINTS`,
 `PREVENTED`, `FOCUS`, `LIMIT`, `COOLDOWN`); an unknown reason shows a generic sentence, never its code. Participants, zones,
 attacks, abilities, effects and terms are shown by their pack identifier because frozen fights carry no display names. The panel
-never computes a cost or a legality and has no control that submits anything: sending a combat action is P12.2.
+never computes a cost or a legality. Since P12.2-A it also lists the named actions to send ([below](#p122-a-tactical-actions)).
 
 Keyboard and narrow screens: each section is a native `details` element (open by default; Tab reaches each summary, Space or
 Enter toggles it), the zone map sits in a labelled, focusable scroll region, long identifiers wrap, and the layout holds at 320 px.
 Strings are `combat.*` messages with reviewed Italian targets and the usual ID and placeholder parity check.
+
+### P12.2-A tactical actions
+
+The "Send an action" section of the panel (`combat-actions.ts`) turns the projection's legal candidates into named buttons, one per
+action and target: move to a zone, attack with a named attack on a target, use an ability (one listed target, or none), a
+declared social or scene action, take a guarded stance, and end the turn. They exist only while `playerDecision` is true. A
+disabled candidate stays listed with its stable reason and cannot be chosen. Not offered yet: items, readying, assessing,
+withdrawing, speech, reactions, the answer to an offer, the settlement of a verdict, abilities with several targets, and free text.
+
+Choosing an action sends nothing. It opens a review that states, from the projection and without computing any rule, the
+action's name and target, the action points it spends and how many remain, the Focus it spends and how many remain, a declared
+check and terms, that ending the turn forfeits the unused points and hands control to the others, and that the game decides the
+result and a sent action cannot be undone. Only the review's "Confirm and send" button hands the action to the page, which
+validates it again against its newest projection (`resolveChoice`): out of turn, not listed, disabled, or costing more points or
+Focus than remain is refused with a sentence and no request. Otherwise the page makes one
+`POST /api/v1/campaigns/{id}/commands?adventureId=…` with the session cookie and the CSRF proof of `GET /api/v1/session`, and the
+closed envelope of [section 3](#3-command-envelope): `requestId` (a fresh UUID), `expectedRevision` (the revision of the shown
+projection), `commandType` and `payload`:
+
+| Action | `commandType` | `payload` |
+| --- | --- | --- |
+| Move | `MOVE_ZONE` | `zoneId` |
+| Attack | `STRIKE` | `attackId`, `targetId` |
+| Ability | `COMBAT_USE_ABILITY` | `abilityId`, `targetIds` |
+| Social or scene action | `INTERACT` | `actionId` and, for a social action, `targetId` |
+| Guarded stance | `GUARD` | none |
+| End the turn | `END_ACTIVATION` | none |
+
+A review is dropped as soon as the projection moves to another revision or no longer allows the action, and the buttons are
+disabled while a send is in flight, so a second confirmation cannot be made. A refused command (HTTP 4xx with a stable `code`)
+changed nothing: the page words it as a sentence ending "Nothing changed" and shows no code, and a stale revision also re-reads the
+state. A reply that never arrives keeps the request identity, so confirming the same action at the same revision again returns the
+stored operation instead of playing it twice. After an answer the page tracks the operation like any other (the "Actions" list and
+the stream) and re-reads the projection. The server still decides legality and every effect; the page's check only avoids
+sending what the projection already shows to be illegal.
 
 ## 4. Stream contract
 
@@ -680,8 +715,9 @@ combat projection); draft preservation in the page remains P12.5.
 Since P12.1-A the backend side of the panel exists: `GET /api/v1/campaigns/{id}/encounter` ([combat projection](#p121-a-combat-projection))
 shows the active actor, initiative order, remaining points, zones and passages, known conditions, the player's own values,
 defenses revealed only by an assessment, objectives and the candidates with their known costs and targets, without hidden
-values. Since P12.1-B the page renders it read-only ([combat panel](#p121-b-combat-panel)); the controls that send these
-candidates, the action chat and the confirmation of the verdict remain P12.2 and later.
+values. Since P12.1-B the page renders it read-only ([combat panel](#p121-b-combat-panel)); since P12.2-A the controls that send
+the named tactical actions exist ([tactical actions](#p122-a-tactical-actions)); the action chat, the other candidates and the
+confirmation of the verdict remain P12.2 and later.
 
 ## 8. Loading, empty, error, and recovery states
 

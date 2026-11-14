@@ -9,8 +9,9 @@
  * and reconnect notices, and the scoped persistent draft (docs/13 section 4, docs/29 sections 3
  * and 6).
  *
- * The component never submits anything: Send stays disabled, the draft is kept only by the
- * shared {@link StoryInputState}, and the stream/status reads go through
+ * The component never submits a draft: Send stays disabled and the draft is kept only by the
+ * shared {@link StoryInputState}. The one write is a named combat action the player reviewed and confirmed in the combat
+ * panel ({@link CampaignPlaythrough.send}, P12.2-A). The stream/status reads go through
  * {@link CampaignSession}, which persists the operation identities and cursor so the explicit
  * EN↔IT reload resumes without duplicating or dropping deliveries.
  */
@@ -25,6 +26,7 @@ import {
   locationMessage, narrationReasonMessage, operationStatusMessage, presentMessage, receiptLines, resourceMessages, streamResetMessage,
 } from './campaign-messages';
 import { CampaignScope, CampaignSession, CampaignTransport } from './campaign-session';
+import { choiceKey, envelope, resolveChoice, TacticalChoice } from './combat-actions';
 
 /** Delay before the first retry after a failed read, doubled up to {@link MAX_BACKOFF_MS}. */
 const BASE_BACKOFF_MS = 2_000;
@@ -100,7 +102,9 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
             <p class="muted" i18n="@@campaign.resume.readOnly">This summary is read from the last saved state; reading it does not advance time.</p>
           </section>
         }
-        @defer (when combat()?.encounter != null) { <app-combat-panel [view]="combat()" /> }
+        @defer (when combat()?.encounter != null) {
+          <app-combat-panel [view]="combat()" [sending]="sending()" [problem]="problem()" (confirmed)="send($event)" (dismissed)="problem.set(null)" />
+        }
         <app-campaign-panels [panels]="panels()" [older]="older()" [nextBefore]="cursor()" [loadingOlder]="loadingOlder()" (olderRequested)="loadOlder()" />
       } @else if (failure()) { <p class="notice" role="alert" data-error>{{ failure() }}</p>
       } @else { <p role="status" i18n="@@campaign.view.loading">Loading the playthrough…</p> }
@@ -162,6 +166,12 @@ export class CampaignPlaythrough {
   /** Cursor of the next older journal page, or null at the oldest event. */
   readonly cursor = signal<number | null>(null);
   readonly loadingOlder = signal(false);
+  /** True while one confirmed tactical action is on its way; a second confirmation is refused meanwhile. */
+  readonly sending = signal(false);
+  /** Stable code of the last refused or lost tactical submission, or null. */
+  readonly problem = signal<string | null>(null);
+  /** The identity of the submission in flight or lost, kept so repeating the same choice at the same revision is idempotent. */
+  private attempt: { readonly key: string; readonly revision: number; readonly requestId: string } | null = null;
   readonly failure = signal('');
   readonly notice = signal('');
   readonly busy = signal(false);
@@ -185,6 +195,7 @@ export class CampaignPlaythrough {
       : $localize`:@@story.unavailable:Draft kept in this tab only. Device storage is unavailable.`);
   private epoch = 0;
   private run: AbortController | undefined;
+  private scopeKey = '';
 
   /** Restart the draft scope, state read and stream follower whenever the routed identity changes. */
   constructor() {
@@ -207,6 +218,7 @@ export class CampaignPlaythrough {
     this.cursor.set(null);
     this.failure.set('');
     this.notice.set('');
+    if (this.scopeKey !== JSON.stringify(scope)) { this.scopeKey = JSON.stringify(scope); this.attempt = null; this.problem.set(null); }
     this.state.set('connecting');
     this.epoch = this.input.activate(scope);
     const run = new AbortController();
@@ -293,6 +305,46 @@ export class CampaignPlaythrough {
       if (run.signal.aborted) return;
       this.failure.set(campaignErrorMessage(error instanceof CampaignProtocolError ? error.code : null));
     } finally { this.loadingOlder.set(false); }
+  }
+
+  /**
+   * Send one confirmed tactical action (P12.2-A).
+   *
+   * Runs only from the combat panel's confirm button. The choice is validated again against the newest projection; a choice that is
+   * out of turn, unlisted, disabled or unaffordable is refused here and no request is made. A refusal by the server changes nothing
+   * and is shown as a sentence; a lost reply keeps the request identity, so repeating the same choice at the same revision returns
+   * the stored operation instead of playing it twice. After an answer the page re-reads the state and keeps following the stream.
+   */
+  async send(choice: TacticalChoice): Promise<void> {
+    const run = this.run;
+    const view = this.combat();
+    if (this.sending() || run === undefined || view === null) return;
+    const resolved = resolveChoice(view.encounter, choice);
+    if (!resolved.ok) { this.problem.set(resolved.refusal); return; }
+    const key = choiceKey(choice);
+    if (this.attempt?.key !== key || this.attempt.revision !== view.stateRevision) {
+      this.attempt = { key, revision: view.stateRevision, requestId: globalThis.crypto.randomUUID() };
+    }
+    const scope = this.scope();
+    this.sending.set(true);
+    this.problem.set(null);
+    try {
+      const operation = await this.transport.submit(scope, envelope(resolved.command, this.attempt.requestId, view.stateRevision), run.signal);
+      if (run.signal.aborted) return;
+      this.attempt = null;
+      this.session.applyOperation(scope, operation);
+      this.refresh();
+    } catch (error) {
+      if (run.signal.aborted) return;
+      if (error instanceof CampaignProtocolError && error.kind === 'api') {
+        // A refusal is final for this identity: nothing was stored, so the next try is a new request.
+        this.attempt = null;
+        this.problem.set(error.code ?? 'REFUSED');
+        if (error.code === 'COMMAND_STALE_REVISION') this.refresh();
+      } else {
+        this.problem.set('LOST');
+      }
+    } finally { this.sending.set(false); }
   }
 
   /** Check once for updates now; the continuous follower resumes by itself. */

@@ -5,20 +5,26 @@
  * the objectives with their status, the player's legal candidates with costs, targets and disabled reasons, and the verdict that
  * waits for settlement.
  *
- * The component only displays what the server decided. It never computes a cost, a legality, a defense or an outcome, never
- * submits anything, and shows participant, zone, attack and effect identifiers literally because frozen fights carry no display
- * names. A defense of another participant is shown only as the server's last successful assessment, labelled with the round and
- * revision it was learned at. Sections are native `details` elements and the zone map is a keyboard-focusable scroll region, so
- * the panel works with the keyboard alone and reflows to a single column on a narrow screen.
+ * The component only displays what the server decided. It never computes a cost, a legality, a defense or an outcome, and shows
+ * participant, zone, attack and effect identifiers literally because frozen fights carry no display names. A defense of another
+ * participant is shown only as the server's last successful assessment, labelled with the round and revision it was learned at.
+ * Sections are native `details` elements and the zone map is a keyboard-focusable scroll region, so the panel works with the
+ * keyboard alone and reflows to a single column on a narrow screen.
+ *
+ * Named actions (P12.2-A): the "Send an action" section lists the legal choices of the projection as buttons. A button only opens a
+ * review of the action's costs from the projection; the single `confirmed` output fires from the review's confirm button, never
+ * from choosing, from a newer projection or from anything else, and a review is discarded as soon as the projection moves to
+ * another revision or no longer allows the action. The host validates and sends; this component sends nothing itself.
  */
-import { ChangeDetectionStrategy, Component, computed, inject, input, LOCALE_ID } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, LOCALE_ID, output, signal } from '@angular/core';
 import { CombatEncounter, CombatParticipant, CombatView } from './campaign-protocol';
+import { resolveChoice, TacticalChoice, tacticalEntries } from './combat-actions';
 import {
   abilityMessage, actingMessage, capacityMessage, checkMessage, combatLabels, coverMessage, crossingMessage, disabledMessage,
-  focusCostMessage, hasChoices, initiativeMessage, learnedMessage, maxTargetsMessage, moveMessage, objectiveMessage,
+  endsTurnMessage, focusCostMessage, hasChoices, initiativeMessage, learnedMessage, maxTargetsMessage, moveMessage, objectiveMessage,
   objectiveStatusMessage, offerMessage, participantName, phaseMessage, priceMessage, reactionPolicyMessage, recipientsMessage,
-  roundMessage, sceneMessage, sideMessage, socialMessage, speechMessage, standingMessage, strikeMessage, targetsMessage,
-  termsMessage, verdictMessage, withdrawMessage,
+  refusalMessage, roundMessage, sceneMessage, sideMessage, socialMessage, speechMessage, spendFocusMessage, spendMessage,
+  standingMessage, strikeMessage, targetsMessage, termsMessage, verdictMessage, withdrawMessage,
 } from './combat-messages';
 
 /** Show the combat projection of one revision; renders nothing outside a fight. */
@@ -42,6 +48,11 @@ import {
     .reason { color: var(--muted, inherit); }
     [data-disabled] { opacity: .85; }
     meter { width: 100%; max-width: 16rem; }
+    .send ul { list-style: none; padding-left: 0; }
+    .send button { min-height: 2.5rem; max-width: 100%; margin: .15rem .25rem .15rem 0; overflow-wrap: anywhere; }
+    .send button[aria-pressed='true'] { font-weight: 700; outline: 2px solid var(--focus, Highlight); }
+    .send button:focus-visible { outline: 3px solid var(--focus, Highlight); outline-offset: 2px; }
+    .review { border: 1px solid var(--line, currentColor); border-radius: .4rem; padding: .25rem .75rem; margin-block: .75rem; }
     @media (max-width: 30rem) { details { padding-inline: .5rem; } dl.values { grid-template-columns: 1fr 1fr; } }
   `,
   template: `
@@ -217,6 +228,38 @@ import {
             @if (!choices(o)) { <p class="muted">{{ t.noDecision }}</p> }
           } @else { <p class="muted" data-no-decision>{{ t.noDecision }}</p> }
         </details>
+        <section class="send" data-send aria-labelledby="combat-send-title">
+          <h4 id="combat-send-title">{{ t.sendTitle }}</h4>
+          <p class="muted">{{ t.sendHelp }}</p>
+          @if (entries().length === 0) { <p class="muted" data-none-to-send>{{ t.noneToSend }}</p> }
+          <ul data-send-list>
+            @for (entry of entries(); track entry.key) {
+              <li><button type="button" [attr.data-choice]="entry.key" [disabled]="entry.disabled !== null || sending()"
+                [attr.aria-pressed]="review()?.key === entry.key" (click)="prepare(entry.key)">{{ label(entry.choice) }}</button>
+                @if (entry.disabled; as why) { <span class="reason"> · {{ reasonText(why) }}</span> }</li>
+            }
+          </ul>
+          <div aria-live="polite" data-review-region>
+            @if (review(); as shown) {
+              <section class="review" aria-labelledby="combat-review-title" data-review>
+                <h5 id="combat-review-title">{{ t.previewTitle }}</h5>
+                <p data-review-action><strong>{{ label(shown.preview.choice) }}</strong></p>
+                <ul>
+                  <li data-review-points>{{ shown.preview.endsTurn ? endsTurnText(shown.preview.points) : spendText(shown.preview.points, shown.preview.pointsAfter) }}</li>
+                  @if (shown.preview.focus > 0) { <li data-review-focus>{{ spendFocusText(shown.preview.focus, shown.preview.focusAfter) }}</li> }
+                  @if (shown.preview.check; as check) { <li data-review-check>{{ checkText(check) }}</li> }
+                  @if (shown.preview.terms; as terms) { <li data-review-terms>{{ termsText(terms) }}</li> }
+                  <li class="muted">{{ t.previewFinal }}</li>
+                </ul>
+                <p class="review-actions">
+                  <button type="button" data-confirm [disabled]="sending()" (click)="confirm(shown.preview.choice)">{{ t.confirm }}</button>
+                  <button type="button" data-cancel [disabled]="sending()" (click)="cancel()">{{ t.cancel }}</button></p>
+                @if (sending()) { <p role="status" data-sending>{{ t.sending }}</p> }
+              </section>
+            }
+          </div>
+          @if (problemText(); as why) { <p class="notice" role="alert" data-problem>{{ why }}</p> }
+        </section>
         <p class="muted">{{ t.readOnly }}</p>
       </section>
     }
@@ -225,10 +268,33 @@ import {
 export class CombatPanel {
   /** The projection of the shown revision; null or a view without a fight renders nothing. */
   readonly view = input.required<CombatView | null>();
+  /** True while the host sends the confirmed action; every control that could send another is disabled meanwhile. */
+  readonly sending = input(false);
+  /** Stable code of the last refusal the host met (the page's own or the server's), or null; shown as a sentence, never as a code. */
+  readonly problem = input<string | null>(null);
+  /** The player confirmed the reviewed action; the host validates it again against its newest projection and sends it. */
+  readonly confirmed = output<TacticalChoice>();
+  /** The player started a new review or backed out, so the host forgets the last refusal. */
+  readonly dismissed = output<void>();
   private readonly locale = inject(LOCALE_ID);
   private readonly numbers = new Intl.NumberFormat(this.locale, { maximumFractionDigits: 0 });
   readonly t = combatLabels();
   readonly fight = computed(() => this.view()?.encounter ?? null);
+  /** The named actions the projection offers at the player's decision; empty at any other time. */
+  readonly entries = computed(() => { const fight = this.fight(); return fight === null ? [] : tacticalEntries(fight); });
+  /** The action under review and the revision it was chosen at; a newer revision discards it so a stale review never lingers. */
+  readonly prepared = signal<{ readonly key: string; readonly revision: number } | null>(null);
+  /** The preview of the prepared action, or null when none is prepared or the projection no longer allows it. */
+  readonly review = computed(() => {
+    const mark = this.prepared();
+    const view = this.view();
+    const fight = this.fight();
+    if (mark === null || view === null || fight === null || mark.revision !== view.stateRevision) return null;
+    const entry = this.entries().find((candidate) => candidate.key === mark.key);
+    const resolved = entry === undefined ? null : resolveChoice(fight, entry.choice);
+    return resolved?.ok ? { key: mark.key, preview: resolved.preview } : null;
+  });
+  readonly problemText = computed(() => { const code = this.problem(); return code === null ? null : refusalMessage(code); });
 
   name = participantName;
   sideText = sideMessage;
@@ -268,6 +334,46 @@ export class CombatPanel {
   termsText(terms: { termsId: string; kind: string; cost: number }): string { return termsMessage(terms.termsId, terms.kind, this.n(terms.cost)); }
   offerText(terms: string, recipient: string): string { return offerMessage(terms, participantName(recipient)); }
   policyText(reaction: Parameters<typeof reactionPolicyMessage>[0]): string { return reactionPolicyMessage(reaction, this.n(reaction.value)); }
+
+  spendText(points: number, after: number): string { return spendMessage(this.n(points), this.n(after)); }
+  spendFocusText(focus: number, after: number): string { return spendFocusMessage(this.n(focus), this.n(after)); }
+  endsTurnText(points: number): string { return endsTurnMessage(this.n(points)); }
+
+  /** The named action as the player reads it: its name and target, from the same sentences as the candidate lists. */
+  label(choice: TacticalChoice): string {
+    switch (choice.kind) {
+      case 'move': return moveMessage(choice.zone);
+      case 'strike': return `${strikeMessage(choice.attackId)} · ${this.targetsText([choice.targetId])}`;
+      case 'ability': return choice.targetIds.length === 0 ? abilityMessage(choice.abilityId) : `${abilityMessage(choice.abilityId)} · ${this.targetsText(choice.targetIds)}`;
+      case 'interact': {
+        const social = this.fight()?.options?.actions.find((action) => action.actionId === choice.actionId)?.kind === 'social';
+        const name = social ? socialMessage(choice.actionId) : sceneMessage(choice.actionId);
+        return choice.targetId === null ? name : `${name} · ${this.targetsText([choice.targetId])}`;
+      }
+      case 'guard': return this.t.guardOption;
+      case 'end': return this.t.endOption;
+    }
+  }
+
+  /** Review one listed action: this only previews its costs and sends nothing. */
+  prepare(key: string): void {
+    const view = this.view();
+    if (view === null || this.sending() || !this.entries().some((entry) => entry.key === key && entry.disabled === null)) return;
+    this.dismissed.emit();
+    this.prepared.set({ key, revision: view.stateRevision });
+  }
+
+  /** Back out of the review without sending anything. */
+  cancel(): void {
+    this.dismissed.emit();
+    this.prepared.set(null);
+  }
+
+  /** Hand the reviewed action to the host; the only way this panel ever causes a send, and only from the confirm button. */
+  confirm(choice: TacticalChoice): void {
+    if (this.sending() || this.review() === null) return;
+    this.confirmed.emit(choice);
+  }
 
   /** The participants standing in one zone, by name, or null when nobody is. */
   occupants(fight: CombatEncounter, zone: string): string | null {

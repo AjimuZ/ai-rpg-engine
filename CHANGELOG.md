@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Named combat actions with a cost review (P12.2-A), 14 November 2026
+
+- During your turn in a fight the combat panel now has a "Send an action" section with a button for each move, attack,
+  ability, social or scene action, guarded stance and "End your turn" that the game currently allows. Unavailable ones stay
+  listed with their reason and cannot be chosen.
+- Choosing an action only opens a review: its name and target, the action points and Focus it would spend and what remains, a
+  declared check or terms, what ending the turn forfeits, and that a sent action cannot be undone. Nothing is sent until you press
+  "Confirm and send"; "Do not send" closes the review. A review disappears when the fight moves on.
+- Out of turn, unavailable or unaffordable actions are refused on the page without a request, and a refusal by the game says
+  "Nothing changed". Repeating an action after a lost reply cannot play it twice.
+- 19 new reviewed messages in English and Italian (654 in the catalog); the panel's footer sentence changed. Not offered yet:
+  items, readying, assessing, withdrawing, speech, reactions, offers, settling a verdict and the action chat. Typing free
+  text is still not sent.
+
 ## Unreleased — A combat panel in English and Italian (P12.1-B), 14 November 2026
 
 - During a fight the playthrough page now shows a read-only combat panel: whose turn it is with the round and the action

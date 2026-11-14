@@ -4591,6 +4591,36 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     Sending combat actions, labelled names, the action chat and the verdict confirmation remain P12.2 and later; mobile and
     reconnect behavior inside a real fight remain P12.5.
 - [ ] P12.2 Allow named actions and a persistent combat dialogue/action chat with known recipients, attributed replies and editable quick replies; validate talk, negotiation and scene-changing intent, preview consequential costs and preserve explicit player submission/decisions.
+  - P12.2-A, named actions with cost previews, 14 November 2026 (partial: the box stays unchecked; the action chat, quick
+    replies, talk and negotiation intent and the other candidates remain). The combat panel's "Send an action" section
+    (`combat-actions.ts`) lists the projection's legal candidates as buttons (move, attack, ability with one or no target,
+    declared social or scene action, guarded stance, end turn); choosing one opens a review of its action points and Focus
+    before and after, declared check and terms, forfeited points when ending the turn, and irreversibility, and only the
+    "Confirm and send" button makes one `POST …/commands` (new `CampaignTransport.submit`: session cookie, CSRF proof, closed
+    envelope with a fresh `requestId` and the shown revision as `expectedRevision`). `resolveChoice` refuses out-of-turn,
+    unlisted, disabled and unaffordable choices before any request, a review is dropped when the revision changes, a refusal
+    shows a sentence ending "Nothing changed" (never a code), and a lost reply keeps the request identity so a repeat cannot
+    play the action twice ([UI](13-api-and-ui.md#p122-a-tactical-actions)). No backend, migration or command contract changed.
+  - Tests: `combat-actions.spec.ts` (11 new: payload and preview per command type, out-of-turn, unlisted, disabled, point and
+    Focus refusals, wording of refusals, review without a request, one confirmed request with CSRF proof and revision, a 422
+    shown as a sentence with no operation recorded, a lost reply repeated with the same `requestId`, no entries once the fight
+    is decided). Existing tests changed: `combat-panel.spec.ts` no longer asserts that the panel has no button (it asserts that
+    every button is `type="button"`, that no confirm button exists before a choice and that no `/commands` request occurs),
+    the Italian catalog count moved from 635 to 654, and the `CampaignServer` fixture answers `POST …/commands`.
+  - Verification (14 November 2026, Node 24.22.1, Windows reference host): `npm --prefix frontend run typecheck` passed;
+    `npm --prefix frontend test` passed 193 tests in 21 files; `npm --prefix frontend run check:i18n` printed "Localization
+    parity: 654 reviewed messages" (19 new units and the reworded `combat.readOnly`); `npm --prefix frontend run build:locales`
+    built both locales. The production initial bundle is 535.32 kB (529.59 kB after P12.1-B; budget warning 500 kB, error 1 MB)
+    and the lazy panel chunk 33.10 kB (25.50 kB).
+  - Not proven: the real backend with the page (the specs use a scripted server, so the CSRF header, the envelope and the
+    refusal codes were never checked against the real route from the browser); a browser run (no headless-Chrome journey, no
+    axe, no keyboard or 320 px check of the new buttons and review); that the server answers a command with the status this
+    page expects after an accepted action in a real fight; a refusal other than 422 `COMMAND_TURN_UNAVAILABLE` and a lost
+    reply were tested only through the fixture; reconnect or session renewal inside a fight (P12.5); a screen reader and
+    independent review of the 19 Italian messages; `verify.sh full` and `verify.sh containers`. Ammunition spent by an
+    attack is not previewed because the projection does not carry it. The composer sentence "Sending actions is not
+    connected yet" and the saved-screen notice with the same claim were left unchanged (free text is still not sent), so
+    both now understate tactical sending.
 - [ ] P12.3 Provide actor-knowledge-scoped legal candidates to Codex for NPC/companion choices.
 - [ ] P12.4 Add deterministic tactic fallback, interruption messages, bounded knowledge-scoped combat replies and outcome narration; dialogue failure leaves committed state and tactical controls available.
 - [ ] P12.5 Verify mobile/keyboard play, chat/tactics switching, draft preservation, no out-of-turn/automatic submission and session renewal/reconnect inside a fight, including negotiated settlement retries.

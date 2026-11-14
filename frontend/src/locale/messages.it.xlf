@@ -4892,8 +4892,8 @@
     </unit>
     <unit id="combat.readOnly">
       <segment>
-        <source>This panel shows the saved state only. Reading it does not advance time or send anything.</source>
-      <target>Questo pannello mostra solo lo stato salvato. Leggerlo non fa avanzare il tempo e non invia nulla.</target>
+        <source>Reading this panel does not advance time. An action is sent only after you review and confirm it.</source>
+      <target>Leggere questo pannello non fa avanzare il tempo. Un’azione viene inviata solo dopo che l’hai controllata e confermata.</target>
       </segment>
     </unit>
     <unit id="combat.mapRegion">
@@ -5296,6 +5296,120 @@
       <segment>
         <source>Used when Focus is at least <ph id="0" equiv="value" disp="value" /></source>
       <target>Usata quando la Concentrazione è almeno <ph id="0" equiv="value" disp="value" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.sendTitle">
+      <segment>
+        <source>Send an action</source>
+      <target>Invia un’azione</target>
+      </segment>
+    </unit>
+    <unit id="combat.sendHelp">
+      <segment>
+        <source>Choosing an action only shows what it would cost. Nothing is sent until you confirm it.</source>
+      <target>Scegliere un’azione mostra soltanto quanto costerebbe. Non viene inviato nulla finché non la confermi.</target>
+      </segment>
+    </unit>
+    <unit id="combat.noneToSend">
+      <segment>
+        <source>No action can be sent right now.</source>
+      <target>Ora non c’è nessuna azione da inviare.</target>
+      </segment>
+    </unit>
+    <unit id="combat.previewTitle">
+      <segment>
+        <source>Review before sending</source>
+      <target>Controlla prima di inviare</target>
+      </segment>
+    </unit>
+    <unit id="combat.previewFinal">
+      <segment>
+        <source>The game decides the result, and a sent action cannot be undone.</source>
+      <target>Il risultato lo decide il gioco e un’azione inviata non si può annullare.</target>
+      </segment>
+    </unit>
+    <unit id="combat.confirm">
+      <segment>
+        <source>Confirm and send</source>
+      <target>Conferma e invia</target>
+      </segment>
+    </unit>
+    <unit id="combat.cancel">
+      <segment>
+        <source>Do not send</source>
+      <target>Non inviare</target>
+      </segment>
+    </unit>
+    <unit id="combat.sending">
+      <segment>
+        <source>Sending…</source>
+      <target>Invio in corso…</target>
+      </segment>
+    </unit>
+    <unit id="combat.spend">
+      <segment>
+        <source>Spends <ph id="0" equiv="points" disp="points" /> action points; <ph id="1" equiv="after" disp="after" /> left afterwards.</source>
+      <target>Spende <ph id="0" equiv="points" disp="points" /> punti azione; dopo ne restano <ph id="1" equiv="after" disp="after" />.</target>
+      </segment>
+    </unit>
+    <unit id="combat.spendFocus">
+      <segment>
+        <source>Spends <ph id="0" equiv="focus" disp="focus" /> Focus; <ph id="1" equiv="after" disp="after" /> left afterwards.</source>
+      <target>Spende <ph id="0" equiv="focus" disp="focus" /> di Concentrazione; dopo ne restano <ph id="1" equiv="after" disp="after" />.</target>
+      </segment>
+    </unit>
+    <unit id="combat.endsTurn">
+      <segment>
+        <source>Ends your turn. Unused action points that are lost: <ph id="0" equiv="points" disp="points" />. The others act next.</source>
+      <target>Termina il tuo turno. Punti azione non usati che andranno persi: <ph id="0" equiv="points" disp="points" />. Poi agiscono gli altri.</target>
+      </segment>
+    </unit>
+    <unit id="combat.refusedTurn">
+      <segment>
+        <source>It is not your turn to act. Nothing changed.</source>
+      <target>Non è il tuo turno. Non è cambiato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.refusedUnavailable">
+      <segment>
+        <source>That action is not available now. Nothing changed.</source>
+      <target>Quell’azione ora non è disponibile. Non è cambiato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.refusedPoints">
+      <segment>
+        <source>You do not have enough action points for that. Nothing changed.</source>
+      <target>Non hai abbastanza punti azione. Non è cambiato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.refusedFocus">
+      <segment>
+        <source>You do not have enough Focus for that. Nothing changed.</source>
+      <target>Non hai abbastanza Concentrazione. Non è cambiato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.refusedStale">
+      <segment>
+        <source>The fight moved on while you were deciding. Review the updated choices. Nothing changed.</source>
+      <target>Lo scontro è andato avanti mentre decidevi. Rivedi le scelte aggiornate. Non è cambiato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.refusedBusy">
+      <segment>
+        <source>The game is busy with another action. Try again in a moment. Nothing changed.</source>
+      <target>Il gioco è occupato con un’altra azione. Riprova tra poco. Non è cambiato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.sendLost">
+      <segment>
+        <source>The reply was lost. If you repeat the action, it is played at most once.</source>
+      <target>La risposta è andata persa. Se ripeti l’azione, verrà giocata al massimo una volta.</target>
+      </segment>
+    </unit>
+    <unit id="combat.refusedGeneric">
+      <segment>
+        <source>The game refused that action. Nothing changed.</source>
+      <target>Il gioco ha rifiutato l’azione. Non è cambiato nulla.</target>
       </segment>
     </unit>
   </file>

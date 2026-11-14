@@ -67,7 +67,15 @@ export function combatLabels() {
     difficult: $localize`:@@combat.difficult:Difficult terrain`,
     obscured: $localize`:@@combat.obscured:Obscured`,
     unlimited: $localize`:@@combat.unlimited:No occupant limit`,
-    readOnly: $localize`:@@combat.readOnly:This panel shows the saved state only. Reading it does not advance time or send anything.`,
+    readOnly: $localize`:@@combat.readOnly:Reading this panel does not advance time. An action is sent only after you review and confirm it.`,
+    sendTitle: $localize`:@@combat.sendTitle:Send an action`,
+    sendHelp: $localize`:@@combat.sendHelp:Choosing an action only shows what it would cost. Nothing is sent until you confirm it.`,
+    noneToSend: $localize`:@@combat.noneToSend:No action can be sent right now.`,
+    previewTitle: $localize`:@@combat.previewTitle:Review before sending`,
+    previewFinal: $localize`:@@combat.previewFinal:The game decides the result, and a sent action cannot be undone.`,
+    confirm: $localize`:@@combat.confirm:Confirm and send`,
+    cancel: $localize`:@@combat.cancel:Do not send`,
+    sending: $localize`:@@combat.sending:Sending…`,
     mapRegion: $localize`:@@combat.mapRegion:Zones and passages, scrollable`,
   };
 }
@@ -196,6 +204,46 @@ export function disabledMessage(code: string): string {
     case 'LIMIT': return $localize`:@@combat.disabledLimit:Already used as often as allowed`;
     case 'COOLDOWN': return $localize`:@@combat.disabledCooldown:Still recovering`;
     default: return $localize`:@@combat.unavailable:Not available now`;
+  }
+}
+
+/** Return the action-point price of a previewed action and what remains afterwards. */
+export function spendMessage(points: string, after: string): string {
+  return $localize`:@@combat.spend:Spends ${points}:points: action points; ${after}:after: left afterwards.`;
+}
+
+/** Return the Focus price of a previewed action and what remains afterwards. */
+export function spendFocusMessage(focus: string, after: string): string {
+  return $localize`:@@combat.spendFocus:Spends ${focus}:focus: Focus; ${after}:after: left afterwards.`;
+}
+
+/** Return the consequence of ending the turn: the unused points that are lost. */
+export function endsTurnMessage(points: string): string {
+  return $localize`:@@combat.endsTurn:Ends your turn. Unused action points that are lost: ${points}:points:. The others act next.`;
+}
+
+/**
+ * Return the sentence for a refusal and a statement that nothing changed. Accepts the page's own refusal codes and the stable
+ * server codes of a refused command; an unknown code gets the generic sentence and is never shown.
+ */
+export function refusalMessage(code: string | null): string {
+  switch (code) {
+    case 'NOT_YOUR_TURN': case 'COMMAND_TURN_UNAVAILABLE': case 'COMMAND_MODE_ILLEGAL':
+      return $localize`:@@combat.refusedTurn:It is not your turn to act. Nothing changed.`;
+    case 'NOT_LISTED': case 'DISABLED': case 'COMMAND_TARGET_ILLEGAL': case 'COMMAND_ZONE_UNAVAILABLE': case 'COMMAND_ATTACK_UNAVAILABLE':
+    case 'COMMAND_GUARD_UNAVAILABLE': case 'COMMAND_ABILITY_UNAVAILABLE': case 'COMMAND_INTERACTION_UNAVAILABLE': case 'COMMAND_ACTION_PREVENTED':
+      return $localize`:@@combat.refusedUnavailable:That action is not available now. Nothing changed.`;
+    case 'ACTION_POINTS': case 'COMMAND_ACTION_POINTS_INSUFFICIENT':
+      return $localize`:@@combat.refusedPoints:You do not have enough action points for that. Nothing changed.`;
+    case 'FOCUS': case 'COMMAND_RESOURCE_INSUFFICIENT':
+      return $localize`:@@combat.refusedFocus:You do not have enough Focus for that. Nothing changed.`;
+    case 'COMMAND_STALE_REVISION':
+      return $localize`:@@combat.refusedStale:The fight moved on while you were deciding. Review the updated choices. Nothing changed.`;
+    case 'COMMAND_CAMPAIGN_BUSY': case 'COMMAND_ADMISSION_LIMIT':
+      return $localize`:@@combat.refusedBusy:The game is busy with another action. Try again in a moment. Nothing changed.`;
+    case 'LOST':
+      return $localize`:@@combat.sendLost:The reply was lost. If you repeat the action, it is played at most once.`;
+    default: return $localize`:@@combat.refusedGeneric:The game refused that action. Nothing changed.`;
   }
 }
 

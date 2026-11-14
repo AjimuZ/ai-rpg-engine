@@ -159,11 +159,19 @@ export class CampaignServer {
   failStream = 0;
   statusCode = 200;
   errorCode = '';
+  /** Commands received (P12.2-A) with their CSRF header and decoded body, in order. */
+  readonly commands: { readonly csrf: string | undefined; readonly body: Record<string, any> }[] = [];
+  /** Reply to a command; the default is a committed operation. Throwing a TypeError models a lost reply. */
+  commandReply: () => Response = () => json(operation(OP1, 'COMMITTED', 1, true), 202);
 
   readonly fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = String(input);
     this.calls.push(url);
     if (url === '/api/v1/session') return Promise.resolve(json({ csrfToken: 'token' }));
+    if (init?.method === 'POST' && url.includes('/commands?')) {
+      this.commands.push({ csrf: (init.headers as Record<string, string> | undefined)?.['X-CSRF-Token'], body: JSON.parse(String(init.body)) });
+      try { return Promise.resolve(this.commandReply()); } catch (error) { return Promise.reject(error); }
+    }
     // Saved-library endpoints the surrounding screen needs to select this playthrough.
     if (url === `/api/v1/adventures/${ADVENTURE}`) {
       return Promise.resolve(json({ adventureId: ADVENTURE, title: 'The Lantern', genre: 'Fantasy', sourceLocale: 'it', metadataRevision: 0,

@@ -1773,6 +1773,12 @@ locales (see the P12.1 roadmap entry for results and limits). The panel shows on
 the UI relies on the backend allowlist; no test feeds the panel hostile hidden data. QA-07 and QA-09 stay open for the real
 backend and the full combat path (P12.5).
 
+P12.2-A (14 November 2026) adds `combat-actions.spec.ts` (11 tests): validation of each named action against the projection
+(out of turn, unlisted, disabled, too few points or Focus build no command), the closed payload of each command type, the cost
+previews, no request until the confirm button, one request with the CSRF proof and the shown revision, a refusal worded without
+its code, and a lost reply repeated with the same request identity (see the P12.2 roadmap entry for results and limits). The
+real backend, the browser and no-automatic-submission across reconnect and session renewal (P12.5) were not exercised.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.
