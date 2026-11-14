@@ -188,7 +188,7 @@ schema versions for persisted/imported data.
 | `POST /api/v1/campaigns/{id}/operations/{operationId}/cancel` | Request cancellation | Receipt determines whether effects already committed |
 | `POST /api/v1/campaigns/{id}/operations/{operationId}/narration/retry` | Narration-only retry of a committed operation whose narration is pending (P08.5) | Never re-runs the action, rolls a draw or changes the receipt; at most three retries |
 | `GET /api/v1/campaigns/{id}/stream` | Resumable authorized event stream | Transport delivery only |
-| `GET /api/v1/campaigns/{id}/encounter` | Public current combat projection | No raw enemy secrets |
+| `GET /api/v1/campaigns/{id}/encounter` | Public current combat projection (P12.1-A): initiative, action points, zones and passages, standings and conditions, the player's own values, defenses known from assessments, objectives, legal candidates with costs and targets, the verdict awaiting settlement | No advancement or write; no raw enemy secrets ([details](#p121-a-combat-projection)) |
 | `POST /api/v1/campaigns/{id}/ai-session/renew` | Renew every AI session of an idle campaign (P09.4) | Does not advance the world or change the transcript; 409 while anything of the campaign runs |
 | `GET /api/v1/campaigns/{id}/resume` | Short factual resume card (P09.5) | No advancement or write; shows missing pinned content and the mutation pause |
 | `GET /api/v1/runtime/status` | Selected narration runtime (Codex or Claude), version, account and model readiness | No credentials or raw RPC identifiers; read-only, the runtime is changed through the launcher (ADR 0020) |
@@ -474,6 +474,35 @@ them with the state and the resume card, re-reads them when the stream reports a
 read-only, and fetches older journal pages on request. The legacy `/quests` and `/known-state` sections of the
 state endpoint still read the unchanged free-text tables and are not used by the interface.
 
+### P12.1-A combat projection
+
+`GET /api/v1/campaigns/{campaignId}/encounter?adventureId={uuid}` (`CombatPanels`) uses the admission, `no-store` policy
+and error codes of the other campaign reads (400 `CAMPAIGN_READ_INPUT_INVALID`; 404 `CAMPAIGN_SCOPE_UNAVAILABLE`; 503
+`CAMPAIGN_READ_STORAGE_UNAVAILABLE`, also for an unreadable stored fight or more than 1,000 assessment events; 403 from
+admission). It answers 200 with one repeatable-read snapshot: `scope` (adventure, campaign and content revision IDs,
+`stateRevision`), the campaign `mode` and `encounter`, null outside a fight. During one, `encounter` holds:
+
+- the cursor: `encounterId`, `templateId`, `phase`, `round`, `roundCap`, `acting` and `actionPoints` (both null between
+  activations and once the fight has a verdict), `actionPointsPerActivation` and `playerDecision`;
+- `initiative` (`rank`, `participantId`, rolled `initiative`), empty before the roll;
+- the space: `zones` (`id`, `cover`, `obscured`, `capacity`; never the author tags), `edges` (`from`, `to`, `difficult`,
+  `blocked` as the passages stand now, `cost` of one crossing or null while blocked) and `escapeZones`;
+- `participants` in roster order: `participantId`, `side`, `zone`, `status`, `effects` (`effectId`, `stacks`) and `known`:
+  for another participant, the values of the newest successful public assessment in this encounter (`health`,
+  `healthMax`, `guard`, `resistance`, `armor` as the sheet held them, with the `round` and `stateRevision` they were learned
+  at, because Health changes afterwards), otherwise null;
+- `player`: the player's own `health`, `healthMax`, `focus`, `focusMax`, sheet `guard`, `resistance` and `armor`, the
+  `guarding` stance and `reactionsLeft`;
+- `objectives` (`objectiveId`, `kind`, `zone`, `participantId`, `rounds`, `status` `pending`, `met` or `failed`);
+- `options`, the legal candidates with costs, targets and disabled reasons passed through the receipt allowlist, so they are
+  member for member those of a tactical receipt at the same state (empty without a player decision), and `outcome`, the
+  verdict in the receipt's form at `OUTCOME_PENDING`, otherwise null.
+
+Another participant's current Health, Focus, defenses, stance, reactions, policies, attacks, abilities and role values,
+any effect clock, absorption or source, a check's difficulty or margin, a counteroffer not yet made and anything from an
+`INTERNAL` event or another encounter's event are never returned (QA-16, `CombatPanelTest`). Reading the projection writes
+nothing and submits nothing. No frontend control reads it yet (P12.1).
+
 ## 4. Stream contract
 
 P07.5 implements this contract for operation lifecycle messages; see
@@ -621,6 +650,10 @@ answer and the verdict waiting for an explicit settlement; reading it submits no
 from before the reconnect is refused as a stale revision or by the rule it now breaks, an attempt cut off before its commit rolls
 its reserved dice when asked again, and the conversation's public lines are unchanged through restore, renewal and reconnect.
 No frontend control reads the member yet (P12.1), and draft preservation in the page remains P12.5.
+Since P12.1-A the backend side of the panel exists: `GET /api/v1/campaigns/{id}/encounter` ([combat projection](#p121-a-combat-projection))
+shows the active actor, initiative order, remaining points, zones and passages, known conditions, the player's own values,
+defenses revealed only by an assessment, objectives and the candidates with their known costs and targets, without hidden
+values. The panel that renders it is still to be built (P12.1).
 
 ## 8. Loading, empty, error, and recovery states
 

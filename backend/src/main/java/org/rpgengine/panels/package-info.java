@@ -11,5 +11,9 @@
  * {@link org.rpgengine.panels.PanelContent}, which keeps only text whose source visibility is public.
  * A panel therefore cannot show hidden quests, secret definitions or internal events, and no panel
  * infers a bonus or a restoration from prose: numbers are the stored and recomputed values.
+ *
+ * <p>Since P12.1 {@link org.rpgengine.panels.CombatPanels} projects the active fight for the combat panel in the same
+ * read-only way: initiative, action points, zones, public standings and conditions, the player's own values, defenses known
+ * only from public assessments, objectives, legal candidates with costs and targets, and the verdict awaiting settlement.
  */
 package org.rpgengine.panels;

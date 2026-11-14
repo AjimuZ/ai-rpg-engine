@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — A player-safe view of the fight for the combat panel (P12.1-A), 14 November 2026
+
+- New read-only route `GET /api/v1/campaigns/{id}/encounter?adventureId=…` describes the active fight at one revision: the
+  initiative order, whose activation it is with the points left, the zones with cover, sight and capacity, each passage with
+  its current state and crossing price, every participant's side, zone, standing and active effects, the player's own Health,
+  Focus, Guard, Resistance, armor, stance and reactions, the objectives with their status, the legal actions with their costs,
+  targets and the reasons they are unavailable (exactly as a command result lists them), and the outcome waiting for the
+  player's settlement. Outside a fight its `encounter` field is null.
+- Another participant's Health and defenses appear only as a successful assessment published them, labelled with the round
+  and revision they were learned at, since Health may have changed afterwards. Its attacks, reactions, reaction policies,
+  stance, Focus and effect clocks never appear, nor a check's difficulty, a counteroffer not yet made or anything from an
+  internal event. Reading it changes nothing.
+- No migration and no change to receipts, events or commands. The interface does not show this view yet (P12.1).
+
 ## Unreleased — The resume card shows the fight in progress (P11.6-B), 14 November 2026
 
 - The resume card (`GET /api/v1/campaigns/{id}/resume`) now fills its `encounter` field during a fight, so a client that

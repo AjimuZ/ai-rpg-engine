@@ -1758,6 +1758,14 @@ resources, the draw cursor and the dialogue operation and transcript survive ren
 repeats nothing. QA-09 stays open for the browser path (P12.5): draft preservation, no submission of a draft held in the page,
 and renewal of a running runtime session. Also not proven: a live dump and reload of a fight.
 
+P12.1-A (14 November 2026) adds QA-16 coverage for one player API, the combat projection
+([API](13-api-and-ui.md#p121-a-combat-projection)), in three real PostgreSQL cases of `CombatPanelTest`. The serialized
+projection contains no opponent attack or reaction identifier, no counteroffer not yet made and no check difficulty or margin;
+every participant other than the player carries only public members; another participant's values appear only after a
+successful public assessment of the same encounter, while a newer forged `INTERNAL` assessment and another encounter's
+assessment are ignored. QA-16 stays open: the HTTP route itself, the narrative, guide, media metadata and UI diagnostics are
+not covered by this case, and no deliberate weakening ran.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

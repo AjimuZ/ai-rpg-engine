@@ -1072,6 +1072,27 @@ ignored, byte-identical repeated reads, a refused command changing nothing, scop
 filters, dependency-pack definitions have no names, journal lines name quests and locations by identifier, and the
 legacy free-text tables remain until the planner stops reading them.
 
+### Combat projection (P12.1-A)
+
+`GET /api/v1/campaigns/{id}/encounter?adventureId=…` ([API](../docs/13-api-and-ui.md#p121-a-combat-projection)) is the
+backend of the combat panel.
+
+- `org.rpgengine.panels.CombatPanels` authorizes the scope and reads the active encounter (`EncounterWriter.state`) and this
+  encounter's `PUBLIC` `ASSESSMENT_RESOLVED` events in one read-only repeatable-read transaction. It returns the cursor,
+  initiative order, zones and current passages with crossing costs, public standings with effects, the player's own values,
+  objectives with their status (`EncounterObjective.evaluate`), and another participant's values only from its newest
+  successful assessment, with the round and revision they were learned at.
+- Options and verdict are `TacticalRules.options` and `EncounterOutcome.publicForm` passed through
+  `CommandReceipts.tactical`, the receipt's own allowlist, so the projection lists exactly what a receipt would.
+- `CombatPanelsController` answers with the codes of the other campaign reads; `encounter` is null outside a fight.
+
+Tests: `CombatPanelTest` (real PostgreSQL on the encounter and tactics fixtures: the projection of `close-brawl` against the
+stored state and the receipt's options, known values after a successful assessment and none after a failed one,
+byte-identical repeated reads that write nothing, scope refusals; hidden sentinels in `ridge-retreat` (the sentry's attack
+and reaction absent, only public members per participant, a forged internal assessment and another encounter's assessment
+ignored); in `parley-ground` no counteroffer or difficulty before an attempt, and the agreement verdict at
+`OUTCOME_PENDING`). Limits: no HTTP-level test of the route, no frontend panel, participants are named by roster ID only.
+
 ## Encounter lifecycle, combat profiles and zones (P11.1)
 
 Entering combat freezes an authored encounter ([ADR 0028](../docs/adr/0028-encounter-lifecycle-frozen-profiles-and-zone-graph.md),

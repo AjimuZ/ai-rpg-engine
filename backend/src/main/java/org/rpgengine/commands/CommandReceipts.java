@@ -170,6 +170,17 @@ public final class CommandReceipts {
     }
 
     /**
+     * Apply the receipt's tactical allowlist to a summary that was not read from a receipt (P12.1): the combat panel
+     * projects the stored fight's legal options and verdict through it, so the panel can show nothing a receipt would not.
+     *
+     * @param summary a tactical summary in the scheduler's form; members it lacks are absent or empty in the view
+     * @return detached ordered map of allowlisted values, in the shape of a receipt's {@code combat} block
+     */
+    public static Map<String, Object> tactical(Map<String, ?> summary) {
+        return combat(JSON.valueToTree(summary));
+    }
+
+    /**
      * Copy the allowlisted members of a tactical summary: scalar cursor facts, the initiative order, each participant's
      * public standing with any effects it holds, the operation's strikes (never a hidden defense, armor or Health value) and the legal options
      * (moves, speech allowance and recipients, declared actions, attacks with costs, targets and disabled reasons, Guard

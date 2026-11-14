@@ -4527,6 +4527,39 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
 **Depends on:** P11 and P08; UI foundation P05. **Areas:** legal-action API, combat panels, NPC task contract.
 
 - [ ] P12.1 Show initiative, AP, zones, known defenses/conditions, costs, targets, and objective without leaking hidden data.
+  - P12.1-A, player-safe combat projection, 14 November 2026 (partial: the backend half; the box stays unchecked because no
+    frontend panel renders it yet). `GET /api/v1/campaigns/{id}/encounter?adventureId=…`, the route docs/13 already reserved,
+    is served by `CombatPanels` and `CombatPanelsController` (package `org.rpgengine.panels`) in one read-only repeatable-read
+    snapshot: cursor (phase, round, round cap, acting participant, action points and points per activation, player decision),
+    initiative order, zones with cover, sight and capacity, edges with current passage state and crossing cost, escape zones,
+    each participant's side, zone, standing and effects with stacks, the player's own Health, Focus, sheet Guard, Resistance,
+    armor, stance and reactions left, objectives with their evaluated status, and the verdict at `OUTCOME_PENDING`. Known
+    defenses of another participant come only from its newest successful `PUBLIC` `ASSESSMENT_RESOLVED` event in this
+    encounter, with the round and revision they were learned at. Options and verdict pass through the receipt allowlist via
+    the new `CommandReceipts.tactical`, so they match a receipt member for member. No migration, command, receipt or event
+    changed ([API](13-api-and-ui.md#p121-a-combat-projection)).
+  - Hidden data (QA-16): `CombatPanelTest` checks that the serialized projection never contains the sentry's attack `jab` or
+    reaction `snap`, a counteroffer not yet made (`small-toll`, `toll`) or the words `difficulty` and `margin`; that every
+    participant other than the player has only the members `participantId`, `side`, `zone`, `status`, `effects` and `known`;
+    that `known` is null before an assessment and after a failed one; and that a newer forged `INTERNAL` assessment (Health
+    7331) and a newer `PUBLIC` assessment of another encounter (4242) leave the known values at the real assessment's. The
+    numeric sentinels are checked structurally, not as text, because digits can occur inside an identity.
+  - Verification (14 November 2026, JDK 21 and PostgreSQL 18.6 in the images pinned by ADR 0009, on the Windows reference
+    host): `sh .agents/ralph/verify.sh backend -Dtest=CombatPanelTest` first failed 3 of 3 tests on wrong test expectations
+    (pack edges are two-way; the raw options differed from the receipt's allowlisted form, which led to routing options and
+    verdict through `CommandReceipts.tactical`), then passed 3 tests with 0 failures, 0 errors and 0 skipped.
+    `sh .agents/ralph/verify.sh backend -Dtest=CombatPanelTest,ReadyAssessCommandsTest,NegotiationCommandsTest,WithdrawCommandsTest,CombatRecoveryTest,MemoryContinuityTest,CampaignCommandHttpTest,PlayPanelsTest`
+    passed 64 tests with 0 failures, 0 errors and 0 skipped. The route path then changed from `/combat` to `/encounter` (one
+    mapping string and comments), and on that final source tree
+    `sh .agents/ralph/verify.sh backend -Dtest=CombatPanelTest,PlayPanelsTest,CampaignCommandHttpTest` passed 24 tests (3, 11
+    and 10) with 0 failures, 0 errors and 0 skipped; only documents changed afterwards. No test calls the route.
+    `sh .agents/ralph/verify.sh repo` passed (diff check, line endings, repository checks, repository tests, backup tests) once
+    the documents were written; only this sentence changed after it.
+  - Not proven: `verify.sh full` and `verify.sh containers` were not run by this session; no deliberate
+    weakening ran; no HTTP-level test of the route (its admission, error codes and JSON over the servlet stack are unexercised;
+    the tests call the service and serialize with a default mapper); the projection during an activation of another
+    participant, with active effects or with a blocked passage; a fight at `OUTCOME_PENDING` other than an agreement.
+    Participants are named by roster ID only. The frontend panel, reason labels and the browser path remain P12.1 and P12.5.
 - [ ] P12.2 Allow named actions and a persistent combat dialogue/action chat with known recipients, attributed replies and editable quick replies; validate talk, negotiation and scene-changing intent, preview consequential costs and preserve explicit player submission/decisions.
 - [ ] P12.3 Provide actor-knowledge-scoped legal candidates to Codex for NPC/companion choices.
 - [ ] P12.4 Add deterministic tactic fallback, interruption messages, bounded knowledge-scoped combat replies and outcome narration; dialogue failure leaves committed state and tactical controls available.
