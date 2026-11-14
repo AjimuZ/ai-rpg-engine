@@ -32,5 +32,10 @@
  * <p>Since P12.3 {@code TacticCandidates} is the pure, knowledge-scoped menu of a non-player participant's decision: what it
  * observes and its legal candidates, which the tactic contract of {@code org.rpgengine.inference.contract} offers to the
  * narration runtime and which revalidates a choice. The scheduler's fixed tactic still decides every non-player activation.
+ *
+ * <p>Since P13.1 (ADR 0040) encounter planning has its pure inputs and limits: {@code CapabilitySnapshot} is the hashed
+ * reading of the party's capabilities before entry, {@code EncounterDifficulty} the selected band and {@code ThreatBudget}
+ * the docs/12 section 4 capacity, threat band and hostile-body limit, whose {@code check} admits or refuses a proposed
+ * hostile roster with every finding. Nothing calls them yet; no encounter is planned, proposed or entered through them.
  */
 package org.rpgengine.combat;

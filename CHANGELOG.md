@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Capability snapshot and threat limits for encounter planning (P13.1-A), 14 November 2026
+
+- The engine can now record a fingerprint of what the party can do before a planned fight: each member's level, Health,
+  resources, worn equipment, conditions, learned abilities, skills and ammunition. From it the engine derives how much
+  opposition the party can face at the chosen difficulty (gentle, standard, hard or severe).
+- A proposed group of opponents is refused when it costs more or less than that difficulty allows, or has too many bodies
+  (more than the party size plus two). It is also refused when it is malformed: no opponent, a duplicate or reserved name,
+  or a level outside 1–20. Every reason is reported at once.
+- Members who are defeated, absent, excluded or at zero Health do not count, and the same facts always give the same answer.
+- Nothing changes in play yet: no fight is planned or checked this way, and fights you start from the story are unchanged.
+  No database migration, route or page changed.
+
 ## Unreleased — Settling a decided fight and keeping the combat chat draft (P12.5-B), 14 November 2026
 
 - When a fight is decided, the combat panel lists one action, "Settle the fight". Choosing it opens a review that says settling

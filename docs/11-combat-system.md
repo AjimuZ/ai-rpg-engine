@@ -319,6 +319,8 @@ The confirmation has two parts:
 
 Since P11.1 these structural rules and numbers are executable data: `CombatProfile` holds the kernel identity (`skirmish-initiative-rounds/1`) and every value of the table above that a pack may tune, with its default and bound; a pack's `combat` rule maps the four roles to its attributes, Health and Focus to its resources, and may override values inside their bounds ([pack contract](09-adventure-packs.md#4-definition-model)). The resolved profile is frozen into each encounter at entry. Scheduler, spatial model, dice and reaction depth cannot be changed by a pack.
 
+Since P13.1-A the threat heuristic row is executable too, but as a fixed engine rule identified as `threat-heuristic/1` (`ThreatBudget`, `EncounterDifficulty`), not as profile data. A pack cannot tune it, because adding parameters to `CombatProfile` would make the profiles stored in active encounters unreadable ([ADR 0040](adr/0040-capability-snapshot-and-a-versioned-threat-heuristic.md)). Actor and template levels are bounded to 1–20 for this heuristic (an engine bound, not a calibrated cap). A retuned value gets a new heuristic identity.
+
 Rules for changing these values:
 
 - P11 and P13 implement the values as listed. A defect found before release, such as an unreachable objective or an unbounded loop, is fixed in this table and in the defining section within the same change.

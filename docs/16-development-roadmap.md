@@ -4854,7 +4854,60 @@ this update. No combat runtime/browser result is claimed.
 
 **Depends on:** P11–P12. **Areas:** encounter planning, content variants, progression, rewards UI.
 
-- [ ] P13.1 Implement capability snapshot and deterministic threat/roster/resource constraints.
+- [x] P13.1 Implement capability snapshot and deterministic threat/roster/resource constraints.
+  - P13.1-A, capability snapshot and threat constraints, 14 November 2026
+    ([ADR 0040](adr/0040-capability-snapshot-and-a-versioned-threat-heuristic.md)).
+    - **Snapshot.** New pure `combat/CapabilitySnapshot` records:
+      - the content and profile hashes, the source revision, the location and scene tags, the difficulty and the heuristic
+        identity;
+      - per actor: membership, status, an explicit level of 1–20, Health, relied resources, worn equipment, conditions,
+        learned abilities, skill ranks and ammunition.
+
+      Its canonical text does not depend on input order, and `hash()` is its SHA-256. `Actor.player` reads the entry facts
+      (`FrozenEncounter.PlayerFacts`) and counts the profile's Focus as a relied resource whenever the player has one.
+    - **Limits.** New pure `combat/ThreatBudget` and `combat/EncounterDifficulty` implement the docs/12 section 4 heuristic as
+      the fixed engine rule `threat-heuristic/1`:
+      - capacity summed as exact rationals and rounded down once, over active actors above zero Health only;
+      - catalog costs with level scaling;
+      - the band compared exactly in integers;
+      - at most party size + 2 hostile bodies, capped at 8.
+
+      `check(roster)` refuses with every finding in a fixed order: `NO_ACTIVE_PARTY`, `INVALID_ID`, `RESERVED_ID`,
+      `DUPLICATE_ID`, `LEVEL_OUT_OF_RANGE`, `EMPTY_ROSTER`, `TOO_MANY_HOSTILES`, `OVER_BUDGET`, `UNDER_BUDGET`.
+    - **Decisions.** The heuristic is not `CombatProfile` data, because new profile parameters would make stored encounter
+      profiles unreadable (`fromCanonical` requires the exact parameter set). A roster below the band is refused too.
+    - **Unchanged.** No migration, command, route, page or existing test changed. QA-14 is not met; see the gaps below.
+    - **Documents.** CHANGELOG, backend README, docs/11 (threat heuristic row), docs/12 sections 1, 2 and 4, ADR 0040 and its
+      index, and a dated P13.1-A paragraph in [docs/15 section 3](15-quality-and-acceptance.md#3-mandatory-scenario-register)
+      naming `ThreatBudgetTest` as QA-14 evidence for the invalid- and over-budget-roster clauses only.
+  - Tests: `ThreatBudgetTest` (10, new):
+    - capacity, including an exact 5.6 + 8.4 = 14 sum, and the lowest relied resource;
+    - absent, defeated, excluded and zero-Health actors not counted, and `NO_ACTIVE_PARTY`;
+    - costs at levels 1, 2, 3 and 20, and refused levels 0 and 21;
+    - admitted rosters and over- and under-budget rosters in the Standard and Hard bands (QA-14 over-budget);
+    - one invalid roster reporting reserved, duplicate and invalid IDs, a level out of range, too many bodies and over budget
+      in order, and an empty roster (QA-14 invalid roster);
+    - the body limit at party size + 2 and at the cap of 8;
+    - the snapshot hash unchanged by input order and changed by one ammunition unit or the difficulty;
+    - the player read from entry facts;
+    - inconsistent snapshots refused.
+  - Verification (14 November 2026, Windows reference host): `sh .agents/ralph/verify.sh backend -Dtest=ThreatBudgetTest`
+    printed `VERIFY PASSED (-Dtest=ThreatBudgetTest)` (backend-sources, backend-database and backend-focused all PASS). The
+    focused Maven log reports `Tests run: 10, Failures: 0, Errors: 0, Skipped: 0` and `BUILD SUCCESS`. After the
+    documentation changes, `py -B tools/repository_checks/checks.py all` printed `all: 0 finding(s)`, and
+    `git diff --check HEAD` printed nothing. The second attempt (same day) changed documentation only, adding the docs/15
+    paragraph; afterwards the same repository check again printed `all: 0 finding(s)` and `git diff --check HEAD` printed
+    nothing. The backend test was not rerun.
+  - Not proven:
+    - Nothing reads a campaign into a snapshot or calls `check`. No encounter is planned, proposed or refused by these
+      limits, and an authored template entered with `ENGAGE` is not budget-checked.
+    - The engine has no level source (P13.4), so every level is caller-supplied.
+    - No catalog statistic bands per tier, so a strong body declared "minor" is not caught yet. Also missing: control, area
+      and burst caps, extra activations, reinforcement phases, unreachable objectives and hidden hard counters (the rest of
+      QA-14, P13.3).
+    - Ammunition is recorded but does not change capacity, so a no-ammunition party is not yet planned for.
+    - Calibration finding: one fresh level-1 actor has a Gentle band of 4.8–6.4 that no level-1 cost meets (P18.3).
+    - Not run by this session: `verify.sh full`, `verify.sh containers` and deliberate weakenings.
 - [ ] P13.2 Implement template-bounded Codex encounter proposals, one repair, and safe fallback.
 - [ ] P13.3 Freeze admitted content; validate reinforcement phases, objectives, escape, and hard counters.
 - [ ] P13.4 Implement challenge-source rewards, loot ownership, cumulative thresholds, training, unlocks, and pending purchases.

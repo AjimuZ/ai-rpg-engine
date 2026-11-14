@@ -1383,6 +1383,29 @@ new role in `SessionScopeTest`'s role matrix.
 Limits: no command or presentation job calls the contract or the decision yet, so no reply is generated, stored, sent or shown.
 No migration, route or command changed.
 
+## Capability snapshot and threat limits (P13.1-A)
+
+Three pure classes in `org.rpgengine.combat` hold the inputs and limits of encounter planning
+([ADR 0040](../docs/adr/0040-capability-snapshot-and-a-versioned-threat-heuristic.md),
+[encounters sections 2 and 4](../docs/12-encounters-and-progression.md#4-initial-threat-heuristic)):
+
+- `CapabilitySnapshot` is the party's hashed capabilities before entry. Each actor carries an explicit level of 1–20, Health,
+  relied resources, worn equipment, conditions, learned abilities, skill ranks and ammunition. The canonical text does not
+  depend on input order, and `hash()` is its SHA-256. `Actor.player(facts, profile, level, ammunition)` reads the same
+  `FrozenEncounter.PlayerFacts` that entry freezes.
+- `EncounterDifficulty` holds the four bands (60–80, 90–110, 120–140 and 150–170 percent of capacity).
+- `ThreatBudget.of(snapshot)` derives the capacity (exact rationals, rounded down once), the band bounds and the hostile-body
+  limit. `cost(tier, level)` is the catalog cost with level scaling. `check(roster)` returns a `Verdict` with every `Finding`
+  in a fixed order.
+
+The heuristic is a fixed engine rule, `threat-heuristic/1`, and not `CombatProfile` data, so stored encounter profiles still
+read back.
+
+Test: `ThreatBudgetTest` (10).
+
+Limits: nothing reads a campaign into a snapshot or calls the check, so no encounter is planned or refused by it. There are no
+catalog statistic bands per tier, control, area or burst caps, or reinforcement phases. No migration, route or command changed.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

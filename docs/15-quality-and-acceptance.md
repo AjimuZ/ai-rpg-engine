@@ -1812,6 +1812,16 @@ nothing generated, and the committed state and the player's legal actions are un
 results and limits. No command calls the contract, no reply is shown in play, an acceptance implied in free words is not
 detectable mechanically, and no live model output was evaluated.
 
+P13.1-A (14 November 2026) adds `ThreatBudgetTest` (10), QA-14 evidence for the invalid-roster and over-budget-roster
+clauses of the pure threat check ([encounters section 4](12-encounters-and-progression.md#4-initial-threat-heuristic)). One
+invalid roster reports a reserved ID (`player`), a duplicate ID, an invalid ID and a level out of range, then too many hostile
+bodies and over budget, in that fixed order; an empty roster is refused; the body limit is checked at party size + 2 and at the
+cap of 8. Over- and under-budget rosters are refused at the exact bounds of the Standard and Hard bands, with one level above
+the band's cost already over it. See the P13.1 roadmap entry for results and limits. QA-14 is not met: an unreachable
+objective, a hidden hard counter and an over-budget phase or reinforcement (P13.3) are not checked, and there are no statistic
+bands per tier, so a strong body declared "minor" passes. Nothing calls the check yet, so no encounter is planned, proposed or
+refused by it, and no deliberate weakening ran.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

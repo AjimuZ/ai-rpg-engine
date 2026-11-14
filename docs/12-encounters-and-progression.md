@@ -8,6 +8,8 @@ Separate **encounter planning**, **encounter execution**, and **outcome settleme
 
 Since P11.1 authored encounter templates exist as pack data (location, zones, roster with explicit statistics and threat tier, objectives, escape zones and opening policy) and the player can enter one explicitly; the compiler enforces the default roster limit of section 4 (at most party size plus two hostile bodies). Planning, threat budgets and generated proposals (sections 2–7) remain P13.
 
+Since P13.1-A the inputs and limits of planning exist as pure, deterministic code that nothing calls yet ([ADR 0040](adr/0040-capability-snapshot-and-a-versioned-threat-heuristic.md)). `CapabilitySnapshot` implements part of section 2. `ThreatBudget` with `EncounterDifficulty` implements the capacity, band, cost and hostile-body rules of section 4 and refuses an invalid or out-of-band hostile roster. No campaign is read into a snapshot, no encounter is planned or proposed, and an authored template entered with `ENGAGE` is not budget-checked.
+
 ## 2. Encounter input snapshot
 
 Capture pack/ruleset hashes, source revision, scene tags, known threats, participating actors, health and resource ratios, conditions, equipped and accessible items, ammunition, learned abilities, skill ranks, party size, mobility, damage/defense coverage, escape options, objective, recent challenge history, and selected difficulty policy.
@@ -15,6 +17,14 @@ Capture pack/ruleset hashes, source revision, scene tags, known threats, partici
 Do not assume an item in storage is equipped. Do not count an unknown ability, a depleted charge, an absent companion, or an unaccepted reward. Consider encumbrance, injuries, exhaustion if enabled, and terrain restrictions. Private world facts may constrain planning, but an enemy's tactical knowledge is separately filtered.
 
 The snapshot has an identifier/hash. If a participating actor's mechanical state changes before entry, revalidate or regenerate; never start from stale equipment assumptions.
+
+**Implemented (P13.1-A).** `CapabilitySnapshot` records these items:
+
+- the content and combat-profile hashes, the source revision, the location and scene tags;
+- the selected difficulty and the heuristic identity;
+- per actor: membership (player or companion), status (active, defeated, absent or excluded), an explicit level of 1–20, Health, the spendable combat resources it relies on, worn equipment (never stored items), active conditions, learned abilities, skill ranks and accessible ammunition.
+
+Its canonical JSON does not depend on input order, and its SHA-256 is the snapshot's identity. A plan is stale when a fresh reading hashes differently. `CapabilitySnapshot.Actor.player` reads the player from the same committed facts encounter entry freezes, treating the profile's Focus as a relied resource whenever the player has one. Not yet captured: known threats, mobility, damage and defense coverage, escape options, the objective and recent challenge history. No reader fills a snapshot from a campaign, and there is no level source until advancement (P13.4).
 
 ## 3. Planning pipeline
 
@@ -51,6 +61,16 @@ If the actor does not rely on a spendable combat resource, use a resource ratio 
 Default base enemy threat costs at level 1: minor 4, standard 8, elite 12, anchor 20. For higher-level templates use `ceil(baseCost × (1 + 0.20 × (level - 1)))` as an initial scaling candidate. Catalog profiles assign bounded health, attack, damage, defense, and ability ranges for each cost and level; changing a profile outside those ranges requires a new reviewed cost. AI cannot declare an arbitrarily strong enemy “minor” to fit the budget.
 
 Threat totals are necessary but insufficient. Also limit hostile active bodies to at most party size plus two by default, prevent unsupported repeated control effects, cap area damage and burst combinations, and reject inaccessible invulnerable targets. Boss phases count their complete expected action economy and resources. A solo anchor with extra activations must pay for those activations explicitly.
+
+**Implemented (P13.1-A).** `ThreatBudget.of(snapshot)` derives the following, and `check(roster)` admits a list of hostile bodies (ID, tier, level) only when it has no finding:
+
+- **Capacity.** Only active actors above zero Health count. The resource ratio is the lowest among the actor's relied resources, or 1 if it relies on none. The sum is exact and rounded down once. Both ratios lie in 0–1, so the clamp never binds.
+- **Band.** `100 × cost` is compared with `capacity × percent` in integers.
+- **Hostile-body limit.** Party size + 2, and never more than the 8 non-player participants of one fight.
+
+Findings come in a fixed order: `NO_ACTIVE_PARTY`, then per entry in roster order `INVALID_ID`, `RESERVED_ID` (`player`), `DUPLICATE_ID` and `LEVEL_OUT_OF_RANGE`, then `EMPTY_ROSTER`, `TOO_MANY_HOSTILES` and `OVER_BUDGET` or `UNDER_BUDGET`. A roster below the band is refused too, so a proposal cannot misstate the selected difficulty. Consequence: one fresh level-1 actor has a Gentle band of 4.8–6.4 that no level-1 cost meets (a level-2 minor, cost 5, does), a calibration point for P18.3.
+
+Not implemented: catalog statistic bands per tier (so a strong body declared "minor" is not caught yet), control, area and burst caps, extra activations, reinforcement phases (P13.3) and template allies. Ammunition is recorded but does not change capacity.
 
 ## 5. Feasibility and fairness checks
 
