@@ -1870,6 +1870,20 @@ attribute point) spends nothing and returns its inputs unchanged. See the P13.4 
 not met in play: nothing stores a standing, `SETTLE_ENCOUNTER` and quest endings add no XP, and purchases write no character
 state. No deliberate weakening ran.
 
+P13.5-A (20 November 2026) adds `AdvancementPreviewTest` (4), supporting evidence for QA-15's rule that advancement never
+changes a build automatically. Previews of every defined choice carry the cost, the exact build change or the refusal
+reason; two proposed sequences are compared side by side (changes, differences, points left); a sequence stops at its first
+refusal; and the standing and build passed in are equal afterwards (the path of an empty sequence returns the same
+instances). It proves the pure preview only: no screen shows it, nothing stores a standing, and no deliberate weakening ran.
+The same task adds `DynamicEncounterExitTest` (3), QA-14 evidence for the first half of the P13 exit. Two eligible scenes at
+different locations are planned for the same level-1 party: at the trailhead the runtime's composition (a raider) is admitted
+as proposed, and at the ford the runtime cannot compose, so the first authored template inside the band (two minors, after an
+over-band elite crossing is skipped) is admitted. Both encounters stay inside the threat band with no infeasibility finding,
+and they differ in source, template, location, hostile roster and definition hash; planning twice gives the same hashes; a
+scene with only an over-band template yields no encounter. The second half of the exit, settlement and progression exactly
+once from final state, is not demonstrated: nothing calls settlement, `Advancement` or the preview from play. No deliberate
+weakening ran.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

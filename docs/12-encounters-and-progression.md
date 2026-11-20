@@ -176,7 +176,14 @@ If an award crosses multiple thresholds, record every gained level and entitleme
   - `Unlock`: an ability at rank one once its skill-rank and ability prerequisites hold, costing the profile's unlock cost.
 
   Checks run in the order definition, cap or learned state, prerequisites, points. A refusal (`UNKNOWN_DEFINITION`, `RANK_CAP`, `ATTRIBUTE_CAP`, `ALREADY_LEARNED`, `PREREQUISITE_MISSING`, `NOT_ENOUGH_TRAINING`, `NO_ATTRIBUTE_POINT`) spends nothing and returns the inputs unchanged.
-- **Not implemented.** No standing is stored and no award follows a settlement. Purchases do not write the character's skills, attributes or learned abilities, so no ability becomes usable through them yet. No pack declares an advancement profile, a level-aware formula, a skill prerequisite, a teacher or a discovery requirement. Milestone profiles (section 10), the safe-boundary rule and the preview (P13.5) are missing. `CapabilitySnapshot` still accepts levels 1–20 only.
+- **Not implemented.** No standing is stored and no award follows a settlement. Purchases do not write the character's skills, attributes or learned abilities, so no ability becomes usable through them yet. No pack declares an advancement profile, a level-aware formula, a skill prerequisite, a teacher or a discovery requirement. Milestone profiles (section 10) and the safe-boundary rule are missing. `CapabilitySnapshot` still accepts levels 1–20 only.
+
+**Implemented (P13.5-A), pure and not yet called.** `AdvancementPreview` shows the effect of advancement choices without committing them:
+
+- `options(rules, standing, build)` lists every attribute, skill and ability choice with its cost and the exact build changes (attribute value, skill rank, ability learned), or its refusal reason. Each option is a single choice from the same start, so committing one changes what the others would cost.
+- `path(...)` applies a proposed sequence in order to a hypothetical copy and stops at the first refusal, reporting the applied count, the refusal, the end standing and build and the points spent. `compare(...)` previews two sequences from the same start and returns both paths, the differences between their end builds and the points each leaves pending.
+- A preview calls `Advancement.purchase` on immutable inputs and stores nothing, so the player's build and pending points never change automatically; only a separate validated purchase commits a choice.
+- **Not previewed.** Effects of pack formulas (for example a pool maximum that follows an attribute) are absent because no level-aware formula is read yet. No screen shows a preview.
 
 ## 10. Milestones and alternative profiles
 

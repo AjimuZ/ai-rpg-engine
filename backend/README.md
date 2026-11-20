@@ -1516,6 +1516,26 @@ Tests: `AdvancementTest` (4).
 Limits: nothing calls it. No standing is stored, no award follows a settlement, purchases do not write `character_state` or
 `learned_ability`, and no pack declares an advancement profile. No migration, pack schema, route or command changed.
 
+### Advancement preview and comparison (P13.5-A)
+
+`progression/AdvancementPreview` shows what advancement choices would do without committing any of them.
+
+- `options(rules, standing, build)` lists one `Option` per attribute of the build, skill and ability of the rules (attributes,
+  skills, abilities; sorted by key). Each carries the `Advancement.Outcome` (costs, or the refusal) and the `Change`s it
+  would make (`Kind` ATTRIBUTE, SKILL or ABILITY, from and to). Options are independent single choices from the same start.
+- `option(...)` previews one purchase. `path(rules, standing, build, purchases)` applies a sequence in order to a copy and
+  stops at the first refusal: it reports how many were applied, the refusal, the end standing and build, the points spent and
+  the changes from the stored build.
+- `compare(rules, standing, build, left, right)` previews two sequences from the same start and returns both paths, the
+  build differences (`from` is the left value, `to` the right one) and the pending points each leaves.
+- A preview only calls `Advancement.purchase` on immutable inputs, so it never changes the standing or the build; committing
+  stays a separate validated purchase.
+
+Tests: `AdvancementPreviewTest` (4).
+
+Limits: nothing calls it. Effects that depend on pack formulas (for example a pool maximum that follows an attribute) are not
+previewed, because the engine reads no level-aware formula yet. No migration, pack schema, route, command or page changed.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

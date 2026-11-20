@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Advancement choices previewed and compared before you commit (P13.5-A), 20 November 2026
+
+- The engine can now show what a level-up choice would do before you make it. For each skill rank, attribute increase or
+  ability you could buy, it lists the cost, the exact change to your character, or the reason it is refused.
+- It can also line up two plans of several purchases side by side. Each plan is applied in order, stops at the first choice
+  that breaks a rule, and the comparison shows how the two resulting characters differ and how many points each leaves.
+- A preview never changes your character: your skills, attributes, abilities and pending points stay as they were until a
+  purchase is committed on its own.
+- Nothing changes in play yet: no screen shows these previews, and no database migration, route or page changed.
+
 ## Unreleased — Levels, training points and purchases counted exactly (P13.4-B), 20 November 2026
 
 - The engine can now turn experience into levels. Experience adds up, and you reach level 2 at 100, level 3 at 300, level 4

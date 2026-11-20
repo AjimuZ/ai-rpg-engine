@@ -5177,7 +5177,54 @@ this update. No combat runtime/browser result is claimed.
     - Milestone profiles, the safe-boundary rule and the preview (P13.5) are missing. `CapabilitySnapshot` still accepts
       levels 1–20 only.
     - Not run by this session: `verify.sh full`, `verify.sh containers`, other backend classes and deliberate weakenings.
-- [ ] P13.5 Add advancement preview and comparison without automatic player build changes.
+- [x] P13.5 Add advancement preview and comparison without automatic player build changes.
+  - P13.5-A, advancement preview and comparison, 20 November 2026 (this session leaves the P13.5 box to the runner; nothing
+    calls the preview yet).
+    - **Preview.** New pure `progression/AdvancementPreview`: `options(rules, standing, build)` lists one `Option` per build
+      attribute, rules skill and rules ability (in that order, sorted by key) with its `Advancement.Outcome` and its build
+      `Change`s (`ATTRIBUTE`, `SKILL`, `ABILITY`, from and to), or its refusal; `option(...)` previews one purchase.
+    - **Comparison.** `path(...)` applies a sequence in order to a hypothetical copy and stops at the first refusal;
+      `compare(...)` returns two paths from the same start, the build differences (`from` the left value, `to` the right) and
+      the pending training and attribute points each leaves.
+    - **No automatic build change.** A preview only calls `Advancement.purchase` on immutable inputs and stores nothing; the
+      tests assert the inputs are equal afterwards and that an empty or immediately refused sequence returns the same
+      instances.
+    - **Unchanged.** No migration, pack schema, command, route, page or existing test changed.
+    - **P13 exit, first half.** New test-only `DynamicEncounterExitTest` plans two eligible scenes with the existing pieces
+      (`EncounterOption` eligibility, `ThreatBudget`, `EncounterFallback`, `EncounterAdmission`, `EncounterFeasibility`); no
+      production code changed for it.
+    - **Documents.** CHANGELOG, backend README, docs/12 section 9, dated P13.5-A paragraphs in docs/15 section 3, the
+      progression package documentation.
+  - Tests (new): `AdvancementPreviewTest` (4): every defined choice listed in order with cost, change or refusal
+    (`ATTRIBUTE_CAP`, `RANK_CAP`, two `PREREQUISITE_MISSING`); nothing available without pending points; two sequences
+    compared (3 training spent against 1 attribute point, a refusal at the second step of the right one, differences on
+    `might`, `blade` and `cleave`, points left -3 and +1); empty, refused and equal sequences.
+    `DynamicEncounterExitTest` (3), one level-1 party at Standard (band exactly 8) wielding a blade: (1) at the `trailhead`
+    the runtime's composition (the raider alone, cost 8) is admitted as `PROPOSED`, and at the `ford` a refused runtime call
+    falls back to the first authored template inside the band, `ford-pair` (eel and heron, 4 + 4), after the over-band
+    `ford-elite` (cost 12) is skipped, admitted as `AUTHORED`; both have a cost between the budget's minimum and maximum, no
+    `EncounterFeasibility` finding, and differ in source, template, location, hostile roster and definition hash; (2)
+    planning both scenes twice gives the same definition hashes; (3) a scene offering only `ford-elite` yields
+    `NoEncounter`.
+  - Verification (20 November 2026, Windows reference host):
+    - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=AdvancementPreviewTest,AdvancementTest`
+      printed `VERIFY PASSED` (backend-sources, backend-database and backend-focused PASS). The focused Maven log reports
+      `Tests run: 8, Failures: 0, Errors: 0, Skipped: 0` (4 in each class). A first run with the pattern joined by `+`
+      matched no test and failed; it was repeated with a comma.
+    - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=DynamicEncounterExitTest,AdvancementPreviewTest`
+      printed `VERIFY PASSED` (all three stages PASS). The focused Maven log reports `Tests run: 7, Failures: 0, Errors: 0,
+      Skipped: 0` (3 in `DynamicEncounterExitTest`, 4 in `AdvancementPreviewTest`). The comment-only `package-info.java`
+      edit predates this run.
+    - After the documentation changes, `py -B tools/repository_checks/checks.py all` printed `all: 0 finding(s)` and
+      `git diff --check HEAD` printed nothing.
+  - Not proven:
+    - **P13 exit, second half.** Settlement and progression "exactly once from final state" has no test or run: nothing
+      calls settlement, `Advancement` or the preview from play, so this is the remaining gap of the exit. The first half
+      (two eligible scenes yielding valid, varied encounters) is shown only at planning and admission level, with one party
+      fixture and a runtime outcome supplied by the test; no live narration runtime, no combat run and no browser run.
+    - No screen, route or API shows a preview, no standing is stored and purchases do not write `character_state` or
+      `learned_ability`. Pack-formula effects (for example a maximum that follows an attribute) are not previewed.
+    - Not run by this session: `verify.sh full`, `verify.sh containers`, other backend classes and deliberate weakenings.
 
 **Exit:** two eligible scenes yield valid varied encounters; settlement and progression use actual final state exactly once. **Checks:** QA-14–15, no-ammunition/low-health parties, multi-threshold awards, quest/fight reward deduplication. **Suggested commit:** `Add bounded dynamic encounters and character advancement`.
 
