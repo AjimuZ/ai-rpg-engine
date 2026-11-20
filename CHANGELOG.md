@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — A first adventure ready at the first start (P14.1-A.1), 20 November 2026
+
+- A packaged installation started with `./start.sh` now sets itself up. The first start creates your owner identity in
+  the private file `.local/owner-id`, and the engine creates you and a sample adventure, "Lantern Ford". Saved adventures
+  no longer answer "owner not configured".
+- Lantern Ford is a short neutral English adventure: a camp beside a river ford, a raider waiting at the crossing (a fight
+  you can enter from the start) and a far bank to reach.
+- Restarting creates nothing new: still one owner, one workspace and one sample. If you already have adventures, no sample
+  is added, and a newer image never replaces or adds to the sample you have.
+- Keep `.local/owner-id` with your backups. If the database belongs to an owner other than the one in that file, the engine
+  refuses to start until the original file is restored, so it never hides your adventures behind a new empty owner.
+- Starting with `docker compose up` alone, without the launcher, still configures no owner. The sample is English only.
+  Owner creation, idempotent restarts and entering the sample's fight have passed automated tests, but no live packaged
+  start in a browser has been recorded yet.
+
 ## Unreleased — Advancement choices previewed and compared before you commit (P13.5-A), 20 November 2026
 
 - The engine can now show what a level-up choice would do before you make it. For each skill rank, attribute increase or

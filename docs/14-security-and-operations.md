@@ -58,8 +58,13 @@ events, raw pending decisions, planning artifacts or seed identities. Independen
 read-only repeatable-read transactions prevent torn revision/data snapshots.
 Bounded collections fail closed; missing and foreign save scopes share 404.
 
-`engine.http.owner-id` selects a pre-existing local owner server-side; absent
-configuration disables session and campaign routes with 503. The whole campaign
+`engine.http.owner-id` selects the local owner server-side; absent
+configuration disables session and campaign routes with 503. A packaged start
+through `start.sh` always configures it from the ignored `.local/owner-id`. The
+engine then creates that owner, a sample workspace and its sealed sample pack at
+first start, idempotently, and refuses to start for a database of another owner
+([ADR 0046](adr/0046-automatic-first-start-provisioning-of-the-owner-and-a-sample-adventure.md)).
+No route creates owners or seeds data. The whole campaign
 subtree passes admission before routing; admitted unknown routes return 404.
 Future APIs outside that subtree must join the admission boundary explicitly.
 `engine.http.origin` defaults to

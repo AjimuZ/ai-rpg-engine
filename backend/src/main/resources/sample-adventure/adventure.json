@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "id": "sample:lantern-ford",
+  "version": "1.0.0",
+  "title": "Lantern Ford",
+  "summary": "A neutral sample adventure: a river crossing, a waiting raider and a quiet far bank.",
+  "authors": [
+    "Project contributors"
+  ],
+  "license": "MIT",
+  "engineCompatibility": ">=0.1.0 <1.0.0",
+  "ruleset": {
+    "id": "skirmish",
+    "version": ">=1.0.0 <2.0.0",
+    "policyProfile": "standard"
+  },
+  "contentLocale": "en",
+  "narrativeMode": "emergent",
+  "entrypoint": {
+    "situation": "You reach the camp beside the ford at dusk. A raider waits by the crossing; you can face them, or look for another way to the far bank.",
+    "location": "ford-camp",
+    "creationProfile": "traveler"
+  },
+  "files": [
+    {
+      "path": "rules.json",
+      "category": "rules"
+    },
+    {
+      "path": "locations.json",
+      "category": "locations"
+    },
+    {
+      "path": "skills.json",
+      "category": "skills"
+    },
+    {
+      "path": "abilities.json",
+      "category": "abilities"
+    },
+    {
+      "path": "items.json",
+      "category": "items"
+    },
+    {
+      "path": "creation.json",
+      "category": "creation"
+    },
+    {
+      "path": "quests.json",
+      "category": "quests"
+    },
+    {
+      "path": "encounters.json",
+      "category": "encounters"
+    },
+    {
+      "path": "generation.json",
+      "category": "generationPolicy"
+    },
+    {
+      "path": "lore.md",
+      "category": "lore"
+    },
+    {
+      "path": "CREDITS.md",
+      "category": "credits"
+    },
+    {
+      "path": "LICENSE.md",
+      "category": "license"
+    }
+  ],
+  "modules": [],
+  "generationPolicy": "generation.json",
+  "contentGuidance": {
+    "tone": "Calm and non-romantic",
+    "themes": [
+      "travel",
+      "skirmish"
+    ],
+    "exclusions": [
+      "mandatory romance"
+    ],
+    "audience": "general"
+  },
+  "provenance": {
+    "source": "Original project sample",
+    "notice": "See CREDITS.md and LICENSE.md"
+  }
+}

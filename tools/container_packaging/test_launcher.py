@@ -417,6 +417,33 @@ class LauncherFunctionTest(unittest.TestCase):
         self.assertIn("rc=1", result.stdout)
         self.assertEqual("", (secrets_dir / "pw").read_text())
 
+    def test_owner_identity_is_created_once_and_exported_with_the_origin(self) -> None:
+        """One random version-4 UUID is stored privately, reused unchanged and exported (ADR 0046)."""
+        result = self.call('APP_PORT_VALUE=9191\n'
+                           'ensure_owner; first="$ENGINE_HTTP_OWNER_ID"; unset ENGINE_HTTP_OWNER_ID\n'
+                           'ensure_owner; [ "$first" = "$ENGINE_HTTP_OWNER_ID" ] && echo same\n'
+                           'echo "owner=$ENGINE_HTTP_OWNER_ID"; echo "origin=$ENGINE_HTTP_ORIGIN"\n'
+                           'env | grep -E "^ENGINE_HTTP_(OWNER_ID|ORIGIN)=" | sort')
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("same", result.stdout)
+        stored = (self.dir / ".local" / "owner-id").read_text(encoding="ascii")
+        self.assertRegex(stored, r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\n$")
+        self.assertIn("owner=" + stored.strip(), result.stdout)
+        self.assertIn("origin=http://127.0.0.1:9191", result.stdout)
+        # Exported, so Compose interpolates both into the engine's environment.
+        self.assertIn("ENGINE_HTTP_ORIGIN=http://127.0.0.1:9191", result.stdout)
+        self.assertIn("ENGINE_HTTP_OWNER_ID=" + stored.strip(), result.stdout)
+        self.assertEqual(1, result.stdout.count("created owner identity"))
+
+    def test_malformed_owner_identity_is_not_regenerated(self) -> None:
+        """A damaged owner file fails loudly; a new owner would not own the saved adventures."""
+        (self.dir / ".local").mkdir()
+        (self.dir / ".local" / "owner-id").write_text("not-a-uuid\n")
+        result = self.call('APP_PORT_VALUE=8080; ( ensure_owner ) || echo "rc=$?"')
+        self.assertIn("rc=1", result.stdout)
+        self.assertIn("owner-id is malformed", result.stderr)
+        self.assertEqual("not-a-uuid\n", (self.dir / ".local" / "owner-id").read_text())
+
     def test_malformed_identity_is_not_regenerated(self) -> None:
         """A damaged installation id fails loudly; regenerating would orphan volumes."""
         (self.dir / ".local").mkdir()

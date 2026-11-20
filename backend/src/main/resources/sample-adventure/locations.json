@@ -1,0 +1,5 @@
+{"schemaVersion":1,"definitions":[
+{"id":"ford-camp","kind":"location","data":{"name":"Ford Camp","description":"A ring of stones and a lantern post beside a shallow river crossing.",
+  "links":[{"to":"far-bank","accessible":true}]}},
+{"id":"far-bank","kind":"location","data":{"name":"Far Bank","description":"Reeds and a dry path climbing away from the water.",
+  "links":[{"to":"ford-camp","accessible":true}]}}]}

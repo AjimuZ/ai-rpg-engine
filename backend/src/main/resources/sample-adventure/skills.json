@@ -1,0 +1,3 @@
+{"schemaVersion":1,"definitions":[
+{"id":"fieldwork","kind":"skill","data":{"name":"Trailcraft","description":"Read paths and water.","attribute":"awareness","maxRank":3}},
+{"id":"bladework","kind":"skill","data":{"name":"Bladework","description":"Fight with blades.","attribute":"might","maxRank":3}}]}

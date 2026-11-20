@@ -82,6 +82,8 @@ readonly STATE_DIR=".local"
 readonly SECRET_DIR="$STATE_DIR/secrets"
 readonly ID_FILE="$STATE_DIR/installation-id"
 readonly DEFAULT_SECRET_FILE="$SECRET_DIR/postgres-password"
+# The single owner's UUID (ADR 0046): created once, then passed to the engine on every start.
+readonly OWNER_FILE="$STATE_DIR/owner-id"
 
 # Filled in by resolve_config / identity helpers.
 APP_PORT_VALUE=""
@@ -366,6 +368,39 @@ ensure_identity() {
     info "created installation identity $PROJECT"
 }
 
+# load_owner - export ENGINE_HTTP_OWNER_ID from the stored owner UUID without
+# creating anything. Returns 1 when no file exists yet; dies when it is malformed,
+# because a new owner would not own this installation's adventures (the engine
+# also refuses to start for a second owner).
+load_owner() {
+    [ -f "$OWNER_FILE" ] || return 1
+    local owner
+    owner="$(head -n 1 "$OWNER_FILE" | tr -d '\r')"
+    [[ "$owner" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] ||
+        die "$OWNER_FILE is malformed (expected one lowercase UUID). Restore it from backup; do not delete it, because it names the owner of this installation's adventures."
+    export ENGINE_HTTP_OWNER_ID="$owner"
+}
+
+# ensure_owner - create the owner UUID once (random version 4, private file),
+# then export it with the origin derived from APP_PORT, which the engine admits
+# as the only browser origin. An existing file is never rewritten.
+ensure_owner() {
+    if ! load_owner; then
+        require_random_source
+        mkdir -p -- "$STATE_DIR"
+        local hex variant
+        hex="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+        [ "${#hex}" -eq 32 ] || die "could not read the operating-system random source for the owner identity."
+        # RFC 9562 version 4: the version nibble is 4 and the variant bits are 10.
+        variant="$(printf '%x' $(( (16#${hex:16:1} & 3) | 8 )))"
+        (umask 077 && set -C && printf '%s\n' "${hex:0:8}-${hex:8:4}-4${hex:13:3}-${variant}${hex:17:3}-${hex:20:12}" >"$OWNER_FILE") ||
+            die "could not create $OWNER_FILE."
+        load_owner
+        info "created owner identity $OWNER_FILE (the engine provisions this owner and a sample adventure at first start)"
+    fi
+    export ENGINE_HTTP_ORIGIN="http://127.0.0.1:${APP_PORT_VALUE}"
+}
+
 # require_random_source - fail with provisioning guidance when the OS
 # cryptographic random device is unavailable. Passwords are never derived from
 # anything weaker (no $RANDOM, timestamps or fixed values).
@@ -547,6 +582,7 @@ cmd_start() {
     # .env may have just been created; re-read settings from it.
     resolve_config
     ensure_secret
+    ensure_owner
     # Selected before the first Compose call, so every call of this start sees the same project.
     if [ "$with_models" -eq 1 ]; then
         [ -f "$MODELS_OVERLAY" ] || die "$MODELS_OVERLAY is missing; --with-models needs the file from the checkout."
@@ -595,6 +631,7 @@ cmd_check() {
     info "APP_PORT: $APP_PORT_VALUE (bound to 127.0.0.1 only)"
     if [ -f .env ]; then info ".env: present"; else info ".env: missing (a normal start copies .env.example)"; fi
     if load_identity; then info "installation: $PROJECT"; else info "installation: not initialized (a normal start creates $ID_FILE)"; fi
+    if load_owner; then info "owner identity: present"; else info "owner identity: missing (a normal start creates $OWNER_FILE)"; fi
     if [ -f "$SECRET_FILE" ]; then
         if [ -s "$SECRET_FILE" ]; then info "database password file: present"; else warn "database password file is empty: $SECRET_FILE"; failed=1; fi
     else

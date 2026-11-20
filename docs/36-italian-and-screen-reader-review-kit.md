@@ -316,8 +316,11 @@ Context: `/interface-kit`, a page of theme samples (controls, bars, frames, icon
 
 ### 2.8 Saved adventures (library list and adventure page)
 
-Context: the "Saved adventures" list on `/library` and `/saved/<id>`. On the packaged installation today the list
-answers `LOCAL_OWNER_UNCONFIGURED` and shows `saved.unconfigured` as an alert (the screen-reader script uses it).
+Context: the "Saved adventures" list on `/library` and `/saved/<id>`. Since P14.1-A.1 (ADR 0046), a packaged
+installation started with `./start.sh` provisions its owner and lists the sample adventure "Lantern Ford". This has
+not yet been observed in a browser. Without an owner, for example after a plain `docker compose up`, the list still
+answers `LOCAL_OWNER_UNCONFIGURED` and shows `saved.unconfigured` as an alert. The screen-reader script was written
+against that state and has not been updated.
 
 | ID | English | Italian | Verdict |
 | --- | --- | --- | --- |

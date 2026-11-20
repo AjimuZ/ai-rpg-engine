@@ -5233,6 +5233,58 @@ this update. No combat runtime/browser result is claimed.
 **Depends on:** P00–P13. **Areas:** cross-module tests, sample packs, installation docs.
 
 - [ ] P14.1 Complete one end-to-end neutral adventure slice per genre fixture in English and Italian, including combat, localized terminology and return to exploration.
+  - P14.1-A.1 (20 November 2026, partial; this box stays unchecked): a packaged installation provisions its owner and
+    first adventure at first start, following the owner's decision recorded as
+    [ADR 0046](adr/0046-automatic-first-start-provisioning-of-the-owner-and-a-sample-adventure.md).
+    - Launcher: `start.sh` writes one random version-4 UUID to the ignored `.local/owner-id` once. Every start exports it
+      as `ENGINE_HTTP_OWNER_ID`, with `ENGINE_HTTP_ORIGIN=http://127.0.0.1:<APP_PORT>`. A malformed file is refused,
+      and `--check` reports whether the file exists.
+    - Compose: `compose.yaml` forwards both variables (owner empty, origin `http://127.0.0.1:8080` by default) and sets
+      `ENGINE_PROVISIONING_ENABLED=true`. The origin is derived by the launcher, not by Compose, because the containers
+      check starts the project with `APP_PORT=0`.
+    - Engine: `adventure/FirstStartProvisioning` runs before the web server, only when provisioning is enabled and an
+      owner is configured. It inserts the owner when missing. For an owner with no workspace, it creates one sample
+      workspace whose ID is derived from the owner. While that workspace has no revision, it seals the bundled
+      `sample:lantern-ford` 1.0.0 (`backend/src/main/resources/sample-adventure/`, English, MIT) through the normal
+      staging and registration path.
+    - Refusals: a database holding another owner stops startup, and no seeding route exists. The sample's
+      `ford-ambush` encounter sits at the entry location `ford-camp`.
+    - This replaces the `503 LOCAL_OWNER_UNCONFIGURED` answer for a launcher start; a plain `docker compose up` still
+      has no owner.
+    - Tests added:
+      - `FirstStartProvisioningTest` (5, real PostgreSQL):
+        (1) the first call creates owner, workspace and one sealed revision, and two more calls create nothing and
+        leave exactly one row of each;
+        (2) an empty sample workspace (a start interrupted between the steps) is completed once;
+        (3) an owner who already has a workspace gets no sample;
+        (4) a database of another owner refuses provisioning and writes nothing;
+        (5) a campaign created from the provisioned revision with the `scout` archetype commits `ENGAGE ford-ambush`,
+        switches to `ENCOUNTER` mode and records the encounter at `ford-camp`.
+      - `test_launcher.py`: the owner file is created once, has the version-4 format and is exported with the origin;
+        a malformed file is refused and left untouched.
+      - `test_compose.py`: the six engine variables are rendered, the owner stays empty and the origin keeps its default
+        without the launcher, and exported values are forwarded.
+    - Verification (20 November 2026, Windows reference host):
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=FirstStartProvisioningTest` printed
+        `VERIFY PASSED` (backend-sources, backend-database and backend-focused PASS). The focused Maven log reports
+        `Tests run: 5, Failures: 0, Errors: 0, Skipped: 0`.
+      - On the host with Git Bash:
+        - `py -B -m unittest tools.container_packaging.test_launcher.LauncherFunctionTest tools.container_packaging.test_launcher.LauncherStaticTest`
+          ran 14 tests, OK;
+        - `py -B -m unittest tools.container_packaging.test_launcher.LauncherCommandSurfaceTest` ran 9 tests, OK;
+        - `py -B -m unittest discover -s tools/container_packaging -p test_compose.py` ran 15 tests, OK (Compose 5.x).
+      - After the documentation changes:
+        - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh repo` printed `VERIFY PASSED`: diff-check,
+          line-endings, repository-checks, repository-tests and backup-tests all PASS;
+        - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh probe` printed `VERIFY PASSED`, including
+          `compose-v2`, which runs `test_compose.py` with Compose 2.x.
+    - Not proven:
+      - No live `./start.sh` was run, so no browser has shown the provisioned library or the absence of the 503 on a real
+        packaged origin.
+      - `verify.sh containers` and `verify.sh full` were not run by this session.
+      - The sample is English only and covers one genre: the Italian slice, the second genre, localized terminology,
+        a complete fight and the return to exploration (the rest of P14.1) remain open.
+      - The screen-reader script of docs/36 still describes the unconfigured state.
 - [ ] P14.2 Verify reboot, AI renewal, interrupted generation, lost response, backup restore, and no duplicate effects.
 - [ ] P14.3 Run the required reduced-scope MVP QA matrix and record fresh evidence.
 - [ ] P14.4 Measure baseline latency/context use and list unresolved defects honestly; demonstrate one optional bilingual baseline/planner investigation comparison when available, or record deferred/unavailable planning with the playable fallback. Advanced planning cannot block MVP.

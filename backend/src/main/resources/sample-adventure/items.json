@@ -1,0 +1,9 @@
+{"schemaVersion":1,"definitions":[
+{"id":"kit","kind":"item","data":{"name":"Trail Kit","description":"A pouch of tools.","itemType":"tool","maxStack":1,
+  "rarity":"ordinary","appearance":{"id":"kit.canvas","summary":"A green canvas pouch."}}},
+{"id":"sword","kind":"item","data":{"value":30,"name":"Sword","description":"Plain steel.","itemType":"weapon","slot":"main-hand","hands":1,
+  "combat":{"attack":{"attribute":"force","skill":"bladework","damage":{"count":1,"sides":6}}},
+  "tags":["weapon"],"rarity":"ordinary","appearance":{"id":"sword.steel","summary":"A plain steel sword."}}},
+{"id":"cloak","kind":"item","data":{"value":15,"name":"Cloak","description":"Wool.","itemType":"armor","slot":"body","rarity":"ordinary",
+  "combat":{"armor":1},
+  "appearance":{"id":"cloak.wool","summary":"A grey wool cloak."}}}]}

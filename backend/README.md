@@ -519,11 +519,17 @@ creation. Set `ENGINE_HTTP_OWNER_ID` to a pre-existing owner UUID; absent owner
 configuration leaves both routes unavailable. Set `ENGINE_HTTP_ORIGIN` to the
 exact browser origin when using a port/host other than `http://127.0.0.1:8080`.
 Only HTTP loopback origins with explicit ports are accepted. The server derives
-ownership from this configuration; the browser cannot select it. This opt-in
-does not create owners/workspaces or import packs. Those remain internal setup.
-These environment variables configure host backend execution. Root Compose does
-not forward them automatically; enabling this API there requires an explicit
-engine-service environment override and the same pre-existing database setup.
+ownership from this configuration; the browser cannot select it. On a host
+backend this opt-in creates no owner or workspace and imports no pack.
+In a packaged installation (P14.1-A.1, [ADR 0046](../docs/adr/0046-automatic-first-start-provisioning-of-the-owner-and-a-sample-adventure.md)),
+`start.sh` generates the owner UUID once in `.local/owner-id` and exports it with
+the origin derived from `APP_PORT`. Root Compose forwards both and sets
+`ENGINE_PROVISIONING_ENABLED=true` (`engine.provisioning.enabled`, default false).
+`FirstStartProvisioning` then runs before the web server starts. It creates the
+owner and, for an owner without workspaces, one sample workspace. It seals the
+bundled `sample:lantern-ford` pack (`src/main/resources/sample-adventure/`) only
+while that workspace has no revision. Every step is idempotent. A database of a
+different owner stops startup.
 Bootstrap returns a CSRF token and a separate HttpOnly SameSite=Strict cookie;
 send both plus the exact Origin with UTF-8 JSON creation requests. Sessions
 expire after 30 minutes or process restart, with at most 32 live sessions and

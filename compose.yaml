@@ -31,6 +31,13 @@ services:
       SPRING_PROFILES_ACTIVE: packaged
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-engine}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-engine}
+      # First-start provisioning (ADR 0046). start.sh generates the owner UUID once in
+      # .local/owner-id and exports it with the origin it derives from APP_PORT. Without
+      # the launcher the owner stays empty, so the API answers 503 LOCAL_OWNER_UNCONFIGURED
+      # and nothing is provisioned. The origin default matches the default APP_PORT.
+      ENGINE_HTTP_OWNER_ID: ${ENGINE_HTTP_OWNER_ID:-}
+      ENGINE_HTTP_ORIGIN: ${ENGINE_HTTP_ORIGIN:-http://127.0.0.1:8080}
+      ENGINE_PROVISIONING_ENABLED: "true"
     secrets:
       - postgres_password
     # Only this service is reachable from the browser. Runtime inference egress

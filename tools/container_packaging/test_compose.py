@@ -37,7 +37,8 @@ class ComposeTest(unittest.TestCase):
             files += ["--file", str(ROOT / "compose.models.yaml")]
         environment = {name: value for name, value in os.environ.items()
                        if name not in {"COMPOSE_PROFILES", "MODELS_DIR", "GATEWAY_KEYS_DIR", "GATEWAY_DESTINATIONS_FILE",
-                                       "IMAGE_CONTENT_POLICY"}}
+                                       "IMAGE_CONTENT_POLICY", "APP_PORT", "ENGINE_HTTP_OWNER_ID",
+                                       "ENGINE_HTTP_ORIGIN"}}
         result = subprocess.run(
             ["docker", "compose", "--env-file", str(ROOT / ".env.example"),
              *files, *selection, "config", "--format", "json"],
@@ -142,12 +143,32 @@ class ComposeTest(unittest.TestCase):
     def test_the_default_engine_has_no_local_backend_address(self) -> None:
         """A plain start configures exactly the packaged database and profile, and no model server."""
         environment = self.config["services"]["engine"]["environment"]
-        self.assertEqual({"SPRING_PROFILES_ACTIVE", "SPRING_DATASOURCE_URL", "SPRING_DATASOURCE_USERNAME"},
+        self.assertEqual({"SPRING_PROFILES_ACTIVE", "SPRING_DATASOURCE_URL", "SPRING_DATASOURCE_USERNAME",
+                          "ENGINE_HTTP_OWNER_ID", "ENGINE_HTTP_ORIGIN", "ENGINE_PROVISIONING_ENABLED"},
                          set(environment))
         self.assertNotIn("ENGINE_INFERENCE_LOCAL_URL", (ROOT / "compose.yaml").read_text(encoding="utf-8"))
         # The profile alone selects the service and does not give the engine its address.
         selected = self.render("models")
         self.assertEqual(environment, selected["services"]["engine"]["environment"])
+
+    def test_the_engine_receives_the_owner_and_origin_that_the_launcher_exports(self) -> None:
+        """Without the launcher the owner is empty and the origin is the default port's (ADR 0046)."""
+        environment = self.config["services"]["engine"]["environment"]
+        # Compose versions render an empty interpolation as "" or null; both leave admission unconfigured.
+        self.assertFalse(environment["ENGINE_HTTP_OWNER_ID"])
+        self.assertEqual("http://127.0.0.1:8080", environment["ENGINE_HTTP_ORIGIN"])
+        self.assertEqual("true", environment["ENGINE_PROVISIONING_ENABLED"])
+        owner = "0f1e2d3c-4b5a-4978-8a6b-5c4d3e2f1a0b"
+        rendered = subprocess.run(
+            ["docker", "compose", "--env-file", str(ROOT / ".env.example"), "--file", str(ROOT / "compose.yaml"),
+             "config", "--format", "json"],
+            capture_output=True, text=True, timeout=30, check=False,
+            env={**{name: value for name, value in os.environ.items() if name != "COMPOSE_PROFILES"},
+                 "ENGINE_HTTP_OWNER_ID": owner, "ENGINE_HTTP_ORIGIN": "http://127.0.0.1:9191"})
+        self.assertEqual(0, rendered.returncode, rendered.stderr)
+        exported = json.loads(rendered.stdout)["services"]["engine"]["environment"]
+        self.assertEqual(owner, exported["ENGINE_HTTP_OWNER_ID"])
+        self.assertEqual("http://127.0.0.1:9191", exported["ENGINE_HTTP_ORIGIN"])
 
     def test_the_model_overlay_gives_the_engine_the_service_address_and_changes_nothing_else(self) -> None:
         """With the overlay the engine gets engine.inference.local.url for `models`; nothing else differs."""

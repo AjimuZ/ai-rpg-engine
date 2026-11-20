@@ -1,0 +1,8 @@
+{"schemaVersion":1,"definitions":[
+{"id":"traveler","kind":"creation","data":{"name":"Traveler","attributeBudget":6,"skillBudget":4,
+  "attributes":["awareness","might"],"skills":["fieldwork","bladework"],
+  "archetypes":[{"id":"scout","name":"Scout","attributes":{"awareness":2,"might":2},
+    "skills":{"fieldwork":1,"bladework":2}}],
+  "startingItems":[{"item":"kit","quantity":1},{"item":"sword","quantity":1,"equipped":true},
+    {"item":"cloak","quantity":1,"equipped":true}],
+  "startingAbilities":["steady"]}}]}

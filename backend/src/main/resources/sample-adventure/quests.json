@@ -1,0 +1,6 @@
+{"schemaVersion":1,"definitions":[
+{"id":"crossing","kind":"quest","data":{"name":"Cross the Ford","summary":"Reach the far bank of the river.",
+  "initialStatus":"available",
+  "objectives":[{"id":"reach","description":"Reach the far bank.","when":{"visited":"far-bank"}}],
+  "outcomes":[{"id":"crossed","kind":"success","when":{"objective":{"quest":"crossing","id":"reach"}},
+    "settlement":{"consequences":["The far bank is now known."]}}]}}]}

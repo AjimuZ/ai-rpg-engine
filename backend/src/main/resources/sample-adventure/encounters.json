@@ -1,0 +1,12 @@
+{"schemaVersion":1,"definitions":[
+{"id":"ford-ambush","kind":"encounter","data":{"name":"Ford Ambush","description":"A raider waits on the stones of the crossing.",
+  "location":"ford-camp",
+  "zones":[{"id":"camp","name":"Camp"},{"id":"stones","name":"Stepping Stones","cover":"partial","capacity":4},
+    {"id":"reeds","name":"Reeds","tags":["exit"]}],
+  "edges":[{"from":"camp","to":"stones"},{"from":"camp","to":"reeds","difficult":true},{"from":"stones","to":"reeds"}],
+  "playerZone":"camp","escapeZones":["reeds"],
+  "participants":[{"id":"raider","name":"Raider","side":"hostile","zone":"stones","threat":"standard",
+    "stats":{"health":14,"guard":12,"resistance":11,"armor":1,"force":1,"finesse":1,"insight":1,"resolve":1},
+    "attacks":[{"id":"cudgel","attribute":"force","skill":1,"strongHit":false,"damage":{"count":1,"sides":6}}]}],
+  "objectives":[{"id":"drive-off","name":"Drive off the raider","kind":"defeatHostiles"},
+    {"id":"slip-away","name":"Slip away through the reeds","kind":"escape"}]}}]}
