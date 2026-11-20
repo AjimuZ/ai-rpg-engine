@@ -1491,6 +1491,31 @@ Limits: nothing calls either class. No pack declares a reward source or particip
 reward, quest endings still settle as in P10.3, and XP does not accumulate into levels. No migration, pack schema, route or
 command changed.
 
+### Levels, training, unlocks and pending purchases (P13.4-B)
+
+`progression/Advancement` implements the default level-and-training profile of docs/12 section 9.
+
+- `Advancement.threshold(L)` is `50 × L × (L - 1)`. `Profile.levelFor(xp)` is the highest level reached, capped by an
+  optional maximum level (none by default).
+- `Advancement.award(profile, standing, xp, health, focus)` adds settled XP (for example `ChallengeRewards.Plan.xp()`) to a
+  `Standing` (XP, level, pending training and attribute points). It returns one `Gain` per newly crossed level: one training
+  point, plus one attribute point on an even level. Health and Focus maxima rise by 2 and 1 per level, and their current
+  values never change. A repeated or zero award grants nothing, and a standing whose level does not match its XP is refused.
+- `Advancement.purchase(rules, standing, build, purchase)` spends pending points on one `SkillRank`, `AttributeIncrease` or
+  `Unlock`. A rank costs its new value in training points, capped at `min(5, level + 1)` and the skill's `maxRank`. An
+  attribute costs one attribute point, capped at 6 and the attribute's range. An unlock needs the ability's skill-rank and
+  ability prerequisites and costs the profile's `abilityCost` (1 by default).
+- A refusal (`UNKNOWN_DEFINITION`, `RANK_CAP`, `ATTRIBUTE_CAP`, `ALREADY_LEARNED`, `PREREQUISITE_MISSING`,
+  `NOT_ENOUGH_TRAINING`, `NO_ATTRIBUTE_POINT`) spends nothing and returns the inputs unchanged.
+- `Rules.of(profile, catalog, vocabulary)` reads the pinned skills, abilities and attribute ranges.
+
+The decision is [ADR 0045](../docs/adr/0045-level-entitlements-recorded-once-and-spent-only-by-purchase.md).
+
+Tests: `AdvancementTest` (4).
+
+Limits: nothing calls it. No standing is stored, no award follows a settlement, purchases do not write `character_state` or
+`learned_ability`, and no pack declares an advancement profile. No migration, pack schema, route or command changed.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

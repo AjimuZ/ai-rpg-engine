@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Levels, training points and purchases counted exactly (P13.4-B), 20 November 2026
+
+- The engine can now turn experience into levels. Experience adds up, and you reach level 2 at 100, level 3 at 300, level 4
+  at 600 and level 5 at 1,000. There is no top level unless an adventure sets one.
+- Every level you gain gives one training point, and every even level also gives one attribute point. Gaining several levels
+  at once gives each of them exactly once. Getting the same experience again gives nothing more.
+- A level raises your maximum Health by 2 and your maximum Focus by 1, but it does not heal you or restore Focus.
+- Your points wait until you spend them. Nothing is chosen for you. You can buy the next rank of a skill (it costs as many
+  training points as the new rank, up to rank 5 and at most one above your level), add one to an attribute (up to 6) or
+  learn an ability whose requirements you meet (one training point). A purchase that breaks a rule spends nothing and
+  changes nothing.
+- Nothing changes in play yet: no experience is added after a fight or a quest, no screen offers these purchases, and no
+  database migration, route or page changed.
+
 ## Unreleased — Fight and quest rewards paid once, and loot collected explicitly (P13.4-A), 20 November 2026
 
 - The engine can now work out the rewards a finished fight or quest owes, so that each challenge pays its experience and

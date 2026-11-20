@@ -1860,6 +1860,16 @@ away, under another identity, after the snapshot changes or when its template is
 results and limits. QA-14 is still not met: an over-budget phase or reinforcement cannot be checked because pack data declares
 no phases, nothing calls the admission, `ENGAGE` and its offers are not checked, and no deliberate weakening ran.
 
+P13.4-B (20 November 2026) adds `AdvancementTest` (4). It is QA-15 evidence for the pure advancement rules
+([encounters section 9](12-encounters-and-progression.md#9-default-advancement-proposal)). An award that crosses
+several thresholds grants each newly reached level's training and attribute points exactly once: 650 XP from the start gives
+levels 2, 3 and 4 (3 training, 2 attribute points), one award of 1,000 XP equals 650 then 350, and a maximum level stops further
+grants. Health and Focus maxima rise with each level while current values are not refilled (Health 14/20 → 14/26). A purchase
+that is refused (not enough training, missing prerequisite, already learned, rank or attribute cap, unknown definition, no
+attribute point) spends nothing and returns its inputs unchanged. See the P13.4 roadmap entry for results and limits. QA-15 is
+not met in play: nothing stores a standing, `SETTLE_ENCOUNTER` and quest endings add no XP, and purchases write no character
+state. No deliberate weakening ran.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

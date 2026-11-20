@@ -5079,7 +5079,7 @@ this update. No combat runtime/browser result is claimed.
     - Not checked: repeated short control effects, the player's own entry conditions that prevent movement, ammunition
       actually held, statistic bands per tier and campaign-scoped identities.
     - Not run by this session: `verify.sh full`, `verify.sh containers`, other backend classes and deliberate weakenings.
-- [ ] P13.4 Implement challenge-source rewards, loot ownership, cumulative thresholds, training, unlocks, and pending purchases.
+- [x] P13.4 Implement challenge-source rewards, loot ownership, cumulative thresholds, training, unlocks, and pending purchases.
   - P13.4-A, challenge-source rewards and loot ownership, 20 November 2026 (the P13.4 box stays unchecked: this story does
     not finish it; [ADR 0044](adr/0044-challenge-keyed-rewards-and-claimed-loot.md)).
     - **Rewards.** New pure `progression/ChallengeRewards.plan(recipient, settled, claims)`:
@@ -5133,6 +5133,49 @@ this update. No combat runtime/browser result is claimed.
     - XP is not accumulated into levels: cumulative thresholds, training, unlocks and pending purchases remain P13.4 work.
     - Containers, partial lot claims and campaign-scoped holdings are not covered. Loot of a re-entered template is only exact
       once holdings come from campaign actors.
+    - Not run by this session: `verify.sh full`, `verify.sh containers`, other backend classes and deliberate weakenings.
+  - P13.4-B, thresholds, training, unlocks and pending purchases, 20 November 2026 (this session leaves the P13.4 box to the
+    runner; nothing calls this code yet; [ADR 0045](adr/0045-level-entitlements-recorded-once-and-spent-only-by-purchase.md)).
+    - **Thresholds.** New pure `progression/Advancement`: `threshold(L)` = `50 × L × (L - 1)`, and `Profile.levelFor(xp)`
+      gives the highest level reached under an optional maximum level (none in `Profile.DEFAULT`). XP is bounded at
+      1,000,000,000.
+    - **Award.** `award(profile, standing, xp, health, focus)` adds settled XP to a `Standing` (XP, level, pending training
+      and attribute points) and returns one `Gain` per newly crossed level: one training point, plus one attribute point on
+      an even level. Health and Focus maxima rise by 2 and 1 per level and current values never change. A standing whose
+      level does not match its XP is refused.
+    - **Purchases.** `purchase(rules, standing, build, purchase)` spends pending points on one `SkillRank` (cost: the new
+      rank; cap `min(5, level + 1)` and the skill's `maxRank`), `AttributeIncrease` (one attribute point; cap 6 and the
+      range) or `Unlock` (skill-rank and ability prerequisites; the profile's `abilityCost`, 1 by default, a provisional
+      value for P18.3). A refusal (seven reasons) spends nothing and returns the inputs unchanged.
+    - **Unchanged.** No migration, pack schema, command, route, page or existing test changed.
+    - **Documents.** CHANGELOG, backend README, docs/12 sections 1, 8 and 9, docs/15 section 3 (QA-15 evidence), the
+      progression package documentation, ADR 0045 and its index.
+  - Tests (new): `AdvancementTest` (4):
+    - the docs/20 worked scenario: 90 + 20 XP gives level 2, `Gain(2, 1, 1)`, Health 24/24 → 24/26, Focus 10/10 → 10/11, and
+      the thresholds 0, 100, 300, 600, 1,000;
+    - QA-15: 650 XP from the start gives levels 2, 3 and 4 once each (3 training, 2 attribute points), Health 14/20 → 14/26;
+      a zero award changes nothing; 350 more gives only level 5 (training 4, attribute 2); one award of 1,000 gives the same
+      standing; a maximum level of 3 stops at level 3 with 5,000 XP and a further 9,000 XP grants nothing;
+    - purchases: a rank, an unlock and an attribute spend exactly their cost, and `NOT_ENOUGH_TRAINING`,
+      `PREREQUISITE_MISSING` (missing rank and missing ability), `ALREADY_LEARNED`, `ATTRIBUTE_CAP` (cap 6 and range 4),
+      `UNKNOWN_DEFINITION` (three kinds), `RANK_CAP` (level, `maxRank` and rank 5) and `NO_ATTRIBUTE_POINT` each spend
+      nothing and return the same inputs;
+    - malformed standings, awards, pools and profiles are refused.
+  - Verification (20 November 2026, Windows reference host):
+    - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=AdvancementTest` printed
+      `VERIFY PASSED (-Dtest=AdvancementTest)` (backend-sources, backend-database and backend-focused all PASS). The focused
+      Maven log reports `Tests run: 4, Failures: 0, Errors: 0, Skipped: 0` and `BUILD SUCCESS`.
+    - After the documentation changes, `py -B tools/repository_checks/checks.py all` printed `all: 0 finding(s)`, and
+      `git diff --check HEAD` printed nothing (the new, untracked files are not covered by it).
+    - A later Javadoc-only correction (`Refusal.ATTRIBUTE_CAP` now links `Advancement#ATTRIBUTE_CAP`) was not followed by
+      another Maven run; both document checks were repeated afterwards with the same results.
+  - Not proven:
+    - Nothing calls `Advancement`: no standing is stored, `SETTLE_ENCOUNTER` and quest endings add no XP, and purchases do
+      not write `character_state` or `learned_ability`, so QA-15 holds for the pure rules only, not in play.
+    - No pack declares an advancement profile, a level-aware formula, a skill prerequisite, a teacher or a discovery
+      requirement; the per-level maximum bonus is the engine's, not the pack formula's.
+    - Milestone profiles, the safe-boundary rule and the preview (P13.5) are missing. `CapabilitySnapshot` still accepts
+      levels 1–20 only.
     - Not run by this session: `verify.sh full`, `verify.sh containers`, other backend classes and deliberate weakenings.
 - [ ] P13.5 Add advancement preview and comparison without automatic player build changes.
 

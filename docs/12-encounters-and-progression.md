@@ -16,6 +16,8 @@ Since P13.3-A the decided encounter is frozen once and admitted only when feasib
 
 Since P13.4-A challenge rewards settle once per challenge source and loot changes owner only by an explicit claim, again as pure code that nothing calls yet ([ADR 0044](adr/0044-challenge-keyed-rewards-and-claimed-loot.md)); see section 8.
 
+Since P13.4-B settled XP turns into levels whose entitlements are recorded once and spent only by validated purchases, again as pure code that nothing calls yet ([ADR 0045](adr/0045-level-entitlements-recorded-once-and-spent-only-by-purchase.md)); see section 9.
+
 ## 2. Encounter input snapshot
 
 Capture pack/ruleset hashes, source revision, scene tags, known threats, participating actors, health and resource ratios, conditions, equipped and accessible items, ammunition, learned abilities, skill ranks, party size, mobility, damage/defense coverage, escape options, objective, recent challenge history, and selected difficulty policy.
@@ -140,7 +142,7 @@ A quest and its associated fight may refer to the same `challengeSourceId`. The 
   - Only a hostile left defeated gives `AVAILABLE` lots, owned by nobody, its equipped items included. Allies and active, escaped and surrendered opponents keep theirs, and nothing opens after a defeat or the player's surrender.
   - `claim(lotId, recipient)` moves a whole lot once as a transfer with source key `loot:<encounterId>:<lotId>`, recording any unequip. A held, claimed or unknown lot is refused.
   - No claim creates or loses a unit.
-- **Not implemented.** No pack declares a reward source or a participant's holdings. `SETTLE_ENCOUNTER` and quest endings do not call the planner, so quest endings still settle as in P10.3. XP is not accumulated into levels. Containers, partial lot claims and campaign-scoped holdings are missing.
+- **Not implemented.** No pack declares a reward source or a participant's holdings. `SETTLE_ENCOUNTER` and quest endings do not call the planner, so quest endings still settle as in P10.3. Settled XP is not yet added to a stored advancement standing (section 9 describes the pure award since P13.4-B). Containers, partial lot claims and campaign-scoped holdings are missing.
 
 ## 9. Default advancement proposal
 
@@ -163,6 +165,18 @@ Each gained level grants one training point. Every even level grants one attribu
 Health maximum increases by two per gained level through its formula; Focus maximum increases by one. Current pools do **not** automatically increase or refill when their maxima rise. Attribute changes may alter maxima through formulas; current values are clamped only if a maximum decreases. Award XP after encounter settlement, open advancement choices at the next safe boundary, and do not interrupt a frozen encounter to change its mechanical profile.
 
 If an award crosses multiple thresholds, record every gained level and entitlement exactly once. Unspent choices remain pending. The UI previews effects before a purchase and commits a validated purchase operation. A new ability is not usable until that operation succeeds.
+
+**Implemented (P13.4-B), pure and not yet called** ([ADR 0045](adr/0045-level-entitlements-recorded-once-and-spent-only-by-purchase.md)).
+
+- **Standing.** `Advancement.Standing` records cumulative XP (at most 1,000,000,000), the level reached and the pending training and attribute points. A `Profile` declares an optional maximum level (none by default), the Health and Focus maximum gained per level (2 and 1) and the unlock cost (1 training point, a provisional default).
+- **Award.** `Advancement.award(profile, standing, xp, health, focus)` adds settled XP and returns one `Gain` per level above the recorded one up to the level the new total reaches: one training point each, plus one attribute point on an even level. It raises the Health and Focus maxima by the per-level gains times the levels gained and leaves both current values unchanged. A zero or repeated award grants nothing, and a standing whose level is not the one its XP reaches is refused. Past a declared maximum level XP still accumulates and grants nothing.
+- **Purchase.** `Advancement.purchase(rules, standing, build, purchase)` spends pending points on one choice:
+  - `SkillRank`: the next rank, at most `min(5, level + 1)` and the skill's declared `maxRank`, costing that rank in training points;
+  - `AttributeIncrease`: +1 to a base attribute, at most 6 and the attribute's range maximum, costing one attribute point;
+  - `Unlock`: an ability at rank one once its skill-rank and ability prerequisites hold, costing the profile's unlock cost.
+
+  Checks run in the order definition, cap or learned state, prerequisites, points. A refusal (`UNKNOWN_DEFINITION`, `RANK_CAP`, `ATTRIBUTE_CAP`, `ALREADY_LEARNED`, `PREREQUISITE_MISSING`, `NOT_ENOUGH_TRAINING`, `NO_ATTRIBUTE_POINT`) spends nothing and returns the inputs unchanged.
+- **Not implemented.** No standing is stored and no award follows a settlement. Purchases do not write the character's skills, attributes or learned abilities, so no ability becomes usable through them yet. No pack declares an advancement profile, a level-aware formula, a skill prerequisite, a teacher or a discovery requirement. Milestone profiles (section 10), the safe-boundary rule and the preview (P13.5) are missing. `CapabilitySnapshot` still accepts levels 1–20 only.
 
 ## 10. Milestones and alternative profiles
 
