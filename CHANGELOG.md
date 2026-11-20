@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Planned fights frozen once and refused when unwinnable or unfair (P13.3-A), 20 November 2026
+
+- A fight the engine plans is now fixed once, exactly as it would start, and only that fixed version can start. If the party
+  or the offered fights change before it starts, it is planned again instead of being quietly rebuilt.
+- A planned fight is refused when one of its goals can never be met: a place no path reaches (also when opponents fill the
+  only doorway, since a fallen opponent still blocks it), an escape route that is closed, or a "survive" goal longer than the
+  fight's round limit.
+- It is also refused when an opponent secretly counters you: when you must defeat opponents but your weapons and abilities can
+  never hurt one of them or never reach it, or when one can take away all your remaining turns. A way to make an opponent
+  surrender counts as a way to defeat it.
+- When the proposed fight is refused, the engine uses the first fight the author wrote for the place that fits the
+  difficulty and passes these checks, unchanged. If none does, no fight starts.
+- Nothing changes in play yet: no fight is planned this way, and fights you start yourself are not checked. No database
+  migration, route or page changed.
+
 ## Unreleased — Starting an offered fight from the page (P13.2-B), 20 November 2026
 
 - Outside a fight, the playthrough page has a "Look for fights you can start here" button. It lists only the authored fights

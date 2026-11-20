@@ -1843,6 +1843,23 @@ after a confirmed review, never during a fight, with a lost reply retried under 
 server. See the P13.2 roadmap entry for results and limits; nothing ran against the real backend from the page, and no
 deliberate weakening ran.
 
+P13.3-A (20 November 2026) adds `EncounterFeasibilityTest` (6) and `EncounterAdmissionTest` (3). They are QA-14 evidence for
+the unreachable-objective and hidden-hard-counter clauses
+([encounters section 5](12-encounters-and-progression.md#5-feasibility-and-fairness-checks)). Unreachable objectives: a vault
+behind a doorway the warden fills, an escape behind a full hall (opened by a declared scene action usable from a walked zone,
+and not by one usable only from the hall), and a survive objective of 31 rounds under a cap of 30. Hidden hard counters: armor
+10 against a blade of at most 8 (answered by penetration 4 or a bleeding tick on any hit, not by one after damage, and by a
+declared surrender negotiation but not by a truce), Guard 40 against a best score of 25 (Guard 29 is hittable), a sniper on a
+barred obscured or fully covered ledge (reachable by a bow when the ledge is visible, or by a blade when it can climb down),
+and an attack or reaction that holds the player's actions persistently or for 30 activations (29 activations, one activation
+or a movement-only hold pass). An unarmed player gets no defeat-hostiles fight, while an escape or survive stake with an
+unbeatable opponent passes. Through `EncounterAdmission`, a budget-fitting proposed golem the blade cannot harm and a
+budget-fitting authored vault are never admitted: the result is the first feasible authored template, or no encounter. An
+admitted definition equals a fresh freeze of the same template and facts, and is reported changed after the weapon is put
+away, under another identity, after the snapshot changes or when its template is withdrawn. See the P13.3 roadmap entry for
+results and limits. QA-14 is still not met: an over-budget phase or reinforcement cannot be checked because pack data declares
+no phases, nothing calls the admission, `ENGAGE` and its offers are not checked, and no deliberate weakening ran.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

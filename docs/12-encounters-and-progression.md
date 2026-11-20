@@ -12,6 +12,8 @@ Since P13.1-A the inputs and limits of planning exist as pure, deterministic cod
 
 Since P13.2-A the proposal step exists as a contract and a pure decision that nothing calls yet ([ADR 0041](adr/0041-template-bounded-encounter-compositions-and-an-authored-fallback.md), [docs/21 section 15e](21-ai-task-contracts-and-prompts.md#15e-implemented-template-bounded-encounter-proposals-p132-a)). A proposal only selects among authored content; see section 3.
 
+Since P13.3-A the decided encounter is frozen once and admitted only when feasible for the player, again as pure code that nothing calls yet ([ADR 0043](adr/0043-planned-encounters-are-frozen-once-and-admitted-only-when-feasible.md)); see sections 3 and 5.
+
 ## 2. Encounter input snapshot
 
 Capture pack/ruleset hashes, source revision, scene tags, known threats, participating actors, health and resource ratios, conditions, equipped and accessible items, ammunition, learned abilities, skill ranks, party size, mobility, damage/defense coverage, escape options, objective, recent challenge history, and selected difficulty policy.
@@ -42,6 +44,8 @@ Its canonical JSON does not depend on input order, and its SHA-256 is the snapsh
 10. Execute using the combat module and settle exactly once.
 
 **Implemented (P13.2-A), steps 4–7 only and not yet called.** The caller supplies the eligible authored templates (step 4), each as an `EncounterOption` with the level its hostile participants are costed at, together with the capability snapshot. The `encounter` contract asks the runtime to choose one template, a subset of its hostile participants and a starting zone for each (step 5). The validator checks the offered template, the participants, the starting zones (never an escape zone), zone capacities, the hostile-body limit and the threat band of section 4 (step 6). At most one repair follows, then `EncounterFallback` takes the first offered authored template whose unchanged roster fits the band, or reports that no valid encounter exists (step 7). An accepted composition is kept only while a fresh reading has the same snapshot hash. Not implemented: deciding eligibility (step 1), objective and stakes (step 2), motivation, visibility, retreat behavior and reward sources in the proposal (step 5), solvability, reachability and canon checks (step 6), campaign-scoped identities and freezing (steps 8–9, P13.3).
+
+**Implemented (P13.3-A), parts of steps 6–9 and not yet called** ([ADR 0043](adr/0043-planned-encounters-are-frozen-once-and-admitted-only-when-feasible.md)). `EncounterAdmission` freezes the decided encounter once, with the identity, profile, player facts and combat forms entry uses and no opening strike, and admits it only when `EncounterFeasibility` finds no unreachable objective and no hidden hard counter in that frozen definition (section 5). An infeasible proposal is not repaired: it falls back to the first offered authored template that fits the band and is feasible, or to no encounter. Entry may store the admitted definition only while the snapshot, the offered option and a fresh freeze are unchanged. Still not implemented: eligibility, campaign-scoped identities, reinforcement phases, canon checks, an opening strike chosen at entry, and any caller.
 
 ## 4. Initial threat heuristic
 
@@ -74,7 +78,7 @@ Threat totals are necessary but insufficient. Also limit hostile active bodies t
 
 Findings come in a fixed order: `NO_ACTIVE_PARTY`, then per entry in roster order `INVALID_ID`, `RESERVED_ID` (`player`), `DUPLICATE_ID` and `LEVEL_OUT_OF_RANGE`, then `EMPTY_ROSTER`, `TOO_MANY_HOSTILES` and `OVER_BUDGET` or `UNDER_BUDGET`. A roster below the band is refused too, so a proposal cannot misstate the selected difficulty. Consequence: one fresh level-1 actor has a Gentle band of 4.8–6.4 that no level-1 cost meets (a level-2 minor, cost 5, does), a calibration point for P18.3.
 
-Not implemented: catalog statistic bands per tier (so a strong body declared "minor" is not caught yet), control, area and burst caps, extra activations, reinforcement phases (P13.3) and template allies. Ammunition is recorded but does not change capacity.
+Not implemented: catalog statistic bands per tier (so a strong body declared "minor" is not caught yet), control, area and burst caps, extra activations, reinforcement phases (P13.3) and template allies. Ammunition is recorded but does not change capacity. Inaccessible and invulnerable targets are refused since P13.3-A (section 5).
 
 ## 5. Feasibility and fairness checks
 
@@ -88,6 +92,13 @@ Not implemented: catalog statistic bands per tier (so a strong body declared "mi
 - Threat escalation must not secretly scale upward whenever the player gains an advantage.
 
 These checks bound obvious failures; they do not prove balance or narrative fairness. Run simulations and human playtests to calibrate damage, survivability, encounter length, and tactic quality.
+
+**Implemented (P13.3-A), pure and not yet called.** `EncounterFeasibility.check(frozen)` reads the frozen encounter for the player who would enter it and reports, objectives first in declared order and then hostile participants in roster order:
+
+- **Unreachable objective.** A reach-zone or escape objective whose zone no walk of the player reaches (`no-path`), a survive objective of more rounds than the round cap (`round-cap`), or a defeat-hostiles or protect objective while a hostile is countered (`countered`). The walk follows unblocked edges and the passages a declared scene action opens from a walked zone. A zone other than the player's that the other starting participants already fill is closed, because the player cannot make them leave and a defeated participant keeps its place.
+- **Hidden hard counter.** Entry reveals no statistic, attack, reaction or effect, so every counter is hidden and refused. While a stake needs hostiles out of the fight: a hostile that no attack, hostile-targeting ability or surrender negotiation of the player can ever harm (`unharmable`), or that none of those can reach wherever it walks (`out-of-reach`). Under any stake: a hostile whose attack or reaction on its attacker can stop the player's actions for the rest of the fight (`action-lock`: persistent, or at least the round cap in activations, round ends or world seconds).
+
+Each means is judged on its best case: the best roll, the largest damage, the lowest defense effects can leave, ammunition assumed available. Allies, reactions and opponents' choices are not counted as the player's means. Not checked by it: a required damage type (the ruleset has none), repeated short control effects (immunity windows), the player's own entry conditions that prevent movement, mechanical loops and secret escalation.
 
 ## 6. Dynamic variation without arbitrary mutation
 

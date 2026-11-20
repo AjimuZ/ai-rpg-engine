@@ -5021,7 +5021,64 @@ this update. No combat runtime/browser result is claimed.
     - The request identity lives in the page only and does not survive a reload.
     - No browser, keyboard, 320 px, axe or screen-reader check, and no second-person review of the Italian sentences.
     - Not run by this session: `verify.sh full`, `verify.sh containers`, other backend classes and deliberate weakenings.
-- [ ] P13.3 Freeze admitted content; validate reinforcement phases, objectives, escape, and hard counters.
+- [x] P13.3 Freeze admitted content; validate reinforcement phases, objectives, escape, and hard counters.
+  - P13.3-A, frozen admission and feasibility of planned encounters, 20 November 2026
+    ([ADR 0043](adr/0043-planned-encounters-are-frozen-once-and-admitted-only-when-feasible.md)).
+    - **Feasibility.** New pure `combat/EncounterFeasibility.check(frozen)` reads the `FrozenEncounter` entry would store and
+      returns every finding in a fixed order, objectives in declared order and then hostile participants in roster order:
+      - `UNREACHABLE_OBJECTIVE`: `no-path` (reach-zone or escape zone outside the player's walk), `round-cap` (survive longer
+        than the round cap), `countered` (defeat-hostiles or protect while a hostile is countered);
+      - `HARD_COUNTER`: `unharmable` or `out-of-reach` while a stake needs hostiles out of the fight, and `action-lock` under
+        any stake.
+
+      The walk follows unblocked edges and passages a declared scene action opens from a walked zone. A zone the other starting
+      participants fill is closed to the player, because a defeated participant keeps its place. The player's attacks,
+      hostile-targeting abilities and surrender negotiations are judged on their best case. Allies, reactions and opponents'
+      choices do not count. Every counter is hidden, because entry reveals no mechanics (ADR 0042).
+    - **Admission.** New pure `inference/contract/EncounterAdmission.admit(decision, current, entry)`:
+      - freezes the `EncounterFallback` decision once, with the entry's identity, pack profiles, player facts and combat
+        forms and no opening strike, and returns `Admitted` only without a finding;
+      - an infeasible proposal falls back with `PROPOSAL_INVALID` and its first finding's code, and an earlier fallback keeps
+        its cause; the result is the first option whose authored roster fits the band and whose frozen template is feasible,
+        or `NoEncounter`;
+      - `unchanged(admitted, current, entry)` holds only for the same snapshot hash, the same offered option and an identical
+        fresh freeze, so entry stores the admitted definition or plans again.
+    - **Unchanged.** No migration, command, route, page, contract, schema or existing test changed.
+    - **Documents.** CHANGELOG, backend README, docs/12 sections 1, 3, 4 and 5, docs/21 section 15e, a dated P13.3-A paragraph in
+      [docs/15 section 3](15-quality-and-acceptance.md#3-mandatory-scenario-register), ADR 0043 and its index, and the combat
+      and contract package documentation.
+  - Tests (new):
+    - `EncounterFeasibilityTest` (6): a winnable patrol, and the same patrol refused for an unarmed player only under a defeat
+      stake; a vault behind a filled doorway and an escape behind a filled hall (`no-path`), opened by a scene action usable
+      from a walked zone but not from the hall; survive 30 passes and 31 is `round-cap`; armor 10 against a blade of at most 8
+      (`unharmable`), answered by penetration 4, a bleeding tick on any hit and a surrender negotiation, not by a tick after
+      damage or a truce; Guard 40 refused and Guard 29 admitted; a barred ledge (`out-of-reach`) for melee, for a bow when
+      obscured or in full cover, admitted for a bow when visible and for a blade when the sniper can climb down; a persistent
+      or 30-activation action hold (`action-lock`), also by a reaction on the attacker, while 29 activations, one activation,
+      a movement hold or the same effect on the reactor pass; every finding in its fixed order with its codes.
+    - `EncounterAdmissionTest` (3): a feasible proposal admitted as `PROPOSED` with the definition of a fresh freeze, and
+      `unchanged` true for the same state and false without the blade, under another identity, for a hurt snapshot and for a
+      withdrawn template, the admitted hash unchanged; an infeasible frozen encounter refused by `Admitted`; a proposed golem
+      refused (`unreachable-objective`) and the patrol admitted as `AUTHORED`, while the crypt's own fitting authored roster is
+      skipped, and the golem admitted when the player carries a pick; an authored vault fallback skipped for the patrol with
+      the decision's `context-scope` kept, `NoEncounter` for an unarmed player and for a decision without an encounter, and
+      refusals for another actor's facts and a missing profile.
+  - Verification (20 November 2026, Windows reference host):
+    `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=EncounterFeasibilityTest,EncounterAdmissionTest,EncounterContractTest,EncounterOptionTest`
+    printed `VERIFY PASSED` (backend-sources, backend-database and backend-focused all PASS). The focused Maven log reports
+    `Tests run: 20, Failures: 0, Errors: 0, Skipped: 0` (2 + 6 + 9 + 3) and `BUILD SUCCESS`. After the documentation
+    changes, `py -B tools/repository_checks/checks.py all` printed `all: 0 finding(s)`, and `git diff --check HEAD` printed
+    nothing.
+  - Not proven:
+    - Nothing calls `EncounterAdmission`, so no planned encounter is admitted, stored or entered, and no campaign is read into
+      a snapshot or entry facts. `ENGAGE` and the offered authored templates are not budget- or feasibility-checked.
+    - Reinforcement phases do not exist in pack data, so no phase is validated and QA-14's over-budget-phase clause is unmet.
+      QA-14 is not met.
+    - Feasibility findings are not fed to the proposal's single repair. An opening strike chosen at entry would change the
+      admitted definition.
+    - Not checked: repeated short control effects, the player's own entry conditions that prevent movement, ammunition
+      actually held, statistic bands per tier and campaign-scoped identities.
+    - Not run by this session: `verify.sh full`, `verify.sh containers`, other backend classes and deliberate weakenings.
 - [ ] P13.4 Implement challenge-source rewards, loot ownership, cumulative thresholds, training, unlocks, and pending purchases.
 - [ ] P13.5 Add advancement preview and comparison without automatic player build changes.
 

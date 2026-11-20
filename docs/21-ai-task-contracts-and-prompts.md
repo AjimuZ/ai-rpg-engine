@@ -724,8 +724,12 @@ notice is produced.
 - No caller: nothing decides eligibility, assembles the context from a campaign, freezes a composed encounter or stores the
   decision. Authored templates entered with `ENGAGE` are still not budget-checked.
 - No live model output was evaluated.
-- Objective, motivation, visibility, retreat behavior, reward sources, reinforcement phases, objective reachability, hard
-  counters and campaign-scoped identities are not proposed or checked (P13.3, P13.4).
+- Objective, motivation, visibility, retreat behavior, reward sources, reinforcement phases and campaign-scoped identities
+  are not proposed or checked (P13.3, P13.4). Objective reachability and hidden hard counters are checked since P13.3-A,
+  after this contract and not by its validator: `EncounterAdmission` freezes the decided encounter and refuses an
+  infeasible one, so those findings get no repair attempt
+  ([ADR 0043](adr/0043-planned-encounters-are-frozen-once-and-admitted-only-when-feasible.md),
+  [docs/12 section 5](12-encounters-and-progression.md#5-feasibility-and-fairness-checks)).
 - With the provisional numbers, small parties often have no fitting authored roster, so `NoEncounter` may be common (P18.3).
 
 ## 16. Neutral protocol proof (P01.1)

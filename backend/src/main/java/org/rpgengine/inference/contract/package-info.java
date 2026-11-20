@@ -13,7 +13,10 @@
  * character's audience, which it takes from its context through {@code TaskContract#audience}.
  * The combat-reply (P12.4-B) and encounter-proposal (P13.2-A) contracts followed;
  * {@link org.rpgengine.inference.contract.EncounterFallback} turns an encounter call's outcome into
- * the runtime's checked composition, the first fitting authored template, or no encounter.
+ * the runtime's checked composition, the first fitting authored template, or no encounter, and
+ * {@link org.rpgengine.inference.contract.EncounterAdmission} (P13.3-A) freezes that encounter for
+ * the player once and admits it only when no objective is unreachable and no hostile is a hidden
+ * hard counter, falling back to the first fitting feasible authored template or no encounter.
  *
  * <p>{@link org.rpgengine.inference.contract.ContractRunner} submits one contract task through
  * the fair {@link org.rpgengine.inference.scheduling.InferenceScheduler} (P08.6), which dispatches

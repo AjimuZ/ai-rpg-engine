@@ -1411,7 +1411,8 @@ read back.
 Test: `ThreatBudgetTest` (10).
 
 Limits: nothing reads a campaign into a snapshot or calls the check, so no encounter is planned or refused by it. There are no
-catalog statistic bands per tier, control, area or burst caps, or reinforcement phases. No migration, route or command changed.
+catalog statistic bands per tier, control, area or burst caps, or reinforcement phases (objective reachability and hard counters
+followed in P13.3-A, below). No migration, route or command changed.
 
 ### Template-bounded encounter proposals (P13.2-A)
 
@@ -1435,6 +1436,31 @@ encounter case of `ContractSchemaTest`, and the shared `combat/PlanningFixtures`
 
 Limits: no planning path calls the contract or the decision, so no encounter is proposed, entered or stored this way. No
 migration, route or command changed.
+
+### Frozen admission and feasibility of planned encounters (P13.3-A)
+
+`combat/EncounterFeasibility.check(frozen)` judges a `FrozenEncounter` for the player entering it and returns every
+`Finding` in a fixed order: objectives in declared order, then hostile participants in roster order.
+
+- `UNREACHABLE_OBJECTIVE`: a reach-zone or escape objective outside the player's walk (`no-path`), a survive objective longer
+  than the round cap (`round-cap`), or a defeat-hostiles or protect objective while a hostile is countered (`countered`). The
+  walk follows unblocked edges and passages a declared scene action opens; a zone the other participants already fill to
+  capacity at entry is closed to the player, because a defeated participant keeps its place.
+- `HARD_COUNTER`: while an objective needs hostiles out of the fight, one that no attack, ability or surrender negotiation of
+  the player can ever harm (`unharmable`) or reach wherever it walks (`out-of-reach`), each judged on its best case; and,
+  under any objective, one whose attack or reaction can stop the player's actions for the rest of the fight (`action-lock`).
+
+`inference/contract/EncounterAdmission.admit(decision, current, entry)` freezes the decided encounter once with the entry's
+identity, profiles, player facts and combat forms, exactly as entry freezes, and returns `Admitted` only without a finding.
+An infeasible proposal falls back to the first offered authored template that fits the budget and is feasible, or to
+`NoEncounter`. `unchanged(admitted, current, entry)` says whether the admitted definition still matches the committed state.
+The decision is [ADR 0043](../docs/adr/0043-planned-encounters-are-frozen-once-and-admitted-only-when-feasible.md).
+
+Tests: `EncounterFeasibilityTest` (6) and `EncounterAdmissionTest` (3).
+
+Limits: nothing calls the admission, so no planned encounter is entered or stored. `ENGAGE` and the offers of authored
+templates are not checked. Reinforcement phases do not exist in pack data, so no phase is validated. No migration, route or
+command changed.
 
 ## Interface reload contract (P05.6)
 

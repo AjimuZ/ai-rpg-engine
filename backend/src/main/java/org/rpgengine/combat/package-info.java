@@ -42,5 +42,11 @@
  * and hostile limit a composition must respect, the composition of a variant that only selects and places the template's
  * hostile participants, and the deterministic fallback to the first authored template that fits the budget. The
  * {@code encounter} contract of {@code org.rpgengine.inference.contract} proposes such compositions; nothing calls either yet.
+ *
+ * <p>Since P13.3-A (ADR 0043) {@code EncounterFeasibility} checks a {@code FrozenEncounter} for the player entering it: an
+ * objective no walk, round or means of the player can meet, and a hostile participant that is a hidden hard counter (one the
+ * player can never harm or reach while an objective needs it out of the fight, or one that can deny the player every remaining
+ * action). {@code EncounterAdmission} in {@code org.rpgengine.inference.contract} freezes the planned encounter once and admits
+ * it only without a finding; nothing calls it yet.
  */
 package org.rpgengine.combat;
