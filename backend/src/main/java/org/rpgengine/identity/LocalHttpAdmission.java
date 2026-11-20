@@ -82,10 +82,12 @@ public class LocalHttpAdmission extends OncePerRequestFilter {
         // Guard every method in both scope subtrees, including malformed identities and
         // unsupported sections, so future workspace/campaign routes cannot omit admission.
         // The model status and settings subtrees (P21.3-A) are owner-only too: same admission, same rules.
+        // The installed-pack subtree (P14.1-C) is guarded whole, so later pack import routes inherit it.
         if (!Set.of("/api/v1/session", "/api/v1/campaigns", "/api/v1/adventures", "/api/v1/models",
-                "/api/v1/settings").contains(path)
+                "/api/v1/settings", "/api/v1/packs").contains(path)
                 && !path.startsWith("/api/v1/campaigns/") && !path.startsWith("/api/v1/adventures/")
-                && !path.startsWith("/api/v1/models/") && !path.startsWith("/api/v1/settings/")) {
+                && !path.startsWith("/api/v1/models/") && !path.startsWith("/api/v1/settings/")
+                && !path.startsWith("/api/v1/packs/")) {
             chain.doFilter(request, response);
             return;
         }

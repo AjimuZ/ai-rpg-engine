@@ -46,6 +46,10 @@ Section 4 records the backend restart and restore evidence added by P06.5-B.1. T
 (no submit path). Its draft and stream-cursor storage keys embed the adventure ID before the playthrough ID, and
 `campaign-isolation.spec.ts` (P06.5-B.2) proves with two same-name adventures that drafts never cross, that
 switching aborts the pending reads and that a late reply cannot reach the other adventure's view.
+Since P14.1-C the saved view links to `/adventures/<adventureId>/create`. That screen lists the adventure's sealed
+revisions through `GET /api/v1/packs` and creates a playthrough (title, character name, default allocations) only
+when the player asks. It then opens the playthrough in that view
+([API and UI](13-api-and-ui.md#installed-packs-and-browser-playthrough-creation-p141-c)).
 
 The owner requires personalized adventures in parallel, each with its own specifications, content and media folders. An **adventure workspace** is not a quick-save slot. It owns an authored world/configuration and can contain multiple **campaigns** (playthroughs); each campaign can have checkpoints/backups. A reusable imported **pack** is a versioned content source, not the active adventure or a saved campaign. P03.1 delivers the storage foundation only: `adventure_workspace`, adventure-owned `content_revision`, `campaign` rows pinned to a revision of the same adventure, and `campaign_checkpoint` rows. Subsequent checkpoints add library reads, database recovery and the optional folder projection below; read-only browser library binding follows; workspace commands and saved-campaign play remain pending.
 

@@ -5772,5 +5772,137 @@
       <target>Cerca scontri che puoi iniziare qui</target>
       </segment>
     </unit>
+    <unit id="saved.newPlaythrough">
+      <segment>
+        <source>Create a new playthrough</source>
+      <target>Crea una nuova partita</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.title">
+      <segment>
+        <source>New playthrough</source>
+      <target>Nuova partita</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.intro">
+      <segment>
+        <source>Nothing is saved until you select Create playthrough. Attributes and skills start at the adventure’s defaults.</source>
+      <target>Non viene salvato nulla finché non selezioni Crea partita. Attributi e abilità partono dai valori predefiniti dell’avventura.</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.noContent">
+      <segment>
+        <source>This adventure has no installed content yet, so a playthrough cannot be created.</source>
+      <target>Questa avventura non ha ancora contenuti installati, quindi non è possibile creare una partita.</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.content">
+      <segment>
+        <source>Adventure content</source>
+      <target>Contenuto dell’avventura</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.contentError">
+      <segment>
+        <source>Choose the adventure content to play.</source>
+      <target>Scegli il contenuto dell’avventura da giocare.</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.authors">
+      <segment>
+        <source>Authors:</source>
+      <target>Autori:</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.license">
+      <segment>
+        <source>License:</source>
+      <target>Licenza:</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.titleLabel">
+      <segment>
+        <source>Playthrough title</source>
+      <target>Titolo della partita</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.titleHelp">
+      <segment>
+        <source>Enter a title of 1–200 characters.</source>
+      <target>Inserisci un titolo da 1 a 200 caratteri.</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.titleError">
+      <segment>
+        <source>Enter a title of 1–200 characters.</source>
+      <target>Inserisci un titolo da 1 a 200 caratteri.</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.nameLabel">
+      <segment>
+        <source>Character name</source>
+      <target>Nome del personaggio</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.create">
+      <segment>
+        <source>Create playthrough</source>
+      <target>Crea partita</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.sending">
+      <segment>
+        <source>Creating the playthrough…</source>
+      <target>Creazione della partita in corso…</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.back">
+      <segment>
+        <source>Back to the saved adventure</source>
+      <target>Torna all’avventura salvata</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.lost">
+      <segment>
+        <source>The reply was lost, so the playthrough may already exist. Select Create playthrough again without changing anything: the same request is repeated and no second playthrough is created.</source>
+      <target>La risposta è andata persa, quindi la partita potrebbe esistere già. Seleziona di nuovo Crea partita senza cambiare nulla: viene ripetuta la stessa richiesta e non viene creata una seconda partita.</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.invalidReply">
+      <segment>
+        <source>The engine sent a reply this interface cannot verify. Open the saved adventure to check whether the playthrough exists.</source>
+      <target>Il motore ha inviato una risposta che questa interfaccia non può verificare. Apri l’avventura salvata per controllare se la partita esiste.</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.choicesInvalid">
+      <segment>
+        <source>The adventure did not accept these choices. Nothing was created.</source>
+      <target>L’avventura non ha accettato queste scelte. Non è stato creato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.scopeUnavailable">
+      <segment>
+        <source>This adventure or its content is no longer available. Nothing was created.</source>
+      <target>Questa avventura o il suo contenuto non è più disponibile. Non è stato creato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.conflict">
+      <segment>
+        <source>This request was already used with other choices. Nothing was created; select Create playthrough to send a new request.</source>
+      <target>Questa richiesta è già stata usata con altre scelte. Non è stato creato nulla; seleziona Crea partita per inviare una nuova richiesta.</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.busy">
+      <segment>
+        <source>The engine is busy. Nothing was created; try again in a moment.</source>
+      <target>Il motore è occupato. Non è stato creato nulla; riprova tra un momento.</target>
+      </segment>
+    </unit>
+    <unit id="newPlaythrough.unavailable">
+      <segment>
+        <source>Creating a playthrough is unavailable right now. Nothing was created; try again later.</source>
+      <target>Al momento non è possibile creare una partita. Non è stato creato nulla; riprova più tardi.</target>
+      </segment>
+    </unit>
   </file>
 </xliff>

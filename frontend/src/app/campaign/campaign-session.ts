@@ -1,5 +1,5 @@
 /**
- * Read-only campaign transport and durable operation/stream-cursor reconciliation.
+ * Campaign transport (reads plus two explicit writes) and durable operation/stream-cursor reconciliation.
  *
  * {@link CampaignTransport} issues same-origin GETs (campaign state, the resume card, one
  * operation's status, one bounded stream long poll) and validates every reply. {@link CampaignSession} keeps, per
@@ -10,8 +10,10 @@
  * cursor. Delivery is deduplicated by cursor and operation version, so replays after a reload
  * never apply a message twice, including presentation cues, which take the same path and are then kept
  * in memory by {@link CueState} (ordered, deduplicated by delivery identity and never persisted, so a
- * reload does not replay them). The only write is {@link CampaignTransport.submit}, called after an explicit confirmation of a
- * previewed tactical action (P12.2-A); nothing here submits a draft or anything on its own.
+ * reload does not replay them). There are exactly two writes: {@link CampaignTransport.submit}, called after an explicit
+ * confirmation of a previewed tactical action (P12.2-A), and {@link CampaignTransport.create}, called only when the player
+ * submits the playthrough creation form (P14.1-C) and repeated with the same request identity after a lost reply. Nothing
+ * here submits a draft or anything on its own.
  */
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { SavedLibraryClient, LIBRARY_FETCH } from '../library/saved-library-client';
@@ -47,6 +49,40 @@ export interface TrackedOperation {
 
 /** Persisted reconciliation record for one scope. */
 interface SyncRecord { readonly cursor: string | null; readonly operations: readonly TrackedOperation[] }
+
+/**
+ * Body of `POST /api/v1/campaigns` (docs/13, P06.1) as the creation screen sends it (P14.1-C). The request
+ * identity makes a repeat with the same body return the stored playthrough instead of creating another.
+ */
+export interface CreationCommand {
+  readonly requestId: string;
+  readonly adventureId: string;
+  readonly contentRevisionId: string;
+  readonly title: string;
+  readonly narrativeLocale: 'en' | 'it';
+  readonly choices: { readonly name: string; readonly attributes: Record<string, never>; readonly skills: Record<string, never> };
+}
+
+/** Identities of a created (or replayed) playthrough; nothing else is returned by creation. */
+export interface CreatedPlaythrough { readonly campaignId: string; readonly actorId: string; readonly contentRevisionId: string }
+
+/**
+ * Validate a creation reply: exactly the three documented identities, the revision being the one requested.
+ *
+ * @throws CampaignProtocolError `invalid` for any other shape
+ */
+export function parseCreated(value: unknown, contentRevisionId: string): CreatedPlaythrough {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new CampaignProtocolError('invalid', 'Creation reply is not an object');
+  const body = value as Record<string, unknown>;
+  const keys = Object.keys(body).sort();
+  if (keys.join(',') !== 'actorId,campaignId,contentRevisionId'
+    || !keys.every(/** Each identity is a canonical UUID. */ (key) => typeof body[key] === 'string' && uuid.test(body[key] as string))
+    || body['contentRevisionId'] !== contentRevisionId) {
+    throw new CampaignProtocolError('invalid', 'Invalid creation reply');
+  }
+  return { campaignId: body['campaignId'] as string, actorId: body['actorId'] as string, contentRevisionId };
+}
 
 /** Maximum operations remembered per campaign; terminal ones are evicted first. */
 export const MAX_TRACKED = 50;
@@ -109,6 +145,29 @@ export class CampaignTransport {
     let body: unknown;
     try { body = await response.json(); } catch { throw new CampaignProtocolError('invalid', 'Reply is not valid JSON'); }
     return parseOperation(body, scope.campaignId);
+  }
+
+  /**
+   * Create one playthrough (P14.1-C), called only from the creation screen's explicit submit.
+   *
+   * Like {@link submit}, a lost reply is recovered by repeating the call with the same `requestId` and body: the
+   * server answers 201 with the stored identities and creates nothing new. A 403 renews the session once.
+   *
+   * @throws CampaignProtocolError `api` with the stable code for a refusal (nothing was created), `unavailable` when
+   *   the request could not be made or its reply was lost (the playthrough may exist: repeat with the same identity),
+   *   `invalid` for a reply that is not the documented identities
+   */
+  async create(command: CreationCommand, signal: AbortSignal): Promise<CreatedPlaythrough> {
+    let response = await this.post('/api/v1/campaigns', command, await this.csrf(false, signal), signal);
+    if (response.status === 403) response = await this.post('/api/v1/campaigns', command, await this.csrf(true, signal), signal);
+    if (response.status !== 201) throw await this.failure(response);
+    if (!(response.headers.get('Content-Type') ?? '').toLowerCase().startsWith('application/json')) {
+      throw new CampaignProtocolError('invalid', 'Reply is not JSON');
+    }
+    let body: unknown;
+    // A reply cut off while its body is read is a lost reply, not a malformed one: the playthrough may exist.
+    try { body = await response.json(); } catch { throw new CampaignProtocolError(signal.aborted ? 'aborted' : 'unavailable', 'Creation reply lost'); }
+    return parseCreated(body, command.contentRevisionId);
   }
 
   /** Read one operation's current status by identity; the safe query after a reload or a lost reply. */

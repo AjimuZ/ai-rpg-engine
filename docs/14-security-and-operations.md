@@ -67,6 +67,9 @@ first start, idempotently, and refuses to start for a database of another owner
 No route creates owners or seeds data. The whole campaign
 subtree passes admission before routing; admitted unknown routes return 404.
 Future APIs outside that subtree must join the admission boundary explicitly.
+The installed-pack subtree `/api/v1/packs` joined it in P14.1-C: its listing reveals
+only the owner's sealed revisions with public author metadata
+([ADR 0047](adr/0047-installed-pack-listing-and-browser-playthrough-creation.md)).
 `engine.http.origin` defaults to
 `http://127.0.0.1:8080` and accepts only an exact HTTP loopback origin with explicit
 port. API Host must match its authority. Forwarded headers are not trusted.

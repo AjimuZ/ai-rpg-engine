@@ -1,5 +1,5 @@
 /** Preview and saved-library routes; adventure identity is explicit and never inferred from display names. */
-import { Routes } from '@angular/router';
+import { Routes, UrlMatchResult, UrlSegment } from '@angular/router';
 import { Library } from './preview/library';
 import { Workspace } from './preview/workspace';
 import { Creation } from './preview/creation';
@@ -8,9 +8,21 @@ import { Sheet, Inventory, Journal, ContentPanel } from './preview/panels';
 import { Settings } from './preview/settings';
 import { GraphicKit } from './preview/ui-kit';
 import { SavedAdventureView } from './library/saved-library';
+import { PlaythroughCreation } from './library/playthrough-creation';
+import { isUuid } from './library/saved-library-client';
+
+/**
+ * Match `adventures/<canonical uuid>/create`, the creation screen of a saved adventure (P14.1-C). Preview
+ * identities are never UUIDs, so their workspace keeps its own `create` preview.
+ */
+export function savedCreation(segments: UrlSegment[]): UrlMatchResult | null {
+  return segments.length === 3 && segments[0].path === 'adventures' && isUuid(segments[1].path) && segments[2].path === 'create'
+    ? { consumed: segments, posParams: { adventureId: segments[1] } } : null;
+}
 
 /** Route screens and browser titles; unmatched paths return to the local library. */
 export const routes: Routes = [
+  { matcher: savedCreation, component: PlaythroughCreation, title: $localize`:@@shell.createTitle:New playthrough | Adventure engine` },
   { path: '', pathMatch: 'full', redirectTo: 'library' },
   { path: 'library', component: Library, title: $localize`:@@shell.libraryTitle:Library | Adventure engine` },
   { path: 'settings', component: Settings, title: $localize`:@@shell.settingsTitle:Settings | Adventure engine` },

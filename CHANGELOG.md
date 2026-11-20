@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Create a playthrough from the browser (P14.1-C), 20 November 2026
+
+- A saved adventure now has a "Create a new playthrough" link. The new screen lists the adventure's installed content
+  with its title, summary, authors and licence, and asks for a playthrough title and a character name. Nothing is
+  saved until you press "Create playthrough". The new playthrough then opens in the live campaign view.
+- Your character starts with the adventure's default attributes and skills. Choosing an archetype or spending points
+  at creation is not offered yet. The story is narrated in the interface language when the adventure provides it, and
+  otherwise in the adventure's own language.
+- If the connection drops while creating, press "Create playthrough" again without changing anything. The same request
+  is repeated, and no second playthrough is created. Changing the choices starts a new request.
+- `GET /api/v1/packs` lists the installed content of your adventures with public author metadata only, behind the same
+  local admission as the other saved reads. Import diagnostics are not part of it yet.
+- Creating a playthrough this way has passed automated tests, including one from the bundled Lantern Ford sample. No live
+  packaged start in a browser has been recorded yet.
+
 ## Unreleased — A first adventure ready at the first start (P14.1-A.1), 20 November 2026
 
 - A packaged installation started with `./start.sh` now sets itself up. The first start creates your owner identity in

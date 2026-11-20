@@ -5285,6 +5285,79 @@ this update. No combat runtime/browser result is claimed.
       - The sample is English only and covers one genre: the Italian slice, the second genre, localized terminology,
         a complete fight and the return to exploration (the rest of P14.1) remain open.
       - The screen-reader script of docs/36 still describes the unconfigured state.
+  - P14.1-C (20 November 2026, partial; this box stays unchecked): the interface can create a playthrough from an owned
+    adventure ([ADR 0047](adr/0047-installed-pack-listing-and-browser-playthrough-creation.md)).
+    - Engine: `GET /api/v1/packs[?adventureId][&after][&limit]` (`adventure/InstalledPackService`,
+      `InstalledPackController`) lists the owner's sealed revisions. Each row has exactly `contentRevisionId`,
+      `adventureId`, `packId`, `packVersion`, `sourceLocale`, `admittedAt` and the manifest's `title`, `summary`,
+      `authors` and `license`. A missing or foreign adventure returns 404 `PACK_SCOPE_UNAVAILABLE`.
+      `LocalHttpAdmission` now guards the whole `/api/v1/packs` subtree.
+    - Interface:
+      - `SavedLibraryClient.packs` uses the strict `parsePacks` parser, which rejects unknown fields and foreign or
+        duplicate rows.
+      - `CampaignTransport.create` posts `POST /api/v1/campaigns` with the CSRF proof. `parseCreated` accepts exactly
+        the three identities, with the requested revision.
+      - The `savedCreation` route matcher sends `/adventures/<uuid>/create` to the new `library/playthrough-creation.ts`
+        screen. Preview identities keep the preview form. The saved view links to the new screen.
+      - The screen sends a trimmed title and name, default allocations and the interface language, and only on an
+        explicit press. A lost reply keeps the request identity; a refusal or changed choices get a new one.
+      - Success opens `/saved/<adventureId>?playthrough=<campaignId>`.
+      - 22 new messages (`newPlaythrough.*`, `saved.newPlaythrough`) have Italian targets.
+    - Tests added or extended:
+      - `CampaignCreationHttpTest.listsSealedRevisionsWithPublicMetadataOnly` (real HTTP and PostgreSQL). It checks
+        the 403 without a session, `no-store`, the exact page and row fields, the owner page, 404 for foreign and
+        unknown adventures, 400 for noncanonical or out-of-range controls, and a 201 creation from the listed
+        revision with name-only choices.
+      - `FirstStartProvisioningTest.theProvisionedRevisionIsListedAndAcceptsDefaultChoices` lists the provisioned
+        `sample:lantern-ford` revision with its metadata, and creates a campaign from it with the screen's
+        default choices. It then makes the live view's three reads through the production services. The state has
+        the title and the sample's English entrypoint text with no fallback. The resume card is at `ford-camp`
+        ("Ford Camp") with dependencies `AVAILABLE`, not paused, and no fight. The panels name the character.
+      - `LocalHttpAdmissionTest.guardsAdventureSubtreeBeforeRouting` now also covers `/api/v1/packs` and
+        `/api/v1/packs/import`.
+      - `playthrough-creation.spec.ts` (4 tests):
+        (1) strict pack and reply parsing;
+        (2) nothing is sent before submit or with a blank name, the exact body, a lost reply followed by a second
+        press that resends the identical body and request identity, and the redirect to the live view with that
+        playthrough selected. The simulated server answers that playthrough's `state`, `resume`, `panels` and
+        `stream` reads only after the creation succeeded, with bodies shaped like a fresh Lantern Ford campaign.
+        The test asserts that `app-campaign-playthrough` renders the title, the English starting situation with
+        `lang="en"` and no fallback notice, "Ford Camp" on the resume card, no pause notice, the character sheet,
+        and no error. It also asserts that the three reads were made and that nothing beyond the two creation
+        attempts was written;
+        (3) changed choices after a loss get a new identity;
+        (4) the preview `create` route is unchanged.
+      - The pinned catalog size in `italian-variant.spec.ts` went from 714 to 736.
+    - Verification (20 November 2026, Windows reference host):
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=CampaignCreationHttpTest,FirstStartProvisioningTest,LocalHttpAdmissionTest`
+        printed `VERIFY PASSED`. Maven reports `Tests run: 32, Failures: 0, Errors: 0, Skipped: 0`; the provisioning
+        class ran 6 and the admission class 5.
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh frontend` printed `VERIFY PASSED`: install,
+        typecheck, test, i18n, build and locales all PASS.
+      - An earlier frontend run failed only on the pinned catalog size (`expected 736 to be 714`), with 230 of 231
+        tests passing. The count was updated, and the rerun passed.
+      - After the documentation changes, `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh repo` printed
+        `VERIFY PASSED`: diff-check, line-endings, repository-checks, repository-tests and backup-tests all PASS.
+      - Second attempt, after review: these runs added the live-view assertions to the Vitest journey and the
+        three-read checks to `FirstStartProvisioningTest`.
+        `sh .agents/ralph/verify.sh backend -Dtest=FirstStartProvisioningTest` printed `VERIFY PASSED`, with Maven
+        reporting `Tests run: 6, Failures: 0, Errors: 0, Skipped: 0`. `sh .agents/ralph/verify.sh frontend` printed
+        `VERIFY PASSED`, with Vitest reporting 24 files and 231 tests passed. After the documentation changes,
+        `sh .agents/ralph/verify.sh repo` printed `VERIFY PASSED`.
+    - Not proven:
+      - No live `./start.sh` was run, so no browser has created a playthrough from the provisioned sample on a real
+        packaged origin. The criterion "opens in the live campaign view" is covered in two halves that were never
+        joined end to end. The backend tests show that the real state, resume and panels reads answer for a
+        playthrough created from the provisioned sample. The Vitest journey shows that the live view renders
+        bodies of that shape after the creation redirect. The simulated bodies are hand-written, not captured from
+        the real reads, and the stream was empty.
+      - `verify.sh full` and `verify.sh containers` were not run by this session.
+      - The new screen is not rendered by `italian-variant.spec.ts`. Its 22 Italian targets had one author pass, with
+        no independent review, and they are not yet in the docs/36 review kit table.
+      - The pending request identity is not kept across a reload. Creation profiles, archetypes, custom allocations
+        and pack import diagnostics are not offered.
+      - The Italian slice, the second genre, localized terminology, a complete fight and the return to exploration
+        (the rest of P14.1) remain open.
 - [ ] P14.2 Verify reboot, AI renewal, interrupted generation, lost response, backup restore, and no duplicate effects.
 - [ ] P14.3 Run the required reduced-scope MVP QA matrix and record fresh evidence.
 - [ ] P14.4 Measure baseline latency/context use and list unresolved defects honestly; demonstrate one optional bilingual baseline/planner investigation comparison when available, or record deferred/unavailable planning with the playable fallback. Advanced planning cannot block MVP.

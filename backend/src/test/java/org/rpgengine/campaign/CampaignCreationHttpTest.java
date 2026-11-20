@@ -98,6 +98,51 @@ class CampaignCreationHttpTest {
         }
     }
 
+    /**
+     * The installed-pack listing (P14.1-C) reveals the sealed revision with public author metadata only, scopes
+     * it to the owner's adventure, and its revision is accepted by creation without any other lookup.
+     */
+    @Test
+    void listsSealedRevisionsWithPublicMetadataOnly() throws Exception {
+        assertEquals(403, exchange("GET", "/api/v1/packs?adventureId=" + adventure, "", "").status());
+        var listing = exchange("GET", "/api/v1/packs?adventureId=" + adventure, "", headers());
+        assertEquals(200, listing.status(), listing.body());
+        assertTrue(listing.headers().toLowerCase().contains("cache-control: no-store"));
+        JsonNode page = json.readTree(listing.body());
+        assertEquals(java.util.Set.of("packs", "nextAfter"), java.util.Set.copyOf(page.propertyNames()));
+        assertTrue(page.get("nextAfter").isNull());
+        assertEquals(1, page.get("packs").size());
+        JsonNode pack = page.get("packs").get(0);
+        assertEquals(java.util.Set.of("contentRevisionId", "adventureId", "packId", "packVersion", "sourceLocale",
+                "admittedAt", "title", "summary", "authors", "license"), java.util.Set.copyOf(pack.propertyNames()));
+        assertEquals(revision.toString(), pack.get("contentRevisionId").asText());
+        assertEquals(adventure.toString(), pack.get("adventureId").asText());
+        assertEquals("sample:fantasy-exploration", pack.get("packId").asText());
+        assertEquals("Mosslight Trail", pack.get("title").asText());
+        assertEquals("Project contributors", pack.get("authors").get(0).asText());
+        assertEquals(listing.body(), exchange("GET", "/api/v1/packs", "", headers()).body(),
+                "the unfiltered owner page holds the same single revision");
+        var foreign = new TransactionTemplate(manager).execute(status -> {
+            var owner = OwnerProfile.create("Other", Instant.now());
+            entities.persist(owner);
+            var workspace = AdventureWorkspace.create(owner.getId(), "Other", "other", SupportedLocale.EN, Instant.now());
+            entities.persist(workspace);
+            return workspace.getId();
+        });
+        var hidden = exchange("GET", "/api/v1/packs?adventureId=" + foreign, "", headers());
+        assertEquals(404, hidden.status());
+        assertEquals("{\"code\":\"PACK_SCOPE_UNAVAILABLE\"}", hidden.body());
+        assertEquals(404, exchange("GET", "/api/v1/packs?adventureId=" + UUID.randomUUID(), "", headers()).status());
+        for (String query : new String[] {"?adventureId=" + adventure.toString().toUpperCase(), "?limit=0", "?limit=101",
+                "?after=x"}) {
+            assertEquals(400, exchange("GET", "/api/v1/packs" + query, "", headers()).status(), query);
+        }
+        var created = post(json.writeValueAsString(Map.of("requestId", UUID.randomUUID(), "adventureId", adventure,
+                "contentRevisionId", pack.get("contentRevisionId").asText(), "title", "From the listing",
+                "narrativeLocale", "en", "choices", Map.of("name", "Player", "attributes", Map.of(), "skills", Map.of()))));
+        assertEquals(201, created.status(), created.body());
+    }
+
     /** Read APIs must authenticate, authorize the full scope, and return only the selected player's state. */
     @Test
     void readsScopedProjectionsWithoutWriting() throws Exception {

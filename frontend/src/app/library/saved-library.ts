@@ -150,6 +150,7 @@ interface SavedScope {
             </li>
           }
         </ul>
+        <p><a [routerLink]="['/adventures', current.adventure.adventureId, 'create']" i18n="@@saved.newPlaythrough">Create a new playthrough</a></p>
         <a routerLink="/library" i18n="@@workspace.return">Return to library</a>
       </section>
       @if (selected(); as playthrough) {

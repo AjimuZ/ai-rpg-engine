@@ -47,6 +47,23 @@ export interface SavedPlaythrough {
 }
 
 /**
+ * One sealed content revision of an owned adventure (`GET /api/v1/packs`, P14.1-C): the identity a new
+ * playthrough pins plus the pack's public author metadata in its source language.
+ */
+export interface InstalledPack {
+  readonly contentRevisionId: string;
+  readonly adventureId: string;
+  readonly packId: string;
+  readonly packVersion: string;
+  readonly sourceLocale: 'en' | 'it';
+  readonly admittedAt: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly authors: readonly string[];
+  readonly license: string;
+}
+
+/**
  * Failure categories a screen can explain without exposing server detail.
  * `aborted` means the caller cancelled the request (for example after switching adventure).
  */
@@ -175,6 +192,56 @@ export function parsePlaythroughs(value: unknown, adventureId: string): SavedPla
   return playthroughs;
 }
 
+// The only fields a pack row may carry; anything else would be more than public author metadata.
+const PACK_FIELDS = ['contentRevisionId', 'adventureId', 'packId', 'packVersion', 'sourceLocale', 'admittedAt',
+  'title', 'summary', 'authors', 'license'];
+// Manifest text limit of pack contract 1 (docs/09); identifiers follow the database checks.
+const MANIFEST_TEXT = 4096;
+
+/**
+ * Validate an installed-pack listing for one requested adventure.
+ *
+ * Unlike the older listings, a row with any field outside the public allowlist is rejected, so an
+ * interface built against this contract never renders more than author metadata.
+ *
+ * @param value decoded JSON body
+ * @param adventureId the adventure the caller asked about; a row for any other adventure is foreign
+ * @returns validated revisions in server order
+ * @throws SavedLibraryError `invalid` for malformed, unknown-field, duplicate or foreign rows
+ */
+export function parsePacks(value: unknown, adventureId: string): InstalledPack[] {
+  const source = record(value, 'listing');
+  if (Object.keys(source).some(/** Only the page fields are known. */ (key) => key !== 'packs' && key !== 'nextAfter')) invalid('listing');
+  const list = source['packs'];
+  if (!Array.isArray(list) || list.length > 100) invalid('packs');
+  const packs = (list as unknown[]).map(/** Validate each row independently. */ (item) => {
+    const row = record(item, 'pack');
+    if (Object.keys(row).some(/** Reject anything beyond public metadata. */ (key) => !PACK_FIELDS.includes(key))) invalid('pack');
+    const sourceLocale = row['sourceLocale'];
+    if (sourceLocale !== 'en' && sourceLocale !== 'it') invalid('sourceLocale');
+    const authors = row['authors'];
+    if (!Array.isArray(authors) || authors.length === 0 || authors.length > 100) invalid('authors');
+    const pack: InstalledPack = {
+      contentRevisionId: uuid(row, 'contentRevisionId'),
+      adventureId: uuid(row, 'adventureId'),
+      packId: text(row, 'packId', 128),
+      packVersion: text(row, 'packVersion', 64),
+      sourceLocale,
+      admittedAt: instant(row, 'admittedAt'),
+      title: text(row, 'title', MANIFEST_TEXT),
+      summary: text(row, 'summary', MANIFEST_TEXT),
+      authors: (authors as unknown[]).map(/** Each author is bounded manifest text. */ (author) => text({ author }, 'author', MANIFEST_TEXT)),
+      license: text(row, 'license', MANIFEST_TEXT),
+    };
+    // A revision of another adventure must never be offered for this adventure's playthrough.
+    if (pack.adventureId !== adventureId) invalid('adventureId');
+    return pack;
+  });
+  if (new Set(packs.map(/** Identity distinguishes revisions. */ (item) => item.contentRevisionId)).size !== packs.length) invalid('packs');
+  if (source['nextAfter'] !== null && !isUuid(source['nextAfter'])) invalid('nextAfter');
+  return packs;
+}
+
 /** Read-only persisted library access shared by the library and saved-adventure screens. */
 @Injectable({ providedIn: 'root' })
 export class SavedLibraryClient {
@@ -203,6 +270,13 @@ export class SavedLibraryClient {
     if (!isUuid(adventureId)) throw new SavedLibraryError('missing', 'Unknown adventure identity');
     const query = new URLSearchParams({ adventureId, limit: String(PAGE_LIMIT) });
     return parsePlaythroughs(await this.read(`/api/v1/campaigns?${query}`, signal), adventureId);
+  }
+
+  /** List the first page of sealed revisions of one adventure; a missing or foreign adventure is `missing`. */
+  async packs(adventureId: string, signal: AbortSignal): Promise<InstalledPack[]> {
+    if (!isUuid(adventureId)) throw new SavedLibraryError('missing', 'Unknown adventure identity');
+    const query = new URLSearchParams({ adventureId, limit: String(PAGE_LIMIT) });
+    return parsePacks(await this.read(`/api/v1/packs?${query}`, signal), adventureId);
   }
 
   /**

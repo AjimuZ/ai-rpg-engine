@@ -13,11 +13,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.rpgengine.campaign.CampaignCreationService;
+import org.rpgengine.campaign.CampaignProjectionService;
 import org.rpgengine.campaign.CharacterChoices;
 import org.rpgengine.commands.CommandExecutionService;
 import org.rpgengine.commands.OperationAdmissionService;
 import org.rpgengine.commands.OperationStatus;
 import org.rpgengine.commands.TypedCommand;
+import org.rpgengine.memory.ResumeCards;
+import org.rpgengine.panels.PlayPanels;
 import org.rpgengine.presentation.SupportedLocale;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,6 +40,10 @@ class FirstStartProvisioningTest {
     @Autowired private CampaignCreationService creation;
     @Autowired private CommandExecutionService executions;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private InstalledPackService packs;
+    @Autowired private CampaignProjectionService projections;
+    @Autowired private ResumeCards resumeCards;
+    @Autowired private PlayPanels playPanels;
 
     /** Construct the injected fixture; missing database infrastructure fails startup. */
     FirstStartProvisioningTest() { }
@@ -118,6 +125,45 @@ class FirstStartProvisioningTest {
         assertTrue(failure.getMessage().contains("another owner"), failure.getMessage());
         assertEquals(List.of(previous), jdbc.queryForList("select id from identity_owner_profile", UUID.class));
         assertEquals(1, jdbc.queryForObject("select count(*) from adventure_workspace", Integer.class));
+    }
+
+    /**
+     * The installed-pack read (P14.1-C) finds the provisioned sample's sealed revision with its author metadata, and
+     * the creation screen's choices (a name with default allocations, no archetype) create a playthrough from it
+     * whose state, resume card and panels (the live campaign view's reads) answer at the camp, unpaused.
+     */
+    @Test
+    void theProvisionedRevisionIsListedAndAcceptsDefaultChoices() {
+        var provisioned = provisioning.provision(OWNER);
+        var listing = packs.list(OWNER, provisioned.workspaceId(), null, 50);
+        assertEquals(1, listing.packs().size());
+        assertNull(listing.nextAfter());
+        var pack = listing.packs().getFirst();
+        assertEquals(jdbc.queryForObject("select id from content_revision", UUID.class), pack.contentRevisionId());
+        assertEquals(List.of("sample:lantern-ford", "1.0.0", "Lantern Ford", "en", "MIT"),
+                List.of(pack.packId(), pack.packVersion(), pack.title(), pack.sourceLocale(), pack.license()));
+        assertEquals(List.of("Project contributors"), pack.authors());
+        assertThrows(AdventureLibraryService.ScopeUnavailable.class,
+                () -> packs.list(OWNER, UUID.randomUUID(), null, 50));
+        var created = creation.create(OWNER, provisioned.workspaceId(), new CampaignCreationService.Request(
+                UUID.randomUUID(), pack.contentRevisionId(), "Lantern watch", SupportedLocale.EN,
+                new CharacterChoices("Player", null, Map.of(), Map.of(), null, null)));
+        assertEquals(pack.contentRevisionId(), jdbc.queryForObject(
+                "select content_revision_id from campaign where id = ?", UUID.class, created.campaignId()));
+
+        // The three reads the live campaign view makes before following the stream all answer for this playthrough.
+        var state = projections.read(OWNER, provisioned.workspaceId(), created.campaignId());
+        assertEquals("Lantern watch", state.campaign().title());
+        assertEquals(List.of("You reach the camp beside the ford at dusk. A raider waits by the crossing; you can face "
+                + "them, or look for another way to the far bank.", "en", false), List.of(state.startingSituation().text(),
+                state.startingSituation().locale(), state.startingSituation().fallback()));
+        var card = resumeCards.read(OWNER, provisioned.workspaceId(), created.campaignId());
+        assertEquals(List.of("ford-camp", "Ford Camp"), List.of(card.location().id(), card.location().name()));
+        assertEquals(List.of("AVAILABLE", false), List.of(card.dependencies().status(), card.dependencies().mutationPaused()));
+        assertNull(card.encounter());
+        var panels = playPanels.read(OWNER, provisioned.workspaceId(), created.campaignId(), null, 20);
+        assertEquals("Player", panels.character().name());
+        assertEquals(created.campaignId(), panels.scope().campaignId());
     }
 
     /**

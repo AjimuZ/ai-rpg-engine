@@ -161,9 +161,43 @@ displayed state, the view re-reads the state before polling again; a reset's hea
 replaces the stored cursor even if the stored value is larger.
 Workspace creation and sending actions from the browser are still pending.
 
+### Installed packs and browser playthrough creation (P14.1-C)
+
+`GET /api/v1/packs[?adventureId=<uuid>][&after=<uuid>][&limit=<1..100>]` (`InstalledPackService`,
+[ADR 0047](adr/0047-installed-pack-listing-and-browser-playthrough-creation.md)) returns `{packs, nextAfter}`:
+the owner's **sealed** content revisions, optionally only those of one adventure, ordered by revision UUID
+(default page 50, exclusive `after`, null `nextAfter` ends the page). Each row has exactly `contentRevisionId`,
+`adventureId`, `packId`, `packVersion`, `sourceLocale`, `admittedAt` and the sealed manifest's `title`, `summary`,
+`authors` and `license` in the pack's source language. Hashes, file lists, rules, lore, secrets, import reports
+and owner identity are never returned, and import diagnostics are not part of the listing yet. The whole
+`/api/v1/packs` subtree has the same admission as `/api/v1/adventures` (session cookie for GET, `no-store`).
+Malformed or noncanonical controls return 400 `PACK_READ_INPUT_INVALID`. A missing or foreign `adventureId`
+returns 404 `PACK_SCOPE_UNAVAILABLE`, not an empty page. Storage failures return 503
+`PACK_READ_STORAGE_UNAVAILABLE`, and a sealed manifest without its schema-guaranteed fields returns 503
+`PACK_READ_CONTENT_UNAVAILABLE`.
+
+The browser binds it in `SavedLibraryClient.packs`. Its strict parser `parsePacks` rejects unknown page or row
+fields, rows of another adventure, duplicate revisions, noncanonical UUIDs and unbounded text. The saved-adventure
+view links to `/adventures/<adventureId>/create`. A URL matcher sends a canonical UUID there to
+`PlaythroughCreation`, while preview identities keep the preview form. The screen reads the adventure and its
+sealed revisions, preselects the only revision (several must be chosen), and validates a trimmed playthrough title
+(1–200) and character name (1–60).
+
+Only the player's "Create playthrough" press sends `POST /api/v1/campaigns` (`CampaignTransport.create`, with the
+CSRF proof). The body is `{requestId, adventureId, contentRevisionId, title, narrativeLocale, choices: {name,
+attributes: {}, skills: {}}}`: no archetype, so allocations are the profile's minima, and `narrativeLocale` is the
+interface language. The 201 reply must have exactly `campaignId`, `actorId` and the requested
+`contentRevisionId`. Then the screen opens `/saved/<adventureId>?playthrough=<campaignId>`, the live campaign view.
+
+A lost reply (network failure, or a body cut off) or an unverifiable one keeps the request identity: pressing
+again with the same choices repeats the same request, and the server returns the stored playthrough. A refusal
+(`CREATION_*` code) or changed choices start a new identity. Refusal codes have a closed table of English and
+Italian sentences in `playthrough-creation.ts`. The pending identity is kept in memory only. Creation profiles,
+archetypes and custom allocations are not offered, because no read API projects them yet.
+
 ## 1. Contract status
 
-Except for the session/creation/projection/consultation/library endpoints above, the following endpoints and DTO
+Except for the session/creation/projection/consultation/library/installed-pack endpoints above, the following endpoints and DTO
 fields are proposed v1 contracts. There are no generated OpenAPI definitions.
 API and content versions are separate. Use an `/api/v1` namespace and explicit
 schema versions for persisted/imported data.
@@ -176,7 +210,7 @@ schema versions for persisted/imported data.
 | `GET /api/v1/readiness` | Database, migrations, adapter support, configured AI readiness | Sanitized diagnostics |
 | `POST /api/v1/packs/validate` | Stage and validate a selected pack | No campaign effects |
 | `POST /api/v1/packs/import` | Register a successfully validated immutable revision | Owner action |
-| `GET /api/v1/packs` | List installed revisions and diagnostics | Public author metadata only |
+| `GET /api/v1/packs` | List installed revisions and diagnostics | Public author metadata only. Implemented (P14.1-C) for the owner's sealed revisions without diagnostics ([details](#installed-packs-and-browser-playthrough-creation-p141-c)) |
 | `POST /api/v1/campaigns` | Create from pack/ruleset revision and creation choices | Transactional and idempotent |
 | `GET /api/v1/campaigns` | Owner's campaigns | Scope to local owner |
 | `GET /api/v1/campaigns/{id}/state` | Player projection at one revision | No advancement |
