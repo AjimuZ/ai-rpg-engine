@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Starting an offered fight from the page (P13.2-B), 20 November 2026
+
+- Outside a fight, the playthrough page has a "Look for fights you can start here" button. It lists only the authored fights
+  that the game would let you start at your current place right now. A fight elsewhere, or one you could not start (during
+  another fight, when defeated or while the playthrough is paused), is never listed or hinted at.
+- Each listed fight shows only what you could see on entering it: who is there, which side they are on and where they stand,
+  where you start, the ways out and what the fight is about, plus whether it may open with your attack. It never shows an
+  opponent's statistics, strength, attacks or the place's layout. Names are shown as the content's identifiers.
+- Choosing "Start the fight", or "Start the fight … by attacking …", only opens a review; the fight starts only when you
+  confirm. If the reply is lost, confirming again cannot start the fight twice. A refusal says that nothing changed.
+- Nothing is read or sent by itself: the list is read only when you ask, and it is cleared as soon as the playthrough moves on.
+- Known gap: after the fight starts, initiative cannot yet be rolled from the page.
+- The combat projection gains an `offers` list (empty during a fight). No database migration or new route; 13 new messages
+  with Italian translations.
+
 ## Unreleased — Bounded encounter proposals with one repair and a safe fallback (P13.2-A), 14 November 2026
 
 - New `encounter` task contract for the narration runtime: given the party's capabilities, the chosen difficulty and the

@@ -321,6 +321,52 @@ final class CommandRules {
      */
     record Perception(String location, List<UUID> actors) { }
 
+    /**
+     * The authored encounters the player could enter now with a plain {@code ENGAGE} (P13.2-B): every pinned template at
+     * the player's current location that the {@code ENGAGE} rule gate ({@code Check#engage}) admits without an opening
+     * strike, in template ID order. The gate is the admission gate itself, not a copy, so an offered template is one the
+     * same committed state would admit and a refused one is never named. Runs in the caller's transaction (a read-only
+     * snapshot is enough: the gate only reads), so the list describes the revision that snapshot sees.
+     *
+     * @param jdbc JDBC access joined to the caller's transaction
+     * @param campaign campaign already authorized by the caller
+     * @param player the campaign's creation player, already checked to be a character by the caller
+     * @param content catalog preloaded outside the caller's transaction
+     * @return the admissible templates; empty without a pinned catalog of this revision (including a paused campaign) or
+     *         without a current location
+     */
+    static List<EncounterTemplate> engageable(JdbcTemplate jdbc, UUID campaign, UUID player,
+            CommandRuleCatalogs.Content content) {
+        if (content.catalog() == null) {
+            return List.of();
+        }
+        var check = new Check(jdbc, campaign, player, content);
+        CommandRuleCatalog catalog;
+        try {
+            catalog = check.catalog();
+        } catch (OperationAdmissionFailure unavailable) {
+            // A catalog of another revision cannot decide entry for this campaign.
+            return List.of();
+        }
+        String here = check.here();
+        if (here == null) {
+            return List.of();
+        }
+        var offered = new java.util.ArrayList<EncounterTemplate>();
+        for (EncounterTemplate template : new TreeMap<>(catalog.combat().templates()).values()) {
+            if (!here.equals(template.location())) {
+                continue;
+            }
+            try {
+                check.engage(new TypedCommand.Engage(template.id(), null));
+                offered.add(template);
+            } catch (OperationAdmissionFailure refused) {
+                // Refused entry is simply not offered; the reason stays private, as an ENGAGE refusal's does.
+            }
+        }
+        return List.copyOf(offered);
+    }
+
     /** Build a sanitized category for {@code throw}; the caller's transaction rolls back every write. */
     private static OperationAdmissionFailure fail(OperationAdmissionFailure.Kind kind) {
         return new OperationAdmissionFailure(kind);

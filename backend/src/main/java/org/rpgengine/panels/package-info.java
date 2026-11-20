@@ -15,5 +15,7 @@
  * <p>Since P12.1 {@link org.rpgengine.panels.CombatPanels} projects the active fight for the combat panel in the same
  * read-only way: initiative, action points, zones, public standings and conditions, the player's own values, defenses known
  * only from public assessments, objectives, legal candidates with costs and targets, and the verdict awaiting settlement.
+ * Since P13.2-B it also names, outside a fight, the authored encounters the player may start now, chosen by the
+ * {@code ENGAGE} admission gates themselves and limited to what entry reveals.
  */
 package org.rpgengine.panels;

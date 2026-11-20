@@ -225,7 +225,83 @@ class CombatPanelTest {
         assertEquals(List.of(new CombatPanels.Objective("last", "survive", null, null, 5, "pending")), decided.objectives());
     }
 
+    /**
+     * Outside a fight the projection offers exactly the templates a plain {@code ENGAGE} admits (P13.2-B, ADR 0042): the
+     * trailhead's in ID order and never the grove's; at the grove only the grove's, whose ally is never an opening target. An
+     * offer carries only what entry reveals, an offered opening target is accepted by {@code ENGAGE}, and nothing is offered
+     * during the fight it starts. Reading the offers writes nothing.
+     */
+    @Test
+    void offersNameOnlyTheEncountersEntryAdmits() throws Exception {
+        campaignOf(EncounterPack.files());
+        var before = world();
+        var calm = read();
+        assertEquals(before, world(), "reading the offers writes nothing");
+        assertEquals(List.of("close-brawl", "close-rush", "toll-parley", "trail-ambush", "yard-duel"), ids(calm));
+        assertEquals(new CombatPanels.Offer("trail-ambush", "entry",
+                List.of(new CombatPanels.OfferParticipant("raider", "hostile", "yard")), List.of("escape-route"),
+                List.of(new CombatPanels.Stake("drive-off", "defeatHostiles", null, null, null),
+                        new CombatPanels.Stake("slip-away", "escape", null, null, null)),
+                "initiative", List.of("raider")), offer(calm, "trail-ambush"));
+        var parley = offer(calm, "toll-parley");
+        assertEquals(List.of(new CombatPanels.OfferParticipant("keeper", "ally", "gate"),
+                new CombatPanels.OfferParticipant("smuggler", "hostile", "booth")), parley.participants());
+        assertEquals(List.of(new CombatPanels.Stake("hold", "survive", null, null, 3),
+                new CombatPanels.Stake("keep-keeper", "protect", null, "keeper", null)), parley.objectives());
+        assertEquals("forbidden", parley.openingPolicy());
+        assertEquals(List.of(), parley.openingTargets(), "a forbidden opening names no target");
+        // Hidden sentinels: the portrayed NPC, attacks, declared actions, threat tiers, cover, zone tags and display names.
+        String body = JSON.writeValueAsString(calm.offers());
+        for (String sentinel : List.of("warden", "cudgel", "taunt", "seal-route", "demand-passage", "standard", "minor",
+                "partial", "obscured", "exit", "Trail Ambush", "Raider", "health", "stats")) {
+            assertFalse(body.contains(sentinel), "hidden sentinel in the offers: " + sentinel);
+        }
+        for (JsonNode offer : JSON.readTree(body)) {
+            assertEquals(Set.of("templateId", "playerZone", "participants", "escapeZones", "objectives", "openingPolicy",
+                    "openingTargets"), Set.copyOf(offer.propertyNames()));
+            for (JsonNode participant : offer.path("participants")) {
+                assertEquals(Set.of("participantId", "side", "zone"), Set.copyOf(participant.propertyNames()));
+            }
+        }
+
+        execute(new TypedCommand.Move("grove"));
+        var grove = read();
+        assertEquals(List.of("grove-watch"), ids(grove), "only the current location's templates are offered");
+        assertEquals(List.of("wolf"), offer(grove, "grove-watch").openingTargets(), "an ally is never an opening target");
+        execute(new TypedCommand.Move("trailhead"));
+        assertEquals(ids(calm), ids(read()));
+
+        execute(new TypedCommand.Engage("trail-ambush", "raider"));
+        var fighting = read();
+        assertEquals("trail-ambush", fighting.encounter().templateId());
+        assertEquals(List.of(), fighting.offers(), "nothing is offered during a fight");
+    }
+
+    /** A defeated player is offered nothing, exactly as {@code ENGAGE} refuses every entry for one. */
+    @Test
+    void aDefeatedPlayerIsOfferedNothing() throws Exception {
+        campaignOf(EncounterPack.files());
+        UUID player = jdbc.queryForObject("select actor_id from campaign_creation where campaign_id = ?", UUID.class,
+                campaign);
+        jdbc.update("update actor_resource set current_value = minimum_value, row_version = row_version + 1 "
+                + "where campaign_id = ? and actor_id = ? and resource_key = 'vigor'", campaign, player);
+        assertEquals(List.of(), read().offers());
+        var refused = assertThrows(OperationAdmissionFailure.class, () -> executions.execute(owner, adventure, campaign,
+                new OperationAdmissionService.Command(UUID.randomUUID().toString(), revision, "ENGAGE",
+                        Map.of("encounterId", "trail-ambush"))));
+        assertEquals(OperationAdmissionFailure.Kind.ENCOUNTER_UNAVAILABLE, refused.kind());
+    }
+
     // ---- helpers ------------------------------------------------------------------------------------------------
+
+    private static List<String> ids(CombatPanels.CombatPanel panel) {
+        return panel.offers().stream().map(CombatPanels.Offer::templateId).toList();
+    }
+
+    private static CombatPanels.Offer offer(CombatPanels.CombatPanel panel, String id) {
+        return panel.offers().stream().filter(offer -> offer.templateId().equals(id)).findFirst()
+                .orElseThrow(() -> new AssertionError(id));
+    }
 
     /** Register a pack variant and create a campaign on it; the surveyor starts at the trailhead. */
     private void campaignOf(Map<String, byte[]> files) throws Exception {

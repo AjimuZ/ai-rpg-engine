@@ -5694,5 +5694,83 @@
       <target>Quell’offerta non è più sul tavolo. Non è cambiato nulla.</target>
       </segment>
     </unit>
+    <unit id="combat.refusedEntry">
+      <segment>
+        <source>That fight cannot be started now. Nothing changed.</source>
+      <target>Ora quello scontro non può essere iniziato. Non è cambiato nulla.</target>
+      </segment>
+    </unit>
+    <unit id="combat.offersTitle">
+      <segment>
+        <source>Fights you can start here</source>
+      <target>Scontri che puoi iniziare qui</target>
+      </segment>
+    </unit>
+    <unit id="combat.offersHelp">
+      <segment>
+        <source>Starting a fight is always your choice. Choosing one only shows what you can see of it; nothing is sent until you confirm it.</source>
+      <target>Iniziare uno scontro è sempre una tua scelta. Sceglierne uno mostra soltanto ciò che puoi vederne; non viene inviato nulla finché non lo confermi.</target>
+      </segment>
+    </unit>
+    <unit id="combat.stakes">
+      <segment>
+        <source>What is at stake</source>
+      <target>Cosa è in gioco</target>
+      </segment>
+    </unit>
+    <unit id="combat.entryBinds">
+      <segment>
+        <source>Starting the fight cannot be taken back. The game decides every result.</source>
+      <target>L’inizio dello scontro non si può annullare. Ogni risultato lo decide il gioco.</target>
+      </segment>
+    </unit>
+    <unit id="combat.start">
+      <segment>
+        <source>Start the fight <ph id="0" equiv="fight" disp="fight" /></source>
+      <target>Inizia lo scontro <ph id="0" equiv="fight" disp="fight" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.startStrike">
+      <segment>
+        <source>Start the fight <ph id="0" equiv="fight" disp="fight" /> by attacking <ph id="1" equiv="target" disp="target" /></source>
+      <target>Inizia lo scontro <ph id="0" equiv="fight" disp="fight" /> attaccando <ph id="1" equiv="target" disp="target" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.startZone">
+      <segment>
+        <source>You start in <ph id="0" equiv="zone" disp="zone" /></source>
+      <target>Inizi nella zona <ph id="0" equiv="zone" disp="zone" /></target>
+      </segment>
+    </unit>
+    <unit id="combat.openingInitiative">
+      <segment>
+        <source>An attack that starts this fight resolves at your own turn in the first round.</source>
+      <target>Un attacco che inizia questo scontro si risolve nel tuo turno del primo round.</target>
+      </segment>
+    </unit>
+    <unit id="combat.openingFirst">
+      <segment>
+        <source>An attack that starts this fight resolves before anyone acts in the first round.</source>
+      <target>Un attacco che inizia questo scontro si risolve prima che chiunque agisca nel primo round.</target>
+      </segment>
+    </unit>
+    <unit id="combat.openingForbidden">
+      <segment>
+        <source>This fight cannot be started with an attack.</source>
+      <target>Questo scontro non può iniziare con un attacco.</target>
+      </segment>
+    </unit>
+    <unit id="combat.offersNone">
+      <segment>
+        <source>No fight can be started here right now.</source>
+      <target>Qui ora non si può iniziare nessuno scontro.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.resume.lookForFights">
+      <segment>
+        <source>Look for fights you can start here</source>
+      <target>Cerca scontri che puoi iniziare qui</target>
+      </segment>
+    </unit>
   </file>
 </xliff>

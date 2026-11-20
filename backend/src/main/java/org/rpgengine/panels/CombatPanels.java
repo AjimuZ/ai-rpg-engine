@@ -12,9 +12,13 @@ import org.rpgengine.combat.EncounterObjective;
 import org.rpgengine.combat.EncounterOutcome;
 import org.rpgengine.combat.EncounterPhase;
 import org.rpgengine.combat.EncounterState;
+import org.rpgengine.combat.EncounterTemplate;
 import org.rpgengine.combat.EncounterWriter;
+import org.rpgengine.combat.OpeningPolicy;
 import org.rpgengine.combat.TacticalRules;
 import org.rpgengine.commands.CommandReceipts;
+import org.rpgengine.commands.CommandRuleCatalogs;
+import org.rpgengine.commands.EncounterOffers;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -38,9 +42,19 @@ import tools.jackson.databind.json.JsonMapper;
  * {@code PUBLIC} {@code ASSESSMENT_RESOLVED} event of this encounter, labelled with the round and revision they were learned
  * at, because Health changes afterwards and the panel must not present an old reading as current.
  *
+ * <p><b>Offers (P13.2-B, ADR 0042).</b> Outside a fight the projection names the authored encounters the player may start
+ * now ({@link Offer}), chosen by {@link EncounterOffers}, which applies the {@code ENGAGE} admission gates themselves: only
+ * templates at the player's current location that a plain {@code ENGAGE} would be admitted for, so a template elsewhere or one
+ * entry would refuse is never confirmed. Each offer holds only what docs/11 section 3 lets entry reveal: the observable
+ * participants with their side and starting zone, the player's starting zone, the escape zones, the objectives (the stakes) and
+ * the opening-action policy with its lawful targets. It never holds a participant's statistics, threat tier, attacks,
+ * reactions, conditions or portrayed NPC, the zone graph, cover, capacity or tags, the declared social and scene actions, or
+ * any display text. Offers are empty during a fight, under a starting decision the engine cannot answer, and when the pinned
+ * content cannot be loaded.
+ *
  * <p><b>Consistency and writes.</b> The scope is authorized and every row is read in one read-only repeatable-read snapshot,
  * so the whole projection describes the {@link Scope#stateRevision} it names. Reading it never advances time, writes a row,
- * draws a die or starts work; it lists candidates, it does not submit one.
+ * draws a die or starts work; it lists candidates and offers, it does not submit one.
  */
 @Service
 public class CombatPanels {
@@ -49,14 +63,17 @@ public class CombatPanels {
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final JdbcTemplate jdbc;
+    private final CommandRuleCatalogs catalogs;
     private final TransactionTemplate snapshot;
 
     /**
      * @param jdbc storage
      * @param manager transaction manager
+     * @param catalogs pinned rule catalogs, read before the snapshot for the encounter offers
      */
-    public CombatPanels(JdbcTemplate jdbc, PlatformTransactionManager manager) {
+    public CombatPanels(JdbcTemplate jdbc, PlatformTransactionManager manager, CommandRuleCatalogs catalogs) {
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
+        this.catalogs = Objects.requireNonNull(catalogs, "catalogs");
         snapshot = new TransactionTemplate(Objects.requireNonNull(manager, "manager"));
         snapshot.setReadOnly(true);
         snapshot.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
@@ -82,11 +99,14 @@ public class CombatPanels {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("the combat panel requires an independent snapshot");
         }
-        return Objects.requireNonNull(snapshot.execute(status -> project(owner, adventure, campaign)));
+        // Loaded outside the snapshot, as admission does: the pinned revision is frozen, so it is the snapshot's revision. A
+        // foreign scope yields no catalog here and is refused inside the snapshot.
+        var content = catalogs.pinned(owner, adventure, campaign);
+        return Objects.requireNonNull(snapshot.execute(status -> project(owner, adventure, campaign, content)));
     }
 
     /** Authorize the scope and read the whole projection in the caller's snapshot. */
-    private CombatPanel project(UUID owner, UUID adventure, UUID campaign) {
+    private CombatPanel project(UUID owner, UUID adventure, UUID campaign, CommandRuleCatalogs.Content content) {
         jdbc.execute("set local statement_timeout = '5s'");
         var rows = jdbc.query("select c.mode, c.state_revision, c.content_revision_id from campaign c join adventure_workspace w "
                 + "on w.id = c.adventure_id where c.id = ? and c.adventure_id = ? and w.owner_id = ?",
@@ -99,12 +119,36 @@ public class CombatPanels {
         var scope = new Scope(adventure, campaign, (UUID) row[2], (long) row[1]);
         var fight = EncounterWriter.active(jdbc, campaign);
         if (fight.isEmpty()) {
-            return new CombatPanel(scope, (String) row[0], null);
+            var offers = EncounterOffers.offered(jdbc, campaign, content).stream().map(CombatPanels::offer).toList();
+            return new CombatPanel(scope, (String) row[0], null, offers);
         }
         EncounterState state = EncounterWriter.state(jdbc, campaign)
                 .orElseThrow(() -> new IllegalStateException("active encounter unreadable in the panel snapshot"));
         return new CombatPanel(scope, (String) row[0], encounter(fight.get().templateId(), state,
-                assessed(campaign, state)));
+                assessed(campaign, state)), List.of());
+    }
+
+    /**
+     * Project one admissible template as an offer: only the facts entry reveals (see the class comment). Opening targets are
+     * the hostile participants in authored order, and none under the {@code forbidden} policy, matching what {@code ENGAGE}
+     * accepts as an opening strike.
+     */
+    private static Offer offer(EncounterTemplate template) {
+        var participants = new ArrayList<OfferParticipant>();
+        var targets = new ArrayList<String>();
+        for (EncounterTemplate.Participant participant : template.participants()) {
+            participants.add(new OfferParticipant(participant.id(), participant.side().wire(), participant.zone()));
+            if (participant.side() == EncounterTemplate.Side.HOSTILE && template.opening() != OpeningPolicy.FORBIDDEN) {
+                targets.add(participant.id());
+            }
+        }
+        var stakes = new ArrayList<Stake>();
+        for (EncounterObjective objective : template.objectives()) {
+            stakes.add(new Stake(objective.id(), objective.kind().wire(), objective.zone(), objective.participant(),
+                    objective.kind() == EncounterObjective.Kind.SURVIVE ? objective.rounds() : null));
+        }
+        return new Offer(template.id(), template.playerZone(), List.copyOf(participants),
+                List.copyOf(template.escapeZones()), List.copyOf(stakes), template.opening().wire(), List.copyOf(targets));
     }
 
     /**
@@ -216,8 +260,48 @@ public class CombatPanels {
      * @param scope identity and revision tokens; a client discards a projection of another scope or an older revision
      * @param mode campaign mode
      * @param encounter the active fight, or null without one
+     * @param offers encounters the player may start now with {@code ENGAGE}, in template ID order; always empty during a fight
+     *        (P13.2-B)
      */
-    public record CombatPanel(Scope scope, String mode, Encounter encounter) {
+    public record CombatPanel(Scope scope, String mode, Encounter encounter, List<Offer> offers) {
+    }
+
+    /**
+     * One encounter the player may start, as entry reveals it (docs/11 section 3, ADR 0042). {@code ENGAGE} names
+     * {@code templateId}, and optionally one of {@code openingTargets} as its opening strike.
+     *
+     * @param templateId template identity, the {@code encounterId} of the {@code ENGAGE} payload
+     * @param playerZone zone the player would start in
+     * @param participants the observable participants in authored order, without the player
+     * @param escapeZones zones whose reach completes an escape, in ID order
+     * @param objectives the objectives in authored order: what the fight is about
+     * @param openingPolicy {@code initiative}, {@code first} or {@code forbidden}
+     * @param openingTargets hostile participants an opening strike may name, in authored order; empty under {@code forbidden}
+     */
+    public record Offer(String templateId, String playerZone, List<OfferParticipant> participants, List<String> escapeZones,
+            List<Stake> objectives, String openingPolicy, List<String> openingTargets) {
+    }
+
+    /**
+     * One observable participant of an offer.
+     *
+     * @param participantId roster ID
+     * @param side {@code ally} or {@code hostile}
+     * @param zone starting zone
+     */
+    public record OfferParticipant(String participantId, String side, String zone) {
+    }
+
+    /**
+     * One objective of an offer, before the fight has a status for it.
+     *
+     * @param objectiveId objective ID
+     * @param kind {@code defeatHostiles}, {@code escape}, {@code reachZone}, {@code survive} or {@code protect}
+     * @param zone target zone of {@code reachZone}, otherwise null
+     * @param participantId protected ally of {@code protect}, otherwise null
+     * @param rounds rounds to survive for {@code survive}, otherwise null
+     */
+    public record Stake(String objectiveId, String kind, String zone, String participantId, Integer rounds) {
     }
 
     /**

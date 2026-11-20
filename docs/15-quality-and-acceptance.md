@@ -1834,6 +1834,15 @@ unreachable objective, a hidden hard counter and an over-budget phase or reinfor
 no statistic bands per tier, and no planning path calls the contract, so no campaign encounter is proposed or refused this way.
 No live model output was evaluated and no deliberate weakening ran.
 
+P13.2-B (20 November 2026) adds two `CombatPanelTest` methods (now 5) and `combat-entry.spec.ts` (14 cases). They are QA-16
+evidence for the offers of the combat projection ([docs/13](13-api-and-ui.md#p132-b-starting-an-offered-fight)): only the
+templates a plain `ENGAGE` admits at the player's location are offered, never another location's or a defeated player's, each
+offer carries exactly its seven members and three per participant, and hidden sentinels (portrayed NPC, attack, declared actions,
+threat tiers, cover, zone tags, display names) are absent. On the page, offers are read only on request and `ENGAGE` is sent only
+after a confirmed review, never during a fight, with a lost reply retried under the same request identity against the scripted
+server. See the P13.2 roadmap entry for results and limits; nothing ran against the real backend from the page, and no
+deliberate weakening ran.
+
 ## 4. Long-campaign evaluation
 
 Run at least one **500-turn seeded campaign scenario** with 25 forced context renewals, at least 20 encounters, 50 recurring entities, 30 delayed promises/clues, multiple quest outcomes, and administrative corrections affecting old summaries. The exact turn schedule is a test fixture, not a forced story for users.

@@ -1085,6 +1085,13 @@ backend of the combat panel.
 - Options and verdict are `TacticalRules.options` and `EncounterOutcome.publicForm` passed through
   `CommandReceipts.tactical`, the receipt's own allowlist, so the projection lists exactly what a receipt would.
 - `CombatPanelsController` answers with the codes of the other campaign reads; `encounter` is null outside a fight.
+- Since P13.2-B ([ADR 0042](../docs/adr/0042-offered-encounters-reveal-only-what-entry-reveals.md)) the body also has
+  `offers`: outside a fight, the templates at the player's location that a plain `ENGAGE` would admit, chosen by
+  `commands.EncounterOffers` (`CommandSemantics.explorer` and `CommandRules.engageable`, which calls the admission gate itself)
+  with the pinned catalog loaded before the snapshot. An offer holds only the starting zones, participants with side and zone,
+  escape zones, objectives and opening policy with its targets. `offers` is empty during a fight, for a defeated player, a
+  paused campaign or an unsupported decision. Tested by `CombatPanelTest`'s `offersNameOnlyTheEncountersEntryAdmits` and
+  `aDefeatedPlayerIsOfferedNothing`.
 
 Tests: `CombatPanelTest` (real PostgreSQL on the encounter and tactics fixtures: the projection of `close-brawl` against the
 stored state and the receipt's options, known values after a successful assessment and none after a failed one,

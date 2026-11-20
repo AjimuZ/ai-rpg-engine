@@ -4809,7 +4809,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     - **Not done: `ENGAGE`.** No projection the page reads names an encounter the player may start (the resume card's `encounter`
       is the active fight only, and the backend refuses an entry without confirming that a template exists elsewhere), so the page
       has no encounter id to send. Needs a product decision and a read model of the encounters offered at the player's location;
-      nothing was added for it.
+      nothing was added for it. Moved to P13.2-B, which added both on 20 November 2026 (see P13.2).
     - **Unchanged.** No backend, migration, route or command changed. Three new messages (`combat.settleOption`,
       `combat.settleBinds`, `combat.draftKept`) with Italian entries; the catalog moved from 698 to 701.
   - Tests (`combat-chat.spec.ts`, 7 new; `combat-actions.spec.ts`, 2 existing tests changed):
@@ -4908,7 +4908,7 @@ this update. No combat runtime/browser result is claimed.
     - Ammunition is recorded but does not change capacity, so a no-ammunition party is not yet planned for.
     - Calibration finding: one fresh level-1 actor has a Gentle band of 4.8–6.4 that no level-1 cost meets (P18.3).
     - Not run by this session: `verify.sh full`, `verify.sh containers` and deliberate weakenings.
-- [ ] P13.2 Implement template-bounded Codex encounter proposals, one repair, and safe fallback.
+- [x] P13.2 Implement template-bounded Codex encounter proposals, one repair, and safe fallback.
   - P13.2-A, template-bounded encounter proposals with one repair and a safe fallback, 14 November 2026
     ([ADR 0041](adr/0041-template-bounded-encounter-compositions-and-an-authored-fallback.md)).
     - **Options.** New pure `combat/EncounterOption`: one eligible authored template at a caller-supplied level.
@@ -4958,6 +4958,69 @@ this update. No combat runtime/browser result is claimed.
     - With the provisional numbers, small parties often have no fitting authored roster, so `NoEncounter` may be common (P18.3).
     - No live model output was evaluated. Not run by this session: `verify.sh full`, `verify.sh containers` and deliberate
       weakenings.
+  - P13.2-B, starting an offered fight from the page, 20 November 2026 (the P13.2 box stays unchecked: this story does not
+    finish it; [ADR 0042](adr/0042-offered-encounters-reveal-only-what-entry-reveals.md)). Moved here from P12.5-B, whose
+    `ENGAGE` half it completes.
+    - **Read model.** `CombatPanels.CombatPanel` gains `offers` (records `Offer`, `OfferParticipant`, `Stake`): outside a fight,
+      every pinned template at the player's location that a plain `ENGAGE` would admit, in template ID order; empty during a
+      fight. New `commands/EncounterOffers` applies `CommandSemantics.explorer` (mode, decision and player binding, answered
+      with null) and `CommandRules.engageable`, which calls the admission gate `Check#engage` itself.
+      - Each offer reveals only the docs/11 section 3 facts, read most conservatively: template ID, player zone, participants
+        (ID, side, zone), escape zones, objectives as stakes, opening policy and opening targets (hostiles; none under
+        `forbidden`).
+      - It never holds statistics, tiers, attacks, reactions, the portrayed NPC, zone graph, cover, capacity, tags, declared
+        actions or display text.
+    - **Page.** The resume card has "Look for fights you can start here" outside a fight and unless paused; it reads
+      `GET …/encounter` once (`lookForFights`). The page never reads it by itself outside a fight, which also keeps the recorded
+      real-server transcript valid.
+      - `parseCombatView` reads `offers` and refuses an offer during a fight, a repeated template, an unknown policy or side, and
+        an opening target that is not a listed hostile or is named under `forbidden`.
+      - New `app-encounter-offers` (`encounter-offers.ts`) lists the offers, or "No fight can be started here right now."
+    - **Send.** New `combat-entry.ts`: entries "Start the fight …" and, per opening target, "… by attacking …"; a review, then
+      "Confirm and send" only. `resolveEntry` refuses during a fight (`NOT_YOUR_TURN`) or for an unoffered template or unlisted
+      target (`NOT_LISTED`) and sends nothing.
+      - The host's new `engage` and the existing `send` share one `dispatch` with the existing identity rule: same key at the same
+        revision reuses the `requestId` after a lost reply.
+      - The payload is `ENGAGE` `{encounterId}` or `{encounterId, openingStrike}`.
+    - **Messages.** 13 new (`combat.offersTitle`, `offersHelp`, `offersNone`, `stakes`, `entryBinds`, `start`, `startStrike`,
+      `startZone`, `openingInitiative`, `openingFirst`, `openingForbidden`, `refusedEntry`, `campaign.resume.lookForFights`)
+      with Italian entries; the catalog moved from 701 to 714. `objectiveMessage` now accepts an objective without a status.
+    - **Unchanged.** No migration, route or command changed.
+    - **Documents.** CHANGELOG, backend README, docs/11 section 3, docs/13 (projection, panel and new "P13.2-B starting an
+      offered fight" section), a dated P13.2-B paragraph in docs/15 section 3, ADR 0042 and its index.
+  - Tests:
+    - `CombatPanelTest` (2 new, 5 in all; written by an earlier attempt of this story and first run now):
+      - `offersNameOnlyTheEncountersEntryAdmits`: the trailhead's five templates in ID order and never the grove's; at the
+        grove only `grove-watch`, whose ally is not an opening target; the exact member sets; hidden sentinels absent; an offered
+        opening target accepted by `ENGAGE`; no offers during the fight; reading writes nothing.
+      - `aDefeatedPlayerIsOfferedNothing`, with `ENGAGE` refused `ENCOUNTER_UNAVAILABLE` on the same state.
+    - `combat-entry.spec.ts` (14 new):
+      - parsing and payloads: offers read as sent; seven malformed bodies refused; `ENGAGE` built only for an offered template
+        and listed target; refused during a fight and without a projection;
+      - page: no read until asked, then only entry facts shown and nothing sent on review or cancel; the empty answer worded;
+        no button or list during a fight or while paused; one `ENGAGE` only after confirmation, with the lost first reply
+        retried with an identical body (same `requestId`, payload and expected revision).
+    - Existing assertions changed: the Italian catalog count in `italian-variant.spec.ts` (701 to 714). The fixture's
+      projection bodies now carry `offers`.
+  - Verification (20 November 2026, Windows reference host):
+    - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh frontend` first failed 1 test: a new assertion of this story
+      expected joined stake text, and it was corrected to compare the items.
+    - The rerun printed `VERIFY PASSED (frontend)` (install, typecheck, test, i18n, build and locales all PASS), with
+      `Test Files 23 passed (23)` and `Tests 227 passed (227)`.
+    - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=CombatPanelTest` printed
+      `VERIFY PASSED (-Dtest=CombatPanelTest)`. The focused Maven log reports `Tests run: 5, Failures: 0, Errors: 0,
+      Skipped: 0` and `BUILD SUCCESS`.
+    - After the documentation changes, `py -B tools/repository_checks/checks.py all` printed `all: 0 finding(s)`.
+  - Not proven:
+    - The page was never run against the real backend: the offers and `ENGAGE` went only to the scripted server, so the real
+      envelope, receipt and the switch to the fight panel were not seen end to end.
+    - After `ENGAGE` the fight waits at round 0 for `ROLL_INITIATIVE`, which the page cannot send, so a fight started from
+      the page cannot progress from the page yet.
+    - Offers are unbudgeted authored templates. Nothing calls the P13.2-A contract or fallback, so no proposed composition is
+      offered.
+    - The request identity lives in the page only and does not survive a reload.
+    - No browser, keyboard, 320 px, axe or screen-reader check, and no second-person review of the Italian sentences.
+    - Not run by this session: `verify.sh full`, `verify.sh containers`, other backend classes and deliberate weakenings.
 - [ ] P13.3 Freeze admitted content; validate reinforcement phases, objectives, escape, and hard counters.
 - [ ] P13.4 Implement challenge-source rewards, loot ownership, cumulative thresholds, training, unlocks, and pending purchases.
 - [ ] P13.5 Add advancement preview and comparison without automatic player build changes.

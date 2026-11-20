@@ -23,7 +23,8 @@ import tools.jackson.core.JacksonException;
  * session cookie) is enforced by {@link LocalHttpAdmission}; a GET needs no CSRF token and every response is
  * {@code no-store} through that filter.
  *
- * <p>Responses: 200 with the {@link CombatPanels.CombatPanel} body (its {@code encounter} null outside a fight); 400
+ * <p>Responses: 200 with the {@link CombatPanels.CombatPanel} body (its {@code encounter} null outside a fight, where its
+ * {@code offers} name the encounters the player may start; P13.2-B); 400
  * {@code CAMPAIGN_READ_INPUT_INVALID} for missing or noncanonical identities; 404 {@code CAMPAIGN_SCOPE_UNAVAILABLE} for a
  * missing, foreign or mismatched scope; 503 {@code CAMPAIGN_READ_STORAGE_UNAVAILABLE} for storage failures, an unreadable
  * stored fight or a history beyond its bound; 403 {@code LOCAL_ADMISSION_DENIED}. The codes are those of the other campaign

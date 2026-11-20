@@ -10,8 +10,9 @@
  * and 6).
  *
  * The component never submits a draft: Send stays disabled and the draft is kept only by the
- * shared {@link StoryInputState}. The one write is a named combat action the player reviewed and confirmed in the combat
- * panel ({@link CampaignPlaythrough.send}, P12.2-A). The stream/status reads go through
+ * shared {@link StoryInputState}. The only writes are a named combat action the player reviewed and confirmed in the combat
+ * panel ({@link CampaignPlaythrough.send}, P12.2-A) and the start of an offered fight confirmed in the offers list
+ * ({@link CampaignPlaythrough.engage}, P13.2-B). The stream/status reads go through
  * {@link CampaignSession}, which persists the operation identities and cursor so the explicit
  * EN↔IT reload resumes without duplicating or dropping deliveries.
  */
@@ -26,7 +27,9 @@ import {
   locationMessage, narrationReasonMessage, operationStatusMessage, presentMessage, receiptLines, resourceMessages, streamResetMessage,
 } from './campaign-messages';
 import { CampaignScope, CampaignSession, CampaignTransport } from './campaign-session';
-import { choiceKey, envelope, resolveChoice, TacticalChoice } from './combat-actions';
+import { choiceKey, envelope, resolveChoice, TacticalChoice, TacticalCommand } from './combat-actions';
+import { EntryChoice, entryKey, resolveEntry } from './combat-entry';
+import { EncounterOffers } from './encounter-offers';
 
 /** Delay before the first retry after a failed read, doubled up to {@link MAX_BACKOFF_MS}. */
 const BASE_BACKOFF_MS = 2_000;
@@ -45,7 +48,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 
 /** Show a playthrough's authorized public projection and follow its resumable stream while mounted. */
 @Component({
-  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CampaignPanels, CampaignCues, CombatPanel],
+  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CampaignPanels, CampaignCues, CombatPanel, EncounterOffers],
   template: `
     <section class="panel campaign-playthrough" [attr.data-campaign-id]="campaignId()" aria-labelledby="campaign-title">
       @if (view(); as current) {
@@ -100,10 +103,17 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
               </ul>
             }
             <p class="muted" i18n="@@campaign.resume.readOnly">This summary is read from the last saved state; reading it does not advance time.</p>
+            @if (!card.inFight && !card.mutationPaused) {
+              <p><button type="button" data-look-for-fights [disabled]="lookingForFights() || sending()" (click)="lookForFights()"
+                i18n="@@campaign.resume.lookForFights">Look for fights you can start here</button></p>
+            }
           </section>
         }
         @defer (when combat()?.encounter != null) {
           <app-combat-panel [view]="combat()" [journal]="panels()?.journal ?? null" [journalLocale]="panels()?.locale ?? null" [scope]="scope()" [sending]="sending()" [problem]="problem()" (confirmed)="send($event)" (dismissed)="problem.set(null)" />
+        }
+        @if (combat()?.encounter === null) {
+          <app-encounter-offers [view]="combat()" [sending]="sending()" [problem]="problem()" (confirmed)="engage($event)" (dismissed)="problem.set(null)" />
         }
         <app-campaign-panels [panels]="panels()" [older]="older()" [nextBefore]="cursor()" [loadingOlder]="loadingOlder()" (olderRequested)="loadOlder()" />
       } @else if (failure()) { <p class="notice" role="alert" data-error>{{ failure() }}</p>
@@ -166,6 +176,8 @@ export class CampaignPlaythrough {
   /** Cursor of the next older journal page, or null at the oldest event. */
   readonly cursor = signal<number | null>(null);
   readonly loadingOlder = signal(false);
+  /** True while the player's own request for the fights offered here is being read (P13.2-B). */
+  readonly lookingForFights = signal(false);
   /** True while one confirmed tactical action is on its way; a second confirmation is refused meanwhile. */
   readonly sending = signal(false);
   /** Stable code of the last refused or lost tactical submission, or null. */
@@ -245,7 +257,8 @@ export class CampaignPlaythrough {
           this.resume.set(card);
           const panels = await this.transport.panels(scope, signal);
           this.panels.set(panels);
-          // The combat projection is read only during a fight, so a playthrough without one issues no extra request.
+          // The combat projection is read only during a fight, so a playthrough without one issues no extra request; outside a
+          // fight its offers are read only when the player asks for them (lookForFights, P13.2-B).
           this.combat.set(card.inFight ? await this.transport.encounter(scope, signal) : null);
           this.older.set([]);
           this.cursor.set(panels.nextBefore);
@@ -308,6 +321,28 @@ export class CampaignPlaythrough {
   }
 
   /**
+   * Read the fights the player may start here (P13.2-B), only because the player asked. This is the combat projection read: it
+   * writes nothing and starts nothing. A projection that shows a fight, or a revision other than the shown resume card's, means the
+   * playthrough moved on, so the whole view is re-read instead of mixing revisions. A failure keeps what is shown and reports the
+   * usual localized error.
+   */
+  async lookForFights(): Promise<void> {
+    const run = this.run;
+    const card = this.resume();
+    if (run === undefined || card === null || this.lookingForFights() || this.sending()) return;
+    this.lookingForFights.set(true);
+    try {
+      const view = await this.transport.encounter(this.scope(), run.signal);
+      if (run.signal.aborted) return;
+      if (view.encounter !== null || view.stateRevision !== card.stateRevision) { this.refresh(); return; }
+      this.combat.set(view);
+    } catch (error) {
+      if (run.signal.aborted) return;
+      this.failure.set(campaignErrorMessage(error instanceof CampaignProtocolError ? error.code : null));
+    } finally { this.lookingForFights.set(false); }
+  }
+
+  /**
    * Send one confirmed tactical action (P12.2-A).
    *
    * Runs only from the combat panel's confirm button. The choice is validated again against the newest projection; a choice that is
@@ -316,20 +351,42 @@ export class CampaignPlaythrough {
    * the stored operation instead of playing it twice. After an answer the page re-reads the state and keeps following the stream.
    */
   async send(choice: TacticalChoice): Promise<void> {
-    const run = this.run;
     const view = this.combat();
-    if (this.sending() || run === undefined || view === null) return;
+    if (this.sending() || this.run === undefined || view === null) return;
     const resolved = resolveChoice(view.encounter, choice);
     if (!resolved.ok) { this.problem.set(resolved.refusal); return; }
-    const key = choiceKey(choice);
-    if (this.attempt?.key !== key || this.attempt.revision !== view.stateRevision) {
-      this.attempt = { key, revision: view.stateRevision, requestId: globalThis.crypto.randomUUID() };
+    await this.dispatch(choiceKey(choice), resolved.command, view.stateRevision);
+  }
+
+  /**
+   * Start one offered fight with `ENGAGE` (P13.2-B). Runs only from the confirm button of the offers list. The entry is validated
+   * again against the newest projection: during a fight, for a template the projection no longer offers, or for an opening target
+   * the offer does not list, nothing is sent. A lost reply keeps the request identity, so confirming the same entry at the same
+   * revision again cannot start the fight twice.
+   */
+  async engage(choice: EntryChoice): Promise<void> {
+    const view = this.combat();
+    if (this.sending() || this.run === undefined || view === null) return;
+    const resolved = resolveEntry(view, choice);
+    if (!resolved.ok) { this.problem.set(resolved.refusal); return; }
+    await this.dispatch(entryKey(choice), resolved.command, view.stateRevision);
+  }
+
+  /**
+   * Submit one validated command under the identity rule: the same key at the same revision reuses the request identity of a lost
+   * attempt; any other key or revision gets a new one.
+   */
+  private async dispatch(key: string, command: TacticalCommand, revision: number): Promise<void> {
+    const run = this.run;
+    if (run === undefined) return;
+    if (this.attempt?.key !== key || this.attempt.revision !== revision) {
+      this.attempt = { key, revision, requestId: globalThis.crypto.randomUUID() };
     }
     const scope = this.scope();
     this.sending.set(true);
     this.problem.set(null);
     try {
-      const operation = await this.transport.submit(scope, envelope(resolved.command, this.attempt.requestId, view.stateRevision), run.signal);
+      const operation = await this.transport.submit(scope, envelope(command, this.attempt.requestId, revision), run.signal);
       if (run.signal.aborted) return;
       this.attempt = null;
       this.session.applyOperation(scope, operation);

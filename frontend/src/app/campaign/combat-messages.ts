@@ -101,6 +101,48 @@ export function combatLabels() {
   };
 }
 
+/**
+ * Static labels of the list of encounters the player may start (P13.2-B). Headings shared with the fight's own panel reuse its
+ * message IDs, so one sentence has one translation.
+ */
+export function entryLabels() {
+  return {
+    title: $localize`:@@combat.offersTitle:Fights you can start here`,
+    help: $localize`:@@combat.offersHelp:Starting a fight is always your choice. Choosing one only shows what you can see of it; nothing is sent until you confirm it.`,
+    none: $localize`:@@combat.offersNone:No fight can be started here right now.`,
+    present: $localize`:@@combat.participants:Participants`,
+    escape: $localize`:@@combat.escape:Escape zones`,
+    noEscape: $localize`:@@combat.noEscape:This fight has no escape zones.`,
+    stakes: $localize`:@@combat.stakes:What is at stake`,
+    noStakes: $localize`:@@combat.noObjectives:This fight has no objectives.`,
+    previewTitle: $localize`:@@combat.previewTitle:Review before sending`,
+    binds: $localize`:@@combat.entryBinds:Starting the fight cannot be taken back. The game decides every result.`,
+    confirm: $localize`:@@combat.confirm:Confirm and send`,
+    cancel: $localize`:@@combat.cancel:Do not send`,
+    sending: $localize`:@@combat.sending:Sending…`,
+  };
+}
+
+/** Return the label of starting one offered fight, plainly or with an opening attack on one participant. */
+export function entryMessage(templateId: string, openingStrike: string | null): string {
+  return openingStrike === null ? $localize`:@@combat.start:Start the fight ${templateId}:fight:`
+    : $localize`:@@combat.startStrike:Start the fight ${templateId}:fight: by attacking ${participantName(openingStrike)}:target:`;
+}
+
+/** Return the zone the player starts an offered fight in. */
+export function startZoneMessage(zone: string): string {
+  return $localize`:@@combat.startZone:You start in ${zone}:zone:`;
+}
+
+/** Return what an offered fight's opening-action policy means for an attack that starts it (docs/11 section 3). */
+export function openingPolicyMessage(policy: 'initiative' | 'first' | 'forbidden'): string {
+  switch (policy) {
+    case 'initiative': return $localize`:@@combat.openingInitiative:An attack that starts this fight resolves at your own turn in the first round.`;
+    case 'first': return $localize`:@@combat.openingFirst:An attack that starts this fight resolves before anyone acts in the first round.`;
+    case 'forbidden': return $localize`:@@combat.openingForbidden:This fight cannot be started with an attack.`;
+  }
+}
+
 /** Return the reason the draft cannot be sent now, or null when it can; the draft itself is never touched. */
 export function chatBlockMessage(refusal: string): string | null {
   switch (refusal) {
@@ -267,8 +309,8 @@ export function learnedMessage(round: string, revision: string): string {
   return $localize`:@@combat.learned:Learned in round ${round}:round: (revision ${revision}:revision:). Health may have changed since.`;
 }
 
-/** Return one objective as a sentence. */
-export function objectiveMessage(objective: CombatObjective, rounds: string): string {
+/** Return one objective as a sentence; an offered encounter's stakes use the same sentences before they have a status. */
+export function objectiveMessage(objective: Pick<CombatObjective, 'kind' | 'zone' | 'participantId'>, rounds: string): string {
   const zone = objective.zone ?? '?';
   const who = participantName(objective.participantId ?? '?');
   switch (objective.kind) {
@@ -355,6 +397,8 @@ export function refusalMessage(code: string | null): string {
       return $localize`:@@combat.refusedText:Those words cannot be sent: write between 1 and 500 characters. Nothing changed.`;
     case 'COMMAND_OFFER_UNAVAILABLE':
       return $localize`:@@combat.refusedOffer:That offer is no longer on the table. Nothing changed.`;
+    case 'COMMAND_ENCOUNTER_UNAVAILABLE':
+      return $localize`:@@combat.refusedEntry:That fight cannot be started now. Nothing changed.`;
     case 'COMMAND_CAMPAIGN_BUSY': case 'COMMAND_ADMISSION_LIMIT':
       return $localize`:@@combat.refusedBusy:The game is busy with another action. Try again in a moment. Nothing changed.`;
     case 'LOST':

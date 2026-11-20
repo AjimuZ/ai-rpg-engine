@@ -65,6 +65,8 @@ Since P11.1 the player enters an authored encounter with the explicit `ENGAGE` i
 
 Since P11.3 the opening strike resolves once, inside the initiative operation: under `first` right after round one opens, the player's round-one grant then being short by `strikeCost`, and under `initiative` when the player's round-one activation starts, paid from it. Legality is judged at the slot, because a target can move or fall before it. A strike that cannot be made lapses with a public reason (`OPENING_STRIKE_LAPSED`: out of range, no attack, attacker down and so on), spending and drawing nothing.
 
+Since P13.2-B the player-safe combat projection lists, outside a fight, the templates a plain `ENGAGE` would admit at the player's location, decided by the admission gate itself ([ADR 0042](adr/0042-offered-encounters-reveal-only-what-entry-reveals.md)). This reading of "observable participants, positions, threats, escape options, and stakes" is the most conservative one: each offer shows the participants' roster IDs, sides and starting zones, the player's starting zone, the escape zones, the objectives and the opening-action policy with its lawful targets. "Threats" is the hostile side only; no statistic, threat tier, attack, reaction, layout or display text is revealed, and a template the player cannot enter is never named. The page reads the offers only when the player asks and sends `ENGAGE` only from a confirmed review ([docs/13](13-api-and-ui.md#p132-b-starting-an-offered-fight)).
+
 ## 4. Default actor profile
 
 | Field | AI RPG Skirmish default |

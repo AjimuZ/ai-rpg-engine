@@ -502,7 +502,8 @@ Another participant's current Health, Focus, defenses, stance, reactions, polici
 any effect clock, absorption or source, a check's difficulty or margin, a counteroffer not yet made and anything from an
 `INTERNAL` event or another encounter's event are never returned (QA-16, `CombatPanelTest`). Reading the projection writes
 nothing and submits nothing. The playthrough page reads it since P12.1-B
-([combat panel](#p121-b-combat-panel)).
+([combat panel](#p121-b-combat-panel)). Since P13.2-B the body also has `offers`, the encounters the player may start, always
+empty during a fight ([offered fights](#p132-b-starting-an-offered-fight)).
 
 ### P12.1-B combat panel
 
@@ -512,7 +513,7 @@ an oversized list or a foreign scope reject the whole body) and `combat-messages
 `GET …/encounter` only when the resume card reports a fight (`inFight`, the card's `encounter` member being non-null), after
 the panels and in the same re-read, so a playthrough outside a fight issues no extra request; a read refused by the server or
 failing validation shows the usual localized error and no panel. The component is loaded lazily when the first projection with a
-fight arrives.
+fight arrives. Outside a fight the page reads the projection only when the player asks for the fights offered there (P13.2-B).
 
 It shows, in order: the phase sentence, the round of the cap and the acting participant with the points left; the verdict at
 `OUTCOME_PENDING`; the initiative order (the acting participant carries `aria-current`); zones and passages with the crossing
@@ -620,9 +621,35 @@ no route sends a reply and the page shows none). Draft persistence and the settl
   refusal after the player confirmed those exact words, or by the player's own "Clear words"; a refusal or a lost reply keeps it.
   If the page is reloaded while the words are being sent, they return as a draft and are not sent again. Refused storage keeps
   the draft in the page only.
-- **Starting a fight (`ENGAGE`) is not connected.** No projection the page reads names an encounter the player may start (the
-  resume card's `encounter` is the active fight only), so the page has no encounter identity to send and sends none. A read model
-  of the encounters offered at the player's location, and the decision on how much of it the player may see, are still needed.
+- **Starting a fight (`ENGAGE`)** was not connected by P12.5-B: no projection named an encounter the player may start. Since
+  P13.2-B the projection's `offers` does, below.
+
+### P13.2-B starting an offered fight
+
+- **Read model** ([ADR 0042](adr/0042-offered-encounters-reveal-only-what-entry-reveals.md)). Outside a fight,
+  `GET …/encounter` returns `offers`: every pinned template at the player's current location that a plain `ENGAGE` would admit on
+  the same snapshot, in template ID order (`EncounterOffers`, which calls the `ENGAGE` rule gate itself). A template elsewhere,
+  of another vocabulary, for a defeated player, under a paused campaign or an unsupported starting decision, or during a fight is
+  never named, so the list confirms nothing a refused `ENGAGE` would not. Each offer holds `templateId`, `playerZone`,
+  `participants` (`participantId`, `side` `ally` or `hostile`, `zone`), `escapeZones`, `objectives` (`objectiveId`, `kind`,
+  `zone`, `participantId`, `rounds`) and `openingPolicy` with `openingTargets` (the hostile participants; none under
+  `forbidden`). It never holds statistics, threat tiers, attacks, reactions, conditions, the portrayed NPC, the zone graph, cover,
+  capacity, tags, declared actions or display text (`CombatPanelTest`).
+- **Page.** Outside a fight and unless the playthrough is paused, the resume card has "Look for fights you can start here", which
+  reads the projection once (`CampaignPlaythrough.lookForFights`); the page never reads it by itself outside a fight. A projection
+  showing a fight or another revision than the card's re-reads the whole view instead. `parseCombatView` refuses an offer during a
+  fight, a repeated template, an unknown policy or side, and an opening target that is not one of the offer's hostile
+  participants or is named under `forbidden`. `app-encounter-offers` lists each offer by its identifier with "You start in …",
+  the participants with their side and zone, the escape zones, the stakes (objective sentences) and the opening policy, or says
+  "No fight can be started here right now." Any newer revision clears the list.
+- **Send.** Each offer has "Start the fight …" and, per opening target, "Start the fight … by attacking …" (`combat-entry.ts`).
+  Choosing one opens a review that says starting cannot be taken back; only its "Confirm and send" sends. The page validates the
+  entry again (`resolveEntry`: during a fight, an unoffered template or an unlisted target sends nothing) and posts `ENGAGE`
+  `{encounterId}` or `{encounterId, openingStrike}` through the same host path and identity rule as the named actions: a lost
+  reply keeps the `requestId` for the same entry at the same revision. A refusal is worded ("That fight cannot be started now.
+  Nothing changed." for `COMMAND_ENCOUNTER_UNAVAILABLE`).
+- **Not done.** After entry the fight waits at round 0 for `ROLL_INITIATIVE`, which the page cannot send. Offers are authored
+  templates only, not budget-checked and not composed by the encounter contract of P13.2-A.
 
 ## 4. Stream contract
 

@@ -56,6 +56,32 @@ final class CommandSemantics {
         return state.player();
     }
 
+    /**
+     * The player who could submit an exploration intention now, read without a lock for a projection (P13.2-B): the same
+     * mode, decision and player-binding rules as {@link #requireEligible} for a non-tactical command, but answered with null
+     * instead of a refusal, so a read model can offer nothing rather than fail.
+     *
+     * @param jdbc JDBC access joined to the caller's (possibly read-only) transaction
+     * @param campaign campaign already authorized by the caller
+     * @return the creation player, or null outside {@code EXPLORATION}, under an unsupported decision, or without a bound
+     *         character
+     */
+    static UUID explorer(JdbcTemplate jdbc, UUID campaign) {
+        var states = jdbc.query("select c.mode, c.pending_decision::text, cc.actor_id, a.kind from campaign c "
+                        + "left join campaign_creation cc on cc.campaign_id = c.id "
+                        + "left join actor a on a.campaign_id = c.id and a.id = cc.actor_id where c.id = ?",
+                (row, index) -> new State(row.getString(1), row.getString(2), row.getObject(3, UUID.class),
+                        row.getString(4)), campaign);
+        if (states.isEmpty()) { return null; }
+        State state = states.getFirst();
+        if (!"EXPLORATION".equals(state.mode())
+                || state.decision() != null && !StartingDecision.supports(JSON.readTree(state.decision()))
+                || state.player() == null || !"CHARACTER".equals(state.kind())) {
+            return null;
+        }
+        return state.player();
+    }
+
     /** Throw a sanitized category; escaping the caller's transaction guarantees rollback. */
     private static void fail(OperationAdmissionFailure.Kind kind) { throw new OperationAdmissionFailure(kind); }
 

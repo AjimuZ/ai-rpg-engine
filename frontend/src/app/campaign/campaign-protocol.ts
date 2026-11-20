@@ -444,7 +444,10 @@ export interface ResumeCard {
   readonly location: { readonly id: string; readonly name: string | null; readonly nameLocale: 'en' | 'it' | null; readonly nameFallback: boolean } | null;
   readonly presentActors: readonly { readonly actorId: string; readonly name: string }[];
   readonly resources: readonly { readonly key: string; readonly minimum: number; readonly current: number; readonly maximum: number }[];
-  /** True while a fight is active; only then does the page read the combat projection (P12.1-B). */
+  /**
+   * True while a fight is active; only then does the page read the combat projection by itself (P12.1-B). Outside a fight it reads
+   * the projection's offers only when the player asks (P13.2-B).
+   */
   readonly inFight: boolean;
   readonly pendingDecision: DecisionKind;
   readonly awaitingNarrationTotal: number;
@@ -847,8 +850,30 @@ export interface CombatEncounter {
   readonly options: CombatOptions | null;
   readonly outcome: CombatVerdict | null;
 }
-/** The combat projection at one committed revision; `encounter` is null outside a fight. */
-export interface CombatView { readonly stateRevision: number; readonly encounter: CombatEncounter | null }
+/** Opening-action policies of an encounter the player may start (docs/11 section 3). */
+export const COMBAT_OPENING_POLICIES = ['initiative', 'first', 'forbidden'] as const;
+/** One observable participant of an offered encounter: never the player, never a statistic. */
+export interface EncounterOfferParticipant { readonly participantId: string; readonly side: 'ally' | 'hostile'; readonly zone: string }
+/** One objective of an offered encounter, before the fight gives it a status. */
+export type EncounterStake = Omit<CombatObjective, 'status'>;
+/**
+ * One encounter the player may start now with `ENGAGE` (P13.2-B, ADR 0042), holding only what entry reveals: who is observably
+ * there and where, where the player starts, the escape zones, the stakes and the opening policy with its lawful opening targets.
+ */
+export interface EncounterOffer {
+  readonly templateId: string;
+  readonly playerZone: string;
+  readonly participants: readonly EncounterOfferParticipant[];
+  readonly escapeZones: readonly string[];
+  readonly objectives: readonly EncounterStake[];
+  readonly openingPolicy: (typeof COMBAT_OPENING_POLICIES)[number];
+  readonly openingTargets: readonly string[];
+}
+/**
+ * The combat projection at one committed revision; `encounter` is null outside a fight, and `offers` names the encounters the player
+ * may start now. Offers are always empty during a fight.
+ */
+export interface CombatView { readonly stateRevision: number; readonly encounter: CombatEncounter | null; readonly offers: readonly EncounterOffer[] }
 
 /** Read an array of bounded identifiers. */
 function identifiers(source: Record<string, unknown>, field: string): string[] {
@@ -937,19 +962,49 @@ function parseCombatVerdict(value: unknown): CombatVerdict {
 }
 
 /**
- * Validate a combat projection body against the route's scope (docs/13 "P12.1-A combat projection").
+ * Read the encounters offered outside a fight. An absent member is an empty list. An offer whose opening target is not one of its
+ * hostile participants, or that names a target under the `forbidden` policy, is refused as invalid, so the page can never build an
+ * `ENGAGE` the projection itself does not allow.
+ */
+function parseEncounterOffers(value: unknown): EncounterOffer[] {
+  if (value === undefined || value === null) return [];
+  return list({ offers: value }, 'offers', MAX_COMBAT_ROWS).map((entry): EncounterOffer => {
+    const row = record(entry, 'offers');
+    const participants = rowsOf(row, 'participants').map((who): EncounterOfferParticipant => ({
+      participantId: token(who, 'participantId', 200), side: choice(who, 'side', ['ally', 'hostile'] as const), zone: token(who, 'zone', 200) }));
+    const openingPolicy = choice(row, 'openingPolicy', COMBAT_OPENING_POLICIES);
+    const openingTargets = identifiers(row, 'openingTargets');
+    const hostile = new Set(participants.filter((who) => who.side === 'hostile').map((who) => who.participantId));
+    if ((openingPolicy === 'forbidden' && openingTargets.length > 0) || !openingTargets.every((target) => hostile.has(target))) invalid('openingTargets');
+    return {
+      templateId: token(row, 'templateId', 256), playerZone: token(row, 'playerZone', 200), participants,
+      escapeZones: identifiers(row, 'escapeZones'),
+      objectives: rowsOf(row, 'objectives').map((stake) => ({
+        objectiveId: token(stake, 'objectiveId', 200), kind: choice(stake, 'kind', COMBAT_OBJECTIVE_KINDS), zone: optionalToken(stake, 'zone', 200),
+        participantId: optionalToken(stake, 'participantId', 200), rounds: optionalCount(stake, 'rounds') })),
+      openingPolicy, openingTargets,
+    };
+  });
+}
+
+/**
+ * Validate a combat projection body against the route's scope (docs/13 "P12.1-A combat projection", P13.2-B offers).
  *
  * @param value decoded JSON body of the encounter endpoint
  * @param adventureId adventure requested by the route
  * @param campaignId campaign requested by the route
- * @throws CampaignProtocolError `invalid` for a foreign scope, an unknown enumeration or an oversized list
+ * @throws CampaignProtocolError `invalid` for a foreign scope, an unknown enumeration, an oversized list, an offer during a fight,
+ *         a repeated offer or an opening target the offer does not allow
  */
 export function parseCombatView(value: unknown, adventureId: string, campaignId: string): CombatView {
   const source = record(value, 'encounter');
   const scope = record(source['scope'], 'scope');
   if (uuid(scope, 'adventureId') !== adventureId || uuid(scope, 'campaignId') !== campaignId) invalid('scope');
   const stateRevision = count(scope, 'stateRevision');
-  if (source['encounter'] === null || source['encounter'] === undefined) return { stateRevision, encounter: null };
+  const offers = parseEncounterOffers(source['offers']);
+  if (new Set(offers.map((offer) => offer.templateId)).size !== offers.length) invalid('offers');
+  if (source['encounter'] === null || source['encounter'] === undefined) return { stateRevision, encounter: null, offers };
+  if (offers.length > 0) invalid('offers');
   const fight = record(source['encounter'], 'encounter');
   const player = record(fight['player'], 'player');
   const acting = optionalToken(fight, 'acting', 200);
@@ -959,6 +1014,7 @@ export function parseCombatView(value: unknown, adventureId: string, campaignId:
   const options = parseCombatOptions(fight['options'] ?? {});
   return {
     stateRevision,
+    offers,
     encounter: {
       encounterId: uuid(fight, 'encounterId'), phase: choice(fight, 'phase', COMBAT_PHASES), round: count(fight, 'round'), roundCap: count(fight, 'roundCap'),
       acting, actionPoints, actionPointsPerActivation: count(fight, 'actionPointsPerActivation'), playerDecision,

@@ -56,13 +56,14 @@ export function state(options: { fallback?: boolean; locale?: string; situation?
 /**
  * Combat projection body (P12.1) as the backend writes it: round 2 of a fight at the player's own decision, two zones and a
  * blocked tower, a hostile sentry whose defenses the player assessed in round 1, an ally, and one candidate of each family
- * including disabled ones. `verdict` shows the fight decided and waiting for settlement; `none` is the body outside a fight.
+ * including disabled ones. `verdict` shows the fight decided and waiting for settlement; `none` is the body outside a fight, which
+ * with `offers` names the two encounters of {@link offeredEncounters} (P13.2-B). A fight's body always has empty offers.
  */
-export function encounterBody(options: { verdict?: boolean; none?: boolean; offer?: boolean } = {}) {
+export function encounterBody(options: { verdict?: boolean; none?: boolean; offer?: boolean; offers?: boolean } = {}) {
   const scope = { adventureId: ADVENTURE, campaignId: CAMPAIGN, contentRevisionId: OP2, stateRevision: 2 };
-  if (options.none) return { scope, mode: 'EXPLORATION', encounter: null };
+  if (options.none) return { scope, mode: 'EXPLORATION', encounter: null, offers: options.offers ? offeredEncounters() : [] };
   const decided = options.verdict === true;
-  return { scope, mode: 'ENCOUNTER', encounter: {
+  return { scope, mode: 'ENCOUNTER', offers: [], encounter: {
     encounterId: OP2, templateId: 'gate-fight', phase: decided ? 'OUTCOME_PENDING' : 'AWAITING_ACTION', round: 2, roundCap: 8,
     acting: decided ? null : 'player', actionPoints: decided ? null : 2, actionPointsPerActivation: 3, playerDecision: !decided,
     initiative: [{ rank: 0, participantId: 'player', initiative: 14 }, { rank: 1, participantId: 'sentry', initiative: 9 }, { rank: 2, participantId: 'scout', initiative: 7 }],
@@ -92,6 +93,23 @@ export function encounterBody(options: { verdict?: boolean; none?: boolean; offe
       ...(options.offer ? { offer: { offerId: 'offer-1', actionId: 'plead', recipientId: 'sentry', response: 'OFFERED',
         terms: { termsId: 'toll', kind: 'pay', cost: 1 }, canAccept: true } } : {}) },
     outcome: decided ? { outcome: 'VICTORY', objectiveId: null, objectives: [{ objectiveId: 'clear', status: 'met' }] } : null } };
+}
+
+/**
+ * Offers outside a fight as the backend writes them (P13.2-B): an ambush that may open with an attack on the raider, with an ally,
+ * an escape zone and two stakes, and a parley that cannot be opened by an attack and has neither escape zones nor objectives.
+ */
+export function offeredEncounters() {
+  return [
+    { templateId: 'trail-ambush', playerZone: 'entry',
+      participants: [{ participantId: 'raider', side: 'hostile', zone: 'yard' }, { participantId: 'keeper', side: 'ally', zone: 'entry' }],
+      escapeZones: ['escape-route'],
+      objectives: [{ objectiveId: 'drive-off', kind: 'defeatHostiles', zone: null, participantId: null, rounds: null },
+        { objectiveId: 'hold', kind: 'survive', zone: null, participantId: null, rounds: 3 }],
+      openingPolicy: 'initiative', openingTargets: ['raider'] },
+    { templateId: 'toll-parley', playerZone: 'gate', participants: [{ participantId: 'smuggler', side: 'hostile', zone: 'booth' }],
+      escapeZones: [], objectives: [], openingPolicy: 'forbidden', openingTargets: [] },
+  ];
 }
 
 /** Resume card body (P09.5); `paused` adds a missing-content diagnosis, `awaiting` one owed narration, `fight` an active encounter. */
