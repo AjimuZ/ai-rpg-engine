@@ -103,6 +103,28 @@ describe('Settlement rules', /** The one choice of a decided fight is built only
   });
 });
 
+describe('Initiative rules', /** A fight just entered offers exactly one choice: the explicit roll (P14.1-A.2). */ () => {
+  const entered = () => fight((body) => {
+    Object.assign(body['encounter'], { phase: 'ENTERING', round: 0, acting: null, actionPoints: null, playerDecision: false, initiative: [], options: null });
+  });
+
+  it('builds ROLL_INITIATIVE with an empty payload only for an entered fight and lists nothing else there', /** Closed payload. */ () => {
+    const resolved = resolveChoice(entered(), { kind: 'roll' });
+    if (!resolved.ok) throw new Error(resolved.refusal);
+    expect(resolved.command).toEqual({ commandType: 'ROLL_INITIATIVE', payload: {} });
+    expect([resolved.preview.points, resolved.preview.endsTurn, resolved.preview.rolls, resolved.preview.settles]).toEqual([0, false, true, false]);
+    expect(tacticalEntries(entered()).map((item) => item.key)).toEqual(['roll']);
+  });
+
+  it('refuses the roll once round one is open and every other choice before it', /** No out-of-turn command. */ () => {
+    expect(resolveChoice(fight(), { kind: 'roll' })).toEqual({ ok: false, refusal: 'NOT_LISTED' });
+    expect(resolveChoice(null, { kind: 'roll' })).toEqual({ ok: false, refusal: 'NOT_LISTED' });
+    expect(resolveChoice(entered(), { kind: 'end' })).toEqual({ ok: false, refusal: 'NOT_YOUR_TURN' });
+    expect(resolveChoice(entered(), { kind: 'speak', recipientId: 'sentry', text: 'Hello' })).toEqual({ ok: false, refusal: 'NOT_YOUR_TURN' });
+    expect(tacticalEntries(fight()).some((item) => item.key === 'roll')).toBe(false);
+  });
+});
+
 describe('Combat chat in the playthrough view', /** Draft first, review next, send only on confirmation. */ () => {
   let server: CampaignServer;
   /** The device storage, shared by the page loads of one test so a reload sees what the first load kept. */
@@ -167,6 +189,9 @@ describe('Combat chat in the playthrough view', /** Draft first, review next, se
     expect(lines).toEqual(['Said · Mara says to sentry: "Stand down."', 'Reply · sentry refuses plead: the fight goes on.']);
     expect([...root.querySelectorAll('#combat-chat-recipient option')].map((o) => (o.textContent ?? '').trim()))
       .toEqual(['Nobody chosen', 'sentry · Hostile', 'scout · Ally']);
+    // The log role is allowed on a wrapper only, never on the ordered list itself (axe aria-allowed-role, found in the live fight).
+    const log = root.querySelector('[data-chat-lines]')!;
+    expect([log.localName, log.getAttribute('role'), log.querySelectorAll(':scope > ol').length]).toEqual(['div', 'log', 1]);
     expect(server.commands).toEqual([]);
   });
 

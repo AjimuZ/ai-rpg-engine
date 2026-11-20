@@ -5358,6 +5358,93 @@ this update. No combat runtime/browser result is claimed.
         and pack import diagnostics are not offered.
       - The Italian slice, the second genre, localized terminology, a complete fight and the return to exploration
         (the rest of P14.1) remain open.
+  - P14.1-A.2 (20 November 2026, partial; this box stays unchecked): the fantasy slice ran in Chrome against the packaged
+    application's live API, in English and in Italian, from the creation screens to the return to exploration.
+    - **Missing piece found and added.** The first live run created a playthrough and started the bundled `ford-ambush`
+      fight from the page, then stalled: the fight waits at `ENTERING`, round 0, for `ROLL_INITIATIVE`, and the page had no
+      way to send it (docs/13 had listed this as "Not done"). The combat panel now lists one choice there, "Roll
+      initiative" (`combat-actions.ts`: `kind: 'roll'`, `awaitsInitiative`, preview flag `rolls`). It builds the empty
+      `ROLL_INITIATIVE` payload only at `ENTERING`, round 0 and no outcome, behind the same review, confirmation and
+      request-identity path as the other actions. Two messages (`combat.rollOption`, `combat.rollBinds`) have Italian
+      targets with one author pass and no independent review; the catalog went from 736 to 738 (`italian-variant.spec.ts`,
+      `frontend/src/locale/README.md`).
+    - **Accessibility defect found live and fixed.** Axe reported `aria-allowed-role` (minor) on the combat conversation log
+      in an Italian and an English fight: `role="log"` sat on an `<ol>`. It is now on a wrapper `<div>` around the list.
+      `combat-chat.spec.ts` asserts the wrapper and the single list. The same journey passed this check after the rebuild.
+    - **Commands.**
+      - `sh ./start.sh` (image built from this tree three times: as found, after the roll control, after the log fix).
+        Each build runs the frontend tests, `test:i18n`, `build:locales` and `PackagedSecretsTest` inside the image. The
+        second build's output was read in full: 233 tests in 24 files, parity of 738 messages, 4 packaged-secret tests.
+        The third build's output was trimmed to its last lines, so its counts were not read; it succeeded. Gameplay stayed
+        "NOT ready" because no runtime account is signed in, as expected.
+      - `node .local/scratch/p141a2/journey.mjs` (private, ignored script using `.agents/ralph/browser/browser.mjs`, host
+        Chrome in a temporary profile; every API reply came from the container). Final run: **80 of 80 checks passed**,
+        with 12 recorded observations.
+      - `sh ./start.sh --stop`.
+      - `sh .agents/ralph/verify.sh frontend` after the last code edit: `VERIFY PASSED` (install, typecheck, test, i18n,
+        build and locales PASS; Vitest log: 24 files, 233 tests passed). After the documentation changes,
+        `sh .agents/ralph/verify.sh repo` printed `VERIFY PASSED` (diff-check, line-endings, repository-checks,
+        repository-tests and backup-tests PASS).
+    - **What the final journey showed (live).**
+      - Run 1, English, one browser profile:
+        - Library, saved adventure and creation screens produced one playthrough (`POST /api/v1/campaigns` 201). The live
+          view showed the sample's own starting text tagged `en` with no fallback note, "Ford Camp", no pause notice and
+          the character sheet naming Mara. Send stayed disabled. Axe found nothing.
+        - A keyboard draft with a selection of 10–17 was saved on the device.
+        - "Look for fights you can start here" offered `ford-ambush`. A cancelled review sent nothing. The confirmed
+          start was the second write (`ENGAGE`). The send list then held exactly one choice, `roll`. The roll was the third
+          write, round 1 opened at the player's turn, and the initiative order listed both sides.
+        - The player moved, then switched EN to IT through Settings in the middle of the fight. After the reload the
+          stream resumed with `after=` the saved cursor, the draft and selection survived, the three operations kept
+          their identities and order, no write was sent, and the combat panel read in reviewed Italian ("Ordine di
+          iniziativa", "Round 1 di …"). The fight went on in Italian to a verdict (this run: strike, end turn, strike,
+          move to the reeds, outcome ESCAPE). The only choice then was "Concludi lo scontro".
+        - IT back to EN: the stream resumed after the newest cursor, draft and selection survived again, and the verdict
+          still waited. Settling was sent once, with a review saying it returns to the story. The combat panel
+          disappeared, the resume card read "Encounter: None" with the fight lookup available again, and the event
+          history recorded the settled escape.
+        - The nine writes were, in order, `CREATE`, `ENGAGE`, `ROLL_INITIATIVE`, `MOVE_ZONE`, `STRIKE`, `END_ACTIVATION`,
+          `STRIKE`, `MOVE_ZONE`, `SETTLE_ENCOUNTER`. Each was one explicit confirmation, each request identity was used
+          once, and no request body carried the draft.
+        - Axe found nothing in the fight, in Italian and after the return. 390 px showed no horizontal overflow in any of
+          the four layouts checked.
+      - Run 2, Italian from the first screen: the creation asked for Italian narration. The sample has no Italian text, so
+        the passage was English with the reviewed Italian notice about the original language. The roll label and review
+        were Italian, the fight ended (this run: a defeat, "Sconfitta") and was settled once, exploration returned, no
+        English interface sentence leaked, the draft survived, and axe and 390 px were clean.
+    - **Earlier runs of the same journey, for the record.** The first run of the journey failed 5 of 77 checks: the axe
+      finding above, a wrong operation count in my own script (3, not 4) and the console 404 (below). The second run after
+      the rebuild failed 2 of 78 checks because of the script: a panel check raced the page load, and the opponent won
+      initiative, so no strike was in reach. Those were corrected in the script, not by weakening a product check, and the
+      two runs after that passed in full (79 of 79, then 80 of 80). Dice decide who moves first and who wins: the English
+      fight ended in an escape in both full passes, the Italian fight of the final pass ended in a defeat, and the Italian
+      outcome of the 79-check pass was not captured.
+    - **Observations, not fixed.**
+      - Chrome requests `/favicon.ico` itself and the packaged origin answers 404 (confirmed with `fetch`), which is the
+        only console error. Nothing links an icon.
+      - Every action stayed `COMMITTED_NARRATION_PENDING` ("Saved; narration is pending") because no runtime account was
+        signed in. The saved results were complete, and the fight needed no narration.
+      - The playthrough list on the saved view still reads the creation title with "Turn 0, Decision pending" until a
+        reload, as recorded in the P05.6-A third checkpoint; not rechecked.
+    - **Acceptance criteria against the evidence.**
+      - The P05.6 Chrome journey reran against the live API and covered the draft, its selection, the operations and the
+        cursor. Not covered: a held long poll, chunked delivery and recreating the containers with the profile open (the
+        P05.6-A recreation step was not repeated).
+      - Exploration, combat, localized terminology and return to exploration passed in both languages. "Localized
+        terminology" is the interface's reviewed Italian. The sample's own names (for example "Ford Camp", `raider`, `camp`)
+        stay English, so no Italian adventure text exists to show.
+    - **Not proven.**
+      - The second genre fixture, an Italian-authored adventure and any pack-level localization (the pack format has no
+        locale overlay): the P14.1 task still names one slice per genre fixture.
+      - Independent review of the 22 + 2 new Italian targets. They are not in the docs/36 review kit table, and no screen
+        reader was run (axe is not one).
+      - A narrated fight: no runtime account was signed in. Narration, its renewal and `COMMITTED_NARRATION_PENDING`
+        resolution were not exercised.
+      - Defeat, victory by `defeatHostiles` and a long fight were each seen at most once by dice; no victory ending was
+        observed (escape and defeat were).
+      - Deliberate weakenings of the journey, `verify.sh full`, `verify.sh containers` and backend tests: not run (no
+        backend code changed).
+      - Nothing in the journey was repeated across a restart of the containers.
 - [ ] P14.2 Verify reboot, AI renewal, interrupted generation, lost response, backup restore, and no duplicate effects.
 - [ ] P14.3 Run the required reduced-scope MVP QA matrix and record fresh evidence.
 - [ ] P14.4 Measure baseline latency/context use and list unresolved defects honestly; demonstrate one optional bilingual baseline/planner investigation comparison when available, or record deferred/unavailable planning with the playable fallback. Advanced planning cannot block MVP.

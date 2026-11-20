@@ -76,6 +76,7 @@ export function combatLabels() {
     previewFinal: $localize`:@@combat.previewFinal:The game decides the result, and a sent action cannot be undone.`,
     confirm: $localize`:@@combat.confirm:Confirm and send`,
     settleBinds: $localize`:@@combat.settleBinds:Settling confirms the verdict, ends the fight and returns you to the story. It cannot be taken back.`,
+    rollBinds: $localize`:@@combat.rollBinds:Rolling initiative opens the first round. The game rolls and records the order, and it cannot be taken back.`,
     draftKept: $localize`:@@combat.draftKept:Your unsent words stay on this device through a reload or reconnect and are never sent automatically.`,
     cancel: $localize`:@@combat.cancel:Do not send`,
     sending: $localize`:@@combat.sending:Sending…`,
@@ -225,6 +226,7 @@ export function choiceMessage(choice: TacticalChoice, fight: CombatEncounter | n
     case 'guard': return $localize`:@@combat.guardOption:Take a guarded stance`;
     case 'end': return $localize`:@@combat.endOption:End your turn`;
     case 'settle': return $localize`:@@combat.settleOption:Settle the fight`;
+    case 'roll': return $localize`:@@combat.rollOption:Roll initiative`;
     case 'speak': return $localize`:@@combat.speakTo:Speak to ${participantName(choice.recipientId)}:recipient:`;
     case 'answer': return answerMessage(choice.decision, fight?.options?.offer?.terms.termsId ?? '?');
   }
@@ -234,6 +236,7 @@ export function choiceMessage(choice: TacticalChoice, fight: CombatEncounter | n
 export function phaseMessage(phase: Phase, playerDecision: boolean): string {
   switch (phase) {
     case 'PROPOSED': case 'VALIDATED': case 'REJECTED': case 'ENTERING':
+      // The sentence stays as is: at ENTERING the page also offers the roll, which the send list names.
       return $localize`:@@combat.phaseSetup:The fight is being set up.`;
     case 'ROUND_OPEN': case 'ACTOR_START': case 'RESOLVING': case 'ACTOR_END': case 'ROUND_END':
       return $localize`:@@combat.phaseRound:The round is being played.`;

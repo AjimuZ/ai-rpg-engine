@@ -22,7 +22,9 @@ export type TacticalChoice =
   /** The player's explicit answer to the offer on the table; the offer's identity comes from the projection, never from the page. */
   | { readonly kind: 'answer'; readonly decision: 'accept' | 'decline' }
   /** The player's explicit confirmation of a decided fight (P12.5-B); the encounter's identity comes from the projection. */
-  | { readonly kind: 'settle' };
+  | { readonly kind: 'settle' }
+  /** The player's explicit start of round one of a fight just entered (P14.1-A.2); the engine rolls and stores the order. */
+  | { readonly kind: 'roll' };
 
 /** Longest utterance the server accepts, in UTF-16 units (docs/07 P11.2). */
 export const MAX_SPEECH_TEXT = 500;
@@ -53,6 +55,8 @@ export interface TacticalPreview {
   readonly decision: 'accept' | 'decline' | null;
   /** True when the choice settles a decided fight: it spends nothing and ends the encounter for good. */
   readonly settles: boolean;
+  /** True when the choice rolls initiative for a fight just entered: it spends nothing and opens round one. */
+  readonly rolls: boolean;
 }
 
 /** The typed command a choice becomes. */
@@ -78,7 +82,16 @@ export function choiceKey(choice: TacticalChoice): string {
     case 'speak': return `speak:${choice.recipientId}:${choice.text}`;
     case 'answer': return `answer:${choice.decision}`;
     case 'settle': return 'settle';
+    case 'roll': return 'roll';
   }
+}
+
+/**
+ * True while an entered fight waits for the player's explicit initiative roll. The engine never rolls it by itself: the
+ * fight stays at phase `ENTERING` and round 0 until `ROLL_INITIATIVE` is committed, so no other decision exists then.
+ */
+export function awaitsInitiative(fight: CombatEncounter | null): boolean {
+  return fight !== null && fight.phase === 'ENTERING' && fight.round === 0 && fight.outcome === null;
 }
 
 /** True while the fight waits at its verdict for the player's explicit settlement; no tactical decision exists then. */
@@ -94,6 +107,8 @@ export function awaitsSettlement(fight: CombatEncounter | null): boolean {
 export function tacticalEntries(fight: CombatEncounter): TacticalEntry[] {
   // A decided fight offers exactly one choice, the explicit settlement; nothing else is legal at its verdict.
   if (awaitsSettlement(fight)) return [{ key: choiceKey({ kind: 'settle' }), choice: { kind: 'settle' }, disabled: null }];
+  // An entered fight offers exactly one choice too: the roll that opens round one.
+  if (awaitsInitiative(fight)) return [{ key: choiceKey({ kind: 'roll' }), choice: { kind: 'roll' }, disabled: null }];
   const options = fight.options;
   if (!fight.playerDecision || options === null) return [];
   const entries: TacticalEntry[] = [];
@@ -135,9 +150,18 @@ export function resolveChoice(fight: CombatEncounter | null, choice: TacticalCho
     if (fight === null || !awaitsSettlement(fight)) return refuse('NOT_LISTED');
     return {
       ok: true, command: { commandType: 'SETTLE_ENCOUNTER', payload: { encounterId: fight.encounterId } },
-      preview: { choice, points: 0, pointsAfter: 0, focus: 0, focusAfter: fight.player.focus, endsTurn: false, check: null, terms: null, speech: null, decision: null, settles: true },
+      preview: { choice, points: 0, pointsAfter: 0, focus: 0, focusAfter: fight.player.focus, endsTurn: false, check: null, terms: null, speech: null, decision: null, settles: true, rolls: false },
     };
   }
+  if (choice.kind === 'roll') {
+    // Rolling is listed only at the entered fight's first decision, so it is refused at any other phase and builds nothing.
+    if (fight === null || !awaitsInitiative(fight)) return refuse('NOT_LISTED');
+    return {
+      ok: true, command: { commandType: 'ROLL_INITIATIVE', payload: {} },
+      preview: { choice, points: 0, pointsAfter: 0, focus: 0, focusAfter: fight.player.focus, endsTurn: false, check: null, terms: null, speech: null, decision: null, settles: false, rolls: true },
+    };
+  }
+  if (awaitsInitiative(fight)) return refuse('NOT_YOUR_TURN');
   if (awaitsSettlement(fight)) return refuse('NOT_YOUR_TURN');
   const options = fight?.options ?? null;
   if (fight === null || !fight.playerDecision || options === null || fight.actionPoints === null) return refuse('NOT_YOUR_TURN');
@@ -227,7 +251,7 @@ export function resolveChoice(fight: CombatEncounter | null, choice: TacticalCho
   }
   if (!endsTurn && points > left) return refuse('ACTION_POINTS');
   if (focus > focusLeft) return refuse('FOCUS');
-  return { ok: true, command, preview: { choice, points, pointsAfter: endsTurn ? 0 : left - points, focus, focusAfter: focusLeft - focus, endsTurn, check, terms, speech, decision, settles: false } };
+  return { ok: true, command, preview: { choice, points, pointsAfter: endsTurn ? 0 : left - points, focus, focusAfter: focusLeft - focus, endsTurn, check, terms, speech, decision, settles: false, rolls: false } };
 }
 
 /** The request body of one command: the closed envelope of docs/13 section 3. */

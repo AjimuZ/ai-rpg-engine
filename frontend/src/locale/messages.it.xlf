@@ -5346,6 +5346,18 @@
       <target>Concludere conferma il verdetto, chiude lo scontro e ti riporta alla storia. Non si può annullare.</target>
       </segment>
     </unit>
+    <unit id="combat.rollOption">
+      <segment>
+        <source>Roll initiative</source>
+      <target>Tira l’iniziativa</target>
+      </segment>
+    </unit>
+    <unit id="combat.rollBinds">
+      <segment>
+        <source>Rolling initiative opens the first round. The game rolls and records the order, and it cannot be taken back.</source>
+      <target>Tirare l’iniziativa apre il primo round. Il gioco tira i dadi e registra l’ordine, e non si può annullare.</target>
+      </segment>
+    </unit>
     <unit id="combat.draftKept">
       <segment>
         <source>Your unsent words stay on this device through a reload or reconnect and are never sent automatically.</source>

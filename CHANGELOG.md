@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — A fight you can play from the browser (P14.1-A.2), 20 November 2026
+
+- After you start a fight, the combat panel now offers "Roll initiative" (Italian: "Tira l’iniziativa"). Before this, a
+  fight started from the page stopped at "Before the first round" and could not go on. The roll is sent only after you
+  review it and press "Confirm and send". Then you can move, attack, end your turn or slip away, and settle the verdict
+  to return to exploration.
+- The fight's conversation log no longer breaks an accessibility rule (the log role sat on a list). The screen looks the
+  same.
+- In Chrome against a packaged installation, one playthrough was created from the Lantern Ford screens and played in
+  English, with the language changed to Italian and back in the middle of the fight. A second was played in Italian from the
+  first screen. Both fights ended and returned to exploration. The draft, its selection, the actions list and the update
+  position survived each reload.
+- The sample's own text is English only, so an Italian playthrough shows it in English with a visible notice. Narration
+  was not available in these runs, so each action stayed "saved; narration is pending".
+
 ## Unreleased — Create a playthrough from the browser (P14.1-C), 20 November 2026
 
 - A saved adventure now has a "Create a new playthrough" link. The new screen lists the adventure's installed content

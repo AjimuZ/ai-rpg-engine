@@ -251,6 +251,7 @@ import {
                 <p data-review-action><strong>{{ label(shown.preview.choice) }}</strong></p>
                 <ul>
                   @if (shown.preview.settles) { <li data-review-settles>{{ t.settleBinds }}</li> }
+                  @else if (shown.preview.rolls) { <li data-review-rolls>{{ t.rollBinds }}</li> }
                   @else { <li data-review-points>{{ shown.preview.endsTurn ? endsTurnText(shown.preview.points) : spendText(shown.preview.points, shown.preview.pointsAfter) }}</li> }
                   @if (shown.preview.focus > 0) { <li data-review-focus>{{ spendFocusText(shown.preview.focus, shown.preview.focusAfter) }}</li> }
                   @if (shown.preview.check; as check) { <li data-review-check>{{ checkText(check) }}</li> }

@@ -85,11 +85,14 @@ export function knownRecipients(fight: CombatEncounter): string[] {
         <p class="muted">{{ t.chatHelp }}</p>
 
         <h4 id="combat-chat-lines-title">{{ t.transcriptTitle }}</h4>
-        <ol class="lines" role="log" aria-live="polite" tabindex="0" aria-labelledby="combat-chat-lines-title" [attr.lang]="journalLocale()" data-chat-lines>
-          @for (line of lines(); track line.sequence) {
-            <li [attr.data-line-kind]="line.kind"><strong>{{ kindText(line.kind) }}</strong> · {{ line.statement }}</li>
-          }
-        </ol>
+        <!-- The log role sits on a wrapper: an ordered list may not carry it (axe aria-allowed-role, seen in the live fight). -->
+        <div class="lines" role="log" aria-live="polite" tabindex="0" aria-labelledby="combat-chat-lines-title" [attr.lang]="journalLocale()" data-chat-lines>
+          <ol>
+            @for (line of lines(); track line.sequence) {
+              <li [attr.data-line-kind]="line.kind"><strong>{{ kindText(line.kind) }}</strong> · {{ line.statement }}</li>
+            }
+          </ol>
+        </div>
         @if (lines().length === 0) { <p class="muted" data-chat-empty>{{ t.noTranscript }}</p> }
 
         <label for="combat-chat-recipient">{{ t.recipientLabel }}</label>

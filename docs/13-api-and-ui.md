@@ -682,8 +682,13 @@ no route sends a reply and the page shows none). Draft persistence and the settl
   `{encounterId}` or `{encounterId, openingStrike}` through the same host path and identity rule as the named actions: a lost
   reply keeps the `requestId` for the same entry at the same revision. A refusal is worded ("That fight cannot be started now.
   Nothing changed." for `COMMAND_ENCOUNTER_UNAVAILABLE`).
-- **Not done.** After entry the fight waits at round 0 for `ROLL_INITIATIVE`, which the page cannot send. Offers are authored
-  templates only, not budget-checked and not composed by the encounter contract of P13.2-A.
+- **Initiative (P14.1-A.2).** After entry the fight waits at phase `ENTERING`, round 0, for `ROLL_INITIATIVE`; the engine never
+  rolls it by itself. The send list of the combat panel then holds exactly one choice, "Roll initiative" (`kind: 'roll'`,
+  `awaitsInitiative` in `combat-actions.ts`), built only while the projection reads `ENTERING`, round 0 and no outcome. Its review
+  says the roll opens the first round and cannot be taken back. Only "Confirm and send" posts `ROLL_INITIATIVE` with the empty
+  payload through the same host path and identity rule as the other actions; every other choice, and the roll at any other phase,
+  is refused locally with nothing sent. Two messages carry Italian targets (`combat.rollOption`, `combat.rollBinds`).
+- **Not done.** Offers are authored templates only, not budget-checked and not composed by the encounter contract of P13.2-A.
 
 ## 4. Stream contract
 

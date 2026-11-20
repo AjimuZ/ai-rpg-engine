@@ -28,7 +28,7 @@ The encounter proposals of ADR 0041 are not called by any planning path yet, so 
 
 - `CombatPanels.CombatPanel` gains `offers` (records `Offer`, `OfferParticipant`, `Stake`). The page gains `combat-entry.ts` and the `app-encounter-offers` list. No migration, command or route changed.
 - Offers are still unbudgeted authored templates: an offered template is not checked by `ThreatBudget`, and ADR 0041's proposals are not offered until a planning path calls them (P13.2, P13.3).
-- After `ENGAGE` the fight waits at round 0 for `ROLL_INITIATIVE`, which the page cannot send yet.
+- After `ENGAGE` the fight waits at round 0 for `ROLL_INITIATIVE`. The page could not send it when this record was written; since P14.1-A.2 the combat panel offers it as one reviewed "Roll initiative" choice (docs/13, "P13.2-B starting an offered fight").
 
 ## Verification
 

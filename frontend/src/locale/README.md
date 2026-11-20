@@ -69,6 +69,8 @@ first-pass fixes are by the same author line and are not independent.
 The saved-adventure playthrough creation screen (`src/app/library/playthrough-creation.ts`, P14.1-C) adds 22 messages
 (`newPlaythrough.*` and `saved.newPlaythrough`), so the catalog now holds 736 units. Those targets had one author pass,
 no independent review, and they are not yet in the review kit table either.
+The combat panel's initiative roll (P14.1-A.2) adds two more (`combat.rollOption` and `combat.rollBinds`), so the catalog
+now holds 738 units, with the same single author pass and no independent review.
 The Italian targets of those 77 messages (plus the
 reworded `saved.readOnly`) had one author review pass on 28 October 2026, which corrected
 11 targets (ambiguous `Ricevuta`, identical sentences for two narration reasons, `tempo di
