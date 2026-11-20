@@ -14,6 +14,8 @@ Since P13.2-A the proposal step exists as a contract and a pure decision that no
 
 Since P13.3-A the decided encounter is frozen once and admitted only when feasible for the player, again as pure code that nothing calls yet ([ADR 0043](adr/0043-planned-encounters-are-frozen-once-and-admitted-only-when-feasible.md)); see sections 3 and 5.
 
+Since P13.4-A challenge rewards settle once per challenge source and loot changes owner only by an explicit claim, again as pure code that nothing calls yet ([ADR 0044](adr/0044-challenge-keyed-rewards-and-claimed-loot.md)); see section 8.
+
 ## 2. Encounter input snapshot
 
 Capture pack/ruleset hashes, source revision, scene tags, known threats, participating actors, health and resource ratios, conditions, equipped and accessible items, ammunition, learned abilities, skill ranks, party size, mobility, damage/defense coverage, escape options, objective, recent challenge history, and selected difficulty policy.
@@ -125,6 +127,20 @@ Since P10.2 the creation primitive exists: units that enter a campaign are writt
 Since P10.3 quest rewards use that primitive: an ending quest settles its item rewards once for the protagonist under the source key `quest:<quest id>:outcome`, and the settlement is unique per source and recipient, so a returning player, a replayed request or a restored save cannot pay it twice. The same table will carry `challengeSourceId` settlements for encounters (P13.4); a quest key and a challenge key are distinct sources, which is how a quest milestone can pay in addition to the fight's XP.
 
 A quest and its associated fight may refer to the same `challengeSourceId`. The default policy awards that challenge XP once; a separate quest milestone can reward an additional distinct objective. Do not duplicate rewards through aliases, repeated journal views, respawn abuse, or restore/retry delivery.
+
+**Implemented (P13.4-A), pure and not yet called** ([ADR 0044](adr/0044-challenge-keyed-rewards-and-claimed-loot.md)).
+
+- **Challenge rewards.** `ChallengeRewards.plan(recipient, settled, claims)` takes the source keys the recipient's ledger already holds and a list of endings. It returns each owed settlement once and the reason for every part that pays nothing.
+  - A declared `Source` has a `challengeSourceId`, a magnitude (minor 10, standard 20, major 35 XP, section 9), the outcomes that earn it and reward-table items.
+  - A challenge settles under `challenge:<challengeSourceId>` for the first claim that earns it. The claim is either a fight whose verdict is in the policy (by default victory, hostile surrender, objective or agreement; an escape only when declared; never a defeat or the player's surrender) or a completed quest naming the source.
+  - Every later claim on that key is `ALREADY_SETTLED`: the same template entered again, an alias template, the quest after the fight, or a replay. A loss is `NOT_EARNED` and leaves the challenge open.
+  - A quest's own milestone XP and items settle under its existing `quest:<questId>:outcome` key.
+  - Each settlement carries a canonical ledger form (`xp`, `items`, origin, `challengeSourceId`). The ledger's unique key refuses a plan read from a stale ledger.
+- **Loot.** `EncounterLoot.open(encounterId, outcome, standings, holdings)` turns each holding carried into the fight into one lot.
+  - Only a hostile left defeated gives `AVAILABLE` lots, owned by nobody, its equipped items included. Allies and active, escaped and surrendered opponents keep theirs, and nothing opens after a defeat or the player's surrender.
+  - `claim(lotId, recipient)` moves a whole lot once as a transfer with source key `loot:<encounterId>:<lotId>`, recording any unequip. A held, claimed or unknown lot is refused.
+  - No claim creates or loses a unit.
+- **Not implemented.** No pack declares a reward source or a participant's holdings. `SETTLE_ENCOUNTER` and quest endings do not call the planner, so quest endings still settle as in P10.3. XP is not accumulated into levels. Containers, partial lot claims and campaign-scoped holdings are missing.
 
 ## 9. Default advancement proposal
 

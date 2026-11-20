@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Fight and quest rewards paid once, and loot collected explicitly (P13.4-A), 20 November 2026
+
+- The engine can now work out the rewards a finished fight or quest owes, so that each challenge pays its experience and
+  reward items only once. This holds whether you win the fight, make the opponents surrender, reach the fight's goal, agree a
+  truce, or finish a quest about the same challenge. Fighting the same opponents again, a second fight that counts as the
+  same challenge, re-reading the journal or retrying a request pays nothing more.
+- Losing or surrendering earns nothing, and the challenge stays open for a later win. A quest can still pay its own separate
+  reward on top of the fight's.
+- What a defeated opponent carried, worn items included, is left to collect. Nobody owns it until someone picks it up, and
+  each item can be picked up only once. Opponents that are still fighting, fled or surrendered keep their belongings, so an
+  item a living opponent still wears never ends up in your pack. Nothing is left to collect when you lose the fight.
+- Nothing changes in play yet: adventures do not declare these rewards or what opponents carry, and finishing a fight or a
+  quest does not use these rules yet. No database migration, route or page changed.
+
 ## Unreleased — Planned fights frozen once and refused when unwinnable or unfair (P13.3-A), 20 November 2026
 
 - A fight the engine plans is now fixed once, exactly as it would start, and only that fixed version can start. If the party

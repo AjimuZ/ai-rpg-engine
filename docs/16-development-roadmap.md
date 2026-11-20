@@ -5080,6 +5080,60 @@ this update. No combat runtime/browser result is claimed.
       actually held, statistic bands per tier and campaign-scoped identities.
     - Not run by this session: `verify.sh full`, `verify.sh containers`, other backend classes and deliberate weakenings.
 - [ ] P13.4 Implement challenge-source rewards, loot ownership, cumulative thresholds, training, unlocks, and pending purchases.
+  - P13.4-A, challenge-source rewards and loot ownership, 20 November 2026 (the P13.4 box stays unchecked: this story does
+    not finish it; [ADR 0044](adr/0044-challenge-keyed-rewards-and-claimed-loot.md)).
+    - **Rewards.** New pure `progression/ChallengeRewards.plan(recipient, settled, claims)`:
+      - A `Source` declares a `challengeSourceId`, a magnitude (minor 10, standard 20, major 35 XP), the outcomes that earn
+        it and reward-table items. The default policy is `VICTORY`, `HOSTILE_SURRENDER`, `OBJECTIVE` and `AGREEMENT`;
+        `ESCAPE` earns only when declared; `DEFEAT` and `PLAYER_SURRENDER` are refused in a declaration.
+      - A challenge settles under `challenge:<challengeSourceId>` for the first claim that earns it, a `Fight` verdict in
+        the policy or a completed `Quest` naming the source. Every later claim on the key, in the plan or in the ledger, is
+        `ALREADY_SETTLED`. A claim that does not earn it is `NOT_EARNED` and leaves it open.
+      - A quest milestone (its own XP and items) settles under the existing `quest:<questId>:outcome` key.
+      - Each settlement carries a canonical ledger form with `xp`, `items`, its origin and `challengeSourceId`.
+    - **Loot.** New pure `progression/EncounterLoot`:
+      - `open(encounterId, outcome, standings, holdings)` makes each holding exactly one lot. Only a hostile left `DEFEATED`
+        gives `AVAILABLE` lots, owned by nobody, equipped ones included. Nothing opens after `DEFEAT` or `PLAYER_SURRENDER`.
+      - `Loot.claim(lotId, recipient)` moves a whole lot once as a `Transfer` with source key `loot:<encounterId>:<lotId>`
+        and the unequip flag. It refuses `NOT_AVAILABLE`, `ALREADY_CLAIMED` (also for the same recipient) and `UNKNOWN_LOT`.
+      - `units()` per definition never changes.
+    - **Unchanged.** No migration, pack schema, command, route, page or existing test changed.
+    - **Documents.** CHANGELOG, backend README, docs/12 sections 1 and 8, the progression package documentation, ADR 0044
+      and its index.
+  - Tests (new):
+    - `ChallengeRewardsTest` (5):
+      - a won fight settles `challenge:bandit-camp` once with 20 XP, its item and the exact ledger form;
+      - the fight and its quest pay the challenge once in either order, the milestone pays besides (30 XP), and a ledger
+        holding the keys pays nothing (3 skips);
+      - a respawned fight, an alias source and a repeated quest pay nothing more, while a companion's own ledger pays once;
+      - a defeat, the player's surrender, an undeclared escape and a failed quest are `NOT_EARNED` and a later hostile
+        surrender still earns; a declared escape earns and a victory outside that policy does not;
+      - malformed declarations are refused.
+    - `EncounterLootTest` (4):
+      - only the defeated raider's blade and coin open; the active archer's equipped bow, the surrendered captain's blade and
+        the fallen ally's rope are `NOT_AVAILABLE`;
+      - a claim gives the exact `Transfer`, a second claim by anybody is `ALREADY_CLAIMED`, the original value is unchanged
+        and the units (blade 2, bow 1, coin 15, rope 1) are conserved;
+      - nothing opens after a defeat or surrender of the player, while an escape, agreement or objective opens both lots;
+      - inconsistent inputs are refused.
+  - Verification (20 November 2026, Windows reference host):
+    - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=ChallengeRewardsTest,EncounterLootTest`
+      first failed to compile: a private helper named `items` clashed with the records' `items()` accessor. It was renamed.
+    - The rerun printed `VERIFY PASSED (-Dtest=ChallengeRewardsTest,EncounterLootTest)` (backend-sources,
+      backend-database and backend-focused all PASS). The focused Maven log reports `Tests run: 9, Failures: 0, Errors: 0,
+      Skipped: 0` (5 + 4) and `BUILD SUCCESS`.
+    - After the documentation changes, `py -B tools/repository_checks/checks.py all` printed `all: 0 finding(s)`, and
+      `git diff --check HEAD` printed nothing.
+  - Not proven:
+    - Nothing calls either class: `SETTLE_ENCOUNTER` settles no reward and quest endings still settle as in P10.3, so no
+      reward is deduplicated in play and no ledger row is written by this code. That a stale plan fails its commit rests on
+      the existing unique key and `ResolvedCommit` rule, not on a test of this story.
+    - No pack declares a reward source, a quest's shared challenge or participant holdings, and no pack validation exists
+      for them.
+    - XP is not accumulated into levels: cumulative thresholds, training, unlocks and pending purchases remain P13.4 work.
+    - Containers, partial lot claims and campaign-scoped holdings are not covered. Loot of a re-entered template is only exact
+      once holdings come from campaign actors.
+    - Not run by this session: `verify.sh full`, `verify.sh containers`, other backend classes and deliberate weakenings.
 - [ ] P13.5 Add advancement preview and comparison without automatic player build changes.
 
 **Exit:** two eligible scenes yield valid varied encounters; settlement and progression use actual final state exactly once. **Checks:** QA-14–15, no-ammunition/low-health parties, multi-threshold awards, quest/fight reward deduplication. **Suggested commit:** `Add bounded dynamic encounters and character advancement`.

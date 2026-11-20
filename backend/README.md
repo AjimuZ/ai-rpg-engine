@@ -1462,6 +1462,35 @@ Limits: nothing calls the admission, so no planned encounter is entered or store
 templates are not checked. Reinforcement phases do not exist in pack data, so no phase is validated. No migration, route or
 command changed.
 
+### Challenge rewards and loot ownership (P13.4-A)
+
+`progression/ChallengeRewards.plan(recipient, settled, claims)` takes the recipient's settled source keys and a list of
+endings, `Fight` (frozen encounter ID, declared `Source`, verdict) or `Quest` (ID, outcome, completed, optional shared
+`Source`, milestone XP and items). It returns each owed `Settlement` once with its canonical ledger form, and a `Skip` for
+every part that pays nothing.
+
+- A challenge pays its XP (minor 10, standard 20, major 35) and reward-table items under `challenge:<challengeSourceId>`.
+  Only the first claim that earns it pays: a fight whose verdict is in the source's policy (default victory, hostile
+  surrender, objective, agreement) or a completed quest naming it.
+- Re-entered fights, alias templates, the quest after its fight and replays are `ALREADY_SETTLED`. A loss is `NOT_EARNED`
+  and leaves the challenge open.
+- A quest milestone settles under `quest:<questId>:outcome`, a distinct source.
+
+`progression/EncounterLoot.open(encounterId, outcome, standings, holdings)` makes each holding one lot.
+
+- Only a defeated hostile's lots are `AVAILABLE`, owned by nobody, and none opens after `DEFEAT` or `PLAYER_SURRENDER`.
+- `Loot.claim(lotId, recipient)` moves a whole lot once (`Transfer`, source key `loot:<encounterId>:<lotId>`). It refuses
+  `NOT_AVAILABLE`, `ALREADY_CLAIMED` and `UNKNOWN_LOT`.
+- `Loot.units()` is unchanged by any claim.
+
+The decision is [ADR 0044](../docs/adr/0044-challenge-keyed-rewards-and-claimed-loot.md).
+
+Tests: `ChallengeRewardsTest` (5) and `EncounterLootTest` (4).
+
+Limits: nothing calls either class. No pack declares a reward source or participant holdings, `SETTLE_ENCOUNTER` settles no
+reward, quest endings still settle as in P10.3, and XP does not accumulate into levels. No migration, pack schema, route or
+command changed.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.
