@@ -14,7 +14,8 @@
  * {@link StoryInputState}; the draft is never sent automatically. The only writes are the player's own words sent with the Send
  * button to the person who spoke last ({@link CampaignPlaythrough.sendReply}, P17.3-B), a named combat action the player reviewed
  * and confirmed in the combat panel ({@link CampaignPlaythrough.send}, P12.2-A) and the start of an offered fight confirmed in the
- * offers list ({@link CampaignPlaythrough.engage}, P13.2-B). The stream/status reads go through
+ * offers list ({@link CampaignPlaythrough.engage}, P13.2-B), plus a request for a runtime image that the player starts with its button
+ * in {@link RuntimeArtwork} (P17.6-C), which changes no game state. The stream/status reads go through
  * {@link CampaignSession}, which persists the operation identities and cursor so the explicit
  * EN↔IT reload resumes without duplicating or dropping deliveries.
  */
@@ -27,6 +28,7 @@ import { ArtworkIndex } from './campaign-artwork';
 import { CombatPanel } from './combat-panel';
 import { CampaignCues } from './campaign-cues';
 import { CampaignStory } from './campaign-story';
+import { RuntimeArtwork } from './runtime-artwork';
 import { OfferedReply, offeredReplies, replyRecipient, speakCommand, storyEntries } from './campaign-story-model';
 import {
   awaitingMessage, campaignErrorMessage, commandTypeLabel, decisionMessage, dependencyIssueMessage, fallbackNotice, languageName,
@@ -58,7 +60,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 
 /** Show a playthrough's authorized public projection and follow its resumable stream while mounted. */
 @Component({
-  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CampaignPanels, CampaignCues, CampaignStory, CombatPanel, EncounterOffers, MusicPanel],
+  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CampaignPanels, CampaignCues, CampaignStory, CombatPanel, EncounterOffers, MusicPanel, RuntimeArtwork],
   template: `
     <section class="panel campaign-playthrough" [attr.data-campaign-id]="campaignId()" aria-labelledby="campaign-title">
       @if (view(); as current) {
@@ -127,6 +129,9 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
           <app-encounter-offers [view]="combat()" [sending]="sending()" [problem]="problem()" (confirmed)="engage($event)" (dismissed)="problem.set(null)" />
         }
         <app-campaign-panels [panels]="panels()" [artwork]="shownArtwork()" [older]="older()" [nextBefore]="cursor()" [loadingOlder]="loadingOlder()" (olderRequested)="loadOlder()" />
+        @if (imagesShown()) {
+          <app-runtime-artwork [scope]="scope()" [revision]="panels()?.stateRevision ?? null" (ready)="reloadArtwork()" />
+        }
       } @else if (failure()) { <p class="notice" role="alert" data-error>{{ failure() }}</p>
       } @else { <p role="status" i18n="@@campaign.view.loading">Loading the playthrough…</p> }
 
@@ -207,6 +212,8 @@ export class CampaignPlaythrough {
    * on the screen (the gallery and the item icons included), so the panels then show their built-in text and icon fallbacks.
    */
   readonly shownArtwork = computed(() => this.reading.readingLayout() === 'text-focused' ? null : this.artwork());
+  /** Whether the runtime artwork section is shown (P17.6-C): only where images are drawn, so the text-focused layout asks for none. */
+  readonly imagesShown = computed(() => this.reading.readingLayout() !== 'text-focused');
   /** Combat projection of the shown revision (P12.1-B); read only while the resume card reports a fight, null otherwise. */
   readonly combat = signal<CombatView | null>(null);
   /** Older journal pages fetched on request, newest first; cleared whenever the first page is re-read. */
@@ -564,6 +571,20 @@ export class CampaignPlaythrough {
 
   /** Check once for updates now; the continuous follower resumes by itself. */
   refresh(): void { this.start(this.scope()); }
+
+  /**
+   * Re-read the artwork listing after the runtime artwork section reports a new image (P17.6-C), so it replaces the fallback in
+   * the story and the panels. Art is decoration: a failed read keeps what is shown.
+   */
+  async reloadArtwork(): Promise<void> {
+    const run = this.run;
+    if (run === undefined) return;
+    const scope = this.scope();
+    try {
+      const entries = await this.transport.artwork(scope, run.signal);
+      if (!run.signal.aborted) this.artwork.set(new ArtworkIndex(entries, scope));
+    } catch { /* The shown artwork and its fallbacks stay. */ }
+  }
 
   /** Localized text helpers for the template; each returns display text only. */
   /** Localized kind label of a quick reply, so its kind never relies on colour. */

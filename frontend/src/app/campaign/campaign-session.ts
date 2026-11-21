@@ -11,9 +11,10 @@
  * never apply a message twice, including presentation cues, which take the same path and are then kept
  * in memory by {@link CueState} (ordered, deduplicated by delivery identity and never persisted, so a
  * reload does not replay them). The narration an operation published is read by identity and kept in memory too
- * ({@link CampaignSession.readNarration}, P17.3-B). There are exactly two writes: {@link CampaignTransport.submit}, called after an explicit
- * confirmation of a previewed tactical action (P12.2-A), and {@link CampaignTransport.create}, called only when the player
- * submits the playthrough creation form (P14.1-C) and repeated with the same request identity after a lost reply. Nothing
+ * ({@link CampaignSession.readNarration}, P17.3-B). There are exactly three writes: {@link CampaignTransport.submit}, called after an explicit
+ * confirmation of a previewed tactical action (P12.2-A), {@link CampaignTransport.create}, called only when the player
+ * submits the playthrough creation form (P14.1-C) and repeated with the same request identity after a lost reply, and
+ * {@link CampaignTransport.requestImage}, called only from a runtime artwork button (P17.6-C); it changes no game state. Nothing
  * here submits a draft or anything on its own.
  */
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
@@ -26,6 +27,7 @@ import {
 import { PackMusic, parseMusicListing } from '../music/music-pack';
 import { CommandEnvelope } from './combat-actions';
 import { CueState } from './presentation-cues';
+import { ImageAnswer, ImageCategory, ImageRequests, parseImageAnswer, parseImageRequests } from './runtime-artwork-protocol';
 
 /** Adventure and campaign identity; display names never address a record. */
 export interface CampaignScope { readonly adventureId: string; readonly campaignId: string }
@@ -140,6 +142,37 @@ export class CampaignTransport {
   async music(scope: CampaignScope, signal: AbortSignal): Promise<PackMusic> {
     const body = await this.json(`/api/v1/campaigns/${scope.campaignId}/music?adventureId=${scope.adventureId}`, signal);
     return parseMusicListing(body, scope.adventureId, scope.campaignId);
+  }
+
+  /**
+   * Read the subjects the player sees now with the state of their art, the image capability and the budget (P17.6-C). Reading
+   * it never asks for an image to be made.
+   */
+  async imageRequests(scope: CampaignScope, signal: AbortSignal): Promise<ImageRequests> {
+    const body = await this.json(`/api/v1/campaigns/${scope.campaignId}/artwork/requests?adventureId=${scope.adventureId}`, signal);
+    return parseImageRequests(body, scope.adventureId, scope.campaignId);
+  }
+
+  /**
+   * Ask for the image of one subject the player sees now (P17.6-C), called only from its button in the runtime artwork section.
+   * Only the category and the subject reference are sent; the server builds the appearance from public pack fields. Repeating
+   * the call after a lost reply is safe: an equal request joins the job already running. A 403 renews the session once.
+   *
+   * @throws CampaignProtocolError `api` with the stable code for a refusal (nothing was queued), `unavailable` when the request
+   *   could not be made or its reply was lost, `invalid` for a reply that is not the documented answer
+   */
+  async requestImage(scope: CampaignScope, category: ImageCategory, subject: string, signal: AbortSignal): Promise<ImageAnswer> {
+    const path = `/api/v1/campaigns/${scope.campaignId}/artwork/requests?adventureId=${scope.adventureId}`;
+    const body = { category, subject };
+    let response = await this.post(path, body, await this.csrf(false, signal), signal);
+    if (response.status === 403) response = await this.post(path, body, await this.csrf(true, signal), signal);
+    if (response.status !== 200 && response.status !== 202) throw await this.failure(response);
+    if (!(response.headers.get('Content-Type') ?? '').toLowerCase().startsWith('application/json')) {
+      throw new CampaignProtocolError('invalid', 'Reply is not JSON');
+    }
+    let reply: unknown;
+    try { reply = await response.json(); } catch { throw new CampaignProtocolError(signal.aborted ? 'aborted' : 'unavailable', 'Image reply lost'); }
+    return parseImageAnswer(reply);
   }
 
   /** Read and validate the player-safe combat projection of one scope (P12.1); reading it never advances time or submits anything. */

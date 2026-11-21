@@ -6291,5 +6291,266 @@
       <target>La risposta si è persa, quindi le tue parole potrebbero essere arrivate o no. Premi di nuovo Invia: viene ripetuta la stessa richiesta e nulla viene contato due volte.</target>
       </segment>
     </unit>
+    <unit id="campaign.artwork.title">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:31</note>
+      </notes>
+      <segment>
+        <source>New artwork</source>
+      <target>Nuove illustrazioni</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.help">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:34</note>
+      </notes>
+      <segment>
+        <source>Ask for an image of what you see now. Play goes on while it is made, and the story does not change.</source>
+      <target>Chiedi un'immagine di ciò che vedi ora. Il gioco continua mentre viene creata e la storia non cambia.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.ask">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:71</note>
+      </notes>
+      <segment>
+        <source>Ask for an image</source>
+      <target>Chiedi un'immagine</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.retry">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:72</note>
+      </notes>
+      <segment>
+        <source>Try again</source>
+      <target>Riprova</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.listFailed">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:73</note>
+      </notes>
+      <segment>
+        <source>New artwork cannot be listed right now. The shown art and the built-in fallbacks stay.</source>
+      <target>Al momento non è possibile elencare le nuove illustrazioni. Restano le illustrazioni mostrate e le alternative integrate.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.outOfView">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:128</note>
+      </notes>
+      <segment>
+        <source>This is no longer in view, so no image was asked for.</source>
+      <target>Non è più in vista, quindi non è stata chiesta nessuna immagine.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.lost">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:131</note>
+      </notes>
+      <segment>
+        <source>The request may not have arrived. The list is read again; asking again is safe.</source>
+      <target>La richiesta potrebbe non essere arrivata. L'elenco viene letto di nuovo; chiedere ancora è sicuro.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.budget">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:144</note>
+      </notes>
+      <segment>
+        <source>Images asked for in this period: <ph id="0" equiv="charged" disp="charged"/> of <ph id="1" equiv="limit" disp="limit"/>.</source>
+      <target>Immagini chieste in questo periodo: <ph id="0" equiv="charged" disp="charged"/> su <ph id="1" equiv="limit" disp="limit"/>.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.scene">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:148</note>
+      </notes>
+      <segment>
+        <source>Scene</source>
+      <target>Scena</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.portrait">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:149</note>
+      </notes>
+      <segment>
+        <source>Portrait</source>
+      <target>Ritratto</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.item">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:149</note>
+      </notes>
+      <segment>
+        <source>Item</source>
+      <target>Oggetto</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.pending">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:154</note>
+      </notes>
+      <segment>
+        <source>Being made…</source>
+      <target>In creazione…</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.ready">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:155</note>
+      </notes>
+      <segment>
+        <source>Ready</source>
+      <target>Pronta</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.missing">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:157</note>
+      </notes>
+      <segment>
+        <source>No image yet</source>
+      <target>Ancora nessuna immagine</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.retryLabel">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:164</note>
+      </notes>
+      <segment>
+        <source>Try again to make an image of <ph id="0" equiv="label" disp="label"/></source>
+      <target>Riprova a creare un'immagine di <ph id="0" equiv="label" disp="label"/></target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.askLabel">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:165</note>
+      </notes>
+      <segment>
+        <source>Ask for an image of <ph id="0" equiv="label" disp="label"/></source>
+      <target>Chiedi un'immagine di <ph id="0" equiv="label" disp="label"/></target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.disabled">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:235</note>
+      </notes>
+      <segment>
+        <source>Making new images is turned off. The built-in art and fallbacks stay, and play goes on.</source>
+      <target>La creazione di nuove immagini è disattivata. Restano le illustrazioni integrate e le alternative, e il gioco continua.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.unavailable">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:239</note>
+      </notes>
+      <segment>
+        <source>No image service is set up, so no new image can be made. The built-in art and fallbacks stay, and play goes on.</source>
+      <target>Nessun servizio di immagini è configurato, quindi non si possono creare nuove immagini. Restano le illustrazioni integrate e le alternative, e il gioco continua.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.readyNotice">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:242</note>
+      </notes>
+      <segment>
+        <source>Image ready: <ph id="0" equiv="label" disp="label"/></source>
+      <target>Immagine pronta: <ph id="0" equiv="label" disp="label"/></target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.failedNotice">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:244</note>
+      </notes>
+      <segment>
+        <source>No image could be made: <ph id="0" equiv="label" disp="label"/></source>
+      <target>Non è stato possibile creare l'immagine: <ph id="0" equiv="label" disp="label"/></target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.failedTimeout">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:249</note>
+      </notes>
+      <segment>
+        <source>Could not be made: it took too long.</source>
+      <target>Non è stato possibile crearla: ci è voluto troppo tempo.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.failedStale">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:250</note>
+      </notes>
+      <segment>
+        <source>Could not be made: it arrived after things changed, so it was not used.</source>
+      <target>Non è stato possibile crearla: è arrivata dopo che la situazione era cambiata, quindi non è stata usata.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.failed">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:251</note>
+      </notes>
+      <segment>
+        <source>Could not be made.</source>
+      <target>Non è stato possibile crearla.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.queued">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:258</note>
+      </notes>
+      <segment>
+        <source>Asked. The image is being made; you can keep playing.</source>
+      <target>Richiesta inviata. L'immagine è in creazione; puoi continuare a giocare.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.coalesced">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:259</note>
+      </notes>
+      <segment>
+        <source>This image is already being made; you can keep playing.</source>
+      <target>Questa immagine è già in creazione; puoi continuare a giocare.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.reused">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:260</note>
+      </notes>
+      <segment>
+        <source>This image already exists and is shown.</source>
+      <target>Questa immagine esiste già ed è mostrata.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.newer">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:261</note>
+      </notes>
+      <segment>
+        <source>A newer image of this is already shown.</source>
+      <target>È già mostrata un'immagine più recente.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.queueFull">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:264</note>
+      </notes>
+      <segment>
+        <source>Too many images are waiting for this playthrough. Try again when one is ready.</source>
+      <target>Troppe immagini sono in attesa per questa partita. Riprova quando una sarà pronta.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.artwork.budgetSpent">
+      <notes>
+        <note category="location">src/app/campaign/runtime-artwork.ts:265</note>
+      </notes>
+      <segment>
+        <source>The image limit for this period is used up. The fallback stays; try again later.</source>
+      <target>Il limite di immagini per questo periodo è esaurito. Resta l'alternativa; riprova più tardi.</target>
+      </segment>
+    </unit>
   </file>
 </xliff>

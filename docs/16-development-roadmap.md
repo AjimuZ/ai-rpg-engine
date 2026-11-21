@@ -7691,6 +7691,72 @@ this update. No combat runtime/browser result is claimed.
         same-name adventure switching were not run.
       - Concurrent requests from several threads were not tested, and the timeout case is timing-based.
       - `verify.sh full` and `containers` were not run here (the runner runs them).
+  - P17.6-C (21 November 2026): the playthrough screen requests runtime scene, portrait and item images through
+    `RuntimeImageJobs` and shows their pending, ready and error states. The box stays unchecked: this story does not finish P17.6.
+    - **Delivered.**
+      - New `RuntimeImageRequests` (`org.rpgengine.assets`), the game flow. It lists the subjects the player sees now: the scene of
+        the current location, the portrait of each actor the player saw there and has not since found absent (the resume card's
+        rule; subject = actor ID, as the story's portrait lookup uses), and the art of each carried item definition. For each it
+        reports `missing`, `pending`, `ready` or `failed` with a fixed code.
+      - Only the root pack's definitions are eligible, and a location or NPC with `knowledge: secret` never is. The appearance
+        text is built on the server from public fields only: a location's `description`, an NPC's `role` and `description`, an
+        item's `appearance.summary`. Every subject is appearance revision 1, so pack-authored art is reused, never replaced.
+      - New `RuntimeImageController`: `GET /api/v1/campaigns/{campaignId}/artwork/requests?adventureId=` lists them with the
+        capability (`enabled`, `disabled`, `unavailable`) and the budget. `POST` on the same path with exactly
+        `{"category","subject"}` asks for one image. The client cannot send appearance text: an extra field is a 400. A subject
+        out of view, hidden or unknown and a foreign scope all get the same 404 `ARTWORK_SUBJECT_UNAVAILABLE`. A refusal by the
+        job service (`disabled`, `unavailable`, `queue-full`, `budget-exhausted`) is a 200 that names it.
+      - `RuntimeImageJobs.capability()` was added. Job states are held in memory (at most 2048 subjects).
+      - Interface: new `frontend/src/app/campaign/runtime-artwork.ts` (section "New artwork") and
+        `runtime-artwork-protocol.ts` (strict parsers). The transport gained `imageRequests` and `requestImage`.
+      - The section lists the subjects with their state and the budget, and a button per missing or failed subject sends one
+        request; nothing is requested automatically. While a job is pending it re-reads the list every 3 s, at most 400 times per
+        revision. When a subject turns ready it re-reads the artwork listing, so the image replaces the fallback in the story and
+        the panels.
+      - Disabled or unavailable generation shows a note and no button. A failed read shows a note and is not retried for a 404,
+        a 403 or an invalid reply. The text-focused layout shows no section and reads nothing.
+      - 29 new messages with Italian targets.
+    - **Tests.**
+      - New `RuntimeImageRequestsTest`, 2 tests on real PostgreSQL with a scripted image port.
+        - `requestsVisibleSubjectsWithPublicAppearanceAndReportsTheirState`: the exact listing (scene, the seen public NPC,
+          three carried items, the authored sword `READY`). The exact prompts for scene, portrait and item use only the public
+          fields. States go pending → ready and pending → failed (`image-server-busy`); an unsafe backend code becomes
+          `image-job-failed`. The sword is `REUSED`. The hidden NPC, the far bank, an uncarried item, an NPC definition ID and
+          a foreign owner are refused. No prompt holds the secret description, the item description, the campaign ID or the
+          actor name.
+        - `leavesPlayOnFallbackArtWithoutCapabilityOrBudget`: `DISABLED`, `UNAVAILABLE` and `BUDGET_EXHAUSTED` leave the
+          subject `missing` and store nothing. Over HTTP with the packaged default, the GET answers `disabled` and the POST
+          answers 200 `disabled`. A hidden NPC and an unknown subject get byte-identical 404 bodies. A body carrying
+          `appearance` is a 400.
+      - New `runtime-artwork.spec.ts`, 16 tests (parser refusals, including an extra `appearance` field).
+        - The screen asks only on a click (body `{category, subject}` with the CSRF token), shows pending with the composer
+          still present, then ready with the scene image replacing the fallback in the story.
+        - A failure shows its reason and Try again; `budget-exhausted` shows a note.
+        - Disabled shows no button and keeps the fallbacks. A 404 list is not retried. The text-focused layout reads nothing.
+      - Existing specs: the recorded-transcript server answers the new GET with the packaged default (`disabled`, no subject).
+        This follows the artwork and music listings; the real route's subjects for that campaign are not recorded. The Italian
+        catalog count in `italian-variant.spec.ts` went from 791 to 820.
+    - **Commands and results.**
+      - `sh .agents/ralph/verify.sh backend -Dtest=RuntimeImageRequestsTest` → `VERIFY PASSED`, `Tests run: 2, Failures: 0,
+        Errors: 0, Skipped: 0`, first run.
+      - `sh .agents/ralph/verify.sh frontend`: the first run failed 6 tests. They were the catalog count, unrecorded requests
+        in the two transcript specs, and three new tests that had no narration on screen. The fixes were the count, the
+        transcript answer and the fixture; no assertion was weakened. The second run gave `VERIFY PASSED (frontend)`:
+        typecheck, test (33 files, 324 tests), i18n, build and locales.
+    - **Not proven or not done.**
+      - No real image backend and no packaged browser run. A scripted port stood in for the backend, and a simulated server
+        for the screen.
+      - Which layer kept the hidden NPC out was not separated: perception may already not record a sighting of it, so the
+        `knowledge: secret` filter itself may not be the one exercised.
+      - No deliberate weakenings were run for this story.
+      - `RuntimeImageJobsTest` and `ManagedAssetsTest` were not re-run after the additive `capability()` method.
+      - Labels and appearance text are in the pack's source language, not localized. Dependency-pack definitions are never
+        eligible. A revealed secret NPC never gets a runtime portrait.
+      - Job states and charges are in memory: a restart or eviction shows a running job's subject as missing; asking again
+        coalesces into it.
+      - No shop flow exists, so no shop listing requests images. There is no change-art or reroll action.
+      - Still open from P17.6-A: per-category pack policy, acceptance review, provenance, durable jobs, QA-31/QA-33 as a whole,
+        `verify.sh full` and `containers` (the runner runs them).
 - [ ] P17.7 Qualify optional local EN/IT speech with admitted model/voice licenses, stable voice identities, accepted-line audio caching and shared GPU limits under QA-38; ship disabled with tested text-only fallback if hardware/rights/quality gates fail. No TTS prerequisite for core v1.
 - [ ] P17.8 Research and qualify a concrete optional local EN/IT STT backend against exact code/weight/dependency rights, bounded capture/cancel interfaces, offline behavior, platform packaging and measured CPU/RAM/GPU/latency budgets; no recognizer is selected by the design alone.
   **Requires tasks:** P21.4.

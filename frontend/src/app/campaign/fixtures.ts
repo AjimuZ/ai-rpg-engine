@@ -209,6 +209,15 @@ export class CampaignServer {
   commandReply: () => Response = () => json(operation(OP1, 'COMMITTED', 1, true), 202);
   /** While set, state reads wait for it, so a test can render the page between a commit and its re-read. */
   stateHold: Promise<void> | null = null;
+  /**
+   * Runtime artwork listing (P17.6-C), called on every read so a test can change it between polls; null answers 404, as for a
+   * server without the route, which leaves every earlier screen test unchanged.
+   */
+  imageRequestsBody: (() => unknown) | null = null;
+  /** Image requests received (P17.6-C) with their CSRF header and decoded body, in order. */
+  readonly imageAsks: { readonly csrf: string | undefined; readonly body: Record<string, any> }[] = [];
+  /** Reply to an image request; throwing a TypeError models a lost reply. */
+  imageReply: () => Response = () => json({ code: 'ARTWORK_SUBJECT_UNAVAILABLE' }, 404);
 
   readonly fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = String(input);
@@ -231,6 +240,13 @@ export class CampaignServer {
     if (url.includes('/panels?')) {
       const before = /[?&]before=(\d+)/.exec(url);
       return Promise.resolve(json(before ? this.olderPages.get(Number(before[1])) ?? { code: 'CAMPAIGN_SCOPE_UNAVAILABLE' } : this.panelsBody));
+    }
+    if (url.includes('/artwork/requests?')) {
+      if (init?.method === 'POST') {
+        this.imageAsks.push({ csrf: (init.headers as Record<string, string> | undefined)?.['X-CSRF-Token'], body: JSON.parse(String(init.body)) });
+        try { return Promise.resolve(this.imageReply()); } catch (error) { return Promise.reject(error); }
+      }
+      return Promise.resolve(this.imageRequestsBody === null ? json({ code: 'ARTWORK_SUBJECT_UNAVAILABLE' }, 404) : json(this.imageRequestsBody()));
     }
     if (url.includes('/artwork?')) return Promise.resolve(json(this.artworkBody));
     if (url.includes('/music?')) return Promise.resolve(json(this.musicBody));

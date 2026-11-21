@@ -81,6 +81,8 @@ changes, rights date and the credits of the visit), so the catalog now holds 776
 same single author pass and no independent review; the credit data of the reviewed tracks is shown verbatim and marked `lang="en"`.
 The reading tokens and read-back of the story screen (P17.3-A) add nine more (`settings.spacing*`, `settings.measure*` and
 `story.previously`), so the catalog now holds 785 units, with the same single author pass and no independent review.
+The runtime artwork section of the playthrough screen (P17.6-C) adds 29 `campaign.artwork.*` messages, so the catalog now
+holds 820 units (`italian-variant.spec.ts` pins the count), with the same single author pass and no independent review.
 The Italian targets of those 77 messages (plus the
 reworded `saved.readOnly`) had one author review pass on 28 October 2026, which corrected
 11 targets (ambiguous `Ricevuta`, identical sentences for two narration reasons, `tempo di

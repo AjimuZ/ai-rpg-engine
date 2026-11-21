@@ -423,6 +423,27 @@ public class RuntimeImageJobs implements AutoCloseable {
         return true;
     }
 
+    /** Whether {@link #request} can queue anything at all, as a screen shows it before the player asks (P17.6-C). */
+    public enum Capability {
+        /** The owner enabled generation and an image port exists. */
+        ENABLED,
+        /** The owner has not enabled generation; every request is {@link Admission#DISABLED}. */
+        DISABLED,
+        /** No image capability is configured, or the service closed; every request is {@link Admission#UNAVAILABLE}. */
+        UNAVAILABLE
+    }
+
+    /**
+     * @return the capability {@link #request} applies to scene, portrait and item requests, checked in the same order:
+     *         the owner switch first, then the port and the closed state
+     */
+    public synchronized Capability capability() {
+        if (!settings.enabled()) {
+            return Capability.DISABLED;
+        }
+        return port == null || closed ? Capability.UNAVAILABLE : Capability.ENABLED;
+    }
+
     /** @return the campaign's charges in the current window, its waiting jobs and whether one runs */
     public synchronized Budget budget(UUID campaign) {
         Objects.requireNonNull(campaign, "campaign");

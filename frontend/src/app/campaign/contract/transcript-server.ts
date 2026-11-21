@@ -77,6 +77,12 @@ export class TranscriptServer {
       // that declares no music: no policy and no track.
       return Promise.resolve(new Response(JSON.stringify({ scope: SCOPE, policy: null, tracks: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     }
+    if (!answer && method === 'GET' && path === `/api/v1/campaigns/${CAMPAIGN}/artwork/requests?adventureId=${ADVENTURE}`) {
+      // The runtime artwork listing (P17.6-C) postdates the transcript as well. It is answered with the packaged default, where
+      // generation is off (`disabled`), an unused default budget and no subject; the subject list itself is not recorded.
+      return Promise.resolve(new Response(JSON.stringify({ scope: SCOPE, capability: 'disabled',
+        budget: { charged: 0, limit: 12, queued: 0, running: false }, subjects: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    }
     if (!answer) {
       this.unrecorded.push(`${method} ${path}`);
       return Promise.reject(new TypeError('Request was not recorded from the real server'));

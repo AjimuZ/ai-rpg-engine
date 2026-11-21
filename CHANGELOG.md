@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Ask for scene, portrait and item images during play (P17.6-C), 21 November 2026
+
+- The playthrough screen has a "New artwork" section. It lists the current place, the people you have seen there and the items
+  you carry, each marked as having no image yet, being made, ready, or failed with a reason, plus how many images were asked
+  for in the current budget period. A button asks for one image; nothing is requested on its own. You can keep reading and
+  sending while it is made, and a ready image replaces the built-in fallback in the story and the panels.
+- The engine builds each image description itself from the adventure's public text only: a place's description, a person's
+  role and description, an item's appearance summary. A hidden place or person is never listed, and the browser cannot send
+  its own description. Art the adventure already ships is reused, never regenerated.
+- Image creation stays off by default. When it is off, when no image service is set up or when the budget is used up, the
+  section says so and play goes on with the fallback art. The text-focused layout shows no section.
+- New routes `GET` and `POST /api/v1/campaigns/{campaignId}/artwork/requests`. Not proven: a real image backend and a run in
+  the packaged browser.
+
 ## Unreleased — Bounded runtime image jobs (P17.6-A), 21 November 2026
 
 - The backend can now turn a request for a missing scene, portrait or item image into at most one generation, store the

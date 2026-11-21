@@ -221,7 +221,7 @@ pipeline, catalog/category UI fallback and QA-31 remain undelivered.
 
 **Local capability (ADR 0021, worker packaged in P21.5-A, the rest planned in P21.5):** neither agent runtime supplies images, so the supported capability for P17.6 is a local image worker with the owner's chosen checkpoint (recommended default WAI-illustrious-SDXL v17.0), the owner's own A1111-compatible server, or a hosted images API with an owner key. All of them follow this pipeline's authority, budget, provenance and fallback rules ([inference backends](34-inference-backends-and-model-selection.md)).
 
-**Image-generation port (P21.5-B.2, implemented; no runtime job uses it yet):** P17.6 builds the runtime image jobs on one backend-neutral port, `ImageGenerationPort` in `org.rpgengine.inference`. A job submits an `ImageRequest` and gets an `ImageHandle` with a result stage and `cancel`. The request holds the prompt, negative prompt, an optional checkpoint name, the size, steps, guidance, an explicit seed and an optional sampler, and nothing else: no session, actor, scene, entity or canonical state ever reaches a backend, and the port changes no authority rule. The result is `COMPLETED`, `CANCELLED` or `FAILED` with a fixed code, and never completes exceptionally. A completed result carries a PNG that the adapter checked against the request (signature, size, chunk CRCs, pixel stream, text and EXIF chunks removed) and an `ImageProvenance` with the backend, the settings sent, SHA-256 hashes of both prompts and of the output, the output size and the checkpoint hash the server reported, never prompt text. The `a1111-http` adapter implements it, and since P21.4-D so does the `local-image` adapter over the packaged worker, which exists only behind its address and the admission switch. Since P17.6-A the runtime image jobs below provide the one-active-job-per-campaign limit, coalescing and storage in the asset registry; acceptance review and a game flow that requests images remain P17.6 work. Details and limits are in [docs/34 section 8](34-inference-backends-and-model-selection.md#8-local-image-worker-profile).
+**Image-generation port (P21.5-B.2, implemented; no runtime job uses it yet):** P17.6 builds the runtime image jobs on one backend-neutral port, `ImageGenerationPort` in `org.rpgengine.inference`. A job submits an `ImageRequest` and gets an `ImageHandle` with a result stage and `cancel`. The request holds the prompt, negative prompt, an optional checkpoint name, the size, steps, guidance, an explicit seed and an optional sampler, and nothing else: no session, actor, scene, entity or canonical state ever reaches a backend, and the port changes no authority rule. The result is `COMPLETED`, `CANCELLED` or `FAILED` with a fixed code, and never completes exceptionally. A completed result carries a PNG that the adapter checked against the request (signature, size, chunk CRCs, pixel stream, text and EXIF chunks removed) and an `ImageProvenance` with the backend, the settings sent, SHA-256 hashes of both prompts and of the output, the output size and the checkpoint hash the server reported, never prompt text. The `a1111-http` adapter implements it, and since P21.4-D so does the `local-image` adapter over the packaged worker, which exists only behind its address and the admission switch. Since P17.6-A the runtime image jobs below provide the one-active-job-per-campaign limit, coalescing and storage in the asset registry, and since P17.6-C the playthrough screen requests images through them; acceptance review remains P17.6 work. Details and limits are in [docs/34 section 8](34-inference-backends-and-model-selection.md#8-local-image-worker-profile).
 
 **Runtime image jobs (P17.6-A, 21 November 2026; implemented in the backend, no caller yet):** `RuntimeImageJobs` in
 `org.rpgengine.assets` takes a request for one subject's identifying image (category `scene`, `portrait` or `item`, stable
@@ -240,9 +240,41 @@ revision, pinned pack revision and recovery generation read at request time. So 
 request in force, another pack revision, or an installation restore (new `STALE_GENERATION` verdict) keeps it out of
 storage. An image that arrives after a cancel or after the running timeout (600 s by default) is dropped. Jobs run through
 `ImageAdmission` as `SPECULATIVE` work. Limits: jobs and charges are in memory, so a restart forgets queued work and resets
-the window. No game flow, route or screen requests images, so no pending state is shown. Nothing checks that the
-appearance text is public; that is the caller's contract. There is no pack policy per category, no acceptance review and
-no provenance stored with the asset. Tests: `RuntimeImageJobsTest` on a scripted port.
+the window. The service itself does not check that the appearance text is public; that is the caller's contract, which
+the game flow below keeps. There is no pack policy per category, no acceptance review and no provenance stored with the
+asset. Tests: `RuntimeImageJobsTest` on a scripted port.
+
+**Requesting images during play (P17.6-C, 21 November 2026; implemented, scripted port and simulated screen only):**
+`RuntimeImageRequests` is the game flow that calls the jobs above. It lists what the player sees now:
+- the scene of the current location;
+- the portrait of each actor the player saw there and has not since found absent (subject = actor ID, the story's portrait
+  lookup);
+- the art of each carried item definition.
+
+Only definitions of the pinned root pack qualify, and a location or NPC with `knowledge: secret` never does. The server builds
+the appearance text from public fields only: a location's `description`, an NPC's `role` and `description`, an item's
+`appearance.summary`. Item descriptions, facts, goals, names and campaign rows never enter it. Every subject is appearance
+revision 1, the pinned revision's own, so authored pack art is reused and never regenerated.
+
+`GET /api/v1/campaigns/{campaignId}/artwork/requests?adventureId=` returns the subjects with `missing`, `pending`, `ready` or
+`failed` (and a fixed code), the capability (`enabled`, `disabled`, `unavailable`) and the budget. A `POST` on the same path
+with exactly `{"category","subject"}` asks for one image. The client cannot send appearance text. A hidden, unknown or
+out-of-view subject and a foreign scope all get the same 404. A refusal by the job service is a 200 naming it (see
+[docs/13](13-api-and-ui.md)).
+
+The playthrough screen's "New artwork" section lists these subjects and their budget. Each missing or failed subject has a
+button; nothing is requested automatically. While a job is pending the section re-reads the list every 3 s (at most 400 times
+per revision), and a ready image replaces the fallback in the story and the panels. Disabled or unavailable generation, a spent
+budget and a failed read only change that section's text, while reading, Send and the fallbacks stay as they are. The
+text-focused layout shows no section and reads nothing.
+
+Limits:
+- labels and prompts are in the pack's source language;
+- a revealed secret NPC never gets a runtime portrait;
+- job states are in memory (at most 2048 subjects);
+- no shop flow, no change-art action, no real backend or packaged browser run.
+
+Tests: `RuntimeImageRequestsTest` and `frontend/src/app/campaign/runtime-artwork.spec.ts`.
 
 Pack/owner policy chooses `disabled`, `catalogOnly` or `bounded` by category. The owner enables generation explicitly and sets request/concurrency/budget limits before calls. Default to one active image job per campaign, coalesce duplicate requests and enforce a finite queue; the actual limits and provider behavior require implementation evidence. Do not generate a shop's entire unseen catalog merely because a panel opened.
 
