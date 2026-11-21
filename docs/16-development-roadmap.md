@@ -7478,7 +7478,41 @@ this update. No combat runtime/browser result is claimed.
       screen-reader review; reading backwards one passage at a time; the saved-adventure intro still says "Sending actions in the
       browser is not connected yet." (known defect, unchanged); `sh .agents/ralph/verify.sh full` and `containers` were not run by
       this session (the runner runs them).
-- [ ] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.
+- [x] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.
+  - P17.4-A (21 November 2026): QA-25 browser evidence for the routed screens of the unlocalized build, and one blocking defect
+    fixed. Windows 11, installed Chrome driven through the private tools in `.agents/ralph/browser/` (Playwright, fresh profile).
+    - **Check.** New `frontend/tools/accessibility-check.mjs` serves `frontend/dist/engine-ui/browser` on loopback (every `/api/`
+      request answers 404, so each screen shows its own no-server state) and opens 11 routes: library, settings, interface-kit, the
+      mosslight story, create, sheet, inventory, journal, guide and creative screens, and a saved-adventure URL. Five profiles:
+      desktop 1280x800; narrow 390x844; reflow 320x256 CSS pixels (what a 400% zoom of a 1280x1024 window leaves); reduced motion
+      emulated at 1280x800; root font size 200% followed by the WCAG text-spacing overrides. Every profile checks console errors (only
+      the stand-in server's 404 answers tolerated), one h1, one main, document language, horizontal overflow, clipped text and axe.
+      Desktop, narrow and reduced motion also walk the page with Tab (skip link first, a visible focus indicator and an on-screen
+      element at every stop, every tabbable control reached, no trap); desktop also presses Enter on the skip link; reduced motion
+      also checks `prefers-reduced-motion` matches with no running animation and no smooth scrolling. A last pass reads Chrome's
+      accessibility tree per screen and requires every control to have a name.
+    - **Defect found and fixed.** The first run of the full script against the build as it stood printed `352 PASS, 11 FAIL`: on
+      every screen Enter on "Skip to content" navigated to `/` (`before: /settings, after: /`), because the document base is `/` and a
+      bare `#main` resolves against it. Fixed in `frontend/src/app/app.html`: the link's click is cancelled and focuses `main`.
+      New spec `frontend/src/app/app-shell.spec.ts` (click default prevented, `main#main` focused).
+    - **Commands and results.**
+      - `node frontend/tools/accessibility-check.mjs` on the old build → `352 PASS, 11 FAIL` (all 11 the skip link, as above).
+      - `sh .agents/ralph/verify.sh frontend` → `VERIFY PASSED (frontend)` (install, typecheck, test, i18n, build, locales all PASS;
+        the step output printed no test count, so none is recorded here).
+      - `sh .agents/ralph/verify.sh repo` after the documentation edits → `VERIFY PASSED (repo)` (five steps PASS).
+      - `node frontend/tools/accessibility-check.mjs .local/scratch/qa25` on the rebuilt output → `363 PASS, 0 FAIL`. Two full-page
+        screenshots of the story at 390 px and 320 px were looked at: scene, passage, Continue, chronicle, suggestions and composer
+        all readable, nothing cut off. (Run-to-run harness corrections before that were mine, not the page's: a keyboard walk that
+        started inside `main` after the skip link, and a tree check that required the unnamed main landmark to be named.)
+    - **Screen-reader coverage: none.** No screen reader (NVDA, JAWS, VoiceOver, TalkBack, Narrator) was run. The accessibility tree
+      shows roles and names offered to assistive technology; that is not what a screen reader announces, and axe is not one either.
+    - **Not proven.** Keyboard-only creation, play and a fight with real data (the screens ran without a server; the earlier
+      P14.3-A journey and `reading-journey.mjs` cover keyboard paths on other builds); real browser zoom (the viewport width is
+      emulated, text size by a root font-size override, so a stored `px` reading size is not scaled by it); the Italian build; the live
+      campaign screen with real narration (owner gate P17.3-O) and the packaged installation (`live-screen-check.mjs` and
+      `./start.sh` were not run here); focus return from dialogs, since no screen under test opens one; text and non-text contrast
+      beyond axe's color-contrast rule, and any human visual review beyond the two screenshots; Firefox, Safari, touch devices and
+      forced-colors rendering; `sh .agents/ralph/verify.sh full` and `containers` (the runner runs them).
 - [ ] P17.5 Verify missing art/audio never blocks play and media cannot reveal secrets.
 - [ ] P17.6 Implement bounded runtime scene/portrait/item image jobs using verified capability, public appearance inputs, stable identities, durable saved assets, budget limits, deduplication and restore/stale-result checks under QA-31.
   **Requires tasks:** P21.5.

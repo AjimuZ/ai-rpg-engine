@@ -964,7 +964,12 @@ compiled locale variants.
 - Audio is optional, user-activated, independently adjustable, and never required for clues.
 - Dynamic music uses the reviewed catalog and complete current-track/Music Credits treatment in [music and credits](24-dynamic-music-and-credits.md); ordinary play cannot trigger unapproved remote requests.
 
+The "Skip to content" link moves focus to the main region and never follows its anchor: the document base is `/`, so a bare
+`#main` would leave the current screen for the application root (found and fixed by the P17.4-A browser check).
+
 These are targets requiring actual browser and assistive-technology review. A stylesheet or DOM unit test does not certify accessibility.
+`frontend/tools/accessibility-check.mjs` (P17.4-A) is the repeatable real-browser check of the routed screens: desktop, 390 px,
+the 320 px reflow width, reduced motion and enlarged text, with axe and a Tab walk. It is not a screen-reader review.
 
 ## 10. Frontend state ownership
 

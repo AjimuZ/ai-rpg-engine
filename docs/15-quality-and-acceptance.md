@@ -1835,6 +1835,17 @@ installation without a runtime (27 PASS: no story, no chip, no recipient, Send d
 with narration from a real signed-in runtime, a real server round trip of the reply, assistive-technology review and a human
 visual review remain open (owner gate P17.3-O), so full QA-29 is not claimed.
 
+P17.4-A records QA-25 browser evidence with `node frontend/tools/accessibility-check.mjs` (363 checks, 363 PASS on 21 November 2026
+after one fix; the same script found 11 FAIL on the build before it): 11 routed screens of the unlocalized build in English, each in
+five profiles (desktop 1280x800; narrow 390x844; reflow 320x256 CSS pixels, the width a 400% zoom of a 1280 px window leaves;
+reduced motion emulated; root text 200% then the WCAG text-spacing overrides), with axe, horizontal overflow, clipped text and the
+Tab order (skip link first, a visible focus indicator at every stop, every tabbable control reached, no trap). The defect it found
+and that is fixed: "Skip to content" followed `#main` against `<base href="/">` and left every screen for the application root.
+Screen-reader coverage: none. Chrome's accessibility tree was read (every control is named; heading and navigation landmarks
+exist), which shows what assistive technology is offered, not what NVDA, JAWS, VoiceOver or TalkBack would say. QA-25 stays open
+for keyboard-only creation and fight with real data, real browser zoom, the Italian build, the live campaign screen with real
+narration, a human contrast and visual review, and a screen reader.
+
 P05.7-B.2.2 records QA-40 evidence for presentation cues; the point-by-point map to
 backend tests, frontend tests and the browser check is in the
 [roadmap](16-development-roadmap.md) entry of that name. The browser check ran the

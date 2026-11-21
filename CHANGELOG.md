@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Real accessibility and viewport checks (P17.4-A), 21 November 2026
+
+- "Skip to content" now moves focus to the page content. Before, pressing it on any screen reloaded the application at its start
+  page, so keyboard users lost their place.
+- New `frontend/tools/accessibility-check.mjs` runs 363 browser checks over the 11 routed screens at desktop, 390 px, the 320 px
+  reflow width, with reduced motion and with enlarged text and text spacing: no axe violation, no horizontal overflow or clipped
+  text, a visible focus indicator at every Tab stop and no keyboard trap. It is not a screen-reader review, and screen-reader
+  coverage is none.
+
 ## Unreleased — Layouts and quick replies on the live screen (P17.3-B), 21 November 2026
 
 - The playthrough screen now shows the narration the engine published as an attributed story: the newest passage with the

@@ -1,4 +1,5 @@
-<a class="skip-link" href="#main" i18n="@@shell.skip">Skip to content</a>
+<!-- The page's base href is "/", so a bare "#main" would navigate away from the current screen: focus the content instead. -->
+<a class="skip-link" href="#main" (click)="$event.preventDefault(); main.focus()" i18n="@@shell.skip">Skip to content</a>
 <header class="app-header">
   <a class="brand" routerLink="/library" i18n="@@shell.brand">Adventure engine</a>
   <nav aria-label="Application" i18n-aria-label="@@shell.navigation">
@@ -6,6 +7,6 @@
     <a routerLink="/settings" routerLinkActive="selected" ariaCurrentWhenActive="page" i18n="@@shell.settings">Settings</a>
   </nav>
 </header>
-<main id="main" tabindex="-1">
+<main #main id="main" tabindex="-1">
   <router-outlet />
 </main>
