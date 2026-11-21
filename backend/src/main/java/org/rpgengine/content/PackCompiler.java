@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import org.rpgengine.rules.CombatProfile;
+import org.rpgengine.rules.CreativeBounds;
 import org.rpgengine.rules.WorldClock;
 import org.rpgengine.rules.ZoneGraph;
 import org.rpgengine.world.FactionClockRules;
@@ -74,6 +75,10 @@ public final class PackCompiler {
     static final int NPC_REPORTS_MAX = 8;
     /** Optional module that lets NPC definitions declare relationship rules and companions (P15.1-B). */
     public static final String RELATIONSHIPS_MODULE = "relationships";
+    /** Optional module that lets a pack declare one creative-abilities profile, a {@code ruleType: creative} rule (P15.4-B). */
+    public static final String CREATIVE_MODULE = "creativeAbilities";
+    /** Operation kinds a creative profile may permit, by wire name (P15.4-B). */
+    private static final Set<String> CREATIVE_KINDS = Set.of("damage", "heal", "apply", "remove");
     /** Authored spellings of the relationship triggers, from {@link RelationshipRules.Trigger}. */
     private static final Set<String> RELATIONSHIP_TRIGGERS = java.util.Arrays.stream(RelationshipRules.Trigger.values())
             .map(RelationshipRules.Trigger::token).collect(java.util.stream.Collectors.toUnmodifiableSet());
@@ -156,6 +161,8 @@ public final class PackCompiler {
         private final Set<String> derivedStats = new HashSet<>();
         /** The pack's resolved combat profile (P11.1), or null until its "combat" rule is validated. */
         private CombatProfile combatProfile;
+        /** Whether a "creative" rule was already validated; a pack declares at most one (P15.4-B). */
+        private boolean creativeDeclared;
         /** Equipment slot ID to {capacity, accepted tags}; filled from the "equipment" rule definition. */
         private final Map<String, EquipmentSlot> equipmentSlots = new HashMap<>();
         /** Simultaneous hands this pack's actors have; used to check two-handed items and loadouts. */
@@ -188,15 +195,12 @@ public final class PackCompiler {
             List<Definition> all = collect();
             // Rules first: they define the attribute/resource/rarity vocabularies others reference.
             // Derived statistics read attributes and rest policies read resources, so both follow the other
-            // rules whatever the file order.
-            for (Definition definition : all) {
-                if (definition.kind().equals("rule") && !readsVocabulary(definition)) {
-                    validate(definition);
-                }
-            }
-            for (Definition definition : all) {
-                if (definition.kind().equals("rule") && readsVocabulary(definition)) {
-                    validate(definition);
+            // rules whatever the file order; a creative profile reads the combat profile, so it comes last (P15.4-B).
+            for (int pass = 0; pass <= 2; pass++) {
+                for (Definition definition : all) {
+                    if (definition.kind().equals("rule") && rulePass(definition) == pass) {
+                        validate(definition);
+                    }
                 }
             }
             for (Definition definition : all) {
@@ -255,11 +259,12 @@ public final class PackCompiler {
                             "Module '" + module + "' is not supported by engine " + contract.engineVersion()
                                     + " (pack contract " + EngineContract.PACK_CONTRACT + ")");
                 }
-                // The relationships module reads its rules from NPC definitions; a configuration file would be ignored.
-                if (RELATIONSHIPS_MODULE.equals(module) && modules.get(index).containsKey("configuration")) {
+                // Both modules read their rules from definitions (NPCs, a creative rule); a configuration file would be ignored.
+                if ((RELATIONSHIPS_MODULE.equals(module) || CREATIVE_MODULE.equals(module))
+                        && modules.get(index).containsKey("configuration")) {
                     throw new PackException("CONSTRAINT_CONFLICT",
                             manifestDocument.location("/modules/" + index + "/configuration"),
-                            "The '" + RELATIONSHIPS_MODULE + "' module takes no configuration file");
+                            "The '" + module + "' module takes no configuration file");
                 }
             }
             // One ID and version must always mean the same bytes; changed content needs a new release.
@@ -476,9 +481,13 @@ public final class PackCompiler {
             entry.close();
         }
 
-        /** Whether a rule definition refers to vocabularies that other rule definitions declare. */
-        private static boolean readsVocabulary(Definition definition) {
-            return Set.of("derivedStats", "rest", "combat").contains(definition.data().get("ruleType"));
+        /**
+         * The pass a rule definition is validated in: 0 for the vocabularies, 1 for the rules that read them, 2 for a creative
+         * profile, which reads the combat profile of pass 1.
+         */
+        private static int rulePass(Definition definition) {
+            Object type = definition.data().get("ruleType");
+            return "creative".equals(type) ? 2 : Set.of("derivedStats", "rest", "combat").contains(type) ? 1 : 0;
         }
 
         /** Dispatch one definition to its kind-specific validator. */
@@ -506,7 +515,7 @@ public final class PackCompiler {
         /** Register the rule vocabularies; unknown rule types fail closed rather than being ignored. */
         private void rule(Fields f) {
             String type = f.choice("ruleType", Set.of("attributes", "resources", "rarityTiers",
-                    "derivedStats", "equipment", "rest", "combat"), null);
+                    "derivedStats", "equipment", "rest", "combat", "creative"), null);
             switch (type) {
                 case "attributes" -> {
                     for (Fields a : f.objects("attributes", 1, 16)) {
@@ -538,6 +547,7 @@ public final class PackCompiler {
                 case "equipment" -> equipment(f);
                 case "rest" -> rest(f);
                 case "combat" -> combat(f);
+                case "creative" -> creative(f);
                 default -> {
                     for (Fields t : f.objects("tiers", 1, 16)) {
                         String id = t.id("id", true);
@@ -605,6 +615,69 @@ public final class PackCompiler {
                 combatProfile = CombatProfile.resolve(pack.manifest().id(), roles, health, focus, overrides);
             } catch (IllegalArgumentException conflict) {
                 throw f.fail("CONSTRAINT_CONFLICT", "values", conflict.getMessage());
+            }
+        }
+
+        /**
+         * The pack's creative-abilities profile (P15.4-B, docs/10 section 9): the bounds a player's draft must fit and the rates
+         * its derived cost uses. It exists only for a pack that enables the {@code creativeAbilities} module (MODULE_DISABLED
+         * otherwise), at most once (DUPLICATE), and needs the pack's combat rule, whose fights it is used in. Every bound lies
+         * inside a frozen combat ability's; {@code effects} name this pack's conditions with a combat block, which entry
+         * freezes into each fight of the pack; {@code actionPoints} fits one activation; a Focus rate needs the combat rule's
+         * Focus resource; and the {@code power} tier's joint rules ({@link CreativeBounds#violation}) hold, each reported as
+         * CONSTRAINT_CONFLICT. Both rates are required, so even a zero-cost profile states its cost.
+         */
+        private void creative(Fields f) {
+            if (!moduleEnabled(CREATIVE_MODULE)) {
+                throw f.fail("MODULE_DISABLED", "ruleType",
+                        "A creative profile needs the pack to enable the '" + CREATIVE_MODULE + "' module");
+            }
+            if (creativeDeclared) {
+                throw f.fail("DUPLICATE", "ruleType", "A pack may define one creative rule");
+            }
+            creativeDeclared = true;
+            if (combatProfile == null) {
+                throw f.fail("CONSTRAINT_CONFLICT", null, "A creative profile needs the pack's combat rule (ruleType combat)");
+            }
+            var power = CreativeBounds.Power.valueOf(f.choice("power", Set.of("standard", "high"), "standard")
+                    .toUpperCase(java.util.Locale.ROOT));
+            f.integer("maxOperations", 1, CombatProfile.ABILITY_OPERATIONS_MAX, null);
+            f.integer("maxTargets", 1, CombatProfile.PARTICIPANTS_MAX + 1, null);
+            f.integer("maxRange", 0, combatProfile.value("maxRangeEdges"), 0);
+            f.integer("maxDice", 0, CombatProfile.ABILITY_DICE_MAX, null);
+            f.integer("maxFlat", 0, CombatProfile.ATTACK_FLAT_MAX, 0);
+            List<String> kinds = f.ids("kinds", CREATIVE_KINDS.size());
+            for (int index = 0; index < kinds.size(); index++) {
+                if (!CREATIVE_KINDS.contains(kinds.get(index))) {
+                    throw new PackException("SCHEMA", f.document().location(f.at("kinds") + "/" + index),
+                            "Expected one of " + new TreeSet<>(CREATIVE_KINDS));
+                }
+            }
+            if (kinds.isEmpty()) {
+                throw f.fail("kinds", "A creative profile permits at least one operation kind");
+            }
+            List<String> effects = f.refs("effects", CONDITION, LIST_MAX);
+            for (int index = 0; index < effects.size(); index++) {
+                Definition condition = byId.get(effects.get(index));
+                if (condition == null || !(condition.data().get("combat") instanceof Map<?, ?>)) {
+                    throw new PackException("CONSTRAINT_CONFLICT", f.document().location(f.at("effects") + "/" + index),
+                            "Condition '" + effects.get(index) + "' must be defined in this pack with a combat block");
+                }
+            }
+            f.integer("maxEffectCount", 0, CombatProfile.EFFECT_COUNT_MAX, 0);
+            boolean persistent = f.bool("persistentEffects", false);
+            int budget = f.integer("complexityBudget", 1, CreativeBounds.COMPLEXITY_MAX, null);
+            f.integer("actionPoints", 1, combatProfile.actionPoints(), null);
+            int focusRate = f.integer("focusPerComplexity", 0, CombatProfile.FOCUS_COST_MAX, null);
+            int cooldownRate = f.integer("cooldownPerComplexity", 0, CombatProfile.ABILITY_COOLDOWN_MAX, null);
+            if (focusRate > 0 && combatProfile.focus() == null) {
+                throw f.fail("CONSTRAINT_CONFLICT", "focusPerComplexity",
+                        "A profile that charges Focus needs the combat rule's focus resource");
+            }
+            f.refs("prerequisites", ABILITY, LIST_MAX);
+            String conflict = CreativeBounds.violation(power, budget, focusRate, cooldownRate, persistent);
+            if (conflict != null) {
+                throw f.fail("CONSTRAINT_CONFLICT", "complexityBudget", conflict);
             }
         }
 

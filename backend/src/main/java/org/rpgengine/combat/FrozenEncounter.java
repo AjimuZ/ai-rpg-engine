@@ -300,6 +300,51 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
      */
     public static FrozenEncounter freeze(UUID id, EncounterTemplate template, CombatProfile profile, PlayerFacts player,
             String openingTarget, Library library) {
+        return freeze(id, template, profile, player, openingTarget, library, Set.of());
+    }
+
+    /**
+     * Freeze an encounter that must also hold effects no participant names (P15.4-B): those the template pack's creative
+     * profile lets a draft apply or remove, because a fight never reads the pack once it started. With an empty set this is
+     * exactly {@link #freeze(UUID, EncounterTemplate, CombatProfile, PlayerFacts, String, Library)}, so a fight without a
+     * creative profile keeps its definition text and hash.
+     *
+     * @param id encounter identity
+     * @param template validated template
+     * @param profile the template pack's resolved combat profile
+     * @param player the player's committed facts
+     * @param openingTarget hostile participant attacked by the entering action, or null
+     * @param library the content's combat forms; only what this fight can reach is frozen
+     * @param available canonical condition IDs the fight must also reach; an ID without a combat form adds nothing
+     * @return the frozen encounter
+     * @throws IllegalStateException when a role attribute is missing from the player's sheet, the opening is not
+     *         allowed or the target is not a hostile participant
+     */
+    public static FrozenEncounter freeze(UUID id, EncounterTemplate template, CombatProfile profile, PlayerFacts player,
+            String openingTarget, Library library, Set<String> available) {
+        return freeze(id, template, profile, player, openingTarget, library, available, List.of());
+    }
+
+    /**
+     * Freeze an encounter whose player also holds learned creative recipes (P15.4-B): abilities the commands layer previewed
+     * again against the template pack's creative profile, under IDs no canonical definition can have. They follow the learned
+     * abilities in the player's frozen form, and what they apply or remove is reached like any ability's effect. With no
+     * recipes this is exactly {@link #freeze(UUID, EncounterTemplate, CombatProfile, PlayerFacts, String, Library, Set)}.
+     *
+     * @param id encounter identity
+     * @param template validated template
+     * @param profile the template pack's resolved combat profile
+     * @param player the player's committed facts
+     * @param openingTarget hostile participant attacked by the entering action, or null
+     * @param library the content's combat forms; only what this fight can reach is frozen
+     * @param available canonical condition IDs the fight must also reach; an ID without a combat form adds nothing
+     * @param recipes the player's recipe abilities, with IDs distinct from each other and from every learned ability
+     * @return the frozen encounter
+     * @throws IllegalStateException when a role attribute is missing from the player's sheet, the opening is not
+     *         allowed, the target is not a hostile participant or two abilities share an ID
+     */
+    public static FrozenEncounter freeze(UUID id, EncounterTemplate template, CombatProfile profile, PlayerFacts player,
+            String openingTarget, Library library, Set<String> available, List<CombatAbility> recipes) {
         var gear = library.gear();
         if (!template.pack().equals(profile.pack())) {
             throw new IllegalStateException("the profile does not belong to the template's pack");
@@ -344,6 +389,13 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
                 policies.put(learned, CombatReaction.Policy.FIRST);
             }
         }
+        // Learned recipes follow in the order given (P15.4-B); a shared ID would make one of them unreachable.
+        for (CombatAbility recipe : recipes) {
+            if (abilities.stream().anyMatch(ability -> ability.id().equals(recipe.id()))) {
+                throw new IllegalStateException("two frozen abilities share the ID " + recipe.id());
+            }
+            abilities.add(recipe);
+        }
         var participants = new ArrayList<Participant>();
         participants.add(new Participant(EncounterTemplate.PLAYER, player.actorId(), EncounterTemplate.Side.PLAYER,
                 template.playerZone(), null, null, player.health().current(), player.health().maximum(), focus.current(),
@@ -364,16 +416,17 @@ public record FrozenEncounter(UUID id, String templateId, String location, Comba
         return new FrozenEncounter(id, template.id(), template.location(), profile, template.zones(),
                 template.escapeZones(), template.objectives(), template.opening(), openingTarget, participants,
                 template.actions().stream().map(action -> action.forPlayer(player.skills())).toList(),
-                reachable(participants, library.effects()), template.disengagement());
+                reachable(participants, library.effects(), available), template.disengagement());
     }
 
     /**
-     * The definitions this fight can reach: what its attacks, reactions and abilities apply or remove, and the conditions
-     * its participants came with. An effect cannot apply another, so one pass finds them all. A condition without a combat
-     * block keeps its exploration meaning and has no entry.
+     * The definitions this fight can reach: what its attacks, reactions and abilities apply or remove, the conditions
+     * its participants came with and the {@code available} ones a draft may use. An effect cannot apply another, so one pass
+     * finds them all. A condition without a combat block keeps its exploration meaning and has no entry.
      */
-    private static Map<String, CombatEffect> reachable(List<Participant> participants, Map<String, CombatEffect> effects) {
-        var named = new java.util.TreeSet<String>();
+    private static Map<String, CombatEffect> reachable(List<Participant> participants, Map<String, CombatEffect> effects,
+            Set<String> available) {
+        var named = new java.util.TreeSet<String>(available);
         for (Participant participant : participants) {
             named.addAll(participant.conditions());
             participant.attacks().forEach(attack -> attack.onHit().forEach(effect -> named.add(effect.effectId())));

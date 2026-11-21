@@ -6232,7 +6232,7 @@ this update. No combat runtime/browser result is claimed.
         is structural and no database run was made.
       - Paraphrased secrets and wording claiming an action was taken (human-rubric), and live model output.
       - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
-- [ ] P15.4 Add creative ability drafting, validation preview, explicit execution, learned recipes, and bounded high-power profiles.
+- [x] P15.4 Add creative ability drafting, validation preview, explicit execution, learned recipes, and bounded high-power profiles.
   - P15.4-A (21 November 2026; partial, the box stays unchecked). This adds the draft and its validation preview as pure
     code in the new package `org.rpgengine.creative`. It adds no migration, route, command, pack field or page.
     - **Types.**
@@ -6267,7 +6267,7 @@ this update. No combat runtime/browser result is claimed.
       - Five profiles that break their bounds are refused.
       - A reflection check: the only public entry point takes the profile, draft, effects and caster. The result parts are
         text, numbers, flags, lists, a clock and a frozen ability, and a draft has exactly its five fields.
-    - **Not done in this story:**
+    - **Not done in this story** (P15.4-B below adds the first four):
       - Explicit execution: a command that uses a draft in a fight, previews again and resolves it through the scheduler.
       - Learned recipes: saving a draft as a versioned ability with provenance.
       - Bounded high-power profiles.
@@ -6279,6 +6279,160 @@ this update. No combat runtime/browser result is claimed.
         and the preview is pure; no database or HTTP run was made.
       - That the provisional complexity formula and rates are balanced. No playtest or comparison was made.
       - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
+  - P15.4-B (21 November 2026). This adds explicit execution in fights, learned recipes and bounded high-power profiles
+    ([ADR 0053](adr/0053-drafts-execute-only-through-an-explicit-fight-command-that-previews-again.md)). With P15.4-A,
+    each of the five parts P15.4 names now exists at the engine and command boundary: drafting (the `AbilityDraft` value),
+    the validation preview, explicit execution, learned recipes and bounded high-power profiles. They are not exposed to
+    players by any route or page (see "Not done" below). Migration V35 adds `learned_recipe`; no route or page was added.
+    - **Pack data.**
+      - `EngineContract.current()` supports a second module, `creativeAbilities`.
+      - Only a pack that enables it may declare one `ruleType: creative` rule (`MODULE_DISABLED` otherwise, `DUPLICATE` for
+        a second one), validated after the combat rule. The module takes no configuration file.
+      - Its members and codes are in docs/09. `CommandRuleCatalog.creative()` projects it by pack ID with canonical
+        effect and prerequisite IDs.
+    - **Bounded high-power profiles.**
+      - `rules/CreativeBounds` holds the ceilings that the compiler and `CreativeProfile` share.
+      - `standard` (the default) allows a budget of at most 16, needs a Focus or cooldown rate above 0 and refuses
+        persistent effects.
+      - `power: high` lifts those three limits, up to a budget of 32. Every frozen-ability bound, the 99 Focus and
+        30-round ceilings and at least one action point per draft still hold.
+      - P15.4-A's zero cost without a tier is now refused: zero cost needs `power: high`.
+    - **Execution goes through the command boundary.**
+      - `COMBAT_USE_DRAFT` {draft, targetIds} is a tactical `TypedCommand`. Its payload has no cost, cooldown or limit
+        field. Decoding bounds it structurally: 1..4 steps, numbers within ±999, a label of 1..80, distinct targets.
+      - Admission and the canonical commit both run `CommandRules`. There, `DraftUse.candidate` previews the draft
+        again under the campaign lock against the fight pack's profile, the frozen effects, the encounter Focus and the
+        learned abilities. Its refusals are `ABILITY_UNAVAILABLE` (no profile), `EFFECT_UNSUPPORTED` (outside the profile)
+        and `PREREQUISITE_UNMET`. `TacticalRules.draftRefusal` then checks the turn, prevention, the cooldown, Focus,
+        targets and points.
+      - `LocalActionResolver` previews again with the same rows. `CombatScheduler.useDraft` resolves the candidate with
+        the frozen-ability code.
+      - Without a candidate, `TacticalRules.refusal` refuses a draft and `CombatScheduler.apply` throws.
+      - Entry freezes the profile's effects (`FrozenEncounter.freeze(…, available)`). A pack without a profile freezes
+        what it did before.
+      - The reserved candidate ID is now `#draft`, which no canonical definition ID can equal. Every draft's use is
+        recorded under it, so a draft waits its own cooldown counted from the player's last draft.
+      - The receipt gains `draft` {abilityId, actionPoints, focus, cooldownRounds}. Narration says "a drafted ability".
+        Using a draft learns nothing.
+    - **Learned recipes.**
+      - `LEARN_DRAFT` {recipeId, draft} is an exploration `TypedCommand` (`MODE_ILLEGAL` in a fight). The recipe ID is
+        `[a-z][a-z0-9-]{0,31}`, the draft has the bounds of `COMBAT_USE_DRAFT`'s, and there is no version or cost field.
+      - Admission and the canonical commit both preview the draft again under the campaign lock
+        (`LearnedRecipes.learnable`) against the profile of the player's vocabulary pack, which `ENGAGE` requires of every
+        fight. Learning spends nothing and Focus does not block it. Refusals: `ABILITY_UNAVAILABLE` (no profile, a ninth
+        recipe ID or a hundredth version), `EFFECT_UNSUPPORTED`, `PREREQUISITE_UNMET`.
+      - The commit writes the public `RECIPE_LEARNED` event (no label) and one row of the new V35 table `learned_recipe`:
+        the next version, label, draft, profile pack and rule ID, content revision, derived complexity and costs, and the
+        revision, event and world time. Triggers refuse updates and deletes, an event of another revision, a skipped
+        version and a ninth recipe ID. The receipt gains `recipe` {recipeId, version, abilityId, complexity, actionPoints,
+        focus, cooldownRounds}.
+      - `ENGAGE` previews the latest version of each recipe again against the fight pack's profile
+        (`LearnedRecipes.frozen`). Each one that fits, with its prerequisites learned, is frozen as an ordinary ability
+        `#recipe:<id>` (`FrozenEncounter.freeze(…, available, recipes)`), which `COMBAT_USE_ABILITY` uses with its own
+        cooldown. A player without recipes freezes what it did before.
+      - Narration says "learns a recipe (version N)" and "uses a learned recipe", without the player's recipe ID or label.
+      - Every test cleanup that truncates `campaign` (51 classes) also truncates `learned_recipe`; `EngineApplicationTest`
+        lists the table; the backup tool covers schema 35 (`tools/database_backup`).
+    - **Commands and results (Windows 11 host, pinned containers).** The wrapper prints no counts; the counts below are
+      read from the surefire lines of its `backend-focused.log`. The first group of runs was made before learned recipes
+      were added; the second group is on the final tree.
+      - `sh .agents/ralph/verify.sh backend -Dtest=DraftPreviewTest`: VERIFY PASSED (compile check after the profile
+        change).
+      - `sh .agents/ralph/verify.sh backend -Dtest=DraftPreviewTest,DraftUseTest,TypedCommandTest,CreativeRulesTest,DraftCommandsTest,ReactionCommandsTest,PackCompilerTest,CombatReactionsTest,EventStatementsTest`:
+        - first run: VERIFY FAILED, 145 tests with 1 error. `DraftCommandsTest#anExplicitCommandExecutesThePreviewedDraft`
+          found no `draft` block, because the receipt projection is an allowlist; `CommandReceipts` now copies it.
+        - after the fix, `-Dtest=DraftCommandsTest,EventStatementsTest,CommandReceiptsTest`: VERIFY PASSED, 16 tests. No
+          `CommandReceiptsTest` class exists, so that name ran nothing.
+        - final run of the same nine classes after every code change: VERIFY PASSED, 145 tests, 0 failures (backend-focused
+          19 s). The classes ran DraftUseTest 4, CombatReactionsTest 56, DraftPreviewTest 7, PackCompilerTest 26,
+          EventStatementsTest 12, ReactionCommandsTest 13, DraftCommandsTest 4, TypedCommandTest 21 and
+          CreativeRulesTest 2 tests.
+      - `sh .agents/ralph/verify.sh backend -Dtest=TacticalCommandsTest,StrikeCommandsTest,CombatPanelTest,EncounterLifecycleTest,RelationshipWorldTest,CombatSchedulerTest,EncounterAdmissionTest,ReadyAssessCommandsTest,NegotiationCommandsTest,SettlementCommandsTest`:
+        VERIFY PASSED, 82 tests (regression of the shared combat, receipt and module paths), run after every code change.
+      - The runner's `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full` on this tree: VERIFY FAILED. The
+        backend ran 1922 tests with 1 failure, and every creative class passed (DraftUseTest 4, DraftPreviewTest 7,
+        PackCompilerTest 26, EventStatementsTest 12, DraftCommandsTest 4, TypedCommandTest 21, CreativeRulesTest 2). The
+        failure was
+        `AdmissionProbeControllerTest#anOwnerRequestSendsTheFixedTextAndImageRequestsThroughTheLeaseExecutor`: its image
+        probe ended `image-admission-interrupted` instead of `COMPLETED`. That class is in the inference admission
+        package, which this change does not touch. The test steps a clock while the text and image requests race, and the
+        saved logs show the same class failing in two full runs on 1 November 2026. The frontend tests in the same run
+        passed (24 files, 234 tests).
+      - `sh .agents/ralph/verify.sh backend -Dtest=AdmissionProbeControllerTest` afterwards, on the unchanged tree: VERIFY
+        PASSED, 12 tests, 0 failures. The intermittent race was neither fixed nor explained further.
+      - Final tree, with learned recipes:
+        - `sh .agents/ralph/verify.sh backend -Dtest=DraftCommandsTest,LearnedRecipesTest,TypedCommandTest,EventStatementsTest,EngineApplicationTest,ResolvedCommitTest,DraftUseTest,DraftPreviewTest`:
+          the first run was VERIFY FAILED on a compile error (a local `version` that `EventStatements.state` already
+          declares), the second VERIFY FAILED on a test compile error (`LearnDraft` can never be a `Tactical`, so the
+          check needs a `TypedCommand` variable). The third run: VERIFY PASSED, 64 tests, 0 failures (backend-focused
+          17 s): DraftUseTest 4, DraftPreviewTest 7, EngineApplicationTest 3, EventStatementsTest 12, LearnedRecipesTest 3,
+          DraftCommandsTest 6, TypedCommandTest 22, ResolvedCommitTest 7. After the last comment-only edits the same
+          command ran again: VERIFY PASSED, 64 tests, 0 failures (backend-focused 19 s).
+        - `sh .agents/ralph/verify.sh backend -Dtest=CanonicalCommitServiceTest,CommandExecutionTest,EncounterCommandsTest,TacticalCommandsTest,CombatPanelTest,CombatRecoveryTest,CanonicalFoundationsPersistenceTest,CanonicalMigrationUpgradeTest,MemoryContinuityTest,ReactionCommandsTest,CommandRulesTest,CampaignInterfaceContractTest,FactionClockWorldTest,TypedCommandValidationTest,CreativeRulesTest,PackCompilerTest`:
+          VERIFY PASSED, 190 tests, 0 failures (regression of the commit, encounter, migration and cleanup paths).
+        - `py -B -m unittest discover -s tools/database_backup` (host Python): 9 tests, OK, 1 skipped.
+    - **Evidence.**
+      - `DraftCommandsTest` (PostgreSQL, production admission, resolver and commit; tactics pack variant `CreativePack`,
+        fight `venom-pit`):
+        - The command pays exactly the 2 points, 6 Focus and 6-round cooldown its receipt lists. It takes 1..4 Health
+          from the adder with one d4 and winds it. `winded` was frozen only because the profile permits it.
+        - The use is stored under `#draft`, and no learned-ability row is added. A second draft, a cheaper draft and
+          `COMBAT_USE_ABILITY` naming `#draft` are each `ABILITY_UNAVAILABLE`.
+        - These are refused and write nothing (12 tables compared since `learned_recipe` exists, 11 before):
+          `MODE_ILLEGAL` outside a fight, `PREREQUISITE_UNMET`,
+          `TURN_UNAVAILABLE` before initiative, `EFFECT_UNSUPPORTED` for too many steps, a persistent effect, an
+          unpermitted frozen effect and complexity 10 over 8, `TARGET_ILLEGAL` for none and for the player, and
+          `RESOURCE_INSUFFICIENT` at 5 Focus. The 2-Focus draft then still fits.
+        - A retried request replays the receipt and writes nothing.
+        - A pack without the module has no drafts (`ABILITY_UNAVAILABLE`), learns nothing (`ABILITY_UNAVAILABLE`) and
+          freezes no `winded`.
+        - `aLearnedRecipeIsVersionedWithProvenanceAndFrozenAtEntry`: learning `gust` spends no Focus and stores version 1
+          with the draft as written, profile `sample:armory-creative` / `rules.creative`, the campaign's content revision,
+          the commit's revision, complexity 6, 6 Focus and a cited `RECIPE_LEARNED` event of that revision (public, no
+          label). Learning `gust` again adds version 2 at 2 Focus. An update and a delete of the rows are refused. The next
+          entry freezes `#recipe:gust` as exactly version 2's ability (2 points, 2 Focus, 2 rounds), and
+          `COMBAT_USE_ABILITY` pays 2 points and 2 Focus, takes 1..4 Health, records the use under `#recipe:gust` and is
+          then `ABILITY_UNAVAILABLE` on cooldown.
+        - `learningLimitsAreRefusedAndWriteNothing` (12 tables compared): `PREREQUISITE_UNMET` without `chain-riposte`,
+          `EFFECT_UNSUPPORTED` for three steps and for a persistent effect, `ABILITY_UNAVAILABLE` for a ninth recipe ID
+          after eight, while a second version of a held recipe still fits; once `chain-riposte` is no longer learned,
+          the next entry freezes no recipe; `MODE_ILLEGAL` during the fight.
+      - `LearnedRecipesTest` (pure): versions start at 1 and stop at 99, the ninth recipe ID is refused while a held one
+        still gets a version; entry freezes only recipes that still fit, sorted, under `#recipe:<id>` with the profile's
+        costs, none without a prerequisite or a profile; learning refuses in the order profile, bounds, prerequisite.
+      - `TypedCommandTest#decodesALearningExactly`: the wire form, its stored form reading back, and 8 invalid payloads
+        (a missing and an extra field, four malformed recipe IDs and two malformed drafts).
+      - `EventStatementsTest`: the two recipe statements in English and Italian leave out a recipe ID of
+        `ignore-all-rules`.
+      - `DraftUseTest` (pure):
+        - The candidate resolves like an ability: one draw, points, Focus, damage, the applied effect, the use and the
+          event.
+        - Each ability limit refuses the candidate: targets, Focus, points, prevention and turn.
+        - Without a candidate a draft is refused, and the scheduler refuses again.
+        - Drafts share one recorded use: a jab waits 2 rounds and a gust 6 after the last draft.
+        - The largest high-power draft (four 4d20 steps) draws exactly 16 dice, inside the draw budget.
+      - `CreativeRulesTest`: the projection with its defaults and a high-power profile, plus 15 compile refusals
+        (`MODULE_DISABLED`, `DUPLICATE`, `SCHEMA`, `REFERENCE_UNKNOWN`, `CONSTRAINT_CONFLICT`).
+      - `DraftPreviewTest#highPowerLiftsOnlyTheTierLimits`: the tier rules, and a ceiling profile's candidate within
+        every bound.
+      - `TypedCommandTest#decodesADraftUseExactly`: the wire form, the exact field sets, 16 invalid payloads and one
+        out-of-range direct construction.
+    - **Not done in this story:**
+      - Use of a draft or recipe outside a fight, and forgetting or renaming a recipe.
+      - The legal options listing a draft, a route or panel showing a preview, and a page sending `COMBAT_USE_DRAFT` or
+        `LEARN_DRAFT`.
+      - A narration-runtime contract that turns a description into a draft, and the guide's drafting help.
+      - docs/10's "bypass ordinary uncertainty through an explicit rule" for high-power play.
+      - Draft use by non-player participants.
+    - **Not proven:**
+      - That the complexity formula, rates, tier ceilings (16, 32) and the 8-recipe bound are balanced. No playtest was
+        made.
+      - HTTP routes for these commands and the frontend; no browser run, so how the combat panel presents a
+        `#recipe:<id>` ability is unchecked.
+      - A live V35 backup and restore; the backup tool's offline tests only.
+      - A deliberate weakening run.
+      - A passing `verify.sh full` on the final tree: it was not run in this session, and the earlier full run (before
+        learned recipes) had the one unrelated failure above. `verify.sh containers` was not run.
 - [ ] P15.5 Prove disabled modules disappear cleanly and enabled modules remain adventure-independent.
 - [ ] P15.6 Qualify optional adaptive quest/world-direction tasks using event-triggered significant actors, causal relationship histories and deterministic off-screen catch-up; enable only after agency/coherence/cost comparison, otherwise document disabled/deferred capability with verified baseline fallback.
 

@@ -27,8 +27,11 @@ import tools.jackson.databind.json.JsonMapper;
  *       identity, template, phase, the player's starting zone, the opening policy and the declared opening
  *       strike target (the frozen roster and profile stay in the engine), and (since P11.2) the {@code combat}
  *       summary of a tactical intention: encounter, phase, round, the player's zone, the acting participant and its
- *       remaining action points, the public initiative order and the player's legal options at a decision. Every
- *       participant of an encounter is observable, so none of these values is another actor's private state.</li>
+ *       remaining action points, the public initiative order and the player's legal options at a decision, and (since
+ *       P15.4-B) the {@code draft} block of a draft use: the reserved candidate ID and the action points, Focus and cooldown
+ *       the engine derived for the player's own draft, and the {@code recipe} block of a learning: the recipe ID, its new
+ *       version, its frozen ability ID, complexity and derived costs. Every participant of an encounter is observable, so none of these
+ *       values is another actor's private state.</li>
  * </ul>
  * Other actors' values, causal participants, request identities and unknown detail fields
  * are never copied, so a new internal field cannot leak by default. Public since P09.5, because
@@ -128,6 +131,29 @@ public final class CommandReceipts {
             if (details.path("combat").isObject()) {
                 // Present only for a tactical intention (P11.2), so earlier receipt shapes stay byte-identical.
                 view.put("combat", combat(details.path("combat")));
+            }
+            if (details.path("draft").isObject()) {
+                // Present only for a draft use (P15.4-B): what the engine charged for the player's own draft, nothing else.
+                var draft = details.path("draft");
+                var entry = new LinkedHashMap<String, Object>();
+                entry.put("abilityId", draft.path("abilityId").asString());
+                entry.put("actionPoints", draft.path("actionPoints").asInt());
+                entry.put("focus", draft.path("focus").asInt());
+                entry.put("cooldownRounds", draft.path("cooldownRounds").asInt());
+                view.put("draft", java.util.Collections.unmodifiableMap(entry));
+            }
+            if (details.path("recipe").isObject()) {
+                // Present only for a learning (P15.4-B): the player's own recipe ID, its new version and the derived costs.
+                var recipe = details.path("recipe");
+                var entry = new LinkedHashMap<String, Object>();
+                entry.put("recipeId", recipe.path("recipeId").asString());
+                entry.put("version", recipe.path("version").asInt());
+                entry.put("abilityId", recipe.path("abilityId").asString());
+                entry.put("complexity", recipe.path("complexity").asInt());
+                entry.put("actionPoints", recipe.path("actionPoints").asInt());
+                entry.put("focus", recipe.path("focus").asInt());
+                entry.put("cooldownRounds", recipe.path("cooldownRounds").asInt());
+                view.put("recipe", java.util.Collections.unmodifiableMap(entry));
             }
             if (details.path("quests").isArray() && !details.path("quests").isEmpty()) {
                 // Present only when a public quest transition happened, so earlier receipt shapes stay

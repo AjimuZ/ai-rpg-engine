@@ -271,6 +271,14 @@ restore needs no retirement step for this table. Offline checks were updated for
 in the session that added it; no live V34 dump/restore rehearsal has been run, and both rehearsals below ran before this
 table existed.
 
+V35 scope (P15.4-B) adds `learned_recipe`, one immutable row per version of a creative recipe a player learned: the
+player's recipe ID and version, the draft's label and wire form, the creative profile and content revision it was previewed
+against, the costs the engine derived, and the revision, announcing event and world time of the learning. The label and the
+draft are the player's own text. Rows are immutable and an encounter entry reads only the latest version of each recipe, so a
+restore needs no retirement step for this table. Offline checks were updated for the V35 manifest/catalog but were not run
+in the session that added it; no live V35 dump/restore rehearsal has been run, and both rehearsals below ran before this
+table existed.
+
 ## Live two-genre rehearsal (P06.5-B.1, V26)
 
 `tools/container_packaging/test_restore_isolation.py` runs this tool as an operator would on a populated world, then

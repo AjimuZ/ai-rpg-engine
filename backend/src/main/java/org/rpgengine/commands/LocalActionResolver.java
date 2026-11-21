@@ -106,6 +106,14 @@ import tools.jackson.databind.node.ObjectNode;
  * its equipment change becomes the commit's item effect, and the Guard, armor and attacks it leaves are computed once here
  * and stored with the encounter (ADR 0034).
  *
+ * <p>Drafts (P15.4-B): {@code COMBAT_USE_DRAFT} is the third tactical intention that reads the pinned catalog. It previews the
+ * draft again against the fight pack's creative profile and the effects the fight froze, and the scheduler resolves the
+ * candidate like a frozen ability; the receipt's {@code draft} block lists the derived action points, Focus and cooldown.
+ * Entry freezes the effects that profile permits, so a draft never needs the pack during the fight. The exploration command
+ * {@code LEARN_DRAFT} previews a draft against the profile of the player's vocabulary pack and stores the next version of the
+ * named recipe with the derived costs ({@link LearnedRecipes}); entry previews the latest version of each recipe again and
+ * freezes every one that still fits as a frozen ability under {@code #recipe:<id>}, which {@code COMBAT_USE_ABILITY} uses.
+ *
  * <p>Settlement (P11.5, ADR 0036): {@code SETTLE_ENCOUNTER} reads only the frozen encounter. Its plan ends the encounter at
  * {@code NARRATIVE_RESUME}, adds the unfinished round's seconds when there is one and moves the campaign back to exploration
  * with no pending decision; it changes no pool, item, location or exploration condition, and runs no quest step, so the next
@@ -173,12 +181,23 @@ final class LocalActionResolver {
      * @param encounter tactical state of the active encounter, read for tactical intentions only (P11.2), or null
      * @param learned canonical abilities the player has learned, recorded by an encounter entry (P11.4)
      * @param wornInstances item instances the player wears, read for readying in a fight (P11.5)
+     * @param recipes the latest version of each recipe the player learned, read for learning and entry (P15.4-B)
      */
     record Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
             Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
             UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored, long worldTimeSeconds,
             Set<String> conditions, List<String> worn, EncounterState encounter, Set<String> learned,
-            Set<UUID> wornInstances) {
+            Set<UUID> wornInstances, List<LearnedRecipes.Stored> recipes) {
+        /** Snapshot without learned recipes, the shape used before P15.4-B. */
+        Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
+                Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
+                UUID operationId, List<InventoryModel.Stack> stacks, QuestStore.Stored stored, long worldTimeSeconds,
+                Set<String> conditions, List<String> worn, EncounterState encounter, Set<String> learned,
+                Set<UUID> wornInstances) {
+            this(player, location, playerRowVersion, attributes, skills, pools, vocabularies, operationId, stacks,
+                    stored, worldTimeSeconds, conditions, worn, encounter, learned, wornInstances, List.of());
+        }
+
         /** Snapshot without worn instance identities, the shape used before P11.5. */
         Snapshot(UUID player, String location, long playerRowVersion, Map<String, Long> attributes,
                 Map<String, Long> skills, Map<UUID, Map<String, Pool>> pools, Map<UUID, String> vocabularies,
@@ -256,6 +275,7 @@ final class LocalActionResolver {
             worn = List.copyOf(worn);
             learned = Set.copyOf(learned);
             wornInstances = Set.copyOf(wornInstances);
+            recipes = List.copyOf(recipes);
         }
     }
 
@@ -274,12 +294,23 @@ final class LocalActionResolver {
      * @param conditions conditions a rest ends (P10.4)
      * @param encounter the encounter an {@code ENGAGE} starts, or null (P11.1)
      * @param progress the tactical plan of a tactical intention, or null (P11.2)
+     * @param recipe the recipe version a {@code LEARN_DRAFT} stores, or null (P15.4-B)
      */
     record Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
             List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
             List<String> queryScopes, ItemPlan items, List<ResolvedCommit.Reward> rewards, QuestChanges quests,
             List<ResolvedCommit.ConditionRemoval> conditions, ResolvedCommit.EncounterEntry encounter,
-            TacticalPlan progress) {
+            TacticalPlan progress, LearnedRecipes.Learning recipe) {
+        /** Resolution without a learned recipe, the shape used before P15.4-B. */
+        Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
+                List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
+                List<String> queryScopes, ItemPlan items, List<ResolvedCommit.Reward> rewards, QuestChanges quests,
+                List<ResolvedCommit.ConditionRemoval> conditions, ResolvedCommit.EncounterEntry encounter,
+                TacticalPlan progress) {
+            this(world, resources, placements, events, receiptDetails, queryScopes, items, rewards, quests, conditions,
+                    encounter, progress, null);
+        }
+
         /** Resolution without tactical progress, the shape used before P11.2. */
         Resolution(ResolvedCommit.WorldChange world, List<ResolvedCommit.ResourceChange> resources,
                 List<ResolvedCommit.Placement> placements, List<ResolvedCommit.Event> events, String receiptDetails,
@@ -354,6 +385,8 @@ final class LocalActionResolver {
         private CampaignMode mode = CampaignMode.EXPLORATION;
         private ResolvedCommit.EncounterEntry encounter;
         private TacticalPlan progress;
+        /** The recipe version a {@code LEARN_DRAFT} stores (P15.4-B); null otherwise. */
+        private LearnedRecipes.Learning recipe;
         private final InventoryModel inventory;
         private int nextOrdinal;
         private int nextInstance;
@@ -429,6 +462,7 @@ final class LocalActionResolver {
                 case TypedCommand.AcceptQuest accept -> details.put("questId", accept.questId());
                 case TypedCommand.SuspendQuest suspend -> details.put("questId", suspend.questId());
                 case TypedCommand.ResumeQuest resume -> details.put("questId", resume.questId());
+                case TypedCommand.LearnDraft learn -> learn(learn, Objects.requireNonNull(catalog, "catalog"));
             }
             // A fight changes quest facts only through items, and the next exploration command evaluates them.
             if (!(command instanceof TypedCommand.Tactical)) {
@@ -455,7 +489,44 @@ final class LocalActionResolver {
             return new Resolution(new ResolvedCommit.WorldChange(true, elapsed, mode, null),
                     resources, List.copyOf(placements), List.copyOf(events), JSON.writeValueAsString(details),
                     List.copyOf(scopes), items, List.copyOf(rewards), questChanges, List.copyOf(removals), encounter,
-                    progress);
+                    progress, recipe);
+        }
+
+        /**
+         * Learn a draft as the next version of a recipe (P15.4-B, docs/10 section 9): preview it again with the same pure
+         * function and the same rows the rule gate read, then announce the version and record the costs the engine derived.
+         * Nothing is spent, moved or executed; the commit stores the row, citing the announcing event.
+         */
+        private void learn(TypedCommand.LearnDraft learn, CommandRuleCatalog catalog) {
+            String pack = snapshot.vocabularies().get(snapshot.player());
+            var profile = pack == null ? null : catalog.creative().get(pack);
+            org.rpgengine.creative.DraftPreview.Ready ready;
+            int version;
+            try {
+                ready = LearnedRecipes.learnable(profile, learn.draft(), catalog.combat().library().effects(),
+                        snapshot.learned());
+                version = LearnedRecipes.nextVersion(snapshot.recipes(), learn.recipeId());
+            } catch (OperationAdmissionFailure refused) {
+                throw new IllegalStateException("validated recipe can no longer be learned", refused);
+            }
+            var candidate = ready.candidate();
+            String abilityId = LearnedRecipes.abilityId(learn.recipeId());
+            recipe = new LearnedRecipes.Learning(snapshot.player(), learn.recipeId(), version, learn.draft(), pack,
+                    profile.id(), ready.complexity(), candidate.cost(), candidate.focus(), candidate.cooldownRounds(),
+                    events.size());
+            // The label is the player's wording and stays out of the event, which narration reads.
+            event("RECIPE_LEARNED", EventVisibility.PUBLIC, payload().put("actorId", snapshot.player().toString())
+                    .put("recipeId", learn.recipeId()).put("version", version).put("abilityId", abilityId)
+                    .put("actionPoints", candidate.cost()).put("focus", candidate.focus())
+                    .put("cooldownRounds", candidate.cooldownRounds()));
+            var line = details.putObject("recipe");
+            line.put("recipeId", learn.recipeId());
+            line.put("version", version);
+            line.put("abilityId", abilityId);
+            line.put("complexity", ready.complexity());
+            line.put("actionPoints", candidate.cost());
+            line.put("focus", candidate.focus());
+            line.put("cooldownRounds", candidate.cooldownRounds());
         }
 
         /**
@@ -472,6 +543,7 @@ final class LocalActionResolver {
             progress = switch (tactical) {
                 case TypedCommand.CombatUseItem use -> combatItem(use, state, Objects.requireNonNull(catalog, "catalog"));
                 case TypedCommand.ReadyItem ready -> readyItem(ready, state, Objects.requireNonNull(catalog, "catalog"));
+                case TypedCommand.CombatUseDraft draft -> useDraft(draft, state, Objects.requireNonNull(catalog, "catalog"));
                 default -> CombatScheduler.apply(state, tactical.intent(), draws::value);
             };
             // Only a settlement reaches NARRATIVE_RESUME, and it is the one way back to exploration (ADR 0036).
@@ -529,6 +601,28 @@ final class LocalActionResolver {
                     ally ? allyHealth - combatAlly.health() : 0);
             return CombatScheduler.useItem(state, (org.rpgengine.combat.TacticalIntent.UseItem) use.intent(), outcome,
                     draws::value, nextOrdinal);
+        }
+
+        /**
+         * Use a draft in a fight (P15.4-B, docs/10 section 9): preview it again with the same pure function and the same
+         * rows the rule gate read, then let the scheduler resolve the candidate like a frozen ability. The receipt records the
+         * derived costs, so the player sees what the engine charged rather than anything the draft proposed. Nothing is
+         * learned or stored beyond the fight's own facts: the use under the reserved candidate ID, the pools and the effects.
+         */
+        private TacticalPlan useDraft(TypedCommand.CombatUseDraft use, EncounterState state, CommandRuleCatalog catalog) {
+            org.rpgengine.combat.CombatAbility candidate;
+            try {
+                candidate = DraftUse.candidate(catalog, state, use.draft(), snapshot.learned());
+            } catch (OperationAdmissionFailure refused) {
+                throw new IllegalStateException("validated draft is no longer usable", refused);
+            }
+            var line = details.putObject("draft");
+            line.put("abilityId", candidate.id());
+            line.put("actionPoints", candidate.cost());
+            line.put("focus", candidate.focus());
+            line.put("cooldownRounds", candidate.cooldownRounds());
+            return CombatScheduler.useDraft(state, (org.rpgengine.combat.TacticalIntent.UseDraft) use.intent(), candidate,
+                    draws::value);
         }
 
         /**
@@ -749,8 +843,13 @@ final class LocalActionResolver {
                     snapshot.conditions(), snapshot.skills(), snapshot.learned());
             // Deterministic identity: a retried resolution of this operation freezes the same encounter.
             UUID id = UUID.nameUUIDFromBytes((snapshot.operationId() + "/encounter").getBytes(StandardCharsets.UTF_8));
+            // The effects a draft may use must be frozen now, because the fight never reads the pack again (P15.4-B), and so
+            // must the learned recipes, each previewed again against this pack's profile.
+            var creative = catalog.creative().get(template.pack());
+            var recipes = LearnedRecipes.frozen(creative, snapshot.recipes(), catalog.combat().library().effects(),
+                    snapshot.learned());
             var frozen = FrozenEncounter.freeze(id, template, profile, facts, engage.openingStrike(),
-                    catalog.combat().library());
+                    catalog.combat().library(), creative == null ? Set.of() : creative.effects(), recipes);
             mode = CampaignMode.ENCOUNTER;
             var announced = payload().put("actorId", snapshot.player().toString()).put("encounterId", id.toString())
                     .put("templateId", template.id()).put("location", template.location())

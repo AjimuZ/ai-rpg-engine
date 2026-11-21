@@ -135,6 +135,21 @@ public sealed interface TacticalIntent {
     }
 
     /**
+     * Use the player's creative draft (P15.4-B, docs/10 section 9). The frozen encounter holds no creative profile, so this
+     * value carries only the targets: the commands layer previews the draft again against the pinned profile and the current
+     * state, and passes the resulting candidate ability to {@link TacticalRules#draftRefusal} and
+     * {@link CombatScheduler#useDraft}. Without a candidate, {@link TacticalRules#refusal} refuses it.
+     *
+     * @param targets participants it is used on, distinct; empty for a self draft
+     */
+    record UseDraft(java.util.List<String> targets) implements TacticalIntent {
+        /** Copy the targets. */
+        public UseDraft {
+            targets = java.util.List.copyOf(targets);
+        }
+    }
+
+    /**
      * Answer the terms on the table by their identity (P11.5). This is the only way an agreement or a surrender comes
      * about: words, a response or a retry of the attempt never accept anything for the player.
      *

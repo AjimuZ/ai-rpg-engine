@@ -22,14 +22,23 @@ import org.rpgengine.rules.CombatProfile;
  * nobody, records no event, grants no learned ability and holds no command. The {@link Ready#candidate()} is the frozen
  * ability the draft would become, under the reserved id {@link #CANDIDATE_ID}, so it is never one of the user's learned
  * abilities. Using or learning a draft needs a separate explicit player operation, which must run this preview again against
- * the state current at that moment; a preview shown earlier proves nothing about a later state.
+ * the state current at that moment; a preview shown earlier proves nothing about a later state. Since P15.4-B that operation
+ * exists for use in a fight: the {@code COMBAT_USE_DRAFT} command previews again under the campaign lock, at admission and at
+ * commit, and hands the candidate to the combat scheduler only when the result is {@link Ready}. Learning exists too: the
+ * {@code LEARN_DRAFT} command previews again before storing a recipe version, and an encounter entry previews the stored
+ * draft again before freezing it under {@code #recipe:<id>}.
  *
  * <p>The check is bounded: a draft with more steps than its profile allows is rejected before any step is read, so a proposal
  * cannot make the preview do unbounded work.
  */
 public final class DraftPreview {
-    /** Reserved id of every candidate; a learning operation assigns the real id. */
-    public static final String CANDIDATE_ID = "draft";
+    /**
+     * Reserved id of every candidate; a learned recipe is frozen under {@code #recipe:<id>} instead. A canonical definition ID starts with a
+     * letter (a root ID) or a pack ID (a dependency's {@code pack#id}), so this one can never name a pack ability. The fight
+     * records every draft's use under it, so a draft waits its own cooldown counted from the player's last draft, whichever
+     * draft that was (P15.4-B).
+     */
+    public static final String CANDIDATE_ID = "#draft";
     /** Longest draft label. */
     public static final int MAX_LABEL = 80;
 

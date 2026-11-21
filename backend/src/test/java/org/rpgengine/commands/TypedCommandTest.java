@@ -405,6 +405,102 @@ class TypedCommandTest {
         assertEquals(Map.of("actionId", "seal-route"), new TypedCommand.Interact("seal-route", null).payload());
     }
 
+    /**
+     * A draft use (P15.4-B) carries the draft as written and its targets, never a cost, cooldown or limit: the exact draft and
+     * step field sets decode, an absent attribute or effect is omitted rather than null, the wire spellings are exact, and the
+     * structural bounds (steps, numbers, label, targets) fail as an invalid command before any rule runs.
+     */
+    @Test
+    void decodesADraftUseExactly() {
+        assertTrue(TypedCommand.registered("COMBAT_USE_DRAFT"));
+        var hit = new org.rpgengine.creative.AbilityDraft.Step(org.rpgengine.combat.CombatAbility.Kind.DAMAGE, 1, 4, "force", 1,
+                0, null, false);
+        var wind = new org.rpgengine.creative.AbilityDraft.Step(org.rpgengine.combat.CombatAbility.Kind.APPLY, 0, 0, null, 0, 0,
+                "winded", false);
+        var draft = new org.rpgengine.creative.AbilityDraft("Gust", org.rpgengine.combat.CombatAbility.Targets.HOSTILE, 1, 0,
+                List.of(hit, wind));
+        var command = new TypedCommand.CombatUseDraft(draft, List.of("adder"));
+        Map<String, Object> hitWire = Map.of("kind", "damage", "diceCount", 1, "diceSides", 4, "attribute", "force", "flat", 1,
+                "penetration", 0, "toSelf", false);
+        Map<String, Object> windWire = Map.of("kind", "apply", "diceCount", 0, "diceSides", 0, "flat", 0, "penetration", 0,
+                "toSelf", false, "effectId", "winded");
+        Map<String, Object> draftWire = Map.of("label", "Gust", "targets", "hostile", "maxTargets", 1, "range", 0,
+                "steps", List.of(hitWire, windWire));
+        assertEquals(Map.of("draft", draftWire, "targetIds", List.of("adder")), command.payload());
+        assertEquals(command, decode("COMBAT_USE_DRAFT", Map.of("draft", draftWire, "targetIds", List.of("adder"))));
+        assertEquals(command, TypedCommand.decode(CommandCanonicalForm.encode(command.type(), 3, command.payload(), 32_768)));
+        assertEquals(new org.rpgengine.combat.TacticalIntent.UseDraft(List.of("adder")), command.intent());
+        assertTrue(command instanceof TypedCommand.Tactical, "legal only in encounter mode");
+
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", draftWire));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", draftWire, "targetIds", List.of("adder", "adder")));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", draftWire, "targetIds", List.of(), "focus", 0));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", with(draftWire, "cost", 1), "targetIds", List.of()));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", with(draftWire, "cooldownRounds", 0), "targetIds", List.of()));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", with(draftWire, "label", " "), "targetIds", List.of()));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", with(draftWire, "label", "x".repeat(81)), "targetIds", List.of()));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", with(draftWire, "targets", "HOSTILE"), "targetIds", List.of()));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", with(draftWire, "range", 1000), "targetIds", List.of()));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", with(draftWire, "steps", List.of()), "targetIds", List.of()));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", with(draftWire, "steps",
+                List.of(hitWire, hitWire, hitWire, hitWire, hitWire)), "targetIds", List.of()));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", with(draftWire, "steps", List.of(with(hitWire, "kind", "teleport"))),
+                "targetIds", List.of()));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", with(draftWire, "steps", List.of(with(hitWire, "flat", -1000))),
+                "targetIds", List.of()));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", with(draftWire, "steps", List.of(with(hitWire, "toSelf", "no"))),
+                "targetIds", List.of()));
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", with(draftWire, "steps", List.of(with(hitWire, "focus", 0))),
+                "targetIds", List.of()));
+        var bare = new java.util.HashMap<>(hitWire);
+        bare.remove("penetration");
+        assertInvalid("COMBAT_USE_DRAFT", Map.of("draft", with(draftWire, "steps", List.of(bare)), "targetIds", List.of()));
+        assertThrows(OperationAdmissionFailure.class, () -> new TypedCommand.CombatUseDraft(new org.rpgengine.creative.AbilityDraft(
+                "Gust", org.rpgengine.combat.CombatAbility.Targets.HOSTILE, Integer.MIN_VALUE, 0, List.of(hit)), List.of()));
+    }
+
+    /**
+     * Learning a draft (P15.4-B) carries the recipe ID and the draft as written, never a version or cost: the exact field set
+     * decodes, the recipe ID has the stored form, the draft has the bounds of a draft use, and it is an exploration intention.
+     */
+    @Test
+    void decodesALearningExactly() {
+        assertTrue(TypedCommand.registered("LEARN_DRAFT"));
+        var hit = new org.rpgengine.creative.AbilityDraft.Step(org.rpgengine.combat.CombatAbility.Kind.DAMAGE, 1, 4, null, 0, 0,
+                null, false);
+        var draft = new org.rpgengine.creative.AbilityDraft("Jab", org.rpgengine.combat.CombatAbility.Targets.HOSTILE, 1, 0,
+                List.of(hit));
+        var command = new TypedCommand.LearnDraft("quick-jab", draft);
+        Map<String, Object> hitWire = Map.of("kind", "damage", "diceCount", 1, "diceSides", 4, "flat", 0, "penetration", 0,
+                "toSelf", false);
+        Map<String, Object> draftWire = Map.of("label", "Jab", "targets", "hostile", "maxTargets", 1, "range", 0,
+                "steps", List.of(hitWire));
+        assertEquals(Map.of("recipeId", "quick-jab", "draft", draftWire), command.payload());
+        assertEquals(command, decode("LEARN_DRAFT", Map.of("recipeId", "quick-jab", "draft", draftWire)));
+        assertEquals(command, TypedCommand.decode(CommandCanonicalForm.encode(command.type(), 3, command.payload(), 32_768)));
+        TypedCommand typed = command;
+        assertTrue(!(typed instanceof TypedCommand.Tactical), "legal only in exploration mode");
+        // The stored wire form reads back as the same draft.
+        assertEquals(draft, LearnedRecipes.read(tools.jackson.databind.json.JsonMapper.builder().build()
+                .writeValueAsString(LearnedRecipes.wire(draft))));
+
+        assertInvalid("LEARN_DRAFT", Map.of("draft", draftWire));
+        assertInvalid("LEARN_DRAFT", Map.of("recipeId", "quick-jab", "draft", draftWire, "version", 2));
+        assertInvalid("LEARN_DRAFT", Map.of("recipeId", "Quick", "draft", draftWire));
+        assertInvalid("LEARN_DRAFT", Map.of("recipeId", "9-jab", "draft", draftWire));
+        assertInvalid("LEARN_DRAFT", Map.of("recipeId", "#draft", "draft", draftWire));
+        assertInvalid("LEARN_DRAFT", Map.of("recipeId", "j".repeat(33), "draft", draftWire));
+        assertInvalid("LEARN_DRAFT", Map.of("recipeId", "quick-jab", "draft", with(draftWire, "focus", 0)));
+        assertInvalid("LEARN_DRAFT", Map.of("recipeId", "quick-jab", "draft", with(draftWire, "steps", List.of())));
+    }
+
+    /** @return a copy of a wire object with one member set */
+    private static Map<String, Object> with(Map<String, Object> object, String key, Object value) {
+        var copy = new java.util.HashMap<>(object);
+        copy.put(key, value);
+        return copy;
+    }
+
     private static TypedCommand decode(String type, Map<String, Object> payload) {
         return TypedCommand.decode(CommandCanonicalForm.encode(type, 0, payload, 32_768));
     }

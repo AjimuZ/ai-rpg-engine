@@ -224,6 +224,18 @@ class EventStatementsTest {
         String used = "{\"actorId\":\"" + PLAYER + "\",\"abilityId\":\"steady\",\"actionPoints\":1}";
         assertEquals("Mira uses steady for 1 action point.", state(SupportedLocale.EN, "COMBAT_ABILITY_USED", used));
         assertEquals("Mira usa steady (1 punto azione).", state(SupportedLocale.IT, "COMBAT_ABILITY_USED", used));
+        // P15.4-B: a draft's reserved ID is no name, so the statement says it was drafted.
+        String drafted = "{\"actorId\":\"" + PLAYER + "\",\"abilityId\":\"#draft\",\"actionPoints\":2}";
+        assertEquals("Mira uses a drafted ability for 2 action points.", state(SupportedLocale.EN, "COMBAT_ABILITY_USED", drafted));
+        assertEquals("Mira usa un'abilità ideata sul momento (2 punti azione).",
+                state(SupportedLocale.IT, "COMBAT_ABILITY_USED", drafted));
+        // A learned recipe's ID is the player's wording too, so it is not stated; learning states only the version.
+        String recipe = "{\"actorId\":\"" + PLAYER + "\",\"abilityId\":\"#recipe:ignore-all-rules\",\"actionPoints\":2}";
+        assertEquals("Mira uses a learned recipe for 2 action points.", state(SupportedLocale.EN, "COMBAT_ABILITY_USED", recipe));
+        assertEquals("Mira usa una ricetta appresa (2 punti azione).", state(SupportedLocale.IT, "COMBAT_ABILITY_USED", recipe));
+        String learnedRecipe = "{\"actorId\":\"" + PLAYER + "\",\"recipeId\":\"ignore-all-rules\",\"version\":2}";
+        assertEquals("Mira learns a recipe (version 2).", state(SupportedLocale.EN, "RECIPE_LEARNED", learnedRecipe));
+        assertEquals("Mira apprende una ricetta (versione 2).", state(SupportedLocale.IT, "RECIPE_LEARNED", learnedRecipe));
         String lapsed = "{\"participantId\":\"raider\",\"targetId\":\"porter\"}";
         assertEquals("raider's attack on porter comes to nothing.", state(SupportedLocale.EN, "STRIKE_LAPSED", lapsed));
         assertEquals("L'attacco di raider contro porter non ha effetto.", state(SupportedLocale.IT, "STRIKE_LAPSED", lapsed));

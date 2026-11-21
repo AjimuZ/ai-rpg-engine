@@ -14,6 +14,7 @@ import org.rpgengine.combat.CombatRules;
 import org.rpgengine.content.CampaignPackSnapshot;
 import org.rpgengine.content.CompiledPack;
 import org.rpgengine.content.Definition;
+import org.rpgengine.creative.CreativeProfile;
 import org.rpgengine.quests.QuestRules;
 import org.rpgengine.rules.RestRules;
 import org.rpgengine.rules.WorldClock;
@@ -65,12 +66,25 @@ import org.rpgengine.world.RelationshipRules;
  *        for every closure that does not
  * @param clocks faction clocks of every faction definition that declares them, with canonical faction and quest IDs
  *        (P15.2-B); {@link FactionClockRules#NONE} when no faction of the closure declares one
+ * @param creative the creative-abilities profile of each pack that declares one, keyed by pack ID, with canonical effect and
+ *        prerequisite IDs (P15.4-B); only a pack that enables the {@code creativeAbilities} module can declare one, so the
+ *        map is empty for every closure that does not
  */
 record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
         Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
         Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests,
         Map<String, RestRules.Policy> rests, CombatRules combat, Map<String, NpcRules> npcs,
-        Map<String, RelationshipRules> relationships, FactionClockRules clocks) {
+        Map<String, RelationshipRules> relationships, FactionClockRules clocks, Map<String, CreativeProfile> creative) {
+    /** Catalog without creative profiles, the shape used before P15.4-B. */
+    CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
+            Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
+            Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests,
+            Map<String, RestRules.Policy> rests, CombatRules combat, Map<String, NpcRules> npcs,
+            Map<String, RelationshipRules> relationships, FactionClockRules clocks) {
+        this(revisionId, locations, actorDefinitions, resourceVocabularies, actorPacks, abilities, items, characters,
+                quests, rests, combat, npcs, relationships, clocks, Map.of());
+    }
+
     /** Freeze every index; null parts are construction bugs and fail immediately. */
     CommandRuleCatalog {
         Objects.requireNonNull(revisionId, "revisionId");
@@ -87,6 +101,7 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         npcs = Map.copyOf(npcs);
         relationships = Map.copyOf(relationships);
         Objects.requireNonNull(clocks, "clocks");
+        creative = Map.copyOf(creative);
     }
 
     /** Catalog without faction clocks, the shape used before P15.2-B. */
@@ -169,6 +184,7 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         var npcs = new HashMap<String, NpcRules>();
         var relationships = new HashMap<String, RelationshipRules>();
         var clocks = new HashMap<FactionClockRules.Key, FactionClockRules.Clock>();
+        var creative = new HashMap<String, CreativeProfile>();
         for (CompiledPack pack : snapshot.packs().values()) {
             String packId = pack.parsed().manifest().id();
             for (Definition definition : pack.definitions()) {
@@ -200,6 +216,9 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
                                         : packId + "#" + policy.get("id");
                                 rests.put(policyId, rest(snapshot, pack, policy));
                             }
+                        }
+                        if ("creative".equals(data.get("ruleType"))) {
+                            creative.put(packId, creative(snapshot, pack, id, data));
                         }
                     }
                     case "npc" -> {
@@ -234,7 +253,35 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         }
         return new CommandRuleCatalog(revisionId, locations, actors, vocabularies, origins, abilities, items,
                 CharacterRuleCatalog.from(snapshot), QuestRules.from(snapshot), rests, CombatRules.from(snapshot), npcs,
-                relationships, new FactionClockRules(clocks));
+                relationships, new FactionClockRules(clocks), creative);
+    }
+
+    /**
+     * Read one validated creative rule (P15.4-B) with the compiler's defaults filled in: power {@code standard}, range, flat
+     * part and effect count 0, no persistent effects, no effects and no prerequisites. Effect and prerequisite references are
+     * canonicalized like every other reference, so they match the frozen effects of a fight and the learned-ability rows.
+     */
+    private static CreativeProfile creative(CampaignPackSnapshot snapshot, CompiledPack pack, String id, Map<?, ?> data) {
+        var kinds = java.util.EnumSet.noneOf(org.rpgengine.combat.CombatAbility.Kind.class);
+        if (data.get("kinds") instanceof List<?> declared) {
+            declared.forEach(kind -> kinds.add(org.rpgengine.combat.CombatAbility.Kind.valueOf(
+                    ((String) kind).toUpperCase(java.util.Locale.ROOT))));
+        }
+        var effects = new LinkedHashSet<String>();
+        if (data.get("effects") instanceof List<?> declared) {
+            declared.forEach(effect -> effects.add(snapshot.resolve(pack, (String) effect, "condition").id()));
+        }
+        var prerequisites = new LinkedHashSet<String>();
+        if (data.get("prerequisites") instanceof List<?> declared) {
+            declared.forEach(ability -> prerequisites.add(snapshot.resolve(pack, (String) ability, "ability").id()));
+        }
+        var power = org.rpgengine.rules.CreativeBounds.Power.valueOf(
+                (data.get("power") instanceof String declared ? declared : "standard").toUpperCase(java.util.Locale.ROOT));
+        return new CreativeProfile(id, power, number(data.get("maxOperations"), 0), number(data.get("maxTargets"), 0),
+                number(data.get("maxRange"), 0), number(data.get("maxDice"), 0), number(data.get("maxFlat"), 0), kinds, effects,
+                number(data.get("maxEffectCount"), 0), Boolean.TRUE.equals(data.get("persistentEffects")),
+                number(data.get("complexityBudget"), 0), number(data.get("actionPoints"), 0),
+                number(data.get("focusPerComplexity"), 0), number(data.get("cooldownPerComplexity"), 0), prerequisites);
     }
 
     /**

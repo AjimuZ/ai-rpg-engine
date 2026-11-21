@@ -10,8 +10,9 @@ P04.5's [neutral genre fixtures](../backend/src/test/resources/packs/README.md)
 compile Trailcraft/Vigor and Systems/Charge, distinct creation budgets, recovery
 abilities and exploration objectives through the same engine. This is content
 import evidence only. Both fixtures leave guide, creative abilities and romance
-disabled, without claiming gameplay checks. Since P15.1-B the engine supports one
-optional module, `relationships` (section 6). Every other module ID is still refused.
+disabled, without claiming gameplay checks. Since P15.1-B the engine supports the
+optional module `relationships` (section 6), and since P15.4-B also
+`creativeAbilities` (section 9). Every other module ID is still refused.
 
 Since P10.1 the character part of this model is executable: attributes with ranges, skills with a
 maximum rank, derived statistics, learned abilities with prerequisites, conditions with stacking,
@@ -159,7 +160,18 @@ This module generalizes Rune without requiring its lore. A player describes a de
 
 Flow: draft → validate → show cost/targets → player commits → rules resolve → narration → optional save as a learned reusable ability. Drafting and explaining a recipe do not execute it. Successful learning has provenance and a versioned ability definition.
 
-Implemented since P15.4-A (pure, not yet called): the draft and validate/preview steps of this flow. `creative/DraftPreview` checks an `AbilityDraft` of at most a profile's number of steps (the combat ability operations damage, heal, apply and remove of an authored effect) against a `CreativeProfile`'s bounds on targets, range, dice, amounts, effects, effect duration and complexity. A valid draft is previewed as the frozen combat ability it would become, with costs the engine derives (the profile's action points, and Focus and cooldown proportional to a provisional complexity), the durations of its effects and the blockers of the user's current state (missing prerequisite, too little Focus). The preview is a value: it spends, moves, records and learns nothing. Not implemented: pack data for profiles, a `creativeAbilities` module switch, a command that executes or learns a draft (it must preview again at its own state), a contract that translates a description into a draft, learned recipes and high-power profiles. Details are in the backend README.
+Implemented since P15.4-A: the draft and validate/preview steps of this flow. `creative/DraftPreview` checks an `AbilityDraft` of at most a profile's number of steps (the combat ability operations damage, heal, apply and remove of an authored effect) against a `CreativeProfile`'s bounds on targets, range, dice, amounts, effects, effect duration and complexity. A valid draft is previewed as the frozen combat ability it would become, with costs the engine derives (the profile's action points, and Focus and cooldown proportional to a provisional complexity), the durations of its effects and the blockers of the user's current state (missing prerequisite, too little Focus). The preview is a value: it spends, moves, records and learns nothing.
+
+Implemented since P15.4-B ([ADR 0053](adr/0053-drafts-execute-only-through-an-explicit-fight-command-that-previews-again.md)): the "player commits" and "rules resolve" steps, in fights only, and the optional save as a learned reusable ability.
+
+- A pack that enables the `creativeAbilities` module may declare one `ruleType: creative` profile ([docs/09](09-adventure-packs.md)). Any other pack gets `MODULE_DISABLED`.
+- Profiles have a power tier. A `standard` profile (the default) has a complexity budget of at most 16, must charge Focus or a cooldown and cannot apply persistent effects. Only `power: high` lifts those three limits, up to a budget of 32. Neither tier exceeds a frozen ability's bounds, and every draft costs at least one action point.
+- The tactical command `COMBAT_USE_DRAFT` is the one explicit player action that executes a draft. The rule gate previews the draft again under the campaign lock against the fight pack's profile and current state. The combat scheduler then resolves the candidate like a frozen ability. Every draft's use is recorded under one reserved ID, so a draft waits its own cooldown counted from the player's last draft.
+- Entry freezes the effects the profile permits. Using a draft learns nothing.
+- The exploration command `LEARN_DRAFT` {recipeId, draft} is the one explicit player action that saves a draft. It previews the draft again against the profile of the player's own vocabulary pack, which is the pack of every fight the player can enter; it spends nothing, and Focus does not block it. Each learning stores the next version of the named recipe as an immutable `learned_recipe` row (V35) with its provenance: the profile and content revision it was previewed against, the derived complexity and costs, and the revision and event that announced it. A player holds at most 8 recipes and 99 versions of one.
+- Entry previews the latest version of each recipe again and freezes every one that still fits, and whose prerequisites are learned, as an ordinary frozen ability under `#recipe:<id>`. In the fight `COMBAT_USE_ABILITY` uses it, with its own cooldown.
+
+Not implemented: use of a draft or recipe outside a fight, forgetting or renaming a recipe, a contract that translates a description into a draft, a route or panel that shows a preview or sends either command, and the "bypass ordinary uncertainty" rule below. Details are in the backend README.
 
 Profiles may support constrained, high-power, or author-controlled creative play. A zero-cost profile is an explicit ruleset/content choice, not the default inherited from the demo's personal retcon. “Unlimited creativity” does not mean unbounded CPU, arbitrary code execution, infinite targets, unvalidated state, or freedom to expose secrets. An authored high-power effect can still use bounded engine operations and bypass ordinary uncertainty through an explicit rule.
 

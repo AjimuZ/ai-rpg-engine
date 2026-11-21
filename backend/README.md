@@ -1581,7 +1581,8 @@ targets, range, at most the profile's number of `Step`s using the combat ability
 - `Rejected(issues)` lists every broken bound as a fixed code and path (`label`, `target-count`, `range`,
   `operation-count`, `kind-not-allowed`, `operand`, `dice`, `amount`, `attribute`, `unknown-effect`, `duration`,
   `complexity`). A draft with too many steps is rejected before any step is read.
-- `Ready` shows the frozen `CombatAbility` the draft would become, under the reserved id `draft`. Its costs are derived,
+- `Ready` shows the frozen `CombatAbility` the draft would become, under the reserved id `#draft` (`draft` before P15.4-B,
+  renamed so it can never equal a canonical definition ID). Its costs are derived,
   never proposed: the profile's action points, and Focus and cooldown proportional to a provisional complexity. It also shows
   each applied effect's duration, whether the profile is deliberately zero-cost, and `blockers` of the user's current state
   (`prerequisite-missing`, `insufficient-focus`), which leave the draft valid.
@@ -1590,11 +1591,60 @@ targets, range, at most the profile's number of `Step`s using the combat ability
 - The preview takes immutable values and returns a value. It spends, moves, records, learns and stores nothing, and holds no
   command. Using or learning a draft must be a separate explicit player operation that previews again at its own state.
 
-Tests: `DraftPreviewTest` (6).
+Tests: `DraftPreviewTest` (7 since P15.4-B).
 
-Limits: nothing calls it. No pack declares a profile, there is no `creativeAbilities` module switch, no command executes or
-learns a draft, no contract translates a description into a draft, and there is no high-power profile. No migration, pack
-schema, route, command or page changed.
+Limits of P15.4-A alone: nothing called it, and no pack could declare a profile. P15.4-B below adds both.
+
+### Draft execution, learned recipes and bounded high-power profiles (P15.4-B)
+
+[ADR 0053](../docs/adr/0053-drafts-execute-only-through-an-explicit-fight-command-that-previews-again.md).
+
+- **Pack data.** `EngineContract.current()` supports the `creativeAbilities` module. Only a pack that enables it may declare
+  one `ruleType: creative` rule (`MODULE_DISABLED` otherwise), validated after the combat rule (docs/09). The command
+  catalog projects it as `CommandRuleCatalog.creative()`, keyed by pack ID, with canonical effect and prerequisite IDs.
+- **Power tiers.** `rules/CreativeBounds` holds the engine ceilings that the compiler and `CreativeProfile` share.
+  `power: standard` (the default) allows a budget of at most 16, needs a Focus or cooldown rate above 0 and refuses
+  persistent effects. `power: high` lifts those three limits, up to 32. Both tiers keep every frozen-ability bound, at
+  most 99 Focus and 30 cooldown rounds for the largest draft, and at least one action point per draft.
+- **Command.** `TypedCommand.CombatUseDraft` (`COMBAT_USE_DRAFT` {draft, targetIds}) is a tactical intention whose payload
+  has no cost, cooldown or limit field. Decoding bounds it structurally: 1..4 steps, numbers within ±999, a label of
+  1..80 characters, distinct targets.
+- **Rule gate and resolution.** `DraftUse.candidate` previews the draft against the fight pack's profile, `state.effects()`,
+  the player's encounter Focus and the learned abilities. Its refusals are `ABILITY_UNAVAILABLE` (no profile),
+  `EFFECT_UNSUPPORTED` (any rejection code) and `PREREQUISITE_UNMET`. `CommandRules` runs it at admission and at commit,
+  then `TacticalRules.draftRefusal` (turn, prevention, the cooldown under `#draft`, Focus, targets, points).
+  `LocalActionResolver` previews again with the same rows and calls `CombatScheduler.useDraft`, which resolves the
+  candidate with the frozen-ability code. `TacticalRules.refusal` refuses a `UseDraft` without a candidate, and
+  `CombatScheduler.apply` throws for one.
+- **Freezing.** Entry calls `FrozenEncounter.freeze(…, available)` with the profile's effects, so a draft can apply an
+  effect no participant names. A pack without a profile freezes exactly what it did before.
+- **Records.** The use is stored under `#draft` in `ability_uses`, so a draft waits its own cooldown counted from the
+  player's last draft. The receipt projection allows a `draft` block {abilityId, actionPoints, focus, cooldownRounds}.
+  `EventStatements` states a draft's `COMBAT_ABILITY_USED` as "uses a drafted ability". Using a draft learns nothing.
+- **Learning.** `TypedCommand.LearnDraft` (`LEARN_DRAFT` {recipeId, draft}) is an exploration intention: a recipe ID
+  `[a-z][a-z0-9-]{0,31}` and a draft under the same structural bounds, with no version or cost field.
+  `CommandRules.Check#learnDraft` and the resolver both call `LearnedRecipes.learnable` (the draft previewed against the
+  profile of the player's vocabulary pack; Focus never blocks it) and `LearnedRecipes.nextVersion` (at most 8 recipe IDs and
+  99 versions, otherwise `ABILITY_UNAVAILABLE`). The resolver writes the public `RECIPE_LEARNED` event and the receipt's
+  `recipe` block {recipeId, version, abilityId, complexity, actionPoints, focus, cooldownRounds}, and passes a
+  `LearnedRecipes.Learning` through `ResolvedCommit.recipe()`; `CanonicalCommitService` writes it after the events.
+- **Storage (V35).** `learned_recipe` holds one immutable row per version: the label, the draft's wire form, the profile's
+  pack and rule ID, the content revision, the derived complexity and costs, and the revision, event and world time of the
+  learning. Triggers refuse updates and deletes, an event of another revision, a skipped version and a ninth recipe ID.
+- **Entry.** `ENGAGE` reads the latest version of each recipe into the resolver's snapshot, and `LearnedRecipes.frozen`
+  previews each again against the fight pack's profile. Each one that fits and whose prerequisites are learned is passed to
+  `FrozenEncounter.freeze(…, available, recipes)` as a frozen ability `#recipe:<id>` after the learned abilities, so
+  `COMBAT_USE_ABILITY` uses it with its own cooldown and the legal options list it. `EventStatements` states its use as
+  "uses a learned recipe" and the learning as "learns a recipe (version N)", without the player's recipe ID or label.
+
+Tests: `DraftCommandsTest` (6, PostgreSQL), `LearnedRecipesTest` (3), `DraftUseTest` (4), `CreativeRulesTest` (2),
+`TypedCommandTest#decodesADraftUseExactly`, `TypedCommandTest#decodesALearningExactly`,
+`DraftPreviewTest#highPowerLiftsOnlyTheTierLimits` and the drafted and recipe statements in `EventStatementsTest`.
+
+Limits: drafts and recipes work only in fights, and a recipe cannot be forgotten or renamed. A route or panel showing a
+preview, the legal options listing a draft, a page sending either command, a contract that turns a description into a
+draft, and the guide's drafting help are not implemented. The complexity formula, rates, tier ceilings and the recipe limit
+are provisional. No route or page changed.
 
 ## Interface reload contract (P05.6)
 

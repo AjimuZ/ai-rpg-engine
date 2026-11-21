@@ -319,6 +319,23 @@ Example:
 
 **Social checks and negotiation (P11.5).** [ADR 0033](adr/0033-negotiation-explicit-answers-and-surrender.md) adds closed fields to a `social` action. Any social action may declare `check` {`attribute` (a role: `force`, `finesse`, `insight` or `resolve`), optional `skill` (a skill definition, whose rank the player holds is frozen at entry), optional `difficulty` 0..40, otherwise the recipient's effective Resistance}. A `negotiate` action addressing `hostile` recipients may declare `terms` and a `counteroffer`, each {`id`, `name`, optional `description`, `kind` `truce`, `recipientSurrenders` or `playerSurrenders`, `cost` 0..the profile's `actionPoints`, default 0}. A failed check is a refusal; a success is the counteroffer when one is declared and the margin is below `strongHitMargin`, otherwise the terms. Without a check the counteroffer stands, otherwise the terms do. Terms on any other intent or recipients and a counteroffer without terms are `CONSTRAINT_CONFLICT`, a counteroffer with the terms' ID is `DUPLICATE`, an unknown skill is `REFERENCE_UNKNOWN`, another kind of definition is `REFERENCE_KIND`, and unknown fields, out-of-bound values and a check or terms on a scene action are `SCHEMA`. Terms' names are localizable public text under `/actions/<id>/terms` and `/actions/<id>/counteroffer`. An action declaring none of these keeps its earlier frozen form and draws nothing.
 
+**Creative profile (P15.4-B).** [ADR 0053](adr/0053-drafts-execute-only-through-an-explicit-fight-command-that-previews-again.md) adds one closed rule type, `creative`, the bounds a player's draft must fit and the rates of its engine-derived cost. Only a pack whose own manifest lists `{"id": "creativeAbilities"}` in `modules` may declare it; in any other pack it is `MODULE_DISABLED`, located at `ruleType`. Listing the module with a `configuration` file is `CONSTRAINT_CONFLICT`. A pack declares at most one (`DUPLICATE`), and it needs the pack's combat rule (`CONSTRAINT_CONFLICT`); it is validated after the combat rule, whatever the file order. Members:
+
+- `power`: `standard` (default) or `high`.
+- Required: `maxOperations` 1..4, `maxTargets` 1..9, `maxDice` 0..16, `kinds` (1..4 distinct of `damage`, `heal`, `apply`, `remove`), `complexityBudget` 1..32, `actionPoints` 1..the combat profile's `actionPoints`, `focusPerComplexity` 0..99 and `cooldownPerComplexity` 0..30. Both rates are required, so even a free profile states its cost.
+- Optional: `maxRange` 0..the profile's `maxRangeEdges` (default 0), `maxFlat` 0..20 (0), `maxEffectCount` 0..10000 (0), `persistentEffects` (false), `effects` (conditions of this pack with a combat block, which entry freezes into every fight of the pack; another condition is `CONSTRAINT_CONFLICT`) and `prerequisites` (abilities the player must have learned).
+- Joint rules, each `CONSTRAINT_CONFLICT`: a Focus rate needs the combat rule's `focus`; the budget times each rate must stay within 99 Focus and 30 cooldown rounds; and a `standard` profile has a budget of at most 16, charges Focus or a cooldown and cannot set `persistentEffects`. Unknown members and out-of-bound values are `SCHEMA`, and unknown references `REFERENCE_UNKNOWN`.
+
+Example:
+
+```json
+{"id": "rules.creative", "kind": "rule", "data": {"ruleType": "creative", "maxOperations": 2, "maxTargets": 2,
+  "maxRange": 1, "maxDice": 2, "maxFlat": 2, "kinds": ["damage", "apply"], "effects": ["winded"], "maxEffectCount": 2,
+  "complexityBudget": 8, "actionPoints": 2, "focusPerComplexity": 1, "cooldownPerComplexity": 1}}
+```
+
+The runtime meaning is in [gameplay modules section 9](10-gameplay-modules.md#9-creative-abilities-module). The profile of the pack that declares the player's creation profile also bounds the recipes a player learns with `LEARN_DRAFT`, and the profile of each fight's pack decides which learned recipes that fight's entry freezes. Recipes are campaign state (`learned_recipe`), never pack data.
+
 P10.1 ([ADR 0023](adr/0023-character-rules-and-equipment-constraints.md)) adds two rule types and a few fields, all closed and bounded:
 
 - `equipment`: `hands` (1–4, default 2) and 1–16 `slots` with `id`, `name`, `capacity` (1–8, default 1) and optional `accepts` tags. A pack has at most one equipment rule. A slot with `accepts` takes only items carrying one of those tags.
@@ -517,7 +534,9 @@ located rejection of broken references without partial writes. Production source
 and the engine contract are unchanged. This establishes the import portion of
 QA-01/02, not gameplay or full QA-33. The current contract has no module runtime,
 so both packs keep `modules: []`; distinct guide/creative settings and their
-behavior remain deferred until supported. P04.6 adds reviewed EN/IT resources
+behavior remain deferred until supported. (Since P15.1-B and P15.4-B the contract
+supports the `relationships` and `creativeAbilities` modules; these two fixtures
+still enable neither, and no guide module exists.) P04.6 adds reviewed EN/IT resources
 for every approved catalog leaf, source-owned tutorial/quote text and explicit
 English quote fallback in Italian. Source-only prose remains outside that coverage.
 

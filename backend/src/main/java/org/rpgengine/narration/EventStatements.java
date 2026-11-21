@@ -27,6 +27,8 @@ import tools.jackson.databind.JsonNode;
 public final class EventStatements {
     /** The only event payload version these statements understand. */
     static final int VERSION = 1;
+    /** Prefix of a learned recipe's frozen ability ID (P15.4-B, {@code commands.LearnedRecipes.ABILITY_PREFIX}). */
+    static final String RECIPE_PREFIX = "#recipe:";
 
     /** Static helpers only. */
     private EventStatements() {
@@ -110,6 +112,14 @@ public final class EventStatements {
                 }
                 String on = targets.isEmpty() ? "" : (it ? " su " : " on ") + String.join(", ", targets);
                 yield it ? actor + " usa l'abilità " + ability + on + "." : actor + " uses the ability " + ability + on + ".";
+            }
+            case "RECIPE_LEARNED" -> {
+                // P15.4-B: the recipe ID and the draft's label are the player's wording, so only the version is stated.
+                String actor = name(payload, "actorId", names);
+                Long recipeVersion = number(payload, "version");
+                yield actor == null || recipeVersion == null ? null
+                        : it ? actor + " apprende una ricetta (versione " + recipeVersion + ")."
+                        : actor + " learns a recipe (version " + recipeVersion + ").";
             }
             case "RESOURCE_SPENT" -> {
                 String actor = name(payload, "actorId", names);
@@ -527,7 +537,15 @@ public final class EventStatements {
                 String participant = participant(payload, names);
                 String ability = token(payload, "abilityId");
                 Long points = number(payload, "actionPoints");
+                // A draft's reserved ID is no name (P15.4-B); its wording, which is the player's, stays out of the statement.
+                boolean drafted = org.rpgengine.creative.DraftPreview.CANDIDATE_ID.equals(ability);
+                // So is a learned recipe's ID, which the player chose.
+                boolean recipe = ability != null && ability.startsWith(RECIPE_PREFIX);
                 yield participant == null || ability == null || points == null ? null
+                        : drafted ? (it ? participant + " usa un'abilità ideata sul momento (" + points(true, points) + ")."
+                                : participant + " uses a drafted ability for " + points(false, points) + ".")
+                        : recipe ? (it ? participant + " usa una ricetta appresa (" + points(true, points) + ")."
+                                : participant + " uses a learned recipe for " + points(false, points) + ".")
                         : it ? participant + " usa " + ability + " (" + points(true, points) + ")."
                         : participant + " uses " + ability + " for " + points(false, points) + ".";
             }

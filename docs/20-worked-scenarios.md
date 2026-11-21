@@ -88,6 +88,8 @@ With the optional creative module enabled, a player asks for a recipe that could
 
 No resource is spent, no creature moves, no combat event occurs, and no reusable learned ability is granted unless a separate learning operation was explicitly selected. A later execution request validates the then-current state again.
 
+Since P15.4-A the preview step is implemented as a pure function, and since P15.4-B so is the later execution request, in fights only: the tactical command `COMBAT_USE_DRAFT` previews the draft again under the campaign lock and resolves it through the combat scheduler ([ADR 0053](adr/0053-drafts-execute-only-through-an-explicit-fight-command-that-previews-again.md)). The separate learning operation exists too: the exploration command `LEARN_DRAFT` previews the draft again and stores a new version of a named recipe, which the next fight's entry previews again before freezing it as an ability. The translation of a described intent into a draft and the panel are not implemented.
+
 ## 8. Content upgrade during an active campaign
 
 An author changes a weapon formula in pack version 1.1. A campaign pinned to 1.0 retains its original formula. The owner can preview migration, including equipped items, derived statistics, active encounter dependencies, and affected summaries. Migration is blocked during an incompatible active encounter or waits for settlement. A verified backup and audited revision accompany an applied upgrade.

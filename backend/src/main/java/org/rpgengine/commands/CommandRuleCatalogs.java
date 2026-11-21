@@ -43,9 +43,12 @@ public class CommandRuleCatalogs {
             "UNEQUIP_ITEM", "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST",
             // Entering an encounter freezes the pinned combat profile and template (P11.1).
             "ENGAGE",
-            // Using an item in a fight runs its pinned use contract (P11.3), and readying one checks its pinned slot, hands
-            // and combat data (P11.5); other tactical intentions read the frozen encounter.
-            "COMBAT_USE_ITEM", "READY_ITEM",
+            // Using an item in a fight runs its pinned use contract (P11.3), readying one checks its pinned slot, hands
+            // and combat data (P11.5), and a draft is previewed against the pinned creative profile (P15.4-B); other
+            // tactical intentions read the frozen encounter.
+            "COMBAT_USE_ITEM", "READY_ITEM", "COMBAT_USE_DRAFT",
+            // Learning a draft previews it against the pinned creative profile of the player's vocabulary (P15.4-B).
+            "LEARN_DRAFT",
             // WAIT needs no definition to be legal, but a clock predicate can become true as it passes (P10.4).
             // It uses the catalog when one is available and never fails for lack of it (see Content#optional).
             "WAIT");

@@ -76,7 +76,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *       {@code EQUIP_ITEM}/{@code UNEQUIP_ITEM} rules ({@code ITEM_UNAVAILABLE}, {@code EQUIPMENT_ILLEGAL}) and refuses a weapon whose
  *       hit applies an effect the fight did not freeze ({@code EFFECT_UNSUPPORTED}), and {@code SETTLE_ENCOUNTER} needs the
  *       fight it names at its outcome ({@code TURN_UNAVAILABLE}) and, when that fight ended inside a round, room on the clock
- *       for the round's seconds ({@code TIME_ILLEGAL}).</li>
+ *       for the round's seconds ({@code TIME_ILLEGAL}). Since P15.4-B {@code COMBAT_USE_DRAFT} previews the draft again
+ *       against the fight pack's pinned creative profile ({@link DraftUse}: {@code ABILITY_UNAVAILABLE} without a profile,
+ *       {@code EFFECT_UNSUPPORTED} outside its bounds, {@code PREREQUISITE_UNMET}), then applies the ability rules to the
+ *       candidate (its cooldown counted from the player's last draft, prevention, Focus, targets, points). The exploration
+ *       command {@code LEARN_DRAFT} previews its draft against the profile of the player's vocabulary pack with the same
+ *       three categories, and refuses a ninth recipe or a hundredth version as {@code ABILITY_UNAVAILABLE}
+ *       ({@link LearnedRecipes}).</li>
  *   <li><b>Causal attribution</b> — at commit, resolved effects may only touch the participants
  *       this intention lawfully involves ({@link #requireAttributed}).</li>
  * </ul>
@@ -156,6 +162,7 @@ final class CommandRules {
             case TypedCommand.AcceptQuest accept -> check.quest(accept.questId(), QuestStatus.AVAILABLE);
             case TypedCommand.SuspendQuest suspend -> check.quest(suspend.questId(), QuestStatus.ACTIVE);
             case TypedCommand.ResumeQuest resume -> check.quest(resume.questId(), QuestStatus.SUSPENDED);
+            case TypedCommand.LearnDraft learn -> check.learnDraft(learn);
             case TypedCommand.TradeItems trade -> {
                 if (trade.counterpartyActorId().equals(player)) {
                     throw fail(OperationAdmissionFailure.Kind.ACTOR_UNAVAILABLE);
@@ -243,6 +250,10 @@ final class CommandRules {
             if (!participants.contains(visit.actorId())) {
                 throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
             }
+        }
+        // A learned recipe belongs to the learning participant (P15.4-B).
+        if (plan.recipe() != null && !participants.contains(plan.recipe().actorId())) {
+            throw new IllegalStateException("resolved effect is not attributable to the admitted intention");
         }
         for (var event : plan.events()) {
             if (event.actorId() != null && !participants.contains(event.actorId())) {
@@ -535,7 +546,12 @@ final class CommandRules {
             if (!player.equals(state.player().actorId())) {
                 throw fail(OperationAdmissionFailure.Kind.ACTOR_UNAVAILABLE);
             }
-            var refusal = TacticalRules.refusal(state, tactical.intent());
+            // A draft is previewed again here, at this state (P15.4-B): its own problems come before the turn, because a draft
+            // that breaks its profile is refused at every turn; then its candidate meets the ability rules.
+            var refusal = tactical instanceof TypedCommand.CombatUseDraft draft
+                    ? TacticalRules.draftRefusal(state, (TacticalIntent.UseDraft) draft.intent(),
+                            DraftUse.candidate(catalog(), state, draft.draft(), learned()))
+                    : TacticalRules.refusal(state, tactical.intent());
             if (refusal != null) {
                 throw fail(switch (refusal) {
                     case TURN -> OperationAdmissionFailure.Kind.TURN_UNAVAILABLE;
@@ -615,6 +631,24 @@ final class CommandRules {
                     .anyMatch(effect -> !state.effects().containsKey(effect.effectId()))) {
                 throw fail(OperationAdmissionFailure.Kind.EFFECT_UNSUPPORTED);
             }
+        }
+
+        /**
+         * Learning a draft (P15.4-B): the draft previewed again against the creative profile of the player's vocabulary pack,
+         * the pack of every fight the player can enter ({@link LearnedRecipes#learnable}), then room for the version it adds
+         * ({@link LearnedRecipes#nextVersion}). The mode gate already limits it to exploration.
+         */
+        void learnDraft(TypedCommand.LearnDraft learn) {
+            String pack = vocabulary();
+            LearnedRecipes.learnable(pack == null ? null : catalog().creative().get(pack), learn.draft(),
+                    catalog().combat().library().effects(), learned());
+            LearnedRecipes.nextVersion(LearnedRecipes.latest(jdbc, campaign, player), learn.recipeId());
+        }
+
+        /** @return the canonical abilities the player has learned, read under the caller's lock */
+        private Set<String> learned() {
+            return Set.copyOf(jdbc.queryForList("select definition_id from learned_ability where campaign_id = ? "
+                    + "and actor_id = ?", String.class, campaign, player));
         }
 
         /**

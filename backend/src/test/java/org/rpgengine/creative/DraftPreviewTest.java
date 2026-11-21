@@ -27,6 +27,7 @@ import org.rpgengine.creative.DraftPreview.Duration;
 import org.rpgengine.creative.DraftPreview.Issue;
 import org.rpgengine.creative.DraftPreview.Ready;
 import org.rpgengine.creative.DraftPreview.Rejected;
+import org.rpgengine.rules.CreativeBounds.Power;
 
 /**
  * Creative ability drafting and validation preview (P15.4-A, docs/10 section 9, docs/20 scenario 7): a draft is checked
@@ -42,7 +43,7 @@ class DraftPreviewTest {
     private static final CombatEffect SLOWED = new CombatEffect("slowed", "slowed", Stacking.STRONGEST, 1, Clock.ROUND_ENDS,
             9, false, 0, 0, 0, -1, 0, Set.of(), List.of(), true);
     private static final Map<String, CombatEffect> CATALOG = Map.of("repelled", REPELLED, "bound", BOUND, "slowed", SLOWED);
-    private static final CreativeProfile PROFILE = new CreativeProfile("weaving", 3, 3, 2, 4, 4,
+    private static final CreativeProfile PROFILE = new CreativeProfile("weaving", Power.STANDARD, 3, 3, 2, 4, 4,
             EnumSet.of(Kind.DAMAGE, Kind.APPLY, Kind.REMOVE), Set.of("repelled", "bound", "slowed", "absent"), 3, false, 16, 2,
             1, 1, Set.of("weaving-basics"));
     /** The scenario 7 recipe: push two creatures back with a light hit and a repelling effect. */
@@ -95,11 +96,11 @@ class DraftPreviewTest {
         assertEquals(blocked.candidate(), later.candidate());
     }
 
-    /** A zero-cost profile charges nothing, and says so. */
+    /** A zero-cost profile charges nothing, and says so; since P15.4-B only a high-power profile can be one. */
     @Test
     void zeroCostIsAnExplicitProfileChoice() {
-        var free = new CreativeProfile("free", 3, 3, 2, 4, 4, EnumSet.of(Kind.DAMAGE, Kind.APPLY), Set.of("repelled"), 3,
-                false, 16, 1, 0, 0, Set.of());
+        var free = new CreativeProfile("free", Power.HIGH, 3, 3, 2, 4, 4, EnumSet.of(Kind.DAMAGE, Kind.APPLY),
+                Set.of("repelled"), 3, false, 16, 1, 0, 0, Set.of());
         var result = assertInstanceOf(Ready.class, DraftPreview.preview(free, REPEL, CATALOG, new Caster(0, Set.of())));
         assertTrue(result.zeroCost());
         assertEquals(0, result.candidate().focus());
@@ -143,20 +144,60 @@ class DraftPreviewTest {
                 false))), new Issue("complexity", "/steps"));
     }
 
-    /** A profile cannot promise costs or sizes a frozen ability could not hold. */
+    /**
+     * A profile cannot promise costs or sizes a frozen ability could not hold, whatever its tier; each case below breaks one
+     * rule on a high-power profile, which every other value would satisfy.
+     */
     @Test
     void profileBoundsKeepEveryCandidateFrozenable() {
         Set<Kind> kinds = EnumSet.of(Kind.DAMAGE);
-        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", 3, 3, 2, 4, 4, kinds, Set.of(), 3, false,
-                32, 1, 4, 0, Set.of()));
-        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", 3, 3, 2, 4, 4, kinds, Set.of(), 3, false,
-                16, 1, 0, 2, Set.of()));
-        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", 5, 3, 2, 4, 4, kinds, Set.of(), 3, false,
-                16, 1, 0, 0, Set.of()));
-        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", 3, 3, 2, 4, 4, Set.of(), Set.of(), 3,
-                false, 16, 1, 0, 0, Set.of()));
-        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", 3, 3, 2, 4, 4, kinds, Set.of(), 3, false,
-                16, 0, 0, 0, Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", Power.HIGH, 3, 3, 2, 4, 4, kinds,
+                Set.of(), 3, false, 32, 1, 4, 0, Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", Power.HIGH, 3, 3, 2, 4, 4, kinds,
+                Set.of(), 3, false, 16, 1, 0, 2, Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", Power.HIGH, 5, 3, 2, 4, 4, kinds,
+                Set.of(), 3, false, 16, 1, 0, 0, Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", Power.HIGH, 3, 3, 2, 4, 4, Set.of(),
+                Set.of(), 3, false, 16, 1, 0, 0, Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", Power.HIGH, 3, 3, 2, 4, 4, kinds,
+                Set.of(), 3, false, 16, 0, 0, 0, Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", Power.HIGH, 3, 3, 2, 4, 4, kinds,
+                Set.of(), 3, false, 33, 1, 0, 0, Set.of()));
+    }
+
+    /**
+     * Bounded high-power profiles (P15.4-B): a budget above 16, zero cost and persistent effects each need {@code power: high},
+     * and a high-power profile at every engine ceiling still turns its most complex draft into a frozen ability within every
+     * bound, with at least one action point, so it cannot repeat for free.
+     */
+    @Test
+    void highPowerLiftsOnlyTheTierLimits() {
+        Set<Kind> kinds = EnumSet.of(Kind.DAMAGE);
+        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", Power.STANDARD, 3, 3, 2, 4, 4, kinds,
+                Set.of(), 3, false, 17, 1, 1, 1, Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", Power.STANDARD, 3, 3, 2, 4, 4, kinds,
+                Set.of(), 3, false, 16, 1, 0, 0, Set.of()));
+        assertThrows(IllegalArgumentException.class, () -> new CreativeProfile("p", Power.STANDARD, 3, 3, 2, 4, 4, kinds,
+                Set.of(), 3, true, 16, 1, 1, 1, Set.of()));
+        new CreativeProfile("p", Power.HIGH, 3, 3, 2, 4, 4, kinds, Set.of(), 3, true, 17, 1, 1, 1, Set.of());
+
+        var ceiling = new CreativeProfile("ceiling", Power.HIGH, CombatAbility.MAX_OPERATIONS, 9, 4, CombatAbility.MAX_DICE,
+                20, EnumSet.allOf(Kind.class), Set.of("bound"), CombatEffect.COUNT_MAX, true, CreativeProfile.COMPLEXITY_MAX, 6,
+                3, 0, Set.of());
+        // 1 + 4 dice per step, four steps: 20, under the budget of 32 with the most dice a frozen ability allows.
+        Step heavy = new Step(Kind.DAMAGE, 4, 20, null, 0, 0, null, false);
+        var result = assertInstanceOf(Ready.class, DraftPreview.preview(ceiling, new AbilityDraft("Storm", Targets.HOSTILE,
+                1, 0, List.of(heavy, heavy, heavy, heavy)), CATALOG, new Caster(99, Set.of())));
+        assertEquals(20, result.complexity());
+        assertEquals(60, result.candidate().focus());
+        assertEquals(CombatAbility.MAX_DICE, result.candidate().operations().stream().mapToInt(CombatAbility.Operation::diceCount).sum());
+        assertEquals(6, result.candidate().cost());
+        // A budget the arithmetic cannot exceed: 32 complexity points times 3 Focus is 96, inside the largest cost of 99.
+        assertTrue(CreativeProfile.COMPLEXITY_MAX * 3 <= CombatAbility.FOCUS_MAX);
+        // The persistent effect a standard profile refuses is allowed here and shown as lasting until removed.
+        var bind = assertInstanceOf(Ready.class, DraftPreview.preview(ceiling, step(new Step(Kind.APPLY, 0, 0, null, 0, 0,
+                "bound", false)), CATALOG, new Caster(99, Set.of())));
+        assertEquals(List.of(new Duration("bound", Clock.PERSISTENT, 0)), bind.durations());
     }
 
     /**

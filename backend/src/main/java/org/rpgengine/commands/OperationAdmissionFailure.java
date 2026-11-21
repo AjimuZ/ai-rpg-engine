@@ -59,9 +59,16 @@ public final class OperationAdmissionFailure extends RuntimeException {
          * One category avoids disclosing secret locations or links (HTTP 422).
          */
         DESTINATION_UNAVAILABLE,
-        /** The ability is not a pinned definition or is not learned by the acting player (HTTP 422). */
+        /**
+         * The ability is not a pinned definition or is not learned by the acting player; in a fight, it waits for its limit or
+         * cooldown. Since P15.4-B also a draft in a fight whose pack declares no creative profile, or while the cooldown of the
+         * player's last draft runs (HTTP 422).
+         */
         ABILITY_UNAVAILABLE,
-        /** A required skill rank or prerequisite ability of the selected ability is missing (HTTP 422). */
+        /**
+         * A required skill rank or prerequisite ability of the selected ability is missing; since P15.4-B also a prerequisite
+         * of the creative profile a draft is used under (HTTP 422).
+         */
         PREREQUISITE_UNMET,
         /**
          * Target count violates the ability's target policy, or the policy needs encounter zones; since P11.3 also an
@@ -89,7 +96,8 @@ public final class OperationAdmissionFailure extends RuntimeException {
          * contains an effect type that needs later systems (damage/heal armor, conditions, forced
          * movement, reveals, item creation), reads attribute or resource values from a vocabulary
          * other than the acting player's, or could need more durable draws than one operation may
-         * reserve. Nothing is journaled (HTTP 422).
+         * reserve. Since P15.4-B also a draft that breaks its creative profile's bounds (any rejection code of the
+         * validation preview). Nothing is journaled (HTTP 422).
          */
         EFFECT_UNSUPPORTED,
         /**

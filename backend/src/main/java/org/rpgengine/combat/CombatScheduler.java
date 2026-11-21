@@ -178,7 +178,34 @@ public final class CombatScheduler {
             case TacticalIntent.Settle settle -> run.settleEncounter();
             case TacticalIntent.UseItem use -> throw new IllegalStateException("an item use needs its resolved outcome");
             case TacticalIntent.Ready ready -> throw new IllegalStateException("readying needs its resolved equipment");
+            case TacticalIntent.UseDraft draft -> throw new IllegalStateException("a draft needs its previewed candidate");
         }
+        return run.plan();
+    }
+
+    /**
+     * Resolve the player's draft (P15.4-B, docs/10 section 9) from the candidate ability the commands layer previewed under
+     * the campaign lock. It runs exactly like a frozen ability: it pays the candidate's points and Focus, records the use
+     * under the reserved candidate ID, announces {@code COMBAT_ABILITY_USED} and runs the operations with recorded draws. The
+     * scheduler reads no pack data and learns nothing: the candidate exists only in this plan.
+     *
+     * @param state the encounter as read under the campaign lock
+     * @param intent the player's draft intention
+     * @param candidate the previewed ability, which {@link TacticalRules#draftRefusal} must accept for {@code state}
+     * @param dice recorded draws for its operations' dice
+     * @return the complete plan
+     * @throws IllegalStateException when the draft is refused (the rule gate should have stopped it) or a draw lies outside
+     *         its die
+     */
+    public static TacticalPlan useDraft(EncounterState state, TacticalIntent.UseDraft intent, CombatAbility candidate,
+            Dice dice) {
+        var refusal = TacticalRules.draftRefusal(state, intent, candidate);
+        if (refusal != null) {
+            throw new IllegalStateException("validated draft is refused: " + refusal);
+        }
+        var run = new Run(state);
+        run.draws(dice);
+        run.playerAbility(candidate, intent.targets());
         return run.plan();
     }
 
@@ -1033,8 +1060,12 @@ public final class CombatScheduler {
          * so no reaction answers it.
          */
         void playerAbility(TacticalIntent.UseAbility intent) {
+            playerAbility(participants.get(EncounterTemplate.PLAYER).source.sheet().ability(intent.ability()), intent.targets());
+        }
+
+        /** The player's ability, frozen or a draft's previewed candidate (P15.4-B), on the targets the intention names. */
+        void playerAbility(CombatAbility ability, List<String> named) {
             Working player = participants.get(EncounterTemplate.PLAYER);
-            var ability = player.source.sheet().ability(intent.ability());
             lapseOffer("ACTION_TAKEN");
             points -= ability.cost();
             player.focus -= ability.focus();
@@ -1043,7 +1074,7 @@ public final class CombatScheduler {
             step(EncounterPhase.RESOLVING);
             if (declare(player)) {
                 var targets = ability.targets() == CombatAbility.Targets.SELF ? List.of(player)
-                        : intent.targets().stream().map(participants::get).toList();
+                        : named.stream().map(participants::get).toList();
                 var announced = activation(player).put("abilityId", ability.id()).put("actionPoints", ability.cost())
                         .put("remainingActionPoints", points).put("focus", ability.focus())
                         .put("targets", targets.stream().map(target -> (Object) target.source.id()).toList());

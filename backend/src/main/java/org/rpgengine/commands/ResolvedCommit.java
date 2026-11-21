@@ -45,7 +45,9 @@ import org.rpgengine.rules.WorldClock;
  * campaign in encounter mode. P11.2 adds an optional {@link TacticalPlan} ({@code progress}): the scheduler steps,
  * participant facts and world time of a tactical intention, which keeps the campaign in encounter mode and never
  * accompanies an entry. Since P11.5 a settlement's progress, whose last step is {@code NARRATIVE_RESUME}, is the one that
- * returns the campaign to exploration, and it must (ADR 0036). Preparation intents
+ * returns the campaign to exploration, and it must (ADR 0036). P15.4-B adds an optional {@link LearnedRecipes.Learning}
+ * ({@code recipe}): the one recipe version a {@code LEARN_DRAFT} intention stores, citing the plan event that announces it;
+ * it never accompanies an encounter entry or tactical progress. Preparation intents
  * (query-scope epoch bumps, critical preparation jobs and cited plan branches) are data
  * too; they commit or roll back with the world change that caused them.
  */
@@ -53,7 +55,7 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
         List<Event> events, List<Reward> rewards, String receiptDetails, boolean narrationRequired,
         Preparation preparation, CommandIntent intent, List<Placement> placements, List<KnowledgeChange> knowledge,
         ItemPlan items, QuestChanges quests, List<ConditionRemoval> conditions, EncounterEntry encounter,
-        TacticalPlan progress) {
+        TacticalPlan progress, LearnedRecipes.Learning recipe) {
     /** Most events one plan may carry; the quest engine budgets its steps against what the command already used. */
     public static final int MAX_EVENTS = 256;
 
@@ -140,7 +142,21 @@ public record ResolvedCommit(Context context, WorldChange world, List<ResourceCh
             throw new IllegalArgumentException("tactical progress keeps the campaign in encounter mode until it settles, "
                     + "and carries its time");
         }
+        // A learned recipe is an exploration fact: it never rides on a fight's entry or step (P15.4-B).
+        if (recipe != null && (encounter != null || progress != null || world.mode() != CampaignMode.EXPLORATION
+                || recipe.eventIndex() >= events.size())) {
+            throw new IllegalArgumentException("a learned recipe belongs to an exploration plan and cites one of its events");
+        }
         CanonicalValues.requireJsonObject(receiptDetails, "receiptDetails", 32_768);
+    }
+
+    /** Plan without a learned recipe, the shape used before P15.4-B. */
+    public ResolvedCommit(Context context, WorldChange world, List<ResourceChange> resources, List<Event> events,
+            List<Reward> rewards, String receiptDetails, boolean narrationRequired, Preparation preparation,
+            CommandIntent intent, List<Placement> placements, List<KnowledgeChange> knowledge, ItemPlan items,
+            QuestChanges quests, List<ConditionRemoval> conditions, EncounterEntry encounter, TacticalPlan progress) {
+        this(context, world, resources, events, rewards, receiptDetails, narrationRequired, preparation, intent,
+                placements, knowledge, items, quests, conditions, encounter, progress, null);
     }
 
     /** Plan without tactical progress, the shape used before P11.2. */

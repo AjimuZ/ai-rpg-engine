@@ -40,6 +40,11 @@ import org.rpgengine.rules.ZoneGraph;
  *       pinned use contract is checked by the commands layer, which has the catalog.</li>
  *   <li><b>Abilities</b> (P11.4) — a frozen ability that its limit and cooldown allow, paid in action points and Focus,
  *       on targets of the side it names within its range.</li>
+ *   <li><b>Drafts</b> (P15.4-B, {@link #draftRefusal}) — the candidate ability the commands layer previewed from the
+ *       player's draft, under exactly the ability rules above. Every draft's use is recorded under the one reserved candidate
+ *       ID, so a draft waits its own cooldown counted from the player's last draft, whichever draft that was. Without a
+ *       candidate a draft is refused as an unknown ability, so no caller can resolve one the commands layer did not
+ *       preview.</li>
  *   <li><b>Prevention</b> (P11.4) — an active effect can prevent actions (everything that costs points), movement or
  *       spending Focus. Speech and the end of the activation stay available, so a prevented player is never stuck.</li>
  *   <li><b>Reaction policy</b> (P11.4) — a reaction of the player's frozen profile, set before the first round or at the
@@ -85,7 +90,7 @@ public final class TacticalRules {
         ATTACK,
         /** The Guard action was already taken in this activation. */
         GUARD,
-        /** The player has no such frozen ability, or it waits for its limit or cooldown. */
+        /** The player has no such frozen ability, or it waits for its limit or cooldown; also a draft without its candidate. */
         ABILITY,
         /** The ability costs more Focus than the player holds. */
         RESOURCE,
@@ -116,9 +121,30 @@ public final class TacticalRules {
      *
      * @param state the encounter as read under the campaign lock
      * @param intent the player's intention
-     * @return null when legal, otherwise the first violated rule in the order turn, target or place, cost
+     * @return null when legal, otherwise the first violated rule in the order turn, target or place, cost; a
+     *         {@link TacticalIntent.UseDraft} that passes the turn and prevention is always {@link Refusal#ABILITY} here,
+     *         because only {@link #draftRefusal} knows its candidate
      */
     public static Refusal refusal(EncounterState state, TacticalIntent intent) {
+        return refusal(state, intent, null);
+    }
+
+    /**
+     * Decide whether the player can use a previewed draft now (P15.4-B): the turn and prevention rules of every action, then
+     * the ability rules on the candidate, with its cooldown read under the reserved candidate ID.
+     *
+     * @param state the encounter as read under the campaign lock
+     * @param intent the player's draft intention
+     * @param candidate the frozen ability the commands layer previewed from the draft at this same state
+     * @return null when legal, otherwise the first violated rule, as for {@link #refusal}
+     */
+    public static Refusal draftRefusal(EncounterState state, TacticalIntent.UseDraft intent, CombatAbility candidate) {
+        java.util.Objects.requireNonNull(candidate, "candidate");
+        return refusal(state, intent, candidate);
+    }
+
+    /** The shared rule chain; {@code candidate} is the previewed ability of a draft and null for every other intention. */
+    private static Refusal refusal(EncounterState state, TacticalIntent intent, CombatAbility candidate) {
         if (intent instanceof TacticalIntent.RollInitiative) {
             return state.phase() == EncounterPhase.ENTERING ? null : Refusal.TURN;
         }
@@ -147,7 +173,12 @@ public final class TacticalRules {
             case TacticalIntent.RollInitiative roll -> throw new IllegalStateException("handled above");
             case TacticalIntent.SetReactionPolicy policy -> throw new IllegalStateException("handled above");
             case TacticalIntent.Settle settle -> throw new IllegalStateException("handled above");
-            case TacticalIntent.UseAbility use -> ability(state, player, use);
+            case TacticalIntent.UseAbility use -> {
+                var ability = player.sheet().ability(use.ability());
+                yield ability == null ? Refusal.ABILITY : ability(state, player, ability, use.targets());
+            }
+            case TacticalIntent.UseDraft draft -> candidate == null ? Refusal.ABILITY
+                    : ability(state, player, candidate, draft.targets());
             case TacticalIntent.EndActivation end -> null;
             case TacticalIntent.MoveZone move -> {
                 int cost = moveCost(state, move.zone());
@@ -261,12 +292,12 @@ public final class TacticalRules {
     }
 
     /**
-     * Legality of an ability: a frozen ability, not waiting for its limit or cooldown, its Focus spendable and held, its
-     * targets admissible and its points available, in that order.
+     * Legality of an ability, frozen or a draft's candidate: not waiting for its limit or cooldown, its Focus spendable and
+     * held, its targets admissible and its points available, in that order.
      */
-    private static Refusal ability(EncounterState state, EncounterState.Combatant player, TacticalIntent.UseAbility use) {
-        var ability = player.sheet().ability(use.ability());
-        if (ability == null || ability.waiting(player.uses().get(ability.id()), state.round()) != null) {
+    private static Refusal ability(EncounterState state, EncounterState.Combatant player, CombatAbility ability,
+            java.util.List<String> targets) {
+        if (ability.waiting(player.uses().get(ability.id()), state.round()) != null) {
             return Refusal.ABILITY;
         }
         if (ability.focus() > 0 && state.prevented(player, CombatEffect.Prevents.RESOURCES)) {
@@ -276,11 +307,11 @@ public final class TacticalRules {
             return Refusal.RESOURCE;
         }
         boolean self = ability.targets() == CombatAbility.Targets.SELF;
-        if (self != use.targets().isEmpty() || use.targets().size() > ability.maxTargets()
-                || new HashSet<>(use.targets()).size() != use.targets().size()) {
+        if (self != targets.isEmpty() || targets.size() > ability.maxTargets()
+                || new HashSet<>(targets).size() != targets.size()) {
             return Refusal.TARGET;
         }
-        for (String id : use.targets()) {
+        for (String id : targets) {
             var target = state.participant(id);
             if (target == null || !canTarget(state.space(), player, ability, target)) {
                 return Refusal.TARGET;

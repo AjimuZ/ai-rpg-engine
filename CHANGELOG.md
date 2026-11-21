@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased — Using creative drafts in fights, learned recipes and high-power profiles (P15.4-B), 21 November 2026
+
+- An adventure can now enable the optional `creativeAbilities` module and declare one creative profile: how large a player's
+  draft may be, which effects it may use, and what the engine charges for it. Without the module the profile is refused
+  with a clear error.
+- In a fight, a player can now use a draft with the new `COMBAT_USE_DRAFT` command. This is the only way a draft takes
+  effect. The engine checks the draft again at that moment against the profile and the fight's current state, charges the
+  action points, Focus and cooldown it works out itself, and resolves the draft like any other ability. The result lists
+  what was charged.
+- After a draft, the next draft waits its own cooldown, counted from the last one, so switching drafts does not avoid it.
+- Profiles are `standard` by default. Only a profile marked `power: high` may allow very complex drafts, charge nothing
+  or apply effects that last until removed. Even then every draft stays within the engine's limits and costs at least
+  one action point.
+- An invalid draft, a missing prerequisite, a wrong target, too little Focus, the cooldown, or a fight whose adventure has
+  no profile each refuse the command, and nothing changes.
+- Narration describes a draft as "a drafted ability".
+- The candidate ability's reserved identity is now `#draft` instead of `draft`, so it can never equal an adventure's
+  ability ID.
+- Outside a fight, a player can now save a draft as a learned recipe with the new `LEARN_DRAFT` command, under a recipe
+  name of their choice. The engine checks the draft again against the adventure's profile and stores it with the costs it
+  worked out, the profile and content it was checked against, and the event that announced it. Learning spends nothing,
+  and saving the same name again adds the next version; older versions are kept unchanged.
+- When a fight starts, the latest version of each recipe is checked again and becomes one of the player's abilities in
+  that fight, named `#recipe:<name>`, with its own cooldown. A recipe that no longer fits the profile, or whose
+  prerequisite is no longer learned, is left out of that fight.
+- A player can hold at most 8 recipes and 99 versions of one. Learning during a fight, a draft outside the profile, a
+  missing prerequisite or an adventure without a profile is refused, and nothing changes.
+- Narration says "learns a recipe" and "uses a learned recipe", without the player's own recipe name or label.
+- Database migration V35 adds the `learned_recipe` table, and the backup tool now covers schema 35.
+- Limits: drafts and recipes work only in fights. No screen shows a preview, sends a draft or learns one, and a recipe
+  cannot be forgotten or renamed. Drafts cannot be written from a description yet. The cost formula, the tier limits and
+  the recipe limit are provisional.
+
 ## Unreleased — Creative ability drafts and preview (P15.4-A), 21 November 2026
 
 - The engine can now check a player's draft of a new combat ability: a name, whom it takes, how far it reaches and up to a

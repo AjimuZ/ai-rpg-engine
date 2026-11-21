@@ -458,6 +458,24 @@ canonical commit, derives the due causes from these rows, the terminal `quest_st
 and records at most 32 per commit in due order. The rest stay due for the next commit. `QuestStore` reads the values for
 the `clock` quest atom. Only content that declares clocks writes here.
 
+### Learned recipes (P15.4-B)
+
+V35 adds `learned_recipe`, keyed by `(campaign_id, actor_id, recipe_id, version)`
+([ADR 0053](adr/0053-drafts-execute-only-through-an-explicit-fight-command-that-previews-again.md)). Each row is one
+version of a creative recipe a player saved with the explicit `LEARN_DRAFT` command:
+
+- the recipe: `recipe_id` (`[a-z][a-z0-9-]{0,31}`, the player's choice), `version` 1..99, `label` and `draft` (the draft's
+  wire form, at most 4096 bytes, with no cost field);
+- what it was checked against: `profile_pack_id`, `profile_id` and `content_revision_id`;
+- what the engine derived: `complexity` 1..32, `action_points`, `focus` and `cooldown_rounds`;
+- provenance: `learned_revision`, `learned_event_sequence` (its `RECIPE_LEARNED` event, unique) and `learned_world_time`.
+
+Rows are immutable. An insert trigger requires the event to belong to `learned_revision`, a version above 1 to follow its
+predecessor, and a new recipe ID to leave the actor at most 8. `LearnedRecipes`, called by the canonical commit, writes
+the row after the plan's events. An encounter entry reads only the latest version of each recipe and previews it again
+before freezing it as a `#recipe:<id>` ability; nothing else reads the table. Only content that enables the
+`creativeAbilities` module writes here.
+
 ### Quests, visits and reward settlement (P10.3)
 
 V20 adds `quest_state`, `quest_objective` and `location_visit`. A pure `QuestPlan` derives every quest

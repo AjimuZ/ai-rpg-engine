@@ -140,7 +140,7 @@ public class CommandExecutionService {
                         resolution.events(), resolution.rewards(), resolution.receiptDetails(), true,
                         new ResolvedCommit.Preparation(resolution.queryScopes(), List.of()), intent,
                         resolution.placements(), List.of(), resolution.items(), resolution.quests(),
-                        resolution.conditions(), resolution.encounter(), resolution.progress()));
+                        resolution.conditions(), resolution.encounter(), resolution.progress(), resolution.recipe()));
             }
         } catch (OperationAdmissionFailure rejected) {
             // Current state changed after admission in a way the rules refuse; nothing was applied.
@@ -272,10 +272,12 @@ public class CommandExecutionService {
         // The active encounter's tactical state, read only for a tactical intention (P11.2).
         var encounter = tactical ? EncounterWriter.state(jdbc, campaign).orElseThrow(
                 () -> new IllegalStateException("validated tactical intention has no active encounter")) : null;
+        // Learned recipes, whose next version a learning adds and whose latest versions an entry freezes (P15.4-B).
+        var recipes = tactical ? List.<LearnedRecipes.Stored>of() : LearnedRecipes.latest(jdbc, campaign, player);
         return new LocalActionResolver.Snapshot(player, actor.getKey().orElse(null), actor.getValue(),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[0]),
                 state.isEmpty() ? Map.of() : integers(state.getFirst()[1]), pools, vocabularies, operation, stacks,
-                stored, clock, conditions, worn, encounter, learned, wornInstances);
+                stored, clock, conditions, worn, encounter, learned, wornInstances, recipes);
     }
 
     /**
@@ -285,10 +287,12 @@ public class CommandExecutionService {
      * changes no fact a quest predicate reads, and a tactical intention (P11.2) reads only the frozen
      * encounter, so a fight in progress never depends on reloading the pinned pack. The exceptions are the two item
      * intentions of a fight: using an item (P11.3), whose use contract is pinned pack data like outside a fight, and
-     * readying one (P11.5), whose slot, hands and combat data are too.
+     * readying one (P11.5), whose slot, hands and combat data are too; and using a draft (P15.4-B), previewed against the
+     * pinned creative profile.
      */
     private static boolean needsCatalog(TypedCommand command) {
         return command instanceof TypedCommand.CombatUseItem || command instanceof TypedCommand.ReadyItem
+                || command instanceof TypedCommand.CombatUseDraft
                 || !(command instanceof TypedCommand.Speak) && !(command instanceof TypedCommand.Tactical);
     }
 

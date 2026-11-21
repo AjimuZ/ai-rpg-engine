@@ -75,12 +75,12 @@ public record EngineContract(String engineVersion, String rulesetId, String rule
 
     /**
      * Contract of this build: engine 0.1.0, the built-in {@code skirmish} ruleset at provisional
-     * version 1.0.0 with the {@code standard} profile (ADR 0017), and one optional module, {@code relationships}
-     * (P15.1-B, ADR 0050). Modules are not part of {@link #rulesetHash()}: enabling one changes what a pack may
-     * declare, not the ruleset a revision is pinned to.
+     * version 1.0.0 with the {@code standard} profile (ADR 0017), and two optional modules, {@code relationships}
+     * (P15.1-B, ADR 0050) and {@code creativeAbilities} (P15.4-B). Modules are not part of {@link #rulesetHash()}: enabling
+     * one changes what a pack may declare, not the ruleset a revision is pinned to.
      */
     public static EngineContract current() {
         return new EngineContract("0.1.0", "skirmish", "1.0.0", Set.of("standard"),
-                Set.of(PackCompiler.RELATIONSHIPS_MODULE));
+                Set.of(PackCompiler.RELATIONSHIPS_MODULE, PackCompiler.CREATIVE_MODULE));
     }
 }

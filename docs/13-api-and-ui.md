@@ -570,7 +570,10 @@ The "Send an action" section of the panel (`combat-actions.ts`) turns the projec
 action and target: move to a zone, attack with a named attack on a target, use an ability (one listed target, or none), a
 declared social or scene action, take a guarded stance, and end the turn. They exist only while `playerDecision` is true. A
 disabled candidate stays listed with its stable reason and cannot be chosen. Not offered yet: items, readying, assessing,
-withdrawing, reactions, the settlement of a verdict and abilities with several targets. Speech, free text and the answer to an
+withdrawing, reactions, the settlement of a verdict, abilities with several targets and creative drafts (the backend's
+`COMBAT_USE_DRAFT` since P15.4-B, which no page sends). A learned recipe (`#recipe:<id>`) is a frozen ability, so the backend
+lists it in `combat.options.abilities`; no browser run has shown how the panel presents one, and no page sends the
+exploration command `LEARN_DRAFT` that saves one. Speech, free text and the answer to an
 offer are sent from the [combat chat](#p122-b-combat-chat) (the two answers are also listed here when an offer stands).
 
 Choosing an action sends nothing. It opens a review that states, from the projection and without computing any rule, the

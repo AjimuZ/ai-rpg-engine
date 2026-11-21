@@ -7,9 +7,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.rpgengine.combat.CombatAbility;
 import org.rpgengine.combat.CombatReaction;
 import org.rpgengine.combat.TacticalIntent;
 import org.rpgengine.content.PackTextParser;
+import org.rpgengine.creative.AbilityDraft;
+import org.rpgengine.creative.DraftPreview;
 
 /**
  * Closed vocabulary of player intentions, never effects or generic field writes.
@@ -24,7 +27,8 @@ import org.rpgengine.content.PackTextParser;
  * social or scene action; since P11.3 also strike, the Guard action and using an item; since P11.4 also using a frozen
  * ability and changing a predeclared reaction policy; since P11.5 also answering the offer on the table, readying or
  * stowing one held item, assessing one participant, withdrawing toward an escape zone and settling a decided fight, which
- * returns the campaign to exploration. Unknown types fail closed.
+ * returns the campaign to exploration; since P15.4-B also using a creative draft, the one explicit operation that executes
+ * one, and, in exploration, learning a draft as a versioned recipe ({@link LearnDraft}). Unknown types fail closed.
  * Structural decoding here
  * is followed by current-state rule validation in {@link CommandRules}; resolution
  * remains backend-owned (P07.4). Every value is immutable and can reproduce its exact
@@ -38,7 +42,7 @@ public sealed interface TypedCommand
         TypedCommand.EndActivation, TypedCommand.CombatSpeak, TypedCommand.Interact, TypedCommand.Strike,
         TypedCommand.Guard, TypedCommand.CombatUseItem, TypedCommand.CombatUseAbility, TypedCommand.SetReactionPolicy,
         TypedCommand.AnswerOffer, TypedCommand.ReadyItem, TypedCommand.Assess, TypedCommand.Withdraw,
-        TypedCommand.SettleEncounter {
+        TypedCommand.SettleEncounter, TypedCommand.CombatUseDraft, TypedCommand.LearnDraft {
     /** @return registered, case-sensitive wire identifier */
     String type();
 
@@ -229,6 +233,19 @@ public sealed interface TypedCommand
                     fields(payload, "encounterId");
                     yield new SettleEncounter(CampaignCommandJson.uuid(payload.get("encounterId")));
                 }
+                case "COMBAT_USE_DRAFT" -> {
+                    fields(payload, "draft", "targetIds");
+                    if (!(payload.get("targetIds") instanceof List<?> targets)
+                            || targets.size() > CombatUseDraft.MAX_TARGETS) {
+                        throw invalid();
+                    }
+                    yield new CombatUseDraft(draft(payload.get("draft")),
+                            targets.stream().map(target -> text(target, 128)).toList());
+                }
+                case "LEARN_DRAFT" -> {
+                    fields(payload, "recipeId", "draft");
+                    yield new LearnDraft(text(payload.get("recipeId"), 32), draft(payload.get("draft")));
+                }
                 default -> throw invalid();
             };
         } catch (IllegalArgumentException | ArithmeticException failure) {
@@ -243,16 +260,18 @@ public sealed interface TypedCommand
                 "TRANSFER_ITEM", "TRADE_ITEMS", "ACCEPT_QUEST", "SUSPEND_QUEST", "RESUME_QUEST", "REST", "ENGAGE",
                 "ROLL_INITIATIVE", "MOVE_ZONE", "END_ACTIVATION", "COMBAT_SPEAK", "INTERACT", "STRIKE", "GUARD",
                 "COMBAT_USE_ITEM", "COMBAT_USE_ABILITY", "SET_REACTION_POLICY", "ANSWER_OFFER", "READY_ITEM", "ASSESS",
-                "WITHDRAW", "SETTLE_ENCOUNTER").contains(type);
+                "WITHDRAW", "SETTLE_ENCOUNTER", "COMBAT_USE_DRAFT", "LEARN_DRAFT").contains(type);
     }
 
     /**
      * Tactical intentions (P11.2): legal only in encounter mode, at the decision boundary {@code TacticalRules}
      * checks, and resolved by the combat scheduler from the frozen encounter rather than from pinned definitions. The
-     * exceptions are the two item intentions, {@link CombatUseItem} and {@link ReadyItem}, whose items are pinned data.
+     * exceptions are the two item intentions, {@link CombatUseItem} and {@link ReadyItem}, whose items are pinned data, and
+     * {@link CombatUseDraft}, whose creative profile is (P15.4-B).
      */
     sealed interface Tactical permits RollInitiative, MoveZone, EndActivation, CombatSpeak, Interact, Strike, Guard,
-            CombatUseItem, CombatUseAbility, SetReactionPolicy, AnswerOffer, ReadyItem, Assess, Withdraw, SettleEncounter {
+            CombatUseItem, CombatUseAbility, SetReactionPolicy, AnswerOffer, ReadyItem, Assess, Withdraw, SettleEncounter,
+            CombatUseDraft {
         /** @return the combat-layer value of this intention */
         TacticalIntent intent();
     }
@@ -277,6 +296,65 @@ public sealed interface TypedCommand
             fields(line, "itemInstanceId", "quantity");
             return new TradeItems.Line(CampaignCommandJson.uuid(line.get("itemInstanceId")), quantity(line.get("quantity")));
         }).toList();
+    }
+
+    /**
+     * Decode a creative draft (P15.4-B): exactly {@code label}, {@code targets}, {@code maxTargets}, {@code range} and
+     * 1..{@link CombatUseDraft#MAX_STEPS} {@code steps}. No cost, cooldown or limit field exists, so a draft cannot price
+     * itself; whether it fits a profile is the rule gate's question, not the decoder's.
+     */
+    private static AbilityDraft draft(Object value) {
+        if (!(value instanceof Map<?, ?> draft)) {
+            throw invalid();
+        }
+        fields(draft, "label", "targets", "maxTargets", "range", "steps");
+        if (!(draft.get("steps") instanceof List<?> steps) || steps.isEmpty() || steps.size() > CombatUseDraft.MAX_STEPS) {
+            throw invalid();
+        }
+        return new AbilityDraft(text(draft.get("label"), DraftPreview.MAX_LABEL),
+                wire(CombatAbility.Targets.values(), draft.get("targets"), CombatAbility.Targets::wire),
+                small(draft.get("maxTargets")), small(draft.get("range")), steps.stream().map(TypedCommand::step).toList());
+    }
+
+    /**
+     * Decode one draft step: {@code kind}, {@code diceCount}, {@code diceSides}, {@code flat}, {@code penetration} and
+     * {@code toSelf} always, {@code attribute} and {@code effectId} only when they name something; any other key fails.
+     */
+    private static AbilityDraft.Step step(Object value) {
+        if (!(value instanceof Map<?, ?> step)) {
+            throw invalid();
+        }
+        var required = Set.of("kind", "diceCount", "diceSides", "flat", "penetration", "toSelf");
+        var allowed = Set.of("kind", "diceCount", "diceSides", "flat", "penetration", "toSelf", "attribute", "effectId");
+        if (!step.keySet().containsAll(required) || !allowed.containsAll(step.keySet())
+                || !(step.get("toSelf") instanceof Boolean toSelf)) {
+            throw invalid();
+        }
+        return new AbilityDraft.Step(wire(CombatAbility.Kind.values(), step.get("kind"), CombatAbility.Kind::wire),
+                small(step.get("diceCount")), small(step.get("diceSides")),
+                step.containsKey("attribute") ? text(step.get("attribute"), 32) : null, small(step.get("flat")),
+                small(step.get("penetration")), step.containsKey("effectId") ? text(step.get("effectId"), 256) : null, toSelf);
+    }
+
+    /** The constant whose exact lowercase wire name the value is; any other spelling fails. */
+    private static <E> E wire(E[] values, Object value, java.util.function.Function<E, String> name) {
+        for (E candidate : values) {
+            if (name.apply(candidate).equals(value)) {
+                return candidate;
+            }
+        }
+        throw invalid();
+    }
+
+    /**
+     * Require an exact integer within {@code ±}{@link CombatUseDraft#NUMBER_LIMIT}. The preview checks the real bounds; this
+     * one only keeps every later sum of a draft's numbers far from overflow.
+     */
+    private static int small(Object value) {
+        if (!(value instanceof BigInteger number) || number.abs().compareTo(BigInteger.valueOf(CombatUseDraft.NUMBER_LIMIT)) > 0) {
+            throw invalid();
+        }
+        return number.intValueExact();
     }
 
     /** Require the exact payload field set; missing, extra and effect-bearing keys all fail. */
@@ -891,5 +969,104 @@ public sealed interface TypedCommand
         public Map<String, Object> payload() { return Map.of("encounterId", encounterId.toString()); }
         /** @return the combat-layer intention */
         public TacticalIntent intent() { return new TacticalIntent.Settle(encounterId.toString()); }
+    }
+
+    /**
+     * Use a creative draft during the player's activation (P15.4-B, docs/10 section 9, docs/20 scenario 7): the one explicit
+     * player operation that executes a draft. The intention is the draft as the player wrote it and the participants it is used
+     * on. Its action points, Focus, cooldown and legality are never part of it: the rule gate previews the draft again against
+     * the pinned creative profile and the current encounter state, and the scheduler resolves the candidate that preview
+     * returns. Using a draft learns nothing; the draft exists only in this command, and {@link LearnDraft} is the separate
+     * explicit operation that saves one.
+     *
+     * <p>The bounds here are structural only: at most {@link #MAX_STEPS} steps, numbers within {@code ±}{@link #NUMBER_LIMIT},
+     * a label of at most {@link DraftPreview#MAX_LABEL} characters and distinct bounded targets.
+     *
+     * @param draft the proposal
+     * @param targetIds participants it is used on, distinct; empty for a self draft
+     */
+    record CombatUseDraft(AbilityDraft draft, List<String> targetIds) implements TypedCommand, Tactical {
+        /** Most targets an intention can name: the whole roster. */
+        static final int MAX_TARGETS = CombatUseAbility.MAX_TARGETS;
+        /** Most steps any draft can have: a frozen ability's operations; a profile may allow fewer. */
+        static final int MAX_STEPS = CombatAbility.MAX_OPERATIONS;
+        /** Largest magnitude of a draft number on the wire. */
+        static final int NUMBER_LIMIT = 999;
+
+        /** Require a structurally bounded draft and distinct, bounded targets. */
+        public CombatUseDraft {
+            requireStructural(draft);
+            targetIds = targetIds.stream().map(target -> text(target, 128)).toList();
+            if (targetIds.size() > MAX_TARGETS || new java.util.HashSet<>(targetIds).size() != targetIds.size()) {
+                throw new IllegalArgumentException("targets are bounded and distinct");
+            }
+        }
+        /** @return the fixed draft-use identifier */
+        public String type() { return "COMBAT_USE_DRAFT"; }
+        /** @return the draft in its wire form and the targets; an absent attribute or effect is omitted, never null */
+        public Map<String, Object> payload() {
+            return Map.of("draft", LearnedRecipes.wire(draft), "targetIds", targetIds);
+        }
+        /** @return the combat-layer intention, which carries the targets; the candidate comes from the preview */
+        public TacticalIntent intent() { return new TacticalIntent.UseDraft(targetIds); }
+
+        /**
+         * Require the structural draft bounds shared by every draft command: a label, 1..{@link #MAX_STEPS} steps, numbers
+         * within {@code ±}{@link #NUMBER_LIMIT} and bounded texts. Whether the draft fits a profile is the rule gate's question.
+         *
+         * @throws IllegalArgumentException for a draft outside these bounds
+         */
+        static void requireStructural(AbilityDraft draft) {
+            java.util.Objects.requireNonNull(draft, "draft");
+            text(draft.label(), DraftPreview.MAX_LABEL);
+            if (draft.steps().isEmpty() || draft.steps().size() > MAX_STEPS || !bounded(draft.maxTargets())
+                    || !bounded(draft.range())) {
+                throw invalid();
+            }
+            for (AbilityDraft.Step step : draft.steps()) {
+                if (!bounded(step.diceCount()) || !bounded(step.diceSides()) || !bounded(step.flat())
+                        || !bounded(step.penetration())) {
+                    throw invalid();
+                }
+                if (step.attribute() != null) {
+                    text(step.attribute(), 32);
+                }
+                if (step.effectId() != null) {
+                    text(step.effectId(), 256);
+                }
+            }
+        }
+
+        /** @return whether a draft number lies within the wire bound */
+        private static boolean bounded(int value) {
+            return value >= -NUMBER_LIMIT && value <= NUMBER_LIMIT;
+        }
+    }
+
+    /**
+     * Learn a creative draft as a versioned recipe (P15.4-B, docs/10 section 9): the explicit exploration operation behind
+     * "optional save as a learned reusable ability". The intention is the player's recipe ID and the draft as written; no cost,
+     * cooldown or version is part of it. The rule gate previews the draft again under the campaign lock against the creative
+     * profile of the player's vocabulary pack, and the commit stores the next version with the derived costs and its
+     * provenance. Learning executes nothing: the recipe becomes usable only as a frozen ability of a later fight's entry.
+     *
+     * @param recipeId the player's name for the recipe, {@code [a-z][a-z0-9-]{0,31}}; learning it again adds a version
+     * @param draft the draft, under the bounds of {@link CombatUseDraft#requireStructural}
+     */
+    record LearnDraft(String recipeId, AbilityDraft draft) implements TypedCommand {
+        /** Require a recipe ID of the stored form and a structurally bounded draft. */
+        public LearnDraft {
+            recipeId = text(recipeId, 32);
+            if (!LearnedRecipes.ID.matcher(recipeId).matches()) {
+                throw invalid();
+            }
+            CombatUseDraft.requireStructural(draft);
+        }
+        /** @return the fixed learning identifier */
+        public String type() { return "LEARN_DRAFT"; }
+        /** @return the recipe ID and the draft in its wire form */
+        public Map<String, Object> payload() {
+            return Map.of("recipeId", recipeId, "draft", LearnedRecipes.wire(draft));
+        }
     }
 }

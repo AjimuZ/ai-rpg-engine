@@ -287,6 +287,11 @@ public class CanonicalCommitService {
             // A stale row version or a refused scheduling step throws and rolls back every effect, events included.
             EncounterWriter.progressWithin(jdbc, campaign.getId(), counters.stateRevision(), plan.progress());
         }
+        if (plan.recipe() != null) {
+            // The learned version cites its announcing event (P15.4-B); a skipped version or a ninth recipe violates V35.
+            LearnedRecipes.insertWithin(jdbc, campaign.getId(), content.getId(), counters.stateRevision(),
+                    firstSequence + plan.recipe().eventIndex(), counters.worldTimeSeconds(), plan.recipe());
+        }
         if (plan.narrationRequired()) {
             // The owed presentation is durable exactly when the world change is (P07.5): one
             // NARRATION job per operation, checked against this committed revision at COMMIT.

@@ -302,6 +302,10 @@ Decisions and limits:
 - P15.2-B faction clock values (`faction_clock_change`) are in no context, view or summary either,
   so "relevant faction clocks" in section 5 is still planned. The operational checkpoint snapshot
   does not include them; they are immutable rows that a restore brings back as they were.
+- P15.4-B learned recipes (`learned_recipe`) are in no context, view or summary, and the operational
+  checkpoint snapshot does not include them; they are immutable rows that a restore brings back as
+  they were. Narration states a learning only as "learns a recipe (version N)", without the
+  player's recipe ID or label.
 - Semantic retrieval stays out of scope (section 11).
 
 ## 7. Renewal policy

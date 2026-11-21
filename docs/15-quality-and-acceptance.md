@@ -1,12 +1,26 @@
 # Quality Strategy and Acceptance Criteria
 
+P15.4-B verification (21 November 2026): supporting evidence for the creative half of QA-22 through the production command
+path. `DraftCommandsTest` (PostgreSQL) shows that a draft executes only through the explicit `COMBAT_USE_DRAFT` command. That
+command previews the draft again at admission and at commit and pays exactly the derived costs its receipt lists. A draft
+outside its profile, a missing prerequisite, a wrong target, too little Focus, the cooldown after a draft, a draft outside a
+fight or before initiative, and a fight of a pack without a creative profile are each refused, and none writes anything.
+Using a draft learns nothing. Learning is the separate explicit exploration command `LEARN_DRAFT`: the same test shows that
+it previews the draft again, spends nothing, stores consecutive immutable versions with their profile, content revision,
+derived costs and announcing event, refuses a missing prerequisite, a draft outside the profile, a ninth recipe and any
+learning in a fight without writing anything, and that the next fight's entry freezes only the latest versions that still
+fit, which `COMBAT_USE_ABILITY` then uses at exactly the derived costs. For the "disabled modules absent" half, a pack
+without the `creativeAbilities` module cannot declare a profile (`MODULE_DISABLED`, `CreativeRulesTest`), its fights refuse
+drafts and freeze no effect for them, and its campaigns cannot learn a recipe. This is not QA-22 itself: the guide still has
+no module switch, pack data or caller, and no screen shows a preview, sends a draft or learns one.
+Details are in the [P15.4 roadmap entry](16-development-roadmap.md#19-p15--complete-supported-world-and-optional-modules).
+
 P15.4-A verification (21 November 2026): supporting evidence for the creative half of QA-22 at the level of a pure
 function. `DraftPreviewTest` shows that a draft's validation preview derives its costs, reports each broken bound and the
 current state's blockers, and is a value with no path to execution: its only entry point takes immutable values, its results
-hold only text, numbers, flags, lists and a frozen ability definition, and previewing twice changes nothing. No command
-executes or learns a draft, so "a draft never executes without explicit player action" holds because no execution path
-exists yet, not because one was tested. The "disabled modules absent" half remains open for both modules: there is no
-`creativeAbilities` module switch or pack profile yet.
+hold only text, numbers, flags, lists and a frozen ability definition, and previewing twice changes nothing. At P15.4-A no
+command executed or learned a draft, so "a draft never executes without explicit player action" held because no execution
+path existed yet; P15.4-B above adds the explicit command and its tests.
 
 P15.3-A verification (21 November 2026): QA-22 is covered only at the contract level for the guide. `GuideContractTest`
 shows that the guide's typed answer and presentation decision have no field or parameter that can carry a command, a
