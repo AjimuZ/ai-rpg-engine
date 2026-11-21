@@ -7193,6 +7193,15 @@ this update. No combat runtime/browser result is claimed.
       status of the new messages (one author pass); nothing creates artwork at runtime (P17.6). The artwork listing
       recompiles the pinned pack on each read, as `PresentationScopeResolver` does, and is not cached.
 - [ ] P17.2 Implement optional dynamic music from a reviewed free-license online/local catalog: public-event mood mapping, deliberate activation, stable loops/crossfades, deduplicated cues, volumes, complete current-track/export credits and offline/source-failure fallback under QA-32.
+  - 2026-11-21 P17.2-A (partial; box stays unchecked): added the reviewed catalog
+    `backend/src/main/resources/music/catalog.json` (two recordings, Wholesome CC BY 4.0 and Darkest Child CC BY 3.0,
+    rights as checked on 2026-10-23) and `org.rpgengine.music.MusicCatalog`, which refuses a record lacking creator,
+    notices, modifications or verification date, a license outside CC0/CC BY 3.0/4.0 or whose URL is not that version's,
+    a non-HTTPS source or one off `commons.wikimedia.org`, and a duplicate ID. The catalog holds no media URL.
+    Check: `sh .agents/ralph/verify.sh backend -Dtest=MusicCatalogTest` → `VERIFY PASSED` (2 tests).
+    Not proven: no audio was fetched, played or hashed (`localHash` is null); rights were not rechecked online today and
+    the exact media file revision was not captured; no mood mapping, player, credits screen or export of credits; `verify.sh
+    full` was not run.
 - [ ] P17.3 Finalize the default visual-novel and alternative text-focused layouts, graphic states, configurable tokens and attributed reading/history/quick-reply behavior.
 - [ ] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.
 - [ ] P17.5 Verify missing art/audio never blocks play and media cannot reveal secrets.

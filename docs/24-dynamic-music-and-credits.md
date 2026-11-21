@@ -51,6 +51,8 @@ Candidate credit templates (references only; add the actual selected media versi
 - “Wholesome” — Kevin MacLeod (incompetech.com). [Source recording page](https://commons.wikimedia.org/wiki/File:Wholesome_by_Kevin_MacLeod.ogg). [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/). No audio file is included or modified in this repository.
 - “Darkest Child” (ISRC USUAN1100783) — Kevin MacLeod (incompetech.com). [Source recording page](https://commons.wikimedia.org/wiki/File:Darkest_Child_%28ISRC_USUAN1100783%29.mp3). [Creative Commons Attribution 3.0 Unported](https://creativecommons.org/licenses/by/3.0/). No audio file is included or modified in this repository.
 
+Since P17.2-A these two records are the machine-readable reviewed catalog in `backend/src/main/resources/music/catalog.json`, validated by `org.rpgengine.music.MusicCatalog` (complete credit fields, admitted license with its exact version URL, approved HTTPS source host, no media URL). It is data only: no audio is fetched or played, and playback, mood mapping and credits screens remain planned.
+
 No battle/victory cue is admitted merely to fill a category; silence remains valid until a suitable licensed recording is reviewed. See [third-party notices](../THIRD_PARTY_NOTICES.md) for the reference-only boundary.
 
 ## 6. Verification

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "reviewedOn": "2026-10-23",
+  "recordings": [
+    {
+      "id": "wholesome",
+      "title": "Wholesome",
+      "creator": "Kevin MacLeod (incompetech.com)",
+      "mood": "exploration",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Wholesome_by_Kevin_MacLeod.ogg",
+      "mediaFile": "Wholesome_by_Kevin_MacLeod.ogg",
+      "licenseId": "CC-BY-4.0",
+      "licenseName": "Creative Commons Attribution 4.0 International",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "notices": "Attribution required: title, creator, source and license link. No other notice was supplied on the file page.",
+      "modifications": "None: no audio is copied, trimmed or re-encoded.",
+      "verifiedOn": "2026-10-23",
+      "localHash": null
+    },
+    {
+      "id": "darkest-child",
+      "title": "Darkest Child (ISRC USUAN1100783)",
+      "creator": "Kevin MacLeod (incompetech.com)",
+      "mood": "tension",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Darkest_Child_%28ISRC_USUAN1100783%29.mp3",
+      "mediaFile": "Darkest_Child_(ISRC_USUAN1100783).mp3",
+      "licenseId": "CC-BY-3.0",
+      "licenseName": "Creative Commons Attribution 3.0 Unported",
+      "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+      "notices": "Attribution required: title, creator, source and license link. No other notice was supplied on the file page.",
+      "modifications": "None: no audio is copied, trimmed or re-encoded.",
+      "verifiedOn": "2026-10-23",
+      "localHash": null
+    }
+  ]
+}
