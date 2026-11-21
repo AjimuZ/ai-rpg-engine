@@ -1853,6 +1853,14 @@ never reach the page or a request. Line audio and music failure behavior stays c
 `music-player.spec.ts`. Not run: a real browser with failing asset responses, the packaged installation, any backend check of what
 the asset route admits (`ManagedAssetsTest` was not re-run), a human review of the media itself.
 
+P17.5-B adds `frontend/tools/media-fallback-journey.mjs` (21 November 2026): `node frontend/tools/media-fallback-journey.mjs
+[screenshot-directory]` after a frontend build serves the production build and a scripted campaign API on loopback and drives the
+live screen in headless Chrome. A control pass with valid files and two failing passes, where the loopback server answers every
+image, the line audio and the music track with 404 or with undecodable bytes, gave 50 PASS, 0 FAIL (14 checks in the control pass, 18 in each failing pass): documented text, initial and
+icon fallbacks, text notices for the line and the track, no automatic retry, planted listing extras absent from the page and
+requests, axe clean, and a typed `SPEAK` still sent. It does not cover the packaged installation, the backend's refusal to serve
+hidden assets (P17.5-C), audible output, other media formats, truncated or slow answers, the Italian build or a screen reader.
+
 P05.7-B.2.2 records QA-40 evidence for presentation cues; the point-by-point map to
 backend tests, frontend tests and the browser check is in the
 [roadmap](16-development-roadmap.md) entry of that name. The browser check ran the

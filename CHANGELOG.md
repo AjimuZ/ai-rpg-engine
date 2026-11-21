@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Missing media proven in a real browser (P17.5-B), 21 November 2026
+
+- No product change. New `frontend/tools/media-fallback-journey.mjs` drives the live playthrough screen in headless Chrome while a
+  loopback stand-in engine really answers every image, line-audio and music request with 404 or with corrupt bytes. In both cases
+  the scene shows its text label, the portrait its initial, the item its built-in icon, a failed line or track is reported in text
+  and not retried by itself, and a quick reply plus Send still reaches the server (50 checks: 14 in the control pass and 18 in
+  each of the two failing passes). Not proven: the packaged installation, the backend never serving hidden assets (P17.5-C), audible playback.
+
 ## Unreleased — Missing art and audio never block play (P17.5-A), 21 November 2026
 
 - No product change. New spec `frontend/src/app/campaign/media-fallback.spec.ts` shows that on the playthrough screen a failed

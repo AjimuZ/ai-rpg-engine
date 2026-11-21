@@ -7537,6 +7537,49 @@ this update. No combat runtime/browser result is claimed.
       `sh .agents/ralph/verify.sh full` and `containers` (the runner runs them). The P17.5 box stays unchecked in this entry; the
       remaining scope is the real-browser half (P17.5-B) and the backend half (P17.5-C) named above. Second attempt (21 November
       2026): the spec's planted-text constant was renamed `HIDDEN_MARKER` (was a name a secret scanner flags); no behavior changed.
+  - P17.5-B (21 November 2026): real-browser proof that failing media never blocks play, no product change. New
+    `frontend/tools/media-fallback-journey.mjs` (Windows 11, installed Chrome, headless, fresh profile, through the private tools in
+    `.agents/ralph/browser/`). It serves the unlocalized production build and a SCRIPTED campaign API on loopback (a delivered
+    operation with two attributed passages and one quick reply, artwork rows for a scene, a portrait and an item, a one-track music
+    listing, and a stream that delivers one `LINE_AUDIO` cue). The failures are real HTTP answers from that loopback server, not
+    page stubs and not blocked URLs: three passes with only the media answers differing.
+    - `ok` (control): a valid PNG and a valid WAV. Images load, the line plays to its end, music plays and names its track.
+    - `missing`: every image, the line audio and the music track answer `404`.
+    - `corrupt`: every image, the line audio and the music track answer `200` with bytes no decoder accepts (a PNG signature or a
+      RIFF header followed by noise).
+    - Checked in each failing pass (18 checks per failing pass; the `ok` control runs 14, so a full run prints 50): the browser received exactly that status for the scene, portrait and item
+      requests and for the line and the track; the scene shows its text label (`data-scene="failed"`) with no image element left; the
+      portrait falls back to the speaker's initial `T`; the item shows its built-in icon (`data-art="fallback"`) and keeps its name
+      and quantity; the passage, its attribution, the read-back, the panels and the credits stay; nothing audio is requested before
+      the player clicks; the failed line shows "Audio is not available for this line", the button offers Play again, and the line is
+      not requested again in 3 s; the music panel reports the track unavailable, shows no current track and offers the retry button,
+      and the track is not requested again in 5 s; after all that, a quick reply and Send reach the server as one typed `SPEAK` to
+      the speaker with the exact words; artwork rows carry planted extra fields (prompt, path, URL, note, alt) and neither the page
+      nor any request holds them, `example.invalid` or `/srv/`; every media request used the campaign hash route or the line route
+      on the loopback origin; axe finds no violation; no script error and no console error except the browser's own report of the
+      404 answers.
+    - **Commands and results.**
+      - `node frontend/tools/media-fallback-journey.mjs .local/scratch/p175b-shots` → 50 PASS, 0 FAIL (`ok` 14 checks, `missing` 18,
+        `corrupt` 18; re-run in the second attempt against the existing build left by `sh .agents/ralph/verify.sh frontend`, and the
+        first attempt's "42 (three passes of 14)" was a miscount of the script's 21 `check()` calls, not a different result). Earlier runs failed on the journey, not on the page: a harness bug
+        (the stand-in server wrote headers before reading a missing file, which crashed it on the favicon request), and one axe
+        `landmark-unique` violation in all three passes, including the control. The cause is data: the stand-in playthrough title and
+        the hero's name were both "Mara", which gives two regions one accessible name. The journey now uses a different title. This
+        is a possible finding for real use (a player may give the playthrough and the character the same name) that this task did
+        not change; it is not a media defect.
+      - A full-page screenshot of the `corrupt` pass was looked at: scene label inside the dashed frame, the initial in the portrait
+        frame, the sword's built-in icon, Play line audio, the passage and Send all readable. It was taken before music was turned
+        on. Screenshots are in `.local/scratch/p175b-shots/`.
+      - No command touched the owner's installation, and no packaged installation was started.
+    - Not proven: the packaged installation's own engine and sample (a stand-in server answers; no `./start.sh`); that the server
+      never lists or serves a hidden, unrevealed or unauthorized asset (backend half, P17.5-C; `ManagedAssetsTest` and the
+      presentation tests were not run); audible playback (headless Chrome has no output: media state and UI text were measured);
+      narration from a real runtime (owner gate P17.3-O); the text-focused layout and the 390 px and 320 px widths under failing
+      media; image formats other than PNG and audio other than WAV; truncated or slow responses; the Italian build; Firefox, Safari
+      and touch devices; a screen reader; no deliberate break of the page was made to see the journey fail, so it is not shown to
+      detect a regression; `sh .agents/ralph/verify.sh frontend`, `full` and `containers` were not run after adding the script (the
+      script is a tool outside the unit tests and the build; the runner runs the checks). The P17.5 box stays unchecked: the backend
+      proof belongs to P17.5-C.
 - [ ] P17.6 Implement bounded runtime scene/portrait/item image jobs using verified capability, public appearance inputs, stable identities, durable saved assets, budget limits, deduplication and restore/stale-result checks under QA-31.
   **Requires tasks:** P21.5.
   - QA-33 scope (25 October 2026): besides QA-31, this task proves that generated

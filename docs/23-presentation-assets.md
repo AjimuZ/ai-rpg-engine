@@ -60,6 +60,12 @@ only by the campaign's hash route; a scene image is described by the public plac
 `frontend/src/app/campaign/media-fallback.spec.ts` checks this with a simulated server. It does not prove that the server never
 lists or serves a hidden asset, and no real browser with failing asset responses was run for it.
 
+**Failing media in a real browser (P17.5-B, 21 November 2026).** `frontend/tools/media-fallback-journey.mjs` repeats the check in
+headless Chrome against a loopback stand-in engine that really answers image, line-audio and music requests with 404 or with
+undecodable bytes. The documented fallbacks held in both cases: scene text label, speaker initial, built-in item icon, a text notice
+for a failed line, an "unavailable" music panel with an explicit retry and no automatic retry, and Send still working. A stand-in
+answered, not the packaged engine, and the server's side of secrecy (P17.5-C) is still unproven.
+
 P05.5 integrates original MIT geometry from `frontend/src/app/preview/ui-kit.ts`
 and `frontend/src/_ui-kit.scss` with the existing theme: 20 allowlisted line icons,
 finite/clamped resource meters, an independent crystal illustration, item/empty
