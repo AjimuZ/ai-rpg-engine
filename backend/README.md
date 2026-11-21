@@ -273,6 +273,19 @@ imports return the existing revision; differing bytes at the same ID/version
 fail. `report(revisionId)` reads the report and `files(revisionId)` checks the
 stored inventory against its normalized hash. No controller or media route exists.
 
+P16.1-A adds the injected `content.PackDiagnostics`, a read-only author service with no route. `validate(adventureId,
+staging)` runs the caller's staging step, the parser and `PackRegistry.preview`. It returns a `ValidationReport` instead
+of throwing: `VALID` with the import report that registration would store and the compiler warnings, or `INVALID` with
+the `STAGING`, `PARSING` or `COMPILATION` stage and one `Diagnostic` (code, `SourceLocation`, explanation). Staging
+diagnostics name only the sanitized logical file, at line 1, column 1 and an empty pointer. Once the manifest parses,
+the report also gives the version `Standing` (`NEW_PACK`, `NEW_VERSION`, `IDENTICAL`, `HASH_CONFLICT`, the highest
+registered version, and whether the candidate is below it). It lists each declared dependency as a `DependencyEdge`
+(`SEALED` with its `PackRegistry.diagnose` closure, `UNSEALED`, `HASH_MISMATCH` or `MISSING`). `versions(adventureId,
+packId)` lists registered revisions in SemVer order: sealed state, report version, ruleset availability, and the
+campaigns that pin each one as their root. `PackException.explanation()` returns the message without its code and
+coordinates. `PackDiagnosticsTest` (PostgreSQL, 4 cases) covers QA-02 at exact locations, plus version standing,
+version listing and the dependency graph.
+
 Defaults: 100 MiB ZIP, 250 MiB expanded, 2,000 files, 50:1 expansion, 32 MiB per
 file (text further limited to 1 MiB); image headers declare at most 8,192 per side
 and 32 Mi pixels. Directory sources must be owner-controlled and quiescent;

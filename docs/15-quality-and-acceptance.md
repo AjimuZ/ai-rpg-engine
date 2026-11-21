@@ -1458,6 +1458,23 @@ full QA-23 or full QA-35. All 22 repository-checker tests pass and docs/secrets/
 findings. Jar inspection confirms the four trusted schemas and V8 are packaged,
 with test inventories excluded. No new dependency or toolchain version was introduced.
 
+P16.1-A evidence (21 November 2026, Windows 11 host, pinned containers): QA-02 runs through the author validation
+report. `PackDiagnosticsTest#reportsQa02FailuresAtExactLocations` mutates one fact of the bundled fantasy fixture at a
+time and requires the exact code, stage, file, one-based line and column, and pointer of each failure:
+
+- missing reference: `REFERENCE_UNKNOWN` at `creation.json` `/definitions/0/data/startingItems/0/item`;
+- ability cycle: `CYCLE` at the closing edge `/definitions/1/data/prerequisites/abilities/0`, with the path
+  `steady -> brace -> steady`;
+- unknown effect type: `SCHEMA` at `/definitions/0/data/effects/0/type`;
+- traversal declared in the manifest: `PATH` at `/files/8/path`;
+- traversal inside a ZIP: `PATH` while staging, naming the entry `../escape.json` at line 1, column 1;
+- exponential YAML aliases: `YAML_FEATURE` at the first anchor (`/lol0`, line 2), before any expansion.
+
+The expected line and column are computed from the mutated text, not taken from the parser. The case writes no row.
+`verify.sh backend -Dtest=PackDiagnosticsTest,PackCompilerTest,PackParsingTest,PackStagingTest,NeutralGenreImportTest,PackRegistryPersistenceTest`
+passed 121 tests. Not proven: a route or UI showing these reports, coverage of every diagnostic code, more than one
+blocking diagnostic per run (compilation stops at the first), and YAML locations for files other than the one tested.
+
 P04.5 evidence (24 October 2026, Windows 11/Docker Desktop, pinned JDK 21 and
 PostgreSQL 18.6): `NeutralGenreImportTest` passes both cases using standalone
 fantasy exploration and science-fiction salvage resource directories, without

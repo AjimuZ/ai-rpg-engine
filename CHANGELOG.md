@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — Author validation reports, dependency and version diagnostics (P16.1-A), 21 November 2026
+
+- The engine can now check a candidate adventure pack for an adventure and return a full validation report, instead of
+  stopping with an error. A failing pack gets one diagnostic: the step that failed (reading the files, parsing, or
+  checking content), a stable code, and the exact file, line, column and field path. A passing pack gets the import
+  report that registration would store, and its warnings.
+- The report also compares the pack's version with the versions already registered: new pack, new version, identical
+  (registering again changes nothing), or same version with different files (a new version is needed). It warns when
+  the version is lower than the highest registered one.
+- Each declared dependency is reported as available, legacy without stored files, registered with different files, or
+  missing. An available dependency also shows whether its own dependencies load.
+- The registered versions of a pack can be listed in version order. For each version the list gives its sealed state,
+  whether this engine provides its ruleset, and how many campaigns use it.
+- Limits: there is no page or route for these reports yet. Each run shows only the first blocking problem. Campaign
+  preview and playtest tools are not part of this change.
+
 ## Unreleased — Adaptive quest and world direction recorded as disabled (P15.6-A), 21 November 2026
 
 - Adaptive quest and world direction stays switched off. The comparison of player agency, story coherence and cost that

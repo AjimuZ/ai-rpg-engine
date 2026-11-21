@@ -4,6 +4,7 @@ package org.rpgengine.content;
 public final class PackException extends IllegalArgumentException {
     private final String code;
     private final SourceLocation location;
+    private final String explanation;
 
     /** Build a diagnostic from trusted explanation and untrusted source coordinates; returns no source contents. */
     public PackException(String code, SourceLocation location, String explanation) {
@@ -11,6 +12,7 @@ public final class PackException extends IllegalArgumentException {
                 + " " + location.pointer() + ": " + explanation);
         this.code = code;
         this.location = location;
+        this.explanation = explanation;
     }
 
     /** Return the stable diagnostic code; never fails. */
@@ -21,5 +23,13 @@ public final class PackException extends IllegalArgumentException {
     /** Return the source coordinates; never fails. */
     public SourceLocation location() {
         return location;
+    }
+
+    /**
+     * Return the author-facing explanation alone, without the code and coordinates that
+     * {@link #getMessage()} prefixes; never fails.
+     */
+    public String explanation() {
+        return explanation;
     }
 }

@@ -6544,7 +6544,62 @@ this update. No combat runtime/browser result is claimed.
 
 **Depends on:** P14; integrates P15 definitions. **Areas:** content migration, export/restore, corrections, diagnostic tools.
 
-- [ ] P16.1 Complete validation reports, author previews, dependency graph diagnostics, and content version inspection.
+- [x] P16.1 Complete validation reports, author previews, dependency graph diagnostics, and content version inspection.
+  - P16.1-A (21 November 2026). Backend service only. No migration, route, page, setting, command or pack field changed.
+    - **Delivered.**
+      - New injected `content.PackDiagnostics`.
+      - `validate(adventureId, staging)` runs the caller's staging step, the parser and the unchanged
+        `PackRegistry.preview`. It returns a `ValidationReport` and does not throw: `VALID` with the preview's import
+        report and warnings, or `INVALID` with its stage (`STAGING`, `PARSING`, `COMPILATION`) and one `Diagnostic` (code,
+        `SourceLocation`, explanation).
+      - Once the manifest parses, the report also gives the version `Standing`: `NEW_PACK`, `NEW_VERSION`, `IDENTICAL`
+        or `HASH_CONFLICT`, the hash registered for this version, the highest registered SemVer version, and
+        `belowHighest`. It also lists one `DependencyEdge` per declared dependency, located at `/dependencies/<index>`:
+        `SEALED` with its `PackRegistry.diagnose` closure, `UNSEALED`, `HASH_MISMATCH` with the registered hash, or
+        `MISSING`.
+      - `versions(adventureId, packId)` lists registered revisions in SemVer order: sealed state, report version,
+        ruleset availability, admission time and the number of campaigns that pin each one as their root.
+      - An unknown adventure throws before staging runs. `PackException.explanation()` was added.
+    - **Tests.** `PackDiagnosticsTest` (new, PostgreSQL, 4 cases). Expected lines and columns are computed from the mutated
+      source text.
+      - `reportsQa02FailuresAtExactLocations` covers each QA-02 failure with its exact code, stage, file, line, column and
+        pointer, and checks that no row is written:
+        - `REFERENCE_UNKNOWN`, `creation.json` `/definitions/0/data/startingItems/0/item`;
+        - `CYCLE`, at the closing edge `/definitions/1/data/prerequisites/abilities/0`, with the path
+          `steady -> brace -> steady`;
+        - unknown effect type: `SCHEMA` at `/definitions/0/data/effects/0/type`;
+        - manifest traversal: `PATH` at `/files/8/path`;
+        - ZIP entry `../escape.json`: `PATH` while staging, at line 1, column 1, with an empty pointer;
+        - exponential YAML aliases: `YAML_FEATURE` at the first anchor, `/lol0`, line 2.
+      - `reportsVersionStandingAndRegisteredVersions`:
+        - the valid report equals the stored report;
+        - each standing appears: new pack, identical, conflict at `/version`, newer, and older with `belowHighest`;
+        - two sealed versions are listed in order, with 0 campaigns;
+        - an absent pack or another adventure gives an empty list.
+      - `reportsDependencyGraph`: the sealed dependency has an `AVAILABLE` closure; a wrong hash gives `HASH_MISMATCH`
+        and blocking `HASH_CONFLICT` at `/dependencies/0/hash`; an absent pack gives `MISSING` and blocking `DEPENDENCY`
+        at `/dependencies/0`.
+      - `rejectsUnknownAdventureBeforeStaging`.
+    - **Commands and results (Windows 11 host, pinned containers).**
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=PackDiagnosticsTest`: VERIFY PASSED,
+        4 tests, 0 failures; backend-focused 15 s.
+      - The same command with `-Dtest=PackDiagnosticsTest,PackCompilerTest,PackParsingTest,PackStagingTest,NeutralGenreImportTest,PackRegistryPersistenceTest`:
+        VERIFY PASSED, 121 tests, 0 failures (PackParsingTest 63, PackCompilerTest 26, PackRegistryPersistenceTest 12,
+        PackStagingTest 12, NeutralGenreImportTest 4, PackDiagnosticsTest 4); backend-focused 17 s. Counts are from the
+        surefire lines of `backend-focused.log`.
+    - **Documents.** docs/09 sections 9 and 11, docs/15 (QA-02 evidence), the backend README and CHANGELOG.
+    - **Not proven / remaining for P16.1:**
+      - No HTTP route or page shows these reports, so an author cannot reach them without code. Authorization is left
+        to the future caller.
+      - Only the first blocking diagnostic is reported, because compilation stops there.
+      - Campaign preview and playtest tools (docs/09 section 11) are not built.
+      - The campaign count covers campaigns that pin a revision as their root. Campaigns that reach it only through a
+        dependency are not counted, and a count above 0 was not exercised.
+      - `UNSEALED` dependencies were not exercised.
+      - Not every diagnostic code was re-checked for location precision; the earlier P04 suites still cover them by
+        code and pointer.
+      - No deliberate weakening was run.
+      - `verify.sh full` and `verify.sh containers` were not run.
 - [ ] P16.2 Add full-owner versus player-facing campaign exports and reusable adventure-bundle import/export for sharing between people, with integrity/dependency/locale/rights manifests; prove clean-recipient round trips and no private save/account leakage under QA-41.
 - [ ] P16.3 Add migration/correction previews, dependency impact, backup, audit, and stale-memory invalidation.
 - [ ] P16.4 Restore into explicit adventure/campaign destinations with fresh identities by default, including original artwork, active combat and pending narration; never merge by equal titles.

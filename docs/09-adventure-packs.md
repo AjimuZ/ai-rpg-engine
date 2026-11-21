@@ -411,6 +411,14 @@ Staging buffers bytes in memory without extraction or execution; its inventory
 has a private constructor and defensive byte-array copies. Preview compiles and
 returns a deterministic report without writes. No import endpoint or UI is exposed.
 
+P16.1-A adds `PackDiagnostics.validate(adventureId, staging)`, the author's validation report over this same pipeline.
+It runs the staging step, the parser and the preview, and returns the first blocking diagnostic as data instead of
+throwing it. The diagnostic carries its stage (`STAGING`, `PARSING` or `COMPILATION`), its code, its file, line, column
+and pointer, and its explanation. A valid result carries the preview's import report and warnings. When the manifest
+parses, the report also shows how the version compares with registered versions of the same pack, and the state of each
+declared dependency (section 11). Nothing is written. Staging diagnostics name only the sanitized logical file, because
+no document exists yet. As with the preview, there is no endpoint or UI yet.
+
 1. Stage the owner-selected directory/archive in a non-executable area.
 2. Reject absolute paths, `..` traversal, symlinks/reparse points, case collisions, executable payload types, oversized or explosive archives, and remote includes.
 3. Parse with safe YAML 1.2 core-schema and JSON settings. Prohibit tags and object construction, reject anchors, aliases, merge keys, and duplicate keys (contract 1 allows no aliases), and bound nesting and file count.
@@ -515,6 +523,22 @@ P04.3 compiler codes: `engineCompatibility` and `ruleset.version` are SemVer 2.0
 ## 11. Author workflow
 
 Write a minimal manifest and world overview. Define character creation and starting situation. Select the default ruleset. Add only content needed for the first scene and set generation boundaries. Run validation, inspect diagnostics, preview a campaign, and perform a short playtest. Revise files, bump version, and import a new revision. Existing campaigns continue on their pinned snapshot.
+
+P16.1-A provides the backend half of the "run validation, inspect diagnostics" steps, with no route or page yet:
+
+- `PackDiagnostics.validate` reports either one located blocking diagnostic, or the import report with its warnings. It
+  stops at the first blocking diagnostic, as the compiler does, so fixing one error can reveal the next.
+- Version standing: the candidate is `NEW_PACK`, `NEW_VERSION`, `IDENTICAL` (registering again changes nothing) or
+  `HASH_CONFLICT` (other bytes under a registered version; bump the version). The report also gives the highest
+  registered version and flags a candidate that falls below it.
+- Dependency graph: each declared dependency, located at `/dependencies/<index>`, is `SEALED`, `UNSEALED`,
+  `HASH_MISMATCH` (with the registered hash) or `MISSING`. A sealed dependency also carries the closure diagnosis of its
+  own pinned dependencies (P09.5 codes).
+- `PackDiagnostics.versions(adventureId, packId)` lists registered revisions in SemVer order. For each it gives the
+  sealed state, report version, whether this build provides its ruleset, and how many campaigns pin it as their root.
+  Campaigns that reach it only through a dependency are not counted.
+
+The campaign preview and the playtest steps still have no tool.
 
 A future editor must write this same contract. Its visual form cannot become a second incompatible authoring model.
 
