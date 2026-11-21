@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Relationship causes and companions (P15.1-B), 21 November 2026
+
+- Adventures can enable the first optional module, `relationships`. Its NPCs may then declare bounded attitudes such
+  as trust, the typed events that change them (being spoken to, a gift, a trade, a promise kept or broken), and a
+  threshold from which the NPC joins the player as a companion. A pack that does not enable the module cannot declare
+  these rules: the pack checker reports `MODULE_DISABLED` at the field instead of ignoring it.
+- During play, each change is stored once with the event that caused it and the value before and after. A change that
+  cannot move the value (already at its limit) stores nothing. A companion arrives with the player when the player
+  moves, and its daily schedule pauses while it travels with the player. Looking at the game changes nothing.
+  Adventures without the module behave exactly as before.
+- Database migration V33 adds the `relationship_change` table, and the backup tool now covers schema 33.
+- Limits: new campaigns do not yet create NPCs from the adventure's definitions. No screen shows these values yet. No
+  player command makes promises yet. Companions do not fight alongside the player.
+
 ## Unreleased — NPC schedules, witnesses and reports (P15.1-A), 21 November 2026
 
 - Adventure authors can give an NPC a daily `schedule` of places by time of day. They can also mark it as a `witness`

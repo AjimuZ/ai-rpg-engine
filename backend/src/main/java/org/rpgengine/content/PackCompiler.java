@@ -14,6 +14,7 @@ import java.util.TreeSet;
 import org.rpgengine.rules.CombatProfile;
 import org.rpgengine.rules.WorldClock;
 import org.rpgengine.rules.ZoneGraph;
+import org.rpgengine.world.RelationshipRules;
 
 /**
  * Semantic validation of a {@link ParsedPack}: stable IDs, dependency resolution, cross-references,
@@ -64,6 +65,11 @@ public final class PackCompiler {
     static final int NPC_SCHEDULE_MAX = 24;
     /** Most report routes one witness NPC may declare (P15.1-A). */
     static final int NPC_REPORTS_MAX = 8;
+    /** Optional module that lets NPC definitions declare relationship rules and companions (P15.1-B). */
+    public static final String RELATIONSHIPS_MODULE = "relationships";
+    /** Authored spellings of the relationship triggers, from {@link RelationshipRules.Trigger}. */
+    private static final Set<String> RELATIONSHIP_TRIGGERS = java.util.Arrays.stream(RelationshipRules.Trigger.values())
+            .map(RelationshipRules.Trigger::token).collect(java.util.stream.Collectors.toUnmodifiableSet());
     /** A time of day on the 24-hour clock, {@code HH:MM}. */
     private static final java.util.regex.Pattern DAY_TIME = java.util.regex.Pattern.compile("([01][0-9]|2[0-3]):[0-5][0-9]");
     /** Hands available when a pack's equipment rule does not say otherwise (docs/10 section 3). */
@@ -238,6 +244,12 @@ public final class PackCompiler {
                     throw new PackException("UNSUPPORTED_MODULE", manifestDocument.location("/modules/" + index + "/id"),
                             "Module '" + module + "' is not supported by engine " + contract.engineVersion()
                                     + " (pack contract " + EngineContract.PACK_CONTRACT + ")");
+                }
+                // The relationships module reads its rules from NPC definitions; a configuration file would be ignored.
+                if (RELATIONSHIPS_MODULE.equals(module) && modules.get(index).containsKey("configuration")) {
+                    throw new PackException("CONSTRAINT_CONFLICT",
+                            manifestDocument.location("/modules/" + index + "/configuration"),
+                            "The '" + RELATIONSHIPS_MODULE + "' module takes no configuration file");
                 }
             }
             // One ID and version must always mean the same bytes; changed content needs a new release.
@@ -1266,7 +1278,8 @@ public final class PackCompiler {
          * in-world time, an optional {@code witness} flag (the NPC remembers where it saw the player) and
          * optional {@code reports} routes through which a witness's sightings reach other NPCs after a delay
          * in in-world minutes. The schedule entry in force at 00:00 must be the NPC's {@code location}, so
-         * that location stays where a campaign starts it.
+         * that location stays where a campaign starts it. With the {@code relationships} module (P15.1-B) an NPC
+         * may also declare {@code relationship} rules.
          */
         private void npc(Fields f, Definition self) {
             f.text("name", true);
@@ -1298,7 +1311,81 @@ public final class PackCompiler {
                 // Only a witness records sightings, so a route from anyone else would never carry anything.
                 throw f.fail("CONSTRAINT_CONFLICT", "reports", "Only an NPC marked as a witness can report what it saw");
             }
+            relationship(f);
             facts(f);
+        }
+
+        /**
+         * Validate an NPC's optional {@code relationship} rules (P15.1-B): 1..{@value RelationshipRules#MAX_DIMENSIONS}
+         * bounded dimensions, 1..{@value RelationshipRules#MAX_CAUSES} causes that each name a known trigger and
+         * dimension once with a non-zero bounded delta, and an optional companion threshold above the dimension's
+         * initial value. The field exists only for a pack that enables the {@code relationships} module; any other
+         * pack gets a located MODULE_DISABLED error instead of rules that silently do nothing.
+         */
+        private void relationship(Fields f) {
+            if (!f.has("relationship")) {
+                return;
+            }
+            if (!moduleEnabled(RELATIONSHIPS_MODULE)) {
+                throw f.fail("MODULE_DISABLED", "relationship",
+                        "Relationship rules need the pack to enable the '" + RELATIONSHIPS_MODULE + "' module");
+            }
+            Fields bond = f.object("relationship", true);
+            int limit = RelationshipRules.VALUE_LIMIT;
+            Map<String, int[]> dimensions = new HashMap<>();
+            for (Fields dimension : bond.objects("dimensions", 1, RelationshipRules.MAX_DIMENSIONS)) {
+                String id = dimension.id("id", true);
+                int min = dimension.integer("min", -limit, limit, null);
+                int max = dimension.integer("max", -limit, limit, null);
+                int initial = dimension.integer("initial", -limit, limit, 0);
+                if (min >= max || initial < min || initial > max) {
+                    throw dimension.fail("CONSTRAINT_CONFLICT", "initial",
+                            "A dimension needs min below max and an initial value between them");
+                }
+                if (dimensions.put(id, new int[] {min, max, initial}) != null) {
+                    throw dimension.fail("DUPLICATE", "id", "Duplicate relationship dimension");
+                }
+                dimension.close();
+            }
+            Set<String> pairs = new HashSet<>();
+            for (Fields cause : bond.objects("causes", 1, RelationshipRules.MAX_CAUSES)) {
+                String on = cause.choice("on", RELATIONSHIP_TRIGGERS, null);
+                String dimension = cause.id("dimension", true);
+                if (!dimensions.containsKey(dimension)) {
+                    throw cause.fail("REFERENCE_UNKNOWN", "dimension", "Unknown relationship dimension");
+                }
+                int delta = cause.integer("delta", -RelationshipRules.DELTA_LIMIT, RelationshipRules.DELTA_LIMIT, null);
+                if (delta == 0) {
+                    throw cause.fail("delta", "A cause must change the value: expected a non-zero delta");
+                }
+                if (!pairs.add(on + "|" + dimension)) {
+                    throw cause.fail("DUPLICATE", "on", "One cause per trigger and dimension");
+                }
+                cause.close();
+            }
+            Fields companion = bond.object("companion", false);
+            if (companion != null) {
+                String dimension = companion.id("dimension", true);
+                int[] range = dimensions.get(dimension);
+                if (range == null) {
+                    throw companion.fail("REFERENCE_UNKNOWN", "dimension", "Unknown relationship dimension");
+                }
+                int atLeast = companion.integer("atLeast", -limit, limit, null);
+                // Above the initial value, so every companion joins through a recorded, caused change.
+                if (atLeast <= range[2] || atLeast > range[1]) {
+                    throw companion.fail("CONSTRAINT_CONFLICT", "atLeast",
+                            "A companion threshold lies above the initial value and at most the maximum");
+                }
+                companion.close();
+            }
+            bond.close();
+        }
+
+        /** True when this pack's own manifest enables the module; a dependency's modules do not count. */
+        @SuppressWarnings("unchecked")
+        private boolean moduleEnabled(String module) {
+            var modules = (List<Map<String, Object>>) pack.manifest().values().getOrDefault("modules", List.of());
+            return modules.stream().anyMatch(entry -> module.equals(entry.get("id")));
         }
 
         /**

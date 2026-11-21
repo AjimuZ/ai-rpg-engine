@@ -89,7 +89,22 @@ public final class NpcWorld {
      */
     public static Set<String> advanceWithin(JdbcTemplate jdbc, UUID campaign, Map<String, NpcRules> npcs,
             UUID actingPlayer, KnowledgeLedger.Provenance at) {
+        return advanceWithin(jdbc, campaign, npcs, actingPlayer, at, Set.of());
+    }
+
+    /**
+     * Apply schedules, witnesses and reports for one committing operation, leaving the schedules of companions
+     * aside (P15.1-B): a companion travels with the player instead of keeping its routine.
+     *
+     * @param following NPC actors that are companions of the acting player after this commit
+     * @return the query scopes written, as {@link #advanceWithin(JdbcTemplate, UUID, Map, UUID,
+     *         KnowledgeLedger.Provenance)} describes
+     * @see #advanceWithin(JdbcTemplate, UUID, Map, UUID, KnowledgeLedger.Provenance)
+     */
+    public static Set<String> advanceWithin(JdbcTemplate jdbc, UUID campaign, Map<String, NpcRules> npcs,
+            UUID actingPlayer, KnowledgeLedger.Provenance at, Set<UUID> following) {
         Objects.requireNonNull(campaign, "campaign");
+        Objects.requireNonNull(following, "following");
         Objects.requireNonNull(at, "at");
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("world rules require the caller's transaction");
@@ -99,7 +114,7 @@ public final class NpcWorld {
             return scopes;
         }
         List<Npc> actors = load(jdbc, campaign, npcs);
-        follow(jdbc, campaign, actors, at.worldTime(), scopes);
+        follow(jdbc, campaign, actors, at.worldTime(), following, scopes);
         if (actingPlayer != null) {
             witness(jdbc, campaign, actors, actingPlayer, at, scopes);
         }
@@ -123,11 +138,11 @@ public final class NpcWorld {
         return actors;
     }
 
-    /** Place every scheduled NPC where its routine puts it now; unchanged rows are not written. */
+    /** Place every scheduled NPC except companions where its routine puts it now; unchanged rows are not written. */
     private static void follow(JdbcTemplate jdbc, UUID campaign, List<Npc> actors, long worldTime,
-            Set<String> scopes) {
+            Set<UUID> following, Set<String> scopes) {
         for (Npc npc : actors) {
-            if (npc.rules.schedule() == null) {
+            if (npc.rules.schedule() == null || following.contains(npc.id)) {
                 continue;
             }
             String target = npc.rules.schedule().locationAt(worldTime);

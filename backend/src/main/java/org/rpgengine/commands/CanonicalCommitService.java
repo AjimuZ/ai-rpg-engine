@@ -27,6 +27,7 @@ import org.rpgengine.presentation.PresentationJobService;
 import org.rpgengine.quests.QuestWriter;
 import org.rpgengine.progression.RewardSettlement;
 import org.rpgengine.world.NpcWorld;
+import org.rpgengine.world.Relationships;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -63,6 +64,9 @@ import tools.jackson.databind.json.JsonMapper;
  * Since P15.1-A every commit that carries the pinned catalog then applies the NPC world rules ({@link NpcWorld}):
  * schedules place NPCs for the committed world time, witnesses beside the acting player record where they saw it,
  * and due reports reach their recipients, all before the player's own observation and in the same transaction.
+ * Since P15.1-B the relationship rules of an enabled {@code relationships} module run just before them
+ * ({@link Relationships}): each change cites the event or commitment resolution that caused it, and companions follow
+ * the player's move instead of their schedules.
  * This internal service has no controller, network port or callback.
  * Any validation, persistence, timeout or commit failure rolls back all its writes.
  */
@@ -305,7 +309,12 @@ public class CanonicalCommitService {
         // player perceives whoever the schedules place here now; witnesses and reports read the same state.
         var pinned = rules.optional(campaign.getContentRevisionId());
         if (pinned != null) {
-            scopes.addAll(NpcWorld.advanceWithin(jdbc, campaign.getId(), pinned.npcs(), player, at));
+            // Relationship causes (P15.1-B) read this revision's events and resolved commitments, so they follow the
+            // knowledge changes above; companions move with the player first and then keep out of their schedules.
+            var bonds = Relationships.applyWithin(jdbc, campaign.getId(), pinned.relationships(), player, at);
+            scopes.addAll(bonds.scopes());
+            scopes.addAll(NpcWorld.advanceWithin(jdbc, campaign.getId(), pinned.npcs(), player, at,
+                    bonds.companions()));
         }
         if (player != null) {
             var perception = CommandRules.perceived(jdbc, campaign.getId(), player, rules);

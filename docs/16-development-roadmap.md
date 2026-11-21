@@ -5948,7 +5948,7 @@ this update. No combat runtime/browser result is claimed.
 
 **Depends on:** P14. **Areas:** social/world/quest modules, guide, creative abilities.
 
-- [ ] P15.1 Add NPC goals/schedules, witnesses, knowledge propagation, companions, and relationship causes/commitments.
+- [x] P15.1 Add NPC goals/schedules, witnesses, knowledge propagation, companions, and relationship causes/commitments.
   - P15.1-A (21 November 2026; partial, the box stays unchecked). This adds schedules, witnesses and first-hand
     reports ([ADR 0049](adr/0049-npc-schedules-witnesses-and-first-hand-reports.md)). No migration was added.
     - **Pack content.** NPC definitions accept three optional fields: `schedule` (1..24 `{from: "HH:MM", location}`
@@ -5992,6 +5992,70 @@ this update. No combat runtime/browser result is claimed.
       - HTTP reads in the QA-21 test, which uses views and admissions. HTTP reads are covered generally by
         `WorldClockQueriesTest`, without NPC rules.
       - A deliberate weakening run.
+      - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
+  - P15.1-B (21 November 2026; partial, the box stays unchecked). This adds relationship causes and companions as the
+    engine's first optional module, `relationships`
+    ([ADR 0050](adr/0050-relationship-changes-cite-their-cause-and-companions-follow-the-player.md)).
+    - **Module gate.** `EngineContract.current()` now supports `relationships`. An NPC definition may declare
+      `relationship` only when its own pack's manifest enables the module. Otherwise the compiler reports
+      `MODULE_DISABLED` at the field. A `configuration` file for the module is `CONSTRAINT_CONFLICT`.
+    - **Pack content.** `relationship` holds:
+      - 1..4 `dimensions` `{id, min, max, initial}` within -100..100;
+      - 1..16 `causes` `{on, dimension, delta}`, where `on` is `spoken-to`, `gift`, `trade`, `promise-kept` or
+        `promise-broken` and the delta is ±1..10;
+      - an optional `companion` `{dimension, atLeast}` whose threshold lies above the initial value.
+
+      The pinned catalog carries them as `RelationshipRules`.
+    - **Engine behavior.** `org.rpgengine.world.Relationships` runs in every commit that carries the pinned catalog,
+      after the knowledge changes and before `NpcWorld`:
+      - It reads this revision's `SPEECH_DELIVERED`, `ITEM_TRANSFERRED` and `ITEM_TRADED` events from the acting
+        player to an NPC with rules, and the commitments resolved FULFILLED or BROKEN at this revision with such an
+        NPC as creditor.
+      - Each declared cause moves the value, clamped. A moving change inserts one immutable `relationship_change` row
+        (migration V33). The row cites the event of the same revision (checked by trigger), records the values
+        before and after, and is marked JOINED or LEFT when it crosses the companion threshold. Recorded changes bump
+        `relationships:<npc>`, with at most 64 changes per commit.
+      - Companions of the acting player that stood at the start of its `ACTOR_MOVED` move to its end (row-version
+        guard, `actor:<npc>`). `NpcWorld` skips their schedules.
+
+      Campaigns without relationship rules return before any query. Reads call none of this. The backup tool now
+      covers schema 33 and the new table.
+    - **Commands and results (Windows 11 host, pinned containers).**
+      - `sh .agents/ralph/verify.sh backend -Dtest=RelationshipWorldTest,PackCompilerTest,NpcWorldTest,EngineApplicationTest`:
+        VERIFY PASSED. 30 tests, 0 failures (PackCompilerTest 24, EngineApplicationTest 3, RelationshipWorldTest 2,
+        NpcWorldTest 1); backend-focused 18 s.
+      - `sh .agents/ralph/verify.sh backend -Dtest=CanonicalMigrationUpgradeTest,KnowledgeLedgerTest,PlayPanelsTest,CommandRulesTest,LocalActionResolverTest,CanonicalFoundationsPersistenceTest,ItemCommandsTest`:
+        VERIFY PASSED. 67 tests, 0 failures (CanonicalFoundationsPersistenceTest 16, CanonicalMigrationUpgradeTest 1,
+        PlayPanelsTest 11, LocalActionResolverTest 9, ItemCommandsTest 13, KnowledgeLedgerTest 8, CommandRulesTest 9);
+        backend-focused 24 s. The step-by-step upgrade test still passes with V33 present. `EngineApplicationTest`
+        (first run) lists the new table. Of the 48 suites whose cleanup lists gained the table, 6 ran here and 42 did not.
+    - **Evidence.**
+      - `RelationshipWorldTest#causedChangesAreRecordedAndCompanionsFollowThePlayer`: on real PostgreSQL through the
+        production admission, resolver and commit, with an NPC actor created by the test. Speaking to the guide
+        records trust 0→2, then 2→4 marked JOINED, then 4→5 (clamped), and then no row. Each row cites the
+        `SPEECH_DELIVERED` event of its own revision. Three rounds of audience and privileged views with real time
+        passing leave `campaign`, `actor`, `campaign_event`, `relationship_change` and `query_epoch` byte-identical.
+        The player's move to the grove moves the companion in the same commit (row version +1, `actor:` epoch +1), and
+        its trailhead-only schedule does not pull it back after a later `WAIT`. The database refuses an update or
+        delete of the rows.
+      - `RelationshipWorldTest#disabledModuleLeavesNoTrace`: the same NPC with rules in a pack without the module is
+        refused at registration with `MODULE_DISABLED`. Without the rules, the same commands store no
+        `relationship_change` row and no `relationships:` epoch, and the guide stays at the trailhead.
+      - `PackCompilerTest#validatesRelationshipRulesOnlyWithTheModule`: the module gate, `UNSUPPORTED_MODULE` under a
+        contract without the module, and each bound, duplicate, reference, threshold and configuration error.
+    - **Not done in this story:**
+      - Creation of NPC actors at campaign start, so packaged play still has no NPC these rules change.
+      - A player command that creates commitments, so promise causes need trusted code to resolve a commitment.
+      - Companions in combat (`CapabilitySnapshot` membership), control policy and formation.
+      - Any view, panel or narration context that shows relationship values or membership.
+      - Typed NPC goals, expressed boundaries, witnessed events and multi-hop propagation.
+    - **Not proven:**
+      - The `gift`, `trade`, `promise-kept`, `promise-broken` and LEFT paths. The 64-change cap and the 512-actor
+        failure. None of these branches has a test.
+      - HTTP reads in these tests.
+      - A deliberate weakening run.
+      - `tools/database_backup/test_backup.py`: this session was not allowed to run Python, so the schema 33 scope
+        check is unverified here.
       - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
 - [ ] P15.2 Add richer quest outcomes, faction clocks, bounded time catch-up, reputation, and causally triggered world changes.
 - [ ] P15.3 Add guide personas with separate knowledge/session scope and no mutation authority.

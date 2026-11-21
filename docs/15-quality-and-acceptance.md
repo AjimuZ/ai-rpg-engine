@@ -1,5 +1,14 @@
 # Quality Strategy and Acceptance Criteria
 
+P15.1-B verification (21 November 2026): `RelationshipWorldTest` (PostgreSQL, production command path) shows that each
+relationship change is one immutable row citing the event of its own revision, and that the change crossing the
+companion threshold is marked JOINED. A companion arrives with the player's move instead of following its schedule.
+Reads change nothing. With the `relationships` module disabled, the relationship field is refused (`MODULE_DISABLED`),
+and the same commands store no relationship row and no relationship scope. This is the first module-level evidence for
+the "disabled modules absent" half of QA-22. It is not QA-22 itself: the guide and creative modules do not exist yet.
+The NPC actors in the test are created by the test. Details are in the
+[P15.1 roadmap entry](16-development-roadmap.md#19-p15--complete-supported-world-and-optional-modules).
+
 P15.1-A verification (21 November 2026): QA-21 is covered at the engine level by
 `NpcWorldTest#worldTimeAndWitnessesDeterminePresenceAndKnowledge` on PostgreSQL through the production command path.
 The test shows that a scheduled NPC moves only when a command's world time crosses its boundary, and that only a

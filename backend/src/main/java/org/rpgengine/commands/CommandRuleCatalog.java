@@ -19,12 +19,14 @@ import org.rpgengine.rules.RestRules;
 import org.rpgengine.rules.WorldClock;
 import org.rpgengine.world.NpcRules;
 import org.rpgengine.world.NpcSchedule;
+import org.rpgengine.world.RelationshipRules;
 
 /**
  * Compact immutable projection of the pinned rule facts that command validation and local
  * resolution consult: location links with their travel minutes and tags, location disclosure, rest policies,
  * combat profiles and encounter templates (P11.1), actor-definition disclosure and
- * declaring packs, NPC schedules, witness flags and report routes (P15.1-A), and ability contracts
+ * declaring packs, NPC schedules, witness flags and report routes (P15.1-A), NPC relationship rules (P15.1-B),
+ * and ability contracts
  * including their compiled effect programs. It is
  * derived only from a sealed, recompiled {@link CampaignPackSnapshot}; no authored prose,
  * secret text, display name or localization is retained, so caching it costs little memory
@@ -57,11 +59,15 @@ import org.rpgengine.world.NpcSchedule;
  * @param combat resolved combat profile of each pack and the encounter templates of the closure (P11.1)
  * @param npcs world rules of every NPC definition that declares any (schedule, witness, reports), keyed by
  *        canonical ID with canonical location and recipient IDs (P15.1-A); NPCs without rules are absent
+ * @param relationships relationship rules of every NPC definition that declares them, keyed by canonical ID
+ *        (P15.1-B); only a pack that enables the {@code relationships} module can declare them, so the map is empty
+ *        for every closure that does not
  */
 record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
         Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
         Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests,
-        Map<String, RestRules.Policy> rests, CombatRules combat, Map<String, NpcRules> npcs) {
+        Map<String, RestRules.Policy> rests, CombatRules combat, Map<String, NpcRules> npcs,
+        Map<String, RelationshipRules> relationships) {
     /** Freeze every index; null parts are construction bugs and fail immediately. */
     CommandRuleCatalog {
         Objects.requireNonNull(revisionId, "revisionId");
@@ -76,6 +82,16 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         actorPacks = Map.copyOf(actorPacks);
         abilities = Map.copyOf(abilities);
         npcs = Map.copyOf(npcs);
+        relationships = Map.copyOf(relationships);
+    }
+
+    /** Catalog without relationship rules, the shape used before P15.1-B. */
+    CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
+            Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
+            Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests,
+            Map<String, RestRules.Policy> rests, CombatRules combat, Map<String, NpcRules> npcs) {
+        this(revisionId, locations, actorDefinitions, resourceVocabularies, actorPacks, abilities, items, characters,
+                quests, rests, combat, npcs, Map.of());
     }
 
     /** Catalog without NPC world rules, the shape used before P15.1-A. */
@@ -137,6 +153,7 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         var items = new HashMap<String, ItemRule>();
         var rests = new HashMap<String, RestRules.Policy>();
         var npcs = new HashMap<String, NpcRules>();
+        var relationships = new HashMap<String, RelationshipRules>();
         for (CompiledPack pack : snapshot.packs().values()) {
             String packId = pack.parsed().manifest().id();
             for (Definition definition : pack.definitions()) {
@@ -177,6 +194,9 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
                         if (world.active()) {
                             npcs.put(id, world);
                         }
+                        if (data.get("relationship") instanceof Map<?, ?> declared) {
+                            relationships.put(id, relationship(declared));
+                        }
                     }
                     // A creation profile is the player's own origin and is never concealed; its
                     // declaring pack supplied the player's resource keys at campaign creation.
@@ -192,7 +212,32 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
             }
         }
         return new CommandRuleCatalog(revisionId, locations, actors, vocabularies, origins, abilities, items,
-                CharacterRuleCatalog.from(snapshot), QuestRules.from(snapshot), rests, CombatRules.from(snapshot), npcs);
+                CharacterRuleCatalog.from(snapshot), QuestRules.from(snapshot), rests, CombatRules.from(snapshot), npcs,
+                relationships);
+    }
+
+    /**
+     * Read one NPC's validated relationship rules (P15.1-B). Dimension identifiers are local to the NPC and stay
+     * unqualified; the compiler has already checked bounds, references, uniqueness and the companion threshold,
+     * and that the declaring pack enables the module.
+     */
+    private static RelationshipRules relationship(Map<?, ?> declared) {
+        var dimensions = new HashMap<String, RelationshipRules.Dimension>();
+        for (Map<?, ?> dimension : objects(declared.get("dimensions"))) {
+            dimensions.put((String) dimension.get("id"), new RelationshipRules.Dimension(number(dimension.get("min"), 0),
+                    number(dimension.get("max"), 0), number(dimension.get("initial"), 0)));
+        }
+        var causes = new ArrayList<RelationshipRules.Cause>();
+        for (Map<?, ?> cause : objects(declared.get("causes"))) {
+            causes.add(new RelationshipRules.Cause(RelationshipRules.Trigger.of((String) cause.get("on")),
+                    (String) cause.get("dimension"), number(cause.get("delta"), 0)));
+        }
+        RelationshipRules.Companion companion = null;
+        if (declared.get("companion") instanceof Map<?, ?> threshold) {
+            companion = new RelationshipRules.Companion((String) threshold.get("dimension"),
+                    number(threshold.get("atLeast"), 0));
+        }
+        return new RelationshipRules(dimensions, causes, companion);
     }
 
     /**

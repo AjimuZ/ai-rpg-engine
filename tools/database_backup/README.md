@@ -256,6 +256,13 @@ journal, presentation and memory startup passes on a fight stopped inside a roun
 fight continues from the same cursors. The [live sample rehearsal](#live-sample-rehearsal-p142-b-v32) ran on V32 with a fight entered
 but stopped before its first round. The two-genre rehearsal below holds no encounter.
 
+V33 scope (P15.1-B) adds `relationship_change`, the append-only history of NPC relationship values: one row per change with
+the NPC, the actor it is held toward, the dimension, the cause (an event of the same revision and, for a kept or broken
+promise, the commitment), the values before and after, and a JOINED/LEFT companion mark. It holds no prose. Rows are immutable
+and the current value and companion membership are derived from them, so a restore needs no retirement step for this table.
+Offline checks cover the V33 manifest/catalog; no live V33 dump/restore rehearsal has been run, and both rehearsals below ran
+before this table existed.
+
 ## Live two-genre rehearsal (P06.5-B.1, V26)
 
 `tools/container_packaging/test_restore_isolation.py` runs this tool as an operator would on a populated world, then

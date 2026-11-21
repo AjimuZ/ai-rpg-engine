@@ -9,8 +9,9 @@ The engine distinguishes **attributes** (broad capacities), **skills** (trained 
 P04.5's [neutral genre fixtures](../backend/src/test/resources/packs/README.md)
 compile Trailcraft/Vigor and Systems/Charge, distinct creation budgets, recovery
 abilities and exploration objectives through the same engine. This is content
-import evidence only. No loadable module runtime exists yet; both fixtures leave
-guide, creative abilities and romance disabled, without claiming gameplay checks.
+import evidence only. Both fixtures leave guide, creative abilities and romance
+disabled, without claiming gameplay checks. Since P15.1-B the engine supports one
+optional module, `relationships` (section 6). Every other module ID is still refused.
 
 Since P10.1 the character part of this model is executable: attributes with ranges, skills with a
 maximum rank, derived statistics, learned abilities with prerequisites, conditions with stacking,
@@ -87,6 +88,28 @@ Limits:
 Companions additionally have party membership, control policy, formation/zone, resource state, and their own knowledge. Control options are player-directed or AI-assisted within legal actions. The owner selects a policy; Codex cannot silently control the protagonist. A guide persona does not become a party combatant without an explicit actor profile and membership event.
 
 Relationship dimensions are pack-defined bounded values, such as trust or respect. Significant changes need an event and cause. Hidden values stay hidden. Commitments and expressed boundaries are independent facts, not automatic consequences of crossing a numeric threshold. Optional romance is a content module and is disabled by default in neutral samples; it is not a condition for engine functionality.
+
+**Relationship causes and companions (P15.1-B, implemented; [ADR 0050](adr/0050-relationship-changes-cite-their-cause-and-companions-follow-the-player.md)).** This is the engine's first optional module. A pack enables it with `"modules": [{"id": "relationships"}]`. An NPC definition of that pack may then declare `relationship`:
+
+- `dimensions`: 1..4 entries `{id, min, max, initial}`. The bounds lie within -100..100 with min below max, and `initial` defaults to 0.
+- `causes`: 1..16 entries `{on, dimension, delta}`, one per trigger and dimension. `delta` is 1..10 in either direction. `on` is one of:
+  - `spoken-to`: the player addressed the NPC;
+  - `gift`: the player gave it units of an item;
+  - `trade`: the player traded with it;
+  - `promise-kept` or `promise-broken`: a commitment owed to the NPC was resolved FULFILLED or BROKEN.
+- `companion` (optional): `{dimension, atLeast}`. The threshold must lie above the initial value.
+
+In every committed command, each declared cause found among that revision's typed events or resolved commitments moves the value of that NPC toward the player (or toward the debtor, for a promise), clamped to its bounds. A change that moves the value is stored as one immutable row that cites the causing event of the same revision, with the values before and after. A clamped no-op stores nothing. At most 64 changes are recorded per commit. An NPC is a companion exactly while its companion value toward the player is at least the threshold; the rows that cross it are marked JOINED or LEFT. A companion that stands where the player's move starts arrives with the player in the same commit, and its schedule does not apply while it is a companion.
+
+Disabled behavior: a pack that does not enable the module cannot declare `relationship` (`MODULE_DISABLED`). Its campaigns read nothing and write nothing for relationships, and they behave exactly as before.
+
+Limits:
+
+- No view, panel or narration context shows these values yet, so they are hidden from every audience.
+- Campaign creation still creates no NPC actors.
+- No player command creates commitments yet.
+- Companions do not take part in combat, and have no control policy or formation.
+- Romance, expressed boundaries and faction relationships are not part of this module.
 
 ## 7. World state, factions, and clocks
 

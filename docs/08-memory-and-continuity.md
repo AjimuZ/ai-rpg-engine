@@ -296,6 +296,9 @@ Decisions and limits:
 - A `character` context has no history and no witnessed events. Since P15.1-A its knowledge
   section includes the sightings a witness NPC recorded or was told, because they are that NPC's
   own last known locations. Witnessed events and history are still absent.
+- P15.1-B relationship values and companion membership (`relationship_change`) are in no context,
+  view or summary yet, and the operational checkpoint snapshot does not include them. A
+  companion's location is an ordinary `actor` row.
 - Semantic retrieval stays out of scope (section 11).
 
 ## 7. Renewal policy

@@ -203,6 +203,18 @@ resolver `Placement`, so participant attribution does not apply to it, and no ev
 Witness and report sightings are written through the knowledge ledger in the same commit
 ([ADR 0049](adr/0049-npc-schedules-witnesses-and-first-hand-reports.md)).
 
+Since P15.1-B a companion's `actor.location_id` has a third writer. When the acting player's `ACTOR_MOVED` starts where
+the companion stands, the commit moves the companion to the same destination under its row version and bumps
+`actor:<npc>`, and the companion's schedule does not apply. V33 adds `relationship_change`, keyed by
+`(campaign_id, changed_revision, ordinal)`. Each row is one change of an NPC's bounded dimension toward another actor:
+`holder_actor_id`, `subject_actor_id`, `dimension_id`, `cause` (`SPOKEN_TO`, `GIFT`, `TRADE`, `PROMISE_KEPT`,
+`PROMISE_BROKEN`), `cause_event_sequence` (an event of the same revision, checked by trigger), `commitment_id` (set
+exactly for promises), `delta`, `value_before`, `value_after` (different, both in -100..100), `membership` (`JOINED`,
+`LEFT` or null) and `changed_world_time`. Rows are immutable. The current value is `value_after` of the latest row, or
+the authored initial value when there is none. Companion membership is derived from that value, so no separate table
+records it ([ADR 0050](adr/0050-relationship-changes-cite-their-cause-and-companions-follow-the-player.md)). Only
+content that enables the `relationships` module writes here.
+
 ### Stream, cancellation and presentation jobs (P07.5)
 
 V11 adds, without backfilling history:

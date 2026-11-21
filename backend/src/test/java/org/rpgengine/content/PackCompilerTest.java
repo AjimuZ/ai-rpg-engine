@@ -443,6 +443,74 @@ class PackCompilerTest {
                 clerk)));
     }
 
+    /**
+     * Relationship rules (P15.1-B) exist only where the pack enables the {@code relationships} module: the same NPC
+     * field is a located MODULE_DISABLED error without it. With the module, dimensions are bounded and ordered, causes
+     * name a known trigger and dimension once with a non-zero delta, and a companion threshold lies above the initial
+     * value; the module takes no configuration file.
+     */
+    @Test
+    void validatesRelationshipRulesOnlyWithTheModule() {
+        String valid = "\"relationship\":{\"dimensions\":[{\"id\":\"trust\",\"min\":-5,\"max\":5}],"
+                + "\"causes\":[{\"on\":\"spoken-to\",\"dimension\":\"trust\",\"delta\":2},"
+                + "{\"on\":\"promise-broken\",\"dimension\":\"trust\",\"delta\":-3}],"
+                + "\"companion\":{\"dimension\":\"trust\",\"atLeast\":4}},";
+        var disabled = assertThrows(PackException.class, () -> new PackCompiler().compile(parse(withNpcRules(valid, ""))));
+        assertEquals("MODULE_DISABLED", disabled.code());
+        assertEquals("/definitions/0/data/relationship", disabled.location().pointer());
+        var compiled = new PackCompiler().compile(parse(withRelationships(valid)));
+        assertNotNull(compiled.byId().get("keeper").data().get("relationship"));
+        // Without the field, enabling the module changes nothing else a pack may declare.
+        assertNotNull(new PackCompiler().compile(parse(withRelationships(""))));
+        assertEquals("UNSUPPORTED_MODULE", assertThrows(PackException.class, () -> new PackCompiler(DependencyCatalog.none(),
+                new EngineContract("0.1.0", "skirmish", "1.0.0", Set.of("standard"), Set.of()))
+                .compile(parse(withRelationships(valid)))).code());
+        String dimension = "{\"id\":\"trust\",\"min\":-5,\"max\":5}";
+        String cause = "{\"on\":\"spoken-to\",\"dimension\":\"trust\",\"delta\":2}";
+        assertEquals("CONSTRAINT_CONFLICT", failure(withRelationships(bond("{\"id\":\"trust\",\"min\":5,\"max\":5}",
+                cause, null))));
+        assertEquals("CONSTRAINT_CONFLICT", failure(withRelationships(bond("{\"id\":\"trust\",\"min\":0,\"max\":5,"
+                + "\"initial\":6}", cause, null))));
+        assertEquals("SCHEMA", failure(withRelationships(bond("{\"id\":\"trust\",\"min\":-101,\"max\":5}", cause, null))));
+        assertEquals("DUPLICATE", failure(withRelationships(bond(dimension + "," + dimension, cause, null))));
+        assertEquals("SCHEMA", failure(withRelationships(bond(dimension, "{\"on\":\"insulted\",\"dimension\":\"trust\","
+                + "\"delta\":2}", null))));
+        assertEquals("REFERENCE_UNKNOWN", failure(withRelationships(bond(dimension, "{\"on\":\"gift\",\"dimension\":"
+                + "\"respect\",\"delta\":2}", null))));
+        assertEquals("SCHEMA", failure(withRelationships(bond(dimension, "{\"on\":\"gift\",\"dimension\":\"trust\","
+                + "\"delta\":0}", null))));
+        assertEquals("SCHEMA", failure(withRelationships(bond(dimension, "{\"on\":\"gift\",\"dimension\":\"trust\","
+                + "\"delta\":11}", null))));
+        assertEquals("DUPLICATE", failure(withRelationships(bond(dimension, cause + "," + cause, null))));
+        assertEquals("CONSTRAINT_CONFLICT", failure(withRelationships(bond(dimension, cause,
+                "{\"dimension\":\"trust\",\"atLeast\":0}"))));
+        assertEquals("CONSTRAINT_CONFLICT", failure(withRelationships(bond(dimension, cause,
+                "{\"dimension\":\"trust\",\"atLeast\":6}"))));
+        assertEquals("REFERENCE_UNKNOWN", failure(withRelationships(bond(dimension, cause,
+                "{\"dimension\":\"respect\",\"atLeast\":3}"))));
+        assertEquals("SCHEMA", failure(withRelationships(bond(dimension, cause, null).replace("\"causes\"",
+                "\"mood\":1,\"causes\""))));
+        var configured = withRelationships(valid);
+        configured.put("adventure.json", configured.get("adventure.json").replace("{\"id\":\"relationships\"}",
+                "{\"id\":\"relationships\",\"configuration\":\"rules.json\"}"));
+        assertEquals("CONSTRAINT_CONFLICT", failure(configured));
+    }
+
+    /** Relationship field text with one dimension list, one cause list and an optional companion object. */
+    private static String bond(String dimensions, String causes, String companion) {
+        return "\"relationship\":{\"dimensions\":[" + dimensions + "],\"causes\":[" + causes + "]"
+                + (companion == null ? "" : ",\"companion\":" + companion) + "},";
+    }
+
+    /** The keeper with these fields, in a pack whose manifest enables the relationships module. */
+    private static Map<String, String> withRelationships(String fields) {
+        var files = withNpcRules(fields, "");
+        assertTrue(files.get("adventure.json").contains("\"modules\":[]"), "mutation target missing");
+        files.put("adventure.json", files.get("adventure.json").replace("\"modules\":[]",
+                "\"modules\":[{\"id\":\"relationships\"}]"));
+        return files;
+    }
+
     /** Insert world-rule fields into the keeper's data and append further NPC definitions. */
     private static Map<String, String> withNpcRules(String fields, String definitions) {
         var files = sources();

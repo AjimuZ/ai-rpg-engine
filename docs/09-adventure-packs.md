@@ -267,6 +267,23 @@ P04.2 implements the semantic shapes for rule (`attributes`, `resources`, `rarit
 
 A wrong reference kind is `REFERENCE_KIND`, and a missing one is `REFERENCE_UNKNOWN`. The runtime meaning is in [gameplay modules section 6](10-gameplay-modules.md#6-npcs-companions-and-relationships).
 
+**NPC relationship rules (P15.1-B).** [ADR 0050](adr/0050-relationship-changes-cite-their-cause-and-companions-follow-the-player.md) adds one optional, closed NPC field, `relationship`. Only a pack whose own manifest lists `{"id": "relationships"}` in `modules` may declare it. In any other pack it is `MODULE_DISABLED`, located at the field. Listing the module with a `configuration` file is `CONSTRAINT_CONFLICT`. The field holds:
+
+- `dimensions`: 1..4 entries `{id, min, max, initial}`. Values lie in -100..100 (outside is `SCHEMA`), and `initial` defaults to 0. A min not below max, or an initial value outside the bounds, is `CONSTRAINT_CONFLICT`. A repeated `id` is `DUPLICATE`.
+- `causes`: 1..16 entries `{on, dimension, delta}`. `on` is `spoken-to`, `gift`, `trade`, `promise-kept` or `promise-broken` (any other value is `SCHEMA`). `dimension` must be declared (`REFERENCE_UNKNOWN`). `delta` is -10..10 and not 0 (`SCHEMA`). A repeated trigger and dimension pair is `DUPLICATE`.
+- `companion` (optional): `{dimension, atLeast}`. The dimension must be declared (`REFERENCE_UNKNOWN`). A threshold at or below the initial value, or above the maximum, is `CONSTRAINT_CONFLICT`.
+
+Example:
+
+```json
+"relationship": {
+  "dimensions": [{"id": "trust", "min": -5, "max": 5}],
+  "causes": [{"on": "spoken-to", "dimension": "trust", "delta": 2},
+             {"on": "promise-broken", "dimension": "trust", "delta": -3}],
+  "companion": {"dimension": "trust", "atLeast": 4}
+}
+```
+
 **Combat profile and encounters (P11.1).** [ADR 0028](adr/0028-encounter-lifecycle-frozen-profiles-and-zone-graph.md) adds one rule type and the `encounter` kind, both closed and bounded:
 
 - `combat` (at most one per pack): `roles` maps `force`, `finesse`, `insight` and `resolve` to attributes of the pack (`REFERENCE_UNKNOWN` otherwise; several roles may share one attribute) whose whole declared range lies within the supported role range 0..6 (`CONSTRAINT_CONFLICT` otherwise; attributes no role maps keep their own range); `health` names a resource of the pack and the optional `focus` another one (`DUPLICATE` when equal). `scheduler` may only be `initiative-rounds` and `space` only `zones`: a different scheduler or spatial model is an engine extension (section 6, level 5), not pack data, and fails as `SCHEMA`. `values` may override any provisional parameter of [docs/11 section 17](11-combat-system.md#17-provisional-numerical-defaults) inside its bound: `actionPoints` 1..6 (default 3), `reactionsPerRound` 0..3 (1), `roundSeconds` 1..60 (8), `roundCap` 1..100 (30), `guardBase` and `resistanceBase` 0..20 (10), `equipmentGuardCap` 0..6 (3), `situationalGuardCap` 0..8 (4), `armorMax` 0..10 (4), `guardBonus` 1..4 (2), `partialCoverBonus` 0..4 (2), `situationalModifierCap` 0..6 (3), `strongHitMargin` 1..20 (6), `strongHitDieSides` 2..12 (4), `maxRangeEdges` 0..4 (2), `speechPerActivation` 0..3 (1), `difficultTerrainMultiplier` 1..3 (2), and the action costs `moveCost` 1..3 (1), `strikeCost` (2), `guardCost` (1), `useItemCost` (2), `readyCost` (1), `interactCost` (1), `assessCost` (1) and `withdrawCost` (2), each 1..6. An unknown parameter is `SCHEMA`; a cost above `actionPoints`, a difficult edge costing more than one activation, or a Guard or cover bonus above `situationalGuardCap` is `CONSTRAINT_CONFLICT`. The combat rule is validated after the attribute and resource rules, whatever the file order.
@@ -450,7 +467,7 @@ unrendered text; future rendering must preserve the HTML/remote-fetch restrictio
 
 Do not label a pack valid merely because YAML parses. Narrative reachability cannot always be proved statically; distinguish warnings from guaranteed checks.
 
-P04.3 compiler codes: `engineCompatibility` and `ruleset.version` are SemVer 2.0.0 ranges of 1..4 space-separated comparators (`>=`, `<=`, `>`, `<`, `=`, default `=`); the pack and dependency versions are exact SemVer versions; malformed ones are `VERSION_SYNTAX`. The pack is checked against `EngineContract.current()` (engine 0.1.0, ruleset `skirmish` 1.0.0, provisional until P07, policy profile `standard`, no modules), giving `INCOMPATIBLE_ENGINE`, `INCOMPATIBLE_RULESET` and `UNSUPPORTED_MODULE`. `HASH_CONFLICT` fires when the catalog already has the same pack ID and version with a different content hash, or when a dependency's declared hash differs from the installed one. Other codes are `CYCLE`, `CONSTRAINT_CONFLICT` and the expression codes from section 7. The only non-blocking result so far is the `UNREACHABLE_LOCATION` warning (`CompiledPack.warnings()`). It names locations that cannot be reached over links from the entrypoint. Locked links count as reachable, and move effects are ignored, so this is a heuristic rather than a guarantee.
+P04.3 compiler codes: `engineCompatibility` and `ruleset.version` are SemVer 2.0.0 ranges of 1..4 space-separated comparators (`>=`, `<=`, `>`, `<`, `=`, default `=`); the pack and dependency versions are exact SemVer versions; malformed ones are `VERSION_SYNTAX`. The pack is checked against `EngineContract.current()` (engine 0.1.0, ruleset `skirmish` 1.0.0, provisional until P07, policy profile `standard`; since P15.1-B one module, `relationships`, which takes no `configuration`), giving `INCOMPATIBLE_ENGINE`, `INCOMPATIBLE_RULESET` and `UNSUPPORTED_MODULE`. `HASH_CONFLICT` fires when the catalog already has the same pack ID and version with a different content hash, or when a dependency's declared hash differs from the installed one. Other codes are `CYCLE`, `CONSTRAINT_CONFLICT` and the expression codes from section 7. The only non-blocking result so far is the `UNREACHABLE_LOCATION` warning (`CompiledPack.warnings()`). It names locations that cannot be reached over links from the entrypoint. Locked links count as reachable, and move effects are ignored, so this is a heuristic rather than a guarantee.
 
 ## 11. Author workflow
 

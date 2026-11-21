@@ -19,7 +19,7 @@ import java.util.TreeSet;
  * @param rulesetId stable ID of the implemented ruleset
  * @param rulesetVersion exact SemVer of the implemented ruleset
  * @param policyProfiles policy profiles the ruleset accepts
- * @param modules module IDs this engine can load; empty while no module runtime exists
+ * @param modules module IDs this engine can load; a pack that lists any other module is refused
  */
 public record EngineContract(String engineVersion, String rulesetId, String rulesetVersion,
         Set<String> policyProfiles, Set<String> modules) {
@@ -75,9 +75,12 @@ public record EngineContract(String engineVersion, String rulesetId, String rule
 
     /**
      * Contract of this build: engine 0.1.0, the built-in {@code skirmish} ruleset at provisional
-     * version 1.0.0 with the {@code standard} profile, and no loadable modules (ADR 0017).
+     * version 1.0.0 with the {@code standard} profile (ADR 0017), and one optional module, {@code relationships}
+     * (P15.1-B, ADR 0050). Modules are not part of {@link #rulesetHash()}: enabling one changes what a pack may
+     * declare, not the ruleset a revision is pinned to.
      */
     public static EngineContract current() {
-        return new EngineContract("0.1.0", "skirmish", "1.0.0", Set.of("standard"), Set.of());
+        return new EngineContract("0.1.0", "skirmish", "1.0.0", Set.of("standard"),
+                Set.of(PackCompiler.RELATIONSHIPS_MODULE));
     }
 }
