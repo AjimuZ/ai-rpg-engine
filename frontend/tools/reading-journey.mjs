@@ -1,12 +1,16 @@
 /**
- * QA-29 browser journey for the story screen (P17.3-A): visual-novel and text-focused layouts, attributed reading and history,
- * read-only Continue, quick replies that fill an editable draft without submitting, the configurable reading tokens, and the
- * no-image and keyboard paths. It drives the unlocalized production build in an installed Chrome through a private debugging
- * pipe and a fresh profile, and serves only the build directory on loopback.
+ * QA-29 browser journey for the story screens. Part one (P17.3-A) covers the local preview story: visual-novel and text-focused
+ * layouts, attributed reading and history, read-only Continue, quick replies that fill an editable draft without submitting, the
+ * configurable reading tokens, and the no-image and keyboard paths. Part two (P17.3-B) covers the LIVE campaign screen against a
+ * SCRIPTED narration source: the same loopback server answers the campaign API with fixed bodies (state, resume, panels, artwork,
+ * a delivered operation carrying published narration, an empty stream) and records every command it receives, so the layouts, scene,
+ * portrait and graphic states, attributed reading and history, quick replies, the explicit Send and the retry of a lost reply with
+ * the same request identity are exercised with no narration runtime. It drives the unlocalized production build in an installed
+ * Chrome through a private debugging pipe and a fresh profile, and serves only the build directory and that scripted API on loopback.
  *
  * Usage: `node tools/reading-journey.mjs [screenshot-directory]` after `npm run build`. Exit status is nonzero when any check fails.
- * What it does not establish: the live campaign screen (it has no scene or quick replies yet), real screen-reader output,
- * Firefox or Safari, or a human visual judgment beyond the screenshots it writes.
+ * What it does not establish: narration produced by a real signed-in runtime (QA-29 with live narration, owner gate P17.3-O), the
+ * packaged installation's own engine, real screen-reader output, Firefox or Safari, or a human visual judgment beyond the screenshots.
  */
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -22,10 +26,85 @@ await mkdir(scratch, { recursive: true });
 const profile = await mkdtemp(resolve(scratch, 'qa29-profile-'));
 const browserPath = process.env['BROWSER_PATH'] ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
-/** Serve build files only; extensionless paths get the single-page entry so routed URLs load directly. */
+// ---- Scripted narration source (P17.3-B) ---------------------------------------------------------------------------------------------
+const ADV = '00000000-0000-4000-8000-00000000000a';
+const CAMP = '00000000-0000-4000-8000-0000000000a1';
+const OP = '00000000-0000-4000-8000-0000000000c1';
+const OP_SENT = '00000000-0000-4000-8000-0000000000c2';
+const KEEPER = '00000000-0000-4000-8000-0000000000d1';
+const SYNC_KEY = `engine.campaign-sync.v1:${JSON.stringify([ADV, CAMP])}`;
+const DRAFT_KEY = `engine.story-draft.v1:${JSON.stringify([ADV, CAMP])}`;
+const SCENE_HASH = 'a'.repeat(64);
+const PORTRAIT_HASH = 'b'.repeat(64);
+/** A valid 1x1 PNG, enough for a real image load and decode. */
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+/** What the scripted server does next: how it answers a command, and whether scene art is registered. */
+const live = { commands: [], commandMode: 'ok', art: true };
+const scope = { adventureId: ADV, campaignId: CAMP, contentRevisionId: OP_SENT, stateRevision: 2 };
+const receipt = { stateRevision: 2, firstEventSequence: 3, lastEventSequence: 4, commandType: 'WAIT', elapsedSeconds: 60, turnAdvanced: true, resources: [], calculations: [], randomDraws: [] };
+const operationBody = (id, status, version, extra = {}) => ({ operationId: id, campaignId: CAMP, commandType: id === OP ? 'WAIT' : 'SPEAK', status, baseRevision: 1,
+  committedRevision: 2, operationVersion: version, replayed: false, createdAt: '2026-11-21T00:00:00Z', updatedAt: '2026-11-21T00:00:01Z', receipt, query: '/q', stream: '/s', ...extra });
+const narrated = operationBody(OP, 'DELIVERED', 6, { presentation: { mode: 'NARRATED', reason: null, retriesRemaining: 0, narration: { locale: 'en', repaired: false,
+  passages: [{ messageId: `${OP}:p1`, kind: 'NARRATION', speaker: null, text: 'The grove is quiet; a winding trail leads on.', locale: 'en' },
+    { messageId: `${OP}:p2`, kind: 'CHARACTER_SPEECH', speaker: { actorId: KEEPER, name: 'Trail keeper' }, text: 'Will you come with me to the grove?', locale: 'en' }],
+  suggestions: [{ suggestionId: `${OP}:s1`, kind: 'REPLY', label: 'Agree', draftText: 'I will come with you.', actionId: null },
+    { suggestionId: `${OP}:s2`, kind: 'QUESTION', label: 'Ask about the grove', draftText: 'What do you know about the grove?', actionId: null },
+    { suggestionId: `${OP}:s3`, kind: 'ACTION', label: 'Look from here', draftText: 'I look at the trail from here.', actionId: null }] } } });
+const text = (value) => ({ text: value, locale: 'en', fallback: false });
+const panels = { scope, locale: 'en', contentAvailable: true, clock: { seconds: 90000, day: 2, hour: 1, minute: 0, second: 0 },
+  character: { actorId: OP, name: 'Mara', role: 'Surveyor', location: { id: 'trailhead', name: text('Lantern Shelter') }, attributes: [], skills: [], derived: [] },
+  resources: [], conditions: [], abilities: [], inventory: [], equipment: [], quests: [], knowledge: { discoveriesTotal: 0, discoveries: [], promisesTotal: 0, promises: [] },
+  journal: { entries: [], nextBefore: null } };
+const apiBodies = {
+  [`/api/v1/adventures/${ADV}`]: { adventureId: ADV, title: 'The Lantern', genre: 'Fantasy', sourceLocale: 'en', metadataRevision: 0, createdAt: '2026-11-21T00:00:00Z', updatedAt: '2026-11-21T00:00:00Z' },
+  [`/api/v1/campaigns/${CAMP}/state`]: { scope, campaign: { campaignId: CAMP, adventureId: ADV, contentRevisionId: OP_SENT, title: 'Mara', mode: 'EXPLORATION', stateRevision: 2, gameTurn: 3,
+    worldTimeSeconds: 0, eventSequence: 4, updatedAt: '2026-11-21T00:00:00Z', pendingDecisionAvailable: true }, player: {}, resources: [], inventory: [], abilities: [], knownFacts: [],
+    quests: [], startingSituation: { text: 'A lantern glows at the trailhead.', locale: 'en', fallback: false }, pendingDecision: null },
+  [`/api/v1/campaigns/${CAMP}/resume`]: { scope, title: 'Mara', mode: 'EXPLORATION', gameTurn: 3, worldTimeSeconds: 0, location: { id: 'trailhead', name: 'Lantern Shelter', nameLocale: 'en', nameFallback: false },
+    presentActors: [{ actorId: KEEPER, name: 'Trail keeper' }], resources: [], encounter: null, pendingDecision: 'FREE_INPUT', awaitingNarrationTotal: 0, awaitingNarration: [],
+    dependencies: { status: 'AVAILABLE', mutationPaused: false, issues: [] }, continuity: { checkpoint: 'VALID', publicSummary: 'NONE' } },
+  [`/api/v1/campaigns/${CAMP}/panels`]: panels,
+  [`/api/v1/campaigns/${CAMP}/encounter`]: { scope, mode: 'EXPLORATION', encounter: null, offers: [] },
+  [`/api/v1/campaigns/${CAMP}/music`]: { scope: { adventureId: ADV, campaignId: CAMP }, policy: null, tracks: [] },
+  [`/api/v1/campaigns/${CAMP}/operations/${OP}`]: narrated,
+  '/api/v1/session': { csrfToken: 'token' },
+};
+/** Answer one API request from the script; unknown routes answer like the real server's closed scope. */
+async function scripted(request, response, pathname) {
+  const json = (body, status = 200) => response.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
+  if (request.method === 'POST' && pathname === `/api/v1/campaigns/${CAMP}/commands`) {
+    let body = '';
+    for await (const chunk of request) body += chunk;
+    live.commands.push(JSON.parse(body));
+    // A lost reply: the command arrived, the answer never does.
+    // Headers arrive and the body is cut off, so the browser cannot replay the request by itself and the page sees a lost reply.
+    if (live.commandMode === 'lose') {
+      response.writeHead(202, { 'Content-Type': 'application/json', 'Content-Length': '500' });
+      response.write('{"operationId":');
+      setTimeout(() => request.socket.destroy(), 50);
+      return;
+    }
+    json(operationBody(OP_SENT, 'COMMITTED', 1), 202);
+    return;
+  }
+  if (pathname === '/api/v1/campaigns') return json({ campaigns: [apiBodies[`/api/v1/campaigns/${CAMP}/state`].campaign], nextAfter: null });
+  if (pathname === `/api/v1/campaigns/${CAMP}/artwork`) {
+    const row = (category, subject, sha256) => ({ category, subject, appearanceRevision: 1, sha256, mediaType: 'image/png', width: 1, height: 1, credit: 'Scripted sample art' });
+    return json({ scope: { adventureId: ADV, campaignId: CAMP }, artwork: live.art ? [row('scene', 'trailhead', SCENE_HASH), row('portrait', KEEPER, PORTRAIT_HASH)] : [] });
+  }
+  if (pathname.startsWith(`/api/v1/campaigns/${CAMP}/assets/`)) return void response.writeHead(200, { 'Content-Type': 'image/png' }).end(PNG);
+  if (pathname === `/api/v1/campaigns/${CAMP}/stream`) {
+    return void response.writeHead(200, { 'Content-Type': 'text/event-stream' }).end(`id: 0:1\nevent: stream.ready\ndata: ${JSON.stringify({ campaignId: CAMP, stateRevision: 2 })}\n\n`);
+  }
+  if (apiBodies[pathname]) return json(apiBodies[pathname]);
+  json({ code: 'COMMAND_SCOPE_UNAVAILABLE' }, 404);
+}
+
+/** Serve build files and the scripted API; extensionless paths get the single-page entry so routed URLs load directly. */
 const server = createServer(async (request, response) => {
   try {
     const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
+    if (pathname.startsWith('/api/')) { await scripted(request, response, pathname); return; }
     const requested = resolve(root, '.' + pathname);
     if (!requested.startsWith(root.endsWith(sep) ? root : root + sep)) { response.writeHead(403).end(); return; }
     const file = extname(requested) ? requested : resolve(root, 'index.html');
@@ -384,6 +463,164 @@ try {
     await open('/adventures/mosslight/story', true);
     await waitFor(`document.querySelector('.story')?.dataset.scene === 'ready'`);
     expect(await evaluate(`document.querySelector('.speaker').textContent.includes('Trail keeper')`), 'position lost');
+  });
+  // ======== Live campaign screen against the scripted narration source (P17.3-B) =====================================================
+  /** Open the live screen as a reload leaves it: the delivered operation is known by identity, its narration is read again. */
+  async function openLive(ready = `!!document.querySelector('[data-live-story]')`) {
+    await command('Page.navigate', { url: origin + '/library' });
+    await waitFor(`document.querySelector('h1')?.textContent === 'Your adventures'`);
+    await evaluate(`localStorage.setItem(${JSON.stringify(SYNC_KEY)}, ${JSON.stringify(JSON.stringify({ version: 1, cursor: '0:1',
+      operations: [{ operationId: OP, commandType: 'WAIT', status: 'DELIVERED', operationVersion: 6 }] }))}); localStorage.removeItem(${JSON.stringify(DRAFT_KEY)});`);
+    await command('Page.navigate', { url: origin + `/saved/${ADV}?playthrough=${CAMP}` });
+    await waitFor(ready);
+  }
+  const assetRequests = (since) => requests.slice(since).filter((request) => request.url.includes(`/api/v1/campaigns/${CAMP}/assets/`));
+  const liveText = (selector) => evaluate(`document.querySelector(${JSON.stringify(selector)})?.textContent ?? ''`);
+  live.art = true;
+  live.commandMode = 'ok';
+  await evaluate(`sessionStorage.removeItem('engine.preview-reading.v1')`);
+  await viewport(1440, 1100, false);
+
+  await openLive();
+  await waitFor(`document.querySelector('[data-live-story]').dataset.scene === 'ready'`);
+  await check('Live VN: layout and scene state are exposed and the scene came from the campaign asset route', async () => {
+    expect(await evaluate(`document.querySelector('[data-live-story]').dataset.layout`) === 'visual-novel', 'layout');
+    expect(await evaluate(`document.querySelector('.scene img').src`) === `${origin}/api/v1/campaigns/${CAMP}/assets/${SCENE_HASH}?adventureId=${ADV}`, 'scene url');
+    expect(await evaluate(`document.querySelector('.scene img').naturalWidth > 0`), 'scene image loaded');
+    expect(await liveText('[data-scene-label]') === 'Lantern Shelter', 'place name');
+  });
+  await check('Live VN: the speaker is attributed with a role label, the portrait overlaps the scene and the text stays below it', async () => {
+    const speaker = await liveText('[data-live-passage] .speaker');
+    expect(speaker.includes('Trail keeper') && speaker.includes('Character'), speaker);
+    await waitFor(`document.querySelector('.portrait')?.naturalWidth > 0`);
+    const scene = await rect('.scene');
+    const frame = await rect('.portrait-frame');
+    const body = await rect('.dialogue-text');
+    expect(frame.top < scene.bottom && frame.bottom > scene.bottom, `portrait ${frame.top}-${frame.bottom} vs scene bottom ${scene.bottom}`);
+    expect(body.top >= scene.bottom - 1, `text at ${body.top}, scene ends ${scene.bottom}`);
+    expect(await evaluate(`document.querySelector('.portrait').getAttribute('alt')`) === '', 'portrait is decorative, attribution is text');
+    expect(scene.height >= 550, `scene ${scene.height}px of 1100`);
+    await shot('live-vn-desktop.png');
+  });
+  await check('Live VN: the read-back and the chronicle repeat the earlier passage with name and role, outside the live region', async () => {
+    const before = await liveText('[data-previous]');
+    expect(before.includes('Narrator') && before.includes('Narration') && before.includes('winding trail'), before);
+    expect(await evaluate(`!document.querySelector('[data-live-passage]').contains(document.querySelector('[data-previous]'))`), 'read-back inside live region');
+    expect(await evaluate(`document.querySelector('[data-live-passage]').getAttribute('aria-live')`) === 'polite', 'live region');
+    await evaluate(`document.querySelector('[data-chronicle] summary').focus()`);
+    await enter();
+    await waitFor(`document.querySelector('[data-chronicle]').open`);
+    const entries = await evaluate(`[...document.querySelectorAll('[data-chronicle] li')].map(li => li.textContent.trim())`);
+    expect(entries.length === 2 && entries[0].startsWith('Narrator (Narration):') && entries[1].startsWith('Trail keeper (Character):'), entries.join(' | '));
+    expect(live.commands.length === 0, 'reading sent a command');
+  });
+  await check('Live replies: three labelled chips; choosing one by keyboard fills an editable draft, focuses it and sends nothing', async () => {
+    const labels = await evaluate(`[...document.querySelectorAll('[data-suggestion]')].map(b => b.textContent.trim())`);
+    expect(labels.join(' | ') === 'Speech: Agree | Question: Ask about the grove | Action: Look from here', labels.join(' | '));
+    expect(await evaluate(`document.querySelector('[data-send]').disabled`), 'Send enabled without words');
+    await evaluate(`document.querySelectorAll('[data-suggestion]')[1].focus()`);
+    await enter();
+    await waitFor(`document.querySelector('#campaign-input').value === 'What do you know about the grove?'`);
+    expect(await evaluate(`document.activeElement.id`) === 'campaign-input', 'focus moves to the draft');
+    await waitFor(`[...document.querySelectorAll('[data-suggestion]')].every(b => b.disabled)`);
+    expect(await evaluate(`!document.querySelector('[data-send]').disabled`), 'Send disabled with words');
+    await evaluate(`document.querySelectorAll('[data-suggestion]')[0].click()`);
+    expect(await evaluate(`document.querySelector('#campaign-input').value`) === 'What do you know about the grove?', 'draft replaced');
+    expect(live.commands.length === 0, 'a chip sent a command');
+    expect((await liveText('[data-recipient]')).includes('words to Trail keeper'), 'recipient not named');
+  });
+  await check('Live replies: dismissing a chip keeps the draft and the focus on it', async () => {
+    await evaluate(`document.querySelector('[data-dismiss]').focus(); document.querySelector('[data-dismiss]').click()`);
+    await waitFor(`document.querySelectorAll('[data-suggestion]').length === 2`);
+    expect(await evaluate(`document.activeElement.id`) === 'campaign-input', 'focus returns to the draft');
+    expect(await evaluate(`document.querySelector('#campaign-input').value`) === 'What do you know about the grove?', 'draft changed');
+    expect(live.commands.length === 0, 'dismissing sent a command');
+  });
+  await check('Live Send: a lost reply keeps the draft, and pressing Send again repeats the same request identity', async () => {
+    live.commandMode = 'lose';
+    await evaluate(`document.querySelector('[data-send]').click()`);
+    await waitFor(`(document.querySelector('[data-send-note]')?.textContent ?? '').includes('The reply was lost')`);
+    expect(live.commands.length === 1, `${live.commands.length} commands after the first press`);
+    expect(await evaluate(`document.querySelector('#campaign-input').value`) === 'What do you know about the grove?', 'draft lost with the reply');
+    expect(await evaluate(`!document.querySelector('[data-send]').disabled`), 'Send unavailable for a retry');
+    live.commandMode = 'ok';
+    await evaluate(`document.querySelector('[data-send]').click()`);
+    await waitFor(`document.querySelector('#campaign-input').value === ''`);
+    expect(live.commands.length === 2, `${live.commands.length} commands after the retry`);
+    const [first, second] = live.commands;
+    expect(first.requestId === second.requestId && JSON.stringify(first) === JSON.stringify(second), 'the retry is not the same request');
+    expect(first.commandType === 'SPEAK' && first.payload.recipientActorId === KEEPER && first.payload.text === 'What do you know about the grove?' && first.expectedRevision === 2,
+      JSON.stringify(first));
+    expect(await evaluate(`document.querySelector('[data-suggestion]') === null`), 'replies are still offered after the action was saved');
+  });
+  await check('Live text-focused: the on-screen choice removes every image and asset request, and the choice survives a reload', async () => {
+    await openLive();
+    await waitFor(`document.querySelector('[data-live-story]').dataset.scene === 'ready'`);
+    await evaluate(`(() => { const s = document.querySelector('#live-layout'); s.value = 'text-focused'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await waitFor(`document.querySelector('[data-live-story]').dataset.layout === 'text-focused'`);
+    const mark = requests.length;
+    expect(await evaluate(`document.querySelector('[data-live-story]').dataset.scene`) === 'hidden', 'scene state');
+    expect(await evaluate(`document.querySelectorAll('[data-live-story] img, .scene, .portrait-frame').length`) === 0, 'artwork elements');
+    // A full reload of the same tab keeps the choice and requests no asset at all.
+    await command('Page.reload');
+    await waitFor(`!!document.querySelector('[data-live-story]')`);
+    expect(await evaluate(`document.querySelector('[data-live-story]').dataset.layout`) === 'text-focused', 'choice lost on reload');
+    expect(assetRequests(mark).length === 0, assetRequests(mark).map((request) => request.url).join(' '));
+    const speaker = await liveText('[data-live-passage] .speaker');
+    expect(speaker.includes('Trail keeper') && speaker.includes('Character'), speaker);
+    expect((await liveText('[data-previous]')).includes('Narration'), 'read-back');
+    expect(await evaluate(`document.querySelectorAll('[data-chronicle] li').length`) === 2, 'chronicle');
+    expect(await noOverflow(), 'overflow');
+    await shot('live-text-desktop.png');
+  });
+  await check('Live text-focused: keyboard reaches the chips, the draft and Send, each with a visible focus ring', async () => {
+    await evaluate(`document.body.focus(); document.activeElement.blur()`);
+    const visited = [];
+    const focused = () => evaluate(`(() => { const e = document.activeElement; return { id: e.id, tag: e.tagName, data: Object.keys(e.dataset).join(','), outline: getComputedStyle(e).outlineStyle }; })()`);
+    for (let step = 0; step < 60 && !visited.some((entry) => entry.id === 'campaign-input'); step++) { await tab(); visited.push(await focused()); }
+    // Send is a native disabled button while the draft is empty, so the keyboard reaches it only once there are words to send.
+    await command('Input.insertText', { text: 'Hello' });
+    await waitFor(`document.querySelector('#campaign-input').value === 'Hello' && !document.querySelector('[data-send]').disabled`);
+    await tab();
+    visited.push(await focused());
+    expect(live.commands.length === 2, 'typing or tabbing sent a command');
+    const tags = visited.map((entry) => entry.data || entry.id || entry.tag);
+    expect(tags.some((tag) => tag.includes('suggestion')) && tags.includes('campaign-input') && tags.some((tag) => tag.includes('send')), tags.join(' > '));
+    expect(visited.every((entry) => entry.outline !== 'none' || entry.tag === 'BODY'), 'a focused control has no outline');
+  });
+  await check('Live graphic states: no registered scene shows a text label (none); a failing scene or portrait keeps the text and a dashed edge (failed)', async () => {
+    await evaluate(`sessionStorage.removeItem('engine.preview-reading.v1')`);
+    live.art = false;
+    await openLive();
+    expect(await evaluate(`document.querySelector('[data-live-story]').dataset.scene`) === 'none', 'state none');
+    expect((await liveText('[data-scene-fallback]')).includes('Lantern Shelter'), 'fallback text');
+    expect(await evaluate(`document.querySelector('.portrait-fallback')?.textContent.trim()`) === 'T', 'portrait fallback letter');
+    live.art = true;
+    await command('Network.setBlockedURLs', { urls: ['*/assets/*'] });
+    await openLive();
+    await waitFor(`document.querySelector('[data-live-story]').dataset.scene === 'failed'`);
+    await waitFor(`!!document.querySelector('.portrait-fallback')`);
+    expect(await evaluate(`getComputedStyle(document.querySelector('.scene')).borderTopStyle`) === 'dashed', 'failed edge');
+    expect((await liveText('[data-live-passage] .passage')).includes('Will you come with me'), 'passage');
+    expect(await evaluate(`!!document.querySelector('[data-suggestion]')`), 'replies');
+    await shot('live-vn-no-images.png');
+    await command('Network.setBlockedURLs', { urls: [] });
+  });
+  await check('Live narrow screens: 390px and 320px have no horizontal overflow and the scene stays shorter than half the screen', async () => {
+    await openLive();
+    await waitFor(`document.querySelector('[data-live-story]').dataset.scene === 'ready'`);
+    for (const width of [390, 320]) {
+      await viewport(width, 844, true);
+      expect(await noOverflow(), `overflow at ${width}`);
+      const scene = await rect('.scene');
+      expect(scene.height < 844 * 0.5 && scene.height >= 200, `scene ${scene.height}px`);
+    }
+    await viewport(390, 844, true);
+    await shot('live-vn-mobile.png');
+    await viewport(1440, 1100, false);
+  });
+  await check('Live screen sent only the one command the player pressed Send for (twice, the same request)', async () => {
+    expect(live.commands.length === 2 && live.commands.every((entry) => entry.commandType === 'SPEAK'), `${live.commands.length} commands`);
   });
   await check('No uncaught page exception during the journey', async () => { expect(exceptions.length === 0, exceptions.join(' | ')); });
 } finally {

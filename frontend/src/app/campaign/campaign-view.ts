@@ -9,20 +9,25 @@
  * and reconnect notices, and the scoped persistent draft (docs/13 section 4, docs/29 sections 3
  * and 6).
  *
- * The component never submits a draft: Send stays disabled and the draft is kept only by the
- * shared {@link StoryInputState}. The only writes are a named combat action the player reviewed and confirmed in the combat
- * panel ({@link CampaignPlaythrough.send}, P12.2-A) and the start of an offered fight confirmed in the offers list
- * ({@link CampaignPlaythrough.engage}, P13.2-B). The stream/status reads go through
+ * Since P17.3-B the screen also shows the published narration as an attributed story in the visual-novel or text-focused layout
+ * ({@link CampaignStory}) with optional quick replies. A quick reply only fills the draft held by the shared
+ * {@link StoryInputState}; the draft is never sent automatically. The only writes are the player's own words sent with the Send
+ * button to the person who spoke last ({@link CampaignPlaythrough.sendReply}, P17.3-B), a named combat action the player reviewed
+ * and confirmed in the combat panel ({@link CampaignPlaythrough.send}, P12.2-A) and the start of an offered fight confirmed in the
+ * offers list ({@link CampaignPlaythrough.engage}, P13.2-B). The stream/status reads go through
  * {@link CampaignSession}, which persists the operation identities and cursor so the explicit
  * EN↔IT reload resumes without duplicating or dropping deliveries.
  */
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, input, LOCALE_ID, signal, untracked } from '@angular/core';
+import { PreviewState } from '../preview/preview-state';
 import { StoryInputState } from '../preview/story-input-state';
-import { CampaignProtocolError, CampaignView, CombatView, isPending, JournalEntry, PlayPanels, ResumeCard } from './campaign-protocol';
+import { CampaignProtocolError, CampaignView, CombatView, isPending, JournalEntry, OperationView, PlayPanels, ResumeCard } from './campaign-protocol';
 import { CampaignPanels } from './campaign-panels';
 import { ArtworkIndex } from './campaign-artwork';
 import { CombatPanel } from './combat-panel';
 import { CampaignCues } from './campaign-cues';
+import { CampaignStory } from './campaign-story';
+import { OfferedReply, offeredReplies, replyRecipient, speakCommand, storyEntries } from './campaign-story-model';
 import {
   awaitingMessage, campaignErrorMessage, commandTypeLabel, decisionMessage, dependencyIssueMessage, fallbackNotice, languageName,
   locationMessage, narrationReasonMessage, operationStatusMessage, presentMessage, receiptLines, resourceMessages, streamResetMessage,
@@ -53,11 +58,12 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 
 /** Show a playthrough's authorized public projection and follow its resumable stream while mounted. */
 @Component({
-  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CampaignPanels, CampaignCues, CombatPanel, EncounterOffers, MusicPanel],
+  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CampaignPanels, CampaignCues, CampaignStory, CombatPanel, EncounterOffers, MusicPanel],
   template: `
     <section class="panel campaign-playthrough" [attr.data-campaign-id]="campaignId()" aria-labelledby="campaign-title">
       @if (view(); as current) {
         <h2 id="campaign-title">{{ current.title }}</h2>
+        <app-campaign-story [entries]="story()" [sceneUrl]="sceneUrl()" [sceneLabel]="sceneLabel()" [artwork]="artwork()" />
         @if (current.startingSituation; as situation) {
           <section class="starting-situation" aria-labelledby="starting-title">
             <h3 id="starting-title" i18n="@@campaign.view.startingTitle">Starting situation</h3>
@@ -120,7 +126,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
         @if (combat()?.encounter === null) {
           <app-encounter-offers [view]="combat()" [sending]="sending()" [problem]="problem()" (confirmed)="engage($event)" (dismissed)="problem.set(null)" />
         }
-        <app-campaign-panels [panels]="panels()" [artwork]="artwork()" [older]="older()" [nextBefore]="cursor()" [loadingOlder]="loadingOlder()" (olderRequested)="loadOlder()" />
+        <app-campaign-panels [panels]="panels()" [artwork]="shownArtwork()" [older]="older()" [nextBefore]="cursor()" [loadingOlder]="loadingOlder()" (olderRequested)="loadOlder()" />
       } @else if (failure()) { <p class="notice" role="alert" data-error>{{ failure() }}</p>
       } @else { <p role="status" i18n="@@campaign.view.loading">Loading the playthrough…</p> }
 
@@ -151,14 +157,30 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
       <button type="button" (click)="refresh()" [disabled]="busy()" i18n="@@campaign.view.refresh">Check for updates</button>
 
       <div class="composer">
+        @if (replies().length > 0) {
+          <p id="campaign-suggestion-help" class="muted" i18n="@@campaign.reply.help">Suggestions fill an empty draft. Edit freely; nothing is sent until you press Send.</p>
+          <ul class="quick-replies" aria-label="Suggestions" i18n-aria-label="@@story.suggestionsLabel">
+            @for (reply of replies(); track reply.id) {
+              <li><button type="button" data-suggestion [disabled]="!canChoose()" aria-describedby="campaign-suggestion-help"
+                (click)="chooseReply(reply, field)">{{ replyLabel(reply) }}: {{ reply.label }}</button>
+                <button type="button" data-dismiss [attr.aria-label]="dismissLabel(reply.label)"
+                  (click)="dismissReply(reply.id, field)" i18n="@@story.dismiss">Dismiss</button></li>
+            }
+          </ul>
+        }
         <label for="campaign-input" i18n="@@campaign.view.inputLabel">What do you say or do?</label>
         <textarea #field id="campaign-input" [value]="input.draft().text" maxlength="4000" rows="3"
           placeholder="Write a draft…" i18n-placeholder="@@story.draftPlaceholder" aria-describedby="campaign-draft-status campaign-composer-help"
           (input)="save(field)" (select)="save(field)" (keyup)="save(field)" (click)="save(field)" (focus)="restore(field)"></textarea>
-        <div class="composer-actions"><button type="button" data-send disabled i18n="@@campaign.view.send">Send</button>
+        <div class="composer-actions"><button type="button" data-send [disabled]="!canSend()" (click)="sendReply()" i18n="@@campaign.view.send">Send</button>
           <button type="button" (click)="clear(field)" [disabled]="input.draft().text === ''" i18n="@@story.clear">Clear draft</button></div>
         <p id="campaign-draft-status" class="muted">{{ draftStatus() }}</p>
-        <p id="campaign-composer-help" class="muted" i18n="@@campaign.view.composerHelp">Your draft stays on this device and is never sent automatically, including after changing language. Sending actions is not connected yet.</p>
+        @if (sendNote(); as note) { <p role="status" data-send-note>{{ note }}</p> }
+        @if (recipient(); as to) {
+          <p id="campaign-composer-help" class="muted" [attr.data-recipient]="to.actorId" i18n="@@campaign.reply.sendHelp">Your draft stays on this device. It is sent only when you press Send, as words to {{ to.name }}; if the reply is lost, pressing Send again is safe.</p>
+        } @else {
+          <p id="campaign-composer-help" class="muted" i18n="@@campaign.view.composerHelp">Your draft stays on this device and is never sent automatically, including after changing language. Sending actions is not connected yet.</p>
+        }
       </div>
     </section>
   `,
@@ -179,6 +201,12 @@ export class CampaignPlaythrough {
   readonly panels = signal<PlayPanels | null>(null);
   /** Artwork in force for this playthrough (P17.1-B); null until read or when its read failed. */
   readonly artwork = signal<ArtworkIndex | null>(null);
+  private readonly reading = inject(PreviewState);
+  /**
+   * The artwork the screen may draw: none in the text-focused layout, which promises no image element and no image request anywhere
+   * on the screen (the gallery and the item icons included), so the panels then show their built-in text and icon fallbacks.
+   */
+  readonly shownArtwork = computed(() => this.reading.readingLayout() === 'text-focused' ? null : this.artwork());
   /** Combat projection of the shown revision (P12.1-B); read only while the resume card reports a fight, null otherwise. */
   readonly combat = signal<CombatView | null>(null);
   /** Older journal pages fetched on request, newest first; cleared whenever the first page is re-read. */
@@ -192,6 +220,37 @@ export class CampaignPlaythrough {
   readonly sending = signal(false);
   /** Stable code of the last refused or lost tactical submission, or null. */
   readonly problem = signal<string | null>(null);
+  /** Stable code of the last refused or lost reply to the story (P17.3-B), or null; kept apart from the combat problem line. */
+  readonly speech = signal<string | null>(null);
+  /** Quick replies the player dismissed; their identities belong to one narration, so the list never needs resetting. */
+  private readonly dismissed = signal<readonly string[]>([]);
+  /** Attributed passages of the published narration of this playthrough, oldest first. */
+  readonly story = computed(() => storyEntries(this.operations()));
+  /** True while the playthrough is paused or a fight is on: replies are then not offered and nothing is sent from the story composer. */
+  private readonly locked = computed(() => this.resume()?.mutationPaused === true || this.combat()?.encounter != null);
+  /** Who the player's words go to (the speaker of the newest passage), or null when none is named or the composer is locked. */
+  readonly recipient = computed(() => this.locked() ? null : replyRecipient(this.story()));
+  /** Current quick replies, never more than three, without those the player dismissed. */
+  readonly replies = computed((): OfferedReply[] => this.locked() ? []
+    : offeredReplies(this.operations(), this.view()?.stateRevision ?? null).filter((reply) => !this.dismissed().includes(reply.id)));
+  /** A chip is usable only for an empty draft, so a second choice never replaces the player's words. */
+  readonly canChoose = computed(() => this.input.draft().text === '' && !this.sending());
+  /** Send needs a named recipient, words, and no submission in flight. */
+  readonly canSend = computed(() => this.recipient() !== null && this.input.draft().text.trim() !== '' && !this.sending() && this.view() !== null);
+  /** The stable scene reference: the newest scene cue, else the place the resume card names. */
+  private readonly sceneId = computed(() => this.cues().filter((cue) => cue.kind === 'SCENE' && cue.sceneId !== null).at(-1)?.sceneId ?? this.resume()?.location?.id ?? null);
+  /** Hash URL of the scene image in force, or null when that scene has none. */
+  readonly sceneUrl = computed(() => { const id = this.sceneId(); return id === null ? null : this.artwork()?.imageUrl('scene', id) ?? null; });
+  /** Public name of the place, falling back to the scene reference. */
+  readonly sceneLabel = computed(() => { const card = this.resume(); return card?.location ? locationMessage(card) : this.sceneId() ?? ''; });
+  /** Localized line about the reply in flight, refused or lost; empty when there is nothing to say. */
+  readonly sendNote = computed(() => {
+    if (this.sending()) return $localize`:@@campaign.reply.sending:Sending your words…`;
+    const code = this.speech();
+    if (code === null) return '';
+    if (code === 'LOST') return $localize`:@@campaign.reply.lost:The reply was lost, so your words may or may not have arrived. Press Send again: the same request is repeated and nothing is counted twice.`;
+    return campaignErrorMessage(code);
+  });
   /** The identity of the submission in flight or lost, kept so repeating the same choice at the same revision is idempotent. */
   private attempt: { readonly key: string; readonly revision: number; readonly requestId: string } | null = null;
   readonly failure = signal('');
@@ -261,6 +320,7 @@ export class CampaignPlaythrough {
       this.scopeKey = JSON.stringify(scope);
       this.attempt = null;
       this.problem.set(null);
+      this.speech.set(null);
       // The listing belongs to the scope's pinned pack revision: a refresh of the same scope keeps it, a new scope reads its own.
       this.packMusic.set(null);
     }
@@ -306,6 +366,8 @@ export class CampaignPlaythrough {
           loaded = true;
         }
         if (requery) { await this.session.requery(scope, signal); requery = false; }
+        // Narration published since the last pass (or lost to a reload) is read by identity before the next hold.
+        await this.session.readNarration(scope, signal);
         const result = await this.session.poll(scope, signal, () => {
           // The first chunk of a response proves a live connection even before any message exists.
           this.failure.set('');
@@ -402,7 +464,48 @@ export class CampaignPlaythrough {
     const words = choice.kind === 'speak' ? choice.text : null;
     const accepted = words !== null && fight !== null
       ? () => { this.drafts.clearSent(scope.adventureId, scope.campaignId, fight, words); } : undefined;
-    await this.dispatch(choiceKey(choice), resolved.command, view.stateRevision, accepted);
+    await this.dispatch(choiceKey(choice), resolved.command, view.stateRevision, { accepted });
+  }
+
+  /**
+   * Send the player's draft as words to the person who spoke last (P17.3-B). Runs only from the Send button.
+   *
+   * The draft goes out exactly as written, never because a quick reply was chosen: a chip only fills the draft. Nothing is sent
+   * during a fight (its own chat applies), while the playthrough is paused, without a named recipient or for an unsendable text.
+   * A lost reply keeps the request identity and its revision, so pressing Send again with the same words returns the stored
+   * operation instead of speaking twice. The draft is emptied once the server holds the operation (committed or still running),
+   * never for a refusal, a clarification request or a lost reply.
+   */
+  async sendReply(): Promise<void> {
+    const view = this.view();
+    const to = this.recipient();
+    const text = this.input.draft().text;
+    if (this.sending() || this.run === undefined || view === null || to === null || this.locked()) return;
+    const resolved = speakCommand(to.actorId, text);
+    if (!resolved.ok) { this.speech.set(resolved.refusal); return; }
+    const key = `speak:${to.actorId}:${text}`;
+    // A lost attempt is repeated at the revision it was first sent at: the server matches the stored request by identity and body.
+    const revision = this.attempt?.key === key ? this.attempt.revision : view.stateRevision;
+    await this.dispatch(key, resolved.command, revision, {
+      report: (code) => this.speech.set(code),
+      answered: (operation) => { if (operation.committedRevision !== null || isPending(operation.status)) this.input.edit(''); },
+    });
+  }
+
+  /** Fill an empty draft from a quick reply and move focus to it; a nonempty draft is never replaced and nothing is sent. */
+  chooseReply(reply: OfferedReply, field: HTMLTextAreaElement): void {
+    if (!this.canChoose()) return;
+    this.input.edit(reply.draftText);
+    field.value = this.input.draft().text;
+    field.focus();
+    field.setSelectionRange(this.input.draft().start, this.input.draft().end);
+  }
+
+  /** Hide one chip and keep keyboard position on the draft before its button disappears; the draft and the world are untouched. */
+  dismissReply(id: string, field: HTMLTextAreaElement): void {
+    field.focus();
+    field.setSelectionRange(this.input.draft().start, this.input.draft().end);
+    this.dismissed.update((ids) => [...ids, id]);
   }
 
   /**
@@ -422,9 +525,14 @@ export class CampaignPlaythrough {
   /**
    * Submit one validated command under the identity rule: the same key at the same revision reuses the request identity of a lost
    * attempt; any other key or revision gets a new one. `accepted` runs once when the server answered with a committed operation (new
-   * or replayed), before the re-read starts; it never runs for a refusal, an uncommitted operation or a lost reply.
+   * or replayed), before the re-read starts; it never runs for a refusal, an uncommitted operation or a lost reply. `answered` runs
+   * for any operation the server returned. `report` receives the stable code of a refusal or `LOST`, and `null` when a new
+   * submission starts; it defaults to the combat problem line.
    */
-  private async dispatch(key: string, command: TacticalCommand, revision: number, accepted?: () => void): Promise<void> {
+  private async dispatch(key: string, command: TacticalCommand, revision: number,
+    hooks: { accepted?: () => void; answered?: (operation: OperationView) => void; report?: (code: string | null) => void } = {}): Promise<void> {
+    const { accepted, answered } = hooks;
+    const report = hooks.report ?? ((code: string | null) => this.problem.set(code));
     const run = this.run;
     if (run === undefined) return;
     if (this.attempt?.key !== key || this.attempt.revision !== revision) {
@@ -432,12 +540,13 @@ export class CampaignPlaythrough {
     }
     const scope = this.scope();
     this.sending.set(true);
-    this.problem.set(null);
+    report(null);
     try {
       const operation = await this.transport.submit(scope, envelope(command, this.attempt.requestId, revision), run.signal);
       if (run.signal.aborted) return;
       this.attempt = null;
       this.session.applyOperation(scope, operation);
+      answered?.(operation);
       if (operation.committedRevision !== null) accepted?.();
       this.refresh();
     } catch (error) {
@@ -445,10 +554,10 @@ export class CampaignPlaythrough {
       if (error instanceof CampaignProtocolError && error.kind === 'api') {
         // A refusal is final for this identity: nothing was stored, so the next try is a new request.
         this.attempt = null;
-        this.problem.set(error.code ?? 'REFUSED');
+        report(error.code ?? 'REFUSED');
         if (error.code === 'COMMAND_STALE_REVISION') this.refresh();
       } else {
-        this.problem.set('LOST');
+        report('LOST');
       }
     } finally { this.sending.set(false); }
   }
@@ -457,6 +566,16 @@ export class CampaignPlaythrough {
   refresh(): void { this.start(this.scope()); }
 
   /** Localized text helpers for the template; each returns display text only. */
+  /** Localized kind label of a quick reply, so its kind never relies on colour. */
+  replyLabel(reply: OfferedReply): string {
+    return reply.kind === 'question' ? $localize`:@@story.question:Question` : reply.kind === 'speech' ? $localize`:@@story.speech:Speech` : $localize`:@@story.action:Action`;
+  }
+
+  /** Accessible name of a chip's dismiss button; the reply text is interpolated literally. */
+  dismissLabel(reply: string): string {
+    return $localize`:@@story.dismissLabel:Dismiss suggestion: ${reply}:reply:`;
+  }
+
   command = commandTypeLabel;
   statusText = operationStatusMessage;
   narration = narrationReasonMessage;

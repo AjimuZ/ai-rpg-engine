@@ -10,7 +10,8 @@
  * cursor. Delivery is deduplicated by cursor and operation version, so replays after a reload
  * never apply a message twice, including presentation cues, which take the same path and are then kept
  * in memory by {@link CueState} (ordered, deduplicated by delivery identity and never persisted, so a
- * reload does not replay them). There are exactly two writes: {@link CampaignTransport.submit}, called after an explicit
+ * reload does not replay them). The narration an operation published is read by identity and kept in memory too
+ * ({@link CampaignSession.readNarration}, P17.3-B). There are exactly two writes: {@link CampaignTransport.submit}, called after an explicit
  * confirmation of a previewed tactical action (P12.2-A), and {@link CampaignTransport.create}, called only when the player
  * submits the playthrough creation form (P14.1-C) and repeated with the same request identity after a lost reply. Nothing
  * here submits a draft or anything on its own.
@@ -19,7 +20,7 @@ import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { SavedLibraryClient, LIBRARY_FETCH } from '../library/saved-library-client';
 import {
   ArtworkEntry, CampaignProtocolError, CampaignView, CombatView, compareCursor, Cursor, FrameDecoder, isPending, OPERATION_STATUSES,
-  OperationStatus, OperationView, parseCampaignView, parseCombatView, parseArtwork, parseCursor, parseOperation, parsePlayPanels, parseResumeCard, PlayPanels, PublicReceipt, ResumeCard,
+  OperationPresentation, OperationStatus, OperationView, parseCampaignView, parseCombatView, parseArtwork, parseCursor, parseOperation, parsePlayPanels, parseResumeCard, PlayPanels, PublicReceipt, ResumeCard,
   PresentationCue, StreamEvent,
 } from './campaign-protocol';
 import { PackMusic, parseMusicListing } from '../music/music-pack';
@@ -46,6 +47,11 @@ export interface TrackedOperation {
   /** In-memory only: the receipt is re-read from the operation endpoint after a reload. */
   readonly receipt?: PublicReceipt | null;
   readonly reason?: string | null;
+  /**
+   * In-memory only, like the receipt: the narration read from the operation endpoint. `undefined` means not read yet in this
+   * page load (it is read again after a reload), `null` means the server reported none.
+   */
+  readonly presentation?: OperationPresentation | null;
 }
 
 /** Persisted reconciliation record for one scope. */
@@ -381,10 +387,15 @@ export class CampaignSession {
   private upsert(operations: Map<string, TrackedOperation>, next: TrackedOperation): boolean {
     const known = operations.get(next.operationId);
     // An equal version is a duplicate, except that it may supply the receipt a reload dropped.
-    const receiptOnly = known !== undefined && known.operationVersion === next.operationVersion && !!next.receipt && !known.receipt;
+    const sameVersion = known !== undefined && known.operationVersion === next.operationVersion;
+    // The same holds for narration: a re-read of the same version may supply or change what the page has not shown yet.
+    const supplies = sameVersion && next.presentation !== undefined && JSON.stringify(next.presentation) !== JSON.stringify(known.presentation);
+    const receiptOnly = (sameVersion && !!next.receipt && !known.receipt) || supplies;
     if (known && known.operationVersion >= next.operationVersion && !receiptOnly) return false;
+    // A newer version makes an earlier reading of the narration stale, so only the same version keeps it.
+    const presentation = next.presentation !== undefined ? next.presentation : sameVersion ? known.presentation : undefined;
     // Updating a known key keeps its place: the list stays oldest first across a reload's re-reads.
-    operations.set(next.operationId, { ...next, receipt: next.receipt ?? known?.receipt ?? null });
+    operations.set(next.operationId, { ...next, receipt: next.receipt ?? known?.receipt ?? null, presentation });
     while (operations.size > MAX_TRACKED) {
       const victim = [...operations.values()].find(/** Prefer evicting finished work over pending work. */ (entry) => !isPending(entry.status)) ??
         operations.values().next().value!;
@@ -455,7 +466,7 @@ export class CampaignSession {
   applyOperation(scope: CampaignScope, view: OperationView): boolean {
     const changed = this.upsert(this.record(scope).operations, {
       operationId: view.operationId, commandType: view.commandType, status: view.status,
-      operationVersion: view.operationVersion, receipt: view.receipt,
+      operationVersion: view.operationVersion, receipt: view.receipt, presentation: view.presentation,
     });
     if (changed) { this.persist(scope); this.revision.update((n) => n + 1); }
     return changed;
@@ -509,6 +520,19 @@ export class CampaignSession {
       !entry.receipt && ['DELIVERED', 'COMMITTED_NARRATION_PENDING'].includes(entry.status)).slice(-RECEIPT_REREADS);
     const wanted = new Set([...all.filter(/** Pending operations. */ (entry) => isPending(entry.status)), ...missingReceipts]);
     for (const operation of wanted) this.applyOperation(scope, await this.transport.operation(scope, operation.operationId, signal));
+  }
+
+  /**
+   * Read the narration of delivered operations the page has not read in this load (P17.3-B): an operation whose narration was
+   * delivered is read by identity once, so a reload and a `narrative.ready` message both end with the attributed passages shown.
+   * An operation saved without narration (`COMMITTED_NARRATION_PENDING`) is not read here: its result is the receipt, and the
+   * browser has no narration retry yet, so its presentation cannot change. Bounded to the most recent saved operations; network
+   * failures propagate and leave the record valid.
+   */
+  async readNarration(scope: CampaignScope, signal: AbortSignal): Promise<void> {
+    const unread = this.operations(scope).filter(/** Delivered work whose narration was not read yet. */ (entry) =>
+      entry.presentation === undefined && entry.status === 'DELIVERED').slice(-RECEIPT_REREADS);
+    for (const operation of unread) this.applyOperation(scope, await this.transport.operation(scope, operation.operationId, signal));
   }
 
   /**

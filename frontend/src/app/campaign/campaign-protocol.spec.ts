@@ -4,7 +4,7 @@ import {
   CampaignProtocolError, compareCursor, FrameDecoder, isPending, MAX_FRAME_CHARS, parseCampaignView, parseCursor, parseOperation, parseReceipt,
   parseResumeCard,
 } from './campaign-protocol';
-import { ADVENTURE, CAMPAIGN, frame, OP1, OP2, operation, OTHER_CAMPAIGN, receipt, resumeCard, state } from './fixtures';
+import { ADVENTURE, CAMPAIGN, frame, narratedOperation, OP1, OP2, operation, OTHER_CAMPAIGN, receipt, resumeCard, state } from './fixtures';
 
 describe('Campaign protocol', /** Register validators that guard every rendered server value. */ () => {
   it('parses only canonical cursors and orders within a generation', /** Alternate spellings could bypass duplicate detection. */ () => {
@@ -23,6 +23,30 @@ describe('Campaign protocol', /** Register validators that guard every rendered 
     expect(() => parseOperation({ ...operation(OP1, 'ACCEPTED', -1) }, CAMPAIGN)).toThrow(CampaignProtocolError);
     expect(isPending('COMMITTED')).toBe(true);
     expect(isPending('DELIVERED')).toBe(false);
+  });
+
+  it('parses published narration into attributed passages and suggestions and refuses anything unattributed or oversized', /** P17.3-B. */ () => {
+    const narrated = parseOperation(narratedOperation(OP1), CAMPAIGN).presentation!;
+    expect(narrated.mode).toBe('NARRATED');
+    expect(narrated.passages.map((passage) => [passage.kind, passage.speaker?.name ?? null])).toEqual([['NARRATION', null], ['CHARACTER_SPEECH', 'Trail keeper']]);
+    expect(narrated.suggestions.map((suggestion) => suggestion.kind)).toEqual(['REPLY', 'QUESTION', 'ACTION']);
+    // Before the commit, and for the receipt fallback, there is nothing to read; the receipt stays the presentation.
+    expect(parseOperation(operation(OP1, 'ACCEPTED', 0), CAMPAIGN).presentation).toBeNull();
+    const receiptOnly = { ...operation(OP1, 'COMMITTED_NARRATION_PENDING', 5, true), presentation: { mode: 'RECEIPT', reason: 'NARRATION_UNAVAILABLE', retriesRemaining: 3, narration: null } };
+    expect(parseOperation(receiptOnly, CAMPAIGN).presentation).toMatchObject({ mode: 'RECEIPT', reason: 'NARRATION_UNAVAILABLE', passages: [], suggestions: [] });
+    const withNarration = (change: (body: any) => void) => { const body = narratedOperation(OP1) as any; change(body.presentation.narration); return body; };
+    for (const [name, body] of [
+      ['speech without a speaker', withNarration((n) => { n.passages[1].speaker = null; })],
+      ['a narrator with a speaker', withNarration((n) => { n.passages[0].speaker = { actorId: OP2, name: 'X' }; })],
+      ['a speaker that is not an identity', withNarration((n) => { n.passages[1].speaker.actorId = 'warden'; })],
+      ['a blank passage', withNarration((n) => { n.passages[0].text = '  '; })],
+      ['an unknown passage kind', withNarration((n) => { n.passages[0].kind = 'THOUGHT'; })],
+      ['four suggestions', withNarration((n) => { n.suggestions.push({ ...n.suggestions[0], suggestionId: 'x' }); })],
+      ['duplicate suggestion identities', withNarration((n) => { n.suggestions[1].suggestionId = n.suggestions[0].suggestionId; })],
+      ['an unknown suggestion kind', withNarration((n) => { n.suggestions[0].kind = 'COMMAND'; })],
+      ['a draft over 500 characters', withNarration((n) => { n.suggestions[0].draftText = 'x'.repeat(501); })],
+    ] as const) expect(() => parseOperation(body, CAMPAIGN), name).toThrow(CampaignProtocolError);
+    expect(() => parseOperation({ ...receiptOnly, presentation: { ...receiptOnly.presentation, mode: 'SPOKEN' } }, CAMPAIGN)).toThrow(CampaignProtocolError);
   });
 
   it('rejects malformed receipts instead of partially rendering them', /** Numeric effects must arrive exactly or not at all. */ () => {

@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — Layouts and quick replies on the live screen (P17.3-B), 21 November 2026
+
+- The playthrough screen now shows the narration the engine published as an attributed story: the newest passage with the
+  speaker's name and role (Narrator, Character), a two-line "Previously" read-back, and a chronicle of every passage. It follows
+  the visual-novel or text-focused layout, which you can switch on the screen ("Story layout") and which is kept for the tab.
+  The visual novel shows the place's scene and the speaker's portrait when the adventure has them and a text label when it does
+  not or when an image fails; the text-focused layout draws no image anywhere on the screen, panels included.
+- After a character has spoken, up to three suggestions (speech, question, action) can appear. Choosing one only fills an empty
+  draft, which you can edit. Nothing is sent until you press Send; the words then go to the character who spoke last. If the
+  reply is lost, pressing Send again repeats the same request, so the words are not counted twice. Suggestions disappear when the
+  world has moved on, during a fight and while a playthrough is paused.
+- The browser now reads the `presentation` of delivered operations (passages and suggestions) and refuses a malformed one.
+  Six new interface messages have an Italian text from a single author pass.
+- `frontend/tools/reading-journey.mjs` now also drives the live screen against a scripted narration source (32 checks), and the
+  new `frontend/tools/live-screen-check.mjs` checks the packaged installation without a signed-in runtime. QA-29 with narration
+  from a real runtime is not claimed; it belongs to the owner gate P17.3-O.
+
 ## Unreleased — Reading layouts and tokens (P17.3-A), 21 November 2026
 
 - The story screen of the local preview now has two finished layouts. The visual novel gives the scene about three fifths
@@ -11,8 +28,8 @@
   (narrow, standard, wide). They are kept for the tab and survive a reload; saved preferences from before still load.
   Nine new interface messages have an Italian text from a single author pass.
 - New repeatable check `frontend/tools/reading-journey.mjs` runs the reading and quick-reply journey (QA-29) in Chrome for
-  both layouts. It covers the local preview story only; the live playthrough screen has no scene or quick replies yet (P17.3-B), so full
-  QA-29 is not claimed.
+  both layouts. It covers the local preview story only; the live screen followed in P17.3-B (above), and full QA-29 with live
+  narration is not claimed.
 
 ## Unreleased — Adventure mood policies and sample music (P17.2-D), 21 November 2026
 

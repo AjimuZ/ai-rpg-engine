@@ -6237,5 +6237,59 @@
       <target>Nessun brano verificato si adatta a questo momento, quindi la musica è muta.</target>
       </segment>
     </unit>
+    <unit id="campaign.story.sceneUnavailable">
+      <notes>
+        <note category="location">src/app/campaign/campaign-story.ts:40</note>
+      </notes>
+      <segment>
+        <source>Scene illustration unavailable. <ph id="0" equiv="INTERPOLATION" disp="{{ sceneLabel() }}" /></source>
+      <target>Illustrazione della scena non disponibile. <ph id="0" equiv="INTERPOLATION" disp="{{ sceneLabel() }}" /></target>
+      </segment>
+    </unit>
+    <unit id="campaign.story.sceneCaption">
+      <notes>
+        <note category="location">src/app/campaign/campaign-story.ts:41</note>
+      </notes>
+      <segment>
+        <source>Scene</source>
+      <target>Scena</target>
+      </segment>
+    </unit>
+    <unit id="campaign.reply.help">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:169</note>
+      </notes>
+      <segment>
+        <source>Suggestions fill an empty draft. Edit freely; nothing is sent until you press Send.</source>
+      <target>I suggerimenti riempiono una bozza vuota. Modificala come vuoi; non viene inviato nulla finché non premi Invia.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.reply.sendHelp">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:188</note>
+      </notes>
+      <segment>
+        <source>Your draft stays on this device. It is sent only when you press Send, as words to <ph id="0" equiv="INTERPOLATION" disp="{{ to.name }}" />; if the reply is lost, pressing Send again is safe.</source>
+      <target>La tua bozza resta su questo dispositivo. Viene inviata solo quando premi Invia, come parole rivolte a <ph id="0" equiv="INTERPOLATION" disp="{{ to.name }}" />; se la risposta si perde, premere di nuovo Invia è sicuro.</target>
+      </segment>
+    </unit>
+    <unit id="campaign.reply.sending">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:285</note>
+      </notes>
+      <segment>
+        <source>Sending your words…</source>
+      <target>Invio delle tue parole…</target>
+      </segment>
+    </unit>
+    <unit id="campaign.reply.lost">
+      <notes>
+        <note category="location">src/app/campaign/campaign-view.ts:288</note>
+      </notes>
+      <segment>
+        <source>The reply was lost, so your words may or may not have arrived. Press Send again: the same request is repeated and nothing is counted twice.</source>
+      <target>La risposta si è persa, quindi le tue parole potrebbero essere arrivate o no. Premi di nuovo Invia: viene ripetuta la stessa richiesta e nulla viene contato due volte.</target>
+      </segment>
+    </unit>
   </file>
 </xliff>

@@ -38,6 +38,26 @@ export function operation(id: string, status: string, version: number, withRecei
     updatedAt: '2026-10-28T00:00:01Z', receipt: withReceipt ? receipt() : null, query: '/q', stream: '/s' };
 }
 
+/** The actor who speaks in {@link narratedOperation}; the same public identity the portrait lookup uses. */
+export const SPEAKER = '00000000-0000-4000-8000-0000000000d1';
+
+/**
+ * Operation body with published narration (P08.5 `presentation`): a narrator passage, one passage spoken by {@link SPEAKER}
+ * and, unless `suggestions` is false, three quick replies of the three kinds. It is the scripted narration source of the specs.
+ */
+export function narratedOperation(id: string, options: { version?: number; revision?: number; suggestions?: boolean; speech?: boolean } = {}) {
+  const revision = options.revision ?? 2;
+  const base = operation(id, 'DELIVERED', options.version ?? 6, true);
+  const passages: unknown[] = [{ messageId: `${id}:p1`, kind: 'NARRATION', speaker: null, text: 'The grove is quiet.', locale: 'en' }];
+  if (options.speech !== false) passages.push({ messageId: `${id}:p2`, kind: 'CHARACTER_SPEECH', speaker: { actorId: SPEAKER, name: 'Trail keeper' }, text: 'Will you come with me?', locale: 'en' });
+  return { ...base, committedRevision: revision, receipt: { ...receipt(revision) },
+    presentation: { mode: 'NARRATED', reason: null, retriesRemaining: 0, narration: { locale: 'en', repaired: false, passages,
+      suggestions: options.suggestions === false ? [] : [
+        { suggestionId: `${id}:s1`, kind: 'REPLY', label: 'Agree', draftText: 'I will come with you.', actionId: null },
+        { suggestionId: `${id}:s2`, kind: 'QUESTION', label: 'Ask about the grove', draftText: 'What do you know about the grove?', actionId: null },
+        { suggestionId: `${id}:s3`, kind: 'ACTION', label: 'Look from here', draftText: 'I look at the trail from here.', actionId: null }] } } };
+}
+
 /** One SSE frame for an operation message. */
 export function frame(id: string, type: string, data: Record<string, unknown>): string {
   return `id: ${id}\nevent: ${type}\ndata: ${JSON.stringify({ campaignId: CAMPAIGN, stateRevision: 2, ...data })}\n\n`;
@@ -169,7 +189,7 @@ export function panelsBody(options: { contentAvailable?: boolean; nextBefore?: n
 export class CampaignServer {
   readonly calls: string[] = [];
   streams: string[][] = [];
-  operations = new Map<string, ReturnType<typeof operation>>();
+  operations = new Map<string, unknown>();
   stateBody: unknown = state();
   resumeBody: unknown = resumeCard();
   panelsBody: unknown = panelsBody();

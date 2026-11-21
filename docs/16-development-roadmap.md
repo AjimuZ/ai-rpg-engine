@@ -7412,12 +7412,72 @@ this update. No combat runtime/browser result is claimed.
         looked at: scene dominant, portrait overlapping the scene edge, attribution and read-back below it).
       - `node tools/browser-smoke.mjs` and `node tools/browser-smoke.mjs --locales` → both "Browser smoke passed" (no regression of
         the earlier reading, draft and EN/IT journeys).
-    - Not proven: the live campaign screen (`CampaignPlaythrough`, owned by P17.3-B) has no scene, portrait, layout choice or
+    - Not proven (as of P17.3-A; P17.3-B below delivered the live screen): the live campaign screen (`CampaignPlaythrough`, owned by P17.3-B) has no scene, portrait, layout choice or
       quick replies, so QA-29 is exercised on the local preview story only (local-preview coverage; full QA-29 is not claimed
       and stays open until P17.3-B); no server round trip,
       reconnect deduplication or screen-reader review; no human visual or Italian review of the new text; reading back one
       passage at a time, text-reveal animation and pack-defined tokens are not built; `sh .agents/ralph/verify.sh full` was not
       run by this session (the runner runs it).
+  - 2026-11-21 P17.3-B: the layouts and quick replies on the live campaign screen (partial progress: the P17.3 box stays
+    unchecked on purpose. QA-29 with live narration needs a signed-in narration runtime that only the owner has, so that check
+    belongs to the owner gate P17.3-O; no QA-29 pass with real narration is claimed here).
+    - Delivered: the playthrough screen (`CampaignPlaythrough`) now shows the published narration of an operation as an attributed
+      story (new `campaign-story.ts`, pure model in `campaign-story-model.ts`). The visual-novel and text-focused layouts reuse the
+      preview's classes, tokens and layout choice (`PreviewState`, kept in the tab record `engine.preview-reading.v1`); a native
+      "Story layout" select on the screen changes it at once and the choice survives a reload of the tab. The section exposes
+      `data-layout` and `data-scene` (`hidden` in the text layout, `none` without a registered scene image, `loading`, `ready`,
+      `failed`); a failed or missing scene or portrait leaves a text label and the portrait falls back to the speaker's initial. The
+      text-focused layout also removes the artwork gallery and item icons of the panels, so no image element or image request
+      remains on the screen. Scene and portrait come from the existing artwork listing (scene by the newest scene cue, else the
+      resume card's location id; portrait by the speaking actor id). Reading is the newest passage, a two-line "Previously"
+      read-back outside the live region and a chronicle of every published passage, with name and explicit role label.
+    - Protocol: `parseOperation` now validates the operation's `presentation` (docs/13 P08.5): at most 24 passages and 3 suggestions,
+      speech only with a named speaker, closed kinds, bounded text; anything else fails closed. `CampaignSession.readNarration`
+      reads a `DELIVERED` operation by identity once per page load (after a reload and after `narrative.ready`), in memory only;
+      an operation saved without narration is not read again, because the browser has no narration retry yet.
+    - Quick replies and Send: at most three chips (speech, question, action, each labelled in text) from the newest narrated
+      operation, offered only while the world is still at the revision that operation committed and no later action is unfinished,
+      never during a fight or a pause. A chip only fills an empty draft and focuses it; Dismiss hides it and keeps the draft. The
+      composer's Send is enabled only for words and a named recipient (the speaker of the newest passage) and sends one typed
+      `SPEAK {recipientActorId, text}` with the exact words, never because a chip was chosen. A lost reply keeps the draft and the
+      request identity with the revision it was first sent at, so pressing Send again repeats the same request; the draft is emptied
+      only once the server holds the operation. A refusal keeps the draft and uses a new identity next time. Six new messages
+      with one author pass of Italian (catalog 791 units); the other strings reuse existing message identifiers.
+    - Commands and results:
+      - `sh .agents/ralph/verify.sh frontend` → `VERIFY PASSED (frontend)` on the final tree (typecheck, 30 test files and 303 tests,
+        i18n, build, locales: "Localization parity: 791 reviewed messages"; the existing initial-bundle budget warning remains).
+        New specs: `campaign-story.spec.ts` (9 tests, scripted narration served by the simulated campaign server),
+        `campaign-story-model.spec.ts` (4), one in `campaign-protocol.spec.ts`; the catalog pin in `italian-variant.spec.ts`
+        moved from 785 to 791. A first run failed two recorded-transcript specs because the page asked for the narration of a
+        `COMMITTED_NARRATION_PENDING` operation, a request the golden transcript does not contain; the read is now limited to
+        `DELIVERED` operations, so the transcript and the backend golden file are unchanged.
+      - `node frontend/tools/reading-journey.mjs` (extended; Chrome through a private debugging pipe, loopback server on
+        `frontend/dist/engine-ui/browser` plus a SCRIPTED narration source: fixed API bodies and a delivered operation carrying
+        two passages and three suggestions; it records every command) → 32 PASS, 0 FAIL: 21 of part one (local preview) and 11 of
+        part two (live screen: scene from the campaign asset route, portrait overlap, attribution, read-back and chronicle,
+        three chips and keyboard choice with nothing sent, dismissal, a lost reply followed by a second press that repeats the
+        same request identity and body, text-focused layout with no asset request across a reload, keyboard path to Send,
+        `none` and `failed` graphic states, 390 and 320 px without overflow). Earlier runs failed on harness details only (a
+        browser-side retry of a dropped POST; a keyboard loop that stopped too early), and once on a real finding that is
+        fixed: the panels' gallery still drew images in the text-focused layout. Screenshots in `.local/scratch/qa29/`
+        (`live-vn-desktop.png` and `live-vn-mobile.png` were looked at; the scene there is a one-pixel stand-in image).
+      - Packaged installation (separate copy, never the owner's): `mkdir -p .local/scratch/p173b/app`, `tar --exclude=./.git
+        --exclude=./.local --exclude=./backend/target --exclude=./frontend/node_modules --exclude=./.ajimu-autopilot --exclude=./.env
+        --exclude=./.agents/ralph/.run --exclude=./.agents/skills -cf .local/scratch/p173b/tree.tar .`, `tar -xf ... -C
+        .local/scratch/p173b/app`, then `cd .local/scratch/p173b/app && sh ./start.sh`: three containers healthy, runtime
+        account NOT signed in, gameplay not ready (503), as expected; no other copy held port 8080. A playthrough was made
+        with `node frontend/tools/artwork-journey.mjs create`, and the new repeatable
+        `node frontend/tools/live-screen-check.mjs ADVENTURE CAMPAIGN SHOTDIR` → 27 PASS, 0 FAIL (en and it at 1280 px, en at
+        390 px): without narration there is no story section, no chip and no recipient, the starting situation is readable, Send
+        stays disabled even over a typed draft, nothing is written, no overflow, no axe violation, and the only console error is
+        the known `/favicon.ico` 404. Stopped with `sh ./start.sh --stop` (volumes kept).
+    - Not proven: QA-29 with narration from a real signed-in runtime (owner gate P17.3-O); that a real pack's portrait art is
+      keyed by the actor identity (the lookup uses the actor id and the packaged sample registers none, so the portrait fallback is
+      what the packaged copy would show); a real server round trip of `SPEAK` from a quick reply and a real lost reply (the journey
+      loses the reply by cutting the response body, the specs by a rejected fetch); the Italian text beyond one author pass; a
+      screen-reader review; reading backwards one passage at a time; the saved-adventure intro still says "Sending actions in the
+      browser is not connected yet." (known defect, unchanged); `sh .agents/ralph/verify.sh full` and `containers` were not run by
+      this session (the runner runs them).
 - [ ] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.
 - [ ] P17.5 Verify missing art/audio never blocks play and media cannot reveal secrets.
 - [ ] P17.6 Implement bounded runtime scene/portrait/item image jobs using verified capability, public appearance inputs, stable identities, durable saved assets, budget limits, deduplication and restore/stale-result checks under QA-31.

@@ -40,10 +40,17 @@ history stays in the chronicle. The section exposes `data-layout` and `data-scen
 size (15–24 px), line spacing (`compact` 1.45, `comfortable` 1.65 default, `relaxed` 1.9) and reading width (`narrow` 36
 rem, `standard` 48 rem default, `wide` 64 rem). A token is chosen by its ID from a closed table, so a stored or typed value
 never reaches CSS unchecked, and a snapshot written before the tokens existed stays valid. QA-29 was run on this local preview
-story only; full QA-29 is not claimed. Not delivered: the live
-campaign screen (`CampaignPlaythrough`, owned by P17.3-B) has no scene, portrait, layout choice or quick replies, because no producer of
-them exists in a real turn; reading backwards one passage at a time (only the read-back and the chronicle); optional
-text-reveal animation; a pack's own tokens.
+story only; full QA-29 is not claimed. Not delivered: reading backwards one passage at a time (only the read-back and the
+chronicle); optional text-reveal animation; a pack's own tokens.
+
+**Live screen (P17.3-B, 21 November 2026).** The playthrough screen shows the published narration in the same two layouts
+with the same tokens and a "Story layout" select. `data-scene` is `hidden` (text layout), `none` (no registered scene image),
+`loading`, `ready` or `failed`; a missing or failed scene or portrait leaves a text label (and the speaker's initial for a
+portrait). The scene is looked up in the artwork listing by the newest scene cue, else the resume card's location id; the
+portrait by the speaking actor's id (not proven against a real pack's art). The text-focused layout also withholds the panels'
+gallery and item icons, so the whole screen requests no image. Verified with a scripted narration source in
+`frontend/tools/reading-journey.mjs` and, without a runtime, on the packaged installation with
+`frontend/tools/live-screen-check.mjs`; narration from a real signed-in runtime is owner gate P17.3-O.
 
 P05.5 integrates original MIT geometry from `frontend/src/app/preview/ui-kit.ts`
 and `frontend/src/_ui-kit.scss` with the existing theme: 20 allowlisted line icons,

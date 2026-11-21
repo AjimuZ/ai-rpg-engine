@@ -198,6 +198,84 @@ export interface OperationView {
   readonly committedRevision: number | null;
   readonly operationVersion: number;
   readonly receipt: PublicReceipt | null;
+  /** How the committed action is presented (P08.5); null before the commit, absent only on views built outside the parser. */
+  readonly presentation?: OperationPresentation | null;
+}
+
+/** Presentation modes of a committed operation: narration in progress, published narration, or the receipt fallback. */
+export const PRESENTATION_MODES = ['IN_PROGRESS', 'NARRATED', 'RECEIPT'] as const;
+/** Most passages and suggestions one narration may carry; the server cuts both lists lower, so a larger list is refused. */
+export const MAX_NARRATION_PASSAGES = 24;
+export const MAX_NARRATION_SUGGESTIONS = 3;
+/** Longest passage text, label and draft the browser accepts; longer text is refused, never cut. */
+const MAX_PASSAGE_CHARS = 8_000;
+
+/** One attributed passage of published narration; `speaker` is null for the narrator. */
+export interface NarrationPassage {
+  readonly messageId: string;
+  readonly kind: 'NARRATION' | 'CHARACTER_SPEECH';
+  readonly speaker: { readonly actorId: string; readonly name: string } | null;
+  readonly text: string;
+  readonly locale: 'en' | 'it';
+}
+
+/** One optional quick reply; choosing it only fills the composer, and `actionId` is never sent by the browser. */
+export interface NarrationSuggestion {
+  readonly suggestionId: string;
+  readonly kind: 'REPLY' | 'QUESTION' | 'ACTION';
+  readonly label: string;
+  readonly draftText: string;
+  readonly actionId: string | null;
+}
+
+/** The player-safe presentation of one committed operation. Passages and suggestions are empty unless `mode` is `NARRATED`. */
+export interface OperationPresentation {
+  readonly mode: (typeof PRESENTATION_MODES)[number];
+  readonly reason: string | null;
+  readonly retriesRemaining: number;
+  readonly passages: readonly NarrationPassage[];
+  readonly suggestions: readonly NarrationSuggestion[];
+}
+
+/** Read bounded display text: non-blank, within {@link MAX_PASSAGE_CHARS}, never trimmed or reinterpreted. */
+function shownText(source: Record<string, unknown>, field: string, max = MAX_PASSAGE_CHARS): string {
+  const value = source[field];
+  if (typeof value !== 'string' || value.trim().length === 0 || value.length > max) invalid(field);
+  return value as string;
+}
+
+/** Validate the `presentation` member of an operation body; null and a missing member both mean "not presented yet". */
+function parsePresentation(value: unknown): OperationPresentation | null {
+  if (value === null || value === undefined) return null;
+  const source = record(value, 'presentation');
+  const mode = choice(source, 'mode', PRESENTATION_MODES);
+  const reason = source['reason'];
+  if (reason !== null && reason !== undefined && (typeof reason !== 'string' || !(NARRATION_REASONS as readonly string[]).includes(reason))) invalid('reason');
+  const narration = source['narration'];
+  if (mode !== 'NARRATED' || narration === null || narration === undefined) {
+    return { mode, reason: (reason as string | null | undefined) ?? null, retriesRemaining: count(source, 'retriesRemaining'), passages: [], suggestions: [] };
+  }
+  const body = record(narration, 'narration');
+  choice(body, 'locale', ['en', 'it'] as const);
+  const passages = list(body, 'passages', MAX_NARRATION_PASSAGES).map((entry): NarrationPassage => {
+    const row = record(entry, 'passage');
+    const speaker = row['speaker'];
+    const named = speaker === null || speaker === undefined ? null : record(speaker, 'speaker');
+    const kind = choice(row, 'kind', ['NARRATION', 'CHARACTER_SPEECH'] as const);
+    // Speech without a named speaker could not be attributed, so it is refused instead of shown as anonymous words.
+    if ((kind === 'CHARACTER_SPEECH') !== (named !== null)) invalid('speaker');
+    return { messageId: token(row, 'messageId', 80), kind, text: shownText(row, 'text'), locale: choice(row, 'locale', ['en', 'it'] as const),
+      speaker: named === null ? null : { actorId: uuid(named, 'actorId'), name: token(named, 'name', 200) } };
+  });
+  const suggestions = list(body, 'suggestions', MAX_NARRATION_SUGGESTIONS).map((entry): NarrationSuggestion => {
+    const row = record(entry, 'suggestion');
+    const action = row['actionId'];
+    if (action !== null && action !== undefined && typeof action !== 'string') invalid('actionId');
+    return { suggestionId: token(row, 'suggestionId', 80), kind: choice(row, 'kind', ['REPLY', 'QUESTION', 'ACTION'] as const),
+      label: shownText(row, 'label', 240), draftText: shownText(row, 'draftText', 500), actionId: (action as string | null | undefined) ?? null };
+  });
+  if (new Set(suggestions.map((suggestion) => suggestion.suggestionId)).size !== suggestions.length) invalid('suggestionId');
+  return { mode, reason: null, retriesRemaining: 0, passages, suggestions };
 }
 
 /** Read a status from the closed lifecycle enumeration. */
@@ -223,6 +301,7 @@ export function parseOperation(value: unknown, campaignId: string): OperationVie
     baseRevision: count(source, 'baseRevision'), committedRevision: committed as number | null,
     operationVersion: count(source, 'operationVersion'),
     receipt: source['receipt'] === null || source['receipt'] === undefined ? null : parseReceipt(source['receipt']),
+    presentation: parsePresentation(source['presentation']),
   };
   if (view.campaignId !== campaignId) invalid('campaignId');
   return view;

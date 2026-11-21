@@ -81,6 +81,11 @@ main { max-width: 78rem; margin: auto; padding: 1.25rem; }
 .muted { color: var(--muted); }
 .story { position: relative; }
 .story-title { font-size: 1.1rem; color: var(--accent); }
+/* Live story (P17.3-B): the place name and the layout choice share one wrapping row above the scene. */
+.story-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1rem; }
+.story-bar .story-title { margin: 0 auto 0 0; }
+.story-bar label { color: var(--muted); font-size: .9rem; }
+.story-bar select { width: auto; max-width: 100%; }
 .scene { position: relative; margin: 0; background: #25243d; border-radius: .6rem .6rem 0 0; overflow: hidden; }
 /* The scene is the dominant element: about three fifths of the viewport height on desktop, bounded so a very tall window
    does not push the passage off screen. Narrow viewports override this below so the text keeps priority. */

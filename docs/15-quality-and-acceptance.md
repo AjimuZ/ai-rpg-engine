@@ -81,7 +81,7 @@ runtime check on the owner's account (`inferenceVerified: true`, resumed), a pac
 - **Deterministic half only:** QA-07 and QA-08 (no live narration in play).
 - **Partial or open:** QA-15 (nothing in play applies `Advancement`), QA-24 and QA-28 (the Docker-gated runtime probe
   tests, the lifecycle test and `verify.sh containers` were not run), QA-25, QA-26, QA-29 and QA-30 (human, fresh-clone
-  and provenance checks not run; QA-29 has local-preview coverage only, with no live quick replies until P17.3-B), and QA-34 (no test found for author-fixed NPCs and facts).
+  and provenance checks not run; QA-29 has local-preview and scripted-narration live-screen coverage only, with no run on narration from a real signed-in runtime until P17.3-O), and QA-34 (no test found for author-fixed NPCs and facts).
 
 The matrix as a whole is therefore not a pass; the open items go to the P14.4 defect list.
 
@@ -1824,8 +1824,16 @@ P17.3-A runs QA-29 in Chrome for both layouts of the local preview story with
 narrator/character labels, read-only Continue and chronicle, a suggestion that fills an editable draft without any
 non-read request, disabled suggestions while a draft exists, dismissal that keeps draft and focus, stale suggestions
 gone after Continue, the size/spacing/width tokens and their reload, 390/320 px without overflow, blocked scene and
-portrait images, and keyboard focus rings. This is local-preview coverage only. The campaign screen (P17.3-B), a real server round trip, reconnect deduplication,
-assistive-technology review and a human visual review beyond the screenshots remain open, so full QA-29 is not claimed.
+portrait images, and keyboard focus rings. This is local-preview coverage only.
+
+P17.3-B extends the same script to the live campaign screen against a scripted narration source (32 checks, 32 PASS on 21
+November 2026; 11 of them live): the scene from the campaign asset route, portrait overlap, attribution, read-back and chronicle,
+three labelled chips and a keyboard choice that sends nothing, dismissal, a lost reply followed by a second press that repeats
+the same request identity and body, the text-focused layout with no asset request across a reload, the keyboard path to Send, the
+`none` and `failed` graphic states and 390/320 px without overflow. `frontend/tools/live-screen-check.mjs` checks the packaged
+installation without a runtime (27 PASS: no story, no chip, no recipient, Send disabled, nothing written, no axe violation). QA-29
+with narration from a real signed-in runtime, a real server round trip of the reply, assistive-technology review and a human
+visual review remain open (owner gate P17.3-O), so full QA-29 is not claimed.
 
 P05.7-B.2.2 records QA-40 evidence for presentation cues; the point-by-point map to
 backend tests, frontend tests and the browser check is in the

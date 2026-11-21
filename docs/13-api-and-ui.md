@@ -765,8 +765,16 @@ portrait overlapping its lower edge (visual novel), the text-focused layout requ
 attributed read-back of the previous passage sits outside the live region, and Settings adds two reading tokens (line
 spacing and reading width) next to text size, all kept in the tab's reading record. The details, limits and the
 list of what is not delivered are in [presentation assets](23-presentation-assets.md#2-development-time-ui-asset-kit).
-The live campaign screen does not yet use these layouts; it belongs to P17.3-B. QA-29 was run on the local preview
-story only (local-preview coverage); full QA-29 is not claimed.
+Since P17.3-B the live campaign screen uses the same layouts, tokens and layout choice (a "Story layout" select on the
+screen; the choice is kept in the same tab record). It reads the operation's `presentation` (section P08.5 above: passages
+and up to three suggestions, validated and fail-closed) and shows the newest passage, the read-back and a chronicle. The scene
+comes from the playthrough's artwork listing (newest scene cue, else the resume card's location) and the portrait from the
+speaking actor's identity; `data-scene` is `none` when no image is registered. The text-focused layout draws no image on the
+whole screen. Quick replies come from the newest narrated operation, only while the world is at the revision it committed and
+no later action is unfinished, never during a fight or a pause; a chip only fills an empty draft. Send is enabled only for
+words and a recipient (the speaker of the newest passage) and sends a typed `SPEAK` command with the exact words; a lost
+reply repeats the same request identity and revision. QA-29 was run on the local preview story and on the live screen
+against a scripted narration source; QA-29 with narration from a real signed-in runtime is not claimed (owner gate P17.3-O).
 
 Retain the first project's structured RPG panels and readable dark-theme option. Its obsidian, violet, gold, and cyan palette can become the default theme. It is not mandatory for all packs; support neutral and high-contrast profiles. Content terminology and visible panels derive from enabled modules.
 
