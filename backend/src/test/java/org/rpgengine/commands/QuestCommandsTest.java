@@ -277,6 +277,45 @@ class QuestCommandsTest {
     }
 
     /**
+     * Reputation on the production path (P15.2-A): a campaign of the reputation variant starts at standing zero, so
+     * neither faction-gated quest opens; the survey's ending raises the standing with the wardens by 15 and the quest
+     * that needs 15 is discovered in the same commit, while the one that needs a negative standing never is.
+     */
+    @Test
+    void questEndingRaisesReputationThatOpensAnotherQuest() throws Exception {
+        UUID content = registry.register(adventure, new PackStaging(PackStaging.Limits.standard())
+                .archive(new ByteArrayInputStream(ArmoryPack.zip(QuestPack.withReputation())))).revisionId();
+        var created = creation.create(owner, adventure, new CampaignCreationService.Request(UUID.randomUUID(), content,
+                "Standing", SupportedLocale.EN, new CharacterChoices("Player", "surveyor", Map.of(), Map.of(), null, null)));
+        campaign = created.campaignId();
+        player = created.actorId();
+        revision = 0;
+        execute(new TypedCommand.AcceptQuest("survey"));
+        assertEquals(Map.of("survey", "active"), questStatuses());
+        rejects(OperationAdmissionFailure.Kind.QUEST_UNAVAILABLE, new TypedCommand.AcceptQuest("favor"));
+
+        var moved = execute(new TypedCommand.Move("grove"));
+        assertEquals(OperationStatus.COMMITTED, moved.operation().status());
+        assertEquals(List.of(Map.of("kind", "DISCOVERED", "questId", "gate"),
+                Map.of("kind", "OBJECTIVE", "questId", "survey", "objectiveId", "reach"),
+                Map.of("kind", "COMPLETED", "questId", "survey", "outcomeId", "surveyed"),
+                Map.of("kind", "DISCOVERED", "questId", "favor")), moved.receipt().get("quests"));
+        assertEquals(Map.of("favor", "available", "gate", "available", "shadow", "active", "survey", "completed"),
+                questStatuses());
+        // The discovery cites an event of the same commit as the ending that caused it.
+        assertEquals(List.of(2L, 2L), jdbc.queryForList("select updated_revision from quest_state where campaign_id = ? "
+                + "and quest_id in ('favor', 'survey') order by quest_id", Long.class, campaign));
+
+        // The trailhead was already visited, so accepting the favor finishes it at once; the rival never opens.
+        var accepted = execute(new TypedCommand.AcceptQuest("favor"));
+        assertEquals(OperationStatus.COMMITTED, accepted.operation().status());
+        assertEquals("completed", questStatus("favor"));
+        execute(new TypedCommand.Move("trailhead"));
+        assertEquals(0, count("quest_state where quest_id = 'rival'"));
+        rejects(OperationAdmissionFailure.Kind.QUEST_UNAVAILABLE, new TypedCommand.AcceptQuest("rival"));
+    }
+
+    /**
      * A failure after the quest rows and the reward were written (the presentation job insert) rolls back
      * everything: rows, ledger, settlement, events and revision. With the fault gone a fresh request
      * succeeds and pays once.

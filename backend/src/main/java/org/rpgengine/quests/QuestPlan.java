@@ -24,7 +24,8 @@ import java.util.Set;
  *       objective's predicate holds. Satisfaction is sticky;</li>
  *   <li>an {@code active} quest ends with the first outcome, in authored order, whose predicate holds:
  *       {@code success} and {@code alternative} complete it, {@code failure} fails it. The outcome's
- *       item rewards are granted through {@link World#grant} exactly then.</li>
+ *       item rewards are granted through {@link World#grant} exactly then, and its reputation changes count
+ *       toward the {@link Reputation} that later {@code reputation} predicates read.</li>
  * </ul>
  * Suspended quests track nothing, and completed or failed quests never change again, so a quest settles
  * its reward source at most once.
@@ -235,7 +236,7 @@ public final class QuestPlan {
         var work = new LinkedHashMap<String, Work>();
         rules.quests().forEach((id, quest) -> work.put(id, new Work(quest, stored.getOrDefault(id,
                 State.initial(quest)))));
-        var run = new Run(work, world, eventBudget);
+        var run = new Run(rules, work, world, eventBudget);
         if (request != null) {
             run.request(request);
         }
@@ -259,12 +260,16 @@ public final class QuestPlan {
         final Map<String, Work> work;
         final World world;
         final List<Step> steps = new ArrayList<>();
+        final QuestRules rules;
         int budget;
         int rewardUnits;
         boolean deferred;
+        /** Standing derived from the current endings; null after an ending until the next read recomputes it. */
+        Reputation reputation;
 
         /** Start an evaluation with a fresh budget. */
-        Run(Map<String, Work> work, World world, int eventBudget) {
+        Run(QuestRules rules, Map<String, Work> work, World world, int eventBudget) {
+            this.rules = rules;
             this.work = work;
             this.world = world;
             this.budget = eventBudget;
@@ -275,6 +280,21 @@ public final class QuestPlan {
         @Override public long possessed(String item) { return world.possessed(item); }
 
         @Override public long worldTime() { return world.worldTime(); }
+
+        /** Stored endings and those of this evaluation count alike, so a cascade sees the standing it produced. */
+        @Override
+        public long reputation(String faction) {
+            if (reputation == null) {
+                var endings = new LinkedHashMap<String, String>();
+                work.forEach((id, quest) -> {
+                    if (quest.outcomeId != null) {
+                        endings.put(id, quest.outcomeId);
+                    }
+                });
+                reputation = Reputation.of(rules, endings);
+            }
+            return reputation.toward(faction);
+        }
 
         @Override
         public QuestStatus status(String quest) {
@@ -395,6 +415,7 @@ public final class QuestPlan {
                 quest.status = outcome.kind().ends();
                 quest.outcomeId = outcome.id();
                 quest.changed = true;
+                reputation = null;
                 steps.add(new Ended(quest.quest.id(), quest.quest.secret(), outcome));
                 for (QuestRules.Reward reward : outcome.rewards()) {
                     world.grant(reward.item(), reward.quantity());

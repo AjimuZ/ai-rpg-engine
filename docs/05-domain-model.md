@@ -457,6 +457,11 @@ changed the facts writes the transition, its events and its one-time reward
   source key `quest:<canonical quest id>:outcome` (recipient key: the actor ID) and reward-sourced
   `item_creation` rows citing it. The settlement is unique per campaign, source and recipient, so a
   quest pays at most once whatever outcome or paraphrase is presented later.
+- **Reputation (P15.2-A).** An outcome may carry typed `ReputationChange(faction, delta)` entries. The
+  player's standing with a faction (`Reputation`) is not stored: it is derived from the terminal
+  `quest_state` rows and their recorded outcomes, summed and clamped once to -100..100
+  ([ADR 0051](adr/0051-faction-reputation-is-derived-from-quest-endings.md)). It writes no row and no
+  event of its own.
 - **Events (version 1).** `QUEST_AVAILABLE`, `QUEST_ACCEPTED`, `QUEST_SUSPENDED`, `QUEST_RESUMED`,
   `QUEST_OBJECTIVE_SATISFIED`, `QUEST_COMPLETED`, `QUEST_FAILED`; reward units are announced by
   `ITEM_CREATED` with the settlement's source key. The steps of a hidden background quest are internal

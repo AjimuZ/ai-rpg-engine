@@ -6058,6 +6058,52 @@ this update. No combat runtime/browser result is claimed.
         check is unverified here.
       - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
 - [ ] P15.2 Add richer quest outcomes, faction clocks, bounded time catch-up, reputation, and causally triggered world changes.
+  - P15.2-A (21 November 2026; partial, the box stays unchecked). Quest outcomes can now change faction reputation,
+    and quest predicates can read it
+    ([ADR 0051](adr/0051-faction-reputation-is-derived-from-quest-endings.md)). No migration was added.
+    - **Pack content.** An outcome's `settlement` accepts `reputation`: 0..8 entries `{faction, delta}`, one per
+      faction reference, with a non-zero `delta` within -25..25. World predicates accept the numeric atom
+      `{"reputation": "<faction>"}` with the proven interval -100..100. The atom is not readable in actor scope. The
+      bounds are `PackCompiler.MAX_REPUTATION*`.
+    - **Types.** `QuestRules.Outcome` gains `reputation()`, a list of `ReputationChange(faction, delta)` with
+      canonical faction IDs. Its constructor rejects a zero or oversized delta, a repeated faction and more than 8
+      entries. The older four-argument constructor still means no change. `QuestPredicate.Standing` is the atom.
+      `org.rpgengine.quests.Reputation` is the derived standing.
+    - **Engine behavior.** `Reputation.of(rules, endings)` sums the changes of each ended quest's recorded outcome
+      and clamps once to -100..100. Unknown quests or outcomes count nothing. `QuestPlan` derives it from its working
+      states and recomputes it after each ending, so a cascade in the same commit reads the new standing. Nothing is
+      stored. The cause is the terminal `quest_state` row and its ending event.
+    - **Commands and results (Windows 11 host, pinned containers).**
+      - `sh .agents/ralph/verify.sh backend -Dtest=QuestPlanTest,QuestPredicateTest,PackCompilerTest`: VERIFY PASSED.
+        44 tests, 0 failures (PackCompilerTest 25, QuestPlanTest 12, QuestPredicateTest 7); backend-focused 11 s.
+      - `sh .agents/ralph/verify.sh backend -Dtest=QuestCommandsTest,QuestPlanTest,QuestPredicateTest,PackCompilerTest,PlayPanelsTest,ClockCommandsTest`:
+        VERIFY PASSED. 79 tests, 0 failures (PackCompilerTest 25, ClockCommandsTest 13, QuestPlanTest 12,
+        PlayPanelsTest 11, QuestCommandsTest 11, QuestPredicateTest 7); backend-focused 20 s.
+    - **Evidence.**
+      - `QuestCommandsTest#questEndingRaisesReputationThatOpensAnotherQuest`: on real PostgreSQL through the
+        production admission, resolver and commit, with a campaign created from `QuestPack.withReputation()` (the
+        quest chain plus a `wardens` faction).
+        - Accepting the survey opens neither gated quest, and accepting `favor` is refused `QUEST_UNAVAILABLE`.
+        - The move to the grove ends the survey (+15). In the same commit (revision 2), `favor`, gated at 15 or more,
+          is discovered and listed last in the receipt.
+        - Accepting `favor` finishes it. `rival`, gated below zero, never gets a row and stays refused.
+      - `QuestPlanTest#endingsChangeReputationThatLaterPredicatesRead`: stored endings and endings of the same
+        evaluation count alike, and only the selected outcome counts. Five +25 endings and one -25 ending give 100
+        in either order (clamping each step would give 75); 150 clamps to 100.
+      - `QuestPlanTest#reputationValuesAreBounded`, `QuestPredicateTest#reputationReadsTheFactionStanding` and
+        `PackCompilerTest#validatesQuestReputation` cover the bounds, the typed projection and each compiler error
+        (`SCHEMA`, `DUPLICATE`, `REFERENCE_KIND`, `REFERENCE_UNKNOWN`, boolean misuse, actor scope).
+    - **Not done in this story:**
+      - Faction clocks, bounded time catch-up, and causally triggered world changes.
+      - Reputation from encounters, dialogue or clocks.
+      - Faction resources, and rules that read faction goals or stances.
+      - Any view, panel, receipt entry or narration context that shows a standing.
+      - Other outcome effects (for example XP, currency or access).
+    - **Not proven:**
+      - A deliberate weakening run.
+      - HTTP reads in these tests.
+      - Dependency-pack faction references (`pack#id`) in `reputation`. No test uses them.
+      - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
 - [ ] P15.3 Add guide personas with separate knowledge/session scope and no mutation authority.
 - [ ] P15.4 Add creative ability drafting, validation preview, explicit execution, learned recipes, and bounded high-power profiles.
 - [ ] P15.5 Prove disabled modules disappear cleanly and enabled modules remain adventure-independent.

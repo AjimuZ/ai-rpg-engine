@@ -13,8 +13,8 @@ import org.junit.jupiter.api.Test;
 /** Pure evaluation of world predicates over committed facts (P10.3): atoms, logic, arithmetic and misuse. */
 class QuestPredicateTest {
     /**
-     * Fixed facts: the player visited the grove, holds 3 coins, quest "a" is active with objective "x" satisfied
-     * and the world clock reads one day, two hours and five seconds.
+     * Fixed facts: the player visited the grove, holds 3 coins, quest "a" is active with objective "x" satisfied,
+     * the world clock reads one day, two hours and five seconds, and the player stands at -15 with the guild.
      */
     private static final QuestPredicate.Facts FACTS = new QuestPredicate.Facts() {
         @Override public boolean visited(String location) { return location.equals("grove"); }
@@ -29,6 +29,8 @@ class QuestPredicateTest {
         @Override public boolean satisfied(String quest, String objective) { return quest.equals("a") && objective.equals("x"); }
 
         @Override public long worldTime() { return 86_400 + 2 * 3_600 + 5; }
+
+        @Override public long reputation(String faction) { return faction.equals("guild") ? -15 : 0; }
     };
 
     /** Construct the stateless fixture. */
@@ -46,6 +48,17 @@ class QuestPredicateTest {
         assertFalse(atLeastTwoDays.test(FACTS));
         assertThrows(IllegalArgumentException.class, () -> new QuestPredicate.WorldTime("fortnights"));
         assertThrows(IllegalStateException.class, () -> new QuestPredicate.WorldTime("days").test(FACTS));
+    }
+
+    /** The reputation atom is a number read from the standing toward exactly its faction (P15.2-A). */
+    @Test
+    void reputationReadsTheFactionStanding() {
+        assertEquals(-15, new QuestPredicate.Standing("guild").value(FACTS));
+        assertEquals(0, new QuestPredicate.Standing("fleet").value(FACTS));
+        assertTrue(new QuestPredicate.Operation("lt", List.of(new QuestPredicate.Standing("guild"),
+                new QuestPredicate.Constant(-10))).test(FACTS));
+        assertThrows(IllegalStateException.class, () -> new QuestPredicate.Standing("guild").test(FACTS));
+        assertThrows(NullPointerException.class, () -> new QuestPredicate.Standing(null));
     }
 
     /** Each atom reads exactly its own fact. */

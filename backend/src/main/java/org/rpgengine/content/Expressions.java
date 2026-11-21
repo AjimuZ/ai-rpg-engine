@@ -294,7 +294,8 @@ final class Expressions {
         /** Analyze a state-reading atom after checking it is readable in this scope. */
         private Interval atom(String name, Object argument, String at, boolean required) {
             boolean actor = Set.of("attribute", "resource", "skill", "dice").contains(name);
-            boolean world = Set.of("visited", "possesses", "questStatus", "objective", "worldTime").contains(name);
+            boolean world = Set.of("visited", "possesses", "questStatus", "objective", "worldTime", "reputation")
+                    .contains(name);
             if (!actor && !world) {
                 throw error("SCHEMA", at, "Unknown operator or atom '" + name + "'");
             }
@@ -341,6 +342,11 @@ final class Expressions {
                         throw error("SCHEMA", at, "Expected one of the clock units " + CLOCK_UNITS);
                     }
                     return new Interval(Type.NUMBER, 0, WorldClock.maxUnits(unit));
+                }
+                case "reputation" -> {
+                    // The player's standing with a faction, derived from ended quests and clamped (P15.2-A).
+                    reference(argument, at, Set.of("faction"));
+                    return new Interval(Type.NUMBER, -PackCompiler.MAX_REPUTATION, PackCompiler.MAX_REPUTATION);
                 }
                 case "possesses" -> {
                     var f = new Fields(document, at, argument, context);

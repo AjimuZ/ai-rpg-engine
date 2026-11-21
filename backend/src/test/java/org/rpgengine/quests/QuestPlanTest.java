@@ -260,6 +260,79 @@ class QuestPlanTest {
         assertTrue(tight.steps().isEmpty());
     }
 
+    /**
+     * Reputation is derived from the endings (P15.2-A): stored endings and endings of the same evaluation count,
+     * only the selected outcome counts, the sum is clamped once and the order of endings does not matter.
+     */
+    @Test
+    void endingsChangeReputationThatLaterPredicatesRead() {
+        var standing = new QuestPredicate.Standing("guild");
+        var helped = quest("a-help", QuestStatus.AVAILABLE, null, List.of(new QuestRules.Objective("o", false, YES)),
+                List.of(new QuestRules.Outcome("refused", QuestRules.Kind.FAILURE, new QuestPredicate.Visited("swamp"),
+                        List.of(), List.of(new QuestRules.ReputationChange("guild", -25))),
+                        new QuestRules.Outcome("done", QuestRules.Kind.SUCCESS, YES, List.of(),
+                                List.of(new QuestRules.ReputationChange("guild", 20), new QuestRules.ReputationChange("fleet", -5)))));
+        var trusted = quest("b-trusted", QuestStatus.UNDISCOVERED,
+                new QuestPredicate.Operation("ge", List.of(standing, new QuestPredicate.Constant(20))),
+                List.of(new QuestRules.Objective("o", false, NO)), List.of(success("s", NO)));
+        var rules = rules(helped, trusted);
+        // Before any ending the guild stands at zero and the trusted quest stays hidden.
+        assertTrue(run(rules, Map.of(), new Fake(), null).steps().stream()
+                .noneMatch(step -> step.questId().equals("b-trusted")));
+        // The help ends in this evaluation and the trusted quest is discovered in the same one.
+        var result = run(rules, Map.of("a-help", stored(QuestStatus.ACTIVE, null, 0)), new Fake(), null);
+        assertEquals("done", result.after().get("a-help").outcomeId());
+        assertEquals(new QuestPlan.Discovered("b-trusted", false), result.steps().getLast());
+        // A stored ending counts the same way; the failure outcome that did not end the quest counts nothing.
+        var later = run(rules, Map.of("a-help", stored(QuestStatus.COMPLETED, "done", 1, "o")), new Fake(), null);
+        assertEquals(List.of(new QuestPlan.Discovered("b-trusted", false)), later.steps());
+        assertEquals(new Reputation(Map.of("guild", 20, "fleet", -5)),
+                Reputation.of(rules, Map.of("a-help", "done")));
+        assertEquals(new Reputation(Map.of("guild", -25)), Reputation.of(rules, Map.of("a-help", "refused")));
+        assertEquals(Reputation.NONE, Reputation.of(rules, Map.of("unknown", "done", "b-trusted", "missing")));
+        // Sums are clamped once, so the standing depends only on which quests ended.
+        var many = new LinkedHashMap<String, QuestRules.Quest>();
+        var endings = new LinkedHashMap<String, String>();
+        for (int index = 0; index < 6; index++) {
+            String id = "q" + index;
+            int delta = index == 5 ? -25 : 25;
+            many.put(id, quest(id, QuestStatus.AVAILABLE, null, List.of(new QuestRules.Objective("o", false, YES)),
+                    List.of(new QuestRules.Outcome("e", QuestRules.Kind.SUCCESS, YES, List.of(),
+                            List.of(new QuestRules.ReputationChange("guild", delta))))));
+            endings.put(id, "e");
+        }
+        assertEquals(100, Reputation.of(new QuestRules(many), endings).toward("guild"),
+                "five +25 and one -25 sum to 100; clamping each step in this order would give 75");
+        many.put("q6", quest("q6", QuestStatus.AVAILABLE, null, List.of(new QuestRules.Objective("o", false, YES)),
+                List.of(new QuestRules.Outcome("e", QuestRules.Kind.SUCCESS, YES, List.of(),
+                        List.of(new QuestRules.ReputationChange("guild", 25))))));
+        assertEquals(100, Reputation.of(new QuestRules(many), Map.of("q0", "e", "q1", "e", "q2", "e", "q3", "e",
+                "q4", "e", "q6", "e")).toward("guild"), "150 clamps to 100");
+        var reversed = new LinkedHashMap<String, String>();
+        new ArrayList<>(endings.keySet()).reversed().forEach(id -> reversed.put(id, "e"));
+        assertEquals(Reputation.of(new QuestRules(many), endings), Reputation.of(new QuestRules(many), reversed));
+        assertEquals(0, Reputation.NONE.toward("guild"));
+    }
+
+    /** Typed reputation rejects what the compiler rejects: zero or oversized changes, repeats and unbounded standings. */
+    @Test
+    void reputationValuesAreBounded() {
+        assertThrows(IllegalArgumentException.class, () -> new QuestRules.ReputationChange("guild", 0));
+        assertThrows(IllegalArgumentException.class, () -> new QuestRules.ReputationChange("guild", 26));
+        assertThrows(IllegalArgumentException.class, () -> new QuestRules.ReputationChange("guild", -26));
+        assertThrows(IllegalArgumentException.class, () -> new QuestRules.Outcome("e", QuestRules.Kind.SUCCESS, YES,
+                List.of(), List.of(new QuestRules.ReputationChange("guild", 1), new QuestRules.ReputationChange("guild", 2))));
+        var nine = new ArrayList<QuestRules.ReputationChange>();
+        for (int index = 0; index < 9; index++) {
+            nine.add(new QuestRules.ReputationChange("f" + index, 1));
+        }
+        assertThrows(IllegalArgumentException.class, () -> new QuestRules.Outcome("e", QuestRules.Kind.SUCCESS, YES,
+                List.of(), nine));
+        assertThrows(IllegalArgumentException.class, () -> new Reputation(Map.of("guild", 101)));
+        assertThrows(IllegalArgumentException.class, () -> new Reputation(Map.of("guild", 0)));
+        assertEquals(List.of(), new QuestRules.Outcome("e", QuestRules.Kind.SUCCESS, YES, List.of()).reputation());
+    }
+
     /** The same inputs always give the same steps, in the same order. */
     @Test
     void evaluationIsDeterministic() {

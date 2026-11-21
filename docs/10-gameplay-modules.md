@@ -63,7 +63,9 @@ Since P10.3 this lifecycle is executable ([ADR 0025](adr/0025-quest-lifecycle-ob
 - suspended quests track nothing, ended quests never change again, and a returning player is never paid twice;
 - a quest declared `secret` is hidden background content: it starts by itself, no command addresses it, its progress stays internal and only its ending is public.
 
-Predicates for acquired facts, defeated encounters and completed interactions are not in the compiled grammar yet (the bounded clock is, since P10.4); the engine evaluates what the grammar offers and does not read prose. Since P10.5 the playthrough view shows the result: the quest panel lists every discovered quest from the engine's state with its objectives (done, open or optional) and, once ended, its outcome and the units it paid, while a hidden background quest stays out until its ending is committed. The journal beside it is the public event history, worded in the campaign's language and paged by a stable cursor. Neither panel computes anything; both display what the last commit stored.
+- since P15.2-A an outcome may also change the player's standing with up to 8 factions (section 7), and later predicates in the same commit already read the new standing.
+
+Predicates for acquired facts, defeated encounters and completed interactions are not in the compiled grammar yet (the bounded clock is, since P10.4, and faction standing, since P15.2-A); the engine evaluates what the grammar offers and does not read prose. Since P10.5 the playthrough view shows the result: the quest panel lists every discovered quest from the engine's state with its objectives (done, open or optional) and, once ended, its outcome and the units it paid, while a hidden background quest stays out until its ending is committed. The journal beside it is the public event history, worded in the campaign's language and paged by a stable cursor. Neither panel computes anything; both display what the last commit stored.
 
 An emergent quest is validated content: it needs an identity, achievable conditions, issuer/source, known or hidden scope, reward budget, and failure/expiry behavior. It is not simply an AI sentence ending in “quest completed.”
 
@@ -116,6 +118,15 @@ Limits:
 Factions maintain goals, reputation, resources, relationships, and bounded event clocks. A player action can start or advance a clock. Trigger evaluation is causal and deterministic for mechanics; Codex can suggest narrative interpretation or candidate developments.
 
 **World clock (P10.4, implemented).** The campaign's in-world time is a counter of whole seconds. It moves only when a committed command resolves a duration (travel along a link, a wait of at most four hours, or a rest), by at most one in-world day per command, and it never passes one hundred years; the database refuses any other change. Looking at the game (state, resume card, stream, any `GET`) never advances it, and neither does real time. Quest predicates can read it with `worldTime`. Faction and event clocks below remain planned (P15.2).
+
+**Quest reputation (P15.2-A, implemented; [ADR 0051](adr/0051-faction-reputation-is-derived-from-quest-endings.md)).** A quest outcome may declare `reputation` changes `{faction, delta}`, with a non-zero delta within -25..25. The player's standing with a faction is derived from the quests that have ended: the changes of each recorded outcome are summed and the sum is clamped once to -100..100. Ended quests never change, so every point has a stored cause (the quest's ending event), no quest counts twice, and the order of the endings does not matter. The numeric `reputation` atom lets availability, objective and outcome predicates read the standing. Within one commit an ending already counts for the quests evaluated after it.
+
+Limits:
+
+- Quest outcomes are the only source of reputation. Encounters, dialogue and clocks do not change it.
+- No view, panel, receipt or narration context shows a standing.
+- Faction goals, resources and stances are still read by no rule.
+- Because the sum is clamped once, a standing pushed past a bound keeps the excess.
 
 A clock has owner, current value, target, tick policy, trigger, visibility, and settlement identity. On a long time jump, process due boundaries in order with a cap; if too many accumulate, pause for bounded catch-up rather than blocking indefinitely or skipping consequential events. UI reads do not trigger hidden world advancement.
 

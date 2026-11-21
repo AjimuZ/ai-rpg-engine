@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Quest reputation (P15.2-A), 21 November 2026
+
+- A quest outcome can now change the player's standing with factions: its `settlement` may list up to eight
+  `reputation` entries `{faction, delta}`, with a non-zero delta from -25 to 25. The pack checker reports a zero or
+  out-of-range delta, a repeated faction and a reference that is not a faction at the entry.
+- Quest conditions can read the standing with `{"reputation": "<faction>"}`, a number from -100 to 100. A quest can
+  therefore open, progress or end because of how a faction regards the player. An ending counts at once, so it can
+  open a faction's quest in the same command.
+- The standing is computed from the quests that have ended, so it needs no new storage, and an ending never counts
+  twice. Existing adventures and campaigns behave exactly as before.
+- Limits: only quest endings change reputation. No screen shows it yet. Faction clocks and time catch-up are still to
+  come.
+
 ## Unreleased — Relationship causes and companions (P15.1-B), 21 November 2026
 
 - Adventures can enable the first optional module, `relationships`. Its NPCs may then declare bounded attitudes such

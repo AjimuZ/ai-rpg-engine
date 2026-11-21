@@ -20,7 +20,8 @@ import org.rpgengine.rules.WorldClock;
  *
  * <p>Atoms: {@code visited} (a location the player has stood in), {@code possesses} (units of an item
  * definition the player holds), {@code questStatus} and {@code objective} (a satisfied objective of a
- * quest) and {@code worldTime} (whole elapsed units of the bounded in-world clock). No atom rolls dice
+ * quest), {@code worldTime} (whole elapsed units of the bounded in-world clock) and {@code reputation}
+ * (the player's standing with a faction, derived from ended quests, P15.2-A). No atom rolls dice
  * or reads the wall clock, so evaluation is a pure function of the facts and never depends on randomness
  * or real time; the in-world clock moves only when a committed command resolves a duration.
  *
@@ -51,6 +52,12 @@ public sealed interface QuestPredicate {
 
         /** @return in-world seconds elapsed since the campaign began, as the bounded world clock reads after this commit */
         long worldTime();
+
+        /**
+         * @return the player's standing with the canonical faction, {@link Reputation#MIN}..{@link Reputation#MAX},
+         *         including quests that ended earlier in the same evaluation
+         */
+        long reputation(String faction);
     }
 
     /**
@@ -116,6 +123,7 @@ public sealed interface QuestPredicate {
                                 () -> new IllegalArgumentException("unknown quest status")));
             }
             case "worldTime" -> new WorldTime((String) argument);
+            case "reputation" -> new Standing(snapshot.resolve(pack, (String) argument, "faction").id());
             case "objective" -> {
                 var fields = (Map<?, ?>) argument;
                 yield new Objective(snapshot.resolve(pack, (String) fields.get("quest"), "quest").id(),
@@ -213,6 +221,20 @@ public sealed interface QuestPredicate {
         }
         @Override public boolean test(Facts facts) { throw boolean_(); }
         @Override public long value(Facts facts) { return WorldClock.inUnits(facts.worldTime(), unit); }
+    }
+
+    /**
+     * The player's standing with a faction (P15.2-A), derived from ended quests by {@link Reputation}. Numeric
+     * in {@link Reputation#MIN}..{@link Reputation#MAX}; combine it with a comparison, for example
+     * {@code {"ge": [{"reputation": "guild"}, 10]}}.
+     *
+     * @param faction canonical faction ID
+     */
+    record Standing(String faction) implements QuestPredicate {
+        /** Require the reference. */
+        public Standing { Objects.requireNonNull(faction, "faction"); }
+        @Override public boolean test(Facts facts) { throw boolean_(); }
+        @Override public long value(Facts facts) { return facts.reputation(faction); }
     }
 
     /**

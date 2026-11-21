@@ -13,7 +13,8 @@ import org.rpgengine.content.Definition;
 
 /**
  * Prose-free, immutable projection of every quest in a pinned pack closure (P10.3): initial status,
- * discovery predicate, objectives, outcomes and the item rewards each outcome settles. It is derived
+ * discovery predicate, objectives, outcomes, the item rewards each outcome settles and the faction
+ * reputation changes it makes (P15.2-A). It is derived
  * only from a sealed, recompiled {@link CampaignPackSnapshot}; names, summaries, descriptions and
  * consequence texts are not retained, so a rule catalog that holds it stays small and cannot leak
  * authored text.
@@ -58,6 +59,14 @@ public record QuestRules(Map<String, Quest> quests) {
             }
             objectives = List.copyOf(objectives);
             outcomes = List.copyOf(outcomes);
+        }
+
+        /**
+         * @param outcomeId an outcome ID of this quest
+         * @return the outcome, or empty when the quest declares no such outcome
+         */
+        public java.util.Optional<Outcome> outcome(String outcomeId) {
+            return outcomes.stream().filter(outcome -> outcome.id().equals(outcomeId)).findFirst();
         }
     }
 
@@ -123,9 +132,12 @@ public record QuestRules(Map<String, Quest> quests) {
      * @param when the predicate that selects it
      * @param rewards item units settled once for the player when this outcome ends the quest; one entry per
      *        definition, at most {@link #MAX_REWARD_UNITS} units in total
+     * @param reputation changes to the player's standing with factions while this outcome is the quest's ending
+     *        (P15.2-A); one entry per faction, at most {@link Reputation#MAX_CHANGES}
      */
-    public record Outcome(String id, Kind kind, QuestPredicate when, List<Reward> rewards) {
-        /** Freeze the rewards and require every part. */
+    public record Outcome(String id, Kind kind, QuestPredicate when, List<Reward> rewards,
+            List<ReputationChange> reputation) {
+        /** Freeze the lists and require every part. */
         public Outcome {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(kind, "kind");
@@ -135,6 +147,18 @@ public record QuestRules(Map<String, Quest> quests) {
             if (units > MAX_REWARD_UNITS) {
                 throw new IllegalArgumentException("an outcome rewards at most " + MAX_REWARD_UNITS + " units");
             }
+            reputation = List.copyOf(reputation);
+            if (reputation.size() > Reputation.MAX_CHANGES) {
+                throw new IllegalArgumentException("an outcome changes at most " + Reputation.MAX_CHANGES + " factions");
+            }
+            if (reputation.stream().map(ReputationChange::faction).distinct().count() != reputation.size()) {
+                throw new IllegalArgumentException("an outcome changes each faction at most once");
+            }
+        }
+
+        /** An outcome that changes no reputation, the shape of every outcome before P15.2-A. */
+        public Outcome(String id, Kind kind, QuestPredicate when, List<Reward> rewards) {
+            this(id, kind, when, rewards, List.of());
         }
 
         /** @return total rewarded units */
@@ -155,6 +179,23 @@ public record QuestRules(Map<String, Quest> quests) {
             Objects.requireNonNull(item, "item");
             if (quantity < 1) {
                 throw new IllegalArgumentException("a reward grants at least one unit");
+            }
+        }
+    }
+
+    /**
+     * A change to the player's standing with one faction that an outcome makes (P15.2-A).
+     *
+     * @param faction canonical faction definition ID
+     * @param delta non-zero change within -{@link Reputation#MAX_DELTA}..{@link Reputation#MAX_DELTA}
+     */
+    public record ReputationChange(String faction, int delta) {
+        /** Require a faction and a bounded, non-zero change. */
+        public ReputationChange {
+            Objects.requireNonNull(faction, "faction");
+            if (delta == 0 || Math.abs(delta) > Reputation.MAX_DELTA) {
+                throw new IllegalArgumentException("a reputation change is non-zero and at most "
+                        + Reputation.MAX_DELTA + " in either direction");
             }
         }
     }
@@ -197,17 +238,23 @@ public record QuestRules(Map<String, Quest> quests) {
         var outcomes = new ArrayList<Outcome>();
         for (Map<?, ?> outcome : objects(data.get("outcomes"))) {
             var merged = new LinkedHashMap<String, Integer>();
+            var reputation = new ArrayList<ReputationChange>();
             if (outcome.get("settlement") instanceof Map<?, ?> settlement) {
                 for (Map<?, ?> reward : objects(settlement.get("rewards"))) {
                     String item = snapshot.resolve(pack, (String) reward.get("item"), "item").id();
                     int quantity = reward.get("quantity") instanceof Number number ? number.intValue() : 1;
                     merged.merge(item, quantity, Integer::sum);
                 }
+                for (Map<?, ?> change : objects(settlement.get("reputation"))) {
+                    reputation.add(new ReputationChange(
+                            snapshot.resolve(pack, (String) change.get("faction"), "faction").id(),
+                            ((Number) change.get("delta")).intValue()));
+                }
             }
             var rewards = new ArrayList<Reward>();
             merged.forEach((item, quantity) -> rewards.add(new Reward(item, quantity)));
             outcomes.add(new Outcome((String) outcome.get("id"), Kind.parse((String) outcome.get("kind")),
-                    QuestPredicate.compile(outcome.get("when"), snapshot, pack), rewards));
+                    QuestPredicate.compile(outcome.get("when"), snapshot, pack), rewards, reputation));
         }
         return new Quest(id, secret, initial, available, objectives, outcomes);
     }

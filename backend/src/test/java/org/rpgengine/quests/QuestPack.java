@@ -64,4 +64,44 @@ public final class QuestPack {
         files.put("quests.json", quests.getBytes(StandardCharsets.UTF_8));
         return files;
     }
+
+    /**
+     * Build the reputation variant (P15.2-A): the chain above under pack version 1.0.1, plus a {@code wardens}
+     * faction, a {@code survey} ending that raises the standing with it by 15, a {@code favor} quest discovered
+     * once that standing reaches 15 and a {@code rival} quest that would need it below zero.
+     *
+     * @return file index ready for staging
+     */
+    public static Map<String, byte[]> withReputation() throws URISyntaxException {
+        var files = files();
+        String quests = new String(files.get("quests.json"), StandardCharsets.UTF_8)
+                .replace("\"consequences\":[\"The waystone is known.\"]",
+                        "\"reputation\":[{\"faction\":\"wardens\",\"delta\":15}],\"consequences\":[\"The waystone is known.\"]")
+                .replace("{\"schemaVersion\":1,\"definitions\":[", """
+                        {"schemaVersion":1,"definitions":[
+                        {"id":"favor","kind":"quest","data":{"name":"Wardens' Favor","summary":"Trusted by the wardens.",
+                          "initialStatus":"undiscovered","faction":"wardens",
+                          "availableWhen":{"ge":[{"reputation":"wardens"},15]},
+                          "objectives":[{"id":"return","description":"Return to the trailhead.","when":{"visited":"trailhead"}}],
+                          "outcomes":[{"id":"thanked","kind":"success","when":{"objective":{"quest":"favor","id":"return"}}}]}},
+                        {"id":"rival","kind":"quest","data":{"name":"Outcast","summary":"Shunned by the wardens.",
+                          "initialStatus":"undiscovered","availableWhen":{"lt":[{"reputation":"wardens"},0]},
+                          "objectives":[{"id":"leave","description":"Leave.","when":true}],
+                          "outcomes":[{"id":"gone","kind":"success","when":{"objective":{"quest":"rival","id":"leave"}}}]}},
+                        """);
+        files.put("quests.json", quests.getBytes(StandardCharsets.UTF_8));
+        files.put("factions.json", """
+                {"schemaVersion":1,"definitions":[
+                {"id":"wardens","kind":"faction","data":{"name":"Wardens","description":"Keepers of the trail."}}]}"""
+                .getBytes(StandardCharsets.UTF_8));
+        var json = tools.jackson.databind.json.JsonMapper.builder().build();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> manifest = json.readValue(files.get("adventure.json"), Map.class);
+        var listed = new java.util.ArrayList<Object>((java.util.List<?>) manifest.get("files"));
+        listed.add(Map.of("path", "factions.json", "category", "factions"));
+        manifest.put("files", listed);
+        manifest.put("version", "1.0.1");
+        files.put("adventure.json", json.writeValueAsBytes(manifest));
+        return files;
+    }
 }

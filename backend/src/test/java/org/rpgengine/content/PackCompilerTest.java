@@ -396,6 +396,53 @@ class PackCompilerTest {
                 "{\"item\":\"rope\",\"quantity\":2}", "{\"item\":\"rope\",\"quantity\":20},{\"item\":\"rope\",\"quantity\":13}")))));
     }
 
+    /**
+     * Outcomes may change faction reputation and predicates may read it (P15.2-A): the projection carries typed,
+     * canonical changes, and every bound, duplicate, reference and type error is located.
+     */
+    @Test
+    void validatesQuestReputation() {
+        String ferry = quest("ferry", "{\"ge\":[{\"reputation\":\"guild\"},-5]}").replace("\"consequences\"",
+                "\"reputation\":[{\"faction\":\"guild\",\"delta\":5},{\"faction\":\"fleet\",\"delta\":-25}],\"consequences\"");
+        var files = withFile("quests.json", "quests", envelope(ferry));
+        files.put("factions.json", envelope("""
+                {"id":"guild","kind":"faction","data":{"name":"Guild","description":"Dockers."}},
+                {"id":"fleet","kind":"faction","data":{"name":"Fleet","description":"Sailors."}}"""));
+        var compiled = new PackCompiler().compile(parse(files));
+        var rules = org.rpgengine.quests.QuestRules.from(CampaignPackSnapshot.local(compiled));
+        var outcome = rules.quests().get("ferry").outcomes().getFirst();
+        assertEquals(List.of(new org.rpgengine.quests.QuestRules.ReputationChange("guild", 5),
+                new org.rpgengine.quests.QuestRules.ReputationChange("fleet", -25)), outcome.reputation());
+        assertEquals(new org.rpgengine.quests.QuestPredicate.Operation("ge", List.of(
+                new org.rpgengine.quests.QuestPredicate.Standing("guild"), new org.rpgengine.quests.QuestPredicate.Constant(-5))),
+                rules.quests().get("ferry").availableWhen());
+        // An outcome without the field changes nothing.
+        assertEquals(List.of(), org.rpgengine.quests.QuestRules.from(CampaignPackSnapshot.local(new PackCompiler().compile(
+                parse(withFile("quests.json", "quests", envelope(quest("ferry", "true"))))))).quests().get("ferry")
+                .outcomes().getFirst().reputation());
+        for (String bad : List.of("{\"faction\":\"guild\",\"delta\":0}", "{\"faction\":\"guild\",\"delta\":26}",
+                "{\"faction\":\"guild\",\"delta\":-26}", "{\"faction\":\"guild\"}", "{\"faction\":\"guild\",\"delta\":1,\"x\":1}")) {
+            assertEquals("SCHEMA", failure(withReputation(files, ferry, bad)), bad);
+        }
+        assertEquals("DUPLICATE", failure(withReputation(files, ferry,
+                "{\"faction\":\"guild\",\"delta\":1},{\"faction\":\"guild\",\"delta\":2}")));
+        assertEquals("REFERENCE_KIND", failure(withReputation(files, ferry, "{\"faction\":\"keeper\",\"delta\":1}")));
+        assertEquals("REFERENCE_UNKNOWN", failure(withReputation(files, ferry, "{\"faction\":\"navy\",\"delta\":1}")));
+        // The atom is a number in -100..100 that names a faction and is readable in world scope only.
+        assertEquals("SCHEMA", failure(withFile("quests.json", "quests", envelope(quest("ferry", "{\"reputation\":\"guild\"}")))));
+        assertEquals("REFERENCE_KIND", failure(withFile("quests.json", "quests", envelope(
+                quest("ferry", "{\"ge\":[{\"reputation\":\"keeper\"},1]}")))));
+        rejectsAmount("SCHEMA", "{\"reputation\":\"guild\"}");
+    }
+
+    /** The sources of {@code base} with the ferry quest's reputation list replaced by {@code changes}. */
+    private static Map<String, String> withReputation(Map<String, String> base, String ferry, String changes) {
+        var files = new LinkedHashMap<>(base);
+        files.put("quests.json", envelope(ferry.replace(
+                "{\"faction\":\"guild\",\"delta\":5},{\"faction\":\"fleet\",\"delta\":-25}", changes)));
+        return files;
+    }
+
     /** The reference pack plus a rest rule with the given policy objects (P10.4). */
     private static Map<String, String> withRest(String policies) {
         var files = sources();

@@ -41,6 +41,12 @@ public final class PackCompiler {
      * bounds the rows, ledger entries and events it can write; the quest engine budgets against the same number.
      */
     public static final int MAX_QUEST_REWARD_UNITS = 32;
+    /** Bound of the player's standing with a faction in either direction (P15.2-A); the derived value is clamped to it. */
+    public static final int MAX_REPUTATION = 100;
+    /** Largest change to one faction's standing one quest outcome may make, in either direction (P15.2-A). */
+    public static final int MAX_REPUTATION_DELTA = 25;
+    /** Most factions one quest outcome may change (P15.2-A). */
+    public static final int MAX_REPUTATION_CHANGES = 8;
     private static final Map<String, String> CATEGORY_KINDS = Map.ofEntries(
             Map.entry("locations", "location"), Map.entry("factions", "faction"), Map.entry("creation", "creation"),
             Map.entry("npcs", "npc"), Map.entry("items", "item"), Map.entry("skills", "skill"),
@@ -1840,6 +1846,17 @@ public final class PackCompiler {
                             throw settlement.fail("LIMIT", "rewards", "An outcome rewards at most "
                                     + MAX_QUEST_REWARD_UNITS + " units in total");
                         }
+                    }
+                    // Standing changes toward factions while this outcome is the quest's ending (P15.2-A).
+                    Set<String> factions = new HashSet<>();
+                    for (Fields change : settlement.objects("reputation", 0, MAX_REPUTATION_CHANGES)) {
+                        if (!factions.add(change.ref("faction", FACTION, true))) {
+                            throw change.fail("DUPLICATE", "faction", "An outcome changes each faction at most once");
+                        }
+                        if (change.integer("delta", -MAX_REPUTATION_DELTA, MAX_REPUTATION_DELTA, null) == 0) {
+                            throw change.fail("delta", "A reputation change must not be zero");
+                        }
+                        change.close();
                     }
                     settlement.texts("consequences", 8);
                     settlement.close();
