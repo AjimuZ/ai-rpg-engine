@@ -117,6 +117,13 @@ only the accepted version constraint and retains version 1 seals unchanged.
 
 Serve registered assets with validated MIME type, content hash, containment checks, and `nosniff`. Disallow active SVG scripts or use a validated static subset; a file extension is insufficient. Default CSP permits only required local sources. Remote audio/image origins require an explicit configured allowlist and owner preference, with no arbitrary model-generated URL fetch.
 
+Since P17.1-A (21 November 2026) the route `GET /api/v1/campaigns/{campaignId}/assets/{sha256}` serves media by hash
+only to the owning campaign, with the media type stored after a signature check, `nosniff` and a CSP that allows nothing;
+SVG, markup and unknown formats never enter the registry (`PackMedia.inspectBytes`), and a request for anything the
+campaign is not associated with is a uniform 404. Media are still checked by header only: embedded metadata chunks in a
+registered image are served as stored, and the registry does not strip them (the image adapters of P21.5 do for their own
+output).
+
 Bounded image jobs use a separately verified restricted capability, public appearance inputs, finite budgets and managed temporary/output roots. Do not expose canonical storage, database credentials, private NPC notes or unrestricted developer tools to obtain an illustration. A generated image is untrusted media until validated and registered; it cannot change item data or choose its own serving path. Keep saved originals and subject associations in audience-aware backup/restore, as specified in [presentation assets](23-presentation-assets.md).
 
 P01.6 [records explicit image unavailability](../tools/runtime_probe/IMAGE_CAPABILITY.md)

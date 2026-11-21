@@ -181,6 +181,24 @@ After an entity is admitted and its appearance is public, a job may request one 
 
 Jobs carry stable request identity, category, subject identity, appearance/style revision and source campaign revision. Capture the response, validate MIME/dimensions/byte limits, save to a temporary managed location, hash it, then publish the accepted registry association atomically. A delayed scene result cannot replace the current scene; an old portrait/item result cannot overwrite a newer appearance. Repeated delivery, job retry and save renewal reuse the same accepted association. After an ambiguous provider timeout, reconcile the existing request before spending another generation request; do not claim exactly-once provider billing without supported evidence.
 
+**Asset registry (P17.1-A, 21 November 2026; implemented in the backend, no caller yet):** `org.rpgengine.assets` holds
+the seven categories above (`scene`, `map`, `portrait`, `item`, `ui`, `music`, `effect`; images or audio, never mixed in
+one category) and the registry of V37. `managed_asset` stores validated bytes under their SHA-256, once, with media
+type and declared dimensions; `asset_association` records which hash a campaign shows for one subject (a stable public
+reference) in one category at one appearance revision, with the campaign revision the job was requested at, the pinned
+pack revision and a credit line. Both tables are immutable. `ManagedAssets.publish` gives the rules of the paragraph
+above a tested form: a result for an appearance that is already accepted is `REUSED` and stores nothing, a result for an
+older appearance is `STALE_APPEARANCE`, a result requested under a pack revision the campaign no longer pins is
+`STALE_CONTENT`, and for scenes and maps a result requested before the accepted one is `STALE_SOURCE`. A request newer
+than the campaign is invalid. The media type comes from the bytes' signature and must fit the category, so SVG, markup
+and unknown formats are refused. The route `GET /api/v1/campaigns/{campaignId}/assets/{sha256}` serves by hash and
+only within the campaign (see [docs/13](13-api-and-ui.md#2-proposed-endpoint-families)). The metadata is exactly the hash, media
+facts, public subject reference, revisions and credit; there is no prompt, seed, path or URL column. Not delivered:
+binding authored `asset` files to categories and subjects (pack presentation references remain opaque names), the
+thumbnail variants, a stable-identity lookup for entity artwork and the shop, inventory and equipment icons, rarity and
+frame treatment, the visible credits, and the carriage of the bytes through export and restore (an export carries the
+associations only).
+
 Use a neutral category icon/portrait and visible pending/error state until art is available. Save, purchase, dialogue and combat must remain usable during failure, quota exhaustion, offline periods or policy disablement. Allow explicit retry/change-art actions with budget visibility; do not reroll art on every inspection.
 
 ## 5. Rarity and item presentation

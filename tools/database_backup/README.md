@@ -287,6 +287,14 @@ Rows reference the operation journal and never change, so a restore needs no ret
 checks were updated for the V36 manifest/catalog but were not run in the session that added it; no live V36
 dump/restore rehearsal has been run, and both rehearsals below ran before this table existed.
 
+V37 scope (P17.1-A) adds `managed_asset`, the content-addressed media bytes (up to 32 MiB each, keyed by SHA-256, shared
+across campaigns), and `asset_association`, one immutable row per campaign, category, subject and appearance revision with
+the hash, the revisions and a credit line. Neither holds a prompt, path or credential. Generated images are art the owner
+may want kept, so a dump holding them is larger by their sizes. The association table has no foreign key; its rows name
+a campaign and a hash that a restore must bring along, and the tool dumps both tables whole. The tool and its offline
+checks were updated for the V37 manifest/catalog; `test_backup.py` was not run in the session that added it, and no live
+V37 dump/restore rehearsal has been run.
+
 ## Live two-genre rehearsal (P06.5-B.1, V26)
 
 `tools/container_packaging/test_restore_isolation.py` runs this tool as an operator would on a populated world, then

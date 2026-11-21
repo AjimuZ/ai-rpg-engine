@@ -6947,6 +6947,37 @@ this update. No combat runtime/browser result is claimed.
 **Depends on:** P14; uses P15–P16 metadata. **Areas:** asset registry, theme/layout, optional audio, frontend polish.
 
 - [ ] P17.1 Complete scene/map/portrait/item/UI category handling, stable entity artwork, identifying shop/inventory/equipment icons, accessible rarity/frame treatment, hash-based serving, stale-job protection and visible credits.
+  - P17.1-A (21 November 2026). Partial: the backend asset registry, hash-based serving and stale-job protection. This
+    story does not finish P17.1, so the box stays unchecked.
+    - Delivered: package `org.rpgengine.assets` and migration V37 (`managed_asset`, `asset_association`, both immutable).
+      `AssetCategory` has the seven categories (scene, map, portrait, item, UI, music, effect), each holding images or
+      audio only. `ManagedAssets.publish` takes the media type from the bytes' signature (new
+      `PackMedia.inspectBytes`), judges a result as `ACCEPTED`, `REUSED`, `STALE_APPEARANCE`, `STALE_CONTENT` or
+      `STALE_SOURCE` (scenes and maps only), and stores nothing unless accepted. The V37 insert trigger refuses an older
+      appearance, an unknown campaign or pinned revision and missing bytes. `GET
+      /api/v1/campaigns/{campaignId}/assets/{sha256}?adventureId=` serves a hash only to the owner's campaign that is
+      associated with it or whose pinned pack ships it. The backup tool's table list and schema version were moved to 37.
+    - Exit checks that ran: `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend
+      -Dtest=ManagedAssetsTest,EngineApplicationTest,CampaignExportsTest,CampaignRestoresTest,PackStagingTest` ended
+      `VERIFY PASSED`: 26 tests, 0 failures (ManagedAssetsTest 4, EngineApplicationTest 3, CampaignExportsTest 4,
+      CampaignRestoresTest 3, PackStagingTest 12). Earlier runs of the focused class failed once on a compile error and
+      once on the test's own HTTP reader (chunked bodies); both were fixed and nothing was disabled.
+      `ManagedAssetsTest` covers: first-accepted-wins and the three stale verdicts, an item not ordered by request time,
+      category separation and campaign isolation, the database trigger and immutability refusing the same overwrite
+      by SQL, refusal of mismatched, SVG and malformed input with no row written, real HTTP serving with the stored media
+      type, `nosniff`, CSP and `ETag`, the sealed pack artwork served by its hash, 403/404/400 cases including equal
+      bytes asked for through another campaign, and metadata columns, record components and JSON limited to the
+      allowlist (no prompt, seed, path or URL).
+    - Not run: `verify.sh full` and `verify.sh containers`; `tools/database_backup/test_backup.py` (the shell refused it
+      here), so the V37 backup scope edit is unverified, as is every V36-to-V37 dump and restore.
+    - Not proven or not done: no game flow calls `publish` and the browser does not display the route (P17.6 and
+      the P17.3 layouts); the browser's line-audio request path `/api/v1/assets/<assetId>` is still unserved; authored
+      `asset` files are not bound to categories or subjects; stable entity artwork lookup, shop/inventory/equipment
+      icons, rarity and frame treatment and the visible credits are not built; thumbnails are not made; a campaign
+      export carries associations but not bytes, and a restore of a campaign holding associations was not run, so
+      whether it passes its reference verification is unknown; embedded metadata in a registered image is not
+      stripped; no concurrent publish race was run; and no test outside the five classes named above was re-run, although
+      many truncate lists and table snapshots elsewhere read the schema.
 - [ ] P17.2 Implement optional dynamic music from a reviewed free-license online/local catalog: public-event mood mapping, deliberate activation, stable loops/crossfades, deduplicated cues, volumes, complete current-track/export credits and offline/source-failure fallback under QA-32.
 - [ ] P17.3 Finalize the default visual-novel and alternative text-focused layouts, graphic states, configurable tokens and attributed reading/history/quick-reply behavior.
 - [ ] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.

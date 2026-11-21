@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Managed assets, hash serving and stale-result protection (P17.1-A), 21 November 2026
+
+- The engine now has seven separate asset categories (scene, map, portrait, item, UI, music, effect), each holding
+  only images or only audio, and a registry of validated media with one accepted asset per campaign, category,
+  subject and appearance revision.
+- A late job result is refused as stale when a newer appearance is accepted, when it was requested under a pack
+  revision the campaign no longer pins, or, for scenes and maps, when it was requested before the accepted one. The
+  first accepted result for an appearance stays. A stale result stores nothing.
+- New route `GET /api/v1/campaigns/{campaignId}/assets/{sha256}?adventureId=` serves an asset by its SHA-256, only
+  to the owner of a campaign that is associated with it or whose pinned adventure version ships it, with the stored
+  media type, `nosniff`, a CSP that allows nothing and the hash as the `ETag`.
+- Database migration V37 adds `managed_asset` and `asset_association`, and the backup tool now covers schema 37.
+- Nothing produces or chooses art during play yet: no game flow calls the registry (P17.6), and the interface does
+  not display it.
+
 ## Unreleased — Manual file authoring guide (P16.5-A), 21 November 2026
 
 - New section 11.1 of the adventure pack specification (`docs/09-adventure-packs.md`): a step-by-step guide to

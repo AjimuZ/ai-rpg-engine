@@ -334,6 +334,18 @@ statement with its language, an optional value (`PROPERTY` only) and a reason of
   column, so full-owner exports never copy earlier backups into later ones.
 - `CanonCorrectionsTest` (PostgreSQL, 2 cases) covers QA-27 for claims.
 
+P17.1-A adds the package `org.rpgengine.assets` (V37). `AssetCategory` names the seven categories and the media kind
+each holds. `ManagedAssets.publish(campaign, candidate)` validates bytes by their own signature
+(`PackMedia.inspectBytes`), checks them against the category, and judges the result: `ACCEPTED`, `REUSED` (the same
+appearance is already accepted and stays), `STALE_APPEARANCE`, `STALE_CONTENT` (another pinned pack revision) or
+`STALE_SOURCE` (scenes and maps only: requested before the accepted one). Only an accepted result stores a row. It takes
+the campaign's row lock, and the V37 insert trigger refuses an older appearance, a missing campaign or content
+revision and missing bytes even from a caller that skips the service. `ManagedAssets.serve` and
+`GET /api/v1/campaigns/{campaignId}/assets/{sha256}?adventureId=` return bytes only for a campaign the owner holds that
+is associated with the hash, or whose pinned revision ships an `asset` file of that hash; every other case is
+`404 ASSET_NOT_FOUND`. `managed_asset` has no campaign column, so a full-owner export carries the associations and never
+the bytes. `ManagedAssetsTest` (PostgreSQL and HTTP, 4 cases) covers the above. No game flow calls `publish` yet.
+
 P16.4-A adds the injected `exports.CampaignRestores`, also without a route. `restore(owner, destination, document,
 sha256, identities)` restores one full-owner campaign export as a new campaign of the named, owned destination
 adventure, in one transaction that writes nothing on refusal.

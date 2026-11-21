@@ -66,6 +66,37 @@ public final class PackMedia {
         return new Media(type, size[0], size[1]);
     }
 
+    /**
+     * Validate bytes whose format is decided by their own signature, never by a caller's claim. Used for
+     * media that arrive without a trustworthy file name, such as a generated image (P17.1-A).
+     *
+     * @param bytes complete media bytes
+     * @return the same description {@link #inspect} gives for a file of the detected format
+     * @throws PackException {@code MEDIA_TYPE} when no allowlisted signature matches, {@code MEDIA_LIMIT} for
+     *         oversized files or images
+     */
+    public static Media inspectBytes(byte[] bytes) {
+        String extension;
+        if (startsWith(bytes, 1, "PNG")) {
+            extension = "png";
+        } else if (bytes.length >= 2 && (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xD8) {
+            extension = "jpg";
+        } else if (startsWith(bytes, 0, "RIFF") && startsWith(bytes, 8, "WEBP")) {
+            extension = "webp";
+        } else if (startsWith(bytes, 0, "RIFF") && startsWith(bytes, 8, "WAVE")) {
+            extension = "wav";
+        } else if (startsWith(bytes, 0, "OggS")) {
+            extension = "ogg";
+        } else if (startsWith(bytes, 0, "ID3")
+                || (bytes.length >= 2 && (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xE0) == 0xE0)) {
+            extension = "mp3";
+        } else {
+            throw error("MEDIA_TYPE", "asset", "Asset bytes do not match an allowlisted media type");
+        }
+        // The extension is only a selector for the signature checks inside inspect, which still run in full.
+        return inspect("asset." + extension, bytes);
+    }
+
     /** Return no dimensions when the signature matches, otherwise a MEDIA_TYPE error. */
     private static int[] signature(String path, byte[] bytes, boolean matches) {
         if (!matches) {
