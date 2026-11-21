@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — First-milestone QA matrix rerun (P14.3-A), 21 November 2026
+
+- The checks required for the first playable milestone were run again, and every result is recorded in the roadmap:
+  904 backend tests, 234 interface tests, two backup-restore rehearsals and the runtime probe suite. A packaged start,
+  stop and restart through `./start.sh` kept the saved playthroughs. An English and Italian fight on the Lantern Ford
+  sample in Chrome passed all 80 checks. One short live check of the narration runtime on the owner's account passed
+  and resumed its thread.
+- No behavior changed. The milestone is not yet met. Still open: progression applied after a fight, author-fixed
+  characters and facts, live narration during play, the opt-in Docker lifecycle checks, and the human accessibility,
+  publication and Italian reviews.
+
 ## Unreleased — Backup restore checked in the middle of a fight (P14.2-B), 21 November 2026
 
 - A new automated rehearsal backs up the Lantern Ford sample with the shipped backup tool in the middle of a fight. At

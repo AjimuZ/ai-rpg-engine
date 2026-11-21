@@ -122,7 +122,12 @@ explicitly. It validates correlated completed output before resuming the thread
 in a second stdio process using that volume. Only that verified path reports
 `inferenceVerified: true`. This owner-authenticated neutral stdio path passed; packaged
 runtime/socket restart and broader platform coverage are pending. A live re-check after the
-P01.3 profile reached the account usage limit (`usageLimitExceeded`) and must be repeated.
+P01.3 profile reached the account usage limit (`usageLimitExceeded`). It was repeated on 21 November 2026 (P14.3-A)
+with the command above on the local `ai-rpg-engine-runtime-probe/codex:0.164.0` image, which starts through the same
+`runtime-entrypoint` guard as the packaged runtime image, with `--model gpt-6-luna --effort low`. It passed:
+`inferenceVerified: true`, `status: completed`, `resumed: true`, 80 events, 7 ignored. This shows that the live
+backend accepted the guarded image's neutral task. It does not cover the packaged installation's runtime, which had no
+sign-in, or live narration during play.
 
 ## Isolation profile (P01.3)
 

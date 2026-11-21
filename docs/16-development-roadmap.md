@@ -5723,7 +5723,147 @@ this update. No combat runtime/browser result is claimed.
         restore stays P16.4.
       - No deliberate weakening was run against the new check. `verify.sh full` and `verify.sh containers` were not
         run by this session; the new test runs only in `containers` and in hosted CI's packaging job.
-- [ ] P14.3 Run the required reduced-scope MVP QA matrix and record fresh evidence.
+- [x] P14.3 Run the required reduced-scope MVP QA matrix and record fresh evidence.
+  - P14.3-A (21 November 2026): the MVP matrix of [docs/15 §8](15-quality-and-acceptance.md#8-release-gates)
+    (QA-01–20, QA-23–26, QA-28–30, QA-33–35 and QA-40) was rerun on the working tree, with no source change. Every
+    result below was observed in this session. Many items pass only at the reduced scope, and some are open; those are
+    listed per item and under "Open at MVP scope", so the matrix as a whole is **not** a pass.
+    - **Commands and results** (Windows 11, Docker Desktop Engine 29.9.2, Compose 5.6.1, run one at a time):
+      1. `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=<79 classes named below>`:
+         `VERIFY PASSED`; Maven `Tests run: 904, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`, 01:32 min.
+      2. `... verify.sh frontend`: `VERIFY PASSED`; Vitest `24 passed` files, `234 passed` tests; the localization tool
+         tests 5 pass, 0 fail; `Localization parity: 738 reviewed messages`; production and localized builds pass.
+      3. `py -B -m unittest discover -s tools/container_packaging -p test_sample_restore.py -v`: `Ran 1 test in
+         68.997s`, `OK` (schema 32, 59 tables, 152 rows, 378,550 dump bytes; `operation_random_draw=4`, where P14.2-B
+         saw 6: the dice decide how many draws the fight makes).
+      4. `py -B -m unittest discover -s tools/container_packaging -p test_restore_isolation.py -v`: `Ran 1 test in
+         71.473s`, `OK` (schema 32, 59 tables, 233 rows, 30 rebuilt files).
+      5. `... verify.sh probe`: `VERIFY PASSED`; runtime probe `Ran 116 tests`, `OK (skipped=18)` (the Docker tests),
+         Docker requirement 8, hardware profile on Linux 12 and Compose 2.x rendering 15 tests `OK`.
+      6. One live neutral check on the owner's account volume, through the project's probe only:
+         `py -B tools/runtime_probe/probe.py --timeout 120 live --docker "C:/Program Files/Docker/Docker/resources/bin/docker.exe"
+         --image ai-rpg-engine-runtime-probe/codex:0.164.0 --account-volume rpg-engine-owner-runtime-account --model
+         gpt-6-luna --effort low`: `inferenceVerified: true`, `status: completed`, `resumed: true`, 80 events, 7 ignored,
+         profile `live-container-stdio`. The volume's contents were not read; thread and turn identifiers are not
+         recorded here. The probe image uses the same `runtime-entrypoint` guard as the packaged `rpg-engine/runtime`
+         image (`docker image inspect`); their file contents were not compared.
+      7. `"C:/Program Files/Git/bin/bash.exe" ./start.sh` (images rebuilt from cache, `storage: ready`, `runtime
+         account: NOT signed in`, `gameplay: NOT ready (health group answered 503)`, "not a startup failure"); then
+         `node .agents/ralph/browser/browser.mjs http://127.0.0.1:8080/ --axe` (redirect to `/en/library`, `lang=en`,
+         `axeViolations: []`) and `.../it/library --axe --width 390 --height 844 --reduced-motion` (`lang=it`, title
+         "Biblioteca | Motore di avventure", `axeViolations: []`). Both report one console error, the known
+         `/favicon.ico` 404, which makes the tool exit 1.
+      8. `node .local/scratch/p141a2/journey.mjs` (the P14.1-A.2 Chrome journey, unchanged, on the packaged origin):
+         `RESULT 80/80 passed`. English run: creation, draft, `ENGAGE`, initiative, two strikes, two moves, EN→IT→EN
+         reloads inside the fight, verdict "Fuga" (escape), one `SETTLE_ENCOUNTER`, exploration again. Italian run:
+         verdict "Sconfitta" (defeat) in round 3, settled once. Writes in order: `CREATE, ENGAGE, ROLL_INITIATIVE,
+         MOVE_ZONE, STRIKE, END_ACTIVATION, STRIKE, MOVE_ZONE, SETTLE_ENCOUNTER`; every request identity used once; no
+         request body carried the draft; axe clean at every check point; no horizontal overflow at 390 px. Every action
+         stayed `COMMITTED_NARRATION_PENDING` (no runtime sign-in in the installation).
+      9. `./start.sh --stop` (every service stopped and removed, volumes kept), `./start.sh` again, then a scratch
+         script opened the saved Lantern Ford adventure: 18 playthroughs listed, including "English slice" and "Slice
+         italiana" entries. Their identities were not matched against the run in step 8. Then `./start.sh --stop`.
+      10. After the documentation edits, `... verify.sh repo` (see the last line of this entry).
+    - **Backend classes in step 1, with test counts.** CyberpunkSliceTest 4, NeutralGenreImportTest 4,
+      FirstStartProvisioningTest 7, PackParsingTest 63, PackCompilerTest 22, PackStagingTest 12, ItemCommandsTest 13,
+      CanonicalCommitServiceTest 52, CampaignCommandHttpTest 10, OperationAdmissionServiceTest 26,
+      CommandCanonicalFormTest 10, CommandExecutionTest 6, TypedCommandValidationTest 19, ResolvedCommitTest 7,
+      LocalActionResolverTest 9, IntentContractTest 10, CombatReplyContractTest 6, TacticContractTest 8, PlayPanelsTest
+      11, WorldClockQueriesTest 1, CombatPanelTest 5, GroundedNarrationTest 8, NarrationContractTest 13,
+      RebootRecoveryTest 2, MemoryContinuityTest 13, ContextSelectionTest 7, CombatRecoveryTest 6, InventoryModelTest 10,
+      EquipmentRulesTest 6, CombatMathTest 10, CombatStrikeTest 22, StrikeCommandsTest 19, TacticalCommandsTest 12,
+      CombatRulesTest 7, CombatReactionsTest 56, ReactionCommandsTest 13, CombatEffectsTest 18, EncounterOutcomeTest 33,
+      NegotiationTest 24, NegotiationCommandsTest 9, SettlementCommandsTest 7, OutcomeCommandsTest 7, SettlementTest 5,
+      WithdrawStalemateTest 11, WithdrawCommandsTest 4, EncounterFeasibilityTest 6, ThreatBudgetTest 10,
+      EncounterAdmissionTest 3, DynamicEncounterExitTest 3, AdvancementTest 4, AdvancementPreviewTest 4,
+      KnowledgeLedgerTest 8, ContextAssemblerTest 6, ScopedThreadIsolationTest 2, PresentationScopeResolverTest 5,
+      CampaignStreamHttpTest 4, PublicStreamTest 4, PresentationEventStreamTest 7, CanonicalFoundationsPersistenceTest 16,
+      CampaignCreationHttpTest 21, ScopedSessionsTest 17, ContractSessionScopeTest 5, CodexTaskAdapterTest 16,
+      StdioFrameWireTest 6, UnixSocketFrameWireTest 5, InferenceSchedulerTest 15, AdventureIsolationTest 3,
+      CombatProfileTest 6, EncounterLifecycleTest 3, QuestPredicateTest 6, PackLocalizationTest 40, PresentationEventsTest
+      13, PresentationCuePublicationTest 12, PublicPresentationScopeBuilderTest 7, PresentationJobTest 7,
+      PackagedSecretsTest 4, StartupFailureAnalyzerTest 3, CampaignInterfaceContractTest 1, LocalHttpAdmissionTest 5. The
+      classes were chosen by name and subject for each item; this session did not re-audit which sub-clause of each QA
+      row every test asserts.
+    - **Matrix** (result of this run; "not proven" names what the run did not show):
+      - QA-01 two genres: pass at reduced scope. Backend slices of both fixtures (step 1) and the fantasy slice in Chrome
+        (step 8). Not proven: the cyberpunk slice in a browser (not installable from the packaged image), distinct
+        modules (both packs declare none).
+      - QA-02 invalid pack: pass (pack parsing, compiler and staging classes, step 1).
+      - QA-03 duplicate action: pass. Step 3 retried a tonic use and a quest reward before and after a restore (one item,
+        one reward), on a test-only variant; item and HTTP classes in step 1; in step 8 every request identity was used
+        once. Not proven: a retry over HTTP across a restart of the packaged installation.
+      - QA-04 changed duplicate: pass (admission, canonical-form and HTTP command classes in step 1).
+      - QA-05 illegal proposal: pass for scripted proposals (validation, resolver and contract classes). Not proven: a
+        live model's proposals.
+      - QA-06 read-only inspection: pass (panels and clock-query classes; in step 8 reloads sent no write).
+      - QA-07 player agency: deterministic half only (grounded narration and narration contract classes). Not proven:
+        live narration and its human rubric.
+      - QA-08 fresh thread resume: deterministic half only (reboot and memory continuity classes, scripted narrator).
+        Not proven: a live model after a renewal.
+      - QA-09 combat renewal: pass for state and reconnect (combat recovery class; step 8 reloaded inside the fight,
+        resumed after the saved cursor, sent no write, kept the draft). Not proven: a live narration session renewed
+        inside a fight.
+      - QA-10 inventory coupling: pass (item, inventory and equipment classes).
+      - QA-11 combat arithmetic and dialogue: pass (math, strike, tactical, rules and reaction classes; strikes and moves
+        played in step 8).
+      - QA-12 effect clocks: pass (`CombatEffectsTest` 18).
+      - QA-13 terminal outcomes: pass at reduced scope (outcome, negotiation, settlement and withdraw classes; escape and
+        defeat settled once in step 8). Not shown in a browser this run: victory, surrender, agreement.
+      - QA-14 dynamic encounter bounds: pass (feasibility, threat budget, admission and exit classes).
+      - QA-15 progression: rule level only (advancement and preview classes). Open: under `backend/src/main` only the
+        `progression` package refers to `Advancement`, so nothing in play applies it, and threshold crossing after a
+        played fight is not demonstrated.
+      - QA-16 knowledge isolation: pass for the engine paths tested (knowledge ledger, context assembler, scoped
+        threads, presentation scopes). Not proven: sentinels in live narration; the guide module is not enabled.
+      - QA-17 crash before commit and QA-18 crash after commit: pass (reboot, commit service and combat recovery
+        classes; step 3). Not proven: a killed process (the permit expiry is written by SQL).
+      - QA-19 delivery reconnect: pass (stream classes; frontend session and protocol specs in step 2; step 8 resumed
+        after the cursor). Not proven: a held long poll or chunked delivery in the browser.
+      - QA-20 cross-campaign references: pass (persistence, creation HTTP, admission and scoped session classes).
+      - QA-23 restore rehearsal: pass at reduced scope (steps 3 and 4). Not proven: a fight restored inside a round, a
+        restore through `./start.sh`.
+      - QA-24 process shutdown: partial. Adapter and frame-wire classes and the scheduler passed; step 9 stopped every
+        service cleanly and the saved playthroughs were listed after the restart. Not run: the 18 Docker tests of
+        `tools/runtime_probe` (the command with `RUNTIME_PROBE_DOCKER` set was refused in this session) and the opt-in
+        lifecycle test (`PACKAGING_LIFECYCLE=1`).
+      - QA-25 accessibility: partial. axe clean at every point of step 8 and on both library pages of step 7, 390 px
+        without overflow, Italian with reduced motion, keyboard draft entry. Not proven: a full keyboard-only creation
+        and fight walk-through checked by a person, text zoom, a screen reader (axe is not one).
+      - QA-26 publication: partial. `verify.sh repo` (last line). Not run: a fresh clone and a rights review.
+      - QA-28 containerized startup: partial. Steps 7 and 9: start, stop, start and stop through the root `start.sh`,
+        a clear sign-in and gameplay state, playthroughs kept. Not run: a fresh clone, image recreation with a changed
+        input, restore through the launcher, the `verify.sh containers` profile and the lifecycle test (both exceed a
+        foreground command here).
+      - QA-29 visual-novel reading and quick replies: partial. Frontend specs in step 2; in step 8 the draft and
+        selection survived every reload, a cancelled review sent nothing, and every write needed an explicit
+        confirmation. Not proven: live quick-reply suggestions (no narration runtime in the installation).
+      - QA-30 graphical UI kit: partial. `ui-kit.spec.ts` within step 2 and axe in steps 7–8. Not proven: a contrast and
+        provenance review of every kit asset in this run.
+      - QA-33 independent adventure workspaces: pass at MVP scope (`AdventureIsolationTest` 3, step 4, frontend
+        `campaign-isolation.spec.ts`).
+      - QA-34 author-fixed content and combat variants: partial. The combat-profile half passed (`CombatProfileTest` 6,
+        `EncounterLifecycleTest` 3). Open: no test was found for a required named NPC, its appearance or fixed facts
+        being preserved while only allowed gaps are completed. A search of the backend tests for "author-fixed",
+        "required NPC" and "fixed fact" found only two unrelated helper comments.
+      - QA-35 English and Italian: pass at reduced scope (738-message parity, Italian variant spec, `PackLocalizationTest`
+        40, the Italian cyberpunk slice, the Italian Chrome run with no leaked English sentence). Not proven:
+        independent Italian review, Italian narration, Italian text for the bundled fantasy sample.
+      - QA-40 safe presentation events: pass for the engine and interface units (presentation classes in step 1; cue
+        specs in step 2). Not shown in this run: a cue displayed in the browser.
+      - Also required by §8: "a verified safe Codex profile" — step 6 passed live on the guarded probe image; the
+        packaged installation's own runtime was not signed in, so live narration inside play was not exercised.
+        "Restart/renewal demonstration" — steps 1, 3 and 9 as above, without live narration.
+    - **Open at MVP scope** (for the P14.4 defect list): QA-15 progression from play; QA-34 author-fixed content;
+      live narration in packaged play (QA-07, QA-08, QA-29 suggestions); the Docker-gated checks of QA-24 and QA-28; the
+      human checks of QA-25, QA-26 and QA-35.
+    - **Not proven overall.** `verify.sh full`, `verify.sh containers` and the backend classes outside the 79 named:
+      not run by this session. No deliberate weakening was run. The live check used the owner's quota once, with no
+      overage. Observation: the saved-adventure page still says "Sending actions in the browser is not connected yet."
+      while the live view sends actions; not changed here.
+    - After the documentation edits, `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh repo` printed
+      `VERIFY PASSED` (diff-check, line-endings, repository-checks `all: 0 finding(s)`, repository-tests `Ran 40 tests`
+      `OK (skipped=11)`, backup-tests `Ran 9 tests` `OK (skipped=1)`).
 - [ ] P14.4 Measure baseline latency/context use and list unresolved defects honestly; demonstrate one optional bilingual baseline/planner investigation comparison when available, or record deferred/unavailable planning with the playable fallback. Advanced planning cannot block MVP.
 - [ ] P14.5 Write reproducible setup and an accurate MVP capability table.
 

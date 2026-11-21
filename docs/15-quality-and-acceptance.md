@@ -1,5 +1,22 @@
 # Quality Strategy and Acceptance Criteria
 
+P14.3-A verification (21 November 2026): the reduced-scope MVP matrix of §8 was rerun with fresh evidence; the
+per-item results, exact commands and gaps are in the
+[P14.3 roadmap entry](16-development-roadmap.md#18-p14--playable-mvp-validation). Observed: 904 backend tests in 79
+QA-mapped classes, 234 frontend tests in 24 files with 738-message parity, both restore rehearsals (`test_sample_restore.py`,
+`test_restore_isolation.py`), the runtime probe suite (116 tests, the 18 Docker tests skipped), one live neutral
+runtime check on the owner's account (`inferenceVerified: true`, resumed), a packaged start, stop and restart through
+`./start.sh`, and the bilingual Chrome journey on the packaged origin (80 of 80 checks).
+
+- **Pass at the reduced scope:** QA-01–06, QA-09–14, QA-16–20, QA-23, QA-33, QA-35 and QA-40, each with the limits
+  listed in the roadmap entry.
+- **Deterministic half only:** QA-07 and QA-08 (no live narration in play).
+- **Partial or open:** QA-15 (nothing in play applies `Advancement`), QA-24 and QA-28 (the Docker-gated runtime probe
+  tests, the lifecycle test and `verify.sh containers` were not run), QA-25, QA-26, QA-29 and QA-30 (human, fresh-clone
+  and provenance checks not run; no live quick replies), and QA-34 (no test found for author-fixed NPCs and facts).
+
+The matrix as a whole is therefore not a pass; the open items go to the P14.4 defect list.
+
 P14.2-B verification (21 November 2026): `tools/container_packaging/test_sample_restore.py` with the backend's
 `SampleRestoreCheck` covered QA-03 and QA-23 with a real restore into fresh storage. The run used
 `py -B -m unittest discover -s tools/container_packaging -p test_sample_restore.py -v`: 1 test, OK, 101.8 s, schema
