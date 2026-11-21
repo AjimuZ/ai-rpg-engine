@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "music": {
+    "moods": {
+      "quiet": "exploration",
+      "offered": "tension",
+      "fight": "tension",
+      "won": "exploration",
+      "lost": "exploration",
+      "settled": "exploration"
+    },
+    "tracks": [
+      {
+        "id": "alley-rain",
+        "mood": "exploration",
+        "file": "assets/alley-rain.wav",
+        "title": "Neon Rain",
+        "creator": "Project contributors",
+        "license": "MIT",
+        "source": "Original sample music made by tools/sample-music/make-sample-music.mjs of the project repository",
+        "notices": "Copyright (c) 2026 Project contributors. See the adventure's LICENSE.md.",
+        "modifications": "None: the file is the generator's output, unedited."
+      },
+      {
+        "id": "alley-wires",
+        "mood": "tension",
+        "file": "assets/alley-wires.wav",
+        "title": "Humming Wires",
+        "creator": "Project contributors",
+        "license": "MIT",
+        "source": "Original sample music made by tools/sample-music/make-sample-music.mjs of the project repository",
+        "notices": "Copyright (c) 2026 Project contributors. See the adventure's LICENSE.md.",
+        "modifications": "None: the file is the generator's output, unedited."
+      }
+    ]
+  }
+}

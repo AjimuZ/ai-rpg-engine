@@ -279,6 +279,11 @@ class AdmissionProbeControllerTest {
                     // The stand-in's task has already ended when this could matter.
                 }
             }));
+            // The driver enqueues a claim on its worker, while the image request reaches the coordinator at once.
+            // Waiting here puts the text request in the coordinator first, as the real scheduler's earlier claim
+            // would; otherwise a pass could grant the image first and the interactive text would then preempt it,
+            // ending the image `image-admission-interrupted` (an intended outcome, but not the one this test checks).
+            driver.awaitIdle();
             return handle;
         });
         AdmissionProbeController controller = new AdmissionProbeController(scheduler, images, providing(adapter),
@@ -290,8 +295,8 @@ class AdmissionProbeControllerTest {
             if (System.nanoTime() > deadline) {
                 throw new AssertionError("the probe did not end");
             }
-            // The two requests reach the coordinator in either order. An image granted while the text model is still
-            // held is put back and asks again after the executor's recheck pause, which only the stepped clock passes.
+            // The text request reaches the coordinator first (see the stand-in). An image granted while the text model
+            // is still held is put back and asks again after the executor's recheck pause, which only the stepped clock passes.
             clock.advance(Duration.ofSeconds(10));
             driver.tickNow();
             Thread.sleep(5);

@@ -324,7 +324,9 @@ run can leave them behind without blocking a later run.
 backend's `SampleRestoreCheck` (QA-03, QA-23). The run recorded on 21 November 2026 covered schema 32, 59 tables and
 154 rows, with a 378,636-byte dump.
 
-- The source starts as a packaged first start does. It holds the provisioned `sample:lantern-ford` and a campaign that
+- The source starts as a packaged first start does. It holds the provisioned `sample:lantern-ford` (since P17.2-D, ADR
+  0055, also the second provisioned sample `sample:cyberpunk-neon-alley`, with no campaign; the figures above predate it
+  and were not measured again) and a campaign that
   entered the ford ambush. That campaign's initiative roll was cut off after its dice were reserved and its permit was
   held, so the backup holds an active fight (entered, initiative not yet rolled), a `VALIDATING` attempt, a held permit and
   narration still owed. A supplies variant of the sample, in a second workspace, adds a tonic, coins paid by the

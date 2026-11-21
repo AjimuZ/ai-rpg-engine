@@ -90,6 +90,13 @@ was **not** read, because no image has been built.
 Attribution for a model the owner installs goes to the credits registry of [presentation assets](docs/23-presentation-assets.md).
 This section is a record of what was known and what was not on 31 October 2026, not a legal opinion.
 
-## Music references — optional streaming, no bundled recordings
+## Music references — optional streaming, no bundled third-party recordings
 
 The [dynamic music specification](docs/24-dynamic-music-and-credits.md) records two candidate works by Kevin MacLeod (incompetech.com): [Wholesome](https://commons.wikimedia.org/wiki/File:Wholesome_by_Kevin_MacLeod.ogg), declared [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), and [Darkest Child, ISRC USUAN1100783](https://commons.wikimedia.org/wiki/File:Darkest_Child_%28ISRC_USUAN1100783%29.mp3), declared [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). Source/file-page declarations were checked on 23 October 2026. Since P17.2-B the optional music player can stream these two recordings from Wikimedia Commons after the player turns music on (credits are shown in the player and its Music credits list); no recording is bundled, copied, modified or installed, and real-host playback was not verified. Before admitting another recording, retain the selected recording's complete rights evidence, exact license version, source and any processing notice. The project's MIT license does not relicense that music.
+
+Since P17.2-D the bundled sample adventure ships two original audio files, `assets/ford-dusk.wav` and
+`assets/ford-stones.wav`. They are not third-party material: `tools/sample-music/make-sample-music.mjs` renders them from
+note lists written in that script, with no download, sample library or third-party input, and they are covered by the
+sample's MIT license (`backend/src/main/resources/sample-adventure/LICENSE.md`). The second bundled sample (ADR 0055)
+ships `assets/alley-rain.wav` and `assets/alley-wires.wav`, made by the same script in the same way and covered by its
+own MIT license (`backend/src/main/resources/sample-adventure-2/LICENSE.md`).

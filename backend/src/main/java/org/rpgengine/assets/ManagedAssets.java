@@ -51,6 +51,10 @@ public class ManagedAssets {
             + "coalesce((f->>'height')::int, 0), (f->>'bytes')::bigint from content_revision_report r, "
             + "jsonb_array_elements(r.report->'files') f where r.content_revision_id = ? and f->>'path' = ? "
             + "and f->>'category' = 'asset' and f->>'mediaType' like 'image/%'";
+    /** Sealed audio files of one pack revision, as its import report recorded them. */
+    private static final String AUTHORED_AUDIO = "select f->>'sha256', f->>'mediaType' from content_revision_report r, "
+            + "jsonb_array_elements(r.report->'files') f where r.content_revision_id = ? and f->>'path' = ? "
+            + "and f->>'category' = 'asset' and f->>'mediaType' like 'audio/%'";
     private final JdbcTemplate jdbc;
     private final PackRegistry packs;
     private final TransactionTemplate transaction;
@@ -278,6 +282,65 @@ public class ManagedAssets {
                     revision, binding.file()).stream().findFirst().ifPresent(found::add);
         }
         return found;
+    }
+
+    /**
+     * A pack's music declaration as the client receives it (P17.2-D).
+     *
+     * @param moods public state to mood for the states the pinned pack declares, in public-state order; empty when it
+     *        declares no policy
+     * @param tracks the pack's tracks whose file is a sealed audio asset of the pinned revision
+     */
+    public record MusicListing(java.util.Map<String, String> moods, java.util.List<MusicTrack> tracks) {
+    }
+
+    /**
+     * One pack track with the hash {@link #serve} accepts for it.
+     *
+     * @param track the declaration, credits included
+     * @param licenseUrl exact text URL of the track's license
+     * @param sha256 lower-case SHA-256 of the sealed file
+     * @param mediaType its canonical audio media type
+     */
+    public record MusicTrack(PackPresentation.Track track, String licenseUrl, String sha256, String mediaType) {
+    }
+
+    /**
+     * Read the mood policy and authored tracks of the campaign's pinned pack revision. The policy is part of the sealed
+     * revision, so it cannot change under a campaign; it maps only closed public states (see
+     * {@link PackPresentation.Music}). Reading changes nothing.
+     *
+     * @param owner owner asking, from local admission
+     * @param adventure adventure workspace the campaign belongs to
+     * @param campaign campaign scope
+     * @return the listing (empty policy and no tracks for a pack that declares none or cannot be loaded here), or empty
+     *         when the owner, adventure or campaign do not match
+     * @throws org.springframework.dao.DataAccessException when storage fails
+     */
+    public Optional<MusicListing> music(UUID owner, UUID adventure, UUID campaign) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(adventure, "adventure");
+        Objects.requireNonNull(campaign, "campaign");
+        return reads.execute(status -> {
+            UUID revision = pinnedRevision(owner, adventure, campaign);
+            if (revision == null) {
+                return Optional.<MusicListing>empty();
+            }
+            PackPresentation.Music declared;
+            try {
+                declared = packs.loadForCampaign(adventure, revision).root().presentation().music();
+            } catch (PackException | IllegalStateException failure) {
+                // Music is optional: a pack that cannot be loaded here plays the default policy and no own track.
+                return Optional.of(new MusicListing(java.util.Map.of(), java.util.List.of()));
+            }
+            var tracks = new java.util.ArrayList<MusicTrack>();
+            for (PackPresentation.Track track : declared.tracks()) {
+                jdbc.query(AUTHORED_AUDIO, (rs, n) -> new MusicTrack(track,
+                        PackPresentation.TRACK_LICENSES.get(track.license()), rs.getString(1), rs.getString(2)),
+                        revision, track.file()).stream().findFirst().ifPresent(tracks::add);
+            }
+            return Optional.of(new MusicListing(declared.moods(), java.util.List.copyOf(tracks)));
+        });
     }
 
     /** The pack revision the owner's campaign pins, or null when owner, adventure and campaign do not line up. */

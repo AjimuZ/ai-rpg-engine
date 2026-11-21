@@ -3,3 +3,5 @@
 
 # Preserve the conceptual UI image as a binary asset.
 *.png binary
+# Generated sample audio is byte-exact and must never be normalized.
+*.wav binary

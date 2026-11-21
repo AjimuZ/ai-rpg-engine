@@ -1,0 +1,9 @@
+{"schemaVersion":1,"definitions":[
+{"id":"deck","kind":"item","data":{"name":"Cyberdeck","description":"A portable intrusion rig.","itemType":"tool","maxStack":1,
+  "rarity":"street","appearance":{"id":"deck.chrome","summary":"A scuffed chrome deck with a cracked screen."}}},
+{"id":"pistol","kind":"item","data":{"value":30,"name":"Machine Pistol","description":"Compact and loud.","itemType":"weapon","slot":"main-hand","hands":1,
+  "combat":{"attack":{"attribute":"force","skill":"shooting","damage":{"count":1,"sides":6}}},
+  "tags":["weapon"],"rarity":"street","appearance":{"id":"pistol.matte","summary":"A matte black machine pistol."}}},
+{"id":"jacket","kind":"item","data":{"value":15,"name":"Armored Jacket","description":"Synthetic weave.","itemType":"armor","slot":"body","rarity":"street",
+  "combat":{"armor":1},
+  "appearance":{"id":"jacket.synth","summary":"A glossy synthetic jacket."}}}]}

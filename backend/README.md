@@ -336,6 +336,13 @@ statement with its language, an optional value (`PROPERTY` only) and a reason of
   column, so full-owner exports never copy earlier backups into later ones.
 - `CanonCorrectionsTest` (PostgreSQL, 2 cases) covers QA-27 for claims.
 
+P17.2-D adds the optional `music` object to `PackPresentation` (`Music`: a mood policy over `PUBLIC_STATES` and credited
+`Track`s bound to listed audio assets, licenses in `TRACK_LICENSES`), `ManagedAssets.music(owner, adventure, campaign)` and
+`GET /api/v1/campaigns/{campaignId}/music?adventureId=` (policy, tracks with their sealed hash and media type, or `404
+ASSET_NOT_FOUND`). The bundled sample declares a policy and two original WAV loops. `PackPresentationTest` gains
+`readsAMoodPolicyAndCreditedTracks` and `refusesMusicThatCouldNameHiddenStateOrLacksCredits`; `ManagedAssetsTest` gains
+`deliversThePackMoodPolicyAndItsTracks`.
+
 P17.1-B adds `ManagedAssets.artwork(owner, adventure, campaign)` and `GET /api/v1/campaigns/{campaignId}/artwork?adventureId=`:
 the newest accepted association of each category and subject (at most 500) of a campaign the owner holds, with its hash,
 media facts and credit, or `404 ASSET_NOT_FOUND`. `ManagedAssetsTest` gains `listsTheArtworkInForcePerSubject`.
@@ -632,7 +639,13 @@ different owner stops startup. Since P15.5-A the workspace's title and genre lab
 are read from the bundled manifest (its `title` and first `contentGuidance.themes`
 entry, else `adventure`), so the engine code names no adventure; the Lantern Ford
 sample is therefore listed with the genre `travel`, where earlier builds wrote
-`fantasy`. Existing workspaces keep their stored labels.
+`fantasy`. Existing workspaces keep their stored labels. Since P17.2-D
+([ADR 0055](../docs/adr/0055-first-start-seals-two-neutral-sample-adventures.md)) a fresh
+owner receives two sample workspaces, created together: the one above and one for
+`sample:cyberpunk-neon-alley` ("Neon Alley", `src/main/resources/sample-adventure-2/`,
+English with a reviewed Italian overlay, genre `city`). An owner who already has a
+workspace, including an installation provisioned earlier with Lantern Ford only, keeps
+what it has and gets no second sample.
 Bootstrap returns a CSRF token and a separate HttpOnly SameSite=Strict cookie;
 send both plus the exact Origin with UTF-8 JSON creation requests. Sessions
 expire after 30 minutes or process restart, with at most 32 live sessions and

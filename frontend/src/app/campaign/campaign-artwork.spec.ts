@@ -153,6 +153,26 @@ describe('Item artwork in the playthrough view', /** The panels show the stable 
     expect(credits).toContain('Mira portrait, CC0');
   });
 
+  it('reads the pack music once and lists its own track in the music credits; an unreadable listing changes nothing else (P17.2-D)', async () => {
+    const track = { id: 'ford-dusk', mood: 'exploration', title: 'Ford at Dusk', creator: 'Project contributors', license: 'MIT',
+      licenseUrl: 'https://opensource.org/license/mit', source: 'Original sample music', notices: 'Copyright notice.', modifications: 'None.',
+      sha256: HASH_B, mediaType: 'audio/wav' };
+    server.musicBody = { scope: { adventureId: ADVENTURE, campaignId: CAMPAIGN }, policy: { fight: 'tension' }, tracks: [track] };
+    const root = await open((page) => page.querySelector('[data-music-credit="pack:ford-dusk"]') !== null);
+    expect(root.querySelector('[data-music-credit="pack:ford-dusk"]')!.textContent).toContain('Original sample music');
+    expect(server.calls.filter((url) => url.includes('/music?'))).toEqual([`/api/v1/campaigns/${CAMPAIGN}/music?adventureId=${ADVENTURE}`]);
+    // Nothing is fetched for the track before the player turns music on.
+    expect(server.calls.some((url) => url.includes(`/assets/${HASH_B}`))).toBe(false);
+    TestBed.resetTestingModule();
+    server = new CampaignServer();
+    server.musicBody = { code: 'ASSET_STORAGE_UNAVAILABLE' };
+    TestBed.configureTestingModule({ providers: [provideRouter(routes), { provide: LIBRARY_FETCH, useValue: server.fetch },
+      { provide: STORY_DRAFT_STORAGE, useValue: new MemoryStore() }, syncProvider(new MemoryStore())] });
+    const plain = await open((page) => page.querySelector('[data-item="sword"]') !== null && server.calls.some((url) => url.includes('/music?')));
+    expect(plain.querySelector('[data-music-credit^="pack:"]')).toBeNull();
+    expect(plain.querySelector('[data-music-credit="wholesome"]')).not.toBeNull();
+  });
+
   it('shows no gallery when no scene, map, portrait or interface image is in force', /** An empty section would be noise. */ async () => {
     server.artworkBody = listing(entry({ subject: 'sword' }));
     const root = await open((page) => page.querySelector('[data-item="sword"] img') !== null);

@@ -41,6 +41,7 @@ import org.rpgengine.commands.OperationAdmissionService;
 import org.rpgengine.commands.OperationStatus;
 import org.rpgengine.commands.TypedCommand;
 import org.rpgengine.content.PackException;
+import org.rpgengine.content.PackPresentation;
 import org.rpgengine.content.PackRegistry;
 import org.rpgengine.content.PackStaging;
 import org.rpgengine.presentation.SupportedLocale;
@@ -314,6 +315,57 @@ class ManagedAssetsTest {
         assertEquals(403, get(path, null).status());
         assertEquals(404, get("/api/v1/campaigns/" + campaign + "/artwork?adventureId=" + otherAdventure, cookie).status());
         assertEquals(400, get("/api/v1/campaigns/" + campaign + "/artwork", cookie).status());
+    }
+
+    /**
+     * The music route delivers the pinned pack's mood policy over the closed public states and its own tracks with
+     * complete credits and the hash the asset route serves; nothing else is in the body (P17.2-D).
+     */
+    @Test
+    void deliversThePackMoodPolicyAndItsTracks() throws Exception {
+        String cookie = session();
+        String path = "/api/v1/campaigns/" + campaign + "/music?adventureId=" + adventure;
+        Reply reply = get(path, cookie);
+        assertEquals(200, reply.status(), reply.head());
+        String text = new String(reply.body(), StandardCharsets.UTF_8);
+        var body = JSON.readTree(text);
+        assertEquals(Set.of("scope", "policy", "tracks"), Set.copyOf(body.propertyNames()));
+        assertEquals(campaign.toString(), body.get("scope").get("campaignId").asString());
+        var policy = body.get("policy");
+        assertEquals(PackPresentation.PUBLIC_STATES, List.copyOf(policy.propertyNames()), "every public state, in order");
+        assertEquals("tension", policy.get("offered").asString());
+        assertEquals("tension", policy.get("fight").asString());
+        assertEquals("exploration", policy.get("quiet").asString());
+        var tracks = body.get("tracks");
+        assertEquals(2, tracks.size());
+        var dusk = tracks.get(0);
+        assertEquals(Set.of("id", "mood", "title", "creator", "license", "licenseUrl", "source", "notices", "modifications",
+                "sha256", "mediaType"), Set.copyOf(dusk.propertyNames()));
+        assertEquals("ford-dusk", dusk.get("id").asString());
+        assertEquals("exploration", dusk.get("mood").asString());
+        assertEquals("MIT", dusk.get("license").asString());
+        assertEquals("https://opensource.org/license/mit", dusk.get("licenseUrl").asString());
+        assertEquals("audio/wav", dusk.get("mediaType").asString());
+        assertTrue(dusk.get("source").asString().contains("make-sample-music.mjs"));
+        assertEquals("tension", tracks.get(1).get("mood").asString());
+        byte[] audio = resource("/sample-adventure/assets/ford-dusk.wav");
+        assertEquals(ManagedAssets.sha256(audio), dusk.get("sha256").asString());
+        Reply served = get("/api/v1/campaigns/" + campaign + "/assets/" + dusk.get("sha256").asString() + "?adventureId="
+                + adventure, cookie);
+        assertEquals(200, served.status(), served.head());
+        assertTrue(served.head().toLowerCase().contains("content-type: audio/wav"), served.head());
+        assertArrayEquals(audio, served.body());
+        // Nothing hidden: no encounter, participant, location or other definition of the pack is named.
+        for (String hidden : new String[] {"ford-ambush", "ford-camp", "stepping", "health", "cudgel", "drive-off", "http://", "path"}) {
+            assertFalse(text.contains(hidden), hidden);
+        }
+
+        assertEquals(403, get(path, null).status());
+        assertEquals(404, get("/api/v1/campaigns/" + campaign + "/music?adventureId=" + otherAdventure, cookie).status());
+        assertEquals(404, get("/api/v1/campaigns/" + UUID.randomUUID() + "/music?adventureId=" + adventure, cookie).status());
+        assertEquals(400, get("/api/v1/campaigns/" + campaign + "/music", cookie).status());
+        assertEquals(400, get("/api/v1/campaigns/" + campaign + "/music?adventureId=" + adventure.toString().toUpperCase(),
+                cookie).status());
     }
 
     /** Stored columns, the metadata record and the served headers hold only the allowlist; no free text but a credit. */

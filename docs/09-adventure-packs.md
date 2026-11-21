@@ -244,6 +244,21 @@ depict: `{"category": "item", "subject": "sword", "file": "assets/sword.png", "c
 example. The `assets` list above stays opaque names; bindings name files directly. The asset registry lists the bindings
 with a campaign's artwork ([docs/23](23-presentation-assets.md#4-bounded-generation-during-play)).
 
+**Music policy and tracks (P17.2-D).** An optional `music` object declares the pack's mood policy and its own credited
+recordings ([ADR 0054](adr/0054-packs-declare-a-closed-mood-policy-and-their-own-credited-tracks.md)):
+`{"moods": {"offered": "tension", "fight": "tension"}, "tracks": [{"id", "mood", "file", "title", "creator", "license",
+"source", "notices", "modifications"}]}`. `moods` keys must be among the closed public states `quiet`, `offered`, `fight`,
+`won`, `lost` and `settled` (any other key is an unknown field), and values among the moods `exploration`, `dialogue`,
+`rest`, `tension`, `combat`, `victory`, `defeat`; an undeclared state keeps the client default. A track's `file` must be a
+manifest file of category `asset` with an `.ogg`, `.mp3` or `.wav` extension (`FILE_REFERENCE`), its `mood` one of the
+moods, at most one track per mood (`DUPLICATE`, so at most seven tracks), its `license` one of `CC0-1.0`, `CC-BY-3.0`,
+`CC-BY-4.0` or `MIT`, and every credit text 1 to 200 characters without control characters. `source` is plain text, never a
+URL to fetch. Unknown keys are refused, and diagnostics are located and never repeat the value. The policy is part of the
+sealed revision, so a campaign keeps its pinned pack's policy. `GET /api/v1/campaigns/{campaignId}/music` delivers it
+([docs/13](13-api-and-ui.md)), and the `presentation.json` of each bundled sample (`sample-adventure/` and, since
+[ADR 0055](adr/0055-first-start-seals-two-neutral-sample-adventures.md), `sample-adventure-2/`) is a working example with
+two original WAV loops made by `node tools/sample-music/make-sample-music.mjs`.
+
 `CompiledPack.presentation()` returns the immutable declaration and so reaches `CampaignPackSnapshot`.
 It is internal content like the rest of the compiled pack. `PresentationScopeResolver` (P05.7-B.1.2.3.1)
 builds the per-audience `PublicPresentationScope` of a committed operation from it: an actor appears only

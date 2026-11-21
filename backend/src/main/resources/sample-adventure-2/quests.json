@@ -1,0 +1,6 @@
+{"schemaVersion":1,"definitions":[
+{"id":"data-run","kind":"quest","data":{"name":"Reach the Data Dock","summary":"Get past the lane to the data dock.",
+  "initialStatus":"available",
+  "objectives":[{"id":"reach","description":"Reach the data dock.","when":{"visited":"data-dock"}}],
+  "outcomes":[{"id":"arrived","kind":"success","when":{"objective":{"quest":"data-run","id":"reach"}},
+    "settlement":{"consequences":["The data dock is now known."]}}]}}]}

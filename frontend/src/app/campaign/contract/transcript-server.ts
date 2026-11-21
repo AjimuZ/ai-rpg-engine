@@ -72,6 +72,11 @@ export class TranscriptServer {
       // one read is answered with the empty listing the real route returns for a campaign without artwork. Nothing else is invented.
       return Promise.resolve(new Response(JSON.stringify({ scope: SCOPE, artwork: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     }
+    if (!answer && method === 'GET' && path === `/api/v1/campaigns/${CAMPAIGN}/music?adventureId=${ADVENTURE}`) {
+      // The music listing (P17.2-D) also postdates the transcript; it is answered with what the real route returns for a pack
+      // that declares no music: no policy and no track.
+      return Promise.resolve(new Response(JSON.stringify({ scope: SCOPE, policy: null, tracks: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    }
     if (!answer) {
       this.unrecorded.push(`${method} ${path}`);
       return Promise.reject(new TypeError('Request was not recorded from the real server'));

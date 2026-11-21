@@ -17,7 +17,7 @@
  *   recording is substituted. {@link MusicPlayer.activate} is the explicit retry.
  * - Music never affects the story: no method throws into rendering and nothing here reads or sends story text.
  */
-import { computed, inject, Injectable, InjectionToken, signal } from '@angular/core';
+import { computed, DestroyRef, inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { admitLocal, Mood, mediaUrl, MUSIC_CATALOG, MusicRecording, recordingFor } from './music-catalog';
 
 /** The part of an audio element this controller uses; a test replaces the real element. */
@@ -106,6 +106,8 @@ export class MusicPlayer {
    * nothing reads it; it is the control a later effects player must obey.
    */
   readonly effectsVolume = signal(DEFAULT_VOLUME);
+  /** Tracks the current scope's pack ships (P17.2-D); empty for another scope or a pack without music. */
+  readonly packTracks = signal<readonly MusicRecording[]>([]);
   /** The recording that is audible or fading in; null in silence. */
   readonly current = signal<MusicRecording | null>(null);
   /** Recordings that actually started for the current scope, in first-played order and without repeats (for credits). */
@@ -120,6 +122,10 @@ export class MusicPlayer {
   });
 
   private scope: string | null = null;
+  /** Scope whose pack tracks were offered last; they apply only while that scope is current. */
+  private packScope: string | null = null;
+  /** Null while that scope's pack listing is still being read: no track is chosen for it until it is known. */
+  private offeredTracks: readonly MusicRecording[] | null = [];
   private mood: Mood | null = null;
   private wanted: MusicRecording | null = null;
   private active: Slot | null = null;
@@ -135,6 +141,9 @@ export class MusicPlayer {
     this.muted.set(saved.muted);
     this.volume.set(saved.volume);
     this.effectsVolume.set(saved.effects);
+    // When its injector is destroyed (a test module reset, an application teardown) the player pauses every source and
+    // stops its fade timer, so no element or interval outlives it and keeps a test run from exiting.
+    inject(DestroyRef).onDestroy(/** Release audio and timer. */ () => { this.silence(); this.scope = null; this.mood = null; this.wanted = null; });
   }
 
   /**
@@ -150,10 +159,39 @@ export class MusicPlayer {
       this.mood = null;
       this.problem.set(null);
       this.used.set([]);
+      this.packTracks.set(this.packScope === scope ? this.offeredTracks ?? [] : []);
     }
     if (mood === this.mood) return;
     this.mood = mood;
-    this.wanted = recordingFor(mood, this.catalog) ?? null;
+    this.choose();
+  }
+
+  /**
+   * Offer the tracks a scope's pack ships (P17.2-D). They are preferred over local and online records of the same mood
+   * while that scope is current, and dropped when another scope is cued. `null` means the scope's listing is still being
+   * read: until it is known nothing is chosen for that scope, so a switch never fetches a catalog track (possibly from the
+   * online host) that the pack's own track would replace a moment later. Offering the same tracks again restarts nothing;
+   * a different set re-chooses the current mood's track under the usual crossfade and failure rules. A scope that is cued
+   * without any offer plays the local and online records.
+   */
+  offer(scope: string, tracks: readonly MusicRecording[] | null): void {
+    const same = this.packScope === scope && JSON.stringify(this.offeredTracks) === JSON.stringify(tracks);
+    this.packScope = scope;
+    this.offeredTracks = tracks;
+    if (same || scope !== this.scope) return;
+    this.packTracks.set(tracks ?? []);
+    if (this.mood !== null) this.choose();
+  }
+
+  /** Pick the current mood's track from pack, local and online records, and move to it when music may sound. */
+  private choose(): void {
+    if (this.mood === null) return;
+    if (this.packScope === this.scope && this.offeredTracks === null) {
+      // The pack listing of this scope is not known yet: stay silent rather than start a track it may replace.
+      this.wanted = null;
+      return;
+    }
+    this.wanted = recordingFor(this.mood, [...this.packTracks(), ...this.catalog]) ?? null;
     // A denied playback is not retried by a mood change: only a new click (activate) tries again.
     if (this.playable() && this.problem() !== 'blocked') this.transition(this.wanted);
   }
@@ -353,7 +391,12 @@ export class MusicPlayer {
       for (const slot of [this.active, this.outgoing]) {
         if (slot) slot.level = slot.goal === 1 ? Math.min(FADE_STEPS, slot.level + 1) : Math.max(0, slot.level - 1);
       }
-      if (this.outgoing && this.outgoing.level === 0) { this.drop(this.outgoing); this.outgoing = null; }
+      if (this.outgoing && this.outgoing.level === 0) {
+        // The last step is silence itself: set it before pausing, so the source never stops at an audible level.
+        this.outgoing.audio.volume = 0;
+        this.drop(this.outgoing);
+        this.outgoing = null;
+      }
       this.applyVolume();
       if (!this.outgoing && (!this.active || this.active.level === FADE_STEPS)) { this.stopTick?.(); this.stopTick = null; }
     }, STEP_MS);

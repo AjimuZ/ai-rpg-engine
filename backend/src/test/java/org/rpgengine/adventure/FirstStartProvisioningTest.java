@@ -13,6 +13,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.rpgengine.assets.ManagedAssets;
 import org.rpgengine.campaign.CampaignCreationService;
 import org.rpgengine.campaign.CampaignProjectionService;
 import org.rpgengine.campaign.CharacterChoices;
@@ -29,10 +30,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Real PostgreSQL acceptance of first-start provisioning (P14.1-A.1, ADR 0046): the configured owner, its
- * sample workspace and the sealed bundled adventure are created once and never again; an owner who already
- * has adventures gets no sample; a database of another owner refuses provisioning; and a campaign created
- * from the provisioned revision enters the bundled encounter at its starting location through production code.
+ * Real PostgreSQL acceptance of first-start provisioning (P14.1-A.1, ADR 0046, ADR 0055): the configured owner,
+ * one workspace per bundled sample and their sealed adventures are created once and never again; an owner who
+ * already has adventures gets no sample; a database of another owner refuses provisioning; a campaign created
+ * from the provisioned fantasy revision enters the bundled encounter at its starting location through production
+ * code; and the second sample opens in Italian.
  * Provisioning is disabled by default in tests, so each case calls it directly.
  */
 @SpringBootTest
@@ -46,6 +48,7 @@ class FirstStartProvisioningTest {
     @Autowired private CampaignProjectionService projections;
     @Autowired private ResumeCards resumeCards;
     @Autowired private PlayPanels playPanels;
+    @Autowired private ManagedAssets assets;
 
     /** Construct the injected fixture; missing database infrastructure fails startup. */
     FirstStartProvisioningTest() { }
@@ -72,25 +75,91 @@ class FirstStartProvisioningTest {
                 + "identity_owner_profile");
     }
 
-    /** The first call creates all three; a restart (here two more calls) creates nothing and finds the same rows. */
+    /**
+     * The first call creates the owner and both bundled samples (ADR 0055), each in its own workspace; a restart (here
+     * two more calls) creates nothing and finds the same rows.
+     */
     @Test
-    void provisioningCreatesOneOwnerWorkspaceAndAdventureAndRepeatsAsNothing() {
+    void provisioningCreatesOneOwnerAndBothSamplesAndRepeatsAsNothing() {
+        UUID fantasy = FirstStartProvisioning.sampleWorkspace(OWNER);
+        UUID city = FirstStartProvisioning.sampleWorkspace(OWNER, 1);
         var first = provisioning.provision(OWNER);
-        assertEquals(new FirstStartProvisioning.Result(true, true, true, FirstStartProvisioning.sampleWorkspace(OWNER)),
-                first);
-        var unchanged = new FirstStartProvisioning.Result(false, false, false, first.workspaceId());
+        assertEquals(new FirstStartProvisioning.Result(true, List.of(new FirstStartProvisioning.Sample(fantasy, true, true),
+                new FirstStartProvisioning.Sample(city, true, true)), fantasy), first);
+        assertEquals(fantasy, first.workspaceId());
+        var unchanged = new FirstStartProvisioning.Result(false, List.of(new FirstStartProvisioning.Sample(fantasy, false, false),
+                new FirstStartProvisioning.Sample(city, false, false)), fantasy);
         assertEquals(unchanged, provisioning.provision(OWNER));
         assertEquals(unchanged, provisioning.provision(OWNER));
         assertEquals(List.of(OWNER), jdbc.queryForList("select id from identity_owner_profile", UUID.class));
-        assertEquals(List.of(first.workspaceId()),
-                jdbc.queryForList("select id from adventure_workspace where owner_id = ?", UUID.class, OWNER));
-        assertEquals(List.of(Map.of("pack_id", "sample:lantern-ford", "pack_version", "1.0.0")),
-                jdbc.queryForList("select pack_id, pack_version from content_revision"));
-        assertEquals(1, jdbc.queryForObject("select count(*) from content_revision_report", Integer.class),
-                "the revision is sealed");
-        // Both labels come from the bundled manifest (P15.5-A): its title and its first content theme.
-        assertEquals(Map.of("title", "Lantern Ford", "genre", "travel"),
-                jdbc.queryForMap("select title, genre from adventure_workspace"));
+        assertEquals(java.util.Set.of(fantasy, city), java.util.Set.copyOf(
+                jdbc.queryForList("select id from adventure_workspace where owner_id = ?", UUID.class, OWNER)));
+        assertEquals(List.of(Map.of("adventure_id", city, "pack_id", "sample:cyberpunk-neon-alley", "pack_version", "1.0.0"),
+                Map.of("adventure_id", fantasy, "pack_id", "sample:lantern-ford", "pack_version", "1.0.0")),
+                jdbc.queryForList("select adventure_id, pack_id, pack_version from content_revision order by pack_id"));
+        assertEquals(2, jdbc.queryForObject("select count(*) from content_revision_report", Integer.class),
+                "both revisions are sealed");
+        // The labels come from each bundled manifest (P15.5-A): its title and its first content theme.
+        assertEquals(List.of(Map.of("title", "Lantern Ford", "genre", "travel"), Map.of("title", "Neon Alley", "genre", "city")),
+                jdbc.queryForList("select title, genre from adventure_workspace order by title"));
+    }
+
+    /**
+     * A fresh start interrupted after the workspace step (both workspaces are inserted in one transaction) is
+     * repaired: the next start seals each empty workspace once, and the one after creates nothing.
+     */
+    @Test
+    void emptySampleWorkspacesOfAFreshStartAreCompletedOnTheNextStart() {
+        jdbc.update("insert into identity_owner_profile (id, display_name, ui_locale, created_at, updated_at) "
+                + "values (?, 'Owner', 'en', now(), now())", OWNER);
+        UUID fantasy = FirstStartProvisioning.sampleWorkspace(OWNER);
+        UUID city = FirstStartProvisioning.sampleWorkspace(OWNER, 1);
+        for (UUID workspace : List.of(fantasy, city)) {
+            jdbc.update("insert into adventure_workspace (id, owner_id, title, genre, source_locale, created_at, updated_at) "
+                    + "values (?, ?, 'Sample', 'adventure', 'en', now(), now())", workspace, OWNER);
+        }
+        assertEquals(new FirstStartProvisioning.Result(false, List.of(new FirstStartProvisioning.Sample(fantasy, false, true),
+                new FirstStartProvisioning.Sample(city, false, true)), fantasy), provisioning.provision(OWNER));
+        assertEquals(2, jdbc.queryForObject("select count(*) from content_revision", Integer.class));
+        provisioning.provision(OWNER);
+        assertEquals(2, jdbc.queryForObject("select count(*) from content_revision", Integer.class));
+    }
+
+    /**
+     * The second sample ships in Italian too (ADR 0055): its pack is listed with its own metadata, and a playthrough
+     * created from it in Italian opens at the tram stop with the reviewed Italian opening text and no fallback, while
+     * the fantasy sample's workspace lists only its own pack.
+     */
+    @Test
+    void theSecondSampleIsListedAndOpensInItalian() {
+        provisioning.provision(OWNER);
+        UUID city = FirstStartProvisioning.sampleWorkspace(OWNER, 1);
+        var listing = packs.list(OWNER, city, null, 50);
+        assertEquals(1, listing.packs().size());
+        var pack = listing.packs().getFirst();
+        assertEquals(List.of("sample:cyberpunk-neon-alley", "Neon Alley", "en", "MIT"),
+                List.of(pack.packId(), pack.title(), pack.sourceLocale(), pack.license()));
+        assertEquals(List.of("sample:lantern-ford"), packs.list(OWNER, FirstStartProvisioning.sampleWorkspace(OWNER), null, 50)
+                .packs().stream().map(InstalledPackService.Pack::packId).toList());
+        var created = creation.create(OWNER, city, new CampaignCreationService.Request(UUID.randomUUID(),
+                pack.contentRevisionId(), "Turno di notte", SupportedLocale.IT,
+                new CharacterChoices("Giocatore", null, Map.of(), Map.of(), null, null)));
+        var state = projections.read(OWNER, city, created.campaignId());
+        assertEquals(List.of("Scendi dal tram alla fermata del Vicolo al neon dopo mezzanotte. Un esattore armato blocca "
+                + "la corsia verso il molo dati: puoi affrontarlo, oppure cercare un'altra strada.", "it", false),
+                List.of(state.startingSituation().text(), state.startingSituation().locale(), state.startingSituation().fallback()));
+        assertEquals("tram-stop", resumeCards.read(OWNER, city, created.campaignId()).location().id());
+        var place = playPanels.read(OWNER, city, created.campaignId(), null, 20).character().location();
+        assertEquals(List.of("Fermata del tram", "it", false), List.of(place.name().text(), place.name().locale(),
+                place.name().fallback()));
+        // Its own mood policy and tracks (P17.2-D) are delivered for this playthrough, addressed by the sealed hashes.
+        var music = assets.music(OWNER, city, created.campaignId()).orElseThrow();
+        assertEquals("tension", music.moods().get("offered"));
+        assertEquals(List.of("alley-rain", "alley-wires"), music.tracks().stream().map(t -> t.track().id()).toList());
+        assertTrue(music.tracks().stream().allMatch(t -> t.sha256().matches("[0-9a-f]{64}") && t.mediaType().equals("audio/wav")));
+        // The playthrough belongs to the second sample's workspace only: the first does not hold it.
+        assertThrows(CampaignProjectionService.ScopeUnavailable.class, () -> projections.read(OWNER,
+                FirstStartProvisioning.sampleWorkspace(OWNER), created.campaignId()));
     }
 
     /** The labels follow whatever manifest is bundled; without a usable theme the genre is the neutral label. */
@@ -105,7 +174,10 @@ class FirstStartProvisioningTest {
         assertThrows(IllegalStateException.class, () -> FirstStartProvisioning.labels("{\"title\":\" \"}".getBytes(StandardCharsets.UTF_8)));
     }
 
-    /** A start interrupted after the workspace step is repaired: the next start seals the revision once. */
+    /**
+     * An installation whose start was interrupted under an image with one sample keeps what it has: its empty fantasy
+     * workspace is completed once, and the second sample is not added, because the owner already has a workspace.
+     */
     @Test
     void anEmptySampleWorkspaceIsCompletedOnTheNextStart() {
         jdbc.update("insert into identity_owner_profile (id, display_name, ui_locale, created_at, updated_at) "
@@ -113,9 +185,13 @@ class FirstStartProvisioningTest {
         jdbc.update("insert into adventure_workspace (id, owner_id, title, genre, source_locale, created_at, updated_at) "
                 + "values (?, ?, 'Lantern Ford', 'fantasy', 'en', now(), now())",
                 FirstStartProvisioning.sampleWorkspace(OWNER), OWNER);
-        assertEquals(new FirstStartProvisioning.Result(false, false, true, FirstStartProvisioning.sampleWorkspace(OWNER)),
-                provisioning.provision(OWNER));
+        UUID fantasy = FirstStartProvisioning.sampleWorkspace(OWNER);
+        assertEquals(new FirstStartProvisioning.Result(false, List.of(new FirstStartProvisioning.Sample(fantasy, false, true)),
+                fantasy), provisioning.provision(OWNER));
         assertEquals(1, jdbc.queryForObject("select count(*) from content_revision", Integer.class));
+        assertEquals(new FirstStartProvisioning.Result(false, List.of(new FirstStartProvisioning.Sample(fantasy, false, false)),
+                fantasy), provisioning.provision(OWNER));
+        assertEquals(1, jdbc.queryForObject("select count(*) from adventure_workspace", Integer.class));
     }
 
     /** An owner who already has an adventure is never given the sample, on any start. */
@@ -126,7 +202,7 @@ class FirstStartProvisioningTest {
         jdbc.update("insert into adventure_workspace (id, owner_id, title, genre, source_locale, created_at, updated_at) "
                 + "values (?, ?, 'Mine', 'mystery', 'en', now(), now())", UUID.randomUUID(), OWNER);
         var result = provisioning.provision(OWNER);
-        assertEquals(new FirstStartProvisioning.Result(false, false, false, null), result);
+        assertEquals(new FirstStartProvisioning.Result(false, List.of(), FirstStartProvisioning.sampleWorkspace(OWNER)), result);
         assertNull(provisioning.provision(OWNER).workspaceId());
         assertEquals(1, jdbc.queryForObject("select count(*) from adventure_workspace", Integer.class));
         assertEquals(0, jdbc.queryForObject("select count(*) from content_revision", Integer.class));
@@ -140,7 +216,7 @@ class FirstStartProvisioningTest {
         var failure = assertThrows(IllegalStateException.class, () -> provisioning.provision(OWNER));
         assertTrue(failure.getMessage().contains("another owner"), failure.getMessage());
         assertEquals(List.of(previous), jdbc.queryForList("select id from identity_owner_profile", UUID.class));
-        assertEquals(1, jdbc.queryForObject("select count(*) from adventure_workspace", Integer.class));
+        assertEquals(2, jdbc.queryForObject("select count(*) from adventure_workspace", Integer.class));
     }
 
     /**
@@ -155,7 +231,8 @@ class FirstStartProvisioningTest {
         assertEquals(1, listing.packs().size());
         assertNull(listing.nextAfter());
         var pack = listing.packs().getFirst();
-        assertEquals(jdbc.queryForObject("select id from content_revision", UUID.class), pack.contentRevisionId());
+        assertEquals(jdbc.queryForObject("select id from content_revision where adventure_id = ?", UUID.class,
+                provisioned.workspaceId()), pack.contentRevisionId());
         assertEquals(List.of("sample:lantern-ford", "1.0.0", "Lantern Ford", "en", "MIT"),
                 List.of(pack.packId(), pack.packVersion(), pack.title(), pack.sourceLocale(), pack.license()));
         assertEquals(List.of("Project contributors"), pack.authors());
@@ -189,7 +266,8 @@ class FirstStartProvisioningTest {
     @Test
     void theProvisionedAdventureReachesItsEncounterInPlay() {
         var provisioned = provisioning.provision(OWNER);
-        UUID revision = jdbc.queryForObject("select id from content_revision", UUID.class);
+        UUID revision = jdbc.queryForObject("select id from content_revision where adventure_id = ?", UUID.class,
+                provisioned.workspaceId());
         var created = creation.create(OWNER, provisioned.workspaceId(), new CampaignCreationService.Request(
                 UUID.randomUUID(), revision, "First watch", SupportedLocale.EN,
                 new CharacterChoices("Player", "scout", Map.of(), Map.of(), null, null)));
@@ -212,7 +290,8 @@ class FirstStartProvisioningTest {
     @Test
     void theProvisionedEncounterEndsInANegotiatedSettlement() {
         var provisioned = provisioning.provision(OWNER);
-        UUID revisionId = jdbc.queryForObject("select id from content_revision", UUID.class);
+        UUID revisionId = jdbc.queryForObject("select id from content_revision where adventure_id = ?", UUID.class,
+                provisioned.workspaceId());
         UUID campaign = null;
         long revision = 0;
         for (int attempt = 0; attempt < 5 && campaign == null; attempt++) {

@@ -22,6 +22,7 @@ import {
   OperationStatus, OperationView, parseCampaignView, parseCombatView, parseArtwork, parseCursor, parseOperation, parsePlayPanels, parseResumeCard, PlayPanels, PublicReceipt, ResumeCard,
   PresentationCue, StreamEvent,
 } from './campaign-protocol';
+import { PackMusic, parseMusicListing } from '../music/music-pack';
 import { CommandEnvelope } from './combat-actions';
 import { CueState } from './presentation-cues';
 
@@ -124,6 +125,15 @@ export class CampaignTransport {
   async artwork(scope: CampaignScope, signal: AbortSignal): Promise<readonly ArtworkEntry[]> {
     const body = await this.json(`/api/v1/campaigns/${scope.campaignId}/artwork?adventureId=${scope.adventureId}`, signal);
     return parseArtwork(body, scope.adventureId, scope.campaignId);
+  }
+
+  /**
+   * Read the mood policy and own tracks of the scope's pinned pack (P17.2-D). Reading it changes nothing and fetches no
+   * audio; the policy maps only closed public states, so it carries no hidden state.
+   */
+  async music(scope: CampaignScope, signal: AbortSignal): Promise<PackMusic> {
+    const body = await this.json(`/api/v1/campaigns/${scope.campaignId}/music?adventureId=${scope.adventureId}`, signal);
+    return parseMusicListing(body, scope.adventureId, scope.campaignId);
   }
 
   /** Read and validate the player-safe combat projection of one scope (P12.1); reading it never advances time or submits anything. */

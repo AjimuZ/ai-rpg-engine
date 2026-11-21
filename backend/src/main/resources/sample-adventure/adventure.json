@@ -67,6 +67,14 @@
       "category": "asset"
     },
     {
+      "path": "assets/ford-dusk.wav",
+      "category": "asset"
+    },
+    {
+      "path": "assets/ford-stones.wav",
+      "category": "asset"
+    },
+    {
       "path": "lore.md",
       "category": "lore"
     },

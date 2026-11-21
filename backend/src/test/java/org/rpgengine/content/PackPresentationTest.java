@@ -266,6 +266,81 @@ class PackPresentationTest {
         return files;
     }
 
+    /** A mood policy over the public states and a credited track bound to a listed audio file compile in order (P17.2-D). */
+    @Test
+    void readsAMoodPolicyAndCreditedTracks() {
+        var declaration = valid();
+        declaration.put("music", music(Map.of("fight", "tension", "quiet", "exploration"), track("theme", "exploration", "assets/theme.ogg", "MIT")));
+        var music = compile(withAudio(declaration)).presentation().music();
+        assertEquals(List.of("quiet", "fight"), List.copyOf(music.moods().keySet()));
+        assertEquals("tension", music.moods().get("fight"));
+        assertEquals(new PackPresentation.Track("theme", "exploration", "assets/theme.ogg", "Theme", "Someone", "MIT",
+                "Made by a script", "No notice", "None"), music.tracks().getFirst());
+        assertThrows(UnsupportedOperationException.class, () -> music.moods().put("lost", "defeat"));
+        assertEquals(PackPresentation.Music.NONE, compile(bytes(valid(), true, true)).presentation().music());
+        var tracksOnly = valid();
+        tracksOnly.put("music", Map.of("tracks", List.of(track("theme", "rest", "assets/theme.ogg", "CC0-1.0"))));
+        assertTrue(compile(withAudio(tracksOnly)).presentation().music().moods().isEmpty());
+    }
+
+    /**
+     * A policy cannot name anything outside the closed public states, and a track needs a listed audio file, complete
+     * credits, an admitted license and its own mood; each refusal is located and never echoes the value.
+     */
+    @Test
+    void refusesMusicThatCouldNameHiddenStateOrLacksCredits() {
+        assertMusicRefused(music(Map.of("raider-hidden-plan", "combat")), "SCHEMA", "/music/moods/raider-hidden-plan");
+        assertMusicRefused(music(Map.of("fight", "https://evil.example/a.ogg")), "SCHEMA", "/music/moods/fight");
+        assertMusicRefused(music(Map.of(), track("theme", "exploration", "assets/missing.ogg", "MIT")), "FILE_REFERENCE", "/music/tracks/0/file");
+        assertMusicRefused(music(Map.of(), track("theme", "exploration", "assets/rope.png", "MIT")), "FILE_REFERENCE", "/music/tracks/0/file");
+        assertMusicRefused(music(Map.of(), track("theme", "exploration", "assets/theme.ogg", "CC-BY-NC-4.0")), "SCHEMA", "/music/tracks/0/license");
+        assertMusicRefused(music(Map.of(), track("theme", "battle", "assets/theme.ogg", "MIT")), "SCHEMA", "/music/tracks/0/mood");
+        assertMusicRefused(music(Map.of(), track("https://evil.example/a", "rest", "assets/theme.ogg", "MIT")), "SCHEMA", "/music/tracks/0/id");
+        assertMusicRefused(music(Map.of(), track("one", "rest", "assets/theme.ogg", "MIT"), track("two", "rest", "assets/theme.ogg", "MIT")),
+                "DUPLICATE", "/music/tracks/1/mood");
+        var blank = track("theme", "rest", "assets/theme.ogg", "MIT");
+        blank.put("creator", " ");
+        assertMusicRefused(music(Map.of(), blank), "SCHEMA", "/music/tracks/0/creator");
+        var missing = track("theme", "rest", "assets/theme.ogg", "MIT");
+        missing.remove("notices");
+        assertMusicRefused(music(Map.of(), missing), "SCHEMA", "/music/tracks/0/notices");
+        var url = track("theme", "rest", "assets/theme.ogg", "MIT");
+        url.put("url", "https://evil.example/a.ogg");
+        assertMusicRefused(music(Map.of(), url), "SCHEMA", "/music/tracks/0/url");
+        var extra = music(Map.of());
+        extra.put("cues", List.of("https://evil.example/a.ogg"));
+        assertMusicRefused(extra, "SCHEMA", "/music/cues");
+    }
+
+    private static void assertMusicRefused(Map<String, Object> music, String code, String pointer) {
+        var declaration = valid();
+        declaration.put("music", music);
+        var error = assertThrows(PackException.class, () -> compile(withAudio(declaration)), pointer);
+        assertEquals(code, error.code(), error.getMessage());
+        assertEquals(pointer, error.location().pointer());
+        assertFalse(error.getMessage().contains("evil.example"));
+    }
+
+    @SafeVarargs
+    private static Map<String, Object> music(Map<String, String> moods, Map<String, Object>... tracks) {
+        return new LinkedHashMap<>(Map.of("moods", moods, "tracks", List.of(tracks)));
+    }
+
+    private static Map<String, Object> track(String id, String mood, String file, String license) {
+        return new LinkedHashMap<>(Map.of("id", id, "mood", mood, "file", file, "title", "Theme", "creator", "Someone",
+                "license", license, "source", "Made by a script", "notices", "No notice", "modifications", "None"));
+    }
+
+    /** {@link #withAsset} plus one listed audio file {@code assets/theme.ogg}. */
+    private static Map<String, byte[]> withAudio(Map<String, Object> declaration) {
+        var files = withAsset(declaration);
+        files.put("assets/theme.ogg", new byte[] {1, 2, 3});
+        files.put("adventure.json", new String(files.get("adventure.json"), StandardCharsets.UTF_8)
+                .replace(PRESENTATION_FILE, PRESENTATION_FILE + ",{\"path\":\"assets/theme.ogg\",\"category\":\"asset\"}")
+                .getBytes(StandardCharsets.UTF_8));
+        return files;
+    }
+
     /** A presentation file must be the single one the manifest names. */
     @Test
     void requiresTheManifestToNameTheFile() {

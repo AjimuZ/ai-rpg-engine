@@ -62,12 +62,18 @@ phrases, unnamed controls or broken ARIA references
 ([seventh checkpoint](../docs/29-localization.md#seventh-checkpoint-the-italian-variant-rendered-with-the-reviewed-catalog-28-october-2026)).
 The replay server shared by both specs is `src/app/campaign/contract/transcript-server.ts`. One answer in it is not
 recorded: the artwork listing of P17.1-B postdates the transcript, so the server returns the empty listing the real route
-gives a campaign without artwork instead of listing the read as unrecorded; the producer test does not record it yet.
-`campaign-artwork.spec.ts` (21 cases) covers the listing parser, the hash URL lookup, the tier frames, the item icons in
+gives a campaign without artwork instead of listing the read as unrecorded; the producer test does not record it yet. The
+music listing of P17.2-D is answered the same way, with no policy and no track.
+`campaign-artwork.spec.ts` (22 cases, one for the pack music listing) covers the listing parser, the hash URL lookup, the tier frames, the item icons in
 the routed panels with their fallback, the credits, the scene/map/portrait/UI gallery with its thumbnails (P17.1-C), and the
 identity of an item's image, frame and tier across an equip re-read and a reopened page (two cases that hold the stream
 behind a gate). `tools/artwork-journey.mjs` has the phases `create`, `view` and `equip` against the packaged installation;
-`view ... art` expects the bundled sample's authored sword icon and its credit line.
+`view ... art` expects the bundled sample's authored sword icon and its credit line. `tools/music-journey.mjs` (P17.2-D)
+runs QA-32 against the packaged installation: phase `play` (activation, playback, loop, pause/mute/volume, crossfade,
+secret sentinels, playthrough switch, optional fight), phase `fail decode|source|offline`, phase `adventures [en|it]`
+(both bundled samples listed, a playthrough of each created and opened, no cross-adventure read) and phase `switch` (music
+across an adventure switch). `music-pack.spec.ts` covers the strict music-listing parser, the player's pack tracks and the
+player's teardown, which pauses every source and stops the fade timer so no test run is kept alive.
 P05.5 adds `/interface-kit`, linked from Settings, for the shared original MIT
 SVG/CSS theme: control states, 20 icons, bounded numeric meters, progress,
 dialogue/portrait/item frames, empty slots and independent sample item artwork.

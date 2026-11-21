@@ -47,10 +47,13 @@ import { MusicPlayer, MusicStatus } from './music-player';
           <dt>{{ text.track }}</dt><dd lang="en" data-music-title>{{ track.title }}</dd>
           <dt>{{ text.creator }}</dt><dd lang="en">{{ track.creator }}</dd>
           <dt>{{ text.license }}</dt><dd><a [href]="track.licenseUrl" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" lang="en" data-music-license>{{ track.licenseName }}</a></dd>
-          <dt>{{ text.source }}</dt><dd><a [href]="track.sourcePage" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" lang="en" data-music-source>{{ track.title }}</a></dd>
+          <dt>{{ text.source }}</dt>
+          @if (track.sourcePage) {
+            <dd><a [href]="track.sourcePage" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" lang="en" data-music-source>{{ track.title }}</a></dd>
+          } @else { <dd lang="en" data-music-source>{{ track.sourceText }}</dd> }
           <dt>{{ text.notices }}</dt><dd lang="en" data-music-notices>{{ track.notices }}</dd>
           <dt>{{ text.modifications }}</dt><dd lang="en" data-music-modifications>{{ track.modifications }}</dd>
-          <dt>{{ text.verified }}</dt><dd data-music-verified>{{ track.verifiedOn }}</dd>
+          @if (track.verifiedOn) { <dt>{{ text.verified }}</dt><dd data-music-verified>{{ track.verifiedOn }}</dd> }
         </dl>
       }
       <details data-music-credits>
@@ -64,7 +67,9 @@ import { MusicPlayer, MusicStatus } from './music-player';
             <li [attr.data-music-credit]="record.id">
               <span lang="en">{{ record.title }} — {{ record.creator }}.</span>
               <a [href]="record.licenseUrl" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" lang="en">{{ record.licenseName }}</a>
-              <a [href]="record.sourcePage" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">{{ text.source }}</a>
+              @if (record.sourcePage) {
+                <a [href]="record.sourcePage" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">{{ text.source }}</a>
+              } @else { <span lang="en">{{ record.sourceText }}.</span> }
               <span lang="en">{{ record.notices }} {{ record.modifications }}</span>
             </li>
           } @empty { <li data-music-none>{{ text.none }}</li> }
@@ -83,8 +88,13 @@ import { MusicPlayer, MusicStatus } from './music-player';
 export class MusicPanel {
   /** Identity of the playthrough (adventure and campaign); a change of it silences the previous scope's music. */
   readonly scope = input.required<string>();
-  /** Mood of the playthrough's current public state. */
-  readonly mood = input.required<Mood>();
+  /** Mood of the playthrough's current public state; null while it is being re-read, which keeps the current track. */
+  readonly mood = input.required<Mood | null>();
+  /**
+   * Tracks the playthrough's pack ships (P17.2-D), already validated by `parseMusicListing`; none by default. Null while
+   * the listing is being read, which keeps the player silent for this scope until it is known.
+   */
+  readonly tracks = input<readonly MusicRecording[] | null>([]);
   readonly player = inject(MusicPlayer);
   readonly filter = signal('');
   readonly text = {
@@ -126,12 +136,17 @@ export class MusicPanel {
 
   /** Offer the mood to the player while the panel lives and silence this scope when it goes away. */
   constructor() {
-    effect(/** Re-offer on a changed scope or mood; the player ignores a repeat. */ () => {
+    effect(/** Re-offer on a changed scope, pack tracks or mood; the player ignores a repeat. */ () => {
       const scope = this.scope();
       const mood = this.mood();
+      const tracks = this.tracks();
       untracked(/** Offering a cue reads player state that must not retrigger this effect. */ () => {
+        // A new scope silences the previous one at once, even before its own mood is known.
+        if (this.lastScope !== null && this.lastScope !== scope) this.player.leave(this.lastScope);
         this.lastScope = scope;
-        this.player.cue(scope, mood);
+        // Tracks first, so the cue of a new scope already chooses among its pack's own recordings.
+        this.player.offer(scope, tracks);
+        if (mood !== null) this.player.cue(scope, mood);
       });
     });
     inject(DestroyRef).onDestroy(/** Leaving the playthrough stops its music. */ () => { if (this.lastScope !== null) this.player.leave(this.lastScope); });
@@ -164,10 +179,13 @@ export class MusicPanel {
 
   search(event: Event): void { this.filter.set((event.target as HTMLInputElement).value); }
 
-  /** Catalog records whose credit text contains the filter, ignoring case; all of them for an empty filter. */
+  /**
+   * Records whose credit text contains the filter, ignoring case; all of them for an empty filter. The list holds the
+   * current pack's own tracks and then the reviewed catalog.
+   */
   credits(): readonly MusicRecording[] {
     const needle = this.filter().trim().toLowerCase();
-    return MUSIC_CATALOG.filter(/** A record matches on any visible credit field. */ (record) =>
+    return [...this.player.packTracks(), ...MUSIC_CATALOG].filter(/** A record matches on any visible credit field. */ (record) =>
       needle === '' || [record.title, record.creator, record.licenseName, record.notices, record.modifications].some((field) => field.toLowerCase().includes(needle)));
   }
 }

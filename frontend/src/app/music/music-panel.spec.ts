@@ -57,6 +57,35 @@ describe('music panel', /** Register the rendered behavior. */ () => {
     expect(root.querySelector('[data-music-used-credits]')).not.toBeNull();
   });
 
+  it('keeps the track while the mood is being re-read and silences a previous scope at once (P17.2-D)', async () => {
+    const paused: string[] = [];
+    TestBed.configureTestingModule({ providers: [
+      { provide: MUSIC_AUDIO, useValue: (url: string): MusicAudio => ({ loop: false, volume: 1, onerror: null, play: () => Promise.resolve(), pause: () => { paused.push(url); } }) },
+      { provide: MUSIC_TICK, useValue: () => () => undefined },
+      { provide: MUSIC_STORAGE, useValue: null },
+    ] });
+    const fixture = TestBed.createComponent(MusicPanel);
+    const root = fixture.nativeElement as HTMLElement;
+    fixture.componentRef.setInput('scope', 'one');
+    fixture.componentRef.setInput('mood', 'tension');
+    fixture.detectChanges();
+    (root.querySelector('[data-music-on]') as HTMLButtonElement).click();
+    await flush();
+    fixture.componentRef.setInput('mood', null);
+    fixture.detectChanges();
+    await flush();
+    fixture.componentRef.setInput('mood', 'tension');
+    fixture.detectChanges();
+    await flush();
+    fixture.detectChanges();
+    expect(paused).toEqual([]);
+    expect(root.querySelector('[data-music-title]')?.textContent).toContain('Darkest Child');
+    fixture.componentRef.setInput('scope', 'two');
+    fixture.componentRef.setInput('mood', null);
+    fixture.detectChanges();
+    expect(paused).toHaveLength(1);
+  });
+
   it('lists complete credits for every reviewed track and filters them', async () => {
     const { root, refresh } = render('exploration');
     await refresh();

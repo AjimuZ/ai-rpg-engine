@@ -56,6 +56,9 @@ provisional until P07.
 slice. Unlike the two import fixtures it declares an encounter and is walked by `CyberpunkSliceTest`
 (`org.rpgengine.adventure`), which seals it into a second workspace of the owner that holds the provisioned fantasy
 sample. It shares no definition identity or display name with that sample outside the ruleset's fixed `rules.*` slots.
+Since P17.2-D ([ADR 0055](../../../../../docs/adr/0055-first-start-seals-two-neutral-sample-adventures.md)) the engine
+also bundles a copy of this pack as its second sample (`src/main/resources/sample-adventure-2/`), with the same text
+and data plus a `presentation.json` mood policy and two generated music loops. Keep the two copies' text in step.
 
 | Content | lantern-ford (bundled sample) | cyberpunk-neon-alley |
 | --- | --- | --- |

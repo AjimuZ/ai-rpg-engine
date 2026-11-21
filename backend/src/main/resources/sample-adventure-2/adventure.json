@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "id": "sample:cyberpunk-neon-alley",
+  "version": "1.0.0",
+  "title": "Neon Alley",
+  "summary": "A neutral sample adventure: a tram stop, a waiting enforcer and a quiet data dock.",
+  "authors": [
+    "Project contributors"
+  ],
+  "license": "MIT",
+  "engineCompatibility": ">=0.1.0 <1.0.0",
+  "ruleset": {
+    "id": "skirmish",
+    "version": ">=1.0.0 <2.0.0",
+    "policyProfile": "standard"
+  },
+  "contentLocale": "en",
+  "narrativeMode": "emergent",
+  "entrypoint": {
+    "situation": "You step off the tram at the Neon Alley stop after midnight. An enforcer blocks the lane to the data dock; you can face them, or look for another way through.",
+    "location": "tram-stop",
+    "creationProfile": "street-runner"
+  },
+  "files": [
+    {
+      "path": "rules.json",
+      "category": "rules"
+    },
+    {
+      "path": "locations.json",
+      "category": "locations"
+    },
+    {
+      "path": "skills.json",
+      "category": "skills"
+    },
+    {
+      "path": "abilities.json",
+      "category": "abilities"
+    },
+    {
+      "path": "items.json",
+      "category": "items"
+    },
+    {
+      "path": "creation.json",
+      "category": "creation"
+    },
+    {
+      "path": "quests.json",
+      "category": "quests"
+    },
+    {
+      "path": "encounters.json",
+      "category": "encounters"
+    },
+    {
+      "path": "generation.json",
+      "category": "generationPolicy"
+    },
+    {
+      "path": "presentation.json",
+      "category": "presentation"
+    },
+    {
+      "path": "assets/alley-rain.wav",
+      "category": "asset"
+    },
+    {
+      "path": "assets/alley-wires.wav",
+      "category": "asset"
+    },
+    {
+      "path": "lore.md",
+      "category": "lore"
+    },
+    {
+      "path": "CREDITS.md",
+      "category": "credits"
+    },
+    {
+      "path": "LICENSE.md",
+      "category": "license"
+    },
+    {
+      "path": "locales/it.json",
+      "category": "localization"
+    }
+  ],
+  "modules": [],
+  "generationPolicy": "generation.json",
+  "presentation": "presentation.json",
+  "contentGuidance": {
+    "tone": "Tense and non-romantic",
+    "themes": [
+      "city",
+      "skirmish"
+    ],
+    "exclusions": [
+      "mandatory romance"
+    ],
+    "audience": "general"
+  },
+  "provenance": {
+    "source": "Original project sample",
+    "notice": "See CREDITS.md and LICENSE.md"
+  },
+  "localizations": {
+    "it": [
+      "locales/it.json"
+    ]
+  }
+}

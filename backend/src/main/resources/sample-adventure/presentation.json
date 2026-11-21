@@ -7,5 +7,39 @@
       "file": "assets/sword.png",
       "credit": "Sword icon: original sample art made by tools/sample-art/make-sample-art.mjs, MIT license"
     }
-  ]
+  ],
+  "music": {
+    "moods": {
+      "quiet": "exploration",
+      "offered": "tension",
+      "fight": "tension",
+      "won": "exploration",
+      "lost": "exploration",
+      "settled": "exploration"
+    },
+    "tracks": [
+      {
+        "id": "ford-dusk",
+        "mood": "exploration",
+        "file": "assets/ford-dusk.wav",
+        "title": "Ford at Dusk",
+        "creator": "Project contributors",
+        "license": "MIT",
+        "source": "Original sample music made by tools/sample-music/make-sample-music.mjs of the project repository",
+        "notices": "Copyright (c) 2026 Project contributors. See the adventure's LICENSE.md.",
+        "modifications": "None: the file is the generator's output, unedited."
+      },
+      {
+        "id": "ford-stones",
+        "mood": "tension",
+        "file": "assets/ford-stones.wav",
+        "title": "Stones in the Current",
+        "creator": "Project contributors",
+        "license": "MIT",
+        "source": "Original sample music made by tools/sample-music/make-sample-music.mjs of the project repository",
+        "notices": "Copyright (c) 2026 Project contributors. See the adventure's LICENSE.md.",
+        "modifications": "None: the file is the generator's output, unedited."
+      }
+    ]
+  }
 }

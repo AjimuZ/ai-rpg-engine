@@ -14,8 +14,10 @@ macOS hosts are not verified.
 2. Clone the repository and run `./start.sh --check`. It inspects prerequisites and changes nothing.
 3. Run `./start.sh`. The first run creates the ignored `.env` and the database secret, builds the images (several
    minutes), starts the application and PostgreSQL, and prints the local URL, `http://127.0.0.1:8080/`.
-4. Open the URL. The interface redirects to `/en/library` or `/it/library` by device language. The bundled Lantern Ford
-   fantasy sample is provisioned for the owner on first start.
+4. Open the URL. The interface redirects to `/en/library` or `/it/library` by device language. Two bundled samples are
+   provisioned for the owner on first start: the Lantern Ford fantasy sample and the Neon Alley city sample (its
+   adventure text also in Italian). Each has its own optional music. An installation that already held adventures
+   keeps what it has.
 5. Optional, owner-run: `./start.sh --login` signs the isolated narration runtime in with a ChatGPT device code
    (enable device-code login in your account first; see the account note below). Without it the game is playable but
    narration stays pending.

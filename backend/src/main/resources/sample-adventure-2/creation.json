@@ -1,0 +1,8 @@
+{"schemaVersion":1,"definitions":[
+{"id":"street-runner","kind":"creation","data":{"name":"Street Runner","attributeBudget":6,"skillBudget":4,
+  "attributes":["reflex","tech"],"skills":["netrunning","shooting"],
+  "archetypes":[{"id":"courier","name":"Courier","attributes":{"reflex":2,"tech":2},
+    "skills":{"netrunning":1,"shooting":2}}],
+  "startingItems":[{"item":"deck","quantity":1},{"item":"pistol","quantity":1,"equipped":true},
+    {"item":"jacket","quantity":1,"equipped":true}],
+  "startingAbilities":["stim-patch"]}}]}

@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased — Adventure mood policies and sample music (P17.2-D), 21 November 2026
+
+- An adventure pack can declare its own music in its `presentation` file. It maps the six public situations (quiet,
+  fight offered, fight, won, lost, settled) to moods and lists at most one credited track per mood, bound to an audio
+  file in the pack. A pack that names anything else does not import, so music cannot react to anything the player has
+  not seen. See docs/09 section 3.3 and ADR 0054.
+- New read route `GET /api/v1/campaigns/{campaignId}/music?adventureId=` delivers a playthrough's pack policy and
+  tracks. The browser plays the tracks through the existing asset route by their hash and refuses any listing outside
+  the allowlist.
+- The sample adventure "Lantern Ford" now has music: two short original loops, "Ford at Dusk" (exploration) and "Stones
+  in the Current" (tension when a fight is offered or under way). They are made by `node
+  tools/sample-music/make-sample-music.mjs` and covered by the sample's MIT license. Turning music on in the sample
+  therefore no longer needs the internet.
+- Music fixes found on a packaged installation:
+  - switching playthroughs no longer starts an online track for a moment before the adventure's own track;
+  - starting a fight no longer restarts the tension track;
+  - a crossfade now ends at volume 0 before the old track stops.
+- A new installation now starts with a second sample adventure, "Neon Alley": a short city adventure in English, with
+  its adventure text also in Italian, and two original loops of its own, "Neon Rain" and "Humming Wires". Both samples
+  appear in the library. An installation that already has adventures keeps exactly what it has. See ADR 0055.
+- Music stops at once when you switch to a playthrough of the other adventure, and that adventure's own track starts.
+- The music player now releases its audio and fade timer when the page is torn down, so the interface's unit tests
+  always end by themselves.
+- New repeatable check `frontend/tools/music-journey.mjs` runs the music acceptance journey (QA-32) against a packaged
+  installation, including both samples and a switch between them.
+
 ## Unreleased — Music credits, local tracks and an effects volume (P17.2-C), 21 November 2026
 
 - The current track now shows its notices, disclosed changes and the date its rights were checked, besides creator,

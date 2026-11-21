@@ -1,0 +1,11 @@
+{"schemaVersion":1,"definitions":[
+{"id":"rules.attributes","kind":"rule","data":{"ruleType":"attributes","attributes":[
+  {"id":"reflex","name":"Reflex","min":0,"max":4},{"id":"tech","name":"Tech","min":0,"max":4}]}},
+{"id":"rules.resources","kind":"rule","data":{"ruleType":"resources","resources":[{"id":"integrity","name":"Integrity","max":8}]}},
+{"id":"rules.rarity","kind":"rule","data":{"ruleType":"rarityTiers","tiers":[
+  {"id":"street","name":"Street grade","token":"tier-street"}]}},
+{"id":"rules.equipment","kind":"rule","data":{"ruleType":"equipment","hands":2,"slots":[
+  {"id":"main-hand","name":"Main hand","capacity":1,"accepts":["weapon","tool"]},
+  {"id":"body","name":"Body"}]}},
+{"id":"rules.combat","kind":"rule","data":{"ruleType":"combat",
+  "roles":{"force":"reflex","finesse":"reflex","insight":"tech","resolve":"tech"},"health":"integrity"}}]}

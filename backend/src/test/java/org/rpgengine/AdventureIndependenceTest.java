@@ -17,8 +17,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Enforces P15.5-A structurally: the engine names no adventure. No string literal of the backend's main Java sources is
- * an identifier or a title declared by the bundled sample or by a neutral fixture pack, and no main resource outside the
- * bundled sample folder contains a pack ID or title. The identifiers are read from the packs themselves (manifest ID,
+ * an identifier or a title declared by a bundled sample or by a neutral fixture pack, and no main resource outside the
+ * bundled sample folders contains a pack ID or title. The identifiers are read from the packs themselves (manifest ID,
  * title and entrypoint, every top-level definition ID, and the attribute and resource IDs their rules declare), so a new
  * fixture or definition is covered without editing this test. Comments are skipped, since an explanatory example may
  * name sample data without the engine depending on it.
@@ -30,7 +30,8 @@ import tools.jackson.databind.json.JsonMapper;
 class AdventureIndependenceTest {
     static final Path MAIN = Path.of("src/main/java/org/rpgengine");
     static final Path RESOURCES = Path.of("src/main/resources");
-    static final Path SAMPLE = RESOURCES.resolve("sample-adventure");
+    /** The bundled sample folders (ADR 0055); only they may name an adventure among the main resources. */
+    static final List<Path> SAMPLES = List.of(RESOURCES.resolve("sample-adventure"), RESOURCES.resolve("sample-adventure-2"));
     static final Path FIXTURES = Path.of("src/test/resources/packs");
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
@@ -56,7 +57,7 @@ class AdventureIndependenceTest {
             }
         }
         for (Path resource : files(RESOURCES, "")) {
-            if (resource.startsWith(SAMPLE)) {
+            if (SAMPLES.stream().anyMatch(resource::startsWith)) {
                 continue;
             }
             String text = Files.readString(resource);
@@ -85,9 +86,9 @@ class AdventureIndependenceTest {
         assertThat(literals(source)).containsExactly("plain \\\" quoted", "    block\n    ", "http://host/path");
     }
 
-    /** The bundled sample and every fixture pack folder that has a manifest. */
+    /** The bundled samples and every fixture pack folder that has a manifest. */
     static List<Path> packs() throws IOException {
-        var packs = new ArrayList<Path>(List.of(SAMPLE));
+        var packs = new ArrayList<Path>(SAMPLES);
         try (Stream<Path> folders = Files.list(FIXTURES)) {
             folders.filter(folder -> Files.isRegularFile(folder.resolve("adventure.json"))).sorted().forEach(packs::add);
         }

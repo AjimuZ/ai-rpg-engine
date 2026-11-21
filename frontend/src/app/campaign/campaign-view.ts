@@ -33,7 +33,8 @@ import { CombatDraftStore } from './combat-draft';
 import { EntryChoice, entryKey, resolveEntry } from './combat-entry';
 import { EncounterOffers } from './encounter-offers';
 import { MusicPanel } from '../music/music-panel';
-import { moodOf } from '../music/music-mood';
+import { DEFAULT_MOOD_POLICY, moodOf } from '../music/music-mood';
+import { NO_PACK_MUSIC, PackMusic } from '../music/music-pack';
 
 /** Delay before the first retry after a failed read, doubled up to {@link MAX_BACKOFF_MS}. */
 const BASE_BACKOFF_MS = 2_000;
@@ -125,7 +126,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 
       <app-campaign-cues [cues]="cues()" />
 
-      <app-music [scope]="musicScope()" [mood]="mood()" />
+      <app-music [scope]="musicScope()" [mood]="mood()" [tracks]="packMusic()?.tracks ?? null" />
 
       <h3 i18n="@@campaign.view.operations">Actions</h3>
       <p role="status" aria-live="polite" data-connection>{{ connectionMessage() }}</p>
@@ -200,8 +201,19 @@ export class CampaignPlaythrough {
   readonly scope = computed((): CampaignScope => ({ adventureId: this.adventureId(), campaignId: this.campaignId() }));
   /** Scope identity for optional music: an adventure or campaign change silences the previous scope's track (P17.2-B). */
   readonly musicScope = computed(() => JSON.stringify([this.adventureId(), this.campaignId()]));
-  /** Music mood of the public combat projection only; hidden state cannot reach it. */
-  readonly mood = computed(() => moodOf(this.combat()));
+  /**
+   * The pinned pack's mood policy and own tracks (P17.2-D): null while the listing is being read (the player then chooses
+   * nothing for this scope), and no policy and no track when the listing fails or is invalid.
+   */
+  readonly packMusic = signal<PackMusic | null>(null);
+  /** False from a (re)start until the combat projection of the read revision is known, so a re-read never flickers the mood. */
+  private readonly moodKnown = signal(false);
+  /**
+   * Music mood of the public combat projection only, under the pack's policy or the default one; hidden state cannot reach it.
+   * Null while the view is being re-read: the panel then keeps the current track instead of cueing the momentary `quiet` state
+   * (found on the packaged installation, where the re-read after starting a fight restarted the tension track).
+   */
+  readonly mood = computed(() => this.moodKnown() ? moodOf(this.combat(), this.packMusic()?.policy ?? DEFAULT_MOOD_POLICY) : null);
   readonly operations = computed(() => this.session.operations(this.scope()));
   /** Presentation cues received on this page load, in display order; none is ever required to read the result. */
   readonly cues = computed(() => this.session.cues(this.scope()));
@@ -239,12 +251,19 @@ export class CampaignPlaythrough {
     this.resume.set(null);
     this.panels.set(null);
     this.artwork.set(null);
+    this.moodKnown.set(false);
     this.combat.set(null);
     this.older.set([]);
     this.cursor.set(null);
     this.failure.set('');
     this.notice.set('');
-    if (this.scopeKey !== JSON.stringify(scope)) { this.scopeKey = JSON.stringify(scope); this.attempt = null; this.problem.set(null); }
+    if (this.scopeKey !== JSON.stringify(scope)) {
+      this.scopeKey = JSON.stringify(scope);
+      this.attempt = null;
+      this.problem.set(null);
+      // The listing belongs to the scope's pinned pack revision: a refresh of the same scope keeps it, a new scope reads its own.
+      this.packMusic.set(null);
+    }
     this.state.set('connecting');
     this.epoch = this.input.activate(scope);
     const run = new AbortController();
@@ -274,8 +293,14 @@ export class CampaignPlaythrough {
           // The combat projection is read only during a fight, so a playthrough without one issues no extra request; outside a
           // fight its offers are read only when the player asks for them (lookForFights, P13.2-B).
           this.combat.set(card.inFight ? await this.transport.encounter(scope, signal) : null);
+          this.moodKnown.set(true);
           // Artwork is decoration: a failed or invalid listing shows the built-in icons and never stops the playthrough.
           try { this.artwork.set(new ArtworkIndex(await this.transport.artwork(scope, signal), scope)); } catch { if (signal.aborted) return; this.artwork.set(null); }
+          // The music policy belongs to the sealed pack revision the campaign pins, so one read per scope is enough. Music is
+          // optional: a failed or invalid listing keeps the default policy and no pack track, and never stops the playthrough.
+          if (this.packMusic() === null) {
+            try { this.packMusic.set(await this.transport.music(scope, signal)); } catch { if (signal.aborted) return; this.packMusic.set(NO_PACK_MUSIC); }
+          }
           this.older.set([]);
           this.cursor.set(panels.nextBefore);
           loaded = true;

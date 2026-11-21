@@ -1,0 +1,16 @@
+{"schemaVersion":1,"definitions":[
+{"id":"lane-standoff","kind":"encounter","data":{"name":"Lane Standoff","description":"An enforcer waits at the mouth of the lane.",
+  "location":"tram-stop",
+  "zones":[{"id":"platform","name":"Platform"},{"id":"bins","name":"Cargo Bins","cover":"partial","capacity":4},
+    {"id":"roof","name":"Rooftop","tags":["exit"]}],
+  "edges":[{"from":"platform","to":"bins"},{"from":"platform","to":"roof"},{"from":"bins","to":"roof"}],
+  "playerZone":"platform","escapeZones":["roof"],
+  "participants":[{"id":"enforcer","name":"Enforcer","side":"hostile","zone":"bins","threat":"standard",
+    "stats":{"health":14,"guard":12,"resistance":11,"armor":1,"force":1,"finesse":1,"insight":1,"resolve":1},
+    "attacks":[{"id":"shock-baton","attribute":"force","skill":1,"strongHit":false,"damage":{"count":1,"sides":6}}]}],
+  "objectives":[{"id":"clear-lane","name":"Clear the lane","kind":"defeatHostiles"},
+    {"id":"slip-away","name":"Climb to the rooftop","kind":"escape"}],
+  "actions":[{"id":"offer-toll","name":"Offer a toll","kind":"social","intent":"negotiate",
+    "description":"Offer a small payment so that nobody gets hurt.",
+    "terms":{"id":"paid-passage","name":"A paid passage","kind":"truce",
+      "description":"The enforcer lowers the baton and lets you through; the standoff ends with everyone standing."}}]}}]}

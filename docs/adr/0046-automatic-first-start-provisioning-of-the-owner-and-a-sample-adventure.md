@@ -1,6 +1,8 @@
 # ADR 0046: Automatic first-start provisioning of the owner and a sample adventure
 
-- Status: Accepted (owner decision, 20 November 2026); implemented in P14.1-A.1 (20 November 2026).
+- Status: Accepted (owner decision, 20 November 2026); implemented in P14.1-A.1 (20 November 2026). Superseded in part
+  by [ADR 0055](0055-first-start-seals-two-neutral-sample-adventures.md) (21 November 2026): a fresh installation now
+  receives two bundled samples; the rules below still hold for each.
 - Date: 20 November 2026
 - Changes: the consequence of [ADR 0019](0019-local-campaign-admission.md) that "the packaged launcher does not automatically provision an owner or enable this API". The admission rules of ADR 0019 are unchanged.
 

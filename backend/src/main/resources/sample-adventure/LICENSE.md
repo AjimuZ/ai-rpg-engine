@@ -22,3 +22,7 @@ SOFTWARE.
 
 The file `assets/sword.png` is covered by the same license. Its source is the generator script
 `tools/sample-art/make-sample-art.mjs` of the project repository, which contains no third-party material.
+
+The files `assets/ford-dusk.wav` and `assets/ford-stones.wav` are covered by the same license. Their source is
+the generator script `tools/sample-music/make-sample-music.mjs` of the project repository, which contains no
+third-party material.

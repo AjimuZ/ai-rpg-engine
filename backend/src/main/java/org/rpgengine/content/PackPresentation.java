@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.rpgengine.music.MusicCatalog;
 import org.rpgengine.presentation.PresentationEvent;
 import org.rpgengine.presentation.PublicPresentationScope;
 
@@ -25,7 +26,10 @@ import org.rpgengine.presentation.PublicPresentationScope;
  * {@code poses}, {@code expressions}]. A reference to an asset the file does not list is an undeclared
  * asset and is refused. Since P17.1-C an optional {@code artwork} list [{@code category}, {@code subject},
  * {@code file}, {@code credit}] binds a listed {@code asset} file to the entity it depicts; the asset registry
- * lists those bindings with the campaign's artwork.
+ * lists those bindings with the campaign's artwork. Since P17.2-D an optional {@code music} object
+ * [{@code moods} {public state: mood}, {@code tracks} [{@code id}, {@code mood}, {@code file}, {@code title},
+ * {@code creator}, {@code license}, {@code source}, {@code notices}, {@code modifications}]] declares the pack's
+ * mood policy and its own credited audio files (see {@link Music}).
  *
  * @param scenes declared scene references
  * @param lines declared line references
@@ -33,13 +37,30 @@ import org.rpgengine.presentation.PublicPresentationScope;
  * @param sceneBackdrops scene reference to the asset shown behind it, for scenes that declare one
  * @param lineAudio line reference to its audio asset, for lines that declare one
  * @param actors local NPC definition ID to the poses and expressions it may take
+ * @param artwork authored image bindings
+ * @param music mood policy and authored music tracks; {@link Music#NONE} when the pack declares none
  */
 public record PackPresentation(Set<String> scenes, Set<String> lines, Set<String> assets,
         Map<String, String> sceneBackdrops, Map<String, String> lineAudio, Map<String, Looks> actors,
-        List<Artwork> artwork) {
+        List<Artwork> artwork, Music music) {
+    /**
+     * The closed public states a mood policy may name, equal to {@code PUBLIC_STATES} of the client
+     * ({@code frontend/src/app/music/music-mood.ts}). Each is derived from the player-safe combat projection only,
+     * so a policy has no key through which hidden state could reach the music. Declared before {@link #NONE}, whose
+     * {@link Music#NONE} reads it during class initialization.
+     */
+    public static final List<String> PUBLIC_STATES = List.of("quiet", "offered", "fight", "won", "lost", "settled");
     /** The declaration of a pack that makes none: nothing may be presented. */
     public static final PackPresentation NONE = new PackPresentation(Set.of(), Set.of(), Set.of(), Map.of(),
-            Map.of(), Map.of(), List.of());
+            Map.of(), Map.of(), List.of(), Music.NONE);
+    /**
+     * Licenses a pack-authored track may carry, with the exact text URL of each: the reviewed music licenses of
+     * {@link MusicCatalog#LICENSES} plus MIT, the license the project's own sample content already uses
+     * (docs/adr/0054).
+     */
+    public static final Map<String, String> TRACK_LICENSES = trackLicenses();
+    /** Audio extensions a track file may have; equal to the audio part of {@link PackMedia}'s allowlist. */
+    private static final Set<String> AUDIO_EXTENSIONS = Set.of("ogg", "mp3", "wav");
     /** Image categories a pack may bind authored files to; music and effects are audio and have no binding yet. */
     public static final Set<String> ARTWORK_CATEGORIES = Set.of("scene", "map", "portrait", "item", "ui");
     /** Longest credit line, equal to {@code ManagedAssets.MAX_CREDIT}. */
@@ -60,10 +81,63 @@ public record PackPresentation(Set<String> scenes, Set<String> lines, Set<String
     public record Artwork(String category, String subject, String file, String credit) {
     }
 
-    /** A declaration without authored artwork bindings. */
+    /**
+     * A pack's music declaration (P17.2-D).
+     *
+     * <p>Always holds: every key of {@code moods} is one of {@link #PUBLIC_STATES} and every mood one of
+     * {@link MusicCatalog#MOODS}; at most one track per mood; every track names a listed manifest file of category
+     * {@code asset} with an audio extension and carries complete credit text and an admitted license. The policy
+     * therefore cannot name an event, entity or state outside the closed public list.
+     *
+     * @param moods public state to mood, for the states the pack declares; empty when it declares no policy, in which
+     *        case the client keeps its default mapping
+     * @param tracks the pack's own credited recordings, in declaration order
+     */
+    public record Music(Map<String, String> moods, List<Track> tracks) {
+        /** A pack without a music declaration. */
+        public static final Music NONE = new Music(Map.of(), List.of());
+
+        /** Copy both collections so the compiled declaration stays immutable; moods keep the public-state order. */
+        public Music {
+            var ordered = new java.util.LinkedHashMap<String, String>();
+            for (String state : PUBLIC_STATES) {
+                if (moods.containsKey(state)) {
+                    ordered.put(state, moods.get(state));
+                }
+            }
+            moods = java.util.Collections.unmodifiableMap(ordered);
+            tracks = List.copyOf(tracks);
+        }
+    }
+
+    /**
+     * One recording shipped in the pack.
+     *
+     * @param id stable reference, unique within the pack
+     * @param mood one of {@link MusicCatalog#MOODS}; the track plays for that mood
+     * @param file path of a listed manifest file of category {@code asset} with an audio extension
+     * @param title shown title
+     * @param creator credited creator
+     * @param license key of {@link #TRACK_LICENSES}
+     * @param source plain-text origin of the recording (for example the generator that made it), never a URL to fetch
+     * @param notices notices the license or creator requires
+     * @param modifications disclosed changes, or a statement that there are none
+     */
+    public record Track(String id, String mood, String file, String title, String creator, String license, String source,
+            String notices, String modifications) {
+    }
+
+    /** A declaration without authored artwork bindings or music. */
     public PackPresentation(Set<String> scenes, Set<String> lines, Set<String> assets,
             Map<String, String> sceneBackdrops, Map<String, String> lineAudio, Map<String, Looks> actors) {
-        this(scenes, lines, assets, sceneBackdrops, lineAudio, actors, List.of());
+        this(scenes, lines, assets, sceneBackdrops, lineAudio, actors, List.of(), Music.NONE);
+    }
+
+    /** A declaration without music. */
+    public PackPresentation(Set<String> scenes, Set<String> lines, Set<String> assets,
+            Map<String, String> sceneBackdrops, Map<String, String> lineAudio, Map<String, Looks> actors,
+            List<Artwork> artwork) {
+        this(scenes, lines, assets, sceneBackdrops, lineAudio, actors, artwork, Music.NONE);
     }
 
     /**
@@ -89,6 +163,7 @@ public record PackPresentation(Set<String> scenes, Set<String> lines, Set<String
         lineAudio = Map.copyOf(lineAudio);
         actors = Map.copyOf(actors);
         artwork = List.copyOf(artwork);
+        music = java.util.Objects.requireNonNull(music, "music");
     }
 
     /**
@@ -147,8 +222,71 @@ public record PackPresentation(Set<String> scenes, Set<String> lines, Set<String
             entry.close();
         }
         var artwork = artwork(pack, root, definitions, scenes);
+        var music = music(pack, root);
         root.close();
-        return new PackPresentation(scenes, lines, declaredAssets, backdrops, audio, actors, artwork);
+        return new PackPresentation(scenes, lines, declaredAssets, backdrops, audio, actors, artwork, music);
+    }
+
+    /**
+     * Read the optional {@code music} object: a mood policy over the closed public states and the pack's own tracks.
+     * Unknown keys, a state outside {@link #PUBLIC_STATES}, an unknown mood, a second track for one mood, a file that
+     * is not a listed audio asset, incomplete credit text or a license outside {@link #TRACK_LICENSES} are refused
+     * with a located diagnostic that never repeats the value.
+     */
+    private static Music music(ParsedPack pack, Fields root) {
+        Fields music = root.object("music", false);
+        if (music == null) {
+            return Music.NONE;
+        }
+        var moods = new HashMap<String, String>();
+        Fields policy = music.object("moods", false);
+        if (policy != null) {
+            for (String state : PUBLIC_STATES) {
+                if (policy.has(state)) {
+                    moods.put(state, policy.choice(state, MusicCatalog.MOODS, null));
+                }
+            }
+            // A key outside the public states is an unknown field here, so a policy cannot name hidden state.
+            policy.close();
+        }
+        var listed = new HashSet<String>();
+        pack.manifest().files().forEach(file -> {
+            if (file.category().equals("asset") && AUDIO_EXTENSIONS.contains(PackPaths.extension(file.path()))) {
+                listed.add(file.path());
+            }
+        });
+        var ids = new HashSet<String>();
+        var covered = new HashSet<String>();
+        var tracks = new java.util.ArrayList<Track>();
+        for (Fields entry : music.objects("tracks", 0, MusicCatalog.MOODS.size())) {
+            String id = unique(entry, "id", ids);
+            String mood = entry.choice("mood", MusicCatalog.MOODS, null);
+            String file = entry.text("file", true);
+            if (!listed.contains(file)) {
+                throw entry.fail("FILE_REFERENCE", "file", "Expected a manifest file of category asset with an audio extension");
+            }
+            if (!covered.add(mood)) {
+                throw entry.fail("DUPLICATE", "mood", "Mood already has a track in this pack");
+            }
+            String license = entry.choice("license", TRACK_LICENSES.keySet(), null);
+            tracks.add(new Track(id, mood, file, credit(entry, "title"), credit(entry, "creator"), license,
+                    credit(entry, "source"), credit(entry, "notices"), credit(entry, "modifications")));
+            entry.close();
+        }
+        music.close();
+        return new Music(moods, tracks);
+    }
+
+    /** Required credit text: 1 to {@link #MAX_CREDIT} characters without control characters. */
+    private static String credit(Fields entry, String key) {
+        return entry.matching(key, CREDIT, true,
+                "Expected a credit text of 1 to " + MAX_CREDIT + " characters without control characters");
+    }
+
+    private static Map<String, String> trackLicenses() {
+        var licenses = new HashMap<>(MusicCatalog.LICENSES);
+        licenses.put("MIT", "https://opensource.org/license/mit");
+        return Map.copyOf(licenses);
     }
 
     /**

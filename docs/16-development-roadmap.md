@@ -7192,7 +7192,7 @@ this update. No combat runtime/browser result is claimed.
       or screen-reader review; a container restart or a restore of the packaged playthrough; the unchanged Italian review
       status of the new messages (one author pass); nothing creates artwork at runtime (P17.6). The artwork listing
       recompiles the pinned pack on each read, as `PresentationScopeResolver` does, and is not cached.
-- [ ] P17.2 Implement optional dynamic music from a reviewed free-license online/local catalog: public-event mood mapping, deliberate activation, stable loops/crossfades, deduplicated cues, volumes, complete current-track/export credits and offline/source-failure fallback under QA-32.
+- [x] P17.2 Implement optional dynamic music from a reviewed free-license online/local catalog: public-event mood mapping, deliberate activation, stable loops/crossfades, deduplicated cues, volumes, complete current-track/export credits and offline/source-failure fallback under QA-32.
   - 2026-11-21 P17.2-A (partial; box stays unchecked): added the reviewed catalog
     `backend/src/main/resources/music/catalog.json` (two recordings, Wholesome CC BY 4.0 and Darkest Child CC BY 3.0,
     rights as checked on 2026-10-23) and `org.rpgengine.music.MusicCatalog`, which refuses a record lacking creator,
@@ -7251,6 +7251,141 @@ this update. No combat runtime/browser result is claimed.
     check and no secret-sentinel journey; the effects volume has no effect to control; export credits list all
     recordings, not only played ones; the client catalog is still a hand copy of `catalog.json`; the new credits download
     and text box were not seen in a browser.
+  - 2026-11-21 P17.2-D: pack mood policy delivery and QA-32 on a packaged installation. The first attempt below was
+    blocked; the second attempt (after it) closes both gaps. The runner ticks the P17.2 box only after its own checks.
+    - Delivered: (1) `PackPresentation.Music`: the optional `music` object of the `presentation` file holds `moods`, whose
+      keys are only the six public states (another key does not compile), and `tracks`, at most one per mood. Each track is
+      bound to a listed `.ogg/.mp3/.wav` asset, licensed CC0/CC BY 3.0/4.0/MIT and carries complete credit text. Refusals
+      are located and never echo the value. (2) `ManagedAssets.music` and `GET /api/v1/campaigns/{campaignId}/music?adventureId=`
+      return the pinned revision's policy (null when none) and tracks with the sealed hash and media type. (3) Client:
+      `parseMusicListing` (`music-pack.ts`, strict), `CampaignTransport.music`, one read per playthrough, the mood from the
+      pack policy, `MusicPlayer.offer` with pack tracks first, and pack tracks in the credits. (4) The sample ships
+      `assets/ford-dusk.wav` (256,044 bytes, 8 s) and `assets/ford-stones.wav` (192,044 bytes, 6 s), made by
+      `node tools/sample-music/make-sample-music.mjs`. A second run into scratch was byte-identical (`cmp`). The sample
+      policy maps `offered` and `fight` to tension, the rest to exploration. ADR 0054 records the open details: format,
+      MIT for pack tracks, hash addressing, and deferral until the listing is known. `.gitattributes` marks `*.wav` binary.
+    - Fixed after the first packaged runs: (a) a playthrough switch created an online Commons element for a moment before the
+      pack listing arrived, so the player now chooses nothing for a scope until its listing is known. (b) After starting a
+      fight, the refresh restarted the tension track, so a same-scope refresh now keeps the listing and passes no mood while
+      re-reading. (c) The old source paused at volume 0.025, so the last fade step now sets 0 first.
+    - Commands and results:
+      - `sh .agents/ralph/verify.sh backend -Dtest=PackPresentationTest,ManagedAssetsTest` → `VERIFY PASSED`, 22 + 6 tests,
+        0 failures.
+      - `... -Dtest=FirstStartProvisioningTest,CampaignExportsTest,CampaignRestoresTest,AdventureBundlesTest,AdventureIndependenceTest,PresentationScopeResolverTest,PublicPresentationScopeBuilderTest,MusicCatalogTest`
+        → `VERIFY PASSED`, 38 tests, 0 failures.
+      - `sh .agents/ralph/verify.sh frontend` → `VERIFY PASSED (frontend)`, 28 files and 284 tests, before fix (b).
+      - After fix (b), one `verify.sh frontend` run printed 28 files and 285 tests passed but its `npm test` never exited. The
+        10-minute tool limit killed the script, leaving its child `npm test` running and `.agents/ralph/.run/verify.lock` in
+        place, and this session may neither stop that process nor remove the lock. A direct `npm --prefix frontend test`
+        right after it ended normally with 28 files and 285 tests passed. So the last frontend change has unit tests that pass
+        but no complete `verify.sh frontend` (typecheck, i18n, build, locales); the packaged build below did compile it.
+    - Packaged installation: the tree was exported with `tar -cf .local/scratch/p172d/tree3.tar --exclude=./.git --exclude=./.local
+      ...` and `tar -xf ... -C .local/scratch/p172d/final3`, then started with `cd .local/scratch/p172d/final3 && sh ./start.sh`:
+      three healthy containers, runtime account not signed in, gameplay not ready, as expected. It was stopped with
+      `sh ./start.sh --stop`. Two earlier copies (`app`, `final`) were also stopped. No other copy held the port and the owner's
+      installation was not touched. Two playthroughs were made with `node frontend/tools/artwork-journey.mjs create`.
+      - `node frontend/tools/music-journey.mjs play it ADV A B shots` → 30 PASS, 0 FAIL.
+      - `... play en ADV A B shots engage` → 32 PASS, 0 FAIL (counted from the printed lines). It covered:
+        - one listing read (200, closed policy, two hashed WAV tracks);
+        - no element or media request before the click;
+        - the click plays the pack exploration track from the asset route (ready state 4, decoded duration 8 s);
+        - time advanced in 48 of 49 samples, and the loop wrapped once in 10 s on one element;
+        - pause, resume, mute (volume 0) and volume 0.2;
+        - secret sentinels: before looking for fights the music stayed on exploration although `ford-ambush` waited at the
+          location, and none of `ford-ambush`, `raider`, `cudgel`, `drive-off`, `slip-away`, `shared-crossing`, `reeds`,
+          `stepping`, `"health"` or `guard` appeared in the listing, the music panel, a media address or the saved preference;
+        - after looking, a crossfade to "Stones in the Current": volumes 0.5 → 0 and 0 → 0.5 in 0.025 steps, at most two
+          audible sources, the old source paused at 0;
+        - axe found no violation;
+        - after the fight started (pack policy `fight` → tension) the same element continued, with no new element;
+        - a switch to the other playthrough paused the previous elements within 150 ms and started that playthrough's own
+          track once;
+        - leaving the playthrough paused everything;
+        - no media error, no request to the online host, and no page or console error besides the known favicon 404.
+      - `... fail decode|source|offline ADV B` → each 5 PASS (offline 6). Each showed `unavailable` with the retry button,
+        no element playing, no retry in 5 s, the story usable and no substitute; offline, the explicit retry played after the
+        network returned. Chrome made 2 requests per failed source.
+      - One screenshot (`music-en-desktop.png`) was looked at: the panel shows the tension track with the MIT link, the
+        source text and the notices.
+    - Not proven or not done (first attempt; the adventure switch and the frontend run are closed by the second attempt):
+      - **Adventure switch:** only a switch between two playthroughs of one adventure was shown in the browser. The packaged
+        installation holds one adventure and no route creates another (`AdventureBundles` has no route), so a switch between
+        two adventures was not shown. The scope key covers the adventure ID, and the unit specs cover scope changes.
+      - **Audible output:** headless Chrome shows media state, not sound, and nobody listened to the tracks.
+      - Real-host Commons playback (never contacted), a screen-reader review, and the Italian review of the panel text.
+      - The fixes above were run only in the unit specs and the third packaged run.
+      - `verify.sh full` was not run.
+    - **Blocker (first attempt):** the orphaned `npm test` process and the stale `.agents/ralph/.run/verify.lock` from the
+      killed run needed the owner, and the adventure-switch gap kept P17.2 open. The supervisor cleared the lock and the
+      owner chose to bundle a second sample.
+    - Second attempt (21 November 2026):
+      - **Run that did not exit.** `MusicPlayer` now registers a `DestroyRef` callback: when its injector is destroyed (a test
+        module reset, an application teardown) it pauses every source and stops its fade interval. Before, an element or
+        a `setInterval` could outlive a test. New case in `music-pack.spec.ts` checks it: after `TestBed.resetTestingModule()`
+        every fake element is paused and no tick remains. The earlier hang was not reproduced, so this is the likely cause,
+        not a proven one. `npm --prefix frontend test` → 28 files, 286 tests passed, exited by itself. `sh
+        .agents/ralph/verify.sh frontend` → `VERIFY PASSED (frontend)`: install, typecheck, test (7 s), i18n, build and
+        locales all PASS, and the script exited.
+      - **Second sample** ([ADR 0055](adr/0055-first-start-seals-two-neutral-sample-adventures.md), superseding the
+        one-sample part of ADR 0046). `backend/src/main/resources/sample-adventure-2/` is a copy of the P14.1-B fixture
+        `sample:cyberpunk-neon-alley` ("Neon Alley", genre label `city`, English with its reviewed Italian overlay). It adds a
+        policy (`offered`, `fight` → tension, the rest exploration) and two loops, `assets/alley-rain.wav` ("Neon Rain",
+        192,044 bytes, 6 s) and `assets/alley-wires.wav` ("Humming Wires", 128,044 bytes, 4 s). The generator now takes
+        an output root and writes all four files. A run into `.local/scratch/p172s/music` gave `ford-dusk.wav` and
+        `ford-stones.wav` byte-identical to the committed ones (`cmp`). The folder is numbered so engine code names no
+        adventure, and `AdventureIndependenceTest` treats both folders as samples. `FirstStartProvisioning` decides once
+        whether the owner has no workspace. If so, it inserts both sample workspaces in one transaction, then seals each pack
+        into its own workspace while that workspace is empty. The first workspace keeps its ADR 0046 identity. An
+        installation that already has a workspace keeps what it has and gets no second sample: only fresh installations
+        receive it. `Result` now lists one `Sample` per workspace. Tests changed for two provisioned revisions:
+        `FirstStartProvisioningTest` (3 new cases: both samples once, an interrupted fresh start completed, the second
+        sample listed and opened in Italian with its music listing), `CyberpunkSliceTest`, `RebootRecoveryTest`,
+        `SampleRestoreCheck` (expected rows 1/2/2 and 1/3/3).
+      - Commands and results:
+        - `sh .agents/ralph/verify.sh backend -Dtest=FirstStartProvisioningTest,CyberpunkSliceTest,AdventureIndependenceTest,RebootRecoveryTest,PackPresentationTest,ManagedAssetsTest,CampaignExportsTest,CampaignRestoresTest,AdventureBundlesTest`
+          → `VERIFY PASSED`, 60 tests, 0 failures (read from the log).
+        - Packaged installation: `mkdir -p .local/scratch/p172s/app`, `tar --exclude=./.git --exclude=./.local
+          --exclude=./backend/target --exclude=./frontend/node_modules --exclude=./.ajimu-autopilot --exclude=./.env
+          --exclude=./.agents/ralph/.run --exclude=./.agents/skills -cf .local/scratch/p172s/tree.tar .`, `tar -xf
+          .local/scratch/p172s/tree.tar -C .local/scratch/p172s/app`, then `cd .local/scratch/p172s/app && sh ./start.sh`:
+          three healthy containers, storage ready, runtime account not signed in, gameplay not ready, as expected. `docker
+          ps` showed no other running container first, and the owner's installation was not touched. All QA-32 runs
+          used this one copy, not a `p172d` copy.
+        - `node frontend/tools/music-journey.mjs adventures` → 10 PASS after a fix to the title check, which first read
+          only the link label (first run: 9 PASS, 1 FAIL on that check only). Both adventures were in the English and Italian
+          library with their titles. A playthrough of each was created through the screens and opened (Ford Camp: cloak, kit,
+          sword; Tram Stop: deck, jacket, pistol). Own reads answered 200 and cross-adventure reads 404, and the two
+          adventures list different track hashes.
+        - `... adventures it` → 10 PASS. Created from the Italian screens, Neon Alley opens at "Fermata del tram" and
+          Lantern Ford at "Ford Camp", because that pack has no Italian text.
+        - `... switch en <Lantern Ford> <playthrough> <Neon Alley> <playthrough>` → 8 PASS. The Lantern Ford element was
+          paused within 150 ms. The second listing was read once with Neon Alley's scope, and "Neon Rain" (a different hash,
+          6 s) played on one new element. No online request was made, no hidden detail of either encounter appeared, and
+          leaving stopped all.
+        - `... play en <Lantern Ford> A B .local/scratch/p172s/shots engage` → 32 PASS, 0 FAIL; `... play it <Neon Alley> A B
+          ... engage` → 32 PASS, 0 FAIL. The duration check now expects each sample's own loop length (8 s and 6 s). The
+          sentinel list also holds the Neon Alley encounter details (`lane-standoff`, `enforcer`, `shock-baton`,
+          `clear-lane`, `offer-toll`, `paid-passage`, `cargo bins`).
+        - `... fail decode <Neon Alley>` → 5 PASS; `fail source <Lantern Ford>` → 5 PASS; `fail offline <Neon Alley>` → 6 PASS.
+        - Restart: `sh ./start.sh --stop`, then `sh ./start.sh` again, then `... adventures` → 10 PASS with the same two
+          adventure IDs, so the restart created no duplicate. Finally `sh ./start.sh --stop`.
+        - `music-it-desktop.png` (Neon Alley, Italian) was looked at: the Italian pack text is shown and the panel names
+          "Humming Wires" with its MIT link, source text and notices. The same screen also shows, after the player asked
+          for fights, the offer card with raw IDs (`lane-standoff`, `enforcer`, `bins`, `roof`) instead of names. That
+          is the existing offers panel (P13.2-B), public once asked, and was not changed here.
+      - Not proven: audible output (headless Chrome measures media state, nobody listened); real-host Commons playback;
+        a screen-reader review; the Italian review of the panel text; `SampleRestoreCheck` and the containers profile
+        (`verify.sh containers`) with the new row counts; `verify.sh full`, which the runner runs.
+      - Runner check after the second attempt (21 November 2026): `verify.sh full` failed on one backend test, 1973 run,
+        1 failure, unrelated to music: `AdmissionProbeControllerTest.anOwnerRequestSendsTheFixedTextAndImageRequestsThroughTheLeaseExecutor`
+        expected the image `COMPLETED` and got `FAILED`/`image-admission-interrupted`. Cause, found by reading the code
+        (not reproduced): `TextResidencyDriver.claim` enqueues the text request on the driver's worker, while
+        `LeasedImageAdmission` submits the image to the coordinator at once, so a pass could grant the image first and the
+        interactive text then preempted it. That outcome is intended behavior, so only the test changed: its scheduler
+        stand-in now calls `driver.awaitIdle()` after the claim, so the text request reaches the coordinator first, as the
+        real scheduler's earlier claim would. No production code changed. `sh .agents/ralph/verify.sh backend
+        -Dtest=AdmissionProbeControllerTest` → `VERIFY PASSED`, twice. Two passing runs do not prove the race is gone;
+        the runner's `verify.sh full` will show whether it is.
 - [ ] P17.3 Finalize the default visual-novel and alternative text-focused layouts, graphic states, configurable tokens and attributed reading/history/quick-reply behavior.
 - [ ] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.
 - [ ] P17.5 Verify missing art/audio never blocks play and media cannot reveal secrets.

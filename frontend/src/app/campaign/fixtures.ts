@@ -176,6 +176,8 @@ export class CampaignServer {
   encounterBody: unknown = encounterBody({ none: true });
   /** Artwork listing (P17.1-B); empty by default, as for a campaign without registered images. */
   artworkBody: unknown = { scope: { adventureId: ADVENTURE, campaignId: CAMPAIGN }, artwork: [] };
+  /** Music listing (P17.2-D); no policy and no track by default, as for a pack that declares no music. */
+  musicBody: unknown = { scope: { adventureId: ADVENTURE, campaignId: CAMPAIGN }, policy: null, tracks: [] };
   /** Journal pages served for `before=` requests, keyed by cursor. */
   olderPages = new Map<number, unknown>();
   failStream = 0;
@@ -211,6 +213,7 @@ export class CampaignServer {
       return Promise.resolve(json(before ? this.olderPages.get(Number(before[1])) ?? { code: 'CAMPAIGN_SCOPE_UNAVAILABLE' } : this.panelsBody));
     }
     if (url.includes('/artwork?')) return Promise.resolve(json(this.artworkBody));
+    if (url.includes('/music?')) return Promise.resolve(json(this.musicBody));
     const op = /\/operations\/([0-9a-f-]{36})\?/.exec(url);
     if (op) {
       const view = this.operations.get(op[1]);

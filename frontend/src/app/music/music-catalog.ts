@@ -31,6 +31,14 @@ export interface MusicRecording {
   readonly localFile?: string;
   /** SHA-256 (lowercase hex) of that local copy; present exactly when {@link localFile} is. */
   readonly localHash?: string;
+  /**
+   * For a track shipped in the playthrough's pack (P17.2-D): the scope and hash of its sealed file, served by the engine's
+   * own asset route. Such a record has an empty {@link sourcePage} and {@link verifiedOn}, and states its origin in
+   * {@link sourceText}.
+   */
+  readonly packAsset?: { readonly adventureId: string; readonly campaignId: string; readonly sha256: string };
+  /** Plain-text origin of a pack track (never a link). */
+  readonly sourceText?: string;
 }
 
 /** Reviewed recordings in catalog order. */
@@ -74,6 +82,8 @@ export function recordingFor(mood: Mood, catalog: readonly MusicRecording[] = MU
  * {@link LOCAL_BASE}. Real-host playback has not been verified.
  */
 export function mediaUrl(record: MusicRecording): string {
+  const pack = record.packAsset;
+  if (pack !== undefined) return `/api/v1/campaigns/${pack.campaignId}/assets/${pack.sha256}?adventureId=${pack.adventureId}`;
   if (record.localFile !== undefined) return `${LOCAL_BASE}${encodeURIComponent(record.localFile)}`;
   return `${MEDIA_ORIGIN}/wiki/Special:FilePath/${encodeURIComponent(record.mediaFile)}`;
 }
@@ -133,10 +143,12 @@ export function admitLocal(candidate: unknown): MusicRecording | null {
 export function creditText(record: MusicRecording): string {
   return [
     `"${record.title}" — ${record.creator}`,
-    `Source: ${record.sourcePage}`,
+    `Source: ${record.packAsset ? record.sourceText : record.sourcePage}`,
     `License: ${record.licenseName} (${record.licenseId}), ${record.licenseUrl}`,
     `Notices: ${record.notices}`,
     `Modifications: ${record.modifications}`,
-    `Rights checked: ${record.verifiedOn}${record.localHash ? `; local copy SHA-256 ${record.localHash}` : ''}`,
+    record.packAsset
+      ? `Rights: as declared by the adventure pack; file SHA-256 ${record.packAsset.sha256}`
+      : `Rights checked: ${record.verifiedOn}${record.localHash ? `; local copy SHA-256 ${record.localHash}` : ''}`,
   ].join('\n');
 }

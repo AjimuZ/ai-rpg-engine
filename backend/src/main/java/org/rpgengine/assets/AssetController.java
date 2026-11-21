@@ -116,6 +116,61 @@ public class AssetController {
         }
     }
 
+    /**
+     * Deliver the mood policy and authored tracks of the campaign's pinned pack (P17.2-D, docs/24 section 2). The
+     * policy maps only the closed public states of {@code PackPresentation.PUBLIC_STATES} to moods; nothing in the body
+     * names an entity, an event or a hidden value, and a track is addressed only by the hash {@link #serve} accepts.
+     *
+     * @param request admitted request; owner identity comes only from admission
+     * @param campaignId canonical lower-case campaign UUID
+     * @param adventureId canonical lower-case UUID of the campaign's adventure
+     * @return 200 {@code {"scope":{adventureId,campaignId},"policy":{state:mood}|null,"tracks":[...]}} where each track
+     *         holds exactly id, mood, title, creator, license, licenseUrl, source, notices, modifications, sha256 and
+     *         mediaType, and {@code policy} is null when the pack declares none; 400 {@code ASSET_REQUEST_INVALID},
+     *         403 without admission, 404 {@code ASSET_NOT_FOUND} for a campaign the owner does not hold in that
+     *         adventure, or 503 when storage fails
+     */
+    @GetMapping("/api/v1/campaigns/{campaignId}/music")
+    public ResponseEntity<?> music(HttpServletRequest request, @PathVariable String campaignId,
+            @RequestParam(required = false) String adventureId) {
+        UUID owner = request.getAttribute(LocalHttpAdmission.OWNER_ATTRIBUTE) instanceof UUID value ? value : null;
+        if (owner == null) {
+            return error(403, "LOCAL_ADMISSION_DENIED");
+        }
+        try {
+            UUID adventure = id(adventureId);
+            UUID campaign = id(campaignId);
+            var listed = assets.music(owner, adventure, campaign);
+            if (listed.isEmpty()) {
+                return error(404, "ASSET_NOT_FOUND");
+            }
+            var tracks = listed.get().tracks().stream().map(item -> {
+                var entry = new java.util.LinkedHashMap<String, Object>();
+                entry.put("id", item.track().id());
+                entry.put("mood", item.track().mood());
+                entry.put("title", item.track().title());
+                entry.put("creator", item.track().creator());
+                entry.put("license", item.track().license());
+                entry.put("licenseUrl", item.licenseUrl());
+                entry.put("source", item.track().source());
+                entry.put("notices", item.track().notices());
+                entry.put("modifications", item.track().modifications());
+                entry.put("sha256", item.sha256());
+                entry.put("mediaType", item.mediaType());
+                return entry;
+            }).toList();
+            var body = new java.util.LinkedHashMap<String, Object>();
+            body.put("scope", Map.of("adventureId", adventure.toString(), "campaignId", campaign.toString()));
+            body.put("policy", listed.get().moods().isEmpty() ? null : listed.get().moods());
+            body.put("tracks", tracks);
+            return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(body);
+        } catch (IllegalArgumentException failure) {
+            return error(400, "ASSET_REQUEST_INVALID");
+        } catch (DataAccessException | TransactionException failure) {
+            return error(503, "ASSET_STORAGE_UNAVAILABLE");
+        }
+    }
+
     /** Require canonical lower-case UUID text, rejecting Java's permissive abbreviated forms. */
     private static UUID id(String value) {
         if (value == null) {

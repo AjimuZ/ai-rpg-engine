@@ -111,8 +111,11 @@ class CyberpunkSliceTest {
     void theSecondGenreSharesNoVocabularyWithTheFantasySample() {
         CompiledPack cyber = load(workspace, revision);
         CompiledPack fantasy = load(fantasyWorkspace, fantasyRevision);
+        // Provisioning also seals the bundled copy of this pack in its own workspace (ADR 0055); only the fixture import
+        // and the fantasy sample are compared here.
         assertEquals(List.of("sample:cyberpunk-neon-alley", "sample:lantern-ford"), jdbc.queryForList(
-                "select pack_id from content_revision order by pack_id", String.class));
+                "select pack_id from content_revision where adventure_id in (?, ?) order by pack_id", String.class,
+                workspace, fantasyWorkspace));
         assertEquals(List.of(), cyber.parsed().manifest().values().get("modules"));
         assertEquals(List.of(), fantasy.parsed().manifest().values().get("modules"));
         Set<String> ids = new HashSet<>(cyber.byId().keySet());

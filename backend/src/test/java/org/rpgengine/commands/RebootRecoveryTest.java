@@ -108,7 +108,7 @@ class RebootRecoveryTest {
     void prepare() {
         clear();
         adventure = provisioning.provision(OWNER).workspaceId();
-        UUID content = jdbc.queryForObject("select id from content_revision", UUID.class);
+        UUID content = jdbc.queryForObject("select id from content_revision where adventure_id = ?", UUID.class, adventure);
         campaign = creation.create(OWNER, adventure, new CampaignCreationService.Request(UUID.randomUUID(), content,
                 "Reboot watch", SupportedLocale.EN, new CharacterChoices("Player", "scout", Map.of(), Map.of(), null,
                         null))).campaignId();
@@ -162,7 +162,7 @@ class RebootRecoveryTest {
             assertEquals("FAILED_BEFORE_COMMIT", status(cut), "the reboot ends the attempt without resolving it");
             assertEquals(reserved, draws(cut), "and keeps its dice");
             assertEquals(world, world(), "the reboot changes nothing of the world");
-            assertEquals(List.of(1, 1, 1), List.of(rows("identity_owner_profile"), rows("adventure_workspace"),
+            assertEquals(List.of(1, 2, 2), List.of(rows("identity_owner_profile"), rows("adventure_workspace"),
                     rows("content_revision")), "a provisioned installation is not provisioned again");
             var report = rebooted.getBean(MemoryStartupReconciliation.class).lastReport();
             assertNotNull(report, "the memory pass ran at the reboot");

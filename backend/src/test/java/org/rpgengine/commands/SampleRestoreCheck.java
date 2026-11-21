@@ -100,8 +100,8 @@ class SampleRestoreCheck {
     @Test
     void seedSourceInstallation() throws Exception {
         assertEquals(0, rows("campaign"), "the rehearsal needs a new, disposable database");
-        assertEquals(List.of(1, 1, 1), List.of(rows("identity_owner_profile"), rows("adventure_workspace"),
-                rows("content_revision")), "the start provisioned the owner and the bundled sample");
+        assertEquals(List.of(1, 2, 2), List.of(rows("identity_owner_profile"), rows("adventure_workspace"),
+                rows("content_revision")), "the start provisioned the owner and both bundled samples (ADR 0055)");
         UUID sample = provisioning.provision(OWNER).workspaceId();
 
         UUID suppliesAdventure = UUID.randomUUID();
@@ -168,7 +168,7 @@ class SampleRestoreCheck {
         var evidence = JSON.readValue(Files.readString(evidenceDirectory().resolve("sample-evidence.json")),
                 Evidence.class);
         assertEquals(evidence.world(), world(), "every canonical row of both campaigns and their content is restored");
-        assertEquals(List.of(1, 2, 2), List.of(rows("identity_owner_profile"), rows("adventure_workspace"),
+        assertEquals(List.of(1, 3, 3), List.of(rows("identity_owner_profile"), rows("adventure_workspace"),
                 rows("content_revision")), "a restored installation is not provisioned again");
         assertEquals(2, jdbc.queryForObject("select count(*) from campaign where recovery_generation = 1", Integer.class));
         var report = reconciliation.lastReport();
