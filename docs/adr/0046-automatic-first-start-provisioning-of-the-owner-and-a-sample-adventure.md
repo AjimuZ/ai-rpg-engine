@@ -43,6 +43,7 @@ Facts the design relies on:
 - New: `adventure/FirstStartProvisioning`, the bundled pack under `backend/src/main/resources/sample-adventure/`, the launcher's `ensure_owner`/`load_owner`, and three engine variables in `compose.yaml`. No migration, route, pack schema or page changed.
 - Starting with `docker compose up` alone, without the launcher, still has no owner and still answers 503, as before.
 - Losing `.local/owner-id` with an existing database makes the next start create a new UUID, and the engine then refuses to start until the original file is restored. The launcher cannot tell an upgrade from a lost file without reading the database.
+- Update (21 November 2026, P14.1-D): the sample's `ford-ambush` now also declares a negotiated ending, see [ADR 0048](0048-the-bundled-sample-offers-one-unchecked-free-truce.md); an installation that already sealed the sample keeps its revision, as decision 5 says.
 - Not covered: the sample is English only (no Italian localization); one genre; no live packaged start was run to show the 503 is gone in a browser.
 
 ## Verification

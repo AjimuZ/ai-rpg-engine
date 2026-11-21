@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.rpgengine.campaign.CampaignCreationService;
 import org.rpgengine.campaign.CampaignProjectionService;
 import org.rpgengine.campaign.CharacterChoices;
+import org.rpgengine.combat.EncounterWriter;
 import org.rpgengine.commands.CommandExecutionService;
 import org.rpgengine.commands.OperationAdmissionService;
 import org.rpgengine.commands.OperationStatus;
@@ -184,5 +185,81 @@ class FirstStartProvisioningTest {
         assertEquals("ENCOUNTER", jdbc.queryForObject("select mode from campaign where id = ?", String.class,
                 created.campaignId()));
         assertEquals("ford-camp", jdbc.queryForObject("select location_id from encounter", String.class));
+    }
+
+    /**
+     * The bundled ford ambush ends by agreement (P14.1-D, ADR 0048): from the engagement and the initiative roll, the
+     * player offers the sample's declared passage, which has no check and so always puts its free terms on the table.
+     * Only the explicit answer makes the truce, the lost response of the acceptance replays the same receipt, and the
+     * settlement returns the campaign to exploration at the camp and replays its own receipt too. Dice decide only what
+     * the raider does before the player's first decision, so a fight the raider ended there is started again.
+     */
+    @Test
+    void theProvisionedEncounterEndsInANegotiatedSettlement() {
+        var provisioned = provisioning.provision(OWNER);
+        UUID revisionId = jdbc.queryForObject("select id from content_revision", UUID.class);
+        UUID campaign = null;
+        long revision = 0;
+        for (int attempt = 0; attempt < 5 && campaign == null; attempt++) {
+            var created = creation.create(OWNER, provisioned.workspaceId(), new CampaignCreationService.Request(
+                    UUID.randomUUID(), revisionId, "Parley " + attempt, SupportedLocale.EN,
+                    new CharacterChoices("Player", "scout", Map.of(), Map.of(), null, null)));
+            var engaged = send(created.campaignId(), 0, new TypedCommand.Engage("ford-ambush", null));
+            var rolled = send(created.campaignId(), engaged.operation().committedRevision(), new TypedCommand.RollInitiative());
+            revision = rolled.operation().committedRevision();
+            if ("AWAITING_ACTION".equals(combat(rolled).get("phase"))) {
+                campaign = created.campaignId();
+            }
+        }
+        assertTrue(campaign != null, "the raider ended five fights before the player's first decision");
+
+        var offered = send(campaign, revision, new TypedCommand.Interact("offer-passage", "raider"));
+        revision = offered.operation().committedRevision();
+        var offer = (Map<?, ?>) ((Map<?, ?>) combat(offered).get("options")).get("offer");
+        assertEquals("OFFERED", offer.get("response"));
+        assertEquals("raider", offer.get("recipientId"));
+        assertEquals(Map.of("termsId", "shared-crossing", "kind", "truce", "cost", 0), offer.get("terms"));
+        assertEquals(true, offer.get("canAccept"));
+        assertEquals("AWAITING_ACTION", combat(offered).get("phase"), "a response binds nobody");
+
+        var answer = new OperationAdmissionService.Command(UUID.randomUUID().toString(), revision, "ANSWER_OFFER",
+                new TypedCommand.AnswerOffer((String) offer.get("offerId"), "accept").payload());
+        var accepted = executions.execute(OWNER, provisioned.workspaceId(), campaign, answer);
+        assertEquals(OperationStatus.COMMITTED, accepted.operation().status());
+        revision = accepted.operation().committedRevision();
+        assertEquals("OUTCOME_PENDING", combat(accepted).get("phase"));
+        var outcome = (Map<?, ?>) combat(accepted).get("outcome");
+        assertEquals("AGREEMENT", outcome.get("outcome"));
+        assertEquals("shared-crossing", outcome.get("termsId"));
+        var lost = executions.execute(OWNER, provisioned.workspaceId(), campaign, answer);
+        assertTrue(lost.replayed(), "the lost response of the acceptance is retried with the same identity");
+        assertEquals(accepted.receipt(), lost.receipt());
+
+        UUID encounter = EncounterWriter.state(jdbc, campaign).orElseThrow().id();
+        var settle = new OperationAdmissionService.Command(UUID.randomUUID().toString(), revision, "SETTLE_ENCOUNTER",
+                new TypedCommand.SettleEncounter(encounter).payload());
+        var settled = executions.execute(OWNER, provisioned.workspaceId(), campaign, settle);
+        assertEquals(OperationStatus.COMMITTED, settled.operation().status());
+        assertEquals("AGREEMENT", ((Map<?, ?>) combat(settled).get("outcome")).get("outcome"));
+        assertEquals("EXPLORATION", jdbc.queryForObject("select mode from campaign where id = ?", String.class, campaign));
+        assertEquals("ford-camp", resumeCards.read(OWNER, provisioned.workspaceId(), campaign).location().id());
+        var again = executions.execute(OWNER, provisioned.workspaceId(), campaign, settle);
+        assertTrue(again.replayed(), "the lost response of the settlement is retried with the same identity");
+        assertEquals(settled.receipt(), again.receipt());
+        assertEquals(1, jdbc.queryForObject("select count(*) from campaign_event where campaign_id = ? "
+                + "and event_type = 'ENCOUNTER_SETTLED'", Integer.class, campaign));
+        assertEquals(1, jdbc.queryForObject("select count(*) from campaign_event where campaign_id = ? "
+                + "and event_type = 'OFFER_ANSWERED'", Integer.class, campaign));
+    }
+
+    private CommandExecutionService.Execution send(UUID campaign, long revision, TypedCommand command) {
+        var execution = executions.execute(OWNER, FirstStartProvisioning.sampleWorkspace(OWNER), campaign,
+                new OperationAdmissionService.Command(UUID.randomUUID().toString(), revision, command.type(), command.payload()));
+        assertEquals(OperationStatus.COMMITTED, execution.operation().status(), command.toString());
+        return execution;
+    }
+
+    private static Map<?, ?> combat(CommandExecutionService.Execution execution) {
+        return (Map<?, ?>) execution.receipt().get("combat");
     }
 }

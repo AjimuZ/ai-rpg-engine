@@ -9,4 +9,8 @@
     "stats":{"health":14,"guard":12,"resistance":11,"armor":1,"force":1,"finesse":1,"insight":1,"resolve":1},
     "attacks":[{"id":"cudgel","attribute":"force","skill":1,"strongHit":false,"damage":{"count":1,"sides":6}}]}],
   "objectives":[{"id":"drive-off","name":"Drive off the raider","kind":"defeatHostiles"},
-    {"id":"slip-away","name":"Slip away through the reeds","kind":"escape"}]}}]}
+    {"id":"slip-away","name":"Slip away through the reeds","kind":"escape"}],
+  "actions":[{"id":"offer-passage","name":"Offer a fair crossing","kind":"social","intent":"negotiate",
+    "description":"Propose that each side keeps its own bank and nobody is hurt.",
+    "terms":{"id":"shared-crossing","name":"A shared crossing","kind":"truce",
+      "description":"The raider lowers the cudgel and lets you cross in peace; the fight ends with everyone standing."}}]}}]}

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — A negotiated ending in the sample adventure (P14.1-D), 21 November 2026
+
+- The raider at the ford in Lantern Ford can now be talked to. The fight offers "Offer a fair crossing": the raider
+  answers with a shared crossing (a truce at no cost). Nothing ends until you accept those terms explicitly, and words
+  such as "I accept" change nothing. Accepting ends the fight with everyone standing, and settling it returns you to
+  exploration at the camp. You can still fight or slip away instead.
+- A lost reply to the acceptance or to the settlement can be retried with the same request: it returns the same result
+  and does not pay, settle or write twice.
+- Only a fresh installation gets this. An installation that already holds the sample keeps the version it has; a newer
+  sample is not delivered to an existing workspace. The new texts are English only, like the rest of the sample.
+- Covered by an automated test of the provisioned sample, from the engagement to the settlement. Not run live in a
+  browser.
+
 ## Unreleased — A fight you can play from the browser (P14.1-A.2), 20 November 2026
 
 - After you start a fight, the combat panel now offers "Roll initiative" (Italian: "Tira l’iniziativa"). Before this, a

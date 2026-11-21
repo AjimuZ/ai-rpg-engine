@@ -5445,6 +5445,32 @@ this update. No combat runtime/browser result is claimed.
       - Deliberate weakenings of the journey, `verify.sh full`, `verify.sh containers` and backend tests: not run (no
         backend code changed).
       - Nothing in the journey was repeated across a restart of the containers.
+  - P14.1-D (21 November 2026, partial; this box stays unchecked): the bundled sample encounter now has a negotiated
+    ending ([ADR 0048](adr/0048-the-bundled-sample-offers-one-unchecked-free-truce.md)).
+    - **Change.** `backend/src/main/resources/sample-adventure/encounters.json`: `ford-ambush` declares `offer-passage`
+      (social, intent `negotiate`, hostile recipients, default cost 1) proposing `shared-crossing` (kind `truce`, cost 0),
+      with no check and no counteroffer, so the raider's response is certain and the ending does not depend on dice. The
+      pack compiled and sealed through the normal provisioning path in the test below (`PackCompiler` accepts the terms).
+    - **Test.** `FirstStartProvisioningTest#theProvisionedEncounterEndsInANegotiatedSettlement` provisions the sample,
+      creates a campaign from the sealed revision, engages `ford-ambush`, rolls initiative, offers `offer-passage` to the
+      `raider` and asserts the response `OFFERED` with the terms `shared-crossing`/`truce`/cost 0 and `canAccept` true. It
+      then accepts with `ANSWER_OFFER` (outcome `AGREEMENT`, phase `OUTCOME_PENDING`), retries the same command identity
+      (replayed, same receipt), settles with `SETTLE_ENCOUNTER` (campaign back to `EXPLORATION` at `ford-camp`), and
+      retries the settlement the same way. One `OFFER_ANSWERED` and one `ENCOUNTER_SETTLED` event exist afterwards. The
+      test starts a new campaign, up to five times, when the raider's dice end the fight before the player's first
+      decision; that retry loop is the only dice-dependent part.
+    - **Commands and results.** `sh .agents/ralph/verify.sh backend -Dtest=FirstStartProvisioningTest` printed
+      `VERIFY PASSED` (backend-sources, backend-database, backend-focused PASS), and the same with
+      `-Dtest=FirstStartProvisioningTest#theProvisionedEncounterEndsInANegotiatedSettlement`. The wrapper prints no test
+      counts, so the number of tests run was not read.
+    - **Fresh installation only.** The packaged image seals the sample at the first start, so a fresh installation holds
+      the new action. An installation that already holds a sealed sample revision keeps it (ADR 0046, decision 5), and
+      delivering a new revision to an existing workspace is out of scope.
+    - **Not proven.** A live packaged start and the browser's combat panel offering and answering the new action (the
+      panel lists the projection's declared actions and the offer; no live run was made); `verify.sh full` and
+      `verify.sh containers` (not run); the Italian text of the new action and terms (the pack has no locale overlay, so
+      they show English with the fallback notice); a checked or priced negotiation, a surrender ending and a second genre
+      fixture, which P14.1 still names; the rest of the P14.1 acceptance criteria.
 - [ ] P14.2 Verify reboot, AI renewal, interrupted generation, lost response, backup restore, and no duplicate effects.
 - [ ] P14.3 Run the required reduced-scope MVP QA matrix and record fresh evidence.
 - [ ] P14.4 Measure baseline latency/context use and list unresolved defects honestly; demonstrate one optional bilingual baseline/planner investigation comparison when available, or record deferred/unavailable planning with the playable fallback. Advanced planning cannot block MVP.
