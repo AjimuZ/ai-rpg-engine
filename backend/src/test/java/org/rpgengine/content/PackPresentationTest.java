@@ -202,6 +202,70 @@ class PackPresentationTest {
         assertRefused(notText, "SCHEMA", "/scenes/0/id");
     }
 
+    /** Authored artwork binds a listed asset file to the item, NPC or scene it depicts, with its credit line. */
+    @Test
+    void bindsListedAssetFilesToTheirSubjects() {
+        var declaration = valid();
+        declaration.put("artwork", new ArrayList<>(List.of(
+                art("item", "rope", "assets/rope.png", "Rope icon, MIT"),
+                art("portrait", "keeper", "assets/rope.png", "Keeper portrait, MIT"),
+                art("scene", "harbor-dawn", "assets/rope.png", "Harbor scene, MIT"),
+                art("map", "any-map", "assets/rope.png", "Map, MIT"),
+                art("ui", "any-frame", "assets/rope.png", "Frame, MIT"))));
+        var bound = compile(withAsset(declaration)).presentation().artwork();
+        assertEquals(5, bound.size());
+        assertEquals(new PackPresentation.Artwork("item", "rope", "assets/rope.png", "Rope icon, MIT"), bound.getFirst());
+        assertThrows(UnsupportedOperationException.class, () -> bound.add(bound.getFirst()));
+        assertTrue(compile(bytes(valid(), true, true)).presentation().artwork().isEmpty());
+    }
+
+    /** A binding to a missing file, a wrong kind, an unknown scene, a duplicate or a bad credit is refused and located. */
+    @Test
+    void refusesArtworkThatDoesNotBindToAnything() {
+        assertArtworkRefused(art("item", "rope", "assets/missing.png", "Credit"), "FILE_REFERENCE", "/artwork/0/file");
+        assertArtworkRefused(art("item", "rope", "keeper.json", "Credit"), "FILE_REFERENCE", "/artwork/0/file");
+        assertArtworkRefused(art("item", "keeper", "assets/rope.png", "Credit"), "REFERENCE_UNKNOWN", "/artwork/0/subject");
+        assertArtworkRefused(art("portrait", "rope", "assets/rope.png", "Credit"), "REFERENCE_UNKNOWN", "/artwork/0/subject");
+        assertArtworkRefused(art("scene", "undeclared", "assets/rope.png", "Credit"), "REFERENCE_UNKNOWN", "/artwork/0/subject");
+        assertArtworkRefused(art("music", "rope", "assets/rope.png", "Credit"), "SCHEMA", "/artwork/0/category");
+        assertArtworkRefused(art("item", "https://evil.example/a", "assets/rope.png", "Credit"), "SCHEMA", "/artwork/0/subject");
+        assertArtworkRefused(art("item", "rope", "assets/rope.png", "  "), "SCHEMA", "/artwork/0/credit");
+        assertArtworkRefused(art("item", "rope", "assets/rope.png", "x".repeat(201)), "SCHEMA", "/artwork/0/credit");
+        assertArtworkRefused(art("item", "rope", "assets/rope.png", "line\nbreak"), "SCHEMA", "/artwork/0/credit");
+        var twice = valid();
+        twice.put("artwork", new ArrayList<>(List.of(art("item", "rope", "assets/rope.png", "One"),
+                art("item", "rope", "assets/rope.png", "Two"))));
+        var error = assertThrows(PackException.class, () -> compile(withAsset(twice)));
+        assertEquals("DUPLICATE", error.code());
+        assertEquals("/artwork/1/subject", error.location().pointer());
+        var extra = art("item", "rope", "assets/rope.png", "Credit");
+        extra.put("url", "https://evil.example/a.png");
+        assertArtworkRefused(extra, "SCHEMA", "/artwork/0/url");
+    }
+
+    private static void assertArtworkRefused(Map<String, Object> entry, String code, String pointer) {
+        var declaration = valid();
+        declaration.put("artwork", new ArrayList<>(List.of(entry)));
+        var error = assertThrows(PackException.class, () -> compile(withAsset(declaration)), pointer);
+        assertEquals(code, error.code(), error.getMessage());
+        assertEquals(pointer, error.location().pointer());
+        assertFalse(error.getMessage().contains("evil.example"));
+    }
+
+    private static Map<String, Object> art(String category, String subject, String file, String credit) {
+        return new LinkedHashMap<>(Map.of("category", category, "subject", subject, "file", file, "credit", credit));
+    }
+
+    /** The reference pack with the declaration and one listed asset file {@code assets/rope.png}. */
+    private static Map<String, byte[]> withAsset(Map<String, Object> declaration) {
+        var files = bytes(declaration, true, true);
+        files.put("assets/rope.png", new byte[] {1, 2, 3});
+        files.put("adventure.json", new String(files.get("adventure.json"), StandardCharsets.UTF_8)
+                .replace(PRESENTATION_FILE, PRESENTATION_FILE + ",{\"path\":\"assets/rope.png\",\"category\":\"asset\"}")
+                .getBytes(StandardCharsets.UTF_8));
+        return files;
+    }
+
     /** A presentation file must be the single one the manifest names. */
     @Test
     void requiresTheManifestToNameTheFile() {

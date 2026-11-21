@@ -7,7 +7,10 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import org.rpgengine.content.PackException;
 import org.rpgengine.content.PackMedia;
+import org.rpgengine.content.PackPresentation;
+import org.rpgengine.content.PackRegistry;
 import org.rpgengine.presentation.PresentationEvent;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -43,20 +46,33 @@ public class ManagedAssets {
             + "a.appearance_revision, a.source_revision, a.sha256, m.media_type, m.width, m.height, m.byte_size, a.credit "
             + "from asset_association a join managed_asset m on m.sha256 = a.sha256 where a.campaign_id = ? "
             + "order by a.category, a.subject, a.appearance_revision desc limit " + MAX_LISTED;
+    /** Sealed image files of one pack revision, as its import report recorded them. */
+    private static final String AUTHORED = "select f->>'sha256', f->>'mediaType', coalesce((f->>'width')::int, 0), "
+            + "coalesce((f->>'height')::int, 0), (f->>'bytes')::bigint from content_revision_report r, "
+            + "jsonb_array_elements(r.report->'files') f where r.content_revision_id = ? and f->>'path' = ? "
+            + "and f->>'category' = 'asset' and f->>'mediaType' like 'image/%'";
     private final JdbcTemplate jdbc;
+    private final PackRegistry packs;
     private final TransactionTemplate transaction;
+    private final TransactionTemplate reads;
 
     /**
      * Wire persistence; missing dependencies fail startup.
      *
      * @param jdbc JDBC access joined to the transaction
      * @param manager shared transaction manager
+     * @param packs registry that recompiles a campaign's pinned pack, whose presentation file binds authored artwork
      */
-    public ManagedAssets(JdbcTemplate jdbc, PlatformTransactionManager manager) {
+    public ManagedAssets(JdbcTemplate jdbc, PlatformTransactionManager manager, PackRegistry packs) {
         this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
+        this.packs = Objects.requireNonNull(packs, "packs");
         transaction = new TransactionTemplate(Objects.requireNonNull(manager, "manager"));
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         transaction.setTimeout(30);
+        reads = new TransactionTemplate(manager);
+        reads.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        reads.setReadOnly(true);
+        reads.setTimeout(30);
     }
 
     /** What a job asks to publish; the bytes are untrusted until validated. */
@@ -206,7 +222,9 @@ public class ManagedAssets {
 
     /**
      * List the artwork in force for every subject of one campaign, so a client can look an entity's stable image up
-     * by category and subject instead of guessing a hash.
+     * by category and subject instead of guessing a hash. Accepted associations come first; a subject the pinned
+     * pack revision binds to authored artwork (see {@link PackPresentation#artwork()}) and that has no association
+     * is listed with that artwork, credited as the pack declares.
      *
      * @param owner owner asking, from local admission
      * @param adventure adventure workspace the campaign belongs to
@@ -220,10 +238,46 @@ public class ManagedAssets {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(adventure, "adventure");
         Objects.requireNonNull(campaign, "campaign");
-        if (pinnedRevision(owner, adventure, campaign) == null) {
-            return Optional.empty();
+        return reads.execute(status -> {
+            UUID revision = pinnedRevision(owner, adventure, campaign);
+            if (revision == null) {
+                return Optional.<java.util.List<Metadata>>empty();
+            }
+            var listed = new java.util.ArrayList<>(jdbc.query(CURRENT_ALL, (rs, n) -> metadata(rs), campaign));
+            var held = new java.util.HashSet<String>();
+            listed.forEach(item -> held.add(item.category().wire() + '\u0000' + item.subject()));
+            for (Metadata authored : authored(adventure, revision)) {
+                // An accepted association is a later, explicit choice for the subject, so it keeps its place.
+                if (held.add(authored.category().wire() + '\u0000' + authored.subject())) {
+                    listed.add(authored);
+                }
+            }
+            listed.sort(java.util.Comparator.comparing((Metadata item) -> item.category().wire())
+                    .thenComparing(Metadata::subject));
+            return Optional.of(java.util.List.copyOf(listed.size() > MAX_LISTED ? listed.subList(0, MAX_LISTED) : listed));
+        });
+    }
+
+    /**
+     * The artwork the pinned pack revision binds to its entities in its presentation file, as appearance revision 1
+     * of the pack's own source revision 0. A binding whose file is not a sealed image of the revision is skipped.
+     * A pack that cannot be loaded here binds nothing: the failure is reported by the paths that need the pack, and
+     * it must not hide the associations the campaign holds.
+     */
+    private java.util.List<Metadata> authored(UUID adventure, UUID revision) {
+        java.util.List<PackPresentation.Artwork> bindings;
+        try {
+            bindings = packs.loadForCampaign(adventure, revision).root().presentation().artwork();
+        } catch (PackException | IllegalStateException failure) {
+            return java.util.List.of();
         }
-        return Optional.of(jdbc.query(CURRENT_ALL, (rs, n) -> metadata(rs), campaign));
+        var found = new java.util.ArrayList<Metadata>();
+        for (PackPresentation.Artwork binding : bindings) {
+            jdbc.query(AUTHORED, (rs, n) -> new Metadata(AssetCategory.fromWire(binding.category()), binding.subject(), 1, 0,
+                    rs.getString(1), rs.getString(2), rs.getInt(3), rs.getInt(4), rs.getLong(5), binding.credit()),
+                    revision, binding.file()).stream().findFirst().ifPresent(found::add);
+        }
+        return found;
     }
 
     /** The pack revision the owner's campaign pins, or null when owner, adventure and campaign do not line up. */

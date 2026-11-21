@@ -5,10 +5,10 @@
  * It never starts a stand-in server: every request goes to the engine in the containers. Phases, run one at a time:
  *   create                          create one playthrough through the screens; print its identities and items
  *   view LOCALE ADVENTURE CAMPAIGN SHOTDIR art|none
- *                                   (none: expect built-in icons and the no-artwork credits note. art: expect registered
- *                                   images and a credit line; no route publishes an image yet, so `art` has nothing to
- *                                   show on a packaged installation until P17.1-C binds pack artwork. Rows are never
- *                                   inserted by hand.)
+ *                                   (none: expect built-in icons and the no-artwork credits note. art: expect the bundled
+ *                                   sample's authored sword icon, bound by its presentation file (P17.1-C), on every row
+ *                                   of the `sword` definition, the other items on the built-in icon, and the sample's credit
+ *                                   line. Rows are never inserted by hand.)
  *                                   open the playthrough at 390x844, 1280x800 and 390x844 with reduced motion; print
  *                                   art, frame and tier of every item row, credits, axe contrast and violations
  *   equip ADVENTURE CAMPAIGN ITEM equip|unequip
@@ -119,6 +119,15 @@ if (phase === 'create') {
       await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined);
       await page.waitForTimeout(1000);
       const after = await page.evaluate(summarize);
+      // Icons are lazy: one below the fold loads only when scrolled to, so bring each into view (bounded wait) before the
+      // decode check, which would otherwise report an image that was simply never requested.
+      await page.evaluate(async () => {
+        for (const image of document.querySelectorAll('.art-frame img')) {
+          image.scrollIntoView({ block: 'center' });
+          if (!image.complete) await Promise.race([new Promise((done) => image.addEventListener('load', done, { once: true })), new Promise((done) => setTimeout(done, 5000))]);
+        }
+        window.scrollTo(0, 0);
+      });
       const measured = await page.evaluate(() => {
         const frames = [...document.querySelectorAll('.art-frame')].map((f) => { const s = getComputedStyle(f); return { frame: f.getAttribute('data-frame'), style: s.borderTopStyle, width: s.borderTopWidth, color: s.borderTopColor, behind: (() => { for (let e = f.parentElement; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (!/rgba\(.*, 0\)$|transparent/.test(c)) return c; } return 'rgb(255, 255, 255)'; })() }; });
         return { frames, decoded: [...document.querySelectorAll('.art-frame img')].map((i) => i.complete && i.naturalWidth),
@@ -133,7 +142,13 @@ if (phase === 'create') {
       console.log(JSON.stringify({ label, items: before.items, worn: before.worn, credits: measured.credits, decoded: measured.decoded, borders: [...new Map(borders.map((b) => [b.frame, b])).values()],
         assetRequests: [...new Set(assetRequests)], axe }, null, 1));
       check(`${label}: credits section visible`, measured.creditsVisible, measured.credits);
-      if (withArt) check(`${label}: a credit line is shown`, /CC0/.test(measured.credits), measured.credits);
+      if (withArt) {
+        check(`${label}: the sample's credit line is shown`, /make-sample-art\.mjs/.test(measured.credits), measured.credits);
+        const swords = before.items.filter((row) => row.key === 'sword');
+        check(`${label}: every sword row shows the authored image`, swords.length > 0 && swords.every((row) => row.art === 'image'), before);
+        check(`${label}: a worn item shows the same image as the sword row`, before.worn.every((row) => row.art === 'fallback' || row.src === swords[0]?.src), before.worn);
+        check(`${label}: items without authored art keep the built-in icon`, before.items.filter((row) => row.key !== 'sword').every((row) => row.art === 'fallback'), before.items);
+      }
       else check(`${label}: no image is registered, so every row shows the built-in icon`, before.items.every((i) => i.art !== 'image') && assetRequests.length === 0, { items: before.items, assetRequests });
       check(`${label}: art, frame and tier identical across a reload`, JSON.stringify(before) === JSON.stringify(after));
       if (withArt) {

@@ -28,6 +28,16 @@ export function frameFor(tier: string | null): FrameToken {
   return rank < 0 ? 'unranked' : (`rank-${rank + 1}` as FrameToken);
 }
 
+/** Image categories shown in the gallery, in display order; item art is shown in the inventory and equipment lists. */
+export const GALLERY_CATEGORIES = ['scene', 'map', 'portrait', 'ui'] as const;
+export type GalleryCategory = (typeof GALLERY_CATEGORIES)[number];
+
+/** One gallery image: its stable subject reference and the hash URL it is served from. */
+export interface GalleryItem { readonly subject: string; readonly url: string; readonly width: number; readonly height: number }
+
+/** The images of one gallery category, ordered by subject. */
+export interface GalleryGroup { readonly category: GalleryCategory; readonly items: readonly GalleryItem[] }
+
 /** Lookup of the artwork in force for one campaign scope; an empty index shows only fallbacks. */
 export class ArtworkIndex {
   private readonly byKey = new Map<string, ArtworkEntry>();
@@ -54,6 +64,27 @@ export class ArtworkIndex {
   imageUrl(category: ArtworkEntry['category'], subject: string): string | null {
     const entry = this.byKey.get(`${category}\u0000${subject}`);
     if (entry === undefined || !entry.mediaType.startsWith('image/')) return null;
+    return this.url(entry);
+  }
+
+  /**
+   * The scene, map, portrait and interface images in force, grouped by category in display order. A category without
+   * an image is absent, and so is audio, which is never drawn.
+   */
+  gallery(): readonly GalleryGroup[] {
+    const groups: GalleryGroup[] = [];
+    for (const category of GALLERY_CATEGORIES) {
+      const items = [...this.byKey.values()]
+        .filter((entry) => entry.category === category && entry.mediaType.startsWith('image/'))
+        .sort((a, b) => (a.subject < b.subject ? -1 : a.subject > b.subject ? 1 : 0))
+        .map((entry): GalleryItem => ({ subject: entry.subject, url: this.url(entry), width: entry.width, height: entry.height }));
+      if (items.length > 0) groups.push({ category, items });
+    }
+    return groups;
+  }
+
+  /** The hash route URL of an entry, always within the campaign the listing belongs to. */
+  private url(entry: ArtworkEntry): string {
     return `/api/v1/campaigns/${this.scope.campaignId}/assets/${entry.sha256}?adventureId=${this.scope.adventureId}`;
   }
 

@@ -34,6 +34,11 @@ import tools.jackson.databind.node.ObjectNode;
  * actors' knowledge, planning artifacts, job and runtime-session records. It is for the owner's own keeping and a
  * restore through {@link CampaignRestores}, not for sharing.
  *
+ * <p>Asset bytes (P17.1-C): the registered images and audio the campaign's associations name travel in the
+ * document's top-level {@code assets} array, one entry per hash with its media facts and base64 content, because the
+ * byte store has no campaign column. Authored pack artwork is not repeated there: it is part of the sealed pack
+ * revision, which a restore matches by content hash.
+ *
  * <p><b>Player.</b> Built only from {@link PlayPanels}, page by page through the whole public journal, and accepted
  * only when every page reports the same committed state revision. It holds exactly what the player panels show:
  * no internal event, hidden or secret definition text, other holder's belief, seed, idempotency key, job, plan or
@@ -62,7 +67,14 @@ public class CampaignExports {
     static final int MAX_JOURNAL_PAGES = 5_000;
     /** Whole player reads attempted before a campaign that keeps changing fails the export. */
     static final int PLAYER_ATTEMPTS = 3;
+    /** Name of the document section that carries the bytes of the campaign's managed assets. */
+    public static final String ASSETS = "assets";
     private static final Pattern TABLE = Pattern.compile("^[a-z][a-z0-9_]{0,62}$");
+    // base64 without the line breaks PostgreSQL inserts every 76 characters, so the JSON value is one string.
+    private static final String ASSET_SQL = "select jsonb_build_object('sha256', m.sha256, 'mediaType', m.media_type, "
+            + "'width', m.width, 'height', m.height, 'content', translate(encode(m.content, 'base64'), E'\\n', ''))::text "
+            + "from managed_asset m where m.sha256 in (select a.sha256 from asset_association a where a.campaign_id = ?) "
+            + "order by m.sha256";
     private static final String CONTENT_SQL = "select jsonb_build_object('revisionId', r.id, 'packId', r.pack_id, "
             + "'packVersion', r.pack_version, 'contentHash', r.content_hash, 'rulesetId', r.ruleset_id, "
             + "'rulesetVersion', r.ruleset_version, 'rulesetHash', r.ruleset_hash, 'sourceLocale', r.source_locale)::text "
@@ -151,6 +163,17 @@ public class CampaignExports {
                             rows.add(json.readTree(text));
                         }, campaign);
             }
+            // managed_asset has no campaign column, so its bytes travel in their own section, once per hash.
+            ArrayNode assets = document.putArray(ASSETS);
+            jdbc.query(ASSET_SQL, (RowCallbackHandler) rs -> {
+                String text = rs.getString(1);
+                budget[0]++;
+                budget[1] += text.length();
+                if (budget[0] > MAX_OWNER_ROWS || budget[1] > MAX_OWNER_CHARS) {
+                    throw new IllegalStateException("export limit exceeded");
+                }
+                assets.add(json.readTree(text));
+            }, campaign);
             return document;
         }));
     }

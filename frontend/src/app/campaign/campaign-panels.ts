@@ -4,7 +4,8 @@
  * discovered quests with their objectives and outcome, what the player knows and has promised, and the
  * history of public events. Items carry a stable icon (P17.1-B): the campaign's artwork for the definition when it has
  * one, a neutral built-in icon otherwise, in a frame that follows the declared rarity tier and sits beside the written
- * tier name; the credits of the artwork in force are listed in their own section.
+ * tier name; the credits of the artwork in force are listed in their own section. Scene, map, portrait and interface
+ * images in force (P17.1-C) are listed by category with a thumbnail and their stable subject reference.
  *
  * The component only displays what the server decided at one committed revision. It never computes a
  * bonus, a restoration or a quest result, never mutates anything, and shows pack names only when the
@@ -13,7 +14,8 @@
  */
 import { ChangeDetectionStrategy, Component, computed, inject, input, LOCALE_ID, output } from '@angular/core';
 import { UiIcon } from '../preview/ui-kit';
-import { ArtworkIndex, frameFor } from './campaign-artwork';
+import { ArtThumb } from './art-thumb';
+import { ArtworkIndex, frameFor, GalleryCategory } from './campaign-artwork';
 import { ItemArt } from './item-art';
 import { JournalEntry, PanelClock, PanelQuest, PanelText, PlayPanels } from './campaign-protocol';
 import {
@@ -23,7 +25,7 @@ import {
 
 /** Show the panels of one revision; the parent re-reads them whenever the world revision advances. */
 @Component({
-  selector: 'app-campaign-panels', imports: [ItemArt, UiIcon], changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-campaign-panels', imports: [ArtThumb, ItemArt, UiIcon], changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (panels(); as current) {
       <section class="play-panels" data-panels aria-labelledby="panels-title">
@@ -177,6 +179,23 @@ import {
           </ul>
         </section>
 
+        @if (gallery().length > 0) {
+          <section aria-labelledby="gallery-title" data-gallery>
+            <h4 id="gallery-title" i18n="@@campaign.panels.gallery">Scenes, maps, portraits and interface art</h4>
+            @for (group of gallery(); track group.category) {
+              <h5 [attr.data-gallery-category]="group.category">{{ galleryLabel(group.category) }}</h5>
+              <ul class="gallery-list">
+                @for (image of group.items; track image.subject) {
+                  <li [attr.data-subject]="image.subject" class="with-art">
+                    <app-art-thumb [src]="image.url" />
+                    <span>{{ image.subject }}</span>
+                  </li>
+                }
+              </ul>
+            }
+          </section>
+        }
+
         <section aria-labelledby="credits-title" data-credits>
           <h4 id="credits-title" i18n="@@campaign.panels.credits">Artwork credits</h4>
           @if (credits().length === 0) { <p class="muted" i18n="@@campaign.panels.noCredits">No artwork is credited here. Items without artwork show a built-in icon.</p> }
@@ -216,6 +235,17 @@ export class CampaignPanels {
   readonly entries = computed(() => [...(this.panels()?.journal ?? []), ...this.older()]);
   readonly more = computed(() => this.nextBefore() !== null);
   readonly credits = computed(() => this.artwork()?.credits() ?? []);
+  /** Scene, map, portrait and interface images in force, grouped by category; empty without artwork. */
+  readonly gallery = computed(() => this.artwork()?.gallery() ?? []);
+  private readonly galleryLabels: Record<GalleryCategory, string> = {
+    scene: $localize`:@@campaign.panels.galleryScene:Scenes`,
+    map: $localize`:@@campaign.panels.galleryMap:Maps`,
+    portrait: $localize`:@@campaign.panels.galleryPortrait:Portraits`,
+    ui: $localize`:@@campaign.panels.galleryUi:Interface art`,
+  };
+
+  /** Localized name of a gallery category. */
+  galleryLabel(category: GalleryCategory): string { return this.galleryLabels[category]; }
   /** Carried items by instance, so a worn item shows the same admitted rarity as in the inventory. */
   private readonly carried = computed(() => new Map((this.panels()?.inventory ?? []).map((item) => [item.itemId, item])));
 

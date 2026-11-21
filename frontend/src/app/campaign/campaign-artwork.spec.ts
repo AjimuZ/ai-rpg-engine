@@ -68,6 +68,18 @@ describe('Artwork index and frames', /** Lookup is by stable subject; frames fol
     expect(index.credits()).toEqual(['Studio sample, CC0', 'Original artwork, MIT']);
   });
 
+  it('groups scene, map, portrait and interface images by category and leaves items and audio out', /** The gallery never draws audio. */ () => {
+    const gallery = new ArtworkIndex(parseArtwork(listing(
+      entry({ category: 'ui', subject: 'frame', sha256: 'd'.repeat(64) }), entry({ category: 'scene', subject: 'harbor', sha256: 'e'.repeat(64) }),
+      entry({ category: 'scene', subject: 'camp', sha256: 'f'.repeat(64) }), entry({ category: 'portrait', subject: 'mira' }),
+      entry(), entry({ category: 'music', subject: 'theme', mediaType: 'audio/ogg', width: 0, height: 0, sha256: 'c'.repeat(64) })),
+      ADVENTURE, CAMPAIGN), SCOPE).gallery();
+    expect(gallery.map((group) => `${group.category}:${group.items.map((item) => item.subject).join(',')}`))
+      .toEqual(['scene:camp,harbor', 'portrait:mira', 'ui:frame']);
+    expect(gallery[0].items[0].url).toBe(`/api/v1/campaigns/${CAMPAIGN}/assets/${'f'.repeat(64)}?adventureId=${ADVENTURE}`);
+    expect(new ArtworkIndex([], SCOPE).gallery()).toEqual([]);
+  });
+
   it('chooses a frame from the declared tier only', /** Default tiers rank; a pack tier is unranked; no tier has no frame. */ () => {
     expect(frameFor(null)).toBe('none');
     expect(frameFor('common')).toBe('rank-1');
@@ -122,6 +134,29 @@ describe('Item artwork in the playthrough view', /** The panels show the stable 
     expect(worn.querySelector('[data-rarity]')!.textContent).toContain('Ordinary');
     expect(root.querySelector('[data-credits]')!.textContent).toContain('Original artwork, MIT');
     expect(server.calls.every((url) => !url.includes('/commands'))).toBe(true);
+  });
+
+  it('lists scene, map, portrait and interface images with thumbnails and credits, and no gallery without them', /** Categories stay apart. */ async () => {
+    server.artworkBody = listing(entry({ subject: 'sword' }),
+      entry({ category: 'scene', subject: 'harbor', sha256: HASH_B, credit: 'Harbor scene, MIT' }),
+      entry({ category: 'portrait', subject: 'mira', sha256: 'c'.repeat(64), credit: 'Mira portrait, CC0' }));
+    const root = await open((page) => page.querySelector('[data-gallery] img') !== null);
+    const gallery = root.querySelector('[data-gallery]')!;
+    expect([...gallery.querySelectorAll('[data-gallery-category]')].map((heading) => heading.textContent)).toEqual(['Scenes', 'Portraits']);
+    const harbor = gallery.querySelector('[data-subject="harbor"]')!;
+    expect(harbor.querySelector('img')!.getAttribute('src')).toBe(`/api/v1/campaigns/${CAMPAIGN}/assets/${HASH_B}?adventureId=${ADVENTURE}`);
+    expect(harbor.querySelector('img')!.getAttribute('alt')).toBe('');
+    expect(harbor.textContent).toContain('harbor');
+    expect(gallery.querySelector('[data-subject="sword"]')).toBeNull();
+    const credits = root.querySelector('[data-credits]')!.textContent!;
+    expect(credits).toContain('Harbor scene, MIT');
+    expect(credits).toContain('Mira portrait, CC0');
+  });
+
+  it('shows no gallery when no scene, map, portrait or interface image is in force', /** An empty section would be noise. */ async () => {
+    server.artworkBody = listing(entry({ subject: 'sword' }));
+    const root = await open((page) => page.querySelector('[data-item="sword"] img') !== null);
+    expect(root.querySelector('[data-gallery]')).toBeNull();
   });
 
   it('shows only built-in icons and an honest credits note when the listing cannot be read', /** Decoration never blocks play. */ async () => {

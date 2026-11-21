@@ -234,6 +234,16 @@ Every key but `schemaVersion` is optional, and unknown keys are errors.
 - A diagnostic carries the file, line, column and pointer (an array index, never the value) and a fixed
   message; it never repeats the rejected value.
 
+**Artwork bindings (P17.1-C).** An optional `artwork` list (at most 256 entries) binds authored images to what they
+depict: `{"category": "item", "subject": "sword", "file": "assets/sword.png", "credit": "..."}`. `category` is `scene`,
+`map`, `portrait`, `item` or `ui`; `subject` is a reference of the pattern above and must be the ID of an `item` definition
+(category `item`), of an `npc` definition (`portrait`) or of a scene declared in the same file (`scene`), while `map` and
+`ui` subjects are free references; `file` must be a manifest file of category `asset` (`FILE_REFERENCE` otherwise);
+`credit` is 1 to 200 characters without control characters and not blank; one binding per category and subject
+(`DUPLICATE`). Diagnostics are located and never repeat the value. The bundled sample's `presentation.json` is a working
+example. The `assets` list above stays opaque names; bindings name files directly. The asset registry lists the bindings
+with a campaign's artwork ([docs/23](23-presentation-assets.md#4-bounded-generation-during-play)).
+
 `CompiledPack.presentation()` returns the immutable declaration and so reaches `CampaignPackSnapshot`.
 It is internal content like the rest of the compiled pack. `PresentationScopeResolver` (P05.7-B.1.2.3.1)
 builds the per-audience `PublicPresentationScope` of a committed operation from it: an actor appears only

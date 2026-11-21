@@ -193,9 +193,9 @@ older appearance is `STALE_APPEARANCE`, a result requested under a pack revision
 than the campaign is invalid. The media type comes from the bytes' signature and must fit the category, so SVG, markup
 and unknown formats are refused. The route `GET /api/v1/campaigns/{campaignId}/assets/{sha256}` serves by hash and
 only within the campaign (see [docs/13](13-api-and-ui.md#2-proposed-endpoint-families)). The metadata is exactly the hash, media
-facts, public subject reference, revisions and credit; there is no prompt, seed, path or URL column. Not delivered by P17.1-A:
-binding authored `asset` files to categories and subjects (pack presentation references remain opaque names), the
-thumbnail variants, and the carriage of the bytes through export and restore (an export carries the associations only).
+facts, public subject reference, revisions and credit; there is no prompt, seed, path or URL column. Not delivered by P17.1-A
+(binding, gallery and byte carriage came with P17.1-C below; separate thumbnail variants are still not made): binding
+authored `asset` files to categories and subjects, the thumbnails, and the carriage of the bytes through export and restore.
 
 **Item icons, frames and credits (P17.1-B, 21 November 2026; implemented in the playthrough panels):** `GET
 /api/v1/campaigns/{campaignId}/artwork?adventureId=` lists the newest accepted association of each category and subject, so
@@ -226,6 +226,21 @@ re-read) and when the page is opened again; the restore half is `CampaignRestore
 built-in icon: an equip and a reload on the packaged installation. The journey script has no phase that inserts rows; its
 former `sql` phase was removed. The built-in icons are the original MIT UI-kit paths inventoried in
 `frontend/public/ui/README.md`.
+
+**Authored artwork, gallery and byte carriage (P17.1-C, 21 November 2026; implemented):** a pack binds authored image
+files to entities in the `artwork` list of its `presentation` file ([docs/09 section
+3.3](09-adventure-packs.md#33-presentation-declaration)): category (`scene`, `map`, `portrait`, `item` or `ui`), stable
+subject reference, a listed `asset` file and a credit line. The artwork listing adds each binding the pinned pack revision
+declares, as appearance 1, unless the campaign already holds an accepted association for that category and subject, which
+wins. The bytes are the sealed pack file, served by hash through the same route; a pack that cannot be loaded binds
+nothing and never hides the associations. The bundled sample binds `assets/sword.png`, an original icon made by
+`tools/sample-art/make-sample-art.mjs`, to item `sword`. The playthrough panels show scene, map, portrait and UI images in
+a gallery by category with a 64 px thumbnail, which is the stored image scaled by the browser: separate stored thumbnail
+variants are not made. A full-owner export carries the bytes of the images its associations name in a top-level `assets`
+array (base64, one entry per hash), and a restore stores them back under the same SHA-256 after checking digest, media
+admission and that an association names each one; authored pack artwork is not repeated because a restore matches the sealed
+pack revision by content hash. Packaged-browser evidence and gaps are in the [roadmap](16-development-roadmap.md) entry
+P17.1-C; no shop icon exists yet (P17.1-D).
 
 Use a neutral category icon/portrait and visible pending/error state until art is available. Save, purchase, dialogue and combat must remain usable during failure, quota exhaustion, offline periods or policy disablement. Allow explicit retry/change-art actions with budget visibility; do not reroll art on every inspection.
 

@@ -229,7 +229,7 @@ class CampaignRestoresTest {
         publish(pinned, AssetCategory.ITEM, "lantern", 2, "Lantern icon, MIT", current);
         publish(pinned, AssetCategory.PORTRAIT, "scout", 1, "Scout portrait, CC0", image(13));
         var listed = artwork.artwork(OWNER, source, campaign).orElseThrow();
-        assertEquals(2, listed.size());
+        assertEquals(3, listed.size(), "the lantern icon, the portrait and the sample's own sword icon");
 
         CampaignExports.Export export = exports.export(OWNER, source, campaign, Audience.FULL_OWNER);
         assertEquals(3, JSON.readTree(export.text()).at("/tables/asset_association").size(),
@@ -252,23 +252,85 @@ class CampaignRestoresTest {
     }
 
     /**
-     * A restore into an installation that does not hold the image bytes is not refused: the associations are restored
-     * and the restored campaign lists no image until the bytes exist, which the interface shows as a neutral icon.
+     * A restore into a clean installation brings the registered image bytes with the document: the same hash lists the
+     * same image and credit and serves the same bytes, and the pack's own authored artwork is listed from the
+     * destination's sealed revision, which is byte-identical to the source's.
      */
     @Test
-    void restoreWithoutTheImageBytesKeepsTheAssociationsAndListsNoImage() throws Exception {
+    void restoreIntoACleanInstallationCarriesTheImageBytes() throws Exception {
         UUID pinned = jdbc.queryForObject("select content_revision_id from campaign where id = ?", UUID.class, campaign);
-        publish(pinned, AssetCategory.ITEM, "lantern", 1, "Lantern icon, MIT", image(14));
+        byte[] bytes = image(14);
+        publish(pinned, AssetCategory.ITEM, "lantern", 1, "Lantern icon, MIT", bytes);
+        var listed = artwork.artwork(OWNER, source, campaign).orElseThrow();
         CampaignExports.Export export = exports.export(OWNER, source, campaign, Audience.FULL_OWNER);
+        JsonNode carried = JSON.readTree(export.text()).get("assets");
+        assertEquals(1, carried.size(), "one entry per hash the associations name");
+        assertEquals(sha256(bytes), carried.get(0).get("sha256").asString());
         clear();
         owner(OWNER, "Owner");
+        assertEquals(0, jdbc.queryForObject("select count(*) from managed_asset", Integer.class));
         UUID clean = workspace(OWNER, "Elsewhere");
         seal(clean, pack(false));
 
         var restored = restores.restore(OWNER, clean, export.document(), export.sha256(), Identities.ORIGINAL);
         assertEquals(1, count("select count(*) from asset_association where campaign_id = ?", restored.campaignId()));
+        assertEquals(1, jdbc.queryForObject("select count(*) from managed_asset", Integer.class), "the bytes were restored");
+        assertEquals(listed, artwork.artwork(OWNER, clean, restored.campaignId()).orElseThrow(),
+                "the restored campaign lists the same hashes, credits and authored artwork");
+        assertArrayEquals(bytes, artwork.serve(OWNER, clean, restored.campaignId(), sha256(bytes)).orElseThrow().bytes());
+        var sword = listed.stream().filter(item -> item.subject().equals("sword")).findFirst().orElseThrow();
+        assertEquals(sha256(authoredSword()), sword.sha256());
+        assertArrayEquals(authoredSword(), artwork.serve(OWNER, clean, restored.campaignId(), sword.sha256())
+                .orElseThrow().bytes());
+    }
+
+    /**
+     * A document without the {@code assets} section, as an export of an earlier build, is not refused: the associations
+     * are restored and the restored campaign lists no registered image until the bytes exist, which the interface
+     * shows as a neutral icon. Authored artwork of the pack is unaffected.
+     */
+    @Test
+    void restoreWithoutTheAssetsSectionKeepsTheAssociationsAndListsNoRegisteredImage() throws Exception {
+        UUID pinned = jdbc.queryForObject("select content_revision_id from campaign where id = ?", UUID.class, campaign);
+        publish(pinned, AssetCategory.ITEM, "lantern", 1, "Lantern icon, MIT", image(14));
+        CampaignExports.Export export = exports.export(OWNER, source, campaign, Audience.FULL_OWNER);
+        byte[] older = edited(export.document(), root -> ((ObjectNode) root).remove("assets"));
+        clear();
+        owner(OWNER, "Owner");
+        UUID clean = workspace(OWNER, "Elsewhere");
+        seal(clean, pack(false));
+
+        var restored = restores.restore(OWNER, clean, older, sha256(older), Identities.ORIGINAL);
+        assertEquals(1, count("select count(*) from asset_association where campaign_id = ?", restored.campaignId()));
         assertEquals(0, jdbc.queryForObject("select count(*) from managed_asset", Integer.class), "no bytes were carried");
-        assertTrue(artwork.artwork(OWNER, clean, restored.campaignId()).orElseThrow().isEmpty());
+        var listed = artwork.artwork(OWNER, clean, restored.campaignId()).orElseThrow();
+        assertEquals(1, listed.size());
+        assertEquals("sword", listed.getFirst().subject());
+    }
+
+    /** The assets section is judged like the rest of the document: digests, media and association are checked. */
+    @Test
+    void refusesAnAssetsSectionThatDoesNotMatchItsAssociations() throws Exception {
+        UUID pinned = jdbc.queryForObject("select content_revision_id from campaign where id = ?", UUID.class, campaign);
+        byte[] bytes = image(15);
+        publish(pinned, AssetCategory.ITEM, "lantern", 1, "Lantern icon, MIT", bytes);
+        byte[] exported = exports.export(OWNER, source, campaign, Audience.FULL_OWNER).document();
+        var counts = counts();
+        String otherImage = java.util.Base64.getEncoder().encodeToString(image(16));
+        String notMedia = java.util.Base64.getEncoder().encodeToString("not media".getBytes(StandardCharsets.UTF_8));
+        String otherDigest = sha256(image(17));
+
+        refused(Code.INTEGRITY, destination, edited(exported, root -> ((ObjectNode) root.get("assets").get(0))
+                .put("content", otherImage)), Identities.FRESH);
+        refused(Code.FORMAT, destination, edited(exported, root -> ((ObjectNode) root.get("assets").get(0))
+                .put("content", notMedia)), Identities.FRESH);
+        refused(Code.FORMAT, destination, edited(exported, root -> ((ObjectNode) root.get("assets").get(0))
+                .put("content", "***")), Identities.FRESH);
+        refused(Code.FORMAT, destination, edited(exported, root -> ((ObjectNode) root.get("assets").get(0))
+                .put("sha256", otherDigest)), Identities.FRESH);
+        refused(Code.FORMAT, destination, edited(exported, root -> ((ObjectNode) root).put("assets", "none")),
+                Identities.FRESH);
+        assertEquals(counts, counts(), "a refused restore wrote a row");
     }
 
     /** Kept identities restore exactly into a clean installation whose only change is the destination. */
@@ -388,6 +450,12 @@ class CampaignRestoresTest {
         var out = new ByteArrayOutputStream();
         ImageIO.write(picture, "png", out);
         return out.toByteArray();
+    }
+
+    private static byte[] authoredSword() throws Exception {
+        try (InputStream asset = CampaignRestoresTest.class.getResourceAsStream("/sample-adventure/assets/sword.png")) {
+            return asset.readAllBytes();
+        }
     }
 
     private static byte[] artwork() throws Exception {

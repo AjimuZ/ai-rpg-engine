@@ -3666,6 +3666,51 @@
       <target>Nessuna illustrazione ha crediti qui. Gli oggetti senza illustrazione mostrano un'icona integrata.</target>
       </segment>
     </unit>
+    <unit id="campaign.panels.gallery">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:183</note>
+      </notes>
+      <segment>
+        <source>Scenes, maps, portraits and interface art</source>
+      <target>Scene, mappe, ritratti e grafica dell'interfaccia</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.galleryScene">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:233</note>
+      </notes>
+      <segment>
+        <source>Scenes</source>
+      <target>Scene</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.galleryMap">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:234</note>
+      </notes>
+      <segment>
+        <source>Maps</source>
+      <target>Mappe</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.galleryPortrait">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:235</note>
+      </notes>
+      <segment>
+        <source>Portraits</source>
+      <target>Ritratti</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.galleryUi">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:236</note>
+      </notes>
+      <segment>
+        <source>Interface art</source>
+      <target>Grafica dell'interfaccia</target>
+      </segment>
+    </unit>
     <unit id="campaign.panels.quests">
       <notes>
         <note category="location">src/app/campaign/campaign-panels.ts:112,113</note>

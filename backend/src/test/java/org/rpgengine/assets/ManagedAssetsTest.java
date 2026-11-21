@@ -278,17 +278,39 @@ class ManagedAssetsTest {
         var body = JSON.readTree(new String(reply.body(), StandardCharsets.UTF_8));
         assertEquals(campaign.toString(), body.get("scope").get("campaignId").asString());
         var listed = body.get("artwork");
-        assertEquals(2, listed.size());
+        // The bundled sample binds its own sword icon to the item definition, listed beside the accepted artwork.
+        assertEquals(3, listed.size());
         assertEquals("item", listed.get(0).get("category").asString());
-        assertEquals("portrait", listed.get(1).get("category").asString());
+        assertEquals("lantern", listed.get(0).get("subject").asString());
+        assertEquals("item", listed.get(1).get("category").asString());
+        assertEquals("sword", listed.get(1).get("subject").asString());
+        assertEquals("portrait", listed.get(2).get("category").asString());
         assertEquals(2, listed.get(0).get("appearanceRevision").asInt());
         assertEquals(ManagedAssets.sha256(second), listed.get(0).get("sha256").asString());
         assertEquals("Original artwork, MIT", listed.get(0).get("credit").asString());
         assertEquals(Set.of("category", "subject", "appearanceRevision", "sha256", "mediaType", "width", "height", "credit"),
                 Set.copyOf(listed.get(0).propertyNames()));
 
-        assertEquals(0, JSON.readTree(new String(get("/api/v1/campaigns/" + otherCampaign + "/artwork?adventureId="
-                + otherAdventure, cookie).body(), StandardCharsets.UTF_8)).get("artwork").size());
+        var sword = listed.get(1);
+        byte[] authored = resource("/sample-adventure/assets/sword.png");
+        assertEquals(ManagedAssets.sha256(authored), sword.get("sha256").asString(), "the pack's own file, by its hash");
+        assertEquals("image/png", sword.get("mediaType").asString());
+        assertEquals(96, sword.get("width").asInt());
+        assertEquals(96, sword.get("height").asInt());
+        assertTrue(sword.get("credit").asString().contains("make-sample-art.mjs"));
+        Reply image = get("/api/v1/campaigns/" + campaign + "/assets/" + sword.get("sha256").asString() + "?adventureId="
+                + adventure, cookie);
+        assertEquals(200, image.status(), image.head());
+        assertArrayEquals(authored, image.body());
+        assertEquals(1, JSON.readTree(new String(get("/api/v1/campaigns/" + otherCampaign + "/artwork?adventureId="
+                + otherAdventure, cookie).body(), StandardCharsets.UTF_8)).get("artwork").size(),
+                "another campaign lists only what its own pinned pack binds");
+
+        // An accepted association for the subject is a later, explicit choice and replaces the authored image.
+        assets.publish(campaign, candidate(AssetCategory.ITEM, "sword", 1, 0, png(73)));
+        var replaced = JSON.readTree(new String(get(path, cookie).body(), StandardCharsets.UTF_8)).get("artwork");
+        assertEquals(3, replaced.size());
+        assertEquals(ManagedAssets.sha256(png(73)), replaced.get(1).get("sha256").asString());
         assertEquals(403, get(path, null).status());
         assertEquals(404, get("/api/v1/campaigns/" + campaign + "/artwork?adventureId=" + otherAdventure, cookie).status());
         assertEquals(400, get("/api/v1/campaigns/" + campaign + "/artwork", cookie).status());

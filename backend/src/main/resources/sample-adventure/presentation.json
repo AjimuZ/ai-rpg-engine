@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "artwork": [
+    {
+      "category": "item",
+      "subject": "sword",
+      "file": "assets/sword.png",
+      "credit": "Sword icon: original sample art made by tools/sample-art/make-sample-art.mjs, MIT license"
+    }
+  ]
+}

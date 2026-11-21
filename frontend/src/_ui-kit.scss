@@ -34,6 +34,11 @@ progress { display: block; width: min(100%, 32rem); height: 1rem; accent-color: 
 .art-frame[data-frame='rank-3'] { border: 5px double var(--accent); }
 .art-frame[data-frame='rank-4'] { border: 5px ridge var(--accent); }
 .art-frame[data-frame='rank-5'] { border: 6px double var(--focus); outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Thumbnails of registered scene, map, portrait and interface images (P17.1-C): the whole picture inside a fixed box. */
+.art-thumb { display: inline-grid; place-items: center; box-sizing: border-box; width: 4rem; height: 4rem; flex: 0 0 auto; overflow: hidden; border: 1px solid var(--line); border-radius: .3rem; background: var(--surface); }
+.art-thumb img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.art-thumb app-ui-icon { width: 1.75rem; height: 1.75rem; margin: 0; }
+.gallery-list { display: flex; flex-wrap: wrap; gap: .75rem; padding: 0; list-style: none; }
 .kit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-block: 1rem; }
 .kit-status { display: flex; align-items: center; gap: .5rem; }
 .icon-inventory { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: .75rem; padding: 0; list-style: none; }
@@ -54,7 +59,7 @@ progress { display: block; width: min(100%, 32rem); height: 1rem; accent-color: 
 }
 @media (forced-colors: active) {
   .meter-fill { background: Highlight; forced-color-adjust: none; }
-  .meter-track, .item-frame, .art-frame, .kit-help, button[aria-pressed='true'] { border-color: CanvasText; }
+  .meter-track, .item-frame, .art-frame, .art-thumb, .kit-help, button[aria-pressed='true'] { border-color: CanvasText; }
   .art-frame[data-frame='rank-5'] { outline-color: CanvasText; }
   [aria-invalid='true'] { border-color: CanvasText; border-style: double; }
   .error-text { color: CanvasText; }

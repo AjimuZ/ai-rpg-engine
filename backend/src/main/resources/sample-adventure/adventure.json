@@ -59,6 +59,14 @@
       "category": "generationPolicy"
     },
     {
+      "path": "presentation.json",
+      "category": "presentation"
+    },
+    {
+      "path": "assets/sword.png",
+      "category": "asset"
+    },
+    {
       "path": "lore.md",
       "category": "lore"
     },
@@ -73,6 +81,7 @@
   ],
   "modules": [],
   "generationPolicy": "generation.json",
+  "presentation": "presentation.json",
   "contentGuidance": {
     "tone": "Calm and non-romantic",
     "themes": [

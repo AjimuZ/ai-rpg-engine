@@ -3,6 +3,7 @@ package org.rpgengine.exports;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.rpgengine.content.PackMedia;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowCallbackHandler;
@@ -59,7 +61,10 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code inference_task} rows are not restored: they are the source scheduler's work and quota charges, not campaign
  * state. A checkpoint whose snapshot matched its hash in the export gets the hash of its re-keyed snapshot; a
  * checkpoint that did not match keeps its stored hash and stays detectably corrupt. Other recorded digests (payload,
- * context, fingerprint and result hashes) are evidence and keep their source values.
+ * context, fingerprint and result hashes) are evidence and keep their source values. The document's {@code assets}
+ * section (P17.1-C) puts the registered image and audio bytes back into the content-addressed store under their own
+ * SHA-256, which no identity mapping changes, so a restored association shows the same bytes; a document without the
+ * section restores its associations and no bytes.
  *
  * <p><b>How it fails.</b> Every refusal is checked before or inside one transaction that writes nothing on failure:
  * size, digest, format, schema version and table set, destination scope, content, references and collisions. Rows
@@ -74,6 +79,8 @@ public class CampaignRestores {
     public static final int MAX_DOCUMENT_BYTES = 96 * 1024 * 1024;
     /** Exported tables deliberately not restored: scheduler work and charges of the source process. */
     public static final Set<String> NOT_RESTORED = Set.of("inference_task");
+    /** Most distinct asset byte entries a document may carry. */
+    private static final int MAX_ASSETS = 5_000;
     private static final String INVALIDATIONS = "memory_invalidation";
     private static final String SUMMARIES = "memory_summary";
     private static final String CHECKPOINTS = "campaign_checkpoint";
@@ -183,7 +190,50 @@ public class CampaignRestores {
                 }
             }
         }
-        return new Source(root, campaignId, adventureId, revisionId);
+        return new Source(root, campaignId, adventureId, revisionId, assets(root));
+    }
+
+    /**
+     * Decode and judge the optional {@code assets} section. A document without it (an export older than P17.1-C)
+     * restores its associations without bytes. Nothing the document states is trusted: the media facts come from
+     * the decoded bytes, which must hash to the stated digest, be admitted media, and be named by an association of
+     * the campaign, so the section cannot carry bytes the campaign does not show.
+     */
+    private List<Asset> assets(JsonNode root) {
+        JsonNode section = root.get(CampaignExports.ASSETS);
+        if (section == null) {
+            return List.of();
+        }
+        if (!section.isArray() || section.size() > MAX_ASSETS) {
+            throw new Refused(Code.FORMAT);
+        }
+        var named = new HashSet<String>();
+        for (JsonNode row : root.at("/tables/asset_association")) {
+            named.add(row.path("sha256").asString(""));
+        }
+        var assets = new ArrayList<Asset>();
+        var seen = new HashSet<String>();
+        for (JsonNode entry : section) {
+            String digest = entry.path("sha256").asString("");
+            if (!entry.isObject() || !DIGEST.matcher(digest).matches() || !entry.path("content").isString()
+                    || !named.contains(digest) || !seen.add(digest)) {
+                throw new Refused(Code.FORMAT);
+            }
+            byte[] bytes;
+            PackMedia.Media media;
+            try {
+                bytes = Base64.getDecoder().decode(entry.path("content").asString(""));
+                media = PackMedia.inspectBytes(bytes);
+            } catch (IllegalArgumentException malformed) {
+                // Includes PackException, which refuses unsupported or oversized media without echoing it.
+                throw new Refused(Code.FORMAT);
+            }
+            if (!sha256(bytes).equals(digest)) {
+                throw new Refused(Code.INTEGRITY);
+            }
+            assets.add(new Asset(digest, media.mediaType(), media.width(), media.height(), bytes));
+        }
+        return List.copyOf(assets);
     }
 
     /** The whole restore inside one transaction; any refusal rolls it back. */
@@ -243,6 +293,12 @@ public class CampaignRestores {
         }
 
         UUID campaign = UUID.fromString(map.getOrDefault(source.campaignId(), source.campaignId()));
+        // Bytes first, so every restored association finds its image; equal bytes are stored once and never replaced.
+        for (Asset asset : source.assets()) {
+            jdbc.update("insert into managed_asset (sha256, media_type, byte_size, width, height, content, created_at) "
+                    + "values (?, ?, ?, ?, ?, ?, clock_timestamp()) on conflict (sha256) do nothing", asset.sha256(),
+                    asset.mediaType(), (long) asset.bytes().length, asset.width(), asset.height(), asset.bytes());
+        }
         jdbc.execute("set local session_replication_role = replica");
         for (var insert : inserts) {
             // Names were checked against the catalog and the identifier pattern, so quoting them is safe.
@@ -510,6 +566,10 @@ public class CampaignRestores {
     }
 
     /** A parsed, self-consistent export. */
-    private record Source(JsonNode root, String campaignId, String adventureId, String revisionId) {
+    private record Source(JsonNode root, String campaignId, String adventureId, String revisionId, List<Asset> assets) {
+    }
+
+    /** One decoded and verified entry of the document's {@code assets} section. */
+    private record Asset(String sha256, String mediaType, int width, int height, byte[] bytes) {
     }
 }

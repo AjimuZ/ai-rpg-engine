@@ -2,8 +2,10 @@ package org.rpgengine.content;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import org.rpgengine.presentation.PresentationEvent;
 import org.rpgengine.presentation.PublicPresentationScope;
 
@@ -21,7 +23,9 @@ import org.rpgengine.presentation.PublicPresentationScope;
  * {@code schemaVersion}, optional {@code scenes} [{@code id}, optional {@code backdrop}], {@code lines}
  * [{@code id}, optional {@code audio}], {@code assets} [reference], and {@code actors} [{@code actor},
  * {@code poses}, {@code expressions}]. A reference to an asset the file does not list is an undeclared
- * asset and is refused.
+ * asset and is refused. Since P17.1-C an optional {@code artwork} list [{@code category}, {@code subject},
+ * {@code file}, {@code credit}] binds a listed {@code asset} file to the entity it depicts; the asset registry
+ * lists those bindings with the campaign's artwork.
  *
  * @param scenes declared scene references
  * @param lines declared line references
@@ -31,13 +35,36 @@ import org.rpgengine.presentation.PublicPresentationScope;
  * @param actors local NPC definition ID to the poses and expressions it may take
  */
 public record PackPresentation(Set<String> scenes, Set<String> lines, Set<String> assets,
-        Map<String, String> sceneBackdrops, Map<String, String> lineAudio, Map<String, Looks> actors) {
+        Map<String, String> sceneBackdrops, Map<String, String> lineAudio, Map<String, Looks> actors,
+        List<Artwork> artwork) {
     /** The declaration of a pack that makes none: nothing may be presented. */
     public static final PackPresentation NONE = new PackPresentation(Set.of(), Set.of(), Set.of(), Map.of(),
-            Map.of(), Map.of());
+            Map.of(), Map.of(), List.of());
+    /** Image categories a pack may bind authored files to; music and effects are audio and have no binding yet. */
+    public static final Set<String> ARTWORK_CATEGORIES = Set.of("scene", "map", "portrait", "item", "ui");
+    /** Longest credit line, equal to {@code ManagedAssets.MAX_CREDIT}. */
+    public static final int MAX_CREDIT = 200;
     private static final int MAX = PublicPresentationScope.MAX_ENTRIES;
+    private static final Pattern CREDIT = Pattern.compile("(?=.*\\S)[^\\p{Cntrl}]{1," + MAX_CREDIT + "}");
     private static final String EXPECTED = "Expected a stable reference of 1 to " + PresentationEvent.MAX_REFERENCE
             + " letters, digits, '.', '_' or '-', starting with a letter or digit";
+
+    /**
+     * Authored artwork bound to one subject: the pack file that depicts it and the credit line shown with it.
+     *
+     * @param category one of {@link #ARTWORK_CATEGORIES}
+     * @param subject stable reference of the depicted item or NPC definition, scene or other subject
+     * @param file path of a manifest file of category {@code asset}
+     * @param credit visible credit line, 1 to 200 characters without control characters
+     */
+    public record Artwork(String category, String subject, String file, String credit) {
+    }
+
+    /** A declaration without authored artwork bindings. */
+    public PackPresentation(Set<String> scenes, Set<String> lines, Set<String> assets,
+            Map<String, String> sceneBackdrops, Map<String, String> lineAudio, Map<String, Looks> actors) {
+        this(scenes, lines, assets, sceneBackdrops, lineAudio, actors, List.of());
+    }
 
     /**
      * Poses and expressions one actor definition may take.
@@ -61,6 +88,7 @@ public record PackPresentation(Set<String> scenes, Set<String> lines, Set<String
         sceneBackdrops = Map.copyOf(sceneBackdrops);
         lineAudio = Map.copyOf(lineAudio);
         actors = Map.copyOf(actors);
+        artwork = List.copyOf(artwork);
     }
 
     /**
@@ -118,8 +146,51 @@ public record PackPresentation(Set<String> scenes, Set<String> lines, Set<String
             actors.put(actor, new Looks(Set.copyOf(poses), Set.copyOf(expressions)));
             entry.close();
         }
+        var artwork = artwork(pack, root, definitions, scenes);
         root.close();
-        return new PackPresentation(scenes, lines, declaredAssets, backdrops, audio, actors);
+        return new PackPresentation(scenes, lines, declaredAssets, backdrops, audio, actors, artwork);
+    }
+
+    /**
+     * Read the optional {@code artwork} bindings: each names an image category, the subject it depicts, a listed
+     * manifest file of category {@code asset} and a credit line. An item or portrait subject must be a local
+     * definition of that kind and a scene subject a declared scene; map and ui subjects are free references.
+     */
+    private static List<Artwork> artwork(ParsedPack pack, Fields root, Map<String, Definition> definitions,
+            Set<String> scenes) {
+        var listed = new HashSet<String>();
+        pack.manifest().files().forEach(file -> {
+            if (file.category().equals("asset")) {
+                listed.add(file.path());
+            }
+        });
+        var bound = new HashSet<String>();
+        var result = new java.util.ArrayList<Artwork>();
+        for (Fields entry : root.objects("artwork", 0, MAX)) {
+            String category = entry.choice("category", ARTWORK_CATEGORIES, null);
+            String subject = entry.matching("subject", PresentationEvent.REFERENCE, true, EXPECTED);
+            String file = entry.text("file", true);
+            String credit = entry.matching("credit", CREDIT, true,
+                    "Expected a credit line of 1 to " + MAX_CREDIT + " characters without control characters");
+            if (!listed.contains(file)) {
+                throw entry.fail("FILE_REFERENCE", "file", "Expected a manifest file of category asset");
+            }
+            String kind = category.equals("item") ? "item" : category.equals("portrait") ? "npc" : null;
+            if (kind != null) {
+                Definition definition = definitions.get(subject);
+                if (definition == null || !definition.kind().equals(kind)) {
+                    throw entry.fail("REFERENCE_UNKNOWN", "subject", "Expected the ID of a " + kind + " defined by this pack");
+                }
+            } else if (category.equals("scene") && !scenes.contains(subject)) {
+                throw entry.fail("REFERENCE_UNKNOWN", "subject", "Expected a scene declared by this file");
+            }
+            if (!bound.add(category + '\u0000' + subject)) {
+                throw entry.fail("DUPLICATE", "subject", "Subject already has artwork in this category");
+            }
+            result.add(new Artwork(category, subject, file, credit));
+            entry.close();
+        }
+        return result;
     }
 
     /** A required reference no earlier entry of the same collection used. */

@@ -7140,7 +7140,58 @@ this update. No combat runtime/browser result is claimed.
       shop screen exists; portraits, scenes, maps and the UI category are not displayed; authored `asset` files are
       still not bound to categories or subjects; thumbnails are not made; byte carriage through export and restore is
       still missing; only the five default tier IDs rank, with no pack-declared order or frame tokens; the credit
-      list does not include the credits of authored pack artwork or of the built-in icons.
+      list does not include the credits of authored pack artwork or of the built-in icons. (Several of these gaps are
+      closed by P17.1-C below.)
+  - P17.1-C (21 November 2026). Partial: authored pack artwork binding, an original image in the bundled sample, the
+    gallery of scene/map/portrait/UI images with thumbnails, and byte carriage through export and restore. The P17.1 box
+    stays unchecked: shop icons remain with P17.1-D (no shop flow exists and none was added).
+    - Delivered. (1) The optional `presentation` file gains an `artwork` list ([docs/09 section
+      3.3](09-adventure-packs.md#33-presentation-declaration)): `{category, subject, file, credit}` binds a listed manifest
+      file of category `asset` to an item or NPC definition, a declared scene, or a free map/ui reference
+      (`PackPresentation.Artwork`; refusals are located and never echo the value). (2) `ManagedAssets.artwork` lists those
+      bindings beside the accepted associations (appearance 1, credit as declared; an accepted association for the same
+      subject wins); the existing hash route already served sealed pack files. (3) The sample bundles
+      `assets/sword.png` (96x96, 648 bytes), made by `node tools/sample-art/make-sample-art.mjs` (Node's built-in zlib,
+      no dependency; two runs wrote byte-identical files, compared with `cmp`), bound to item `sword` by
+      `presentation.json`, with lines in `CREDITS.md` and `LICENSE.md`. (4) Export carries the bytes of the campaign's
+      associations in a top-level `assets` array (base64, one entry per hash) and restore puts them back under the same
+      SHA-256 after checking digest, media admission and that an association names each one; a document without the
+      section (an older export) still restores. (5) The playthrough panels show a gallery of scene, map, portrait and
+      UI images by category with a 64 px thumbnail (the stored image scaled by the browser, not a separate variant) and
+      the subject reference as text; its credits join the credits section. Five Italian messages were added (745).
+    - Commands and results. `sh .agents/ralph/verify.sh frontend`: `frontend-install`, `typecheck`, `test`, `i18n`, `build`,
+      `locales` all `PASS` (`VERIFY PASSED (frontend)`; the script printed no test count). `sh .agents/ralph/verify.sh
+      backend -Dtest=X` ended `VERIFY PASSED` for `PackPresentationTest` (new cases `bindsListedAssetFilesToTheirSubjects`,
+      `refusesArtworkThatDoesNotBindToAnything`), `ManagedAssetsTest` (listing now includes the authored sword, serves its
+      bytes by hash, and an accepted association replaces it), `CampaignRestoresTest` (new cases: bytes restored into a clean
+      installation, a document without the `assets` section, and an `assets` section that does not match its associations is
+      refused with a fixed code; the former "no bytes carried" case was replaced by them), and one run of
+      `FirstStartProvisioningTest,CampaignExportsTest,AdventureBundlesTest,PresentationScopeResolverTest,PublicPresentationScopeBuilderTest,AdventureIndependenceTest`.
+      The full plan (`verify.sh full`), the container tests and `tools/database_backup` were not run (no migration changed).
+    - Packaged installation (fresh export with the `tar` pair of the P14.5-A notes to `.local/scratch/p171c/app`; `sh
+      ./start.sh` built the images and started three healthy containers, runtime account not signed in, gameplay not ready,
+      as expected; `sh ./start.sh --stop` afterwards; no other copy held the port, the owner's installation was not touched).
+      `node frontend/tools/artwork-journey.mjs create` made one playthrough through the screens (`cloak` worn, `kit`, `sword`
+      worn). `view en|it ... art` at 390x844, 1280x800 and 390x844 reduced motion: the sword rows (inventory and worn
+      `main-hand`) showed the authored image (`data-art=image`, 96 px decoded, one hash URL requested, the same address in both
+      rows), the other items the built-in icon, the credit line "Sword icon: original sample art made by
+      tools/sample-art/make-sample-art.mjs, MIT license" was visible in the credits section, art/frame/tier were identical
+      across a reload, no horizontal overflow, no page or console error besides the known favicon 404, axe found no violation
+      (color-contrast passing, frame border ratio 9.79). `equip ... unequip` then `equip` through the engine's command
+      route (both 202, committed revisions 1 and 2): the worn items changed and the worn sword showed the same image and
+      frame as its inventory row; the Italian view afterwards showed the same. The first run of `view ... art` failed its
+      "registered images decoded" check because the icon below the fold is lazy-loaded and had not been requested; the script
+      now scrolls each icon into view before measuring and the repeat passed. One screenshot (`packaged-en-desktop.png`) was
+      looked at: both sword rows show the sword image in the frame.
+    - Restore in the browser: no restore route exists, so restored identity is proven by the backend tests only
+      (`CampaignRestoresTest`: the same hash lists the same image and credit and serves the same bytes after a restore
+      into a clean installation, for registered and for authored artwork).
+    - Not proven: the gallery and its thumbnails were not seen in a real browser (the sample has no scene, map, portrait or
+      UI artwork, and no route publishes one), only in `campaign-artwork.spec.ts`; no shop screen or shop icon (P17.1-D);
+      packs declaring their own tier order or frame tokens; thumbnail variants as separate stored files; a human contrast
+      or screen-reader review; a container restart or a restore of the packaged playthrough; the unchanged Italian review
+      status of the new messages (one author pass); nothing creates artwork at runtime (P17.6). The artwork listing
+      recompiles the pinned pack on each read, as `PresentationScopeResolver` does, and is not cached.
 - [ ] P17.2 Implement optional dynamic music from a reviewed free-license online/local catalog: public-event mood mapping, deliberate activation, stable loops/crossfades, deduplicated cues, volumes, complete current-track/export credits and offline/source-failure fallback under QA-32.
 - [ ] P17.3 Finalize the default visual-novel and alternative text-focused layouts, graphic states, configurable tokens and attributed reading/history/quick-reply behavior.
 - [ ] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.

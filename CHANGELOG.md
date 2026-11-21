@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — Authored pack artwork, an original sample image and an artwork gallery (P17.1-C), 21 November 2026
+
+- A pack's optional `presentation` file can now bind a listed image file to the item, NPC or scene it depicts, with a
+  credit line (`artwork` list, [docs/09](docs/09-adventure-packs.md#33-presentation-declaration)). The artwork listing
+  includes those bindings, so an item definition shows the same image in the inventory and the worn equipment.
+- The bundled sample adventure ships an original 96x96 sword icon, drawn by `tools/sample-art/make-sample-art.mjs` (no
+  download or dependency), and credits it in `CREDITS.md`, `LICENSE.md` and the "Artwork credits" section. On a fresh
+  packaged installation the browser showed that image, its frame and its credit line in both lists, unchanged after an
+  equip, an unequip and a reload.
+- The playthrough panels list scene, map, portrait and interface images by category with a thumbnail (the stored image
+  scaled by the browser) when a campaign has any; five Italian messages are added (745 messages).
+- Campaign exports now carry the bytes of the campaign's registered images and audio in an `assets` section, and a
+  restore stores them back under the same hash. An older export without the section still restores, with its
+  associations and no bytes.
+- Not included: shop icons (P17.1-D; there is no shop screen), runtime image creation (P17.6), packs declaring their
+  own rarity order, and a browser view of the gallery on the packaged installation (the sample has no such artwork).
+
 ## Unreleased — Item icons, rarity frames and artwork credits in the playthrough panels (P17.1-B), 21 November 2026
 
 - The inventory and the worn equipment now show an icon for each item inside a frame: the campaign's registered
