@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Missing art and audio never block play (P17.5-A), 21 November 2026
+
+- No product change. New spec `frontend/src/app/campaign/media-fallback.spec.ts` shows that on the playthrough screen a failed
+  scene, portrait or item image, or an artwork or music listing the server cannot read, leaves the story, the panels and Send working,
+  and that images are referred to only by the campaign's hash route, with no path, URL, prompt or note from the server in the page.
+  Proof is at component level; see the roadmap for what was not run (real browser with failing assets, the packaged installation,
+  the backend).
+
 ## Unreleased — Real accessibility and viewport checks (P17.4-A), 21 November 2026
 
 - "Skip to content" now moves focus to the page content. Before, pressing it on any screen reloaded the application at its start

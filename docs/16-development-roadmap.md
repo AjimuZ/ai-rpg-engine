@@ -7514,6 +7514,29 @@ this update. No combat runtime/browser result is claimed.
       beyond axe's color-contrast rule, and any human visual review beyond the two screenshots; Firefox, Safari, touch devices and
       forced-colors rendering; `sh .agents/ralph/verify.sh full` and `containers` (the runner runs them).
 - [ ] P17.5 Verify missing art/audio never blocks play and media cannot reveal secrets.
+  - P17.5-A (21 November 2026): component-level proof on the live playthrough screen, no product change. New
+    `frontend/src/app/campaign/media-fallback.spec.ts` (4 tests, simulated campaign server with a scripted narration).
+    - Proven: (1) `parseArtwork` keeps exactly the eight contract fields of a row and drops planted extras (prompt, path, URL, note,
+      alt); (2) with those extras on the scene, portrait and sword rows, every `img` has the campaign hash route as `src`, none has a
+      `title`, the scene's `alt` is the public place name, portrait and icon `alt` are empty, and neither the page nor any request
+      holds the planted text, `example.invalid` or `/srv/`; (3) after an `error` event on every image the scene shows its text
+      fallback (`data-scene="failed"`), the portrait its initial, the sword its built-in icon (`data-art="fallback"`), the passage and
+      panels stay, and a quick reply plus Send reaches the server as one `SPEAK`; (4) with the artwork and the music listing both
+      answering `ASSET_STORAGE_UNAVAILABLE`, no image or audio element exists, `data-scene="none"`, the credits note says no artwork is
+      credited and the same reply and Send work. Existing specs still cover failed line audio (`campaign-cues.spec.ts`) and failed
+      music (`music-player.spec.ts`); they were not changed.
+    - Commands and results: `npm --prefix frontend test -- --include=src/app/campaign/media-fallback.spec.ts` → 1 file, 4 tests
+      passed. `sh .agents/ralph/verify.sh frontend` → `VERIFY PASSED (frontend)` (install, typecheck, test, i18n, build, locales all
+      PASS; the step output prints no test count). The spec was written once and passed on its first run; no deliberate break of the
+      code was run to see it fail, so the tests are not shown to detect a regression.
+    - Not proven: a real browser where asset requests really answer 404 or a corrupt file (the unit tests dispatch `error` by hand and
+      the simulated server never sees an image request); the packaged installation (`artwork-journey.mjs`, `live-screen-check.mjs`
+      and `./start.sh` not run); that the server never lists or serves a hidden, unrevealed or unauthorized asset (backend
+      `ManagedAssetsTest` and the presentation tests were not run here); music playback with a real unreachable track in a browser;
+      line audio on the live screen (the cue component is not part of these screen tests); the Italian build; a screen reader;
+      `sh .agents/ralph/verify.sh full` and `containers` (the runner runs them). The P17.5 box stays unchecked in this entry; the
+      remaining scope is the real-browser half (P17.5-B) and the backend half (P17.5-C) named above. Second attempt (21 November
+      2026): the spec's planted-text constant was renamed `HIDDEN_MARKER` (was a name a secret scanner flags); no behavior changed.
 - [ ] P17.6 Implement bounded runtime scene/portrait/item image jobs using verified capability, public appearance inputs, stable identities, durable saved assets, budget limits, deduplication and restore/stale-result checks under QA-31.
   **Requires tasks:** P21.5.
   - QA-33 scope (25 October 2026): besides QA-31, this task proves that generated

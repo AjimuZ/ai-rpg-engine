@@ -52,6 +52,14 @@ gallery and item icons, so the whole screen requests no image. Verified with a s
 `frontend/tools/reading-journey.mjs` and, without a runtime, on the packaged installation with
 `frontend/tools/live-screen-check.mjs`; narration from a real signed-in runtime is owner gate P17.3-O.
 
+**Missing media and secrets (P17.5-A, 21 November 2026; component-level proof).** On the playthrough screen a failed scene,
+portrait or item image, and an artwork or music listing that cannot be read, change only the decoration: text label, speaker
+initial, built-in item icon and an honest credits note stay, and reading and Send keep working. The browser keeps only the
+contract fields of a listing row (category, subject, appearance revision, hash, media type, size, credit) and addresses an image
+only by the campaign's hash route; a scene image is described by the public place name, portraits and icons are decorative.
+`frontend/src/app/campaign/media-fallback.spec.ts` checks this with a simulated server. It does not prove that the server never
+lists or serves a hidden asset, and no real browser with failing asset responses was run for it.
+
 P05.5 integrates original MIT geometry from `frontend/src/app/preview/ui-kit.ts`
 and `frontend/src/_ui-kit.scss` with the existing theme: 20 allowlisted line icons,
 finite/clamped resource meters, an independent crystal illustration, item/empty

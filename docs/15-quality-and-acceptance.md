@@ -1846,6 +1846,13 @@ exist), which shows what assistive technology is offered, not what NVDA, JAWS, V
 for keyboard-only creation and fight with real data, real browser zoom, the Italian build, the live campaign screen with real
 narration, a human contrast and visual review, and a screen reader.
 
+P17.5-A adds `frontend/src/app/campaign/media-fallback.spec.ts` (4 tests, 21 November 2026, component level with a simulated
+server): every registered image failing to load, and artwork and music listings the server cannot read, leave the story, the panels
+and a typed Send working; images use only the campaign hash route; fields outside the listing contract (prompt, path, URL, note)
+never reach the page or a request. Line audio and music failure behavior stays covered by `campaign-cues.spec.ts` and
+`music-player.spec.ts`. Not run: a real browser with failing asset responses, the packaged installation, any backend check of what
+the asset route admits (`ManagedAssetsTest` was not re-run), a human review of the media itself.
+
 P05.7-B.2.2 records QA-40 evidence for presentation cues; the point-by-point map to
 backend tests, frontend tests and the browser check is in the
 [roadmap](16-development-roadmap.md) entry of that name. The browser check ran the
