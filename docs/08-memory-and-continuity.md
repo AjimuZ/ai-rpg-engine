@@ -299,6 +299,9 @@ Decisions and limits:
 - P15.1-B relationship values and companion membership (`relationship_change`) are in no context,
   view or summary yet, and the operational checkpoint snapshot does not include them. A
   companion's location is an ordinary `actor` row.
+- P15.2-B faction clock values (`faction_clock_change`) are in no context, view or summary either,
+  so "relevant faction clocks" in section 5 is still planned. The operational checkpoint snapshot
+  does not include them; they are immutable rows that a restore brings back as they were.
 - Semantic retrieval stays out of scope (section 11).
 
 ## 7. Renewal policy

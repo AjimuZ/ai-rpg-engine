@@ -176,6 +176,14 @@ public final class QuestPlan {
         long worldTime();
 
         /**
+         * @param faction canonical faction ID that owns the clock
+         * @param clock clock identifier local to that faction
+         * @return segments filled on the faction clock as committed before this command (P15.2-B); the clock changes
+         *         a command causes are recorded after its quests are evaluated, so they count from the next command
+         */
+        long clock(String faction, String clock);
+
+        /**
          * Hand reward units to the player.
          *
          * @param item canonical item definition ID
@@ -280,6 +288,8 @@ public final class QuestPlan {
         @Override public long possessed(String item) { return world.possessed(item); }
 
         @Override public long worldTime() { return world.worldTime(); }
+
+        @Override public long clock(String faction, String clock) { return world.clock(faction, clock); }
 
         /** Stored endings and those of this evaluation count alike, so a cascade sees the standing it produced. */
         @Override

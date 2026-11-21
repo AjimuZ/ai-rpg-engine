@@ -14,7 +14,8 @@ import org.junit.jupiter.api.Test;
 class QuestPredicateTest {
     /**
      * Fixed facts: the player visited the grove, holds 3 coins, quest "a" is active with objective "x" satisfied,
-     * the world clock reads one day, two hours and five seconds, and the player stands at -15 with the guild.
+     * the world clock reads one day, two hours and five seconds, the player stands at -15 with the guild, and the
+     * guild's raid clock has 3 segments filled.
      */
     private static final QuestPredicate.Facts FACTS = new QuestPredicate.Facts() {
         @Override public boolean visited(String location) { return location.equals("grove"); }
@@ -31,6 +32,10 @@ class QuestPredicateTest {
         @Override public long worldTime() { return 86_400 + 2 * 3_600 + 5; }
 
         @Override public long reputation(String faction) { return faction.equals("guild") ? -15 : 0; }
+
+        @Override public long clock(String faction, String clock) {
+            return faction.equals("guild") && clock.equals("raid") ? 3 : 0;
+        }
     };
 
     /** Construct the stateless fixture. */
@@ -59,6 +64,18 @@ class QuestPredicateTest {
                 new QuestPredicate.Constant(-10))).test(FACTS));
         assertThrows(IllegalStateException.class, () -> new QuestPredicate.Standing("guild").test(FACTS));
         assertThrows(NullPointerException.class, () -> new QuestPredicate.Standing(null));
+    }
+
+    /** The clock atom is a number read from exactly its faction's clock; other clocks stand at zero (P15.2-B). */
+    @Test
+    void clockReadsTheFactionClock() {
+        assertEquals(3, new QuestPredicate.ClockValue("guild", "raid").value(FACTS));
+        assertEquals(0, new QuestPredicate.ClockValue("guild", "muster").value(FACTS));
+        assertEquals(0, new QuestPredicate.ClockValue("fleet", "raid").value(FACTS));
+        assertTrue(new QuestPredicate.Operation("ge", List.of(new QuestPredicate.ClockValue("guild", "raid"),
+                new QuestPredicate.Constant(3))).test(FACTS));
+        assertThrows(IllegalStateException.class, () -> new QuestPredicate.ClockValue("guild", "raid").test(FACTS));
+        assertThrows(NullPointerException.class, () -> new QuestPredicate.ClockValue("guild", null));
     }
 
     /** Each atom reads exactly its own fact. */

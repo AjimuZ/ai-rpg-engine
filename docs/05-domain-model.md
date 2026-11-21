@@ -438,6 +438,26 @@ a calendar reading (day from 1, hour, minute, second) for presentation.
   policy can be interrupted. Events `REST_COMPLETED`/`REST_INTERRUPTED`, `RESOURCE_RECOVERED` and
   `CONDITION_REMOVED` (version 1).
 
+### Faction clocks (P15.2-B)
+
+V34 adds `faction_clock_change`, keyed by `(campaign_id, changed_revision, ordinal)` with ordinal 0..31
+([ADR 0052](adr/0052-faction-clocks-record-each-caused-change-with-bounded-catch-up.md)). Each row is one change of a
+faction clock declared by the pinned content:
+
+- the clock: `faction_id` (canonical) and `clock_id`;
+- the cause: `cause` (`WORLD_TIME`, `QUEST_ENDED` or `CLOCK_COMPLETED`) with `due_world_time`, plus `cause_quest_id` and
+  `cause_event_sequence` for a quest ending, or `cause_faction_id` and `cause_clock_id` for a completion;
+- the values: `value_before`, `value_after` (higher, at most `target`, 1..12), `completed` (exactly when the target is
+  reached) and `changed_world_time`.
+
+Rows are immutable, and each value, tick boundary, quest and source clock appears at most once per clock (unique
+indexes). An insert trigger checks provenance: the row belongs to the campaign's current revision and world time, its
+`value_before` is the clock's current value, a cited quest ended with that event at that time, and a cited clock
+completed at that due time. The current value is the latest `value_after`, or 0. `FactionClocks`, a participant of the
+canonical commit, derives the due causes from these rows, the terminal `quest_state` rows and the committed world time,
+and records at most 32 per commit in due order. The rest stay due for the next commit. `QuestStore` reads the values for
+the `clock` quest atom. Only content that declares clocks writes here.
+
 ### Quests, visits and reward settlement (P10.3)
 
 V20 adds `quest_state`, `quest_objective` and `location_visit`. A pure `QuestPlan` derives every quest

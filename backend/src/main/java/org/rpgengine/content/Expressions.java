@@ -107,6 +107,12 @@ final class Expressions {
 
         /** Objective IDs of an already resolved quest reference, or null when the quest is not local. */
         Set<String> objectives(String questRef);
+
+        /**
+         * Faction clocks of an already resolved faction reference (P15.2-B): target segments by clock identifier, or
+         * null when the faction is not local.
+         */
+        Map<String, Integer> clocks(String factionRef);
     }
 
     /**
@@ -294,8 +300,8 @@ final class Expressions {
         /** Analyze a state-reading atom after checking it is readable in this scope. */
         private Interval atom(String name, Object argument, String at, boolean required) {
             boolean actor = Set.of("attribute", "resource", "skill", "dice").contains(name);
-            boolean world = Set.of("visited", "possesses", "questStatus", "objective", "worldTime", "reputation")
-                    .contains(name);
+            boolean world = Set.of("visited", "possesses", "questStatus", "objective", "worldTime", "reputation",
+                    "clock").contains(name);
             if (!actor && !world) {
                 throw error("SCHEMA", at, "Unknown operator or atom '" + name + "'");
             }
@@ -347,6 +353,24 @@ final class Expressions {
                     // The player's standing with a faction, derived from ended quests and clamped (P15.2-A).
                     reference(argument, at, Set.of("faction"));
                     return new Interval(Type.NUMBER, -PackCompiler.MAX_REPUTATION, PackCompiler.MAX_REPUTATION);
+                }
+                case "clock" -> {
+                    // Segments filled on a faction clock of this pack (P15.2-B); the proven interval is 0..its target.
+                    var f = new Fields(document, at, argument, context);
+                    String faction = f.ref("faction", Set.of("faction"), true);
+                    String clock = f.id("id", true);
+                    f.close();
+                    Map<String, Integer> known = context.clocks(faction);
+                    if (known == null) {
+                        throw error("SCHEMA", PackDocument.child(at, "faction"),
+                                "Clock atoms may only name factions defined in this pack");
+                    }
+                    Integer segments = known.get(clock);
+                    if (segments == null) {
+                        throw error("REFERENCE_UNKNOWN", PackDocument.child(at, "id"),
+                                "Faction '" + faction + "' has no clock '" + clock + "'");
+                    }
+                    return new Interval(Type.NUMBER, 0, segments);
                 }
                 case "possesses" -> {
                     var f = new Fields(document, at, argument, context);

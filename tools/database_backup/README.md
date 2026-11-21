@@ -263,6 +263,14 @@ and the current value and companion membership are derived from them, so a resto
 Offline checks cover the V33 manifest/catalog; no live V33 dump/restore rehearsal has been run, and both rehearsals below ran
 before this table existed.
 
+V34 scope (P15.2-B) adds `faction_clock_change`, the append-only history of faction clocks: one row per change with the
+faction, the clock, the cause (a time boundary, a quest ending with its event, or another clock's completion), the world
+time at which the cause was due, the values before and after, the target and a completion flag. It holds no prose. Rows are
+immutable, and a clock's value, its completion and the causes still due are derived from them and from quest rows, so a
+restore needs no retirement step for this table. Offline checks were updated for the V34 manifest/catalog but were not run
+in the session that added it; no live V34 dump/restore rehearsal has been run, and both rehearsals below ran before this
+table existed.
+
 ## Live two-genre rehearsal (P06.5-B.1, V26)
 
 `tools/container_packaging/test_restore_isolation.py` runs this tool as an operator would on a populated world, then

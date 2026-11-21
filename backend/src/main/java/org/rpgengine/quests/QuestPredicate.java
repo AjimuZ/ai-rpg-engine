@@ -20,8 +20,9 @@ import org.rpgengine.rules.WorldClock;
  *
  * <p>Atoms: {@code visited} (a location the player has stood in), {@code possesses} (units of an item
  * definition the player holds), {@code questStatus} and {@code objective} (a satisfied objective of a
- * quest), {@code worldTime} (whole elapsed units of the bounded in-world clock) and {@code reputation}
- * (the player's standing with a faction, derived from ended quests, P15.2-A). No atom rolls dice
+ * quest), {@code worldTime} (whole elapsed units of the bounded in-world clock), {@code reputation}
+ * (the player's standing with a faction, derived from ended quests, P15.2-A) and {@code clock} (segments filled
+ * on a faction clock by earlier commits, P15.2-B). No atom rolls dice
  * or reads the wall clock, so evaluation is a pure function of the facts and never depends on randomness
  * or real time; the in-world clock moves only when a committed command resolves a duration.
  *
@@ -58,6 +59,14 @@ public sealed interface QuestPredicate {
          *         including quests that ended earlier in the same evaluation
          */
         long reputation(String faction);
+
+        /**
+         * @param faction canonical faction ID that owns the clock
+         * @param clock clock identifier local to that faction
+         * @return segments of the faction clock filled as committed before this command (P15.2-B), zero when none or
+         *         when no such clock exists
+         */
+        long clock(String faction, String clock);
     }
 
     /**
@@ -124,6 +133,11 @@ public sealed interface QuestPredicate {
             }
             case "worldTime" -> new WorldTime((String) argument);
             case "reputation" -> new Standing(snapshot.resolve(pack, (String) argument, "faction").id());
+            case "clock" -> {
+                var fields = (Map<?, ?>) argument;
+                yield new ClockValue(snapshot.resolve(pack, (String) fields.get("faction"), "faction").id(),
+                        (String) fields.get("id"));
+            }
             case "objective" -> {
                 var fields = (Map<?, ?>) argument;
                 yield new Objective(snapshot.resolve(pack, (String) fields.get("quest"), "quest").id(),
@@ -235,6 +249,23 @@ public sealed interface QuestPredicate {
         public Standing { Objects.requireNonNull(faction, "faction"); }
         @Override public boolean test(Facts facts) { throw boolean_(); }
         @Override public long value(Facts facts) { return facts.reputation(faction); }
+    }
+
+    /**
+     * Segments filled on a faction clock (P15.2-B), as recorded by earlier commits. Numeric in 0..the clock's target;
+     * combine it with a comparison, for example {@code {"ge": [{"clock": {"faction": "raiders", "id": "raid"}}, 4]}}.
+     *
+     * @param faction canonical faction ID that owns the clock
+     * @param clock clock identifier local to that faction
+     */
+    record ClockValue(String faction, String clock) implements QuestPredicate {
+        /** Require both parts. */
+        public ClockValue {
+            Objects.requireNonNull(faction, "faction");
+            Objects.requireNonNull(clock, "clock");
+        }
+        @Override public boolean test(Facts facts) { throw boolean_(); }
+        @Override public long value(Facts facts) { return facts.clock(faction, clock); }
     }
 
     /**

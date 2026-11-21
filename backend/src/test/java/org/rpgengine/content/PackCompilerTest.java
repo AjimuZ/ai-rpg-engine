@@ -435,6 +435,74 @@ class PackCompilerTest {
         rejectsAmount("SCHEMA", "{\"reputation\":\"guild\"}");
     }
 
+    /** Two valid guild clocks: an hourly strike clock and an unrest clock advanced by the ferry ending and the strike. */
+    private static final String CLOCKS = """
+            [{"id":"strike","segments":4,"every":{"minutes":60}},
+            {"id":"unrest","segments":3,"every":{"minutes":120,"from":"advance"},
+            "causes":[{"quest":"ferry","outcome":"done","segments":2},{"clock":{"faction":"guild","id":"strike"}}]}]""";
+
+    /**
+     * Factions may declare clocks and quests may read them (P15.2-B): the atom projects to a typed node over the
+     * canonical faction, and every bound, origin, cause, duplicate and reference error is located.
+     */
+    @Test
+    void validatesFactionClocks() {
+        String reads = "{\"lt\":[{\"clock\":{\"faction\":\"guild\",\"id\":\"strike\"}},4]}";
+        var compiled = new PackCompiler().compile(parse(withClocks(CLOCKS, reads)));
+        var rules = org.rpgengine.quests.QuestRules.from(CampaignPackSnapshot.local(compiled));
+        assertEquals(new org.rpgengine.quests.QuestPredicate.Operation("lt", List.of(
+                new org.rpgengine.quests.QuestPredicate.ClockValue("guild", "strike"),
+                new org.rpgengine.quests.QuestPredicate.Constant(4))), rules.quests().get("ferry").availableWhen());
+
+        var schema = List.of(
+                CLOCKS.replace("\"segments\":4", "\"segments\":13"),
+                CLOCKS.replace("\"minutes\":60", "\"minutes\":14"),
+                CLOCKS.replace("\"minutes\":60", "\"minutes\":10081"),
+                CLOCKS.replace("\"from\":\"advance\"", "\"from\":\"later\""),
+                CLOCKS.replace("{\"clock\":{\"faction\":\"guild\",\"id\":\"strike\"}}",
+                        "{\"quest\":\"ferry\",\"clock\":{\"faction\":\"guild\",\"id\":\"strike\"}}"),
+                CLOCKS.replace("{\"clock\":{\"faction\":\"guild\",\"id\":\"strike\"}}", "{\"segments\":1}"),
+                CLOCKS.replace("\"outcome\":\"done\",\"segments\":2", "\"outcome\":\"done\",\"segments\":4"),
+                CLOCKS.replace("\"every\":{\"minutes\":60}", "\"every\":{\"minutes\":60},\"visibility\":\"public\""),
+                CLOCKS.replace("[{\"id\":\"strike\"", "[{\"id\":\"a\",\"segments\":1,\"every\":{\"minutes\":60}},"
+                        + "{\"id\":\"b\",\"segments\":1,\"every\":{\"minutes\":60}},"
+                        + "{\"id\":\"c\",\"segments\":1,\"every\":{\"minutes\":60}},{\"id\":\"strike\""));
+        for (String bad : schema) {
+            assertEquals("SCHEMA", failure(withClocks(bad, reads)), bad);
+        }
+        assertEquals("CONSTRAINT_CONFLICT", failure(withClocks(CLOCKS.replace(",\"every\":{\"minutes\":60}", ""), reads)));
+        assertEquals("CONSTRAINT_CONFLICT", failure(withClocks(CLOCKS.replace("\"every\":{\"minutes\":60}",
+                "\"every\":{\"minutes\":60,\"from\":\"advance\"}"), reads)));
+        assertEquals("CONSTRAINT_CONFLICT", failure(withClocks(CLOCKS.replace("\"id\":\"strike\"}}",
+                "\"id\":\"unrest\"}}"), reads)));
+        assertEquals("DUPLICATE", failure(withClocks(CLOCKS.replace("{\"id\":\"unrest\"", "{\"id\":\"strike\""), reads)));
+        assertEquals("DUPLICATE", failure(withClocks(CLOCKS.replace("\"segments\":2}",
+                "\"segments\":2},{\"quest\":\"ferry\"}"), reads)));
+        assertEquals("DUPLICATE", failure(withClocks(CLOCKS.replace("\"id\":\"strike\"}}]",
+                "\"id\":\"strike\"}},{\"clock\":{\"faction\":\"guild\",\"id\":\"strike\"},\"segments\":2}]"), reads)));
+        assertEquals("REFERENCE_UNKNOWN", failure(withClocks(CLOCKS.replace("\"outcome\":\"done\"",
+                "\"outcome\":\"lost\""), reads)));
+        assertEquals("REFERENCE_UNKNOWN", failure(withClocks(CLOCKS.replace("\"quest\":\"ferry\"", "\"quest\":\"toll\""),
+                reads)));
+        assertEquals("REFERENCE_KIND", failure(withClocks(CLOCKS.replace("\"quest\":\"ferry\"", "\"quest\":\"keeper\""),
+                reads)));
+        assertEquals("REFERENCE_UNKNOWN", failure(withClocks(CLOCKS.replace("\"id\":\"strike\"}}",
+                "\"id\":\"siege\"}}"), reads)));
+        // The atom is a number in 0..target that names a clock of a local faction.
+        assertEquals("SCHEMA", failure(withClocks(CLOCKS, "{\"clock\":{\"faction\":\"guild\",\"id\":\"strike\"}}")));
+        assertEquals("REFERENCE_UNKNOWN", failure(withClocks(CLOCKS, reads.replace("strike", "siege"))));
+        assertEquals("REFERENCE_KIND", failure(withClocks(CLOCKS, reads.replace("guild", "keeper"))));
+        rejectsAmount("SCHEMA", "{\"clock\":{\"faction\":\"guild\",\"id\":\"strike\"}}");
+    }
+
+    /** The reference pack with the guild's clocks set to {@code clocks} and a ferry quest available when {@code reads}. */
+    private static Map<String, String> withClocks(String clocks, String reads) {
+        var files = withFile("quests.json", "quests", envelope(quest("ferry", reads)));
+        files.put("factions.json", envelope("{\"id\":\"guild\",\"kind\":\"faction\",\"data\":{\"name\":\"Guild\","
+                + "\"description\":\"Dockers.\",\"clocks\":" + clocks + "}}"));
+        return files;
+    }
+
     /** The sources of {@code base} with the ferry quest's reputation list replaced by {@code changes}. */
     private static Map<String, String> withReputation(Map<String, String> base, String ferry, String changes) {
         var files = new LinkedHashMap<>(base);

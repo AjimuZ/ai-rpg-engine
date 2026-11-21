@@ -6057,7 +6057,7 @@ this update. No combat runtime/browser result is claimed.
       - `tools/database_backup/test_backup.py`: this session was not allowed to run Python, so the schema 33 scope
         check is unverified here.
       - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
-- [ ] P15.2 Add richer quest outcomes, faction clocks, bounded time catch-up, reputation, and causally triggered world changes.
+- [x] P15.2 Add richer quest outcomes, faction clocks, bounded time catch-up, reputation, and causally triggered world changes.
   - P15.2-A (21 November 2026; partial, the box stays unchecked). Quest outcomes can now change faction reputation,
     and quest predicates can read it
     ([ADR 0051](adr/0051-faction-reputation-is-derived-from-quest-endings.md)). No migration was added.
@@ -6103,6 +6103,92 @@ this update. No combat runtime/browser result is claimed.
       - A deliberate weakening run.
       - HTTP reads in these tests.
       - Dependency-pack faction references (`pack#id`) in `reputation`. No test uses them.
+      - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
+  - P15.2-B (21 November 2026; partial, the box stays unchecked). Factions can declare clocks that time, quest endings
+    and other clocks advance. Each change is recorded with its cause, catch-up is bounded per commit, and quest
+    predicates can read the clocks
+    ([ADR 0052](adr/0052-faction-clocks-record-each-caused-change-with-bounded-catch-up.md)). Migration V34 adds
+    `faction_clock_change`.
+    - **Pack content.** A faction may declare 0..4 `clocks` `{id, segments 1..12, every?, causes 0..8}`:
+      - `every` is `{minutes 15..10080, from start|advance}`.
+      - A cause is `{quest, outcome?, segments?}` naming a quest of the same pack, or `{clock: {faction, id},
+        segments?}` naming a clock of a faction of the same pack. `segments` is 1..the target and defaults to 1.
+      - The compiler reports `SCHEMA`, `DUPLICATE`, `REFERENCE_KIND`, `REFERENCE_UNKNOWN` and `CONSTRAINT_CONFLICT`.
+        `CONSTRAINT_CONFLICT` covers a clock nothing can advance, `from: advance` without a cause and a self-cause.
+        `DUPLICATE` covers two causes that could match one ending or one completion.
+      - World predicates accept the numeric atom `{"clock": {"faction", "id"}}` with the proven interval 0..target, for
+        local factions only.
+    - **Types.** `org.rpgengine.world.FactionClockRules` (`Key`, `Tick`, `Origin`, `QuestEnded`, `ClockCompleted`,
+      `Clock`) repeats the compiler's bounds and its one-match rule. It holds at most 64 clocks per closure.
+      `CommandRuleCatalog.clocks()` projects it with canonical faction and quest IDs; the older constructor means no
+      clocks. `QuestPredicate.ClockValue` is the atom. `QuestPredicate.Facts.clock` and `QuestPlan.World.clock` read it.
+      `QuestStore.Stored` carries the recorded values, and its older two-argument constructor means none.
+    - **Engine behavior.**
+      - `FactionClocks.advanceWithin` runs in every commit that carries the pinned catalog. It runs after the quest
+        rows are written and before relationships and NPC rules. Campaigns without clocks return before any query.
+      - The pure `FactionClocks.plan` derives the due causes from the recorded rows, the terminal `quest_state` rows
+        and the committed world time. It applies them by due time, then tick, quest ending, completion, then clock and
+        cause identity. A completion makes its dependants due at the same time.
+      - At most 32 changes (`MAX_CHANGES`) are recorded per commit, and the rest stay due for the next commit. A full
+        clock takes nothing more.
+      - Each change is one immutable row. Check constraints, four unique indexes and an insert trigger refuse a row
+        that is not the campaign's current revision and time, does not continue the clock's value, or cites a quest
+        ending or completion that did not happen by then. Recorded changes bump `clocks` and `clock:<faction>:<clock>`.
+      - The quest engine reads the values recorded before the command, so quests react from the next command on.
+      - The backup tool now covers schema 34 and the new table. The 49 test suites whose cleanup truncates `campaign`
+        gained the table.
+    - **Commands and results (Windows 11 host, pinned containers).**
+      - `sh .agents/ralph/verify.sh backend -Dtest=FactionClocksTest,FactionClockWorldTest,PackCompilerTest,QuestPredicateTest,QuestPlanTest,EngineApplicationTest`:
+        VERIFY PASSED. 55 tests, 0 failures (PackCompilerTest 26, QuestPlanTest 12, QuestPredicateTest 8,
+        FactionClocksTest 4, EngineApplicationTest 3, FactionClockWorldTest 2); backend-focused 17 s.
+      - `sh .agents/ralph/verify.sh backend -Dtest=QuestCommandsTest,RelationshipWorldTest,NpcWorldTest,ClockCommandsTest,CanonicalMigrationUpgradeTest,CanonicalFoundationsPersistenceTest,CommandRulesTest,LocalActionResolverTest,PlayPanelsTest`:
+        VERIFY PASSED. 73 tests, 0 failures (CanonicalFoundationsPersistenceTest 16, ClockCommandsTest 13,
+        PlayPanelsTest 11, QuestCommandsTest 11, CommandRulesTest 9, LocalActionResolverTest 9, RelationshipWorldTest 2,
+        CanonicalMigrationUpgradeTest 1, NpcWorldTest 1); backend-focused 26 s. The step-by-step upgrade test passes
+        with V34 present, and `EngineApplicationTest` lists the new table.
+      - Of the 49 suites whose cleanup lists gained the table, 7 ran in these two runs and 42 did not.
+    - **Evidence.**
+      - `FactionClockWorldTest#dueCausesAreRecordedInOrderBoundedPerCommit`: on real PostgreSQL through the production
+        admission, resolver and commit, with the exploration fixture plus a `wardens` faction. It has three 12-segment
+        clocks ticking every 15 minutes, an `alarm` clock (2 segments) advanced by the survey's `surveyed` ending and by
+        the `patrol` clock's completion, and a `muster` quest gated on a full alarm.
+        - Moving to the grove ends the survey. In that commit, alarm 0→1 cites the `QUEST_COMPLETED` event of that
+          revision.
+        - Three rounds of reads with real time passing leave `campaign`, `campaign_event`, `quest_state`,
+          `faction_clock_change` and `query_epoch` byte-identical.
+        - A four-hour `WAIT` has 36 ticks and one cascade due. It records exactly 32 ticks, ordinals following due time
+          (900, 1,800, … 9,900 s) and clock identity.
+        - A one-minute `WAIT` then records the other 5 first: watch at 9,900 s, drill, patrol and watch completing at
+          10,800 s, and alarm 1→2 citing the patrol's completion.
+        - That command's quests still read alarm 1. The next command discovers `muster`, and nothing more is recorded
+          (38 rows, `clocks` epoch 3).
+        - The database refuses update, delete, a forged row that does not continue its clock and a forged row of an
+          earlier revision.
+      - `FactionClockWorldTest#campaignsWithoutClocksWriteNothing`: the same commands on the plain fixture store no
+        row and no `clocks` epoch.
+      - `FactionClocksTest` (pure):
+        - A plan bounded at 32, then a plan from the folded history, equals one unbounded plan (36 changes), and
+          completed clocks take nothing at 100 hours.
+        - A tick waits for its boundary.
+        - An ending, a cascade and an `advance`-origin tick happen in causal order, and each counts once.
+        - An ending with another outcome changes nothing.
+        - The rule values refuse inert, self-caused, ambiguous and oversized clocks.
+      - `PackCompilerTest#validatesFactionClocks` and `QuestPredicateTest#clockReadsTheFactionClock` cover the typed
+        projection, each compiler error and the atom's reading.
+    - **Not done in this story:**
+      - Any view, panel, receipt entry, journal event or narration context that shows a clock, and clock visibility.
+      - Clock effects other than quest predicates, such as reputation, NPC placement, faction resources or stances.
+      - Clocks that reset, repeat or run backwards.
+      - Causes and atoms naming dependency-pack quests or factions.
+      - Quest evaluation in the same command as the clock change, and during a fight.
+      - Reputation from clocks, encounters or dialogue, which the derived reputation of ADR 0051 would need to store.
+    - **Not proven:**
+      - A deliberate weakening run.
+      - HTTP reads in these tests.
+      - Clocks during a fight (round time), the `CLOCK_COMPLETED` refusal paths of the provenance trigger and the
+        64-clock closure bound at projection. No test covers them.
+      - `tools/database_backup/test_backup.py`: this session did not run Python, so the schema 34 scope check is
+        unverified here.
       - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
 - [ ] P15.3 Add guide personas with separate knowledge/session scope and no mutation authority.
 - [ ] P15.4 Add creative ability drafting, validation preview, explicit execution, learned recipes, and bounded high-power profiles.

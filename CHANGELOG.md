@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — Faction clocks and time catch-up (P15.2-B), 21 November 2026
+
+- A faction can now declare up to four clocks, each filling from 0 to 1..12 segments. A clock fills as in-world time
+  passes (one segment every 15 minutes to one week, counted from the campaign's start or from the clock's first
+  advance), when a named quest of the same adventure ends (optionally only with a given outcome), or when another clock
+  completes. The pack checker reports out-of-range values, a clock nothing can advance, a clock that names itself, two
+  causes that would count the same fact and unknown quests, outcomes or clocks, at the field.
+- Quest conditions can read a clock with `{"clock": {"faction": "<faction>", "id": "<clock>"}}`, so a quest can open,
+  progress or end because a faction's plan moved on. A quest sees a clock change from the command after it.
+- Every change is stored once, with what caused it (the time boundary, the quest ending and its event, or the other
+  clock's completion), the time it was due and the values before and after. A full clock never changes again. After a
+  long wait or rest, at most 32 changes are recorded per command. The rest are recorded, oldest first, by the next
+  commands, so nothing is skipped or reordered. Looking at the game or real time passing never moves a clock.
+  Adventures without clocks behave exactly as before.
+- Database migration V34 adds the `faction_clock_change` table, and the backup tool now covers schema 34.
+- Limits: no screen shows clocks yet. Clocks only fill, never reset or repeat, and change nothing directly but quest
+  conditions. Clock causes cannot name quests or factions of other packs.
+
 ## Unreleased — Quest reputation (P15.2-A), 21 November 2026
 
 - A quest outcome can now change the player's standing with factions: its `settlement` may list up to eight

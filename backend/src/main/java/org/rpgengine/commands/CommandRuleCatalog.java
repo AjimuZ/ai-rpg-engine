@@ -17,6 +17,7 @@ import org.rpgengine.content.Definition;
 import org.rpgengine.quests.QuestRules;
 import org.rpgengine.rules.RestRules;
 import org.rpgengine.rules.WorldClock;
+import org.rpgengine.world.FactionClockRules;
 import org.rpgengine.world.NpcRules;
 import org.rpgengine.world.NpcSchedule;
 import org.rpgengine.world.RelationshipRules;
@@ -26,7 +27,7 @@ import org.rpgengine.world.RelationshipRules;
  * resolution consult: location links with their travel minutes and tags, location disclosure, rest policies,
  * combat profiles and encounter templates (P11.1), actor-definition disclosure and
  * declaring packs, NPC schedules, witness flags and report routes (P15.1-A), NPC relationship rules (P15.1-B),
- * and ability contracts
+ * faction clocks (P15.2-B), and ability contracts
  * including their compiled effect programs. It is
  * derived only from a sealed, recompiled {@link CampaignPackSnapshot}; no authored prose,
  * secret text, display name or localization is retained, so caching it costs little memory
@@ -62,12 +63,14 @@ import org.rpgengine.world.RelationshipRules;
  * @param relationships relationship rules of every NPC definition that declares them, keyed by canonical ID
  *        (P15.1-B); only a pack that enables the {@code relationships} module can declare them, so the map is empty
  *        for every closure that does not
+ * @param clocks faction clocks of every faction definition that declares them, with canonical faction and quest IDs
+ *        (P15.2-B); {@link FactionClockRules#NONE} when no faction of the closure declares one
  */
 record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
         Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
         Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests,
         Map<String, RestRules.Policy> rests, CombatRules combat, Map<String, NpcRules> npcs,
-        Map<String, RelationshipRules> relationships) {
+        Map<String, RelationshipRules> relationships, FactionClockRules clocks) {
     /** Freeze every index; null parts are construction bugs and fail immediately. */
     CommandRuleCatalog {
         Objects.requireNonNull(revisionId, "revisionId");
@@ -83,6 +86,17 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         abilities = Map.copyOf(abilities);
         npcs = Map.copyOf(npcs);
         relationships = Map.copyOf(relationships);
+        Objects.requireNonNull(clocks, "clocks");
+    }
+
+    /** Catalog without faction clocks, the shape used before P15.2-B. */
+    CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
+            Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
+            Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests,
+            Map<String, RestRules.Policy> rests, CombatRules combat, Map<String, NpcRules> npcs,
+            Map<String, RelationshipRules> relationships) {
+        this(revisionId, locations, actorDefinitions, resourceVocabularies, actorPacks, abilities, items, characters,
+                quests, rests, combat, npcs, relationships, FactionClockRules.NONE);
     }
 
     /** Catalog without relationship rules, the shape used before P15.1-B. */
@@ -154,6 +168,7 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         var rests = new HashMap<String, RestRules.Policy>();
         var npcs = new HashMap<String, NpcRules>();
         var relationships = new HashMap<String, RelationshipRules>();
+        var clocks = new HashMap<FactionClockRules.Key, FactionClockRules.Clock>();
         for (CompiledPack pack : snapshot.packs().values()) {
             String packId = pack.parsed().manifest().id();
             for (Definition definition : pack.definitions()) {
@@ -207,13 +222,50 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
                     }
                     case "ability" -> abilities.put(id, ability(snapshot, pack, data));
                     case "item" -> items.put(id, item(snapshot, pack, data));
+                    case "faction" -> {
+                        for (Map<?, ?> clock : objects(data.get("clocks"))) {
+                            var rule = clock(snapshot, pack, id, clock);
+                            clocks.put(rule.key(), rule);
+                        }
+                    }
                     default -> { }
                 }
             }
         }
         return new CommandRuleCatalog(revisionId, locations, actors, vocabularies, origins, abilities, items,
                 CharacterRuleCatalog.from(snapshot), QuestRules.from(snapshot), rests, CombatRules.from(snapshot), npcs,
-                relationships);
+                relationships, new FactionClockRules(clocks));
+    }
+
+    /**
+     * Read one validated faction clock (P15.2-B). The faction ID is the declaring definition's canonical ID, quest causes
+     * are canonicalized like every other reference, and a clock cause keeps the named faction's canonical ID with the
+     * clock identifier local to it. The compiler has already checked bounds, references and that at most one cause
+     * matches any one fact.
+     */
+    private static FactionClockRules.Clock clock(CampaignPackSnapshot snapshot, CompiledPack pack, String faction,
+            Map<?, ?> clock) {
+        FactionClockRules.Tick tick = null;
+        if (clock.get("every") instanceof Map<?, ?> every) {
+            // A tick may be longer than one command's step (up to a week), so it is not an authored duration.
+            tick = new FactionClockRules.Tick(number(every.get("minutes"), 0) * WorldClock.MINUTE,
+                    FactionClockRules.Origin.of(every.get("from") instanceof String from ? from : "start"));
+        }
+        var causes = new ArrayList<FactionClockRules.Cause>();
+        for (Map<?, ?> cause : objects(clock.get("causes"))) {
+            int segments = number(cause.get("segments"), 1);
+            if (cause.get("quest") instanceof String quest) {
+                causes.add(new FactionClockRules.QuestEnded(snapshot.resolve(pack, quest, "quest").id(),
+                        (String) cause.get("outcome"), segments));
+            } else {
+                var named = (Map<?, ?>) cause.get("clock");
+                causes.add(new FactionClockRules.ClockCompleted(new FactionClockRules.Key(
+                        snapshot.resolve(pack, (String) named.get("faction"), "faction").id(), (String) named.get("id")),
+                        segments));
+            }
+        }
+        return new FactionClockRules.Clock(new FactionClockRules.Key(faction, (String) clock.get("id")),
+                number(clock.get("segments"), 1), tick, causes);
     }
 
     /**

@@ -37,6 +37,9 @@ class QuestPlanTest {
 
         @Override public long worldTime() { return time; }
 
+        // No test here moves a faction clock; the clock atom is covered by QuestPredicateTest.
+        @Override public long clock(String faction, String clock) { return 0; }
+
         @Override public boolean visited(String location) { return visited.contains(location); }
 
         @Override public long possessed(String item) { return held.getOrDefault(item, 0L); }

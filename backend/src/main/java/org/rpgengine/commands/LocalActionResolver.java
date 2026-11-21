@@ -613,6 +613,9 @@ final class LocalActionResolver {
                 // The clock as it reads once this command's own duration has passed.
                 @Override public long worldTime() { return snapshot.worldTimeSeconds() + elapsed; }
 
+                // Faction clocks as committed before this command; its own clock changes are recorded at commit.
+                @Override public long clock(String faction, String clock) { return stored.clock(faction, clock); }
+
                 @Override
                 public void grant(String item, int quantity) {
                     var rule = catalog.characters().items().get(item);

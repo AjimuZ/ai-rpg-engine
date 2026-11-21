@@ -117,7 +117,7 @@ Limits:
 
 Factions maintain goals, reputation, resources, relationships, and bounded event clocks. A player action can start or advance a clock. Trigger evaluation is causal and deterministic for mechanics; Codex can suggest narrative interpretation or candidate developments.
 
-**World clock (P10.4, implemented).** The campaign's in-world time is a counter of whole seconds. It moves only when a committed command resolves a duration (travel along a link, a wait of at most four hours, or a rest), by at most one in-world day per command, and it never passes one hundred years; the database refuses any other change. Looking at the game (state, resume card, stream, any `GET`) never advances it, and neither does real time. Quest predicates can read it with `worldTime`. Faction and event clocks below remain planned (P15.2).
+**World clock (P10.4, implemented).** The campaign's in-world time is a counter of whole seconds. It moves only when a committed command resolves a duration (travel along a link, a wait of at most four hours, or a rest), by at most one in-world day per command, and it never passes one hundred years; the database refuses any other change. Looking at the game (state, resume card, stream, any `GET`) never advances it, and neither does real time. Quest predicates can read it with `worldTime`. Faction clocks (P15.2-B, below) count its boundaries.
 
 **Quest reputation (P15.2-A, implemented; [ADR 0051](adr/0051-faction-reputation-is-derived-from-quest-endings.md)).** A quest outcome may declare `reputation` changes `{faction, delta}`, with a non-zero delta within -25..25. The player's standing with a faction is derived from the quests that have ended: the changes of each recorded outcome are summed and the sum is clamped once to -100..100. Ended quests never change, so every point has a stored cause (the quest's ending event), no quest counts twice, and the order of the endings does not matter. The numeric `reputation` atom lets availability, objective and outcome predicates read the standing. Within one commit an ending already counts for the quests evaluated after it.
 
@@ -129,6 +129,21 @@ Limits:
 - Because the sum is clamped once, a standing pushed past a bound keeps the excess.
 
 A clock has owner, current value, target, tick policy, trigger, visibility, and settlement identity. On a long time jump, process due boundaries in order with a cap; if too many accumulate, pause for bounded catch-up rather than blocking indefinitely or skipping consequential events. UI reads do not trigger hidden world advancement.
+
+**Faction clocks (P15.2-B, implemented; [ADR 0052](adr/0052-faction-clocks-record-each-caused-change-with-bounded-catch-up.md)).** A faction (the owner) may declare up to 4 clocks. Each fills from 0 to its target of 1..12 segments. Three kinds of cause advance it:
+
+- a time tick: one segment each `every.minutes` (15..10,080) of world time, counted from the campaign's start or, with `from: advance`, from the clock's first caused change;
+- the ending of a named quest of the same pack, optionally only with a given outcome;
+- the completion of another clock of a faction of the same pack.
+
+At every committed command, the causes due at the committed world time are derived from stored facts and applied in one order: due time, then tick before quest ending before completion, then clock and cause identity. Each change is one immutable row that names its cause and its due time, with the values before and after. A clock that reaches its target is complete and takes nothing more, so its completion is recorded once; that completion is due at once for the clocks that name it. At most 32 changes are recorded per commit. The rest stay due and are recorded first by the next command, so a long wait or rest is caught up over a few commands without skipping or reordering anything. Quest predicates read a clock with the numeric `clock` atom. They see the values recorded by earlier commands, so a quest reacts to a clock from the command after the change. Reads and real time never advance a clock.
+
+Limits:
+
+- No view, panel, receipt, journal event or narration context shows a clock, and there is no clock visibility setting.
+- Clocks only rise. They do not reset, repeat, run backwards or change reputation, NPCs or other state; their only effect is through quest predicates.
+- Causes and atoms cannot name quests or factions of dependency packs.
+- Quests are not evaluated during a fight. Clocks tick with round time, and quests react from the next exploration command.
 
 Knowledge propagates through witnesses, messages, travel, or other declared mechanisms. A remote town does not instantly know a player's private conversation. Off-scene events cannot grant the protagonist knowledge without a recorded discovery. Since P15.1-A, the declared mechanisms are witness NPCs and their delayed `reports` routes (section 6). They carry only where the player was seen. Travel-based and multi-hop propagation remain planned.
 

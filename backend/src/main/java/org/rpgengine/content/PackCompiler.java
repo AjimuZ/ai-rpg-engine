@@ -14,6 +14,7 @@ import java.util.TreeSet;
 import org.rpgengine.rules.CombatProfile;
 import org.rpgengine.rules.WorldClock;
 import org.rpgengine.rules.ZoneGraph;
+import org.rpgengine.world.FactionClockRules;
 import org.rpgengine.world.RelationshipRules;
 
 /**
@@ -76,6 +77,9 @@ public final class PackCompiler {
     /** Authored spellings of the relationship triggers, from {@link RelationshipRules.Trigger}. */
     private static final Set<String> RELATIONSHIP_TRIGGERS = java.util.Arrays.stream(RelationshipRules.Trigger.values())
             .map(RelationshipRules.Trigger::token).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    /** Authored spellings of where a faction clock's time ticks are counted from (P15.2-B). */
+    private static final Set<String> CLOCK_ORIGINS = java.util.Arrays.stream(FactionClockRules.Origin.values())
+            .map(FactionClockRules.Origin::token).collect(java.util.stream.Collectors.toUnmodifiableSet());
     /** A time of day on the 24-hour clock, {@code HH:MM}. */
     private static final java.util.regex.Pattern DAY_TIME = java.util.regex.Pattern.compile("([01][0-9]|2[0-3]):[0-5][0-9]");
     /** Hands available when a pack's equipment rule does not say otherwise (docs/10 section 3). */
@@ -418,6 +422,49 @@ public final class PackCompiler {
                 }
             }
             return ids;
+        }
+
+        /**
+         * Outcome IDs of a local quest read from raw data (P15.2-B clock causes), or null when the quest is not local;
+         * malformed outcomes are rejected when that quest itself is validated.
+         */
+        private Set<String> outcomes(String questRef) {
+            Definition quest = byId.get(questRef);
+            if (quest == null || !"quest".equals(quest.kind())) {
+                return null;
+            }
+            Set<String> ids = new HashSet<>();
+            if (quest.data().get("outcomes") instanceof List<?> list) {
+                for (Object outcome : list) {
+                    if (outcome instanceof Map<?, ?> map && map.get("id") instanceof String id) {
+                        ids.add(id);
+                    }
+                }
+            }
+            return ids;
+        }
+
+        /**
+         * Clock targets of a local faction read from raw data (P15.2-B), so quests and other factions may name its
+         * clocks in any file order. A malformed target is clamped into the legal range here and rejected when the faction
+         * itself is validated, so it can never widen a proven interval.
+         */
+        @Override
+        public Map<String, Integer> clocks(String factionRef) {
+            Definition faction = byId.get(factionRef);
+            if (faction == null || !"faction".equals(faction.kind())) {
+                return null;
+            }
+            Map<String, Integer> targets = new HashMap<>();
+            if (faction.data().get("clocks") instanceof List<?> list) {
+                for (Object clock : list) {
+                    if (clock instanceof Map<?, ?> map && map.get("id") instanceof String id) {
+                        int segments = map.get("segments") instanceof Number number ? number.intValue() : 1;
+                        targets.put(id, Math.max(1, Math.min(FactionClockRules.MAX_SEGMENTS, segments)));
+                    }
+                }
+            }
+            return targets;
         }
 
         /** Check the manifest entrypoint's location and creation profile references. */
@@ -1261,7 +1308,7 @@ public final class PackCompiler {
             facts(f);
         }
 
-        /** Faction: goals and relationships to other factions. */
+        /** Faction: goals, relationships to other factions and, since P15.2-B, faction clocks. */
         private void faction(Fields f, Definition self) {
             f.text("name", true);
             f.text("description", true);
@@ -1275,6 +1322,91 @@ public final class PackCompiler {
                 }
                 relation.choice("stance", Set.of("allied", "neutral", "hostile"), null);
                 relation.close();
+            }
+            clocks(f, self);
+        }
+
+        /**
+         * Validate a faction's optional {@code clocks} (P15.2-B): 0..{@value FactionClockRules#MAX_CLOCKS_PER_FACTION}
+         * clocks with unique identifiers, each with 1..{@value FactionClockRules#MAX_SEGMENTS} segments, an optional
+         * time tick {@code every: {minutes, from}} and 0..{@value FactionClockRules#MAX_CAUSES} causes. A cause names
+         * exactly one quest of this pack (with an optional outcome of that quest) or one clock of a faction of this pack,
+         * and adds 1..segments segments. Something must be able to advance every clock, a tick counted from the first
+         * advance needs a cause, a clock cannot advance itself, and at most one cause may match any one quest ending or
+         * clock completion, so each fact counts once.
+         */
+        private void clocks(Fields f, Definition self) {
+            Set<String> ids = new HashSet<>();
+            for (Fields clock : f.objects("clocks", 0, FactionClockRules.MAX_CLOCKS_PER_FACTION)) {
+                String id = clock.id("id", true);
+                if (!ids.add(id)) {
+                    throw clock.fail("DUPLICATE", "id", "Duplicate clock ID");
+                }
+                int segments = clock.integer("segments", 1, FactionClockRules.MAX_SEGMENTS, null);
+                Fields every = clock.object("every", false);
+                boolean fromAdvance = false;
+                if (every != null) {
+                    every.integer("minutes", FactionClockRules.MIN_TICK_MINUTES, FactionClockRules.MAX_TICK_MINUTES, null);
+                    fromAdvance = every.choice("from", CLOCK_ORIGINS, FactionClockRules.Origin.START.token())
+                            .equals(FactionClockRules.Origin.ADVANCE.token());
+                    every.close();
+                }
+                List<Fields> causes = clock.objects("causes", 0, FactionClockRules.MAX_CAUSES);
+                if (every == null && causes.isEmpty()) {
+                    throw clock.fail("CONSTRAINT_CONFLICT", "causes", "A clock needs a time tick ('every') or a cause");
+                }
+                if (fromAdvance && causes.isEmpty()) {
+                    throw clock.fail("CONSTRAINT_CONFLICT", "every",
+                            "A tick counted from the first advance needs a cause that advances the clock");
+                }
+                Map<String, Set<String>> endings = new HashMap<>();
+                Set<String> sources = new HashSet<>();
+                for (Fields cause : causes) {
+                    boolean quest = cause.has("quest");
+                    if (quest == cause.has("clock")) {
+                        throw cause.fail("quest", "A cause names exactly one of 'quest' or 'clock'");
+                    }
+                    if (quest) {
+                        String ref = cause.ref("quest", Set.of("quest"), true);
+                        Set<String> outcomes = outcomes(ref);
+                        if (outcomes == null) {
+                            throw cause.fail("quest", "Clock causes may only name quests defined in this pack");
+                        }
+                        String outcome = cause.id("outcome", false);
+                        if (outcome != null && !outcomes.contains(outcome)) {
+                            throw cause.fail("REFERENCE_UNKNOWN", "outcome",
+                                    "Quest '" + ref + "' has no outcome '" + outcome + "'");
+                        }
+                        // "*" stands for any ending; it cannot share a quest with another cause.
+                        Set<String> named = endings.computeIfAbsent(ref, key -> new HashSet<>());
+                        String spelled = outcome == null ? "*" : outcome;
+                        if (named.contains("*") || (outcome == null && !named.isEmpty()) || !named.add(spelled)) {
+                            throw cause.fail("DUPLICATE", "quest", "At most one cause may match an ending of a quest");
+                        }
+                    } else {
+                        Fields target = cause.object("clock", true);
+                        String faction = target.ref("faction", FACTION, true);
+                        String other = target.id("id", true);
+                        target.close();
+                        Map<String, Integer> known = clocks(faction);
+                        if (known == null) {
+                            throw cause.fail("clock", "Clock causes may only name clocks of factions defined in this pack");
+                        }
+                        if (!known.containsKey(other)) {
+                            throw cause.fail("REFERENCE_UNKNOWN", "clock",
+                                    "Faction '" + faction + "' has no clock '" + other + "'");
+                        }
+                        if (faction.equals(self.id()) && other.equals(id)) {
+                            throw cause.fail("CONSTRAINT_CONFLICT", "clock", "A clock cannot advance itself");
+                        }
+                        if (!sources.add(faction + "/" + other)) {
+                            throw cause.fail("DUPLICATE", "clock", "At most one cause may name the same clock");
+                        }
+                    }
+                    cause.integer("segments", 1, segments, 1);
+                    cause.close();
+                }
+                clock.close();
             }
         }
 
