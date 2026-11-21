@@ -1,6 +1,5 @@
 /**
- * Campaign exports (P16.2-A): one owned campaign written as a self-describing JSON document for an explicitly chosen
- * audience.
+ * Owner exports: campaign documents (P16.2-A) and reusable adventure bundles for sharing between people (P16.2-B).
  *
  * <p>{@link org.rpgengine.exports.CampaignExports} offers two audiences that never share a code path for their data.
  * The full-owner export copies every campaign-scoped canonical row, secrets included, from one repeatable-read
@@ -8,5 +7,10 @@
  * already keeps hidden quests, secret definitions, internal events and other holders' knowledge out of the
  * interface. A player export therefore can show nothing the player panels could not show. Neither export carries
  * account data, and neither writes a row.
+ *
+ * <p>{@link org.rpgengine.exports.AdventureBundles} exports a sealed revision and its pinned dependency closure as one
+ * ZIP built only from sealed pack files, with a canonical integrity, dependency, locale and rights manifest. It
+ * previews and imports received bundles through the pack staging and registration boundaries, into a new workspace
+ * or an owned destination, and never overwrites an installed revision or touches a campaign.
  */
 package org.rpgengine.exports;

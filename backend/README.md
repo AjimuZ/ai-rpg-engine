@@ -298,6 +298,22 @@ The read is retried up to three times if a commit lands between pages. Discoveri
 100 newest entries. Exports write no row, and exporting one revision twice gives identical bytes.
 `CampaignExportsTest` (PostgreSQL, 4 cases) holds the sentinel test.
 
+P16.2-B adds the injected `exports.AdventureBundles`, also without a route. `export(owner, adventure, revision)`
+returns a `Bundle`: a ZIP whose root holds `bundle.json` (format `engine.adventure-bundle`, `formatVersion` 1) and
+whose folders `pack-1` … `pack-n` hold the exact sealed files of the revision's pinned dependency closure,
+dependencies first and the root last (at most 32 packs, depth 16, within the staging limits). For each pack the
+manifest lists coordinates, schema version, title, summary, narrative mode, `locales` (source and sorted overlays),
+`rights` (license, authors, provenance, license and credit files), dependency pins, the sender's ruleset coordinates
+and every file's category, size and SHA-256. It is canonical: import rebuilds it from the received packs and requires
+identical bytes. Entries carry a fixed time, so one revision always exports to the same bytes. `preview(owner,
+destination, archive)` writes nothing and gives each pack's `Standing` (`NEW`, `INSTALLED`, `CONFLICT`).
+`importBundle(owner, destination, archive)` stages the archive through `PackStaging.archive`, re-roots each folder
+with the new `PackStaging.subtree`, parses every pack and requires each dependency earlier in the bundle. Then, with no
+write yet, it refuses a `CONFLICT` with `HASH_CONFLICT`. Only after that does it create a new workspace (when
+`destination` is null) and seal each pack through `PackRegistry.register`. Bundle-specific codes are `BUNDLE`,
+`INTEGRITY` and `DEPENDENCY_MISSING`. `AdventureBundlesTest` (PostgreSQL, 3 cases) covers the clean-recipient round
+trip, ten hostile or inconsistent archives, and a recipient save beside a conflicting revision.
+
 Defaults: 100 MiB ZIP, 250 MiB expanded, 2,000 files, 50:1 expansion, 32 MiB per
 file (text further limited to 1 MiB); image headers declare at most 8,192 per side
 and 32 Mi pixels. Directory sources must be owner-controlled and quiescent;

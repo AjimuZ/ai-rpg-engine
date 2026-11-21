@@ -335,6 +335,18 @@ compatibility and IDs, enforce existing archive limits and create fresh local
 identities. Do not transfer account credentials or private playthrough history
 with a reusable authored adventure. See [portable stories](09-adventure-packs.md#14-portable-stories-and-person-to-person-sharing).
 
+P16.2-B (`exports.AdventureBundles`, no route yet) applies this as follows.
+- A bundle is read only from sealed pack files. It cannot carry a save, a journal, account data or local identifiers.
+- Import passes the whole archive through the pack staging boundary before anything else. Traversal, links,
+  duplicates, ZIP64, bombs and the size limits are therefore refused there.
+- Import then requires the canonical `bundle.json` to match the received packs byte for byte, and refuses files
+  outside the pack folders, unlisted files and dependencies the bundle does not carry.
+- An existing pack version with other bytes in a chosen destination stops the import before any write.
+- `AdventureBundlesTest` checks that none of ten hostile or inconsistent archives writes a row. It also checks that a
+  recipient's save and conflicting revision are unchanged afterwards.
+- Media are still checked by header only, and the pack contract has no per-asset rights records. Sharing rights
+  therefore remain the author's declaration, not something the engine verifies.
+
 Optional [STT input](35-speech-input-and-hands-free-play.md) has a separate
 microphone boundary: explicit enablement and capture status, independent mute,
 bounded ephemeral audio, admitted owner/session/origin checks and no account or

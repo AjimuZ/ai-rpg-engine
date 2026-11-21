@@ -6600,7 +6600,7 @@ this update. No combat runtime/browser result is claimed.
         code and pointer.
       - No deliberate weakening was run.
       - `verify.sh full` and `verify.sh containers` were not run.
-- [ ] P16.2 Add full-owner versus player-facing campaign exports and reusable adventure-bundle import/export for sharing between people, with integrity/dependency/locale/rights manifests; prove clean-recipient round trips and no private save/account leakage under QA-41.
+- [x] P16.2 Add full-owner versus player-facing campaign exports and reusable adventure-bundle import/export for sharing between people, with integrity/dependency/locale/rights manifests; prove clean-recipient round trips and no private save/account leakage under QA-41.
   - P16.2-A (21 November 2026). Campaign exports only, as a backend service. No migration, route, page, setting or
     command changed. P16.2 stays unchecked.
     - **Delivered.**
@@ -6665,6 +6665,87 @@ this update. No combat runtime/browser result is claimed.
       - The player export keeps the panels' cap of the 100 newest discoveries and promises (totals are reported).
       - No deliberate weakening was run.
       - The retry after a commit between journal pages, and the row and size caps, were not exercised.
+      - `verify.sh full` and `verify.sh containers` were not run.
+  - P16.2-B (21 November 2026). Reusable adventure-bundle export, preview and import, as a backend service. No
+    migration, route, page, setting or command changed.
+    - **Delivered.**
+      - New injected `exports.AdventureBundles`. `export(owner, adventure, revision)` authorizes the sealed revision,
+        walks its pinned dependency closure (at most 32 packs, depth 16, no two versions of one pack) and returns a
+        ZIP and its SHA-256. The ZIP holds `bundle.json` plus folders `pack-1` … `pack-n` with each revision's exact
+        sealed files, dependencies first. Before returning, the export passes its own bundle through the whole import
+        check.
+      - `bundle.json` (format `engine.adventure-bundle`, version 1) is the integrity, dependency, locale and rights
+        manifest. For each pack it lists coordinates, schema version, title, summary, narrative mode, source locale and
+        sorted overlays, license, authors, provenance, license and credit files, dependency pins, the sender's ruleset
+        coordinates, and every file's category, size and SHA-256. It is canonical, so import requires identical bytes.
+        It names no owner, adventure, revision UUID, timestamp or host path. ZIP entries carry a fixed time, so one
+        revision always exports to the same bytes.
+      - `preview(owner, destination, archive)` writes nothing. It returns each pack's description, rights,
+        dependencies, ruleset match and `Standing` (`NEW`, `INSTALLED`, `CONFLICT`) in the destination.
+      - `importBundle(owner, destination, archive)` runs in this order:
+        1. stage the archive through `PackStaging.archive`;
+        2. refuse files outside the pack folders;
+        3. re-root each folder with the new `PackStaging.subtree`, parse it, and require every dependency pin to be
+           carried earlier in the bundle;
+        4. compare `bundle.json` byte for byte;
+        5. refuse a destination `CONFLICT` with `HASH_CONFLICT`;
+        6. only then write: create a new workspace when no destination is named (title and first theme of the root
+           manifest, its locale), and seal each pack through `PackRegistry.register`.
+
+        Identical packs already in the destination are reused. New codes: `BUNDLE`, `INTEGRITY`,
+        `DEPENDENCY_MISSING`, `DEPENDENCY_CONFLICT`. A missing or foreign scope gives
+        `AdventureLibraryService.ScopeUnavailable`.
+    - **Tests.** `AdventureBundlesTest` (new, PostgreSQL, 3 cases).
+      - `cleanRecipientRoundTripPreservesIdsHashesDependenciesAndCredits` covers both genres. The sender seals the
+        fantasy fixture (EN/IT overlays, one PNG asset) and a cyberpunk root (IT overlay) that pins it. The test
+        checks that:
+        - two exports are byte-identical and the digest matches;
+        - the archive text holds no sender owner, adventure or revision UUID, account name or `admitted`.
+
+        It then truncates every table and adds a different owner. Preview writes nothing and reports both packs'
+        coordinates in order, the root's pin, locales, license, authors and license and credit files. The import
+        creates an adventure owned by the recipient (title `Neon Alley`, genre `city`, `en`). The test checks that:
+        - each pack's ID, version and content hash match the sender's;
+        - the revision UUIDs are new;
+        - every file's bytes equal the sender's;
+        - `PackRegistry.diagnose` reports the closure `AVAILABLE`;
+        - the recipient's re-export is byte-identical to the sender's bundle.
+      - `hostileOrInconsistentBundlesAreRejectedBeforeAnyWrite`: ten archives get a fixed code from both preview and
+        import, and leave the workspace, revision and file counts unchanged:
+        - `PATH` for a `../` entry;
+        - `LIMIT` for a 16 MiB zero file;
+        - `ARCHIVE` for non-ZIP bytes;
+        - `BUNDLE` for a missing manifest and for another format;
+        - `INTEGRITY` for a tampered `lore.md`, an edited title in `bundle.json` and a top-level extra file;
+        - `FILE_REFERENCE` for an unlisted file in a pack folder;
+        - `DEPENDENCY_MISSING` for the root alone.
+      - `recipientSavesAndConflictingRevisionsAreNeverOverwritten`: the recipient owns a campaign on its own revision
+        of the same fantasy pack version with different bytes. Preview reports `CONFLICT, NEW`. The import into that
+        adventure fails with `HASH_CONFLICT` and writes nothing. An import into a new adventure leaves the
+        recipient's adventure, revisions, files and eight campaign tables byte-identical. Repeating the import into
+        the new adventure returns the same revision UUIDs with `created` false and adds no row, and preview then
+        reports `INSTALLED`. A foreign adventure, foreign export, unknown owner and unknown revision each give
+        `ScopeUnavailable`.
+    - **Commands and results (Windows 11 host, pinned containers).**
+      `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=AdventureBundlesTest`: VERIFY
+      PASSED on the first run, 3 tests, 0 failures (surefire line of `backend-focused.log`); backend-focused 16 s.
+    - **Documents.** docs/09 section 14, docs/13 (a planned bundle-routes row), docs/14 (story bundles), docs/15
+      (QA-41 evidence), the backend README and CHANGELOG.
+    - **Not proven / remaining for P16.2:**
+      - No HTTP route, page, upload or download exists for bundles or campaign exports.
+      - The clean recipient is the same database after truncation, not a second installation in its own process or
+        container.
+      - Dependencies already installed at the recipient are never used in place of bundled ones.
+      - The pack contract has no per-asset rights records, so unshareable assets cannot be omitted with a fallback.
+        Media are checked by header only.
+      - A deliberate fork with new identity, and promotion of campaign-generated content, are not offered.
+      - If the recipient's engine rejects a later pack after earlier ones were sealed, those earlier, valid revisions
+        stay in the new workspace. This was not exercised.
+      - Bundle size limits, the closure bounds, `DEPENDENCY_CONFLICT`, YAML manifests and a ruleset mismatch were not
+        exercised.
+      - No private playthrough was planted on the sender side. Its absence follows from the source, which is pack
+        files only.
+      - No deliberate weakening was run.
       - `verify.sh full` and `verify.sh containers` were not run.
 - [ ] P16.3 Add migration/correction previews, dependency impact, backup, audit, and stale-memory invalidation.
 - [ ] P16.4 Restore into explicit adventure/campaign destinations with fresh identities by default, including original artwork, active combat and pending narration; never merge by equal titles.

@@ -207,6 +207,34 @@ public final class PackStaging {
         return finish(Source.ARCHIVE, strip(files, wrapper), strip(directories, wrapper), expanded, data.length);
     }
 
+    /**
+     * Stage the files below one top-level folder of an already staged inventory as a pack of its own (adventure
+     * bundles, P16.2-B). The input already passed every archive or directory protection of this class; the folder
+     * prefix is removed and the inventory-wide rules run again on the result. Files outside the folder are ignored,
+     * so the caller must account for them.
+     *
+     * @param staged inventory produced by this boundary
+     * @param folder single portable path segment, without slashes
+     * @return the re-rooted inventory, with the source and archive size of {@code staged}
+     * @throws PackException {@code PATH} for a folder that is not one portable segment, {@code LIMIT} when it holds
+     *     no file
+     */
+    public StagedPack subtree(StagedPack staged, String folder) {
+        if (!PackPaths.portable(folder) || folder.contains("/")) {
+            throw error("PATH", PackPaths.sanitize(folder), "Expected one portable folder name");
+        }
+        String prefix = folder + "/";
+        Map<String, byte[]> files = new TreeMap<>();
+        long expanded = 0;
+        for (var entry : staged.files.entrySet()) {
+            if (entry.getKey().startsWith(prefix)) {
+                files.put(entry.getKey().substring(prefix.length()), entry.getValue());
+                expanded += entry.getValue().length;
+            }
+        }
+        return finish(staged.source(), files, List.of(), expanded, staged.archiveBytes());
+    }
+
     /** Locate the end-of-central-directory record whose comment length exactly reaches the end of input. */
     private static int endOfCentralDirectory(byte[] data) {
         // The record is 22 bytes plus a comment of at most 65,535 bytes, so the search window is bounded.

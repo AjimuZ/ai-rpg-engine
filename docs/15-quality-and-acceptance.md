@@ -1699,6 +1699,20 @@ recognition acceptance has run. The [STT acceptance matrix](35-speech-input-and-
 defines the enabled-profile evidence and disabled-profile fallback. STT input
 remains separate from QA-38's optional TTS output qualification.
 
+QA-41 is partly covered since P16.2-B. `AdventureBundlesTest` (PostgreSQL, 3 cases) exports a cyberpunk root that
+pins the fantasy fixture; the two carry Italian and English/Italian overlays. It truncates the database and imports
+the bundle as another owner. The pack IDs, versions, content hashes, every file's bytes (license and credit files
+included) and the dependency pin arrive unchanged under new revision UUIDs. The imported closure diagnoses as
+available, and the recipient's re-export is byte-identical to the sender's bundle. Ten hostile or inconsistent
+archives write nothing: traversal, a decompression bomb, a non-ZIP, a missing manifest, a wrong format, a tampered
+pack file, an edited manifest, a file outside the packs, an unlisted file and a missing dependency. A recipient's
+campaign and conflicting revision of the same pack version stay unchanged through a refused conflict import, a
+new-adventure import and an idempotent repeat. Not covered:
+- a second installation in a separate process or container (the clean recipient is a truncated database);
+- unshareable-asset handling, which the pack contract cannot express;
+- a planted private playthrough on the sender side (bundles read only pack files, so absence is by source);
+- any route or page.
+
 P05.1 shell acceptance passes 11 frontend form/routing/service tests, strict
 typecheck and production build. Chrome 155 desktop/mobile smoke verifies both
 neutral local previews, route navigation, keyboard Continue, revealed chronicle,

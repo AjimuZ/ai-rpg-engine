@@ -613,6 +613,26 @@ are idempotent, and a deliberate fork receives explicit new identity/provenance.
 Install content immutably, then create a new local adventure/campaign with local
 IDs. No recipient account, active world or save is replaced by import.
 
+P16.2-B (21 November 2026) implements the interchange as the backend service `exports.AdventureBundles`, with no
+route or page yet.
+- **Layout.** A bundle is one ZIP. `bundle.json` sits at its root, and the folders `pack-1` … `pack-n` each hold the
+  exact sealed files of one revision of the exported revision's pinned dependency closure. Dependencies come first and
+  the root last, with at most 32 packs.
+- **Manifest.** `bundle.json` has format `engine.adventure-bundle`, version 1. For each pack it lists the integrity
+  data (coordinates, every file's category, size and SHA-256), the dependency pins, the locales (source and overlays),
+  the rights (license, authors, provenance, license and credit files) and the sender's ruleset coordinates. It is
+  canonical: import rebuilds it from the received packs and refuses any difference.
+- **Preview.** Preview writes nothing and marks each pack `NEW`, `INSTALLED` or `CONFLICT` for the chosen destination.
+- **Import.** Without a destination, import creates a new workspace. Into an owned destination, it reuses identical
+  revisions and refuses a conflict before any write. Each pack is then sealed through the normal registration path,
+  with local UUIDs.
+- **Not implemented.**
+  - Dependencies already installed at the recipient are not used in place of bundled ones.
+  - The pack contract has no per-asset rights records, so a nonredistributable asset cannot be omitted with a
+    fallback.
+  - A deliberate fork with new identity is not offered.
+  - Exporting a campaign-generated character or artifact as reusable content is not offered.
+
 P16.2/P16.5 verify export followed by import on a separate clean installation,
 both locales/genres, missing dependencies/assets, incompatible revisions,
 malicious files and unchanged sender/recipient saves. The later editor E05/E06

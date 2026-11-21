@@ -210,6 +210,7 @@ schema versions for persisted/imported data.
 | `GET /api/v1/readiness` | Database, migrations, adapter support, configured AI readiness | Sanitized diagnostics |
 | `POST /api/v1/packs/validate` | Stage and validate a selected pack | No campaign effects |
 | `POST /api/v1/packs/import` | Register a successfully validated immutable revision | Owner action |
+| `POST /api/v1/packs/{id}/bundle`, `POST /api/v1/bundles/preview`, `POST /api/v1/bundles/import` | Export, preview and import a reusable adventure bundle for sharing between people | Owner action. Planned: no route exists yet. Since P16.2-B the backend service `exports.AdventureBundles` builds the ZIP (sealed files of the revision's dependency closure plus a canonical `bundle.json`, format `engine.adventure-bundle`, version 1), previews it without writing and imports it into a new or owned adventure; it never overwrites a revision or touches a campaign ([docs/09 section 14](09-adventure-packs.md#14-portable-stories-and-person-to-person-sharing)) |
 | `GET /api/v1/packs` | List installed revisions and diagnostics | Public author metadata only. Implemented (P14.1-C) for the owner's sealed revisions without diagnostics ([details](#installed-packs-and-browser-playthrough-creation-p141-c)) |
 | `POST /api/v1/campaigns` | Create from pack/ruleset revision and creation choices | Transactional and idempotent |
 | `GET /api/v1/campaigns` | Owner's campaigns | Scope to local owner |

@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — Adventure bundles for sharing between people (P16.2-B), 21 November 2026
+
+- The engine can now export an installed adventure version as one ZIP bundle to give to another person. The bundle
+  holds the exact files of that version and of every adventure it depends on, plus a `bundle.json` manifest. For
+  each pack the manifest lists its ID, version, content hash, file hashes, dependencies, source language and
+  translations, license, authors, provenance, and its license and credit files.
+- A bundle never contains saves, campaigns, journals, account data or local identifiers. Exporting the same version
+  twice gives the same file.
+- A recipient can preview a bundle before importing it: title, version, languages, dependencies, rights, and whether
+  each pack is new, already installed or in conflict with what they have.
+- Import checks the archive like any adventure import, whoever sent it. A bundle with a dangerous path, a
+  decompression bomb, an edited file, an edited manifest, an extra file or a missing dependency is refused before
+  anything is written.
+- By default an import creates a new adventure. An import into an existing adventure stops when that adventure holds
+  the same pack version with different files. Nothing already installed is overwritten, no save is touched, and
+  importing the same bundle again changes nothing.
+- Limits:
+  - There is no page or route for bundles yet.
+  - Packs have no per-asset rights records, so a bundle cannot leave out assets that may not be shared.
+  - If the recipient's engine rejects a later pack, the packs before it stay installed in the new adventure.
+
 ## Unreleased — Full-owner and player campaign exports (P16.2-A), 21 November 2026
 
 - The engine can now export a campaign as a JSON document, and the caller has to choose who it is for.
