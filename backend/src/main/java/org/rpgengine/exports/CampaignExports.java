@@ -32,7 +32,7 @@ import tools.jackson.databind.node.ObjectNode;
  * database catalog at export time, so a table added by a later migration is exported without a code change. This
  * export deliberately contains the campaign's secrets: hidden quests and events, the private random seed, other
  * actors' knowledge, planning artifacts, job and runtime-session records. It is for the owner's own keeping and a
- * later restore (P16.4), not for sharing.
+ * restore through {@link CampaignRestores}, not for sharing.
  *
  * <p><b>Player.</b> Built only from {@link PlayPanels}, page by page through the whole public journal, and accepted
  * only when every page reports the same committed state revision. It holds exactly what the player panels show:

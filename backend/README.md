@@ -334,6 +334,26 @@ statement with its language, an optional value (`PROPERTY` only) and a reason of
   column, so full-owner exports never copy earlier backups into later ones.
 - `CanonCorrectionsTest` (PostgreSQL, 2 cases) covers QA-27 for claims.
 
+P16.4-A adds the injected `exports.CampaignRestores`, also without a route. `restore(owner, destination, document,
+sha256, identities)` restores one full-owner campaign export as a new campaign of the named, owned destination
+adventure, in one transaction that writes nothing on refusal.
+- **Destination.** There is no default destination and no lookup by title, and a restore never writes into a stored
+  campaign. The destination must hold a sealed revision of the export's pack and version with the same content hash
+  and ruleset coordinates; that revision, with its original files and artwork, becomes the campaign's revision.
+- **Identities.** `FRESH` gives every UUID of the exported rows a new random identity, assigned in the source's
+  order, and replaces each occurrence in text and JSON values too. The source adventure and revision become the
+  destination's. `ORIGINAL` keeps the identities, for a clean installation. Summary invalidations are renumbered from
+  the installation's counter, and each summary's high-water mark follows. An intact checkpoint gets the hash of its
+  re-keyed snapshot, so it verifies against the restored state.
+- **Writes.** Every exported row except `inference_task` (the source scheduler's work) is inserted with ordinary
+  triggers suspended (`set local session_replication_role = replica`). Check and unique constraints still apply, and
+  every foreign key of the restored rows is verified before commit. The database role must be allowed to set that
+  parameter; the packaged role is.
+- **Refusal codes.** `LIMIT` (over 96 MiB), `INTEGRITY` (digest), `FORMAT`, `SCHEMA_MISMATCH` (other Flyway version or
+  table set), `SCOPE_UNAVAILABLE`, `CONTENT_UNAVAILABLE`, `CONTENT_CONFLICT`, `IDENTITY_IN_USE`.
+- The result names the new campaign, its revision and state revision, the rows written and the identity map.
+- `CampaignRestoresTest` (PostgreSQL, 3 cases) covers QA-23 at campaign scope.
+
 Defaults: 100 MiB ZIP, 250 MiB expanded, 2,000 files, 50:1 expansion, 32 MiB per
 file (text further limited to 1 MiB); image headers declare at most 8,192 per side
 and 32 Mi pixels. Directory sources must be owner-controlled and quiescent;

@@ -64,7 +64,8 @@ import tools.jackson.databind.node.ObjectNode;
  * may depend on the claim, and at most {@value #SUMMARY_SCAN} newest summaries are examined for the preview; the
  * invalidation itself applies to every summary that cites the claim, its beliefs, its source events or its
  * entities. The backup is stored in the same database: it is the state before the correction, not an independent
- * disaster-recovery copy, and nothing restores it yet (P16.4).
+ * disaster-recovery copy. Its bytes are a full-owner export, so {@code exports.CampaignRestores} can restore them as a
+ * new campaign.
  */
 @Service
 public class CanonCorrections {

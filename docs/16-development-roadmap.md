@@ -6840,7 +6840,85 @@ this update. No combat runtime/browser result is claimed.
       - No deliberate weakening was run.
       - No `verify.sh full` run has passed with this change yet (see above), and `verify.sh containers` was not run.
       - The intermittent `AdmissionProbeControllerTest` failure remains open.
-- [ ] P16.4 Restore into explicit adventure/campaign destinations with fresh identities by default, including original artwork, active combat and pending narration; never merge by equal titles.
+- [x] P16.4 Restore into explicit adventure/campaign destinations with fresh identities by default, including original artwork, active combat and pending narration; never merge by equal titles.
+  - P16.4-A (21 November 2026). Campaign restore from a full-owner export, as a backend service. No migration, route,
+    page, setting or command changed.
+    - **Delivered.**
+      - New injected `exports.CampaignRestores`. `restore(owner, destination, document, sha256, identities)` has no
+        default destination and no default `Identities` (`FRESH` or `ORIGINAL`). It always creates a new campaign in
+        the named, owned adventure. It never writes into a stored campaign and never reads a title.
+      - Checks before writing: at most 96 MiB (`LIMIT`); the stated SHA-256 (`INTEGRITY`); format, version 1,
+        `full-owner` audience and header/row consistency (`FORMAT`); the Flyway version and the exact set of
+        campaign-scoped tables, plus no identity column other than `memory_invalidation.sequence`
+        (`SCHEMA_MISMATCH`); the owner's destination (`SCOPE_UNAVAILABLE`).
+      - Content: the destination needs a sealed revision of the export's pack and version (`CONTENT_UNAVAILABLE`)
+        with the same content hash and ruleset coordinates (`CONTENT_CONFLICT`). Every row naming a content
+        revision must name the pinned one. That revision becomes the campaign's, so its sealed files, artwork
+        included, are byte-identical to the source's.
+      - `FRESH`: every UUID in a `uuid`/`uuid[]` column of the exported rows gets a new random UUID. The new UUIDs
+        are assigned in the source's sort order, so serializations ordered by identity keep their order. The source
+        adventure and revision become the destination's. Each mapped UUID is also replaced in every text and JSON
+        value (typed references, scopes, summary sources). `ORIGINAL` keeps the identities, and a collision gives
+        `IDENTITY_IN_USE`.
+      - Summary invalidations are renumbered from the installation sequence, in order. Each summary's
+        `invalidation_high_water` maps to the new number of the newest exported invalidation at or below it, or 0.
+        A checkpoint whose snapshot matched its hash in the export gets the hash of its re-keyed snapshot; a
+        corrupt one keeps its stored hash.
+      - All exported rows except `inference_task` (source scheduler work and quota charges) are inserted in one
+        transaction with `set local session_replication_role = replica`. The triggers guard live transitions and
+        would append stream messages the export already holds. Check and unique constraints still apply, and every
+        foreign key of the restored rows is verified from `pg_constraint` before commit.
+      - The result gives the adventure, new campaign, revision, state revision, rows written and the identity map.
+      - Javadoc of `CampaignExports`, `CanonCorrections` and the package now point to the restore.
+    - **Tests.** `CampaignRestoresTest` (new, PostgreSQL, 3 cases). The fixture is the bundled sample plus
+      `assets/map.png`, sealed in two workspaces both titled `Lantern Ford`. The source campaign `Ford watch` ran
+      `ENGAGE ford-ambush`, captured a checkpoint (`CAPTURED`) and recorded one invalidation. The destination holds
+      a bystander campaign also titled `Ford watch`.
+      - `freshRestoreRecoversFightNarrationAndArtworkBesideItsSource`:
+        - the new campaign is neither the source nor the bystander, in the destination, at the destination revision
+          and the export's state revision; the destination lists two `Ford watch` campaigns;
+        - the source and bystander exports are byte-identical before and after;
+        - more than 10 identities change, every key occurs in the source export and no new value does;
+        - in a re-export, every table equals the source rows with identities substituted (in any order), except
+          `inference_task` (empty), the checkpoint hash (changed; `verify` gives `VALID`) and the invalidation
+          number (larger); the row count matches;
+        - mode is `ENCOUNTER`, one encounter is active, the narration-owing operations and presentation jobs equal
+          the source's counts (above 0), and the campaign's revision serves the fixture's exact PNG bytes;
+        - `ROLL_INITIATIVE` commits on the copy, with draws, one `INITIATIVE_ROLLED` and round of at least 1, and
+          the source export is still byte-identical;
+        - a second restore of the same export makes another campaign (3 in the destination).
+      - `originalIdentitiesRestoreIntoACleanInstallation`: after truncation, a restore into a new workspace keeps
+        the campaign UUID, the identity map holds only the adventure and revision, rows equal the source's, the
+        checkpoint is `VALID` and `ROLL_INITIATIVE` commits.
+      - `refusalsWriteNothing`: `INTEGRITY` (wrong digest, flipped byte), `FORMAT` (player export, non-JSON,
+        another header campaign), `SCHEMA_MISMATCH` (`schemaVersion` 35, `encounter` removed), `SCOPE_UNAVAILABLE`
+        (unknown destination, a stranger), `CONTENT_UNAVAILABLE` (empty workspace), `CONTENT_CONFLICT` (same pack
+        version with one byte appended to the PNG), `IDENTITY_IN_USE` (`ORIGINAL` beside the source), plus an
+        ambient transaction and a missing mode. Row counts of every base table are unchanged.
+    - **Commands and results (Windows 11 host, pinned containers).**
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=CampaignRestoresTest`: VERIFY
+        PASSED on the first run, 3 tests, 0 failures (logs `20261121T081951-20794`); backend-focused 16 s.
+      - The same command with `-Dtest=CampaignRestoresTest,CampaignExportsTest,CanonCorrectionsTest,AdventureBundlesTest`
+        after the documentation and Javadoc edits: VERIFY PASSED, 12 tests, 0 failures (CampaignExportsTest 4,
+        CampaignRestoresTest 3, AdventureBundlesTest 3, CanonCorrectionsTest 2; logs `20261121T082157-20896`);
+        backend-focused 18 s. Counts are from the surefire lines of `backend-focused.log`.
+    - **Documents.** docs/13 (restore apply row, author/owner tools row), docs/14 sections 6 and 8, docs/15 (QA-23
+      evidence), the backend README and CHANGELOG.
+    - **Not proven / remaining for P16.4:**
+      - No HTTP route, page, upload or restore preview exists. Replacing an existing campaign is not offered.
+      - The restored campaign records no source provenance, although docs/14 section 8 asks for it.
+      - Trigger-level invariants (encounter lifecycle, quest transitions, provenance guards) are not rechecked on
+        restored rows; only check, unique and foreign-key constraints are.
+      - The restore needs a role allowed to set `session_replication_role`. A less privileged role was not tried.
+      - The fight was restored before its first round, not inside one. No held mutation lease, leased job, summary
+        (so the high-water mapping), runtime session, narration runtime, Italian locale or second process took
+        part. Restoring a `canon_correction` backup was not exercised.
+      - Recorded digests other than the checkpoint hash (payload, context, fingerprint, result) keep their source
+        values. Plans whose dependency digests cover identities may therefore fail revalidation; this was not
+        exercised. Dice not yet reserved differ from the source's, because draws are keyed by stream identity.
+      - Historical receipts keep the source's invalidation numbers.
+      - The 96 MiB limit was not exercised. No deliberate weakening was run.
+      - `verify.sh full` and `verify.sh containers` were not run.
 - [ ] P16.5 Document manual file authoring with complete neutral examples and troubleshooting.
 
 **Exit:** an author can create and evolve content safely without a visual editor; an owner can recover data independently. **Checks:** QA-02, QA-16, QA-23, incompatible upgrade and corrupted archive tests. **Suggested commit:** `Add safe adventure and campaign administration`.

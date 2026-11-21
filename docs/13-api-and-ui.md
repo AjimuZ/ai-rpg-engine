@@ -233,7 +233,7 @@ schema versions for persisted/imported data.
 | `PUT /api/v1/preferences` | Reading, sound, routing, renewal preferences | No game effects |
 | `POST /api/v1/campaigns/{id}/exports` | Create full-owner or player-facing export | Explicit audience selection. Planned: no route exists yet. Since P16.2-A the backend service `exports.CampaignExports` makes both documents (format `engine.campaign-export`, version 1, with a SHA-256 digest of the bytes): `full-owner` copies every campaign-scoped row, secrets included; `player` holds only the player panels and the whole public journal. Neither export includes account data |
 | `POST /api/v1/restore/preview` | Validate archive compatibility and integrity | No overwrite |
-| `POST /api/v1/restore/apply` | Restore reviewed snapshot to a new campaign identity by default | Owner action with concrete preview token |
+| `POST /api/v1/restore/apply` | Restore reviewed snapshot to a new campaign identity by default | Owner action with concrete preview token. Planned: no route or preview exists yet. Since P16.4-A the backend service `exports.CampaignRestores` restores a full-owner campaign export, checked against its SHA-256, as a new campaign of an explicitly named owned adventure, with fresh identities unless the caller asks to keep them; it never matches by title and never writes into a stored campaign |
 | `POST /api/v1/campaigns/{id}/corrections/preview` | Show proposed administrative correction | No mutation |
 | `POST /api/v1/campaigns/{id}/corrections/apply` | Apply validated correction | Audit, backup, revision increment |
 | `GET /api/v1/assets/{assetId}` | Serve one registered authorized asset | Path never supplied directly by client |
@@ -742,7 +742,7 @@ remains P06, catalog locale resolution and bilingual UI remain P05.6.
 | Combat | Initiative, active actor, AP/reactions, zones, legal actions, targets, consequences and persistent dialogue/action chat |
 | Advancement | Pending entitlements, legal purchases, cost/effect preview |
 | Settings | Reading, theme, sound, narration-runtime readiness (the selected runtime is shown; it is changed through the launcher), the Models panel (implemented in P21.3-D: per-slot backend, model, effort and fallbacks, probe results, class badges and the class-change acknowledgement; advisor presets and budgets are not part of it yet), routing, context renewal |
-| Author/owner tools | Validation, export, restore/correction previews, credits and diagnostics. Planned: no panel exists yet. Since P16.3-A the backend service `corrections.CanonCorrections` previews, applies and reads back audited corrections of knowledge claims; there is no route for it |
+| Author/owner tools | Validation, export, restore/correction previews, credits and diagnostics. Planned: no panel exists yet. Since P16.3-A the backend service `corrections.CanonCorrections` previews, applies and reads back audited corrections of knowledge claims, and since P16.4-A `exports.CampaignRestores` restores a full-owner export into a named adventure; there is no route for either |
 
 ## 6. Interface direction
 

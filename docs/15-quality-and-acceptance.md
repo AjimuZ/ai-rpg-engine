@@ -1732,6 +1732,30 @@ QA-27 is covered for knowledge-claim corrections since P16.3-A, at backend level
 Not covered: other kinds of canon (commitments, quests, items, resources), content-revision migration previews, any
 route or page, restoring the backup, and an independent backup outside the database.
 
+QA-23 is covered at campaign scope since P16.4-A, at backend level, in addition to the whole-database rehearsal of
+P14.2-B. `CampaignRestoresTest` (PostgreSQL, 3 cases) uses the bundled sample plus one original image asset. The
+source campaign has entered the ford ambush (active fight, the entry's narration still owed) and holds a checkpoint
+and a summary invalidation. The destination workspace has the source's title and a campaign with the restored
+campaign's title.
+- *Fresh identities beside the source.* The restore creates a third campaign; neither same-titled one changes, and
+  the source's export is byte-identical. More than 10 identities are re-keyed, and none of the new ones occurs in
+  the source. Every exported row of every table equals its source row with identities replaced, except
+  `inference_task` (not restored), the checkpoint hash and invalidation numbers. The checkpoint verifies `VALID`
+  against the restored state. The fight is active, the operations owing narration and their presentation jobs are
+  all there, and the campaign's revision serves the fixture's exact image bytes. `ROLL_INITIATIVE` then commits on the
+  restored campaign and opens its first round, and the source is still unchanged. A second restore makes a fourth campaign.
+- *Kept identities into a clean installation.* After truncation, the restore into a new workspace keeps the campaign
+  identity; only the adventure and revision change. Rows equal the source's, the checkpoint is `VALID`, and play
+  continues.
+- *Refusals write nothing.* A wrong or mismatched digest, a player export, non-JSON bytes, an inconsistent header,
+  another schema version, a missing table, an unknown or foreign destination, a destination without the pack, one
+  whose same pack version has other bytes, kept identities beside the source and an ambient transaction are refused.
+  Row counts of every table are unchanged.
+
+Not covered: a restore inside a fight's round, a held mutation lease or leased job in the export, summaries (their
+high-water mapping), a narration runtime or session on the restored campaign, Italian locale, source provenance, a
+restore preview, any route or page, the size limit, and a restore into another installation process.
+
 P05.1 shell acceptance passes 11 frontend form/routing/service tests, strict
 typecheck and production build. Chrome 155 desktop/mobile smoke verifies both
 neutral local previews, route navigation, keyboard Continue, revealed chronicle,

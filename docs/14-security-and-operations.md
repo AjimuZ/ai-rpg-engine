@@ -145,7 +145,7 @@ The tracked root [`.env.example`](../.env.example) contains only the consumed lo
 P16.2-A campaign exports (`exports.CampaignExports`, no route yet) keep the two audiences apart by source. The
 `full-owner` export copies every row of every campaign-scoped table from one snapshot. It deliberately includes the
 random seed, the seed identity, hidden quests and internal events, every actor's knowledge, jobs, plans and
-runtime-session records, because a later restore (P16.4) needs them to continue with the same dice. Treat it like a
+runtime-session records, because a restore (`exports.CampaignRestores`, P16.4-A) needs them to continue the campaign. Treat it like a
 backup: it is for the owner, not for sharing. The `player` export is built only from the player panels and their public
 journal, so it can show nothing those panels cannot. Neither export carries the owner profile, the owner's identity or
 installation-wide settings. A sentinel test (`CampaignExportsTest`) plants each of these secrets and checks that none
@@ -222,7 +222,25 @@ become stale. Applying requires the approved preview's digest. Before writing, t
 export at the corrected revision. The approved preview and that export are stored in `canon_correction` (V36), and the
 database checks both digests. The correction appends one internal audit event and never edits an earlier event. This
 backup lives in the same database: it records the state before the correction, it is not an independent recovery
-copy, and nothing restores it yet (P16.4). Content-revision migration previews are not implemented.
+copy. Since P16.4-A its bytes can be restored as a new campaign (below). Content-revision migration previews are not
+implemented.
+
+P16.4-A (21 November 2026) restores one full-owner campaign export, as a backend service with no route or preview
+yet (`exports.CampaignRestores`). The owner names the destination adventure; nothing is inferred and nothing is
+matched by title. A restore always creates a new campaign and never writes into, replaces or merges with a stored
+one. Before writing, it checks the size (96 MiB), the SHA-256 the export reported, the format and audience, the
+document's own consistency, the Flyway schema version and the exact set of campaign tables, the owner's destination,
+and a sealed destination revision with the same pack, version, content hash and ruleset. Exports carry no pack
+files, so that revision supplies the original artwork; an adventure bundle can bring it first. Fresh identities are
+the default: every UUID of the exported rows gets a new one, in the same order, and each occurrence in text and JSON
+values is replaced as well. Kept identities are an explicit choice for a clean installation, and any collision
+refuses the restore. Rows are inserted in one transaction with ordinary triggers suspended
+(`session_replication_role = replica`, transaction-local), because the triggers guard live transitions and append
+stream messages the export already holds. Check and unique constraints still apply, and every foreign key of the
+restored rows is verified before commit. This needs a database role allowed to set that parameter. The source's
+scheduler tasks (`inference_task`) are not restored. Not yet implemented: source provenance on the restored campaign,
+a restore preview, replacement of an existing campaign, and the trigger-level invariants (encounter, quest and
+provenance guards), which are not rechecked on restored rows.
 
 Test restoration into a fresh database and asset directory. Verify sample encounters, quests, operations, and pending decisions. A backup job is not considered successful merely because an archive file exists.
 

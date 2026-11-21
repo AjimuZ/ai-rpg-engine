@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — Campaign restore into a chosen adventure (P16.4-A), 21 November 2026
+
+- The engine can now restore a full-owner campaign export as a new campaign. The owner names the adventure that
+  receives it; the engine never guesses one, never matches anything by title and never writes into an existing
+  campaign, even one with the same name.
+- The restore checks the export's SHA-256, its format, the database schema version and that the chosen adventure
+  holds the same adventure version with identical files. That version supplies the original artwork.
+- By default every identity in the campaign is new, so the restored copy can sit beside the original. Keeping the
+  original identities is an explicit choice for a clean installation; a clash is refused.
+- Everything in the export comes back: the world, an active fight, operations whose narration was still owed, memory,
+  plans and the random seed. The restored campaign continues from the same state revision. The source scheduler's
+  queued model tasks are not restored.
+- A refused restore writes nothing.
+- Limits:
+  - There is no page, route or preview for restores yet.
+  - The restored campaign does not record which export it came from.
+  - Replacing an existing campaign is not offered.
+  - The adventure version must already be installed in the chosen adventure; import its bundle first.
+
 ## Unreleased — Previewed and audited canon corrections (P16.3-A), 21 November 2026
 
 - The owner can now correct one recorded fact of a campaign (a knowledge claim): its truth, and optionally its
