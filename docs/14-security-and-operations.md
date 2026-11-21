@@ -142,6 +142,15 @@ Never put runtime credentials (Codex or Claude), database passwords, `.env` file
 
 The tracked root [`.env.example`](../.env.example) contains only the consumed loopback application port and neutral database labels. The labels do not configure authentication. Supply passwords through private secret files and account state through the supported owner-controlled sign-in flow; never add either to a public example. Ignore rules are a staging safeguard, not a secret scanner or a substitute for reviewing the staged content. The root and independent runtime `.dockerignore` policies now default-deny build inputs and recursively exclude private names inside admitted source trees. Real BuildKit fixture exports verify both policies (`py -B -m unittest discover -s tools/container_packaging -v`); they do not scan arbitrary source content or establish full application containment.
 
+P16.2-A campaign exports (`exports.CampaignExports`, no route yet) keep the two audiences apart by source. The
+`full-owner` export copies every row of every campaign-scoped table from one snapshot. It deliberately includes the
+random seed, the seed identity, hidden quests and internal events, every actor's knowledge, jobs, plans and
+runtime-session records, because a later restore (P16.4) needs them to continue with the same dice. Treat it like a
+backup: it is for the owner, not for sharing. The `player` export is built only from the player panels and their public
+journal, so it can show nothing those panels cannot. Neither export carries the owner profile, the owner's identity or
+installation-wide settings. A sentinel test (`CampaignExportsTest`) plants each of these secrets and checks that none
+reaches the player export. It cannot detect a secret paraphrased into public text.
+
 Player DTOs must omit unrevealed lore, private NPC knowledge, relationship internals, hidden encounter participants/statistics, and planner reasoning. Use separate role/audience threads so secret context cannot persist invisibly into a public narration task. Prevent media/audio choices from leaking a hidden threat before it is observed.
 
 P08.3 enforces the thread separation for inference ([docs/06 section 7](06-codex-integration.md#p083-session-scoping)). Every task runs in the session of its campaign, generation, role, audience, pack hash and policy hash. Player-facing roles can never be scoped to the privileged audience. Only the scoping registry may submit to the runtime port, and tests enforce this at the source level. This prevents context carry-over through a shared conversation. It does not filter what a caller puts into a public context, and it does not detect a paraphrased secret in output.

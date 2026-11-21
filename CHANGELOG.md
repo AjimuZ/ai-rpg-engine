@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased — Full-owner and player campaign exports (P16.2-A), 21 November 2026
+
+- The engine can now export a campaign as a JSON document, and the caller has to choose who it is for.
+- A full-owner export is a complete copy of the campaign's saved state, secrets included: hidden quests, internal
+  events, the random seed, what every character knows, and job, plan and session records. Keep it private, like a
+  backup.
+- A player export contains only what the player panels show: the character, resources, conditions, abilities,
+  inventory and equipment, discovered quests, the player's own knowledge and promises, and the whole public journal.
+  A test plants secrets in a campaign and checks that none of them reaches it.
+- Both exports name the adventure content they need (pack, version, content hash, ruleset) and come with a SHA-256
+  digest. Neither export includes account data. Exporting changes nothing, and exporting the same state twice gives
+  the same file.
+- Limits:
+  - There is no page or route for exports yet.
+  - Nothing can import or restore an export yet.
+  - Pack files and media are not included.
+  - A player export keeps only the 100 newest discoveries and promises.
+
 ## Unreleased — Author validation reports, dependency and version diagnostics (P16.1-A), 21 November 2026
 
 - The engine can now check a candidate adventure pack for an adventure and return a full validation report, instead of

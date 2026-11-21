@@ -6601,6 +6601,71 @@ this update. No combat runtime/browser result is claimed.
       - No deliberate weakening was run.
       - `verify.sh full` and `verify.sh containers` were not run.
 - [ ] P16.2 Add full-owner versus player-facing campaign exports and reusable adventure-bundle import/export for sharing between people, with integrity/dependency/locale/rights manifests; prove clean-recipient round trips and no private save/account leakage under QA-41.
+  - P16.2-A (21 November 2026). Campaign exports only, as a backend service. No migration, route, page, setting or
+    command changed. P16.2 stays unchecked.
+    - **Delivered.**
+      - New package `exports` with the injected `CampaignExports`. `export(owner, adventure, campaign, audience)` has
+        no default audience (`FULL_OWNER` or `PLAYER`). It authorizes the owner, adventure and campaign together, and
+        returns the UTF-8 JSON document, its lowercase SHA-256 digest and the state revision it describes.
+      - Every document has `format` `engine.campaign-export`, `formatVersion` 1, `audience`, `campaign` and `content`.
+        `campaign` holds the identities and state revision. `content` gives the pinned revision, pack, version,
+        content hash, ruleset and source language as the dependency to check.
+      - `full-owner` adds the Flyway `schemaVersion` and `tables`. These are every row of every base table with a
+        `campaign_id` column, found in the catalog at export time, plus the campaign row. They are read in one
+        repeatable-read snapshot, as `to_jsonb` and in a stable order. Secrets are included on purpose (seed, hidden
+        quests, internal events, every actor's knowledge, jobs, plans, session records). The export is capped at
+        200,000 rows and 64 Mi characters, and fails rather than truncates.
+      - `player` adds `panels`, the `PlayPanels` view without its journal page, and `journal`, every public journal
+        page newest first. A commit between pages changes the reported revision. The read then restarts, and after 3
+        tries it fails.
+      - Neither export carries the owner profile, the owner identity, other campaigns or installation-wide tables.
+        Exports write no row.
+    - **Tests.** `CampaignExportsTest` (new, PostgreSQL, 4 cases).
+      - `playerExportHoldsNoPrivateDataOrSecrets` is the sentinel test. After real play, the hidden quest `shadow` is
+        active and internal events exist. The test then plants these secrets:
+        - a known random seed;
+        - an idempotency key;
+        - an NPC with a claim only that NPC holds;
+        - a legacy free-text fact;
+        - a sentinel account name.
+
+        It checks that the player export contains none of 11 sentinel strings. These are the 7 secrets above
+        (counting the NPC's name and the seed as raw text and as hex), plus the hidden quest ID, the seed identity,
+        the owner UUID and the word `INTERNAL`. The player export has exactly 7 top-level sections, and one journal
+        entry per public event. The full-owner export holds each secret except the account name, the owner UUID and
+        the raw seed text (the seed is stored as hex). That proves the secrets really were in storage.
+      - `ownerExportIsCompleteDeterministicAndReadOnly`:
+        - each table in the export matches the catalog list, with this campaign's row count and only its rows;
+        - a second campaign of the same owner is absent;
+        - both audiences give identical bytes on a repeat export, and each digest matches its bytes;
+        - content and schema versions match storage;
+        - 14 tables are unchanged by the exports.
+      - `thePlayerJournalSpansEveryPage`: after 105 waits, the journal equals every public event sequence, newest
+        first, which takes more than one 100-entry page.
+      - `scopeIsCheckedForBothAudiences`: another owner, another adventure and an unknown campaign all get
+        `ScopeUnavailable`. An ambient transaction is refused, and so is a missing audience.
+    - **Commands and results (Windows 11 host, pinned containers).**
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=CampaignExportsTest`: the first
+        run failed to compile (`prepare()` did not declare checked exceptions). After that fix: VERIFY PASSED, 4 tests,
+        0 failures; backend-focused 17 s.
+      - The same command with
+        `-Dtest=CampaignExportsTest,PlayPanelsTest,PlanningBoundaryTest,AdaptiveDirectionDispositionTest,AdventureIndependenceTest,SessionBoundaryTest,SchedulerBoundaryTest,InferenceBoundaryTest`:
+        VERIFY PASSED, 35 tests, 0 failures (PlayPanelsTest 11, InferenceBoundaryTest 6, CampaignExportsTest 4, the
+        other five 2 or 3 each); backend-focused 20 s. Counts are from the surefire lines of `backend-focused.log`.
+    - **Documents.** docs/13 (the `/exports` row), docs/14 section 6, the backend README and CHANGELOG.
+    - **Not proven / remaining for P16.2:**
+      - No HTTP route (`POST /api/v1/campaigns/{id}/exports`), page or file download exists, and nothing imports or
+        restores an export (P16.4).
+      - Exports embed no pack files or media.
+      - Reusable adventure-bundle import/export, rights and locale manifests, and clean-recipient round trips
+        (QA-41) are not started.
+      - The sentinels cover the listed secrets only. A secret paraphrased into public text, a planning artifact, a
+        job or a session record was not planted, because those tables are kept out of the player export by its
+        source, not by a filter.
+      - The player export keeps the panels' cap of the 100 newest discoveries and promises (totals are reported).
+      - No deliberate weakening was run.
+      - The retry after a commit between journal pages, and the row and size caps, were not exercised.
+      - `verify.sh full` and `verify.sh containers` were not run.
 - [ ] P16.3 Add migration/correction previews, dependency impact, backup, audit, and stale-memory invalidation.
 - [ ] P16.4 Restore into explicit adventure/campaign destinations with fresh identities by default, including original artwork, active combat and pending narration; never merge by equal titles.
 - [ ] P16.5 Document manual file authoring with complete neutral examples and troubleshooting.
