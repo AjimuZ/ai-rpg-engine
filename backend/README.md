@@ -1572,6 +1572,30 @@ Tests: `AdvancementPreviewTest` (4).
 Limits: nothing calls it. Effects that depend on pack formulas (for example a pool maximum that follows an attribute) are not
 previewed, because the engine reads no level-aware formula yet. No migration, pack schema, route, command or page changed.
 
+### Creative ability drafts and preview (P15.4-A)
+
+`creative/DraftPreview.preview(profile, draft, effects, caster)` checks a player's `AbilityDraft` (label, target rule, most
+targets, range, at most the profile's number of `Step`s using the combat ability operations `damage`, `heal`, `apply` and
+`remove`) against a `CreativeProfile` and the frozen effect definitions of the campaign's content.
+
+- `Rejected(issues)` lists every broken bound as a fixed code and path (`label`, `target-count`, `range`,
+  `operation-count`, `kind-not-allowed`, `operand`, `dice`, `amount`, `attribute`, `unknown-effect`, `duration`,
+  `complexity`). A draft with too many steps is rejected before any step is read.
+- `Ready` shows the frozen `CombatAbility` the draft would become, under the reserved id `draft`. Its costs are derived,
+  never proposed: the profile's action points, and Focus and cooldown proportional to a provisional complexity. It also shows
+  each applied effect's duration, whether the profile is deliberately zero-cost, and `blockers` of the user's current state
+  (`prerequisite-missing`, `insufficient-focus`), which leave the draft valid.
+- A `CreativeProfile` cannot exceed a frozen ability's bounds, and its budget times its rates cannot exceed the largest Focus
+  cost or cooldown, so a validated draft always fits a `CombatAbility`.
+- The preview takes immutable values and returns a value. It spends, moves, records, learns and stores nothing, and holds no
+  command. Using or learning a draft must be a separate explicit player operation that previews again at its own state.
+
+Tests: `DraftPreviewTest` (6).
+
+Limits: nothing calls it. No pack declares a profile, there is no `creativeAbilities` module switch, no command executes or
+learns a draft, no contract translates a description into a draft, and there is no high-power profile. No migration, pack
+schema, route, command or page changed.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

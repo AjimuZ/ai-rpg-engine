@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Creative ability drafts and preview (P15.4-A), 21 November 2026
+
+- The engine can now check a player's draft of a new combat ability: a name, whom it takes, how far it reaches and up to a
+  few steps (damage, healing, applying or removing an effect the adventure defines). Every problem is reported with a fixed
+  code and the part of the draft it concerns, for example too many targets, too many dice, an unknown effect or an effect
+  that lasts too long.
+- A valid draft is shown as the ability it would become, with its cost worked out by the engine, never by the draft: action
+  points, Focus and a cooldown that grow with the draft's complexity. The preview also lists how long each effect lasts and
+  what stops the player from using it now, such as too little Focus or a missing prerequisite.
+- A preview never uses the draft: it spends nothing, moves nobody, records no event and teaches no ability. Using or
+  learning a draft will need its own explicit player action, checked again at that moment.
+- Limits: this is engine logic only. No adventure can define a creative profile yet, no screen or command shows a preview,
+  and drafts cannot be used, learned or written from a description yet.
+
 ## Unreleased — Guide persona answers (P15.3-A), 21 November 2026
 
 - The engine can now ask a guide persona for advice on a player's question. The guide runs in its own conversation,

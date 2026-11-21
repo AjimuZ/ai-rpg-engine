@@ -1,5 +1,13 @@
 # Quality Strategy and Acceptance Criteria
 
+P15.4-A verification (21 November 2026): supporting evidence for the creative half of QA-22 at the level of a pure
+function. `DraftPreviewTest` shows that a draft's validation preview derives its costs, reports each broken bound and the
+current state's blockers, and is a value with no path to execution: its only entry point takes immutable values, its results
+hold only text, numbers, flags, lists and a frozen ability definition, and previewing twice changes nothing. No command
+executes or learns a draft, so "a draft never executes without explicit player action" holds because no execution path
+exists yet, not because one was tested. The "disabled modules absent" half remains open for both modules: there is no
+`creativeAbilities` module switch or pack profile yet.
+
 P15.3-A verification (21 November 2026): QA-22 is covered only at the contract level for the guide. `GuideContractTest`
 shows that the guide's typed answer and presentation decision have no field or parameter that can carry a command, a
 draft or a state change, that an unoffered action, an uncited certain claim and a seeded secret are each rejected, and that

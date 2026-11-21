@@ -6233,6 +6233,52 @@ this update. No combat runtime/browser result is claimed.
       - Paraphrased secrets and wording claiming an action was taken (human-rubric), and live model output.
       - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
 - [ ] P15.4 Add creative ability drafting, validation preview, explicit execution, learned recipes, and bounded high-power profiles.
+  - P15.4-A (21 November 2026; partial, the box stays unchecked). This adds the draft and its validation preview as pure
+    code in the new package `org.rpgengine.creative`. It adds no migration, route, command, pack field or page.
+    - **Types.**
+      - `AbilityDraft`: label, target rule, most targets, range and `Step`s with the fields of a combat ability operation
+        (damage, heal, apply, remove). It has no cost, cooldown, limit, learned identity or campaign reference.
+      - `CreativeProfile`: bounds on steps, targets, range, total dice, flat amount, permitted kinds and effects, effect
+        duration (counting clocks up to a count, persistent only when allowed) and complexity (budget 1..32), plus the action
+        points and the Focus and cooldown rates per complexity point. Construction refuses any bound beyond a frozen
+        `CombatAbility`'s, and a budget times a rate beyond the largest Focus cost (99) or cooldown (30).
+      - `DraftPreview.preview(profile, draft, effects, caster)` returns `Rejected(issues)` or `Ready(label, candidate,
+        complexity, durations, zeroCost, blockers)`. The codes and the provisional complexity formula are in its Javadoc and
+        the backend README.
+    - **Drafts never execute without explicit player action.**
+      - The candidate is the frozen `CombatAbility` the draft would become, under the reserved id `draft`. Its costs are
+        derived from the profile, and a draft cannot set them.
+      - The preview takes immutable values and returns a value: nothing is spent, moved, recorded, learned or stored, and
+        the result holds no command.
+      - Blockers (`prerequisite-missing`, `insufficient-focus`) describe the previewed state only. `unblocked()` is
+        documented as never being a permission: a later execution must preview again at its own state (docs/20 scenario 7).
+      - No code path executes or learns a draft, so the criterion holds because no execution path exists yet.
+    - **Command and result (Windows 11 host, pinned containers).**
+      - `sh .agents/ralph/verify.sh backend -Dtest=DraftPreviewTest`: VERIFY PASSED (backend-sources 2 s, backend-database
+        6 s, backend-focused 11 s). The wrapper prints no counts. `DraftPreviewTest` has 6 test methods.
+    - **Evidence (`DraftPreviewTest`).**
+      - The scenario 7 recipe (1d4 damage and a two-round `repelled` effect on two hostile targets at range 1) has
+        complexity 13. It costs 2 action points, 13 Focus and a 13-round cooldown with no use limit, and it shows its duration.
+        A second preview is equal, and the inputs are unchanged.
+      - A missing prerequisite and too little Focus are listed in a fixed order on a still-valid draft. A preview at a later
+        state with enough Focus is unblocked and has the same candidate.
+      - A zero-cost profile charges no Focus and no cooldown and says so.
+      - Each of 20 drafts breaks one rule and is rejected with exactly that code and path.
+      - Five profiles that break their bounds are refused.
+      - A reflection check: the only public entry point takes the profile, draft, effects and caster. The result parts are
+        text, numbers, flags, lists, a clock and a frozen ability, and a draft has exactly its five fields.
+    - **Not done in this story:**
+      - Explicit execution: a command that uses a draft in a fight, previews again and resolves it through the scheduler.
+      - Learned recipes: saving a draft as a versioned ability with provenance.
+      - Bounded high-power profiles.
+      - A creative profile in pack data and a `creativeAbilities` module switch with its `MODULE_DISABLED` gate.
+      - A narration-runtime contract that translates a described intent into a draft, and the guide's drafting help.
+      - A route, panel or page that shows a preview; use outside combat.
+    - **Not proven:**
+      - That an execution path asks for explicit player action, because none exists. The evidence is that no path exists
+        and the preview is pure; no database or HTTP run was made.
+      - That the provisional complexity formula and rates are balanced. No playtest or comparison was made.
+      - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
 - [ ] P15.5 Prove disabled modules disappear cleanly and enabled modules remain adventure-independent.
 - [ ] P15.6 Qualify optional adaptive quest/world-direction tasks using event-triggered significant actors, causal relationship histories and deterministic off-screen catch-up; enable only after agency/coherence/cost comparison, otherwise document disabled/deferred capability with verified baseline fallback.
 
