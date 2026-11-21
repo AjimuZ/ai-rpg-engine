@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "rules.attributes",
+      "kind": "rule",
+      "data": {
+        "ruleType": "attributes",
+        "attributes": [
+          {
+            "id": "poise",
+            "name": "Poise",
+            "min": 0,
+            "max": 4
+          }
+        ]
+      }
+    },
+    {
+      "id": "rules.resources",
+      "kind": "rule",
+      "data": {
+        "ruleType": "resources",
+        "resources": [
+          {
+            "id": "stamina",
+            "name": "Stamina",
+            "max": 6
+          }
+        ]
+      }
+    },
+    {
+      "id": "rules.rarity",
+      "kind": "rule",
+      "data": {
+        "ruleType": "rarityTiers",
+        "tiers": [
+          {
+            "id": "ordinary",
+            "name": "Ordinary",
+            "token": "tier-ordinary"
+          }
+        ]
+      }
+    }
+  ]
+}

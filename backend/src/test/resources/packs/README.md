@@ -71,6 +71,12 @@ settles each once and replays the lost responses. The overlay is a reviewed auth
 review. The fixture is excluded from the production jar, so a packaged installation does not hold it, and it declares no
 module (`modules: []`) because the engine still has none to load.
 
+## Manual authoring example (P16.5-A)
+
+`manual-authoring-example` (`example:harbor-lamp` 1.0.0, Harbor Lamp) is the minimal complete pack used by the
+authoring guide in `docs/09-adventure-packs.md` section 11.1. `ManualAuthoringExampleTest` compiles it without a
+database and reproduces the guide's troubleshooting rows. It has no locale, asset or module.
+
 ## Bilingual resource review (P04.6)
 
 All 24 fantasy and 26 salvage catalog leaves have EN/IT entries. Review compares

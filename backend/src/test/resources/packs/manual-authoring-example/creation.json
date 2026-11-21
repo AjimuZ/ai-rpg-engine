@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "walker",
+      "kind": "creation",
+      "data": {
+        "name": "Harbor Walker",
+        "attributeBudget": 2,
+        "skillBudget": 1,
+        "attributes": [
+          "poise"
+        ],
+        "skills": [
+          "seamanship"
+        ],
+        "archetypes": [
+          {
+            "id": "lamplighter",
+            "name": "Lamplighter",
+            "attributes": {
+              "poise": 2
+            },
+            "skills": {
+              "seamanship": 1
+            }
+          }
+        ],
+        "startingItems": [
+          {
+            "item": "satchel",
+            "quantity": 1
+          }
+        ],
+        "startingAbilities": [
+          "trim-wick"
+        ]
+      }
+    }
+  ]
+}

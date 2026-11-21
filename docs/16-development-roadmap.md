@@ -6919,7 +6919,26 @@ this update. No combat runtime/browser result is claimed.
       - Historical receipts keep the source's invalidation numbers.
       - The 96 MiB limit was not exercised. No deliberate weakening was run.
       - `verify.sh full` and `verify.sh containers` were not run.
-- [ ] P16.5 Document manual file authoring with complete neutral examples and troubleshooting.
+- [x] P16.5 Document manual file authoring with complete neutral examples and troubleshooting.
+  - P16.5-A (21 November 2026). Documentation and a test; no production code, migration, route or setting changed.
+    - **Delivered.** Section 11.1 of docs/09 (seven-step guide and a troubleshooting table of eight diagnostic codes).
+      The example pack `example:harbor-lamp` 1.0.0 is the new test resource directory
+      `backend/src/test/resources/packs/manual-authoring-example` (11 files: manifest, rules, locations, skills,
+      items, abilities, creation, generation policy, lore, credits, license; no locale or asset). Its entry is also in
+      the packs README and CHANGELOG.
+    - **Tests.** `ManualAuthoringExampleTest` (new, no database, 4 cases): the example compiles with no warnings;
+      a misspelled starting item gives `REFERENCE_UNKNOWN` at `creation.json` under `startingItems`; an unlisted
+      file and a missing listed file both give `FILE_REFERENCE`; one appended newline changes the content hash.
+    - **Commands and results (Windows 11 host, pinned containers).**
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=ManualAuthoringExampleTest`:
+        VERIFY PASSED (backend-sources, backend-database, backend-focused 11 s). The test count was not read from the
+        surefire log.
+    - **Not proven.** The remaining troubleshooting rows (`FILE_TYPE`, `INCOMPATIBLE_*`, `VERSION_SYNTAX`,
+      `HASH_CONFLICT`, `TEXT_TARGET`) come from the compiler, parser and registry sources and the existing
+      `NeutralGenreImportTest`; the guide's example does not trigger them. The example was not registered into a
+      workspace or played. The guide cannot be followed through an HTTP route or page, because `PackDiagnostics` has
+      none. `verify.sh containers` was not run by this session. The box is ticked by the orchestrator, whose
+      `verify.sh full` run passed; this session itself ran only the focused backend test above.
 
 **Exit:** an author can create and evolve content safely without a visual editor; an owner can recover data independently. **Checks:** QA-02, QA-16, QA-23, incompatible upgrade and corrupted archive tests. **Suggested commit:** `Add safe adventure and campaign administration`.
 

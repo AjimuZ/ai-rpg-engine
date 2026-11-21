@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Manual file authoring guide (P16.5-A), 21 November 2026
+
+- New section 11.1 of the adventure pack specification (`docs/09-adventure-packs.md`): a step-by-step guide to
+  writing, validating and evolving a pack by hand, with a complete neutral example (`Harbor Lamp`) and a
+  troubleshooting table of real diagnostic codes.
+- The example is the test resource directory `backend/src/test/resources/packs/manual-authoring-example`.
+  `ManualAuthoringExampleTest` (4 cases, no database) compiles it and reproduces the troubleshooting rows.
+- No production code, route, page or setting changed.
+
 ## Unreleased — Campaign restore into a chosen adventure (P16.4-A), 21 November 2026
 
 - The engine can now restore a full-owner campaign export as a new campaign. The owner names the adventure that

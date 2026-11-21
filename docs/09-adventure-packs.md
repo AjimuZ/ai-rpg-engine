@@ -540,6 +540,50 @@ P16.1-A provides the backend half of the "run validation, inspect diagnostics" s
 
 The campaign preview and the playtest steps still have no tool.
 
+### 11.1 Manual file authoring guide
+
+An author needs only a text editor. The complete neutral example is the directory
+[`manual-authoring-example`](../backend/src/test/resources/packs/manual-authoring-example/) (pack `example:harbor-lamp`
+1.0.0, "Harbor Lamp": two linked locations, one attribute, one resource, one skill, one item, one self-recovery ability
+and one creation profile, no module, no locale, no asset). `ManualAuthoringExampleTest` compiles it through
+`PackStaging`, `PackParser` and `PackCompiler` with no warnings. Copy it as a starting point.
+
+1. **Folder.** One directory is one pack root. `adventure.json` is the manifest; every other distributed file must be
+   listed in its `files` array with a `path` and a `category` (`rules`, `locations`, `skills`, `abilities`, `items`,
+   `creation`, `generationPolicy`, `lore`, `credits`, `license`, `asset`, `localization`, `textResources`). Prose
+   categories (`lore`, `credits`, `license`) need `.md` files.
+2. **Identity.** `id` is `namespace:name`; `version` is an exact SemVer. `engineCompatibility` and `ruleset.version` are
+   ranges; the example uses the ones the current engine accepts (`>=0.1.0 <1.0.0`, ruleset `skirmish` `>=1.0.0 <2.0.0`).
+   Keep `modules` as `[]` unless you need `relationships` or `creativeAbilities`.
+3. **Definitions.** Each structured file is `{"schemaVersion": 1, "definitions": [...]}`; a definition is
+   `{"id", "kind", "data"}`. The `rules.*` ids and `kind: "rule"` entries (attributes, resources, rarity tiers) are the
+   ruleset's fixed slots. Every other id is yours, unique inside the pack, and referenced by id, never by display name.
+4. **Entrypoint.** `entrypoint.location` and `entrypoint.creationProfile` name definitions of the pack. The creation
+   profile's attributes, skills, starting items and abilities name definitions too.
+5. **Generation policy.** `generation.json` lists the ids the narrator must keep (`constraints.required`) and which
+   categories are `catalogOnly`.
+6. **Validate.** Run the pack through `PackDiagnostics.validate` (see above). It stops at the first blocking
+   diagnostic, so fix one error and run it again.
+7. **Evolve.** The bytes of a released version never change. Any edit, even a newline in `lore.md`, changes the content
+   hash. Bump `version` (for example `1.0.1`), validate, and import the result as a new revision. Existing campaigns
+   stay on the revision they pinned.
+
+| Symptom | Code | Likely cause and fix |
+| --- | --- | --- |
+| A starting item, ability, skill or link names something that does not exist | `REFERENCE_UNKNOWN` | A typo in an id. The diagnostic gives the file and pointer, for example `creation.json` at `/definitions/0/data/startingItems/0/item`. |
+| A file is in the folder but not in `files` | `FILE_REFERENCE` | List it with a category, or move it out of the pack root (editor notes and backups belong outside). |
+| A listed file is absent, a path is duplicated, or the manifest lists itself | `FILE_REFERENCE` | Fix the path or remove the entry. |
+| A prose category points at a non-`.md` file | `FILE_TYPE` | Rename the file or change its category. |
+| The same id and version are already registered with other bytes | `HASH_CONFLICT` | Bump `version`; a registered version is immutable. |
+| The pack asks for an engine or ruleset this build lacks | `INCOMPATIBLE_ENGINE`, `INCOMPATIBLE_RULESET` | Widen or correct the range; see section 10. |
+| A locale overlay targets a protected field such as `/visibility` | `TEXT_TARGET` | Overlays may change text fields only (section 15). |
+| A version is not valid SemVer | `VERSION_SYNTAX` | Use `MAJOR.MINOR.PATCH`. |
+
+Line endings: keep files in UTF-8; a CRLF/LF change alters the hash like any other edit. Strict JSON has no comments or
+trailing commas. `ManualAuthoringExampleTest` reproduces the `REFERENCE_UNKNOWN`, both `FILE_REFERENCE` rows and the
+hash change; the other rows are documented from the compiler and registry sources and tested elsewhere
+(`NeutralGenreImportTest` for `HASH_CONFLICT` and `TEXT_TARGET`).
+
 A future editor must write this same contract. Its visual form cannot become a second incompatible authoring model.
 
 Author-specified facts, required entities and supported constraints are fixed inputs, not suggestions the narrator can replace. Use stable IDs and supported requirement predicates; generate only permitted missing details within policy/budgets. Missing required technical fields and contradictory constraints are diagnostics, not permission to invent rules. The integrated text/graphical editor, genre examples and fixed/open workflow are in [the later editor roadmap](26-adventure-editor-roadmap.md).

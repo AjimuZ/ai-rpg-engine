@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "seamanship",
+      "kind": "skill",
+      "data": {
+        "name": "Seamanship",
+        "description": "Read tides, knots and weather.",
+        "attribute": "poise",
+        "maxRank": 3
+      }
+    }
+  ]
+}

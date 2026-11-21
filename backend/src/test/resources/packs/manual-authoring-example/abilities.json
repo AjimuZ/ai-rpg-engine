@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "trim-wick",
+      "kind": "ability",
+      "data": {
+        "name": "Sit and Rest",
+        "description": "Recover one point of stamina.",
+        "target": {
+          "policy": "self"
+        },
+        "effects": [
+          {
+            "type": "modifyResource",
+            "resource": "stamina",
+            "amount": 1
+          }
+        ]
+      }
+    }
+  ]
+}

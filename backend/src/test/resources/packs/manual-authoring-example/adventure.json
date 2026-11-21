@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "id": "example:harbor-lamp",
+  "version": "1.0.0",
+  "title": "Harbor Lamp",
+  "summary": "A neutral two-location harbor walk used by the manual authoring guide.",
+  "authors": [
+    "Project contributors"
+  ],
+  "license": "MIT",
+  "engineCompatibility": ">=0.1.0 <1.0.0",
+  "ruleset": {
+    "id": "skirmish",
+    "version": ">=1.0.0 <2.0.0",
+    "policyProfile": "standard"
+  },
+  "contentLocale": "en",
+  "narrativeMode": "emergent",
+  "entrypoint": {
+    "situation": "You stand on the quay at dusk. Choose whether to check your kit or walk to the lamp house.",
+    "location": "quay",
+    "creationProfile": "walker"
+  },
+  "files": [
+    {
+      "path": "rules.json",
+      "category": "rules"
+    },
+    {
+      "path": "locations.json",
+      "category": "locations"
+    },
+    {
+      "path": "skills.json",
+      "category": "skills"
+    },
+    {
+      "path": "abilities.json",
+      "category": "abilities"
+    },
+    {
+      "path": "items.json",
+      "category": "items"
+    },
+    {
+      "path": "creation.json",
+      "category": "creation"
+    },
+    {
+      "path": "generation.json",
+      "category": "generationPolicy"
+    },
+    {
+      "path": "lore.md",
+      "category": "lore"
+    },
+    {
+      "path": "CREDITS.md",
+      "category": "credits"
+    },
+    {
+      "path": "LICENSE.md",
+      "category": "license"
+    }
+  ],
+  "modules": [],
+  "generationPolicy": "generation.json",
+  "contentGuidance": {
+    "tone": "Calm and curious",
+    "themes": [
+      "exploration"
+    ],
+    "exclusions": [
+      "mandatory romance"
+    ],
+    "audience": "general"
+  },
+  "provenance": {
+    "source": "Original documentation example",
+    "notice": "See CREDITS.md and LICENSE.md"
+  }
+}

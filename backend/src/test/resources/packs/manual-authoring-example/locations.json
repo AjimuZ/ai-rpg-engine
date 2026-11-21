@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "quay",
+      "kind": "location",
+      "data": {
+        "name": "Harbor Quay",
+        "description": "Stone steps lead down to quiet water.",
+        "links": [
+          {
+            "to": "lamp-house",
+            "accessible": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "lamp-house",
+      "kind": "location",
+      "data": {
+        "name": "Lamp House",
+        "description": "A small tower holds a lamp that is lit each evening.",
+        "links": [
+          {
+            "to": "quay",
+            "accessible": true
+          }
+        ]
+      }
+    }
+  ]
+}

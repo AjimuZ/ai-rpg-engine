@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "id": "satchel",
+      "kind": "item",
+      "data": {
+        "name": "Harbor Satchel",
+        "description": "A waxed bag with rope and chalk.",
+        "itemType": "tool",
+        "maxStack": 1,
+        "rarity": "ordinary",
+        "appearance": {
+          "id": "satchel.waxed",
+          "summary": "A dark waxed bag with a brass buckle."
+        }
+      }
+    }
+  ]
+}
