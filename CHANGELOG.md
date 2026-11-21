@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Baseline latency, context use and open defects (P14.4-A), 21 November 2026
+
+- A routine one-event narration request was measured at about 2,800 estimated tokens, under a quarter of the standard
+  12,000-token input budget. A new test fails when such a request grows past half of the budget.
+- Two short live checks of the narration runtime on the owner's account took 5.7 s and 5.2 s each, from container
+  start to a resumed thread. Narration latency during play was not measured, because the packaged installation has no
+  runtime sign-in.
+- The planner comparison stays deferred: planning is off by default and every quest plays from its authored or
+  procedural baseline. The unresolved defects are listed in the roadmap.
+
 ## Unreleased — First-milestone QA matrix rerun (P14.3-A), 21 November 2026
 
 - The checks required for the first playable milestone were run again, and every result is recorded in the roadmap:

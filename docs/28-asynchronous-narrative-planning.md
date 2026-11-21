@@ -58,6 +58,10 @@ of one known quest, runs as `PREPARATION` background work of the P08.6 scheduler
 transactional P07.6 gate; nothing on the path of a player action calls, waits for or reads
 it. No live planner run, quality comparison (AP-12) or consumer that builds commands from
 plans exists yet; the live comparison is deferred to P14/P18.6 and does not block the MVP.
+P14.4-A (21 November 2026) kept it deferred: planning is off by default (`engine.planning.enabled`
+false, Economy profile), the packaged installation's runtime account is not signed in, and no
+paired baseline/planner run was made. Every quest plays from its authored or procedural baseline,
+which is the playable fallback.
 
 Keep the playable loop small: validated intent when needed, deterministic resolution, canonical save, then public narration. Prepare selected expensive narrative situations separately, so accepting a mystery does not require generating its whole future before acknowledging the action. A prepared situation supplies motives, causal dependencies, clues and alternatives; it never prescribes the protagonist's choices or makes an anticipated outcome inevitable.
 

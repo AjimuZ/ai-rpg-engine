@@ -228,6 +228,13 @@ plus one separator and the glossary entries it brings. After rendering, the asse
 that the real envelope does not exceed the charged total, and throws on a violation. P21
 measurements may replace the method.
 
+**Measured baseline** (P14.4-A, 21 November 2026, one observation): the whole rendered request of a
+one-event narration (a spoken line, two actors, the fixed instructions and the output schema)
+was 3,131 instruction bytes and 2,491 schema bytes, 2,812 estimated tokens, about 23% of the
+12,000-token standard input budget. `GroundedNarrationTest` now fails when such a request grows past half
+of the budget. This is the estimator's own upper bound, not a runtime tokenizer count, and no
+planner, memory-summary or multi-event context was measured.
+
 **Selection** (`ContextSelection`, pure and deterministic):
 
 1. Charge the fixed cost and every mandatory item. If they exceed the input budget, the result

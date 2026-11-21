@@ -30,6 +30,8 @@ import org.rpgengine.inference.scheduling.InferenceScheduler;
 import org.rpgengine.inference.scheduling.SchedulerSettings;
 import org.rpgengine.inference.scheduling.TaskLedger;
 import org.rpgengine.inference.session.ScopedSessions;
+import org.rpgengine.memory.ContextBudget;
+import org.rpgengine.memory.TokenEstimator;
 import org.rpgengine.presentation.PresentationEventStore;
 import org.rpgengine.presentation.PresentationJobService;
 import org.rpgengine.presentation.PresentationScopePort;
@@ -178,6 +180,25 @@ class GroundedNarrationTest {
                 + "where operation_id = ?", operation));
         assertThrows(RuntimeException.class, () -> jdbc.update("delete from narration_publication where operation_id = ?",
                 operation));
+    }
+
+    /**
+     * Baseline context use (P14.4): the whole rendered request of a one-event narration, its fixed
+     * instructions and output schema included, estimated by the application's conservative
+     * {@link TokenEstimator}, stays within half of the standard 12,000-token input budget. The
+     * baseline observed on 21 November 2026 was 2,812 estimated tokens (3,131 instruction bytes and
+     * 2,491 schema bytes), so growth of the fixed instructions or of the per-event text that more
+     * than doubles a routine request fails here and must be measured again.
+     */
+    @Test
+    void oneEventNarrationRequestStaysFarInsideTheStandardInputBudget() {
+        commit("SPEAK", Map.of("recipientActorId", mara.toString(), "text", "Hello there"));
+        port.then(seen -> NarratorTaskPort.narrated(seen, true));
+        assertEquals(1, jobs.drain(4));
+        var request = port.requests.getFirst();
+        int tokens = TokenEstimator.tokens(request.instructions()) + TokenEstimator.tokens(request.outputSchema());
+        assertTrue(tokens > 0, "estimated tokens " + tokens);
+        assertTrue(tokens <= ContextBudget.STANDARD_INPUT / 2, "estimated tokens " + tokens);
     }
 
     /**

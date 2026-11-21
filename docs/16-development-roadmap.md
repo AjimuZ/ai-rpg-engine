@@ -5864,7 +5864,48 @@ this update. No combat runtime/browser result is claimed.
     - After the documentation edits, `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh repo` printed
       `VERIFY PASSED` (diff-check, line-endings, repository-checks `all: 0 finding(s)`, repository-tests `Ran 40 tests`
       `OK (skipped=11)`, backup-tests `Ran 9 tests` `OK (skipped=1)`).
-- [ ] P14.4 Measure baseline latency/context use and list unresolved defects honestly; demonstrate one optional bilingual baseline/planner investigation comparison when available, or record deferred/unavailable planning with the playable fallback. Advanced planning cannot block MVP.
+- [x] P14.4 Measure baseline latency/context use and list unresolved defects honestly; demonstrate one optional bilingual baseline/planner investigation comparison when available, or record deferred/unavailable planning with the playable fallback. Advanced planning cannot block MVP.
+  - P14.4-A (21 November 2026): baseline measurements and the unresolved-defect list. Windows 11, Docker Desktop
+    Engine 29.9.2, run one at a time. The box stays open until the owner accepts the listed limits.
+    - **Commands and results.**
+      1. `time py -B tools/runtime_probe/probe.py --timeout 120 live --docker "C:/Program Files/Docker/Docker/resources/bin/docker.exe"
+         --image ai-rpg-engine-runtime-probe/codex:0.164.0 --account-volume rpg-engine-owner-runtime-account --model
+         gpt-6-luna --effort low`, run twice on the owner's account volume (contents not read; identifiers not
+         recorded): both `inferenceVerified: true`, `status: completed`, `resumed: true`, 80 events, 7 ignored. Wall
+         clock `real 0m5.714s` and `real 0m5.243s`. That span holds the container start, the runtime handshake, one
+         neutral turn and the resume, so it is an upper bound of one low-effort turn and not a per-turn latency. P14.3-A
+         saw about one minute for the same command, so two observations do not make a distribution; no p50/p95 is
+         claimed. Two short runs used the owner's quota once more; no overage.
+      2. Context use: a new test `GroundedNarrationTest.oneEventNarrationRequestStaysFarInsideTheStandardInputBudget`
+         measures the whole rendered narration request (fixed instructions plus output schema) of one spoken line.
+         One intentionally failing run (`assertEquals(-1, tokens)`, since reverted) printed `tokens=2812
+         instructionBytes=3131 schemaBytes=2491`. That is 2,812 estimated tokens with the application's upper-bound
+         estimator (`utf8-bytes-div-2-v1`), about 23% of the 12,000-token standard input budget (docs/08 section 6).
+         The final test asserts `0 < tokens <= 6000`.
+      3. `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=GroundedNarrationTest`: first
+         run with the earlier print-only version `VERIFY PASSED`; failing measurement run `Tests run: 9, Failures: 1`;
+         final run `VERIFY PASSED` (`backend-focused` 15 s, 9 tests including the new one).
+    - **Planner comparison: deferred.** `PlanningSettings` documents planning as off by default (Economy profile),
+      the packaged installation's runtime account is not signed in, and no paired baseline/planner investigation, in
+      either language, was run. The playable fallback is the one proven in P14.3-A: every quest plays from its
+      authored or procedural baseline with local resolution and deterministic receipts (the Chrome journey, 80/80).
+      AP-12 / QA-39 stay with P18.6. Advanced planning does not block the MVP.
+    - **Unresolved defects and limits** (from P14.3-A and this run; none is fixed here):
+      1. QA-15: Advancement is not applied during play; it is used only inside the progression package.
+      2. QA-34: no test found for author-fixed NPCs, appearance or facts being preserved while only gaps are completed.
+      3. Live narration during packaged play is unproven (QA-07, QA-08, QA-29 suggestions): the installation's own
+         runtime account is not signed in, which is owner action. Every play action stays `COMMITTED_NARRATION_PENDING`.
+      4. The saved-adventure page still says "Sending actions in the browser is not connected yet." while the live
+         view sends actions.
+      5. The Docker-gated checks of QA-24 and QA-28 (`RUNTIME_PROBE_DOCKER` suite, `verify.sh containers`) were not run.
+      6. Human checks of QA-25, QA-26, QA-30 and QA-35 (independent Italian review, contrast and provenance of the
+         kit assets) are open.
+      7. `browser.mjs` exits 1 on every page because of the known `/favicon.ico` 404.
+    - **Not proven.** Latency of a local action through the HTTP interface and the database (no timing was taken; the
+      Chrome journey's duration of a few minutes is dominated by browser steps); latency or token usage of narration
+      during play; planner, memory-summary and multi-event context sizes; p50/p95 of anything; Italian request sizes;
+      `verify.sh full` and `verify.sh containers`. No deliberate weakening was run on the new test beyond the one
+      failing measurement run.
 - [ ] P14.5 Write reproducible setup and an accurate MVP capability table.
 
 **Exit:** a fresh installation can play, fight, save, resume, and change adventure files without editing engine source. Critical integrity/security failures block the milestone. **Suggested commit:** `Validate the first playable engine milestone`.
