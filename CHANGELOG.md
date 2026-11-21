@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — NPC schedules, witnesses and reports (P15.1-A), 21 November 2026
+
+- Adventure authors can give an NPC a daily `schedule` of places by time of day. They can also mark it as a `witness`
+  that remembers where it saw the player, and declare `reports` that pass what it saw to other NPCs a set number of
+  in-world minutes later. The pack checker refuses badly ordered schedules and schedules that do not start the NPC at
+  its own location. It also refuses reports from an NPC that is not a witness, and reports to the NPC itself.
+- During play these rules follow only committed world time. A command that moves the clock moves scheduled NPCs, a
+  witness beside the player notes where it saw the player, and a report arrives once enough in-world time has passed.
+  Looking at the game, or real time passing, changes nothing.
+- Limits: new campaigns do not yet create NPCs from the adventure's definitions, so packaged play has no NPC these
+  rules can move. NPC goals are still plain text, and witnesses record only where the player was, not what they saw
+  the player do.
+
 ## Unreleased — Setup steps and MVP capability table (P14.5-A), 21 November 2026
 
 - The README now opens with numbered setup steps for a packaged installation and a table of what works, what is only

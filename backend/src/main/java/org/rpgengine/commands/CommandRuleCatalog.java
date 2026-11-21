@@ -17,12 +17,15 @@ import org.rpgengine.content.Definition;
 import org.rpgengine.quests.QuestRules;
 import org.rpgengine.rules.RestRules;
 import org.rpgengine.rules.WorldClock;
+import org.rpgengine.world.NpcRules;
+import org.rpgengine.world.NpcSchedule;
 
 /**
  * Compact immutable projection of the pinned rule facts that command validation and local
  * resolution consult: location links with their travel minutes and tags, location disclosure, rest policies,
  * combat profiles and encounter templates (P11.1), actor-definition disclosure and
- * declaring packs, and ability contracts including their compiled effect programs. It is
+ * declaring packs, NPC schedules, witness flags and report routes (P15.1-A), and ability contracts
+ * including their compiled effect programs. It is
  * derived only from a sealed, recompiled {@link CampaignPackSnapshot}; no authored prose,
  * secret text, display name or localization is retained, so caching it costs little memory
  * and cannot leak content. Effect programs hold only types, targets, resource keys and
@@ -52,11 +55,13 @@ import org.rpgengine.rules.WorldClock;
  * @param rests rest policies keyed by canonical ID: duration, location tag, interruption chance, restored
  *        resources and removed conditions (P10.4)
  * @param combat resolved combat profile of each pack and the encounter templates of the closure (P11.1)
+ * @param npcs world rules of every NPC definition that declares any (schedule, witness, reports), keyed by
+ *        canonical ID with canonical location and recipient IDs (P15.1-A); NPCs without rules are absent
  */
 record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
         Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
         Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests,
-        Map<String, RestRules.Policy> rests, CombatRules combat) {
+        Map<String, RestRules.Policy> rests, CombatRules combat, Map<String, NpcRules> npcs) {
     /** Freeze every index; null parts are construction bugs and fail immediately. */
     CommandRuleCatalog {
         Objects.requireNonNull(revisionId, "revisionId");
@@ -70,6 +75,16 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         resourceVocabularies = Map.copyOf(resourceVocabularies);
         actorPacks = Map.copyOf(actorPacks);
         abilities = Map.copyOf(abilities);
+        npcs = Map.copyOf(npcs);
+    }
+
+    /** Catalog without NPC world rules, the shape used before P15.1-A. */
+    CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<String, Boolean> actorDefinitions,
+            Map<String, String> resourceVocabularies, Map<String, String> actorPacks, Map<String, Ability> abilities,
+            Map<String, ItemRule> items, CharacterRuleCatalog characters, QuestRules quests,
+            Map<String, RestRules.Policy> rests, CombatRules combat) {
+        this(revisionId, locations, actorDefinitions, resourceVocabularies, actorPacks, abilities, items, characters,
+                quests, rests, combat, Map.of());
     }
 
     /** Catalog without combat rules, the shape used before P11.1. */
@@ -121,6 +136,7 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
         var abilities = new HashMap<String, Ability>();
         var items = new HashMap<String, ItemRule>();
         var rests = new HashMap<String, RestRules.Policy>();
+        var npcs = new HashMap<String, NpcRules>();
         for (CompiledPack pack : snapshot.packs().values()) {
             String packId = pack.parsed().manifest().id();
             for (Definition definition : pack.definitions()) {
@@ -157,6 +173,10 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
                     case "npc" -> {
                         actors.put(id, disclosed(data));
                         origins.put(id, packId);
+                        NpcRules world = npc(snapshot, pack, data);
+                        if (world.active()) {
+                            npcs.put(id, world);
+                        }
                     }
                     // A creation profile is the player's own origin and is never concealed; its
                     // declaring pack supplied the player's resource keys at campaign creation.
@@ -172,7 +192,32 @@ record CommandRuleCatalog(UUID revisionId, Map<String, Location> locations, Map<
             }
         }
         return new CommandRuleCatalog(revisionId, locations, actors, vocabularies, origins, abilities, items,
-                CharacterRuleCatalog.from(snapshot), QuestRules.from(snapshot), rests, CombatRules.from(snapshot));
+                CharacterRuleCatalog.from(snapshot), QuestRules.from(snapshot), rests, CombatRules.from(snapshot), npcs);
+    }
+
+    /**
+     * Read one NPC's validated world rules (P15.1-A): its schedule's start minutes and canonical locations, the
+     * witness flag and its report routes with canonical recipient IDs. The compiler has already checked order,
+     * bounds and the midnight entry, so the value constructors only repeat structural checks.
+     */
+    private static NpcRules npc(CampaignPackSnapshot snapshot, CompiledPack pack, Map<String, Object> data) {
+        NpcSchedule schedule = null;
+        var entries = new ArrayList<NpcSchedule.Entry>();
+        for (Map<?, ?> entry : objects(data.get("schedule"))) {
+            String from = (String) entry.get("from");
+            int minute = Integer.parseInt(from.substring(0, 2)) * 60 + Integer.parseInt(from.substring(3));
+            entries.add(new NpcSchedule.Entry(minute,
+                    snapshot.resolve(pack, (String) entry.get("location"), "location").id()));
+        }
+        if (!entries.isEmpty()) {
+            schedule = new NpcSchedule(entries);
+        }
+        var reports = new ArrayList<NpcRules.Report>();
+        for (Map<?, ?> report : objects(data.get("reports"))) {
+            reports.add(new NpcRules.Report(snapshot.resolve(pack, (String) report.get("to"), "npc").id(),
+                    number(report.get("minutes"), 0)));
+        }
+        return new NpcRules(schedule, Boolean.TRUE.equals(data.get("witness")), reports);
     }
 
     /**

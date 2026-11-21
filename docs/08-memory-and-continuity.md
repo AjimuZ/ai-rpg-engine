@@ -119,9 +119,11 @@ Decisions and limits:
   planner reader and checkpoint column, has no panel reader and is retired together with the planner move (P15).
 - Only trusted resolvers write knowledge. No player command, effect node or HTTP route creates
   claims or commitments yet: the pack `reveal` effect, plan consumers (opportunities, adopted
-  pending events) and item creation stay P10. NPC-side observation, witnesses of a commitment
-  and relationship episodes are P11/P15. Statements and terms keep the language they were
-  written in. They are not translated.
+  pending events) and item creation stay P10. Since P15.1-A, NPCs marked `witness` record OBSERVED
+  sightings of the acting player beside them, and their declared reports give other NPCs TOLD
+  sightings ([ADR 0049](adr/0049-npc-schedules-witnesses-and-first-hand-reports.md)). Both are written
+  through this ledger in the commit. Witnesses of a commitment and relationship episodes remain P15.
+  Statements and terms keep the language they were written in. They are not translated.
 
 ## 5. Context assembly
 
@@ -291,8 +293,9 @@ Decisions and limits:
   callers so far are the P09.3 continuity summarizer and the P09.4 rehydration block.
 - The `causal` tier uses revision equality with the focus operation and the informant. Explicit
   event-to-event causal links do not exist yet.
-- A `character` context has no history and no witnessed events until NPC-side observation exists
-  (P11/P15).
+- A `character` context has no history and no witnessed events. Since P15.1-A its knowledge
+  section includes the sightings a witness NPC recorded or was told, because they are that NPC's
+  own last known locations. Witnessed events and history are still absent.
 - Semantic retrieval stays out of scope (section 11).
 
 ## 7. Renewal policy

@@ -70,6 +70,20 @@ An emergent quest is validated content: it needs an identity, achievable conditi
 
 NPCs have stable identity, goals, personality constraints, current or last known position, beliefs, possessions, and remembered interactions. Background schedules advance only through world-time rules. The engine need not simulate every NPC each minute; evaluate relevant scheduled boundaries lazily and preserve event order.
 
+**Schedules, witnesses and reports (P15.1-A, implemented; [ADR 0049](adr/0049-npc-schedules-witnesses-and-first-hand-reports.md)).** An NPC definition may declare three optional world rules:
+
+- `schedule`: 1..24 entries `{from: "HH:MM", location}` in increasing order. Each entry holds until the next one starts, and the last one wraps past midnight. The entry in force at 00:00 must be the NPC's `location`.
+- `witness: true`: the NPC remembers where it saw the player.
+- `reports`: up to 8 routes `{to: <npc>, minutes}`, allowed only on a witness.
+
+Every committed command first places each scheduled NPC actor where its routine puts it at the committed world time. Then every witness beside the acting player records an OBSERVED sighting of the player. Then each report whose arrival (the witness's sighting time plus the route's minutes) has been reached is delivered to the recipient as a TOLD sighting, unless the recipient already learned something about the player at or after that sighting. A report is relayed only first-hand, and at most 64 arrive per commit. Reads never run any of this, so looking at the game moves no NPC and spreads no news. A schedule move bumps the NPC's row version and `actor:` scope, but no event announces it.
+
+Limits:
+
+- Campaign creation still creates only the player, so NPC actors exist only where trusted code creates them (tests today). Packaged play has no NPC that these rules move.
+- `goals` remain authored text that no rule reads.
+- Witnesses record the player's location, not the events they watched.
+
 Companions additionally have party membership, control policy, formation/zone, resource state, and their own knowledge. Control options are player-directed or AI-assisted within legal actions. The owner selects a policy; Codex cannot silently control the protagonist. A guide persona does not become a party combatant without an explicit actor profile and membership event.
 
 Relationship dimensions are pack-defined bounded values, such as trust or respect. Significant changes need an event and cause. Hidden values stay hidden. Commitments and expressed boundaries are independent facts, not automatic consequences of crossing a numeric threshold. Optional romance is a content module and is disabled by default in neutral samples; it is not a condition for engine functionality.
@@ -82,7 +96,7 @@ Factions maintain goals, reputation, resources, relationships, and bounded event
 
 A clock has owner, current value, target, tick policy, trigger, visibility, and settlement identity. On a long time jump, process due boundaries in order with a cap; if too many accumulate, pause for bounded catch-up rather than blocking indefinitely or skipping consequential events. UI reads do not trigger hidden world advancement.
 
-Knowledge propagates through witnesses, messages, travel, or other declared mechanisms. A remote town does not instantly know a player's private conversation. Off-scene events cannot grant the protagonist knowledge without a recorded discovery.
+Knowledge propagates through witnesses, messages, travel, or other declared mechanisms. A remote town does not instantly know a player's private conversation. Off-scene events cannot grant the protagonist knowledge without a recorded discovery. Since P15.1-A, the declared mechanisms are witness NPCs and their delayed `reports` routes (section 6). They carry only where the player was seen. Travel-based and multi-hop propagation remain planned.
 
 ## 8. Rest, recovery, and defeat
 

@@ -60,6 +60,12 @@ public final class PackCompiler {
     /** Kinds a generation constraint may name: every kind of a known content category. */
     private static final Set<String> ALL_KINDS = Set.copyOf(CATEGORY_KINDS.values());
     private static final int LIST_MAX = 64;
+    /** Most entries of one NPC's daily schedule (P15.1-A): one per in-world hour. */
+    static final int NPC_SCHEDULE_MAX = 24;
+    /** Most report routes one witness NPC may declare (P15.1-A). */
+    static final int NPC_REPORTS_MAX = 8;
+    /** A time of day on the 24-hour clock, {@code HH:MM}. */
+    private static final java.util.regex.Pattern DAY_TIME = java.util.regex.Pattern.compile("([01][0-9]|2[0-3]):[0-5][0-9]");
     /** Hands available when a pack's equipment rule does not say otherwise (docs/10 section 3). */
     static final int DEFAULT_HANDS = 2;
     /** Most hands a pack may declare; larger values would make hand occupancy uninformative. */
@@ -418,7 +424,7 @@ public final class PackCompiler {
                 case "rule" -> rule(f);
                 case "location" -> location(f, definition);
                 case "faction" -> faction(f, definition);
-                case "npc" -> npc(f);
+                case "npc" -> npc(f, definition);
                 case "item" -> item(f);
                 case "skill" -> skill(f);
                 case "ability" -> ability(f, definition);
@@ -1254,13 +1260,20 @@ public final class PackCompiler {
             }
         }
 
-        /** NPC: initial location, optional faction and a profile of attributes, skills and abilities. */
-        private void npc(Fields f) {
+        /**
+         * NPC: initial location, optional faction, a profile of attributes, skills and abilities, and the
+         * P15.1-A world rules: an optional daily {@code schedule} that decides where the NPC is at every
+         * in-world time, an optional {@code witness} flag (the NPC remembers where it saw the player) and
+         * optional {@code reports} routes through which a witness's sightings reach other NPCs after a delay
+         * in in-world minutes. The schedule entry in force at 00:00 must be the NPC's {@code location}, so
+         * that location stays where a campaign starts it.
+         */
+        private void npc(Fields f, Definition self) {
             f.text("name", true);
             f.text("role", true);
             f.text("description", false);
             f.texts("goals", 20);
-            f.ref("location", LOCATION, true);
+            String location = f.ref("location", LOCATION, true);
             f.ref("faction", FACTION, false);
             f.choice("knowledge", VISIBILITY, "public");
             Fields profile = f.object("profile", false);
@@ -1270,7 +1283,54 @@ public final class PackCompiler {
                 profile.refs("abilities", ABILITY, LIST_MAX);
                 profile.close();
             }
+            schedule(f, location);
+            boolean witness = f.bool("witness", false);
+            Set<String> recipients = new HashSet<>();
+            for (Fields report : f.objects("reports", 0, NPC_REPORTS_MAX)) {
+                String to = report.ref("to", Set.of("npc"), true);
+                if (to.equals(self.id()) || !recipients.add(to)) {
+                    throw report.fail("CONSTRAINT_CONFLICT", "to", "An NPC reports to another NPC, at most once each");
+                }
+                report.integer("minutes", 0, WorldClock.MAX_MINUTES, 0);
+                report.close();
+            }
+            if (!recipients.isEmpty() && !witness) {
+                // Only a witness records sightings, so a route from anyone else would never carry anything.
+                throw f.fail("CONSTRAINT_CONFLICT", "reports", "Only an NPC marked as a witness can report what it saw");
+            }
             facts(f);
+        }
+
+        /**
+         * Validate an NPC's optional daily schedule: 1..{@value #NPC_SCHEDULE_MAX} entries with a start time
+         * {@code HH:MM} in strictly increasing order and a location. An entry holds from its start until the
+         * next one, and the last one wraps past midnight to the first, so every in-world time has exactly one.
+         */
+        private void schedule(Fields f, String location) {
+            if (!f.has("schedule")) {
+                return;
+            }
+            List<Fields> entries = f.objects("schedule", 1, NPC_SCHEDULE_MAX);
+            int previous = -1;
+            String atMidnight = null;
+            String last = null;
+            for (Fields entry : entries) {
+                String from = entry.matching("from", DAY_TIME, true, "Expected a time of day HH:MM from 00:00 to 23:59");
+                int minute = Integer.parseInt(from.substring(0, 2)) * 60 + Integer.parseInt(from.substring(3));
+                if (minute <= previous) {
+                    throw entry.fail("CONSTRAINT_CONFLICT", "from", "Schedule entries start in strictly increasing order");
+                }
+                previous = minute;
+                last = entry.ref("location", LOCATION, true);
+                if (minute == 0) {
+                    atMidnight = last;
+                }
+                entry.close();
+            }
+            if (!(atMidnight == null ? last : atMidnight).equals(location)) {
+                throw f.fail("CONSTRAINT_CONFLICT", "schedule",
+                        "The schedule entry in force at 00:00 must place the NPC at its location");
+            }
         }
 
         /**

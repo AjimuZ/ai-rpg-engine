@@ -98,7 +98,7 @@ media-serving route is exposed. See [ADR 0018](adr/0018-protected-pack-registrat
 | `characters` | Attributes, skills, resources, conditions, ability availability | Rules |
 | `inventory` | Item identity, ownership, stacks, slots, durability, trade | Characters, rules |
 | `quests` | Objective predicates, state transitions, rewards | Domain events, rules |
-| `world` | Locations, clocks, factions, schedules, causal triggers | Rules and domain events |
+| `world` | Locations, clocks, factions, schedules, causal triggers. Since P15.1-A `org.rpgengine.world` holds NPC schedules, witnesses and first-hand reports, applied inside the canonical commit ([ADR 0049](adr/0049-npc-schedules-witnesses-and-first-hand-reports.md)); factions and triggers are planned (P15.2) | Rules, the knowledge ledger (through which it writes every sighting) |
 | `social` | Relationships, commitments, NPC beliefs and goals | Knowledge and events |
 | `combat` | Encounters, initiative, legal turns, reactions, resolution, settlement | Rules, characters, inventory |
 | `progression` | XP, milestones, purchases, stat caps, reward ledger | Rules and events |

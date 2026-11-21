@@ -5949,6 +5949,50 @@ this update. No combat runtime/browser result is claimed.
 **Depends on:** P14. **Areas:** social/world/quest modules, guide, creative abilities.
 
 - [ ] P15.1 Add NPC goals/schedules, witnesses, knowledge propagation, companions, and relationship causes/commitments.
+  - P15.1-A (21 November 2026; partial, the box stays unchecked). This adds schedules, witnesses and first-hand
+    reports ([ADR 0049](adr/0049-npc-schedules-witnesses-and-first-hand-reports.md)). No migration was added.
+    - **Pack content.** NPC definitions accept three optional fields: `schedule` (1..24 `{from: "HH:MM", location}`
+      entries, strictly increasing; the entry in force at 00:00 must be the NPC's `location`), `witness` (boolean) and
+      `reports` (up to 8 `{to, minutes 0..1440}`, only on a witness, never to itself, one per recipient). The pinned
+      rule catalog carries them as `NpcRules` with canonical IDs.
+    - **Engine behavior.** The new `org.rpgengine.world.NpcWorld` runs in every canonical commit that carries the
+      pinned catalog, after the operation's knowledge changes and before the player's own observation:
+      - It places scheduled NPC actors for the committed world time. The update is guarded by row version and bumps
+        the `actor:<npc>` scope. No event is written.
+      - Witnesses at the acting player's location record an OBSERVED sighting. An unchanged first-hand sighting at
+        the same place is kept.
+      - Reports whose arrival has been reached are delivered as TOLD sightings dated at arrival. A delivery happens
+        only when it is newer than the recipient's knowledge, at most 64 per commit, and never relayed again.
+      Reads call none of this.
+    - **Commands and results (Windows 11 host, pinned containers).**
+      - `sh .agents/ralph/verify.sh backend -Dtest=NpcScheduleTest,PackCompilerTest,NpcWorldTest`: VERIFY PASSED.
+        26 tests, 0 failures (PackCompilerTest 23, NpcScheduleTest 2, NpcWorldTest 1); backend-focused 17 s.
+      - The same command with `-Dtest=KnowledgeLedgerTest,CommandRulesTest,WorldClockQueriesTest,LocalActionResolverTest`:
+        VERIFY PASSED. 27 tests, 0 failures (9, 8, 9 and 1); backend-focused 20 s. Existing NPCs without world rules
+        behave as before.
+    - **QA-21 evidence** (`NpcWorldTest#worldTimeAndWitnessesDeterminePresenceAndKnowledge`). The test runs real
+      PostgreSQL and the production admission, resolver and commit, with NPC actors created by the test.
+      - At 00:10 the witness records the player, while a bystander without rules and a distant captain learn nothing.
+      - Three rounds of audience and privileged views with real time passing, and a refused 5-hour `WAIT`, leave
+        `campaign`, `actor`, `campaign_event`, `operation_journal`, `actor_sighting`, `knowledge_belief` and
+        `query_epoch` byte-identical.
+      - The 30-minute report reaches the captain at 00:45 dated 00:40, once.
+      - The schedule moves the witness to the grove at 01:16: the player's sighting gets an absence, and `SPEAK` to
+        it is refused `ACTOR_UNAVAILABLE`.
+      - After the player walks to the grove, the new report is absent at arrival minus 1 second and present at
+        arrival.
+    - **Not done in this story:**
+      - Typed NPC goals. `goals` remain text no rule reads.
+      - Companions, relationship causes and commitment witnesses.
+      - Witnessed events beyond the player's location.
+      - Multi-hop or travel-based propagation.
+      - Creation of NPC actors from definitions at campaign start, so packaged play has no NPC these rules move.
+    - **Not proven:**
+      - The 64-witness crowd bound, the 64-delivery cap and the 512-actor failure. These branches have no test.
+      - HTTP reads in the QA-21 test, which uses views and admissions. HTTP reads are covered generally by
+        `WorldClockQueriesTest`, without NPC rules.
+      - A deliberate weakening run.
+      - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
 - [ ] P15.2 Add richer quest outcomes, faction clocks, bounded time catch-up, reputation, and causally triggered world changes.
 - [ ] P15.3 Add guide personas with separate knowledge/session scope and no mutation authority.
 - [ ] P15.4 Add creative ability drafting, validation preview, explicit execution, learned recipes, and bounded high-power profiles.

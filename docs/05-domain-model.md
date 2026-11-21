@@ -196,6 +196,13 @@ Resource keys are applied only to actors whose origin belongs to the ability's p
 others are recorded as unaffected. No table, trigger or migration is added. See the
 [execution contract](07-turn-protocol.md#p074-local-action-execution).
 
+Since P15.1-A an NPC's `actor.location_id` has one more writer. Its pack `schedule`, applied by the
+commit itself after the plan's effects, updates it under the row version read in the same
+transaction and bumps `actor:<npc>`. This is an engine rule over committed world time. It is not a
+resolver `Placement`, so participant attribution does not apply to it, and no event announces it.
+Witness and report sightings are written through the knowledge ledger in the same commit
+([ADR 0049](adr/0049-npc-schedules-witnesses-and-first-hand-reports.md)).
+
 ### Stream, cancellation and presentation jobs (P07.5)
 
 V11 adds, without backfilling history:

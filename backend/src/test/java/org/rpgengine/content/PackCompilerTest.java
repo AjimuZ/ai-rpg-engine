@@ -411,6 +411,49 @@ class PackCompilerTest {
         return "{\"id\":\"" + id + "\",\"name\":\"Rest\"," + fields + "}";
     }
 
+    /**
+     * NPC world rules (P15.1-A): a schedule is ordered, bounded and starts the NPC at its own location at 00:00
+     * (by its 00:00 entry or by the last entry wrapping past midnight); only a witness reports, to another NPC,
+     * once per recipient and within one day.
+     */
+    @Test
+    void validatesNpcWorldRules() {
+        String clerk = ",{\"id\":\"clerk\",\"kind\":\"npc\",\"data\":{\"name\":\"Clerk\",\"role\":\"Clerk\","
+                + "\"location\":\"market\"}}";
+        assertNotNull(new PackCompiler().compile(parse(withNpcRules("\"schedule\":[{\"from\":\"00:00\",\"location\":"
+                + "\"harbor\"},{\"from\":\"08:00\",\"location\":\"market\"}],\"witness\":true,\"reports\":[{\"to\":"
+                + "\"clerk\",\"minutes\":30}],", clerk))));
+        assertNotNull(new PackCompiler().compile(parse(withNpcRules("\"schedule\":[{\"from\":\"08:00\",\"location\":"
+                + "\"market\"},{\"from\":\"20:00\",\"location\":\"harbor\"}],", ""))));
+        assertEquals("CONSTRAINT_CONFLICT", failure(withNpcRules("\"schedule\":[{\"from\":\"08:00\",\"location\":"
+                + "\"market\"}],", "")));
+        assertEquals("CONSTRAINT_CONFLICT", failure(withNpcRules("\"schedule\":[{\"from\":\"00:00\",\"location\":"
+                + "\"harbor\"},{\"from\":\"00:00\",\"location\":\"market\"}],", "")));
+        assertEquals("SCHEMA", failure(withNpcRules("\"schedule\":[{\"from\":\"24:00\",\"location\":\"harbor\"}],", "")));
+        assertEquals("SCHEMA", failure(withNpcRules("\"schedule\":[],", "")));
+        assertEquals("REFERENCE_UNKNOWN", failure(withNpcRules("\"schedule\":[{\"from\":\"00:00\",\"location\":"
+                + "\"nowhere\"}],", "")));
+        assertEquals("CONSTRAINT_CONFLICT", failure(withNpcRules("\"reports\":[{\"to\":\"clerk\"}],", clerk)));
+        assertEquals("CONSTRAINT_CONFLICT", failure(withNpcRules("\"witness\":true,\"reports\":[{\"to\":\"keeper\"}],",
+                "")));
+        assertEquals("CONSTRAINT_CONFLICT", failure(withNpcRules("\"witness\":true,\"reports\":[{\"to\":\"clerk\"},"
+                + "{\"to\":\"clerk\",\"minutes\":5}],", clerk)));
+        assertEquals("REFERENCE_KIND", failure(withNpcRules("\"witness\":true,\"reports\":[{\"to\":\"harbor\"}],", "")));
+        assertEquals("SCHEMA", failure(withNpcRules("\"witness\":true,\"reports\":[{\"to\":\"clerk\",\"minutes\":1441}],",
+                clerk)));
+    }
+
+    /** Insert world-rule fields into the keeper's data and append further NPC definitions. */
+    private static Map<String, String> withNpcRules(String fields, String definitions) {
+        var files = sources();
+        String npcs = files.get("npcs.json");
+        assertTrue(npcs.contains("\"location\":\"harbor\","), "mutation target missing");
+        npcs = npcs.replace("\"location\":\"harbor\",", fields + "\"location\":\"harbor\",");
+        int end = npcs.lastIndexOf("]}");
+        files.put("npcs.json", npcs.substring(0, end) + definitions + npcs.substring(end));
+        return files;
+    }
+
     /** Link durations are whole minutes within one day; zero keeps a link instantaneous. */
     @Test
     void validatesTravelDurations() {

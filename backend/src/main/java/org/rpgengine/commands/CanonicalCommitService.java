@@ -26,6 +26,7 @@ import org.rpgengine.preparation.QueryEpochs;
 import org.rpgengine.presentation.PresentationJobService;
 import org.rpgengine.quests.QuestWriter;
 import org.rpgengine.progression.RewardSettlement;
+import org.rpgengine.world.NpcWorld;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -59,6 +60,9 @@ import tools.jackson.databind.json.JsonMapper;
  * participants' final facts and then each encounter row state in order, every write guarded by the row version
  * the scheduler read, while the V22/V23 triggers check each step. Since P11.5 the campaign leaves encounter mode only with
  * a settlement's progress, which ends its own active encounter at {@code NARRATIVE_RESUME}; the V22 arrows allow that once.
+ * Since P15.1-A every commit that carries the pinned catalog then applies the NPC world rules ({@link NpcWorld}):
+ * schedules place NPCs for the committed world time, witnesses beside the acting player record where they saw it,
+ * and due reports reach their recipients, all before the player's own observation and in the same transaction.
  * This internal service has no controller, network port or callback.
  * Any validation, persistence, timeout or commit failure rolls back all its writes.
  */
@@ -297,6 +301,12 @@ public class CanonicalCommitService {
         scopes.addAll(InventoryWriter.scopes(plan.items()));
         scopes.addAll(QuestWriter.scopes(plan.quests()));
         scopes.addAll(KnowledgeLedger.applyWithin(jdbc, campaign.getId(), at, plan.knowledge()));
+        // NPC world rules (P15.1-A) follow the committed world time before the player looks around, so the
+        // player perceives whoever the schedules place here now; witnesses and reports read the same state.
+        var pinned = rules.optional(campaign.getContentRevisionId());
+        if (pinned != null) {
+            scopes.addAll(NpcWorld.advanceWithin(jdbc, campaign.getId(), pinned.npcs(), player, at));
+        }
         if (player != null) {
             var perception = CommandRules.perceived(jdbc, campaign.getId(), player, rules);
             if (perception != null) {

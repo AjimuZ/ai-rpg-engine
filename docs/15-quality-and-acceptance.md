@@ -1,5 +1,13 @@
 # Quality Strategy and Acceptance Criteria
 
+P15.1-A verification (21 November 2026): QA-21 is covered at the engine level by
+`NpcWorldTest#worldTimeAndWitnessesDeterminePresenceAndKnowledge` on PostgreSQL through the production command path.
+The test shows that a scheduled NPC moves only when a command's world time crosses its boundary, and that only a
+co-present witness records the player. A report arrives exactly at its arrival time and not one second earlier.
+Audience and privileged reads, real time and refused commands change no row. NPC actors in that test are created by
+the test, because campaign creation does not create them yet, so QA-21 is not shown in packaged play. Details are in
+the [P15.1 roadmap entry](16-development-roadmap.md#19-p15--complete-supported-world-and-optional-modules).
+
 P14.3-A verification (21 November 2026): the reduced-scope MVP matrix of §8 was rerun with fresh evidence; the
 per-item results, exact commands and gaps are in the
 [P14.3 roadmap entry](16-development-roadmap.md#18-p14--playable-mvp-validation). Observed: 904 backend tests in 79
