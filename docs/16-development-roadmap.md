@@ -7635,6 +7635,62 @@ this update. No combat runtime/browser result is claimed.
     images and their associations stay in the originating adventure folder for
     same-name entities across switching, late job results and backup/restore.
     P06.5 covers authored artwork and presentation media at the MVP scope.
+  - P17.6-A (21 November 2026): bounded runtime image jobs for scenes, portraits and items, in the backend only. The box stays
+    unchecked: this story does not finish P17.6.
+    - **Delivered.** New `backend/src/main/java/org/rpgengine/assets/RuntimeImageJobs.java` (Spring bean, off by default). It
+      takes a request for one subject (category, stable reference, appearance revision, public appearance text) and answers
+      `QUEUED`, `COALESCED`, `REUSED`, `STALE_APPEARANCE`, `DISABLED`, `UNAVAILABLE`, `QUEUE_FULL` or `BUDGET_EXHAUSTED`.
+      Limits are owner settings `engine.presentation.images.*`: enabled (false), queue-per-campaign (4), requests-per-window
+      (12) per window-minutes (60), max-active (1, over all campaigns), running-timeout-seconds (600), max-wait-seconds (60).
+      At most one job per campaign is with the port. A charge is kept once the port received the job, and given back when the
+      job ends unsent. A queued older appearance is superseded by a newer one. Before sending, a subject that now has art is
+      skipped. Results go through `ManagedAssets.publish` with the request-time state revision, pinned pack revision and recovery
+      generation. `ManagedAssets` gained a package-private `publish(..., generation)` that answers the new `STALE_GENERATION`
+      under the campaign row lock and before the other checks, and `inForce`, which includes the pinned pack's authored
+      binding. Jobs use `ImageAdmission` (`direct()` without the admission bean) as `SPECULATIVE` work. Documented in docs/23
+      section 4 and `application.properties`.
+    - **Tests.** New `RuntimeImageJobsTest`, 3 tests on real PostgreSQL with a scripted image port that the test completes by
+      hand.
+      - `generatesEachAppearanceOnceAndReusesSavedArt`: one generation per appearance, an equal request coalesced and not
+        charged, the accepted image reused, the pack's authored sword never generated, another campaign's equal subject its own
+        job and seed, the exact prompt, size and seed sent, plus the disabled, unavailable, other-category and foreign-scope
+        refusals.
+      - `enforcesQueueConcurrencyAndBudgetLimits`: one job at the port, `QUEUE_FULL`, per-campaign budget, a failed job keeping
+        its charge, a cancelled queued job giving it back, `BUDGET_EXHAUSTED`, FIFO across campaigns, and the window rolling
+        after one hour.
+      - `discardsStaleAndLateResults`: `STALE_APPEARANCE` after another writer accepted appearance 2, `SUPERSEDED` with its
+        charge refunded and never sent, `STALE_SOURCE` for a scene requested before the campaign advanced, `STALE_GENERATION`
+        after the restore's generation bump (the same SQL as `tools/database_backup/backup.py`), a cancelled running job whose
+        image is still returned and dropped, and a 200 ms timeout whose late image is dropped. No refused image left bytes.
+    - **Commands and results.**
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=RuntimeImageJobsTest,ManagedAssetsTest` →
+        `VERIFY PASSED`, `Tests run: 12, Failures: 0, Errors: 0, Skipped: 0` (3 + 9), first run.
+      - Weakenings on an exported copy with `.git`, `.local/scratch/p176a/copy`. It was made with `tar -C . --exclude=./.local
+        --exclude=./backend/target --exclude=./frontend/node_modules --exclude=./.ajimu-autopilot --exclude=./.env
+        --exclude=./.agents/ralph/.run --exclude=./.agents/ralph/logs --exclude=./.agents/skills -cf .local/scratch/p176a/tree.tar .`
+        and `tar -xf`. Each ran `verify.sh backend -Dtest=RuntimeImageJobsTest` from the copy (logs under the copy's own
+        `.agents/ralph/logs`) and was reverted before the next. All 5 failed an assertion, none failed to compile:
+        - W1, no coalescing → `generatesEachAppearanceOnceAndReusesSavedArt` (`QUEUED`, not `COALESCED`).
+        - W2, budget check off → `enforcesQueueConcurrencyAndBudgetLimits` (`QUEUED`, not `BUDGET_EXHAUSTED`).
+        - W3, generation check off in `publish` → `discardsStaleAndLateResults` (`ACCEPTED`, not `STALE_GENERATION`).
+        - W4, an image after a cancel is published → `discardsStaleAndLateResults` (`ACCEPTED`, not `CANCELLED`).
+        - W5, no in-force check at request → `generatesEachAppearanceOnceAndReusesSavedArt` (`QUEUED`, not `REUSED`).
+        Afterwards `diff -rq backend/src .local/scratch/p176a/copy/backend/src` printed nothing.
+      - After the documentation edits: `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh repo` → `VERIFY PASSED (repo)`.
+        A comment-only edit to the `ManagedAssets` class description came after the focused test run, which was not repeated.
+    - **Not proven or not done.**
+      - No game flow, route or screen requests images, and no pending or error state is shown.
+      - No real image backend ran: the worker and `a1111-http` adapters, and the leased admission, were not used.
+      - Nothing checks that the appearance text is public: that is the caller's contract.
+      - Jobs and budget charges are in memory, so a restart forgets them and resets the window. There is no durable job
+        table and no reconciliation after an ambiguous backend timeout.
+      - No pack policy per category (`disabled`/`catalogOnly`/`bounded`), no acceptance review, and no provenance stored with
+        the asset.
+      - `STALE_CONTENT` through a job was not exercised (covered at registry level by `ManagedAssetsTest`).
+      - QA-31 and QA-33 as a whole, export/restore of generated images beyond the existing registry carriage, and
+        same-name adventure switching were not run.
+      - Concurrent requests from several threads were not tested, and the timeout case is timing-based.
+      - `verify.sh full` and `containers` were not run here (the runner runs them).
 - [ ] P17.7 Qualify optional local EN/IT speech with admitted model/voice licenses, stable voice identities, accepted-line audio caching and shared GPU limits under QA-38; ship disabled with tested text-only fallback if hardware/rights/quality gates fail. No TTS prerequisite for core v1.
 - [ ] P17.8 Research and qualify a concrete optional local EN/IT STT backend against exact code/weight/dependency rights, bounded capture/cancel interfaces, offline behavior, platform packaging and measured CPU/RAM/GPU/latency budgets; no recognizer is selected by the design alone.
   **Requires tasks:** P21.4.

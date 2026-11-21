@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Bounded runtime image jobs (P17.6-A), 21 November 2026
+
+- The backend can now turn a request for a missing scene, portrait or item image into at most one generation, store the
+  validated result as the subject's artwork and reuse it afterwards. It is off by default (`engine.presentation.images.enabled`),
+  needs a configured image port, and no game flow, route or screen calls it yet, so players see no change.
+- Limits the owner sets: queued jobs per playthrough, generations per playthrough per rolling window, and jobs running at once.
+  A playthrough has at most one job running at a time. Equal requests join one job. A subject that already has art, including
+  art from the adventure's own package, is never generated. A queued request for an older appearance is replaced by a newer one.
+- A late image is refused if a newer appearance or scene is in force, if the playthrough was restored, or if the job was
+  cancelled or timed out. Jobs are kept in memory only, so a restart forgets queued work and resets the window.
+
 ## Unreleased — Asset routes never expose hidden or foreign media (P17.5-C), 21 November 2026
 
 - The campaign asset route now serves a file from an adventure's own package only when its presentation file binds that file as

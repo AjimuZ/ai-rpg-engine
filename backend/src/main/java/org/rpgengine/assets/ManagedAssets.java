@@ -25,7 +25,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>Always holds: stored bytes pass {@link PackMedia#inspectBytes} and fit the category, so a caller cannot
  * choose the media type or a serving path; a result is accepted at most once per campaign, category, subject and
  * appearance revision, and the first accepted result wins; a result that is older than the one in force, requested
- * under another pinned pack revision, or requested after the campaign's current revision never replaces anything;
+ * under another pinned pack revision, before the campaign's recovery generation advanced (when the caller names the
+ * generation, as {@link RuntimeImageJobs} does), or after the campaign's current revision never replaces anything;
  * and {@link #serve} returns bytes only for a hash the asking owner's campaign is associated with or that its
  * pinned pack revision binds as artwork or as a music track, so equal names or hashes in another campaign, another
  * revision's files and files the pack ships without declaring them for display never resolve. Nothing here advances a
@@ -119,8 +120,16 @@ public class ManagedAssets {
         /** The request predates the accepted scene or map, so it cannot replace what is shown. */
         STALE_SOURCE,
         /** The request was made under a pack revision the campaign no longer pins. */
-        STALE_CONTENT
+        STALE_CONTENT,
+        /**
+         * The request was made before the campaign's recovery generation advanced (an installation restore), so its
+         * snapshot no longer describes the campaign. Only {@link RuntimeImageJobs} asks for this check (P17.6-A).
+         */
+        STALE_GENERATION
     }
+
+    /** Generation argument of {@link #publish(UUID, Candidate, long)} that skips the recovery generation check. */
+    static final long ANY_GENERATION = -1;
 
     /**
      * Outcome of {@link #publish}.
@@ -154,6 +163,18 @@ public class ManagedAssets {
      * @throws org.springframework.dao.DataAccessException when the campaign is missing or storage fails
      */
     public Published publish(UUID campaign, Candidate candidate) {
+        return publish(campaign, candidate, ANY_GENERATION);
+    }
+
+    /**
+     * {@link #publish(UUID, Candidate)} for a job that captured the campaign's recovery generation when it was
+     * requested. The generation is compared under the same campaign row lock as every other verdict and before
+     * them, so a result requested before an installation restore is {@link Status#STALE_GENERATION} and stores
+     * nothing, even when the restored campaign's revision is lower than the one the job saw.
+     *
+     * @param generation recovery generation the job was requested under, or {@link #ANY_GENERATION}
+     */
+    Published publish(UUID campaign, Candidate candidate, long generation) {
         Objects.requireNonNull(campaign, "campaign");
         Objects.requireNonNull(candidate, "candidate");
         if (candidate.category() == null || candidate.subject() == null
@@ -173,15 +194,19 @@ public class ManagedAssets {
         }
         String hash = sha256(candidate.bytes());
         return transaction.execute(status -> {
-            var campaignRow = jdbc.queryForMap("select state_revision, content_revision_id from campaign where id = ? "
-                    + "for no key update", campaign);
+            var campaignRow = jdbc.queryForMap("select state_revision, content_revision_id, recovery_generation "
+                    + "from campaign where id = ? for no key update", campaign);
             long state = ((Number) campaignRow.get("state_revision")).longValue();
-            if (candidate.sourceRevision() > state) {
-                throw new IllegalArgumentException("request is newer than the campaign");
-            }
             String category = candidate.category().wire();
             Metadata latest = jdbc.query(LATEST, (rs, n) -> metadata(rs), campaign, category, candidate.subject())
                     .stream().findFirst().orElse(null);
+            if (generation != ANY_GENERATION
+                    && generation != ((Number) campaignRow.get("recovery_generation")).longValue()) {
+                return new Published(Status.STALE_GENERATION, latest);
+            }
+            if (candidate.sourceRevision() > state) {
+                throw new IllegalArgumentException("request is newer than the campaign");
+            }
             if (!candidate.contentRevisionId().equals(campaignRow.get("content_revision_id"))) {
                 return new Published(Status.STALE_CONTENT, latest);
             }
@@ -223,6 +248,35 @@ public class ManagedAssets {
         Objects.requireNonNull(category, "category");
         Objects.requireNonNull(subject, "subject");
         return jdbc.query(LATEST, (rs, n) -> metadata(rs), campaign, category.wire(), subject).stream().findFirst();
+    }
+
+    /**
+     * The artwork a campaign shows for one subject, exactly as {@link #artwork} lists it: the newest accepted
+     * association, else the authored binding of the pinned pack revision (appearance 1). A runtime image job uses it
+     * so that it never spends a generation on a subject that already has art (P17.6-A).
+     *
+     * @return the artwork in force, or empty when there is none or the campaign is not in the adventure
+     * @throws org.springframework.dao.DataAccessException when storage fails
+     */
+    Optional<Metadata> inForce(UUID adventure, UUID campaign, AssetCategory category, String subject) {
+        Objects.requireNonNull(adventure, "adventure");
+        Objects.requireNonNull(campaign, "campaign");
+        Objects.requireNonNull(category, "category");
+        Objects.requireNonNull(subject, "subject");
+        return reads.execute(status -> {
+            var held = jdbc.query(LATEST, (rs, n) -> metadata(rs), campaign, category.wire(), subject).stream()
+                    .findFirst();
+            if (held.isPresent()) {
+                return held;
+            }
+            UUID revision = jdbc.query("select content_revision_id from campaign where id = ? and adventure_id = ?",
+                    (rs, n) -> rs.getObject(1, UUID.class), campaign, adventure).stream().findFirst().orElse(null);
+            if (revision == null) {
+                return Optional.<Metadata>empty();
+            }
+            return authored(adventure, revision).stream()
+                    .filter(item -> item.category() == category && item.subject().equals(subject)).findFirst();
+        });
     }
 
     /**
