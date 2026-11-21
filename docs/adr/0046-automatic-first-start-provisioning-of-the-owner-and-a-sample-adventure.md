@@ -29,6 +29,7 @@ Facts the design relies on:
    - A database holding another owner but not the configured one stops startup with an actionable message instead of creating a second owner. This happens, for example, when `.local/owner-id` was lost.
    - Storage failures, and a bundled pack that does not seal on this build, also stop startup.
    - The owner's display name is `Owner` and the UI locale is English.
+   - Since P15.5-A the sample workspace's title and genre label come from the bundled manifest: its `title`, and its first `contentGuidance.themes` entry as genre (`adventure` when none fits). The engine code therefore names no adventure. Before that change they were written as the constants "Lantern Ford" and "fantasy".
    - Provisioning is off by default (`engine.provisioning.enabled=false`) and is not enabled by the packaged Spring profile. Tests that use the packaged profile and their own owners are therefore unaffected. It is enabled only through Compose.
 
 ## Alternatives considered

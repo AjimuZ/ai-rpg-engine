@@ -1,5 +1,16 @@
 # Quality Strategy and Acceptance Criteria
 
+P15.5-A verification (21 November 2026): more evidence for the "disabled modules absent" half of QA-22, for the creative
+module. `ModuleAbsenceTest` (PostgreSQL) plays the same commands on one pack with and without the `creativeAbilities`
+module. Without it, learning is refused, and no campaign read the routes return and no receipt contains a draft, a
+recipe, a relationship or a companion member; with it, the recipe is listed as an ordinary fight ability. A frontend case
+in `combat-actions.spec.ts` shows that combat choices are exactly what the projection lists, and that none of them becomes
+a draft or learning command. `AdventureIndependenceTest` shows that the engine's sources and resources name no
+identifier or title of the bundled or fixture packs. The one constant it would have found, the sample's title and genre in
+first-start provisioning, now comes from the manifest. Not shown: the HTTP layer, the guide (still no module switch) and
+QA-22 as a whole. Details are in the
+[P15.5 roadmap entry](16-development-roadmap.md#19-p15--complete-supported-world-and-optional-modules).
+
 P15.4-B verification (21 November 2026): supporting evidence for the creative half of QA-22 through the production command
 path. `DraftCommandsTest` (PostgreSQL) shows that a draft executes only through the explicit `COMBAT_USE_DRAFT` command. That
 command previews the draft again at admission and at commit and pays exactly the derived costs its receipt lists. A draft

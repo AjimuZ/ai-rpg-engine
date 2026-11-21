@@ -88,6 +88,23 @@ describe('Tactical choice validation', /** A choice that the projection does not
     expect(resolveChoice(noEnd, { kind: 'end' })).toEqual({ ok: false, refusal: 'NOT_LISTED' });
   });
 
+  it('offers an optional module\'s ability only when the projection lists it', /** A disabled module leaves no choice (P15.5-A). */ () => {
+    const plain = tacticalEntries(fight());
+    expect(plain.some((entry) => entry.key.includes('#'))).toBe(false);
+    const learned = fight((body) => { body['encounter']['options']['abilities'].push(
+      { abilityId: '#recipe:gust', cost: 2, focus: 2, targets: ['sentry'], maxTargets: 1, disabled: null }); });
+    expect(tacticalEntries(learned).map((entry) => entry.key)).toContain('ability:#recipe:gust:sentry');
+    const recipe = resolveChoice(learned, { kind: 'ability', abilityId: '#recipe:gust', targetIds: ['sentry'] });
+    expect(recipe.ok && recipe.command).toEqual({ commandType: 'COMBAT_USE_ABILITY', payload: { abilityId: '#recipe:gust', targetIds: ['sentry'] } });
+    // No listed choice becomes a draft or learning command: the page has no path to either.
+    for (const current of [fight(), learned]) {
+      for (const entry of tacticalEntries(current)) {
+        const resolved = resolveChoice(current, entry.choice);
+        if (resolved.ok) expect(['COMBAT_USE_DRAFT', 'LEARN_DRAFT']).not.toContain(resolved.command.commandType);
+      }
+    }
+  });
+
   it('words every refusal, local or from the server, without showing a code', /** Nothing partial reaches the player. */ () => {
     const generic = refusalMessage('COMMAND_SOMETHING_NEW');
     for (const code of [...TACTICAL_REFUSALS, 'COMMAND_TURN_UNAVAILABLE', 'COMMAND_ACTION_POINTS_INSUFFICIENT', 'COMMAND_STALE_REVISION', 'COMMAND_CAMPAIGN_BUSY', 'LOST']) {

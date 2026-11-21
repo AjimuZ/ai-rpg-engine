@@ -6433,7 +6433,59 @@ this update. No combat runtime/browser result is claimed.
       - A deliberate weakening run.
       - A passing `verify.sh full` on the final tree: it was not run in this session, and the earlier full run (before
         learned recipes) had the one unrelated failure above. `verify.sh containers` was not run.
-- [ ] P15.5 Prove disabled modules disappear cleanly and enabled modules remain adventure-independent.
+- [x] P15.5 Prove disabled modules disappear cleanly and enabled modules remain adventure-independent.
+  - P15.5-A (21 November 2026). Tests for disabled modules and adventure independence, plus one engine fix. The fix removes
+    the only adventure constant the scan found. No migration, route, command or pack field was added.
+    - **Engine change.** `FirstStartProvisioning` wrote the sample workspace's title and genre as the constants
+      `"Lantern Ford"` and `"fantasy"`. It now reads both from the bundled manifest: the `title`, and the first
+      `contentGuidance.themes` entry as genre, since the pack contract has no genre field. A missing, blank or
+      over-80-character theme gives `adventure`. New installations therefore list the sample with the genre `travel`.
+      Existing workspaces keep their stored labels.
+    - **Disabled modules are absent from the API.** `ModuleAbsenceTest` (PostgreSQL, production admission, resolver and
+      commit) registers `CreativePack` twice, once with and once without the `creativeAbilities` module and profile. Both
+      campaigns play the same commands into the `venom-pit` fight.
+      - Without the module, `LEARN_DRAFT` is refused with `ABILITY_UNAVAILABLE`.
+      - The test serializes as JSON every read the campaign routes return (state, resume card, panels, combat panel,
+        stream) and every receipt. In the disabled campaign none contains `#draft`, `#recipe`, a `"draft"` or `"recipe"`
+        string, or a string starting `"relationship` or `"companion`.
+      - The disabled campaign stores no `learned_recipe` and no `relationship_change` row.
+      - With the module, the same reads contain `#recipe:gust`, and the combat options list it as an ordinary ability at 2
+        points and 6 Focus. This shows the comparison is not vacuous.
+    - **Disabled modules are absent from the UI.**
+      - The new `combat-actions.spec.ts` case shows that the combat choices are exactly what the projection lists. A
+        projection without module data gives no `#` choice. A listed `#recipe:gust` becomes an ordinary
+        `COMBAT_USE_ABILITY` choice, and no listed choice becomes `COMBAT_USE_DRAFT` or `LEARN_DRAFT`.
+      - The preview workspace's guide and creative panels and their direct routes were already shown absent without their
+        metadata (`app.spec.ts`, "keeps content with no optional modules or definitions usable" and "renders configured
+        optional panels and refuses disabled direct routes"). This session did not run `app.spec.ts`.
+    - **No adventure-specific constant in the engine.** `AdventureIndependenceTest` (no database) reads the bundled sample
+      and the three fixture packs under `src/test/resources/packs`. It collects their manifest IDs, titles and entrypoints,
+      every top-level definition ID and the declared attribute and resource IDs. Then it checks two things:
+      - no string literal of `backend/src/main/java` (comments skipped) equals one of those identifiers or contains a
+        pack ID or title;
+      - no main resource outside `sample-adventure/` contains a pack ID or title.
+      It also checks that the identifiers it guards were found, and that its literal reader skips comments. Before the
+      engine change, a manual `grep` of the same identifiers found only the provisioning constant. The test itself was
+      not run on the unfixed tree.
+    - **Commands and results (Windows 11 host, pinned containers).**
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=AdventureIndependenceTest,ModuleAbsenceTest,FirstStartProvisioningTest`:
+        VERIFY PASSED, 11 tests, 0 failures (AdventureIndependenceTest 2, FirstStartProvisioningTest 8 including the new
+        `workspaceLabelsAreReadFromTheManifest`, ModuleAbsenceTest 1); backend-focused 18 s. Counts are from the
+        surefire lines of `backend-focused.log`.
+      - `CI=1 npx ng test --watch=false --include src/app/campaign/combat-actions.spec.ts` (in `frontend/`): 1 file, 12
+        tests passed.
+    - **Not proven:**
+      - The HTTP layer: the test reads the services the routes serialize, with a plain JSON mapper rather than the
+        server's, and no browser run was made.
+      - The guide: it still has no module switch, pack data or caller, so its absence is not tested. QA-22 as a whole
+        stays open.
+      - Relationships in reads: no read shows them even with the module enabled, so for that module the read check
+        proves nothing beyond `RelationshipWorldTest`.
+      - Identifiers the textual scan cannot see: values assembled from parts, nested IDs other than attributes and
+        resources, the in-memory test packs built in Java, and the frontend's two hand-authored preview adventures
+        (`preview-state.ts`), which are local display fixtures, not engine code.
+      - A deliberate weakening run.
+      - `verify.sh full`, `verify.sh containers` and the other frontend tests, which this session did not run.
 - [ ] P15.6 Qualify optional adaptive quest/world-direction tasks using event-triggered significant actors, causal relationship histories and deterministic off-screen catch-up; enable only after agency/coherence/cost comparison, otherwise document disabled/deferred capability with verified baseline fallback.
 
 **Exit:** all supported gameplay modules have typed data, rules, projections, and meaningful integration coverage. **Checks:** QA-21–22 and full requirement-specific scenarios. **Suggested commit:** `Complete reusable world companion and optional ability modules`.

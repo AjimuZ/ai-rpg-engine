@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -87,7 +88,21 @@ class FirstStartProvisioningTest {
                 jdbc.queryForList("select pack_id, pack_version from content_revision"));
         assertEquals(1, jdbc.queryForObject("select count(*) from content_revision_report", Integer.class),
                 "the revision is sealed");
-        assertEquals("Lantern Ford", jdbc.queryForObject("select title from adventure_workspace", String.class));
+        // Both labels come from the bundled manifest (P15.5-A): its title and its first content theme.
+        assertEquals(Map.of("title", "Lantern Ford", "genre", "travel"),
+                jdbc.queryForMap("select title, genre from adventure_workspace"));
+    }
+
+    /** The labels follow whatever manifest is bundled; without a usable theme the genre is the neutral label. */
+    @Test
+    void workspaceLabelsAreReadFromTheManifest() {
+        assertEquals(new FirstStartProvisioning.Labels("Other Place", "mystery"), FirstStartProvisioning.labels(
+                "{\"title\":\" Other Place \",\"contentGuidance\":{\"themes\":[\"mystery\",\"travel\"]}}".getBytes(StandardCharsets.UTF_8)));
+        assertEquals(new FirstStartProvisioning.Labels("Other Place", "adventure"),
+                FirstStartProvisioning.labels("{\"title\":\"Other Place\",\"contentGuidance\":{\"themes\":[]}}".getBytes(StandardCharsets.UTF_8)));
+        assertEquals(new FirstStartProvisioning.Labels("Other Place", "adventure"), FirstStartProvisioning.labels(
+                ("{\"title\":\"Other Place\",\"contentGuidance\":{\"themes\":[\"" + "x".repeat(81) + "\"]}}").getBytes(StandardCharsets.UTF_8)));
+        assertThrows(IllegalStateException.class, () -> FirstStartProvisioning.labels("{\"title\":\" \"}".getBytes(StandardCharsets.UTF_8)));
     }
 
     /** A start interrupted after the workspace step is repaired: the next start seals the revision once. */

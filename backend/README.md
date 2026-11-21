@@ -529,7 +529,11 @@ the origin derived from `APP_PORT`. Root Compose forwards both and sets
 owner and, for an owner without workspaces, one sample workspace. It seals the
 bundled `sample:lantern-ford` pack (`src/main/resources/sample-adventure/`) only
 while that workspace has no revision. Every step is idempotent. A database of a
-different owner stops startup.
+different owner stops startup. Since P15.5-A the workspace's title and genre label
+are read from the bundled manifest (its `title` and first `contentGuidance.themes`
+entry, else `adventure`), so the engine code names no adventure; the Lantern Ford
+sample is therefore listed with the genre `travel`, where earlier builds wrote
+`fantasy`. Existing workspaces keep their stored labels.
 Bootstrap returns a CSRF token and a separate HttpOnly SameSite=Strict cookie;
 send both plus the exact Origin with UTF-8 JSON creation requests. Sessions
 expire after 30 minutes or process restart, with at most 32 live sessions and
@@ -1645,6 +1649,25 @@ Limits: drafts and recipes work only in fights, and a recipe cannot be forgotten
 preview, the legal options listing a draft, a page sending either command, a contract that turns a description into a
 draft, and the guide's drafting help are not implemented. The complexity formula, rates, tier ceilings and the recipe limit
 are provisional. No route or page changed.
+
+### Module absence and adventure independence (P15.5-A)
+
+- `commands/ModuleAbsenceTest` (PostgreSQL) registers `CreativePack` twice, with and without the `creativeAbilities`
+  module and profile, and plays the same commands up to the same `venom-pit` fight. It serializes as JSON every read the
+  campaign routes return (`CampaignProjectionService`, `ResumeCards`, `PlayPanels`, `CombatPanels`, `PublicStreamService`)
+  and every receipt. Without the module, learning is `ABILITY_UNAVAILABLE`, no read or receipt contains `#draft`,
+  `#recipe`, a `"draft"` or `"recipe"` string, or a string starting `"relationship` or `"companion`, and no
+  `learned_recipe` or `relationship_change` row exists. With the module the same reads contain `#recipe:gust`, listed as
+  an ordinary legal ability at 2 points and 6 Focus.
+- `AdventureIndependenceTest` (no database) reads the bundled sample and every pack under `src/test/resources/packs`.
+  It collects the manifest ID, title and entrypoint, every top-level definition ID and the declared attribute and resource
+  IDs. It fails when a string literal of `src/main/java` (comments skipped) equals one of those identifiers or contains a
+  pack ID or title, or when a main resource outside `sample-adventure/` contains a pack ID or title. The only hit was
+  the sample's title and genre written as constants in `FirstStartProvisioning`, which now reads both from the manifest.
+
+Limits: the services are read directly, so the HTTP layer is not exercised. The scan is textual: it cannot find an
+identifier assembled from parts, nested IDs other than attributes and resources, or the in-memory packs tests build in Java.
+The guide still has no module switch, so its absence is not tested here.
 
 ## Interface reload contract (P05.6)
 

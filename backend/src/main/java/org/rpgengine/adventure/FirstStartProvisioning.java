@@ -96,6 +96,8 @@ public class FirstStartProvisioning implements SmartInitializingSingleton {
     public Result provision(UUID owner) {
         Objects.requireNonNull(owner, "owner");
         UUID workspace = sampleWorkspace(owner);
+        Map<String, byte[]> files = sampleFiles();
+        Labels labels = labels(files.get("adventure.json"));
         Step step = transactions.execute(status -> {
             // Serializes concurrent starts on one database; released at commit.
             jdbc.execute("select pg_advisory_xact_lock(hashtext('engine.first-start-provisioning'))");
@@ -122,7 +124,8 @@ public class FirstStartProvisioning implements SmartInitializingSingleton {
                     return new Step(ownerCreated, false, false, false);
                 }
                 jdbc.update("insert into adventure_workspace (id, owner_id, title, genre, source_locale, created_at, "
-                        + "updated_at) values (?, ?, ?, ?, 'en', now(), now())", workspace, owner, "Lantern Ford", "fantasy");
+                        + "updated_at) values (?, ?, ?, ?, 'en', now(), now())", workspace, owner, labels.title(),
+                        labels.genre());
                 workspaceCreated = true;
             }
             boolean empty = !Boolean.TRUE.equals(jdbc.queryForObject(
@@ -132,7 +135,7 @@ public class FirstStartProvisioning implements SmartInitializingSingleton {
         boolean revisionCreated = false;
         if (step.register()) {
             // Registration owns its transaction and seals bytes only after every check passes.
-            var staged = new PackStaging(PackStaging.Limits.standard()).archive(new ByteArrayInputStream(zip(sampleFiles())));
+            var staged = new PackStaging(PackStaging.Limits.standard()).archive(new ByteArrayInputStream(zip(files)));
             revisionCreated = registry.register(workspace, staged).created();
         }
         return new Result(step.ownerCreated(), step.workspaceCreated(), revisionCreated,
@@ -164,6 +167,30 @@ public class FirstStartProvisioning implements SmartInitializingSingleton {
             files.put(path, resource(path));
         }
         return files;
+    }
+
+    /**
+     * Library labels of the sample workspace, read from the bundled manifest so the engine names no adventure of its own
+     * (P15.5-A): the manifest's {@code title}, and as genre the first {@code contentGuidance.themes} entry, since the pack
+     * contract has no genre field. A missing, blank or over-80-character theme gives the neutral label {@code adventure}.
+     *
+     * @param manifest bytes of {@code adventure.json}
+     * @return the stripped title and genre
+     * @throws IllegalStateException when the manifest has no usable title, which is a build defect
+     */
+    static Labels labels(byte[] manifest) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> values = JsonMapper.builder().build().readValue(manifest, Map.class);
+        if (!(values.get("title") instanceof String title) || title.isBlank()) {
+            throw new IllegalStateException("bundled sample adventure has no title");
+        }
+        String genre = "adventure";
+        if (values.get("contentGuidance") instanceof Map<?, ?> guidance && guidance.get("themes") instanceof List<?> themes
+                && !themes.isEmpty() && themes.getFirst() instanceof String theme && !theme.isBlank()
+                && theme.strip().length() <= 80) {
+            genre = theme.strip();
+        }
+        return new Labels(title.strip(), genre);
     }
 
     /** One bundled file; a missing resource is a build defect. */
@@ -200,6 +227,15 @@ public class FirstStartProvisioning implements SmartInitializingSingleton {
      * @param register the sample workspace holds no revision yet, so the bundled pack must be sealed
      */
     private record Step(boolean ownerCreated, boolean workspaceCreated, boolean sample, boolean register) {
+    }
+
+    /**
+     * Library labels of the sample workspace.
+     *
+     * @param title the bundled manifest's title
+     * @param genre its first content theme, or {@code adventure}
+     */
+    record Labels(String title, String genre) {
     }
 
     /**

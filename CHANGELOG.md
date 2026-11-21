@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Module absence and adventure independence checks (P15.5-A), 21 November 2026
+
+- A new installation now takes the bundled sample adventure's title and genre from the adventure's own file, instead of
+  from names written into the engine. The sample is therefore listed with the genre "travel" (its first content theme)
+  instead of "fantasy". Adventures already in a library keep their labels.
+- New tests show that an adventure without the creative-abilities module shows no draft or recipe in any campaign read or
+  command result, and that the combat choices only offer what the server lists. A further test checks that the engine's
+  code and resources name no identifier or title of the bundled or test adventures.
+- Limits: the reads were checked through the engine's services, not over HTTP. The guide module still has no switch, so
+  its absence is not tested.
+
 ## Unreleased — Using creative drafts in fights, learned recipes and high-power profiles (P15.4-B), 21 November 2026
 
 - An adventure can now enable the optional `creativeAbilities` module and declare one creative profile: how large a player's
