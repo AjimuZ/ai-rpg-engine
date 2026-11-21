@@ -193,11 +193,39 @@ older appearance is `STALE_APPEARANCE`, a result requested under a pack revision
 than the campaign is invalid. The media type comes from the bytes' signature and must fit the category, so SVG, markup
 and unknown formats are refused. The route `GET /api/v1/campaigns/{campaignId}/assets/{sha256}` serves by hash and
 only within the campaign (see [docs/13](13-api-and-ui.md#2-proposed-endpoint-families)). The metadata is exactly the hash, media
-facts, public subject reference, revisions and credit; there is no prompt, seed, path or URL column. Not delivered:
+facts, public subject reference, revisions and credit; there is no prompt, seed, path or URL column. Not delivered by P17.1-A:
 binding authored `asset` files to categories and subjects (pack presentation references remain opaque names), the
-thumbnail variants, a stable-identity lookup for entity artwork and the shop, inventory and equipment icons, rarity and
-frame treatment, the visible credits, and the carriage of the bytes through export and restore (an export carries the
-associations only).
+thumbnail variants, and the carriage of the bytes through export and restore (an export carries the associations only).
+
+**Item icons, frames and credits (P17.1-B, 21 November 2026; implemented in the playthrough panels):** `GET
+/api/v1/campaigns/{campaignId}/artwork?adventureId=` lists the newest accepted association of each category and subject, so
+the browser finds an entity's stable artwork by category and stable reference (never a display name) and builds the hash
+URL from it. The inventory and the worn-equipment lists show each item's icon, `category: item` keyed by its definition
+ID, so every instance and a unique item keep the same image wherever they are shown, and a worn item reads its tier from
+the same carried instance as the inventory. Without art, or when the image does not load, the list shows a neutral
+built-in icon (a weapon glyph for a hand slot, the bag glyph otherwise); art is decorative (`alt=""`) because the item name
+is always live text beside it. The frame is independent of the image and follows only the declared rarity tier: `common`
+to `legendary` give five border styles of different style and weight (solid, dashed, double, ridge, double with an
+outline), a pack's own tier gives one more, an item without a tier gets a dotted one; the tier name is written beside the
+frame with a diamond symbol, so colour is never the carrier, and forced-colors mode keeps the borders. A section "Artwork
+credits" lists the credit line of each image in force once, or says that none is credited. A failed listing leaves the
+built-in icons and no credits and never stops the page. Not delivered: any shop screen (none exists), portrait, scene and
+map display, thumbnails, packs declaring their own tier order or frame tokens (only the five default tier IDs rank), a
+human contrast review, and anything that creates art (P17.6). Browser evidence (21 November 2026): a scripted stand-in
+run (not the packaged installation) measured seven distinct frames and reload identity with registered images; a run
+against the packaged installation (`frontend/tools/artwork-journey.mjs`, after `start.sh`) showed the credits note, built-in
+icons in the `unranked` frame, no axe violation with `color-contrast` passing, a frame border ratio of 9.79, and an equip that
+changed the worn items through the engine's command route. Not observed in the packaged installation: a registered
+image and its credit line (the engine has no route that publishes one, and rows are never inserted by hand) and a restored
+playthrough (there is no restore route). The browser view of a registered image, its credit line and the same image after
+an equip and a reload is left to P17.1-C, which binds authored pack artwork and bundles an image in the sample; until then
+registered-image identity is shown only by the backend tests (`ManagedAssetsTest`, `CampaignRestoresTest`), the frontend
+tests and the scripted stand-in. Automated in `campaign-artwork.spec.ts`: equivalent items reuse one icon, and a carried
+item with registered art keeps the same image address, frame token and written tier when it becomes worn (the panels are
+re-read) and when the page is opened again; the restore half is `CampaignRestoresTest`. Only browser-observed, with the
+built-in icon: an equip and a reload on the packaged installation. The journey script has no phase that inserts rows; its
+former `sql` phase was removed. The built-in icons are the original MIT UI-kit paths inventoried in
+`frontend/public/ui/README.md`.
 
 Use a neutral category icon/portrait and visible pending/error state until art is available. Save, purchase, dialogue and combat must remain usable during failure, quota exhaustion, offline periods or policy disablement. Allow explicit retry/change-art actions with budget visibility; do not reroll art on every inspection.
 

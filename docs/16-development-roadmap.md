@@ -6978,6 +6978,169 @@ this update. No combat runtime/browser result is claimed.
       whether it passes its reference verification is unknown; embedded metadata in a registered image is not
       stripped; no concurrent publish race was run; and no test outside the five classes named above was re-run, although
       many truncate lists and table snapshots elsewhere read the schema.
+  - P17.1-B (21 November 2026). Partial: stable item artwork lookup, item icons with a neutral fallback, rarity frames and
+    visible credits in the playthrough panels. This story does not finish P17.1, so the box stays unchecked.
+    - Delivered: `GET /api/v1/campaigns/{campaignId}/artwork?adventureId=` (`ManagedAssets.artwork`, `AssetController`)
+      lists the newest accepted association per category and subject (hash, media facts, credit, at most 500). The
+      frontend parses it strictly (`parseArtwork`), looks an item up by category `item` and its definition ID
+      (`ArtworkIndex`), and builds the P17.1-A hash URL. The inventory and the worn equipment show `app-item-art`: the
+      registered image or a neutral built-in icon (weapon glyph for a hand slot, bag glyph otherwise), also when the
+      image fails to load. The frame follows only the declared tier (`frameFor`: `common` to `legendary` rank 1 to 5, a
+      pack's own tier `unranked`, none `none`), differs by border style and weight, and the tier name is written beside it
+      with a symbol; a worn item takes its tier from the carried instance. A section "Artwork credits" lists the credit
+      of each image in force or says none is credited. A failed listing keeps the built-in icons and the page. Two
+      Italian messages were added (740).
+    - Exit checks that ran: `npm --prefix frontend run typecheck` ended without errors. `npm --prefix frontend test`
+      ended with 25 test files and 251 tests passed (`campaign-artwork.spec.ts` adds 16: parser refusals, newest
+      appearance wins, categories and audio apart, credits once, frame from tier only, routed panels with art, fallback
+      and credits, an unreadable listing). `npm --prefix frontend run check:i18n` ended `Localization parity: 740 reviewed
+      messages`. `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=ManagedAssetsTest` ended
+      `VERIFY PASSED` (the new `listsTheArtworkInForcePerSubject` covers newest-appearance listing, category apart,
+      allowlisted fields and credit, an empty listing for the other campaign, 403, 404 for the wrong adventure and 400
+      without one).
+    - Second attempt, observed on 21 November 2026:
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh frontend` ended `VERIFY PASSED (frontend)` with
+        install, typecheck, test (25 files, 251 tests), i18n, build and locales all `PASS`.
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=CampaignRestoresTest,ManagedAssetsTest`
+        ended `VERIFY PASSED`: 5 tests in each class, 10 in total, 0 failures. The two new restore cases are
+        `freshRestoreKeepsTheRegisteredArtworkIdentity` (a fresh-identity restore lists the same newest image per
+        subject with the same hash, credit and media facts, serves the same bytes under that hash, keeps the older
+        appearance and the source untouched, and a bystander campaign is still refused the hash) and
+        `restoreWithoutTheImageBytesKeepsTheAssociationsAndListsNoImage` (a restore into an installation without the
+        bytes keeps the associations and lists no image, which the interface shows as a built-in icon). This is the
+        restore half of QA-31's identity check, run against the real database; the restore reuses bytes already held
+        by the same installation, since export does not carry bytes.
+      - Scripted stand-in journey, NOT the packaged installation: `.local/scratch/p171b/art-journey.mjs` (ignored
+        scratch, not in the repository and not repeatable from it; headless browser through
+        `.agents/ralph/browser/browser.mjs`), run as `node .local/scratch/p171b/art-journey.mjs` against the freshly
+        built localized bundle in `frontend/dist` with a scripted API, in `en` and `it`, at 390x844, 1280x800 and 390x844 with reduced
+        motion, plus a run with an unreadable listing. Result: credits section visible with the two credit lines
+        (`Artwork credits` / `Crediti delle illustrazioni`), or the honest "No artwork is credited here" note when the
+        listing fails; the inventory and the worn sword show the same image (same hash) and the same frame, the
+        registered images decode (8x8), items without art show the built-in icon, and the page requests only
+        `/assets/<sha256>?adventureId=`; identity of art, frame and tier was identical before and after a page reload
+        in all six runs; seven distinct frames were measured by computed style (rank-1 solid 2px, rank-2 dashed 3px,
+        rank-3 double 5px, rank-4 ridge 5px, rank-5 double 6px, unranked solid 2px, none dotted 2px), and the tier name
+        was written beside every framed item; no horizontal overflow (scrollWidth equals innerWidth at both widths);
+        no page error or console error; the axe report listed no violations in any of the seven runs. Screenshots
+        were written to `.local/scratch/p171b/shots/` but not looked at by this session in this attempt.
+      - Packaged installation, observed on 21 November 2026 (third session of this story). The tree was exported with the
+        `tar` pair of the supervisor notes to `.local/scratch/p171b/app`, and `cd .local/scratch/p171b/app && sh ./start.sh`
+        built the images (cached layers; the image build ran `PackagedSecretsTest`, 4 tests, 0 failures) and started
+        three containers healthy: storage ready, runtime account NOT signed in, gameplay NOT ready (503) and the line
+        "started with gameplay incomplete", which is the expected state without sign-in. It was stopped with
+        `cd .local/scratch/p171b/app && sh ./start.sh --stop` (volumes kept); no other copy held the port and the
+        owner's installation was not touched. The repeatable journey is now in the repository:
+        `frontend/tools/artwork-journey.mjs` (phases `create`, `view`, `equip`; a fourth phase, `sql`, was used in that
+        session and removed in the fourth attempt, see below).
+        - `node frontend/tools/artwork-journey.mjs create` made one playthrough through the library, the sample
+          adventure and the creation form, against the real engine: items `cloak` (worn, body), `kit` and `sword` (worn,
+          main-hand), all tier `ordinary`.
+        - `node frontend/tools/artwork-journey.mjs view en|it ADVENTURE CAMPAIGN .local/scratch/p171b/shots none` at 390x844,
+          1280x800 and 390x844 with reduced motion, English and Italian (six runs, repeated after the equip commands):
+          the credits section was visible with the honest note ("No artwork is credited here..." / its Italian text),
+          every row and worn slot showed the built-in icon (`data-art=fallback`) in the `unranked` frame with the
+          written tier `Ordinary`, no image was requested, art, frame and tier were identical before and after a page
+          reload, no horizontal overflow, no page error and no failed response except the unattributed console 404
+          that Chrome reports for `/favicon.ico` (the page was asked for it and it answers 404; the same notice is
+          set aside in earlier reviews; no favicon file exists in `frontend/public`). Axe reported no violation in any run, with
+          the `color-contrast` rule passing on 98 nodes (110 after the equip commands), 0 violating and 0 left incomplete
+          for review, and 43 rules passed. The measured `unranked` frame border `rgb(230, 199, 131)` has a contrast ratio of
+          9.79 against its background `rgb(32, 32, 50)` (the first run's 12.86 used a transparent background and is not
+          counted). Only that one frame was measured, because the packaged playthrough has only one tier.
+        - The supervisor's own form `node .agents/ralph/browser/browser.mjs URL --width N --height N --axe --screenshot PATH`
+          ran at 390x844, 1280x800 and 390x844 with `--reduced-motion`: status 200, no axe violation, and the same one
+          console 404, so each exited 1 only because of that notice. Screenshots are in
+          `.local/scratch/p171b/shots/`. A later session looked at two of them (`cli-phone.png`, 390 wide, and
+          `cli-desktop.png`, 1280 wide): the inventory and worn-equipment rows each show a framed built-in icon (bag for the
+          cloak and kit, sword glyph for the sword) with the item name, quantity and the written tier "Ordinary" beside it;
+          the section "Artwork credits" shows the note "No artwork is credited here. Items without artwork show a built-in
+          icon."; text is legible and nothing is clipped or overflowing at either width. The other screenshots, the
+          Italian ones and the reduced-motion ones were not looked at, and this is a visual glance, not a human contrast review.
+        - Equip: `node frontend/tools/artwork-journey.mjs equip ... 424d2d51-aa59-4597-938d-0e91d6628c72 unequip` and then
+          `... equip` submitted `UNEQUIP_ITEM` and `EQUIP_ITEM` through the engine's own `POST .../commands` route (the
+          interface has no equip control): both `COMMITTED` (202, revision 0 to 1 to 2). After the equip the page's worn
+          list changed from the body slot alone to body and main-hand, and the worn sword showed the same frame and icon as its
+          inventory row. All of this was with the built-in icon, since no image was registered.
+        - NOT done here, left to P17.1-C (supervisor decision, 21 November 2026): the browser demonstration with a real
+          registered image. P17.1-C binds authored pack artwork and bundles an image in the sample, which gives the packaged
+          installation an image to show without a hand-made database row. Never insert rows by hand to get one. Why it was
+          not done here: registering an image. The engine has no route that publishes one, so the only way into the
+          packaged installation was a database insert, and `docker exec rpg-engine-f23c86ca2821-postgres-1 psql -U engine -d engine
+          -c "insert into managed_asset ... ; insert into asset_association ..."` was refused by the session's permissions; no other way was tried.
+          The `sql` phase that printed that insert has been removed from the script (fourth attempt): rows are never
+          inserted by hand, and nobody is meant to run such an insert. So in the packaged installation the credit line itself, the registered image decoding, the hash URL request, and the same
+          image and frame for the same definition after an equip and a reload were NOT observed. Those are still shown
+          only by the scripted stand-in above (reload identity) and by the backend tests, so QA-30 and the non-generation
+          part of QA-31 are not proven as the acceptance criterion states.
+        - Restore in the browser was not shown: a restore (`CampaignRestores`) is a backend service with no route, so the
+          browser cannot restore a playthrough; the only restore evidence stays the two `CampaignRestoresTest` cases.
+          A container restart (`--stop` and `start.sh`) was not run either.
+        - Provenance: the shipped built-in item icons come from the project's UI kit (`UiIcon` in
+          `frontend/src/app/preview/ui-kit.ts`), which `frontend/public/ui/README.md` inventories as 20 original 24-unit
+          SVG paths, copyright 2026 Azim Ben Othman, MIT (`frontend/public/ui/LICENSE.txt`), with no third-party icon
+          package; the scene and portrait SVGs are listed there as original MIT too. That inventory was read, not
+          re-audited. There is no registered image in the packaged installation to inventory.
+      - Not what the stand-in journey proves: its API is a scripted stand-in that answers the frontend fixture bodies, an
+        artwork listing and a generated 8x8 PNG, so it shows the interface and not the backend route or the packaged
+        installation; the item names and tier names in it are fixed English strings, so the Italian runs prove the
+        section title and layout, not translated tier names; the seven-frame measurement (rank 1 to 5, unranked, none) comes
+        only from this stand-in, because the packaged playthrough has only `ordinary` items; axe is an automated check
+        and is not a screen-reader review; no human contrast, responsive or provenance review was done, and the sample
+        images exist only in the scratch script and the `sql` phase.
+    - After adding `frontend/tools/artwork-journey.mjs`, `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh
+      frontend` ended `VERIFY PASSED (frontend)` (install, typecheck, test, i18n, build, locales all `PASS`). No backend
+      class was run in this session, including the other classes that use the asset registry (`WorkspaceProjection`
+      and `RevisionFolders` callers), because no backend code changed in it.
+    - Whole-plan check: `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full` was not run by the
+      implementing sessions. The orchestrator ran it after the first attempt and reported it as passing, but its output
+      was not shown to the session, so this entry records no step counts for it.
+    - Not run: `verify.sh containers`, the existing `frontend/tools/browser-smoke.mjs`, any screen-reader check, and the
+      shop and purchase identity checks of QA-31, which move to P17.6-B because no shop flow exists. QA-30 is shown only
+      for what the browser runs above measured; its human contrast review stays open for P17.4 and the later
+      stories. QA-31's non-generation part is covered by one lookup by definition ID (inventory and equipment share
+      the image, in the unit tests and the stand-in), the restore tests above, and, on the packaged installation,
+      an equip that changes the worn item shown with the built-in icon. NOT proven, and so this story does not claim
+      QA-30 or the non-generation part of QA-31 as complete: a registered image with a visible credit line in the
+      packaged installation (the database insert was refused), the same image and frame for one definition after an
+      equip, a reload and a restore in the packaged browser (no restore route exists), and an equip with a registered
+      image. These registered-image views are left to P17.1-C, whose sample bundles an image; the journey script no
+      longer has a phase that prints an insert. What this story's automated tests prove for the registered-image
+      identity is the backend side (`ManagedAssetsTest`, `CampaignRestoresTest`) and the frontend side
+      (`campaign-artwork.spec.ts`, including the equip and reopen cases of the fourth attempt below).
+    - Fourth attempt, observed on 21 November 2026 (supervisor notes: three changes only):
+      - Added to `frontend/src/app/campaign/campaign-artwork.spec.ts` (now 18 cases, two new in the block "Artwork
+        identity across equip and reload"). `keeps image, frame and tier when the item is equipped and when the page is
+        opened again` opens the routed playthrough with the sword carried and unworn (registered art, tier `ordinary`),
+        then switches `server.panelsBody` to the equipped body (same `definitionId`, same rarity, worn slot
+        `main-hand`), has the page re-read the panels through a stream reset (the stream is held by a gate until the
+        switch), and asserts that the inventory row and the new worn row show the same `src` (the hash URL), the same
+        `data-frame` and `data-art` and the same tier text as the unworn row had; it then navigates to another route and
+        back (a new playthrough component, which reads the listing and panels again) and asserts the same identity in
+        both rows and the credit line. `gives two items of one definition the same icon` asserts that two inventory
+        rows of one definition show one image address, frame and tier (equivalent items reuse icons).
+      - Automated now: icon reuse for equivalent items, rarity as validated data (`parseArtwork` and `frameFor`), identity
+        across an equip re-read and across opening the page again (frontend specs), and identity across a fresh-identity
+        restore (`CampaignRestoresTest`, second attempt). Only browser-observed: the equip and reload with the built-in
+        icon on the packaged installation (above). Not shown anywhere: an equip or reload with a real registered image in
+        the packaged installation, a restore in the browser, and a container restart.
+      - The `sql` phase of `frontend/tools/artwork-journey.mjs` was removed (with its sample PNG and the `createHash`
+        import): it printed a raw `insert into managed_asset ... asset_association` for use through `docker exec`, which is
+        refused and which the project never does by hand. The remaining phases are `create`, `view` and `equip`; the
+        `view ... art` expectation stays for P17.1-C, which binds authored pack artwork and bundles an image in the
+        sample. The registered-image view of the packaged installation belongs to P17.1-C.
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh frontend` ended `VERIFY PASSED (frontend)` on the
+        second run: install, typecheck, test (25 files, 253 tests), i18n, build and locales `PASS`. The first run failed
+        one assertion of the new test (it read the detached element of the previous route), which was fixed. No backend
+        class and no browser run of the packaged installation was repeated in this attempt, so the browser results
+        above are those of the earlier session.
+    - Not proven or not done: the replay server answers the artwork read with an empty listing that is not recorded by the
+      producer test (`CampaignInterfaceContractTest`), so the contract golden file is unchanged and the real route is
+      covered only by `ManagedAssetsTest`; no game flow publishes art, so in play every item shows the built-in icon; no
+      shop screen exists; portraits, scenes, maps and the UI category are not displayed; authored `asset` files are
+      still not bound to categories or subjects; thumbnails are not made; byte carriage through export and restore is
+      still missing; only the five default tier IDs rank, with no pack-declared order or frame tokens; the credit
+      list does not include the credits of authored pack artwork or of the built-in icons.
 - [ ] P17.2 Implement optional dynamic music from a reviewed free-license online/local catalog: public-event mood mapping, deliberate activation, stable loops/crossfades, deduplicated cues, volumes, complete current-track/export credits and offline/source-failure fallback under QA-32.
 - [ ] P17.3 Finalize the default visual-novel and alternative text-focused layouts, graphic states, configurable tokens and attributed reading/history/quick-reply behavior.
 - [ ] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.

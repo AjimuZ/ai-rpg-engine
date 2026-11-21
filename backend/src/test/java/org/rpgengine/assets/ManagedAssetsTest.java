@@ -259,6 +259,41 @@ class ManagedAssetsTest {
                 + otherAdventure, cookie).status());
     }
 
+    /**
+     * The listing names the newest appearance per category and subject, keeps categories and campaigns apart, carries
+     * only the allowlist and the credit, and answers the same not-found for a campaign the owner does not hold.
+     */
+    @Test
+    void listsTheArtworkInForcePerSubject() throws Exception {
+        byte[] first = png(70);
+        byte[] second = png(71);
+        assets.publish(campaign, candidate(AssetCategory.ITEM, "lantern", 1, 0, first));
+        assets.publish(campaign, candidate(AssetCategory.ITEM, "lantern", 2, 0, second));
+        assets.publish(campaign, candidate(AssetCategory.PORTRAIT, "lantern", 1, 0, png(72)));
+        String cookie = session();
+        String path = "/api/v1/campaigns/" + campaign + "/artwork?adventureId=" + adventure;
+
+        Reply reply = get(path, cookie);
+        assertEquals(200, reply.status(), reply.head());
+        var body = JSON.readTree(new String(reply.body(), StandardCharsets.UTF_8));
+        assertEquals(campaign.toString(), body.get("scope").get("campaignId").asString());
+        var listed = body.get("artwork");
+        assertEquals(2, listed.size());
+        assertEquals("item", listed.get(0).get("category").asString());
+        assertEquals("portrait", listed.get(1).get("category").asString());
+        assertEquals(2, listed.get(0).get("appearanceRevision").asInt());
+        assertEquals(ManagedAssets.sha256(second), listed.get(0).get("sha256").asString());
+        assertEquals("Original artwork, MIT", listed.get(0).get("credit").asString());
+        assertEquals(Set.of("category", "subject", "appearanceRevision", "sha256", "mediaType", "width", "height", "credit"),
+                Set.copyOf(listed.get(0).propertyNames()));
+
+        assertEquals(0, JSON.readTree(new String(get("/api/v1/campaigns/" + otherCampaign + "/artwork?adventureId="
+                + otherAdventure, cookie).body(), StandardCharsets.UTF_8)).get("artwork").size());
+        assertEquals(403, get(path, null).status());
+        assertEquals(404, get("/api/v1/campaigns/" + campaign + "/artwork?adventureId=" + otherAdventure, cookie).status());
+        assertEquals(400, get("/api/v1/campaigns/" + campaign + "/artwork", cookie).status());
+    }
+
     /** Stored columns, the metadata record and the served headers hold only the allowlist; no free text but a credit. */
     @Test
     void keepsSecretsOutOfMetadata() throws Exception {

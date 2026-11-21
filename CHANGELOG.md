@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — Item icons, rarity frames and artwork credits in the playthrough panels (P17.1-B), 21 November 2026
+
+- The inventory and the worn equipment now show an icon for each item inside a frame: the campaign's registered
+  artwork for that item when it has one, a neutral built-in icon otherwise. A missing or unreadable image falls back to
+  the built-in icon and never stops play.
+- The frame follows the item's declared rarity tier only (the default tiers common to legendary get five distinct
+  border styles; a pack's own tier gets one more; no tier, none). The tier name is always written beside the frame with
+  a symbol, so colour and border never carry it alone. A worn item shows the same tier as in the inventory.
+- A new "Artwork credits" section lists the credit line of each image in force, or says that none is credited.
+- New route `GET /api/v1/campaigns/{campaignId}/artwork?adventureId=` lists the newest accepted artwork per category
+  and subject (hash, media facts, credit; no prompt, seed, path or URL) for the owner's campaign. Italian translations
+  for the two new messages are added (740 messages).
+- Nothing creates artwork yet: no game flow calls the registry (P17.6), so until it does every item shows the
+  built-in icon. There is no shop screen, and portraits, scenes and maps are not displayed.
+- A repeatable browser journey for these panels, `frontend/tools/artwork-journey.mjs`, runs against the packaged
+  installation. It showed built-in icons, the no-credit note, no accessibility-tool violation (contrast passing) and
+  an equip that changes the worn items; a registered image with its credit line was not seen there, because the engine
+  has no route that publishes one yet. That view is left to P17.1-C, which binds authored pack artwork and bundles an
+  image in the sample. The journey no longer has a phase that prints a database insert; rows are never inserted by hand.
+- New automated tests (frontend suite now 253 tests, `campaign-artwork.spec.ts` 18 cases) show that an item's image, frame
+  and written tier stay the same when it is equipped and when the page is opened again, and that equivalent items share
+  one icon. Equip and reload on the packaged installation were only observed in the browser, with the built-in icon.
+
 ## Unreleased — Managed assets, hash serving and stale-result protection (P17.1-A), 21 November 2026
 
 - The engine now has seven separate asset categories (scene, map, portrait, item, UI, music, effect), each holding

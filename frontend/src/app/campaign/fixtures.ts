@@ -174,6 +174,8 @@ export class CampaignServer {
   resumeBody: unknown = resumeCard();
   panelsBody: unknown = panelsBody();
   encounterBody: unknown = encounterBody({ none: true });
+  /** Artwork listing (P17.1-B); empty by default, as for a campaign without registered images. */
+  artworkBody: unknown = { scope: { adventureId: ADVENTURE, campaignId: CAMPAIGN }, artwork: [] };
   /** Journal pages served for `before=` requests, keyed by cursor. */
   olderPages = new Map<number, unknown>();
   failStream = 0;
@@ -208,6 +210,7 @@ export class CampaignServer {
       const before = /[?&]before=(\d+)/.exec(url);
       return Promise.resolve(json(before ? this.olderPages.get(Number(before[1])) ?? { code: 'CAMPAIGN_SCOPE_UNAVAILABLE' } : this.panelsBody));
     }
+    if (url.includes('/artwork?')) return Promise.resolve(json(this.artworkBody));
     const op = /\/operations\/([0-9a-f-]{36})\?/.exec(url);
     if (op) {
       const view = this.operations.get(op[1]);

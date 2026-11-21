@@ -23,6 +23,17 @@ progress { display: block; width: min(100%, 32rem); height: 1rem; accent-color: 
 .item-frame figcaption { text-align: center; overflow-wrap: anywhere; }
 .item-empty { border-style: dashed; color: var(--muted); }
 .rarity-label { display: flex; justify-content: center; align-items: center; gap: .4rem; font-size: .875rem; margin-top: .4rem; }
+/* Item icon frames (P17.1-B): the tier is told by border style and weight as well as colour, and its name is always written beside the frame. */
+.with-art { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .5rem; }
+.art-frame { display: inline-grid; place-items: center; box-sizing: border-box; width: 3.25rem; height: 3.25rem; flex: 0 0 auto; overflow: hidden; border: 2px dotted var(--muted); border-radius: .3rem; background: var(--surface); }
+.art-frame img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.art-frame app-ui-icon { width: 1.75rem; height: 1.75rem; margin: 0; }
+.art-frame[data-frame='unranked'] { border: 2px solid var(--accent); }
+.art-frame[data-frame='rank-1'] { border: 2px solid var(--muted); }
+.art-frame[data-frame='rank-2'] { border: 3px dashed var(--accent); }
+.art-frame[data-frame='rank-3'] { border: 5px double var(--accent); }
+.art-frame[data-frame='rank-4'] { border: 5px ridge var(--accent); }
+.art-frame[data-frame='rank-5'] { border: 6px double var(--focus); outline: 2px solid var(--focus); outline-offset: 2px; }
 .kit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-block: 1rem; }
 .kit-status { display: flex; align-items: center; gap: .5rem; }
 .icon-inventory { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: .75rem; padding: 0; list-style: none; }
@@ -43,7 +54,8 @@ progress { display: block; width: min(100%, 32rem); height: 1rem; accent-color: 
 }
 @media (forced-colors: active) {
   .meter-fill { background: Highlight; forced-color-adjust: none; }
-  .meter-track, .item-frame, .kit-help, button[aria-pressed='true'] { border-color: CanvasText; }
+  .meter-track, .item-frame, .art-frame, .kit-help, button[aria-pressed='true'] { border-color: CanvasText; }
+  .art-frame[data-frame='rank-5'] { outline-color: CanvasText; }
   [aria-invalid='true'] { border-color: CanvasText; border-style: double; }
   .error-text { color: CanvasText; }
 }

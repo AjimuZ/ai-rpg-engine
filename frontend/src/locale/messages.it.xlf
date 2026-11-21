@@ -3648,6 +3648,24 @@
       <target>Non indossi nulla.</target>
       </segment>
     </unit>
+    <unit id="campaign.panels.credits">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:158</note>
+      </notes>
+      <segment>
+        <source>Artwork credits</source>
+      <target>Crediti delle illustrazioni</target>
+      </segment>
+    </unit>
+    <unit id="campaign.panels.noCredits">
+      <notes>
+        <note category="location">src/app/campaign/campaign-panels.ts:159</note>
+      </notes>
+      <segment>
+        <source>No artwork is credited here. Items without artwork show a built-in icon.</source>
+      <target>Nessuna illustrazione ha crediti qui. Gli oggetti senza illustrazione mostrano un'icona integrata.</target>
+      </segment>
+    </unit>
     <unit id="campaign.panels.quests">
       <notes>
         <note category="location">src/app/campaign/campaign-panels.ts:112,113</note>

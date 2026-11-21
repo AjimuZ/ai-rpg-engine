@@ -71,6 +71,8 @@ The saved-adventure playthrough creation screen (`src/app/library/playthrough-cr
 no independent review, and they are not yet in the review kit table either.
 The combat panel's initiative roll (P14.1-A.2) adds two more (`combat.rollOption` and `combat.rollBinds`), so the catalog
 now holds 738 units, with the same single author pass and no independent review.
+The item art credits (P17.1-B) add two more (`campaign.panels.credits` and `campaign.panels.noCredits`), so the catalog now
+holds 740 units, with the same single author pass and no independent review.
 The Italian targets of those 77 messages (plus the
 reworded `saved.readOnly`) had one author review pass on 28 October 2026, which corrected
 11 targets (ambiguous `Ricevuta`, identical sentences for two narration reasons, `tempo di

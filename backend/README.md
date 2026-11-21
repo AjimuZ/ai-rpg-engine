@@ -334,6 +334,10 @@ statement with its language, an optional value (`PROPERTY` only) and a reason of
   column, so full-owner exports never copy earlier backups into later ones.
 - `CanonCorrectionsTest` (PostgreSQL, 2 cases) covers QA-27 for claims.
 
+P17.1-B adds `ManagedAssets.artwork(owner, adventure, campaign)` and `GET /api/v1/campaigns/{campaignId}/artwork?adventureId=`:
+the newest accepted association of each category and subject (at most 500) of a campaign the owner holds, with its hash,
+media facts and credit, or `404 ASSET_NOT_FOUND`. `ManagedAssetsTest` gains `listsTheArtworkInForcePerSubject`.
+
 P17.1-A adds the package `org.rpgengine.assets` (V37). `AssetCategory` names the seven categories and the media kind
 each holds. `ManagedAssets.publish(campaign, candidate)` validates bytes by their own signature
 (`PackMedia.inspectBytes`), checks them against the category, and judges the result: `ACCEPTED`, `REUSED` (the same

@@ -67,6 +67,11 @@ export class TranscriptServer {
     this.calls.push(`${method} ${path}`);
     const answer = EXCHANGES.filter(/** Fixture writes are never served to the interface. */ (entry) => entry.client === 'page' &&
       entry.method === method && entry.path === path && PHASES.indexOf(entry.phase) <= this.phase).at(-1);
+    if (!answer && method === 'GET' && path === `/api/v1/campaigns/${CAMPAIGN}/artwork?adventureId=${ADVENTURE}`) {
+      // The artwork listing (P17.1-B) postdates the recorded transcript and its producer test does not record it yet, so this
+      // one read is answered with the empty listing the real route returns for a campaign without artwork. Nothing else is invented.
+      return Promise.resolve(new Response(JSON.stringify({ scope: SCOPE, artwork: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    }
     if (!answer) {
       this.unrecorded.push(`${method} ${path}`);
       return Promise.reject(new TypeError('Request was not recorded from the real server'));

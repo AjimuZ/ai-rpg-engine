@@ -7,7 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -22,11 +24,15 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import javax.imageio.ImageIO;
+
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.rpgengine.adventure.AdventureWorkspace;
+import org.rpgengine.assets.AssetCategory;
+import org.rpgengine.assets.ManagedAssets;
 import org.rpgengine.campaign.CampaignCreationService;
 import org.rpgengine.campaign.CharacterChoices;
 import org.rpgengine.characters.ArmoryPack;
@@ -68,6 +74,7 @@ class CampaignRestoresTest {
     private static final String CAMPAIGN = "Ford watch";
     /** Tables whose restored rows differ from the re-keyed source by design; each is checked on its own. */
     private static final Set<String> RENUMBERED = Set.of("inference_task", "campaign_checkpoint", "memory_invalidation");
+    @Autowired private ManagedAssets artwork;
     @Autowired private CampaignRestores restores;
     @Autowired private CampaignExports exports;
     @Autowired private CommandExecutionService executions;
@@ -109,7 +116,7 @@ class CampaignRestoresTest {
     /** Remove disposable rows. */
     @AfterEach
     void clear() {
-        jdbc.execute("truncate encounter_participant, encounter, quest_objective, quest_state, location_visit, item_creation, equipment_assignment, actor_condition, ai_session_record, memory_invalidation, memory_summary, memory_summary_job, relationship_change, faction_clock_change, learned_recipe, canon_correction, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_event, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, "
+        jdbc.execute("truncate asset_association, managed_asset, encounter_participant, encounter, quest_objective, quest_state, location_visit, item_creation, equipment_assignment, actor_condition, ai_session_record, memory_invalidation, memory_summary, memory_summary_job, relationship_change, faction_clock_change, learned_recipe, canon_correction, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_event, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, "
                 + "learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, "
                 + "ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, "
                 + "campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
@@ -205,6 +212,63 @@ class CampaignRestoresTest {
                 .campaignId();
         assertFalse(Set.of(campaign, bystander, copy).contains(second));
         assertEquals(3, count("select count(*) from campaign where adventure_id = ?", destination));
+    }
+
+    /**
+     * QA-31, restore part: the registered artwork of a campaign keeps its identity through a restore. The restored
+     * campaign lists the same newest image per subject, with the same hash, credit and media facts, and serves exactly
+     * the same bytes under that hash, while the older appearance, the source and the same-titled bystander are
+     * untouched and the bystander is still refused the hash.
+     */
+    @Test
+    void freshRestoreKeepsTheRegisteredArtworkIdentity() throws Exception {
+        UUID pinned = jdbc.queryForObject("select content_revision_id from campaign where id = ?", UUID.class, campaign);
+        byte[] older = image(11);
+        byte[] current = image(12);
+        publish(pinned, AssetCategory.ITEM, "lantern", 1, "Older lantern icon, MIT", older);
+        publish(pinned, AssetCategory.ITEM, "lantern", 2, "Lantern icon, MIT", current);
+        publish(pinned, AssetCategory.PORTRAIT, "scout", 1, "Scout portrait, CC0", image(13));
+        var listed = artwork.artwork(OWNER, source, campaign).orElseThrow();
+        assertEquals(2, listed.size());
+
+        CampaignExports.Export export = exports.export(OWNER, source, campaign, Audience.FULL_OWNER);
+        assertEquals(3, JSON.readTree(export.text()).at("/tables/asset_association").size(),
+                "the export carries every association, old appearances included");
+        UUID copy = restores.restore(OWNER, destination, export.document(), export.sha256(), Identities.FRESH)
+                .campaignId();
+
+        assertEquals(listed, artwork.artwork(OWNER, destination, copy).orElseThrow(),
+                "the restored campaign lists the same image, credit and appearance per subject");
+        assertEquals(3, count("select count(*) from asset_association where campaign_id = ?", copy));
+        var lantern = artwork.current(copy, AssetCategory.ITEM, "lantern").orElseThrow();
+        assertEquals(sha256(current), lantern.sha256());
+        assertEquals("Lantern icon, MIT", lantern.credit());
+        var served = artwork.serve(OWNER, destination, copy, sha256(current)).orElseThrow();
+        assertArrayEquals(current, served.bytes());
+        assertEquals("image/png", served.mediaType());
+        assertTrue(artwork.serve(OWNER, destination, bystander, sha256(current)).isEmpty(),
+                "a campaign without the association is not served the hash");
+        assertEquals(listed, artwork.artwork(OWNER, source, campaign).orElseThrow(), "the source is unchanged");
+    }
+
+    /**
+     * A restore into an installation that does not hold the image bytes is not refused: the associations are restored
+     * and the restored campaign lists no image until the bytes exist, which the interface shows as a neutral icon.
+     */
+    @Test
+    void restoreWithoutTheImageBytesKeepsTheAssociationsAndListsNoImage() throws Exception {
+        UUID pinned = jdbc.queryForObject("select content_revision_id from campaign where id = ?", UUID.class, campaign);
+        publish(pinned, AssetCategory.ITEM, "lantern", 1, "Lantern icon, MIT", image(14));
+        CampaignExports.Export export = exports.export(OWNER, source, campaign, Audience.FULL_OWNER);
+        clear();
+        owner(OWNER, "Owner");
+        UUID clean = workspace(OWNER, "Elsewhere");
+        seal(clean, pack(false));
+
+        var restored = restores.restore(OWNER, clean, export.document(), export.sha256(), Identities.ORIGINAL);
+        assertEquals(1, count("select count(*) from asset_association where campaign_id = ?", restored.campaignId()));
+        assertEquals(0, jdbc.queryForObject("select count(*) from managed_asset", Integer.class), "no bytes were carried");
+        assertTrue(artwork.artwork(OWNER, clean, restored.campaignId()).orElseThrow().isEmpty());
     }
 
     /** Kept identities restore exactly into a clean installation whose only change is the destination. */
@@ -309,6 +373,21 @@ class CampaignRestoresTest {
         }
         files.put("assets/map.png", image);
         return files;
+    }
+
+    private void publish(UUID pinned, AssetCategory category, String subject, long appearance, String credit,
+            byte[] bytes) {
+        assertEquals(ManagedAssets.Status.ACCEPTED, artwork.publish(campaign, new ManagedAssets.Candidate(category,
+                subject, appearance, 0, pinned, credit, bytes)).status());
+    }
+
+    /** A valid PNG whose bytes, and so hash, depend on the shade. */
+    private static byte[] image(int shade) throws Exception {
+        var picture = new BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB);
+        picture.setRGB(0, 0, 0x010101 * shade);
+        var out = new ByteArrayOutputStream();
+        ImageIO.write(picture, "png", out);
+        return out.toByteArray();
     }
 
     private static byte[] artwork() throws Exception {

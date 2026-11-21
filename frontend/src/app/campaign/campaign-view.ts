@@ -20,6 +20,7 @@ import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, injec
 import { StoryInputState } from '../preview/story-input-state';
 import { CampaignProtocolError, CampaignView, CombatView, isPending, JournalEntry, PlayPanels, ResumeCard } from './campaign-protocol';
 import { CampaignPanels } from './campaign-panels';
+import { ArtworkIndex } from './campaign-artwork';
 import { CombatPanel } from './combat-panel';
 import { CampaignCues } from './campaign-cues';
 import {
@@ -116,7 +117,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
         @if (combat()?.encounter === null) {
           <app-encounter-offers [view]="combat()" [sending]="sending()" [problem]="problem()" (confirmed)="engage($event)" (dismissed)="problem.set(null)" />
         }
-        <app-campaign-panels [panels]="panels()" [older]="older()" [nextBefore]="cursor()" [loadingOlder]="loadingOlder()" (olderRequested)="loadOlder()" />
+        <app-campaign-panels [panels]="panels()" [artwork]="artwork()" [older]="older()" [nextBefore]="cursor()" [loadingOlder]="loadingOlder()" (olderRequested)="loadOlder()" />
       } @else if (failure()) { <p class="notice" role="alert" data-error>{{ failure() }}</p>
       } @else { <p role="status" i18n="@@campaign.view.loading">Loading the playthrough…</p> }
 
@@ -171,6 +172,8 @@ export class CampaignPlaythrough {
   readonly resume = signal<ResumeCard | null>(null);
   /** Panels and journal of the shown revision (P10.5); null until read. */
   readonly panels = signal<PlayPanels | null>(null);
+  /** Artwork in force for this playthrough (P17.1-B); null until read or when its read failed. */
+  readonly artwork = signal<ArtworkIndex | null>(null);
   /** Combat projection of the shown revision (P12.1-B); read only while the resume card reports a fight, null otherwise. */
   readonly combat = signal<CombatView | null>(null);
   /** Older journal pages fetched on request, newest first; cleared whenever the first page is re-read. */
@@ -227,6 +230,7 @@ export class CampaignPlaythrough {
     this.view.set(null);
     this.resume.set(null);
     this.panels.set(null);
+    this.artwork.set(null);
     this.combat.set(null);
     this.older.set([]);
     this.cursor.set(null);
@@ -262,6 +266,8 @@ export class CampaignPlaythrough {
           // The combat projection is read only during a fight, so a playthrough without one issues no extra request; outside a
           // fight its offers are read only when the player asks for them (lookForFights, P13.2-B).
           this.combat.set(card.inFight ? await this.transport.encounter(scope, signal) : null);
+          // Artwork is decoration: a failed or invalid listing shows the built-in icons and never stops the playthrough.
+          try { this.artwork.set(new ArtworkIndex(await this.transport.artwork(scope, signal), scope)); } catch { if (signal.aborted) return; this.artwork.set(null); }
           this.older.set([]);
           this.cursor.set(panels.nextBefore);
           loaded = true;

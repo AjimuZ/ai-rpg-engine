@@ -37,6 +37,12 @@ public class ManagedAssets {
             + "m.media_type, m.width, m.height, m.byte_size, a.credit from asset_association a "
             + "join managed_asset m on m.sha256 = a.sha256 where a.campaign_id = ? and a.category = ? and a.subject = ? "
             + "order by a.appearance_revision desc limit 1";
+    /** Most subjects one listing returns; a campaign holding more is cut at the first 500 by category and subject. */
+    public static final int MAX_LISTED = 500;
+    private static final String CURRENT_ALL = "select distinct on (a.category, a.subject) a.category, a.subject, "
+            + "a.appearance_revision, a.source_revision, a.sha256, m.media_type, m.width, m.height, m.byte_size, a.credit "
+            + "from asset_association a join managed_asset m on m.sha256 = a.sha256 where a.campaign_id = ? "
+            + "order by a.category, a.subject, a.appearance_revision desc limit " + MAX_LISTED;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
 
@@ -199,6 +205,35 @@ public class ManagedAssets {
     }
 
     /**
+     * List the artwork in force for every subject of one campaign, so a client can look an entity's stable image up
+     * by category and subject instead of guessing a hash.
+     *
+     * @param owner owner asking, from local admission
+     * @param adventure adventure workspace the campaign belongs to
+     * @param campaign campaign scope
+     * @return the newest accepted association of each category and subject ordered by category then subject (at
+     *         most {@value #MAX_LISTED}), empty list when the campaign has none, or empty optional when the owner,
+     *         adventure or campaign do not match
+     * @throws org.springframework.dao.DataAccessException when storage fails
+     */
+    public Optional<java.util.List<Metadata>> artwork(UUID owner, UUID adventure, UUID campaign) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(adventure, "adventure");
+        Objects.requireNonNull(campaign, "campaign");
+        if (pinnedRevision(owner, adventure, campaign) == null) {
+            return Optional.empty();
+        }
+        return Optional.of(jdbc.query(CURRENT_ALL, (rs, n) -> metadata(rs), campaign));
+    }
+
+    /** The pack revision the owner's campaign pins, or null when owner, adventure and campaign do not line up. */
+    private UUID pinnedRevision(UUID owner, UUID adventure, UUID campaign) {
+        return jdbc.query("select c.content_revision_id from campaign c join adventure_workspace w "
+                + "on w.id = c.adventure_id where c.id = ? and c.adventure_id = ? and w.owner_id = ?",
+                (rs, n) -> rs.getObject(1, UUID.class), campaign, adventure, owner).stream().findFirst().orElse(null);
+    }
+
+    /**
      * Find the bytes a campaign may show under a hash.
      *
      * @param owner owner asking, from local admission
@@ -218,9 +253,7 @@ public class ManagedAssets {
         if (sha256 == null || !HASH.matcher(sha256).matches()) {
             throw new IllegalArgumentException("invalid asset hash");
         }
-        UUID revision = jdbc.query("select c.content_revision_id from campaign c join adventure_workspace w "
-                + "on w.id = c.adventure_id where c.id = ? and c.adventure_id = ? and w.owner_id = ?",
-                (rs, n) -> rs.getObject(1, UUID.class), campaign, adventure, owner).stream().findFirst().orElse(null);
+        UUID revision = pinnedRevision(owner, adventure, campaign);
         if (revision == null) {
             return Optional.empty();
         }

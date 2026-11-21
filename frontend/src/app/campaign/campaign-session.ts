@@ -18,8 +18,8 @@
 import { inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { SavedLibraryClient, LIBRARY_FETCH } from '../library/saved-library-client';
 import {
-  CampaignProtocolError, CampaignView, CombatView, compareCursor, Cursor, FrameDecoder, isPending, OPERATION_STATUSES,
-  OperationStatus, OperationView, parseCampaignView, parseCombatView, parseCursor, parseOperation, parsePlayPanels, parseResumeCard, PlayPanels, PublicReceipt, ResumeCard,
+  ArtworkEntry, CampaignProtocolError, CampaignView, CombatView, compareCursor, Cursor, FrameDecoder, isPending, OPERATION_STATUSES,
+  OperationStatus, OperationView, parseCampaignView, parseCombatView, parseArtwork, parseCursor, parseOperation, parsePlayPanels, parseResumeCard, PlayPanels, PublicReceipt, ResumeCard,
   PresentationCue, StreamEvent,
 } from './campaign-protocol';
 import { CommandEnvelope } from './combat-actions';
@@ -115,6 +115,15 @@ export class CampaignTransport {
     const cursor = before === null ? '' : `&before=${before}`;
     const body = await this.json(`/api/v1/campaigns/${scope.campaignId}/panels?adventureId=${scope.adventureId}${cursor}`, signal);
     return parsePlayPanels(body, scope.adventureId, scope.campaignId);
+  }
+
+  /**
+   * Read the artwork in force for one scope (P17.1-B): the stable images the panels show and their credit lines. Reading it
+   * changes nothing and never asks for an image to be made.
+   */
+  async artwork(scope: CampaignScope, signal: AbortSignal): Promise<readonly ArtworkEntry[]> {
+    const body = await this.json(`/api/v1/campaigns/${scope.campaignId}/artwork?adventureId=${scope.adventureId}`, signal);
+    return parseArtwork(body, scope.adventureId, scope.campaignId);
   }
 
   /** Read and validate the player-safe combat projection of one scope (P12.1); reading it never advances time or submits anything. */

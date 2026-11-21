@@ -752,6 +752,50 @@ export function parsePlayPanels(value: unknown, adventureId: string, campaignId:
   };
 }
 
+/** The seven separate artwork categories of the asset registry (docs/23 section 3). */
+export const ARTWORK_CATEGORIES = ['scene', 'map', 'portrait', 'item', 'ui', 'music', 'effect'] as const;
+export type ArtworkCategory = (typeof ARTWORK_CATEGORIES)[number];
+/** Most artwork entries one listing can hold; the server cuts its listing at the same number. */
+export const MAX_ARTWORK_ROWS = 500;
+
+/** One accepted asset in force for a subject: what a browser needs to show it and to credit it. */
+export interface ArtworkEntry {
+  readonly category: ArtworkCategory;
+  /** Stable public reference (an item definition, character or scene ID), never a display name. */
+  readonly subject: string;
+  readonly appearanceRevision: number;
+  /** Lower-case SHA-256, the identity the hash route serves. */
+  readonly sha256: string;
+  readonly mediaType: string;
+  readonly width: number;
+  readonly height: number;
+  readonly credit: string;
+}
+
+/**
+ * Validate the artwork listing of one campaign (`GET /api/v1/campaigns/{id}/artwork`).
+ *
+ * @param value decoded JSON body
+ * @param adventureId adventure requested by the route
+ * @param campaignId campaign requested by the route
+ * @returns every entry, in the server's order
+ * @throws CampaignProtocolError `invalid` for a foreign scope, an unknown category, a malformed hash or an oversized list
+ */
+export function parseArtwork(value: unknown, adventureId: string, campaignId: string): readonly ArtworkEntry[] {
+  const source = record(value, 'artwork');
+  const scope = record(source['scope'], 'scope');
+  if (uuid(scope, 'adventureId') !== adventureId || uuid(scope, 'campaignId') !== campaignId) invalid('scope');
+  return list(source, 'artwork', MAX_ARTWORK_ROWS).map((entry): ArtworkEntry => {
+    const row = record(entry, 'artwork');
+    const sha256 = token(row, 'sha256', 64);
+    if (!/^[0-9a-f]{64}$/.test(sha256)) invalid('sha256');
+    const mediaType = choice(row, 'mediaType', ['image/png', 'image/jpeg', 'image/webp', 'audio/ogg', 'audio/mpeg', 'audio/wav'] as const);
+    return { category: choice(row, 'category', ARTWORK_CATEGORIES), subject: token(row, 'subject', 64),
+      appearanceRevision: count(row, 'appearanceRevision'), sha256, mediaType,
+      width: count(row, 'width'), height: count(row, 'height'), credit: token(row, 'credit', 200) };
+  });
+}
+
 /** Lifecycle phases, sides, standings and objective states of the combat projection (docs/11, docs/13 "P12.1-A"). */
 export const COMBAT_PHASES = ['PROPOSED', 'VALIDATED', 'REJECTED', 'ENTERING', 'ROUND_OPEN', 'ACTOR_START', 'AWAITING_ACTION', 'RESOLVING',
   'ACTOR_END', 'ROUND_END', 'OUTCOME_PENDING', 'SETTLED', 'NARRATIVE_RESUME'] as const;

@@ -67,6 +67,55 @@ public class AssetController {
         }
     }
 
+    /**
+     * List the artwork in force for the campaign's subjects, each with the hash that {@link #serve} accepts and its
+     * credit line, so the browser can show an entity's stable image, a neutral fallback when there is none, and the
+     * credits. Reading it changes nothing and never starts a generation.
+     *
+     * @param request admitted request; owner identity comes only from admission
+     * @param campaignId canonical lower-case campaign UUID
+     * @param adventureId canonical lower-case UUID of the campaign's adventure
+     * @return 200 {@code {"scope":{adventureId,campaignId},"artwork":[...]}} where each entry holds exactly category
+     *         (wire name), subject, appearanceRevision, sha256, mediaType, width, height and credit; 400
+     *         {@code ASSET_REQUEST_INVALID}, 403 without admission, 404 {@code ASSET_NOT_FOUND} for a campaign the
+     *         owner does not hold in that adventure, or 503 when storage fails
+     */
+    @GetMapping("/api/v1/campaigns/{campaignId}/artwork")
+    public ResponseEntity<?> artwork(HttpServletRequest request, @PathVariable String campaignId,
+            @RequestParam(required = false) String adventureId) {
+        UUID owner = request.getAttribute(LocalHttpAdmission.OWNER_ATTRIBUTE) instanceof UUID value ? value : null;
+        if (owner == null) {
+            return error(403, "LOCAL_ADMISSION_DENIED");
+        }
+        try {
+            UUID adventure = id(adventureId);
+            UUID campaign = id(campaignId);
+            var listed = assets.artwork(owner, adventure, campaign);
+            if (listed.isEmpty()) {
+                return error(404, "ASSET_NOT_FOUND");
+            }
+            var entries = listed.get().stream().map(item -> {
+                var entry = new java.util.LinkedHashMap<String, Object>();
+                entry.put("category", item.category().wire());
+                entry.put("subject", item.subject());
+                entry.put("appearanceRevision", item.appearanceRevision());
+                entry.put("sha256", item.sha256());
+                entry.put("mediaType", item.mediaType());
+                entry.put("width", item.width());
+                entry.put("height", item.height());
+                entry.put("credit", item.credit());
+                return entry;
+            }).toList();
+            return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(Map.of(
+                    "scope", Map.of("adventureId", adventure.toString(), "campaignId", campaign.toString()),
+                    "artwork", entries));
+        } catch (IllegalArgumentException failure) {
+            return error(400, "ASSET_REQUEST_INVALID");
+        } catch (DataAccessException | TransactionException failure) {
+            return error(503, "ASSET_STORAGE_UNAVAILABLE");
+        }
+    }
+
     /** Require canonical lower-case UUID text, rejecting Java's permissive abbreviated forms. */
     private static UUID id(String value) {
         if (value == null) {

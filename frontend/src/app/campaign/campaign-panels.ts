@@ -2,7 +2,9 @@
  * Read-only panels and journal of one playthrough (P10.5, docs/13, "P10.5 panels and journal"): the world clock, the
  * character sheet with conditions, resources and abilities, the inventory with worn equipment, the
  * discovered quests with their objectives and outcome, what the player knows and has promised, and the
- * history of public events.
+ * history of public events. Items carry a stable icon (P17.1-B): the campaign's artwork for the definition when it has
+ * one, a neutral built-in icon otherwise, in a frame that follows the declared rarity tier and sits beside the written
+ * tier name; the credits of the artwork in force are listed in their own section.
  *
  * The component only displays what the server decided at one committed revision. It never computes a
  * bonus, a restoration or a quest result, never mutates anything, and shows pack names only when the
@@ -10,6 +12,9 @@
  * interface carries a `lang` attribute and the shared fallback notice.
  */
 import { ChangeDetectionStrategy, Component, computed, inject, input, LOCALE_ID, output } from '@angular/core';
+import { UiIcon } from '../preview/ui-kit';
+import { ArtworkIndex, frameFor } from './campaign-artwork';
+import { ItemArt } from './item-art';
 import { JournalEntry, PanelClock, PanelQuest, PanelText, PlayPanels } from './campaign-protocol';
 import {
   attributeMessage, clockMessage, conditionMessage, displayName, fallbackNotice, objectiveStateMessage, outcomeKindMessage,
@@ -18,7 +23,7 @@ import {
 
 /** Show the panels of one revision; the parent re-reads them whenever the world revision advances. */
 @Component({
-  selector: 'app-campaign-panels', changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'app-campaign-panels', imports: [ItemArt, UiIcon], changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (panels(); as current) {
       <section class="play-panels" data-panels aria-labelledby="panels-title">
@@ -89,9 +94,10 @@ import {
           @if (current.inventory.length === 0) { <p class="muted" i18n="@@campaign.panels.noItems">You carry nothing.</p> }
           <ul>
             @for (item of current.inventory; track item.itemId) {
-              <li [attr.data-item]="item.definitionId">
+              <li [attr.data-item]="item.definitionId" class="with-art">
+                <app-item-art [src]="art(item.definitionId)" [frame]="frame(item.rarity)" [fallback]="icon(item.wornIn)" />
                 <span [attr.lang]="item.name?.locale ?? null">{{ name(item.name, item.definitionId) }}</span> × {{ item.quantity }}
-                @if (item.rarity) { <span class="muted"> · <span [attr.lang]="item.rarityName?.locale ?? null">{{ name(item.rarityName, item.rarity) }}</span></span> }
+                @if (item.rarity) { <span class="muted" data-rarity> · <app-ui-icon name="rarity" /> <span [attr.lang]="item.rarityName?.locale ?? null">{{ name(item.rarityName, item.rarity) }}</span></span> }
                 @if (item.wornIn) { <strong> · <ng-container i18n="@@campaign.panels.worn">Worn</ng-container> ({{ item.wornIn }})</strong> }
               </li>
             }
@@ -103,7 +109,11 @@ import {
           @if (current.equipment.length === 0) { <p class="muted" i18n="@@campaign.panels.noEquipment">Nothing is worn.</p> }
           <ul>
             @for (worn of current.equipment; track worn.itemId) {
-              <li [attr.data-slot]="worn.slot"><strong>{{ worn.slot }}</strong>: <span [attr.lang]="worn.name?.locale ?? null">{{ name(worn.name, worn.definitionId) }}</span></li>
+              <li [attr.data-slot]="worn.slot" class="with-art">
+                <app-item-art [src]="art(worn.definitionId)" [frame]="frame(rarityOf(worn.itemId))" [fallback]="icon(worn.slot)" />
+                <strong>{{ worn.slot }}</strong>: <span [attr.lang]="worn.name?.locale ?? null">{{ name(worn.name, worn.definitionId) }}</span>
+                @if (rarityOf(worn.itemId); as tier) { <span class="muted" data-rarity> · <app-ui-icon name="rarity" /> <span [attr.lang]="tierName(worn.itemId)?.locale ?? null">{{ name(tierName(worn.itemId), tier) }}</span></span> }
+              </li>
             }
           </ul>
         </section>
@@ -167,6 +177,12 @@ import {
           </ul>
         </section>
 
+        <section aria-labelledby="credits-title" data-credits>
+          <h4 id="credits-title" i18n="@@campaign.panels.credits">Artwork credits</h4>
+          @if (credits().length === 0) { <p class="muted" i18n="@@campaign.panels.noCredits">No artwork is credited here. Items without artwork show a built-in icon.</p> }
+          <ul>@for (line of credits(); track line) { <li>{{ line }}</li> }</ul>
+        </section>
+
         <section aria-labelledby="journal-title" data-journal>
           <h4 id="journal-title" i18n="@@campaign.panels.history">Event history</h4>
           @if (entries().length === 0) { <p class="muted" i18n="@@campaign.panels.noEvents">Nothing has happened yet.</p> }
@@ -191,12 +207,17 @@ export class CampaignPanels {
   /** Cursor of the next older page; null once the oldest event is listed. */
   readonly nextBefore = input<number | null>(null);
   readonly loadingOlder = input(false);
+  /** Artwork in force for the campaign; null (not read, or the read failed) shows every built-in icon and no credits. */
+  readonly artwork = input<ArtworkIndex | null>(null);
   /** Emitted when the player asks for the next older page. */
   readonly olderRequested = output<void>();
   private readonly locale = inject(LOCALE_ID);
   readonly rewardsLabel = $localize`:@@campaign.panels.rewards:Reward`;
   readonly entries = computed(() => [...(this.panels()?.journal ?? []), ...this.older()]);
   readonly more = computed(() => this.nextBefore() !== null);
+  readonly credits = computed(() => this.artwork()?.credits() ?? []);
+  /** Carried items by instance, so a worn item shows the same admitted rarity as in the inventory. */
+  private readonly carried = computed(() => new Map((this.panels()?.inventory ?? []).map((item) => [item.itemId, item])));
 
   name = displayName;
   statusText = questStatusMessage;
@@ -204,6 +225,21 @@ export class CampaignPanels {
   objectiveText = objectiveStateMessage;
   stance = stanceMessage;
   promiseText = promiseMessage;
+
+  /** Hash URL of the item definition's stable artwork, or null so the built-in icon is shown. */
+  art(definitionId: string): string | null { return this.artwork()?.imageUrl('item', definitionId) ?? null; }
+
+  /** Frame of a declared rarity tier; the tier's name is always written beside it. */
+  frame = frameFor;
+
+  /** Declared rarity tier of a carried item instance, or null when it has none. */
+  rarityOf(itemId: string): string | null { return this.carried().get(itemId)?.rarity ?? null; }
+
+  /** Pack name of a carried item's rarity tier, or null. */
+  tierName(itemId: string): PanelText | null { return this.carried().get(itemId)?.rarityName ?? null; }
+
+  /** Neutral built-in icon of an item without artwork: a weapon glyph for a hand slot, the bag glyph otherwise. */
+  icon(slot: string | null): string { return slot !== null && /hand|weapon/i.test(slot) ? 'weapon' : 'inventory'; }
 
   /** Localized clock reading of the panels or of one journal entry. */
   clock(source: { readonly clock: PanelClock }): string { return clockMessage(source.clock, this.locale); }
