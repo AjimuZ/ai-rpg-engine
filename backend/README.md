@@ -314,6 +314,26 @@ write yet, it refuses a `CONFLICT` with `HASH_CONFLICT`. Only after that does it
 `INTEGRITY` and `DEPENDENCY_MISSING`. `AdventureBundlesTest` (PostgreSQL, 3 cases) covers the clean-recipient round
 trip, ten hostile or inconsistent archives, and a recipient save beside a conflicting revision.
 
+P16.3-A adds the injected `corrections.CanonCorrections`, also without a route, for owner corrections of one current
+knowledge claim. A `Request` gives a request ID, the expected revision, the claim, its corrected truth, an optional
+statement with its language, an optional value (`PROPERTY` only) and a reason of 1 to 500 characters.
+- `preview(owner, adventure, campaign, request)` runs the whole correction and rolls it back. It returns the
+  deterministic `engine.canon-correction-preview` document and its SHA-256. The document lists the claim before and
+  after, its source events, carried beliefs, query scopes, changed plans and the examined summaries that become stale.
+- `apply(..., approvedPreview)` takes a full-owner `CampaignExports` backup at the expected revision. It reruns the
+  transaction and refuses `PREVIEW_CHANGED` if the digest differs. A repeated request ID with the same payload
+  replays the stored outcome.
+- One commit journals a `CANON_CORRECTION` operation at the next revision and appends one `INTERNAL`
+  `CANON_CORRECTED` event citing both digests. Through `KnowledgeLedger` it supersedes the claim and carries each
+  current belief (`KNOWS` becomes `BELIEVES` unless the new truth is `TRUE`). It bumps the claim and holder scopes and
+  runs `PlanAdmissionService.invalidateWithin`. It records a `CANON_CORRECTION` summary invalidation, adds a
+  public-state outbox intent, and stores the preview and backup in `canon_correction`.
+- `audit(owner, adventure, campaign, operation)` reads the record back.
+- **Storage (V36).** `canon_correction` holds one immutable row per correction operation. The database checks the
+  preview and backup digests, the operation's command type and its base revision. The table has no `campaign_id`
+  column, so full-owner exports never copy earlier backups into later ones.
+- `CanonCorrectionsTest` (PostgreSQL, 2 cases) covers QA-27 for claims.
+
 Defaults: 100 MiB ZIP, 250 MiB expanded, 2,000 files, 50:1 expansion, 32 MiB per
 file (text further limited to 1 MiB); image headers declare at most 8,192 per side
 and 32 Mi pixels. Directory sources must be owner-controlled and quiescent;

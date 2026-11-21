@@ -742,7 +742,7 @@ remains P06, catalog locale resolution and bilingual UI remain P05.6.
 | Combat | Initiative, active actor, AP/reactions, zones, legal actions, targets, consequences and persistent dialogue/action chat |
 | Advancement | Pending entitlements, legal purchases, cost/effect preview |
 | Settings | Reading, theme, sound, narration-runtime readiness (the selected runtime is shown; it is changed through the launcher), the Models panel (implemented in P21.3-D: per-slot backend, model, effort and fallbacks, probe results, class badges and the class-change acknowledgement; advisor presets and budgets are not part of it yet), routing, context renewal |
-| Author/owner tools | Validation, export, restore/correction previews, credits and diagnostics |
+| Author/owner tools | Validation, export, restore/correction previews, credits and diagnostics. Planned: no panel exists yet. Since P16.3-A the backend service `corrections.CanonCorrections` previews, applies and reads back audited corrections of knowledge claims; there is no route for it |
 
 ## 6. Interface direction
 

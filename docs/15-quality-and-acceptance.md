@@ -1713,6 +1713,25 @@ new-adventure import and an idempotent repeat. Not covered:
 - a planted private playthrough on the sender side (bundles read only pack files, so absence is by source);
 - any route or page.
 
+QA-27 is covered for knowledge-claim corrections since P16.3-A, at backend level. `CanonCorrectionsTest`
+(PostgreSQL, 2 cases) corrects a TRUE claim that the player knows and an NPC believes to FALSE:
+- *Concrete preview.* Two previews are equal and change none of 11 written tables. The preview lists the claim before
+  and after, its source event, both carried beliefs, three query scopes, the one plan and the one summary that
+  depend on the claim.
+- *Backup.* The stored backup equals, byte for byte, a full-owner export taken just before applying.
+- *Source-linked audit.* One internal event cites both claims, the owner's reason and both digests. The successor
+  and the carried beliefs cite that event, and the stored record keeps the approved preview.
+- *Dependency revalidation.* The plan that read the claim registry becomes `INVALIDATED`; a plan on another scope
+  stays `VALIDATED`.
+- *Summary invalidation.* The summary covering the claim's source event becomes stale; a summary of a later event does
+  not.
+- *History preserved.* Every earlier event is byte-identical after the correction. The old claim keeps its
+  proposition, truth and provenance and is only closed.
+- Changed impact, a stale revision, a busy campaign, scope and shape errors are refused with no write.
+
+Not covered: other kinds of canon (commitments, quests, items, resources), content-revision migration previews, any
+route or page, restoring the backup, and an independent backup outside the database.
+
 P05.1 shell acceptance passes 11 frontend form/routing/service tests, strict
 typecheck and production build. Chrome 155 desktop/mobile smoke verifies both
 neutral local previews, route navigation, keyboard Continue, revealed chronicle,

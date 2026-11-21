@@ -279,6 +279,14 @@ restore needs no retirement step for this table. Offline checks were updated for
 in the session that added it; no live V35 dump/restore rehearsal has been run, and both rehearsals below ran before this
 table existed.
 
+V36 scope (P16.3-A) adds `canon_correction`, one immutable row per owner canon correction: the correction operation, its
+base revision, the exact approved preview document and the full-owner campaign export taken before the correction, each
+with a SHA-256 digest the database checks. The export is a complete campaign copy with its secrets, so a dump holding
+corrections is as private as the campaign itself, and each correction adds up to one more export to the dump's size.
+Rows reference the operation journal and never change, so a restore needs no retirement step for this table. Offline
+checks were updated for the V36 manifest/catalog but were not run in the session that added it; no live V36
+dump/restore rehearsal has been run, and both rehearsals below ran before this table existed.
+
 ## Live two-genre rehearsal (P06.5-B.1, V26)
 
 `tools/container_packaging/test_restore_isolation.py` runs this tool as an operator would on a populated world, then

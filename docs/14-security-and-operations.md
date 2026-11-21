@@ -215,6 +215,15 @@ An independently restorable backup includes database data, referenced immutable 
 
 Create backups before migration, restore replacement, and significant canon correction. Restore first validates archive limits, hashes, schema versions, content dependencies, ruleset support, and inventory/encounter invariants. Default restore creates a new campaign identity with source provenance, avoiding accidental overwrite. Replacing an existing campaign requires a concrete preview and explicit owner action.
 
+P16.3-A (21 November 2026) implements this for canon corrections of knowledge claims, as a backend service with no
+route yet (`corrections.CanonCorrections`). The preview runs the correction and rolls it back, so it reports the
+exact impact: the claim before and after, its source events, carried beliefs, changed plans and summaries that
+become stale. Applying requires the approved preview's digest. Before writing, the engine takes a full-owner campaign
+export at the corrected revision. The approved preview and that export are stored in `canon_correction` (V36), and the
+database checks both digests. The correction appends one internal audit event and never edits an earlier event. This
+backup lives in the same database: it records the state before the correction, it is not an independent recovery
+copy, and nothing restores it yet (P16.4). Content-revision migration previews are not implemented.
+
 Test restoration into a fresh database and asset directory. Verify sample encounters, quests, operations, and pending decisions. A backup job is not considered successful merely because an archive file exists.
 
 P03.5 delivers a baseline [database backup tool](../tools/database_backup/README.md) for a

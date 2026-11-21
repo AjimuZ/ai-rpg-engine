@@ -528,9 +528,12 @@ and the reverse.
 **Explicit invalidation.** `MemorySummaries.invalidate(campaign, reason, refs)` appends to
 `memory_invalidation` with a fixed reason code (for example `CORRECTION`) and up to 64
 references (`event:<sequence>`, `actor:`, `location:`, `claim:`, `belief:`, `commitment:`); an
-empty list invalidates every earlier summary of the campaign. No correction command exists yet;
-future correcting writers must call it inside their canonical transaction, as they bump query
-epochs today.
+empty list invalidates every earlier summary of the campaign. Correcting writers call it inside
+their canonical transaction, as they bump query epochs. Since P16.3-A the backend service
+`corrections.CanonCorrections` is one: a claim correction records reason `CANON_CORRECTION` with
+the claim, the replaced beliefs, the claim's source events and its subject and object. When a
+reference does not fit this grammar (a `pack#id` location, for example) or there are more than
+64, it records the empty list instead. No route or page offers corrections yet.
 
 **Jobs** (`memory_summary_job`). `MemorySummaries.request(campaign, audience, force)`:
 

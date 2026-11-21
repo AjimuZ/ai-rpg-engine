@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — Previewed and audited canon corrections (P16.3-A), 21 November 2026
+
+- The owner can now correct one recorded fact of a campaign (a knowledge claim): its truth, and optionally its
+  wording or, for a property, its value. What the fact is about never changes.
+- A preview shows exactly what the correction would do, and writes nothing: the fact before and after, the events it
+  came from, which characters' beliefs follow it, which prepared plans become invalid and which story summaries
+  become out of date. The preview is produced by running the correction and rolling it back.
+- Applying needs the preview's digest. If anything it reported has changed, the correction is refused and the owner
+  previews again. Before writing, the engine takes a full-owner export of the campaign as a backup and stores it
+  with the approved preview.
+- History is kept: every earlier event stays as it was, the old fact and the old beliefs stay recorded and are only
+  closed. The correction itself is one internal event that names the old and new fact, the owner's reason and the
+  digests of the preview and of the backup. Repeating the same request changes nothing.
+- Database migration V36 adds the `canon_correction` table, and the backup tool now covers schema 36.
+- Limits:
+  - There is no page or route for corrections yet, and nothing restores a correction backup yet.
+  - The backup is stored in the same database, so it does not replace an independent backup.
+  - Only knowledge claims can be corrected. Previews of moving a campaign to another adventure version are not
+    available yet.
+
 ## Unreleased — Adventure bundles for sharing between people (P16.2-B), 21 November 2026
 
 - The engine can now export an installed adventure version as one ZIP bundle to give to another person. The bundle
