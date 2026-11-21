@@ -43,10 +43,18 @@ describe('music panel', /** Register the rendered behavior. */ () => {
     const license = root.querySelector('[data-music-license]') as HTMLAnchorElement;
     expect(license.href).toBe('https://creativecommons.org/licenses/by/4.0/');
     expect(root.querySelector('[data-music-pause]')).not.toBeNull();
+    // The current track shows its complete credit, and the visit's credits and the separate effects volume appear.
+    expect(root.querySelector('[data-music-notices]')?.textContent).toContain('Attribution required');
+    expect(root.querySelector('[data-music-modifications]')?.textContent).toContain('None');
+    expect(root.querySelector('[data-music-verified]')?.textContent).toBe('2026-10-23');
+    expect((root.querySelector('[data-music-used-credits]') as HTMLTextAreaElement).value).toContain('"Wholesome" — Kevin MacLeod');
+    expect(root.querySelector('[data-music-effects-volume]')).not.toBeNull();
     (root.querySelector('[data-music-off]') as HTMLButtonElement).click();
     await refresh();
     expect(root.querySelector('[data-music-track]')).toBeNull();
     expect(root.querySelector('[data-music-status]')?.textContent).toContain('Music is off.');
+    // Turning music off silences it but keeps the credits of what already played in this visit.
+    expect(root.querySelector('[data-music-used-credits]')).not.toBeNull();
   });
 
   it('lists complete credits for every reviewed track and filters them', async () => {

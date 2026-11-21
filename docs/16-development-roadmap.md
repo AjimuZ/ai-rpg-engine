@@ -7226,6 +7226,31 @@ this update. No combat runtime/browser result is claimed.
     browser, a secret-sentinel journey; not built: credits in exports/manifests, local tracks, an effects volume, a pack
     presentation policy for moods, spoken-dialogue ducking, a battle/victory recording. The client catalog is a hand copy of
     `catalog.json` with no parity check. Italian targets had one author pass, no independent review.
+  - 2026-11-21 P17.2-C (partial; box stays unchecked): (1) complete credits: the current-track view adds notices,
+    modifications and the rights-check date; `creditText` is the shared credit text; `MusicPlayer.used` lists the recordings
+    that actually started per scope and the panel shows and downloads their credits; every campaign export (full-owner and
+    player) gains a top-level `music` section with the credit record of every reviewed recording
+    (`CampaignExports.music()`; the engine cannot know which track sounded on a device, so it lists all). (2) Local tracks:
+    `MUSIC_LOCAL` and `admitLocal` admit a local record under the same rights checks and a plain file name and SHA-256; it
+    plays from `/assets/music/` ahead of an online record of the same mood under the same loop, crossfade and failure
+    rules; none is bundled. (3) A separate effects volume saved in `engine.music.v1` (nothing audible reads it yet).
+    (4) `MoodPolicy`, `parseMoodPolicy` and `publicStateOf`: six public states to moods, unknown keys or moods drop the
+    policy whole; the playthrough uses the default policy. Seven Italian messages were added (776).
+    Commands and results: `sh .agents/ralph/verify.sh frontend` → `frontend-install`, `typecheck`, `test`, `i18n`, `build`,
+    `locales` all `PASS`, `VERIFY PASSED (frontend)` (no test count printed); `sh .agents/ralph/verify.sh backend
+    -Dtest=CampaignExportsTest,MusicCatalogTest,CampaignRestoresTest` → `VERIFY PASSED` (the player-export section list
+    now includes `music`, with two new assertions). Tests added: six `it` blocks in `music-player.spec.ts` (local track,
+    volumes, used credits, credit text, local refusal, mood policy; counted by reading) and extra assertions in
+    `music-panel.spec.ts` and the saved-preference test. Attempt 2 also updated `backend/README.md` (P16.2-A: the `music`
+    section) and added an assertion in `CampaignExportsTest` that the full-owner export carries `music/recordings` (2
+    entries); that added assertion was not re-run by this session. `verify.sh full` was not run by this session.
+    Scope split: the delivery of a pack's mood policy to the client and QA-32 are left to P17.2-D; this story only keeps the
+    policy format and parser. Not proven / not done, so P17.2 stays open and QA-32 does not pass: a pack cannot yet declare
+    or deliver its own mood policy (no pack field, no route; only the format and parser exist; P17.2-D); no local audio file exists, so local playback was
+    only shown with a fake audio element; no real-host or real-browser playback, loop, decode, offline or adventure-switch
+    check and no secret-sentinel journey; the effects volume has no effect to control; export credits list all
+    recordings, not only played ones; the client catalog is still a hand copy of `catalog.json`; the new credits download
+    and text box were not seen in a browser.
 - [ ] P17.3 Finalize the default visual-novel and alternative text-focused layouts, graphic states, configurable tokens and attributed reading/history/quick-reply behavior.
 - [ ] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.
 - [ ] P17.5 Verify missing art/audio never blocks play and media cannot reveal secrets.

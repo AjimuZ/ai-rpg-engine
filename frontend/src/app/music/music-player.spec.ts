@@ -5,9 +5,18 @@
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CombatView } from '../campaign/campaign-protocol';
-import { MUSIC_CATALOG, mediaUrl, recordingFor } from './music-catalog';
-import { moodOf } from './music-mood';
-import { FADE_STEPS, MUSIC_AUDIO, MUSIC_KEY, MUSIC_STORAGE, MUSIC_TICK, MusicAudio, MusicPlayer } from './music-player';
+import { admitLocal, creditText, MUSIC_CATALOG, mediaUrl, recordingFor } from './music-catalog';
+import { DEFAULT_MOOD_POLICY, moodOf, parseMoodPolicy } from './music-mood';
+import { FADE_STEPS, MUSIC_AUDIO, MUSIC_KEY, MUSIC_LOCAL, MUSIC_STORAGE, MUSIC_TICK, MusicAudio, MusicPlayer } from './music-player';
+
+/** A complete, admissible local record for the tension mood. */
+const LOCAL = {
+  id: 'local-tension', title: 'Local Tension', creator: 'A. Composer', mood: 'tension',
+  sourcePage: 'https://commons.wikimedia.org/wiki/File:Local_tension.ogg', mediaFile: 'Local_tension.ogg',
+  licenseId: 'CC-BY-4.0', licenseName: 'Creative Commons Attribution 4.0 International',
+  licenseUrl: 'https://creativecommons.org/licenses/by/4.0/', notices: 'Attribution required.',
+  modifications: 'Trimmed to 60 seconds.', verifiedOn: '2026-11-21', localFile: 'local-tension.ogg', localHash: 'a'.repeat(64),
+};
 
 /** A fake element that records what the controller does with it. */
 class FakeAudio implements MusicAudio {
@@ -41,9 +50,10 @@ describe('music player', /** Register the controller rules. */ () => {
   let storage: Memory;
 
   /** Create a fresh injector, as a new page load would. */
-  function player(): MusicPlayer {
+  function player(local: readonly unknown[] = []): MusicPlayer {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [
+      { provide: MUSIC_LOCAL, useValue: local },
       { provide: MUSIC_AUDIO, useValue: (url: string) => { const audio = new FakeAudio(url, () => fail(url)); created.push(audio); return audio; } },
       { provide: MUSIC_TICK, useValue: (step: () => void) => { steps.push(step); return () => { steps = steps.filter((s) => s !== step); }; } },
       { provide: MUSIC_STORAGE, useValue: storage },
@@ -184,10 +194,12 @@ describe('music player', /** Register the controller rules. */ () => {
     const first = player();
     first.setVolume(0.3);
     first.activate();
-    expect(JSON.parse(storage.values.get(MUSIC_KEY)!)).toEqual({ version: 1, enabled: true, muted: false, volume: 0.3 });
+    first.setEffectsVolume(0.8);
+    expect(JSON.parse(storage.values.get(MUSIC_KEY)!)).toEqual({ version: 1, enabled: true, muted: false, volume: 0.3, effects: 0.8 });
     const second = player();
     expect(second.enabled()).toBe(true);
     expect(second.volume()).toBe(0.3);
+    expect(second.effectsVolume()).toBe(0.8);
     second.cue('a', 'exploration');
     await flush();
     expect(created).toHaveLength(0);
@@ -226,6 +238,86 @@ describe('music player', /** Register the controller rules. */ () => {
     music.disable();
     expect(sounding()).toHaveLength(0);
     expect(music.status()).toBe('off');
+  });
+
+  it('plays an admitted local track under the same loop, fade and failure rules, and drops an unreviewed one', async () => {
+    const music = player([LOCAL, { ...LOCAL, id: 'bad', licenseUrl: 'https://creativecommons.org/licenses/by/3.0/' }]);
+    expect(music.catalog.map((record) => record.id)).toEqual(['local-tension', 'wholesome', 'darkest-child']);
+    music.activate();
+    music.cue('a', 'exploration');
+    await flush();
+    music.cue('a', 'tension');
+    await flush();
+    expect(created.map((audio) => audio.url)).toEqual([mediaUrl(recordingFor('exploration')!), '/assets/music/local-tension.ogg']);
+    expect(created[1].loop).toBe(true);
+    advance(FADE_STEPS);
+    expect(sounding()).toEqual([created[1]]);
+    expect(music.current()?.id).toBe('local-tension');
+    // A removed local file ends in the same quiet failure as a removed online one and nothing stands in for it.
+    created[1].onerror?.(new Event('error'));
+    expect(music.status()).toBe('unavailable');
+    expect(sounding()).toHaveLength(0);
+    expect(created).toHaveLength(2);
+  });
+
+  it('keeps the music and effects volumes separate and saved', () => {
+    const first = player();
+    first.setVolume(0.2);
+    first.setEffectsVolume(0.9);
+    first.setEffectsVolume(Number.NaN);
+    expect([first.volume(), first.effectsVolume()]).toEqual([0.2, 0.9]);
+    const second = player();
+    expect([second.volume(), second.effectsVolume()]).toEqual([0.2, 0.9]);
+    // A preference saved before the effects volume existed still loads, with the default effects volume.
+    storage.setItem(MUSIC_KEY, '{"version":1,"enabled":true,"muted":false,"volume":0.4}');
+    const older = player();
+    expect([older.volume(), older.effectsVolume()]).toEqual([0.4, 0.5]);
+  });
+
+  it('lists each recording that actually played once, per scope', async () => {
+    const music = player();
+    music.activate();
+    music.cue('a', 'exploration');
+    await flush();
+    music.cue('a', 'tension');
+    await flush();
+    music.cue('a', 'exploration');
+    await flush();
+    expect(music.used().map((record) => record.id)).toEqual(['wholesome', 'darkest-child']);
+    music.cue('b', 'dialogue');
+    expect(music.used()).toEqual([]);
+  });
+});
+
+describe('music credits and local admission', /** Register the credit text and the local-track review. */ () => {
+  it('states every credit field of a recording, including its disclosed modifications and check date', () => {
+    const text = creditText(MUSIC_CATALOG[0]);
+    for (const part of [MUSIC_CATALOG[0].title, MUSIC_CATALOG[0].creator, MUSIC_CATALOG[0].sourcePage, MUSIC_CATALOG[0].licenseUrl,
+      MUSIC_CATALOG[0].notices, MUSIC_CATALOG[0].modifications, MUSIC_CATALOG[0].verifiedOn]) expect(text).toContain(part);
+    expect(creditText(admitLocal(LOCAL)!)).toContain(`SHA-256 ${'a'.repeat(64)}`);
+  });
+
+  it('refuses a local record that lacks rights, names another host or file, or has no hash', () => {
+    expect(admitLocal(LOCAL)).not.toBeNull();
+    for (const bad of [
+      { ...LOCAL, creator: '' }, { ...LOCAL, licenseId: 'CC-BY-NC-4.0' }, { ...LOCAL, mood: 'party' },
+      { ...LOCAL, sourcePage: 'https://example.com/a.ogg' }, { ...LOCAL, sourcePage: 'http://commons.wikimedia.org/a.ogg' },
+      { ...LOCAL, localFile: '../secret.ogg' }, { ...LOCAL, localFile: 'a.exe' }, { ...LOCAL, localHash: 'abc' },
+      { ...LOCAL, localFile: undefined }, { ...LOCAL, verifiedOn: 'yesterday' }, null, 'text',
+    ]) expect(admitLocal(bad)).toBeNull();
+  });
+
+  it('accepts a pack mood policy of known public states and moods only', () => {
+    expect(parseMoodPolicy({})).toEqual(DEFAULT_MOOD_POLICY);
+    expect(parseMoodPolicy({ fight: 'tension', lost: 'rest' })).toEqual({ ...DEFAULT_MOOD_POLICY, fight: 'tension', lost: 'rest' });
+    const view = { encounter: { outcome: null }, offers: [] } as unknown as CombatView;
+    expect(moodOf(view, parseMoodPolicy({ fight: 'tension' })!)).toBe('tension');
+    // A hidden-state key, an unknown mood and a non-object are refused whole, never repaired.
+    expect(parseMoodPolicy({ hiddenEnemy: 'combat' })).toBeNull();
+    expect(parseMoodPolicy({ fight: 'party' })).toBeNull();
+    expect(parseMoodPolicy({ fight: 3 })).toBeNull();
+    expect(parseMoodPolicy(['combat'])).toBeNull();
+    expect(parseMoodPolicy(null)).toBeNull();
   });
 });
 

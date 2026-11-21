@@ -10,6 +10,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import org.rpgengine.music.MusicCatalog;
 import org.rpgengine.panels.PlayPanels;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowCallbackHandler;
@@ -44,6 +45,9 @@ import tools.jackson.databind.node.ObjectNode;
  * no internal event, hidden or secret definition text, other holder's belief, seed, idempotency key, job, plan or
  * session record.
  *
+ * <p><b>Music credits (P17.2-C).</b> Both documents carry a top-level {@code music} section: the complete rights
+ * record of every reviewed music recording, so an export that travels with a playthrough also carries the credits.
+ *
  * <p><b>Both.</b> Account data (the owner profile, the owner's identity, other campaigns and adventures) and
  * installation-wide tables (model slots, scheduler state, resource leases) are never exported. Both documents name
  * the pinned content revision (pack, version, content hash, ruleset) so a recipient can check compatibility, and
@@ -69,6 +73,8 @@ public class CampaignExports {
     static final int PLAYER_ATTEMPTS = 3;
     /** Name of the document section that carries the bytes of the campaign's managed assets. */
     public static final String ASSETS = "assets";
+    /** Name of the document section that carries the credits of the reviewed music recordings. */
+    public static final String MUSIC = "music";
     private static final Pattern TABLE = Pattern.compile("^[a-z][a-z0-9_]{0,62}$");
     // base64 without the line breaks PostgreSQL inserts every 76 characters, so the JSON value is one string.
     private static final String ASSET_SQL = "select jsonb_build_object('sha256', m.sha256, 'mediaType', m.media_type, "
@@ -235,7 +241,23 @@ public class CampaignExports {
         scope.put("campaignId", campaign.toString());
         scope.put("stateRevision", revision);
         document.set("content", content);
+        document.set(MUSIC, music());
         return document;
+    }
+
+    /**
+     * The credits section both audiences carry (P17.2-C): the complete rights record of every reviewed recording the
+     * campaign's presentation may play. Playback is chosen on the player's device and the engine does not record
+     * which track sounded, so the section names every recording the catalog can offer rather than guessing; it
+     * holds no audio and no media address. It is constant for a catalog, so identical revisions still export to
+     * identical bytes.
+     */
+    private ObjectNode music() {
+        ObjectNode section = json.createObjectNode();
+        section.put("note", "Credits of the reviewed recordings optional music may play for this campaign. The engine "
+                + "does not record which track sounded on a device, and no audio is part of this document.");
+        section.set("recordings", json.valueToTree(MusicCatalog.load().recordings()));
+        return section;
     }
 
     /** Authorize the owner, adventure and campaign together and return the pinned content identity. */

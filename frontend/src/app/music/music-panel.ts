@@ -7,7 +7,7 @@
  * Catalog data (titles, creators, license names, notices) is shown verbatim in English, marked with `lang="en"`.
  */
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, signal, untracked } from '@angular/core';
-import { Mood, MUSIC_CATALOG, MusicRecording } from './music-catalog';
+import { creditText, Mood, MUSIC_CATALOG, MusicRecording } from './music-catalog';
 import { MusicPlayer, MusicStatus } from './music-player';
 
 /** Show the music controls for one campaign scope and mood. */
@@ -37,6 +37,10 @@ import { MusicPlayer, MusicStatus } from './music-player';
           <label for="music-volume">{{ text.volume }}</label>
           <input id="music-volume" type="range" min="0" max="100" step="5" [value]="percent()" (input)="volume($event)" data-music-volume>
         </p>
+        <p>
+          <label for="music-effects-volume">{{ text.effectsVolume }}</label>
+          <input id="music-effects-volume" type="range" min="0" max="100" step="5" [value]="effectsPercent()" (input)="effects($event)" data-music-effects-volume>
+        </p>
       }
       @if (player.current(); as track) {
         <dl data-music-track>
@@ -44,6 +48,9 @@ import { MusicPlayer, MusicStatus } from './music-player';
           <dt>{{ text.creator }}</dt><dd lang="en">{{ track.creator }}</dd>
           <dt>{{ text.license }}</dt><dd><a [href]="track.licenseUrl" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" lang="en" data-music-license>{{ track.licenseName }}</a></dd>
           <dt>{{ text.source }}</dt><dd><a [href]="track.sourcePage" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" lang="en" data-music-source>{{ track.title }}</a></dd>
+          <dt>{{ text.notices }}</dt><dd lang="en" data-music-notices>{{ track.notices }}</dd>
+          <dt>{{ text.modifications }}</dt><dd lang="en" data-music-modifications>{{ track.modifications }}</dd>
+          <dt>{{ text.verified }}</dt><dd data-music-verified>{{ track.verifiedOn }}</dd>
         </dl>
       }
       <details data-music-credits>
@@ -62,6 +69,13 @@ import { MusicPlayer, MusicStatus } from './music-player';
             </li>
           } @empty { <li data-music-none>{{ text.none }}</li> }
         </ul>
+      </details>
+      <details data-music-used>
+        <summary>{{ text.usedTitle }}</summary>
+        @if (player.used().length > 0) {
+          <textarea readonly rows="8" lang="en" [attr.aria-label]="text.usedTitle" data-music-used-credits [value]="usedCredits()"></textarea>
+          <p><button type="button" data-music-download (click)="download()">{{ text.download }}</button></p>
+        } @else { <p data-music-used-none>{{ text.usedNone }}</p> }
       </details>
     </section>
   `,
@@ -91,6 +105,13 @@ export class MusicPanel {
     credits: $localize`:@@music.credits.title:Music credits`,
     search: $localize`:@@music.credits.search:Search credits`,
     none: $localize`:@@music.credits.none:No credit matches your search.`,
+    effectsVolume: $localize`:@@music.effectsVolume:Effects volume`,
+    notices: $localize`:@@music.notices:Notices`,
+    modifications: $localize`:@@music.modifications:Changes made`,
+    verified: $localize`:@@music.verified:Rights checked`,
+    usedTitle: $localize`:@@music.used.title:Credits of the music played in this visit`,
+    usedNone: $localize`:@@music.used.none:No track has played in this visit yet.`,
+    download: $localize`:@@music.used.download:Download these credits`,
   };
   private readonly statuses: Readonly<Record<MusicStatus, string>> = {
     off: $localize`:@@music.status.off:Music is off.`,
@@ -120,6 +141,24 @@ export class MusicPanel {
 
   /** Volume as the slider's 0-100 value. */
   percent(): number { return Math.round(this.player.volume() * 100); }
+
+  /** Effects volume as the slider's 0-100 value. */
+  effectsPercent(): number { return Math.round(this.player.effectsVolume() * 100); }
+
+  effects(event: Event): void { this.player.setEffectsVolume(Number((event.target as HTMLInputElement).value) / 100); }
+
+  /** The complete credits of the recordings that played in this scope, one block per recording; empty when none did. */
+  usedCredits(): string { return this.player.used().map(creditText).join('\n\n'); }
+
+  /** Save {@link usedCredits} as a text file; the file is built in the page and nothing is uploaded. */
+  download(): void {
+    const url = URL.createObjectURL(new Blob([this.usedCredits(), '\n'], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'music-credits.txt';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   volume(event: Event): void { this.player.setVolume(Number((event.target as HTMLInputElement).value) / 100); }
 

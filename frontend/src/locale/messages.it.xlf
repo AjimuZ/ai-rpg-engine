@@ -6081,6 +6081,48 @@
       <target>Nessun credito corrisponde alla ricerca.</target>
       </segment>
     </unit>
+    <unit id="music.effectsVolume">
+      <segment>
+        <source>Effects volume</source>
+      <target>Volume degli effetti</target>
+      </segment>
+    </unit>
+    <unit id="music.notices">
+      <segment>
+        <source>Notices</source>
+      <target>Avvisi</target>
+      </segment>
+    </unit>
+    <unit id="music.modifications">
+      <segment>
+        <source>Changes made</source>
+      <target>Modifiche apportate</target>
+      </segment>
+    </unit>
+    <unit id="music.verified">
+      <segment>
+        <source>Rights checked</source>
+      <target>Diritti verificati il</target>
+      </segment>
+    </unit>
+    <unit id="music.used.title">
+      <segment>
+        <source>Credits of the music played in this visit</source>
+      <target>Crediti della musica ascoltata in questa visita</target>
+      </segment>
+    </unit>
+    <unit id="music.used.none">
+      <segment>
+        <source>No track has played in this visit yet.</source>
+      <target>In questa visita non è ancora stato riprodotto alcun brano.</target>
+      </segment>
+    </unit>
+    <unit id="music.used.download">
+      <segment>
+        <source>Download these credits</source>
+      <target>Scarica questi crediti</target>
+      </segment>
+    </unit>
     <unit id="music.status.off">
       <segment>
         <source>Music is off.</source>

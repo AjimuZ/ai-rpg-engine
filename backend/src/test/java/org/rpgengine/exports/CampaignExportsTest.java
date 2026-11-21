@@ -149,8 +149,11 @@ class CampaignExportsTest {
             assertFalse(text.contains(secret.getValue()), "player export leaks the " + secret.getKey());
         }
         JsonNode document = JSON.readTree(text);
-        assertEquals(List.of("audience", "campaign", "content", "format", "formatVersion", "journal", "panels"),
+        assertEquals(List.of("audience", "campaign", "content", "format", "formatVersion", "journal", "music", "panels"),
                 sortedFields(document), "the player document has exactly the documented sections");
+        assertEquals(2, document.at("/music/recordings").size(), "every export carries the music credits");
+        assertEquals("CC-BY-4.0", document.at("/music/recordings/0/licenseId").asText());
+        assertEquals("Kevin MacLeod (incompetech.com)", document.at("/music/recordings/0/creator").asText());
         assertEquals("player", document.get("audience").asText());
         assertEquals(revision, document.at("/campaign/stateRevision").asLong());
         assertEquals(revision, shared.stateRevision());
@@ -162,6 +165,7 @@ class CampaignExportsTest {
 
         // The full-owner export holds every planted secret except account data, which no export carries.
         String full = exports.export(OWNER, adventure, campaign, Audience.FULL_OWNER).text();
+        assertEquals(2, JSON.readTree(full).at("/music/recordings").size(), "the full-owner export carries the credits too");
         for (var secret : secrets.entrySet()) {
             boolean account = secret.getKey().equals("account name") || secret.getKey().equals("owner identity");
             boolean raw = secret.getKey().equals("seed bytes");

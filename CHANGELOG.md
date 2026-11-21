@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — Music credits, local tracks and an effects volume (P17.2-C), 21 November 2026
+
+- The current track now shows its notices, disclosed changes and the date its rights were checked, besides creator,
+  license and source. A new section lists the complete credits of the tracks that played in this visit, in a text box and
+  as a downloadable text file.
+- Every campaign export (full-owner and player) carries a `music` section with the complete credits of the reviewed
+  recordings the engine may play. The engine does not record which track sounded on a device, so the section lists
+  all of them. A restore ignores the section.
+- Installed local tracks are supported beside the online ones: a local record needs the same complete, admitted-license
+  rights record plus a plain file name and a SHA-256, plays from the installation's own `/assets/music/` folder and follows
+  the same loop, crossfade and failure rules. No local track is bundled.
+- Music and effects volumes are separate sliders and both are remembered on the device. No sound effect exists yet, so
+  the effects slider changes nothing audible today.
+- A pack's mood policy can be read and checked (public states to moods only); it is not delivered from a pack yet, so the
+  default mapping applies. Delivery of that policy and the QA-32 check are left to a later step (P17.2-D).
+- 7 Italian messages are added (776 messages).
+
 ## Unreleased — Optional dynamic music (P17.2-B), 21 November 2026
 
 - The playthrough view has a Music section, off by default. Turning it on (a click) starts a looping track chosen from the

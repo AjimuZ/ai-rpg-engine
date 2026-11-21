@@ -27,6 +27,10 @@ export interface MusicRecording {
   readonly notices: string;
   readonly modifications: string;
   readonly verifiedOn: string;
+  /** File name of a permitted local copy under {@link LOCAL_BASE}; absent for an online recording. */
+  readonly localFile?: string;
+  /** SHA-256 (lowercase hex) of that local copy; present exactly when {@link localFile} is. */
+  readonly localHash?: string;
 }
 
 /** Reviewed recordings in catalog order. */
@@ -60,14 +64,79 @@ export const MEDIA_ORIGIN = 'https://commons.wikimedia.org';
  * @returns the first catalog record of that mood, or undefined: silence is the valid answer for a mood
  *   without an admitted recording, and no other mood's track stands in for it
  */
-export function recordingFor(mood: Mood): MusicRecording | undefined {
-  return MUSIC_CATALOG.find(/** One record per mood is enough while the catalog is this small. */ (record) => record.mood === mood);
+export function recordingFor(mood: Mood, catalog: readonly MusicRecording[] = MUSIC_CATALOG): MusicRecording | undefined {
+  return catalog.find(/** One record per mood is enough while the catalog is this small. */ (record) => record.mood === mood);
 }
 
 /**
- * The media address of a reviewed recording (Commons' documented file redirect, which may redirect to the
- * file host). Built from the reviewed file name only. Real-host playback has not been verified.
+ * The media address of a reviewed recording. An online record uses Commons' documented file redirect (which may
+ * redirect to the file host), built from the reviewed file name only; a local record uses its own file under
+ * {@link LOCAL_BASE}. Real-host playback has not been verified.
  */
 export function mediaUrl(record: MusicRecording): string {
+  if (record.localFile !== undefined) return `${LOCAL_BASE}${encodeURIComponent(record.localFile)}`;
   return `${MEDIA_ORIGIN}/wiki/Special:FilePath/${encodeURIComponent(record.mediaFile)}`;
+}
+
+/** Directory of the installation's own music files; a local record names a file here and nothing else. */
+export const LOCAL_BASE = '/assets/music/';
+
+/** Admitted licenses: ID to the exact license URL of that version; equal to `MusicCatalog.LICENSES` in the backend. */
+export const LICENSES: Readonly<Record<string, string>> = {
+  'CC0-1.0': 'https://creativecommons.org/publicdomain/zero/1.0/',
+  'CC-BY-3.0': 'https://creativecommons.org/licenses/by/3.0/',
+  'CC-BY-4.0': 'https://creativecommons.org/licenses/by/4.0/',
+};
+/** Approved source hosts; equal to `MusicCatalog.SOURCE_HOSTS` in the backend. */
+const SOURCE_HOSTS: readonly string[] = ['commons.wikimedia.org'];
+const LOCAL_FILE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.(ogg|mp3|wav|m4a)$/;
+const TEXT_FIELDS = ['id', 'title', 'creator', 'sourcePage', 'mediaFile', 'licenseId', 'licenseName', 'licenseUrl', 'notices', 'modifications', 'verifiedOn'] as const;
+
+/**
+ * Admit one locally installed track under the same rights review as an online one (P17.2-C).
+ *
+ * @param candidate an untrusted record from a local catalog
+ * @returns the record, or null when it lacks any credit field, names an unknown mood, a license outside the
+ *   admitted list or whose URL is not that version's, a source page off the approved HTTPS hosts, a verification
+ *   date that is not ISO, a file name that is not a plain audio file name, or a hash that is not SHA-256 hex.
+ *   A refused record is dropped, never repaired, so an unreviewed file cannot sound.
+ */
+export function admitLocal(candidate: unknown): MusicRecording | null {
+  if (typeof candidate !== 'object' || candidate === null) return null;
+  const value = candidate as Record<string, unknown>;
+  for (const field of TEXT_FIELDS) {
+    if (typeof value[field] !== 'string' || (value[field] as string).trim() === '') return null;
+  }
+  const text = (field: string) => value[field] as string;
+  if (!(MOODS as readonly string[]).includes(String(value['mood']))) return null;
+  if (LICENSES[text('licenseId')] !== text('licenseUrl')) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text('verifiedOn'))) return null;
+  const file = value['localFile'];
+  const hash = value['localHash'];
+  if (typeof file !== 'string' || !LOCAL_FILE.test(file) || typeof hash !== 'string' || !/^[0-9a-f]{64}$/.test(hash)) return null;
+  try {
+    const source = new URL(text('sourcePage'));
+    if (source.protocol !== 'https:' || !SOURCE_HOSTS.includes(source.hostname)) return null;
+  } catch { return null; }
+  return {
+    id: text('id'), title: text('title'), creator: text('creator'), mood: value['mood'] as Mood, sourcePage: text('sourcePage'),
+    mediaFile: text('mediaFile'), licenseId: text('licenseId'), licenseName: text('licenseName'), licenseUrl: text('licenseUrl'),
+    notices: text('notices'), modifications: text('modifications'), verifiedOn: text('verifiedOn'), localFile: file, localHash: hash,
+  };
+}
+
+/**
+ * The credit text of one recording: title, creator, source, license with its link, notices, disclosed
+ * modifications and the date the rights were checked. Used by the current-track view and every credits export, so
+ * they cannot drift apart.
+ */
+export function creditText(record: MusicRecording): string {
+  return [
+    `"${record.title}" — ${record.creator}`,
+    `Source: ${record.sourcePage}`,
+    `License: ${record.licenseName} (${record.licenseId}), ${record.licenseUrl}`,
+    `Notices: ${record.notices}`,
+    `Modifications: ${record.modifications}`,
+    `Rights checked: ${record.verifiedOn}${record.localHash ? `; local copy SHA-256 ${record.localHash}` : ''}`,
+  ].join('\n');
 }

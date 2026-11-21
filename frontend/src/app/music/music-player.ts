@@ -18,7 +18,7 @@
  * - Music never affects the story: no method throws into rendering and nothing here reads or sends story text.
  */
 import { computed, inject, Injectable, InjectionToken, signal } from '@angular/core';
-import { Mood, mediaUrl, MusicRecording, recordingFor } from './music-catalog';
+import { admitLocal, Mood, mediaUrl, MUSIC_CATALOG, MusicRecording, recordingFor } from './music-catalog';
 
 /** The part of an audio element this controller uses; a test replaces the real element. */
 export interface MusicAudio {
@@ -51,6 +51,12 @@ export const MUSIC_STORAGE = new InjectionToken<{ getItem(key: string): string |
     },
   });
 
+/**
+ * Locally installed tracks offered beside the online catalog (P17.2-C). Each is admitted by `admitLocal` under the
+ * same rights review as an online record; a refused one is dropped. Empty by default: no local file is bundled.
+ */
+export const MUSIC_LOCAL = new InjectionToken<readonly unknown[]>('Local music catalog', { providedIn: 'root', factory: () => [] });
+
 /** Storage key of the preference record. */
 export const MUSIC_KEY = 'engine.music.v1';
 /** Length of a crossfade or fade to silence, and the spacing of its volume steps. */
@@ -79,6 +85,14 @@ export class MusicPlayer {
   private readonly factory = inject(MUSIC_AUDIO);
   private readonly tick = inject(MUSIC_TICK);
   private readonly storage = inject(MUSIC_STORAGE);
+  /**
+   * Admitted local tracks first, then the reviewed online ones: a local copy needs no network, and both pass the same
+   * rights review, loop, crossfade and failure rules. A mood without either has silence.
+   */
+  readonly catalog: readonly MusicRecording[] = [
+    ...inject(MUSIC_LOCAL).map(admitLocal).filter((record): record is MusicRecording => record !== null),
+    ...MUSIC_CATALOG,
+  ];
   /** Saved preference: the player turned music on at some point and has not turned it off. */
   readonly enabled = signal(false);
   /** True only after a click in this page load; playback needs both this and {@link enabled}. */
@@ -87,8 +101,15 @@ export class MusicPlayer {
   readonly muted = signal(false);
   /** Music volume from 0 to 1. */
   readonly volume = signal(DEFAULT_VOLUME);
+  /**
+   * Effects volume from 0 to 1, kept apart from the music volume and saved with it. No sound effect exists yet, so
+   * nothing reads it; it is the control a later effects player must obey.
+   */
+  readonly effectsVolume = signal(DEFAULT_VOLUME);
   /** The recording that is audible or fading in; null in silence. */
   readonly current = signal<MusicRecording | null>(null);
+  /** Recordings that actually started for the current scope, in first-played order and without repeats (for credits). */
+  readonly used = signal<readonly MusicRecording[]>([]);
   readonly problem = signal<'blocked' | 'unavailable' | null>(null);
   readonly status = computed((): MusicStatus => {
     if (!this.enabled()) return 'off';
@@ -113,6 +134,7 @@ export class MusicPlayer {
     this.enabled.set(saved.enabled);
     this.muted.set(saved.muted);
     this.volume.set(saved.volume);
+    this.effectsVolume.set(saved.effects);
   }
 
   /**
@@ -127,10 +149,11 @@ export class MusicPlayer {
       this.scope = scope;
       this.mood = null;
       this.problem.set(null);
+      this.used.set([]);
     }
     if (mood === this.mood) return;
     this.mood = mood;
-    this.wanted = recordingFor(mood) ?? null;
+    this.wanted = recordingFor(mood, this.catalog) ?? null;
     // A denied playback is not retried by a mood change: only a new click (activate) tries again.
     if (this.playable() && this.problem() !== 'blocked') this.transition(this.wanted);
   }
@@ -199,6 +222,13 @@ export class MusicPlayer {
     this.applyVolume();
   }
 
+  /** Set the effects volume; clamped to 0..1, a non-number is ignored. */
+  setEffectsVolume(value: number): void {
+    if (!Number.isFinite(value)) return;
+    this.effectsVolume.set(Math.min(1, Math.max(0, value)));
+    this.save();
+  }
+
   /** True when a track may sound now. */
   private playable(): boolean { return this.enabled() && this.armed() && !this.paused(); }
 
@@ -242,6 +272,7 @@ export class MusicPlayer {
     this.demote();
     this.active = slot;
     this.current.set(slot.record);
+    if (!this.used().some((record) => record.id === slot.record.id)) this.used.set([...this.used(), slot.record]);
     this.problem.set(null);
     this.applyVolume();
     this.ramp();
@@ -329,23 +360,26 @@ export class MusicPlayer {
   }
 
   /** Persisted preference; corrupt, foreign or out-of-range data yields the defaults. */
-  private read(): { enabled: boolean; muted: boolean; volume: number } {
-    const defaults = { enabled: false, muted: false, volume: DEFAULT_VOLUME };
+  private read(): { enabled: boolean; muted: boolean; volume: number; effects: number } {
+    const defaults = { enabled: false, muted: false, volume: DEFAULT_VOLUME, effects: DEFAULT_VOLUME };
     try {
       const raw = this.storage?.getItem(MUSIC_KEY) ?? null;
       if (raw === null || raw.length > 200) return defaults;
       const value = JSON.parse(raw) as Record<string, unknown>;
       const volume = value['volume'];
+      // A record saved before the effects volume existed has no `effects`; it keeps the default for it.
+      const effects = value['effects'] === undefined ? DEFAULT_VOLUME : value['effects'];
       if (value['version'] !== 1 || typeof value['enabled'] !== 'boolean' || typeof value['muted'] !== 'boolean'
-        || typeof volume !== 'number' || !Number.isFinite(volume) || volume < 0 || volume > 1) return defaults;
-      return { enabled: value['enabled'], muted: value['muted'], volume };
+        || typeof volume !== 'number' || !Number.isFinite(volume) || volume < 0 || volume > 1
+        || typeof effects !== 'number' || !Number.isFinite(effects) || effects < 0 || effects > 1) return defaults;
+      return { enabled: value['enabled'], muted: value['muted'], volume, effects };
     } catch { return defaults; }
   }
 
   /** Save the preference; a storage failure only means it is not remembered. */
   private save(): void {
     try {
-      this.storage?.setItem(MUSIC_KEY, JSON.stringify({ version: 1, enabled: this.enabled(), muted: this.muted(), volume: this.volume() }));
+      this.storage?.setItem(MUSIC_KEY, JSON.stringify({ version: 1, enabled: this.enabled(), muted: this.muted(), volume: this.volume(), effects: this.effectsVolume() }));
     } catch { /* The preference is simply not remembered. */ }
   }
 }

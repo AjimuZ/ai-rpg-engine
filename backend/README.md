@@ -290,7 +290,9 @@ P16.2-A adds the injected `exports.CampaignExports`, a read-only owner service w
 `export(owner, adventure, campaign, audience)` authorizes the owner, adventure and campaign together, then returns an
 `Export`: the UTF-8 JSON document, its lowercase SHA-256 and the state revision it describes. Every document has
 `format` (`engine.campaign-export`), `formatVersion` 1, `audience`, `campaign` (identities and state revision) and
-`content` (pinned revision, pack, version, content hash, ruleset, source language). `FULL_OWNER` adds `schemaVersion`
+`content` (pinned revision, pack, version, content hash, ruleset, source language) and `music` (`note` and
+`recordings`: the credit record of every reviewed recording from `music.MusicCatalog`, with no audio or media address;
+a restore ignores it). `FULL_OWNER` adds `schemaVersion`
 and `tables`: every row of every base table with a `campaign_id` column, found in the catalog at export time, plus the
 campaign row. It is read in one repeatable-read snapshot and capped at 200,000 rows and 64 Mi characters. `PLAYER` adds
 `panels` (the `PlayPanels` view without its journal page) and `journal`, every page of the public journal, newest first.
