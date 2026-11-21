@@ -76,6 +76,8 @@ holds 740 units, with the same single author pass and no independent review.
 The artwork gallery of the playthrough panels (P17.1-C) adds five (`campaign.panels.gallery` and the four category names
 `campaign.panels.galleryScene`, `galleryMap`, `galleryPortrait` and `galleryUi`), so the catalog now holds 745 units, with the
 same single author pass and no independent review.
+The optional music panel (`src/app/music/`, P17.2-B) adds 24 `music.*` messages, so the catalog now holds 769 units, with the
+same single author pass and no independent review; the credit data of the reviewed tracks is shown verbatim and marked `lang="en"`.
 The Italian targets of those 77 messages (plus the
 reworded `saved.readOnly`) had one author review pass on 28 October 2026, which corrected
 11 targets (ambiguous `Ricevuta`, identical sentences for two narration reasons, `tempo di

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Optional dynamic music (P17.2-B), 21 November 2026
+
+- The playthrough view has a Music section, off by default. Turning it on (a click) starts a looping track chosen from the
+  reviewed free-license catalog by the public situation: calm exploration music, tension music when a fight is offered, and
+  silence for moods without a reviewed recording. Changes crossfade over about two seconds and repeated or equivalent
+  cues do not restart the track.
+- Nothing is loaded from the internet before the player turns music on, and a reload needs a new click. Pause, mute, a
+  music volume, the current track's creator, license and source links, and a searchable list of all credits are included.
+  A browser that refuses playback or a source that cannot be loaded shows a short notice and the story is unchanged.
+- 24 Italian messages are added (769 messages).
+- Not included: playback verified against the real host, credits in exports, locally installed tracks, an effects volume
+  and a pack-defined music policy. The tracks stream from Wikimedia Commons and need a network connection.
+
 ## Unreleased — Authored pack artwork, an original sample image and an artwork gallery (P17.1-C), 21 November 2026
 
 - A pack's optional `presentation` file can now bind a listed image file to the item, NPC or scene it depicts, with a

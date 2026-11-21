@@ -7202,6 +7202,30 @@ this update. No combat runtime/browser result is claimed.
     Not proven: no audio was fetched, played or hashed (`localHash` is null); rights were not rechecked online today and
     the exact media file revision was not captured; no mood mapping, player, credits screen or export of credits; `verify.sh
     full` was not run.
+  - 2026-11-21 P17.2-B (partial; box stays unchecked): added the client music player in `frontend/src/app/music/`:
+    `moodOf` maps the player-safe combat projection to a mood (fight → combat, resolved → victory/defeat, offered encounter →
+    tension, else exploration); `MusicPlayer` starts nothing before an explicit click, saves the preference but needs a new
+    click after a reload, crossfades over 2 s (20 integer steps, at most two audible sources), ignores repeated or
+    equivalent cues, drops a previous campaign's track at once, keeps the current track on a refused or failed source and
+    reports `blocked`/`unavailable` without retrying; `MusicPanel` is mounted in the playthrough view with
+    on/off, pause, mute, volume, current-track title/creator/license/source links and a searchable credits list. Media
+    addresses come only from reviewed file names on `commons.wikimedia.org`. 24 `music.*` Italian messages were added (769).
+    Tests written: `music-player.spec.ts` (13 `it` blocks: controller, preference, mood and catalog guard) and
+    `music-panel.spec.ts` (2 `it` blocks, render); counted by reading the spec files, not from a test run.
+    Checks: the first `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh full` failed in the frontend build
+    (`MusicAudio.onerror` was not compatible with `HTMLAudioElement`; the backend part passed). Fixed by typing it as the DOM
+    `OnErrorEventHandler`; `npx tsc --noEmit -p tsconfig.app.json` and `-p tsconfig.spec.json` (in `frontend/`) then
+    reported no errors. Rerun by the orchestrator after that fix: `"C:/Program Files/Git/bin/bash.exe"
+    .agents/ralph/verify.sh full` → exit status 0 (the whole plan, backend and frontend build and specs, passed). Per-test
+    pass/fail counts for `music-player.spec.ts` and `music-panel.spec.ts` were not read from its output (only the exit
+    status 0 is known).
+    The P17.2 box stays unchecked: its text requires credits in exports and local-catalog support, which are not built
+    (see below), so only part of P17.2 is delivered.
+    Not proven: playback or looping in a real browser, that the Commons `Special:FilePath` address serves a playable file
+    (hosting, redirects, MIME, CORS and decoding unverified), an offline run in a browser, adventure switching in a
+    browser, a secret-sentinel journey; not built: credits in exports/manifests, local tracks, an effects volume, a pack
+    presentation policy for moods, spoken-dialogue ducking, a battle/victory recording. The client catalog is a hand copy of
+    `catalog.json` with no parity check. Italian targets had one author pass, no independent review.
 - [ ] P17.3 Finalize the default visual-novel and alternative text-focused layouts, graphic states, configurable tokens and attributed reading/history/quick-reply behavior.
 - [ ] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.
 - [ ] P17.5 Verify missing art/audio never blocks play and media cannot reveal secrets.

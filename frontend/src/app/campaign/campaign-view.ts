@@ -32,6 +32,8 @@ import { choiceKey, envelope, resolveChoice, TacticalChoice, TacticalCommand } f
 import { CombatDraftStore } from './combat-draft';
 import { EntryChoice, entryKey, resolveEntry } from './combat-entry';
 import { EncounterOffers } from './encounter-offers';
+import { MusicPanel } from '../music/music-panel';
+import { moodOf } from '../music/music-mood';
 
 /** Delay before the first retry after a failed read, doubled up to {@link MAX_BACKOFF_MS}. */
 const BASE_BACKOFF_MS = 2_000;
@@ -50,7 +52,7 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 
 /** Show a playthrough's authorized public projection and follow its resumable stream while mounted. */
 @Component({
-  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CampaignPanels, CampaignCues, CombatPanel, EncounterOffers],
+  selector: 'app-campaign-playthrough', changeDetection: ChangeDetectionStrategy.OnPush, imports: [CampaignPanels, CampaignCues, CombatPanel, EncounterOffers, MusicPanel],
   template: `
     <section class="panel campaign-playthrough" [attr.data-campaign-id]="campaignId()" aria-labelledby="campaign-title">
       @if (view(); as current) {
@@ -123,6 +125,8 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
 
       <app-campaign-cues [cues]="cues()" />
 
+      <app-music [scope]="musicScope()" [mood]="mood()" />
+
       <h3 i18n="@@campaign.view.operations">Actions</h3>
       <p role="status" aria-live="polite" data-connection>{{ connectionMessage() }}</p>
       @if (failure() && view()) { <p class="notice" role="alert" data-error>{{ failure() }}</p> }
@@ -194,6 +198,10 @@ export class CampaignPlaythrough {
   readonly busy = signal(false);
   readonly state = signal<'connecting' | 'live' | 'disconnected'>('connecting');
   readonly scope = computed((): CampaignScope => ({ adventureId: this.adventureId(), campaignId: this.campaignId() }));
+  /** Scope identity for optional music: an adventure or campaign change silences the previous scope's track (P17.2-B). */
+  readonly musicScope = computed(() => JSON.stringify([this.adventureId(), this.campaignId()]));
+  /** Music mood of the public combat projection only; hidden state cannot reach it. */
+  readonly mood = computed(() => moodOf(this.combat()));
   readonly operations = computed(() => this.session.operations(this.scope()));
   /** Presentation cues received on this page load, in display order; none is ever required to read the result. */
   readonly cues = computed(() => this.session.cues(this.scope()));

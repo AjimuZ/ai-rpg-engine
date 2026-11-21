@@ -5979,5 +5979,149 @@
       <target>Al momento non è possibile creare una partita. Non è stato creato nulla; riprova più tardi.</target>
       </segment>
     </unit>
+    <unit id="music.title">
+      <segment>
+        <source>Music</source>
+      <target>Musica</target>
+      </segment>
+    </unit>
+    <unit id="music.help">
+      <segment>
+        <source>Optional background music follows the public situation. Nothing is loaded from the internet until you turn it on, and the story is the same without it.</source>
+      <target>La musica di sottofondo è facoltativa e segue la situazione pubblica. Nulla viene caricato da internet finché non la attivi, e la storia non cambia senza di essa.</target>
+      </segment>
+    </unit>
+    <unit id="music.on">
+      <segment>
+        <source>Turn music on</source>
+      <target>Attiva la musica</target>
+      </segment>
+    </unit>
+    <unit id="music.off">
+      <segment>
+        <source>Turn music off</source>
+      <target>Disattiva la musica</target>
+      </segment>
+    </unit>
+    <unit id="music.start">
+      <segment>
+        <source>Start music</source>
+      <target>Avvia la musica</target>
+      </segment>
+    </unit>
+    <unit id="music.retry">
+      <segment>
+        <source>Try music again</source>
+      <target>Riprova la musica</target>
+      </segment>
+    </unit>
+    <unit id="music.pause">
+      <segment>
+        <source>Pause music</source>
+      <target>Metti in pausa la musica</target>
+      </segment>
+    </unit>
+    <unit id="music.resume">
+      <segment>
+        <source>Resume music</source>
+      <target>Riprendi la musica</target>
+      </segment>
+    </unit>
+    <unit id="music.mute">
+      <segment>
+        <source>Mute music</source>
+      <target>Silenzia la musica</target>
+      </segment>
+    </unit>
+    <unit id="music.volume">
+      <segment>
+        <source>Music volume</source>
+      <target>Volume della musica</target>
+      </segment>
+    </unit>
+    <unit id="music.track">
+      <segment>
+        <source>Track</source>
+      <target>Brano</target>
+      </segment>
+    </unit>
+    <unit id="music.creator">
+      <segment>
+        <source>Creator</source>
+      <target>Autore</target>
+      </segment>
+    </unit>
+    <unit id="music.license">
+      <segment>
+        <source>License</source>
+      <target>Licenza</target>
+      </segment>
+    </unit>
+    <unit id="music.source">
+      <segment>
+        <source>Source page</source>
+      <target>Pagina della fonte</target>
+      </segment>
+    </unit>
+    <unit id="music.credits.title">
+      <segment>
+        <source>Music credits</source>
+      <target>Crediti musicali</target>
+      </segment>
+    </unit>
+    <unit id="music.credits.search">
+      <segment>
+        <source>Search credits</source>
+      <target>Cerca nei crediti</target>
+      </segment>
+    </unit>
+    <unit id="music.credits.none">
+      <segment>
+        <source>No credit matches your search.</source>
+      <target>Nessun credito corrisponde alla ricerca.</target>
+      </segment>
+    </unit>
+    <unit id="music.status.off">
+      <segment>
+        <source>Music is off.</source>
+      <target>La musica è disattivata.</target>
+      </segment>
+    </unit>
+    <unit id="music.status.needsStart">
+      <segment>
+        <source>Music is on but silent until you start it in this visit.</source>
+      <target>La musica è attiva ma resta muta finché non la avvii in questa visita.</target>
+      </segment>
+    </unit>
+    <unit id="music.status.blocked">
+      <segment>
+        <source>The browser did not allow playback. Use the button to try again.</source>
+      <target>Il browser non ha consentito la riproduzione. Usa il pulsante per riprovare.</target>
+      </segment>
+    </unit>
+    <unit id="music.status.unavailable">
+      <segment>
+        <source>The track could not be loaded. The story is unchanged.</source>
+      <target>Non è stato possibile caricare il brano. La storia non cambia.</target>
+      </segment>
+    </unit>
+    <unit id="music.status.paused">
+      <segment>
+        <source>Music is paused.</source>
+      <target>La musica è in pausa.</target>
+      </segment>
+    </unit>
+    <unit id="music.status.playing">
+      <segment>
+        <source>Music is playing.</source>
+      <target>La musica è in riproduzione.</target>
+      </segment>
+    </unit>
+    <unit id="music.status.silent">
+      <segment>
+        <source>No reviewed track fits this moment, so the music is silent.</source>
+      <target>Nessun brano verificato si adatta a questo momento, quindi la musica è muta.</target>
+      </segment>
+    </unit>
   </file>
 </xliff>
