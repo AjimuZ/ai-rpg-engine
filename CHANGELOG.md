@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Setup steps and MVP capability table (P14.5-A), 21 November 2026
+
+- The README now opens with numbered setup steps for a packaged installation and a table of what works, what is only
+  partly proven and what is open. It states that the first-milestone exit is not met and that narration during play
+  needs the owner's sign-in. No behavior changed. The check, start, status and stop steps were run on a fresh export of
+  the working tree (not a git clone) and passed; Linux, macOS and a cold first build were not tried.
+
 ## Unreleased — Baseline latency, context use and open defects (P14.4-A), 21 November 2026
 
 - A routine one-event narration request was measured at about 2,800 estimated tokens, under a quarter of the standard

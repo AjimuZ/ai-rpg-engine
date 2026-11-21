@@ -5906,7 +5906,41 @@ this update. No combat runtime/browser result is claimed.
       during play; planner, memory-summary and multi-event context sizes; p50/p95 of anything; Italian request sizes;
       `verify.sh full` and `verify.sh containers`. No deliberate weakening was run on the new test beyond the one
       failing measurement run.
-- [ ] P14.5 Write reproducible setup and an accurate MVP capability table.
+- [x] P14.5 Write reproducible setup and an accurate MVP capability table.
+  - P14.5-A (21 November 2026; the README steps were run on a fresh export and passed, so the box is ticked; the P14 exit gaps below stay open): documentation only, no source change. The top of
+    [README.md](../README.md) now holds a numbered setup (check, start, open, optional `--login`, status/stop) and a
+    capability table, and says it supersedes the older per-task notes below it (one of which said "no gameplay").
+    - **Commands and results (fresh-checkout run, Windows 11, Docker Desktop 4.96.3, Engine 29.9.2, Compose 5.6.1, Git
+      Bash 5.3).** The copy is an export of the working tree, not a git clone: `mkdir -p .local/scratch/p145/fresh && tar
+      --exclude=./.local --exclude=./backend/target --exclude=./frontend/node_modules --exclude=./.ajimu-autopilot
+      --exclude=./.env --exclude=./.agents/ralph/.run --exclude=./.agents/skills -cf .local/scratch/p145/tree.tar . && tar
+      -xf .local/scratch/p145/tree.tar -C .local/scratch/p145/fresh`. It had no `.env`, `.local` or build output. No
+      other installation held port 8080 (`docker ps -a` showed no running engine container; `--check` reported the port
+      free). In that directory: `sh ./start.sh --check` printed "compose.yaml: valid", "port 8080: free" and "check
+      passed". `sh ./start.sh` created the installation identity, `.env`, the database secret and the owner identity,
+      built both images (layers were largely cached from earlier runs, so the cold first-build time is not measured;
+      the in-image `PackagedSecretsTest` ran 4 tests, 0 failures), started codex, postgres and engine (all healthy),
+      printed "storage: ready", "runtime account: NOT signed in", "gameplay: NOT ready (health group answered 503)" and
+      "started with gameplay incomplete; this is not a startup failure". `sh ./start.sh --status` listed the three
+      services running healthy, storage ready, and exited 3 as the README says. `node
+      .agents/ralph/browser/browser.mjs http://127.0.0.1:8080/` loaded `/en/library` (HTTP 200, title "Library |
+      Adventure engine"), exiting 1 only because of the known `/favicon.ico` 404. `sh ./start.sh --stop` removed the
+      containers and networks and kept the volumes. The README text needed one wording fix: it had said the run was not
+      done. The capability table's other rows copy earlier results (P14.3-A and P14.4-A: 904 backend tests in 79
+      classes, 234 interface tests, two restore rehearsals, Chrome journey 80/80, two live probe runs of 5.7 s and
+      5.2 s) and were not rerun here. `verify.sh full` was not run by this session. The owner's installation and its
+      `.local/installation-id` were not touched; the fresh copy's own volumes (`rpg-engine-d3ea7f36f050_*`) remain.
+    - **P14 exit, honestly.** Not met. Open: QA-15 progression is not applied in play; QA-34 has no test for
+      author-fixed NPCs and facts; live narration during packaged play is unproven (the installation's runtime is not
+      signed in, which is owner action); the Docker-gated checks of QA-24 and QA-28 and `verify.sh containers`
+      were not run; human reviews of QA-25, QA-26, QA-30 and QA-35 are open; the saved-adventure
+      page text is stale; `browser.mjs` exits 1 because of the `/favicon.ico` 404. The exit sentence "change adventure
+      files without editing engine source" holds only for the backend import; the packaged interface has no import.
+    - **Not proven.** A real `git clone` (the copy is an export, and it carried the working tree's uncommitted
+      state); a cold first build time; that the Lantern Ford sample appears in the library of the fresh installation
+      (only the redirect and page load were observed; the sample's provisioning comes from P14.3-A); `--login`; Linux,
+      macOS, and any host other than Windows 11. Because the run passed, P14.5 is ticked; the P14 exit gaps listed above
+      are unchanged.
 
 **Exit:** a fresh installation can play, fight, save, resume, and change adventure files without editing engine source. Critical integrity/security failures block the milestone. **Suggested commit:** `Validate the first playable engine milestone`.
 

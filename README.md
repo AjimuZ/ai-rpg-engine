@@ -1,5 +1,54 @@
 # AI RPG Engine
 
+## Setup and what works today (MVP validation, 21 November 2026)
+
+This section is the current status. The dated paragraphs below it are earlier per-task notes and may describe a state
+that has since moved on (for example "no gameplay"); where they disagree, this section and the
+[roadmap evidence](docs/16-development-roadmap.md) win.
+
+**Reproducible setup.** Verified on Windows 11 with Docker Desktop (WSL 2, Linux containers), from Git Bash. Linux and
+macOS hosts are not verified.
+
+1. Install Docker Engine 29.0+ with Compose 5.0+, and Git for Windows (GNU Bash 4.4+). No host Java, Maven, Node or npm
+   is needed.
+2. Clone the repository and run `./start.sh --check`. It inspects prerequisites and changes nothing.
+3. Run `./start.sh`. The first run creates the ignored `.env` and the database secret, builds the images (several
+   minutes), starts the application and PostgreSQL, and prints the local URL, `http://127.0.0.1:8080/`.
+4. Open the URL. The interface redirects to `/en/library` or `/it/library` by device language. The bundled Lantern Ford
+   fantasy sample is provisioned for the owner on first start.
+5. Optional, owner-run: `./start.sh --login` signs the isolated narration runtime in with a ChatGPT device code
+   (enable device-code login in your account first; see the account note below). Without it the game is playable but
+   narration stays pending.
+6. `./start.sh --status` (exit 3 means storage is ready and gameplay is not), `--logs`, and `--stop` (keeps all data).
+
+Steps 2, 3 and 6 (`--check`, start, `--status`, `--stop`) and the redirect of step 4 were run on 21 November 2026 in a
+fresh export of the working tree (not a git clone): `--check` passed, `./start.sh` built and started with all three
+services healthy, `--status` exited 3 because the runtime is not signed in, and `--stop` removed the containers. The
+first build there reused cached layers, so a cold first-build time is not measured. Details are in the P14.5-A roadmap
+entry.
+
+| Capability | State | Evidence and limits |
+| --- | --- | --- |
+| Packaged start, stop, restart, saved playthroughs kept | Verified (Windows 11) | `./start.sh` start, stop, start; 18 playthroughs listed after restart (P14.3-A). A fresh export of the tree also passed `--check`, start, `--status` and `--stop` (P14.5-A); a real git clone, other hosts and the `verify.sh containers` profile were not run. |
+| Create a playthrough and fight in the browser (English, Italian) | Verified on the fantasy sample | Chrome journey 80/80: creation, initiative, strikes, moves, escape and defeat settled once, return to exploration, language switch inside a fight. Victory, surrender and agreement not shown in a browser. |
+| Cyberpunk adventure | Backend only | Backend slice tests pass in both languages; the pack is not installable from the packaged image and the interface has no import. |
+| Combat rules, dynamic encounters, negotiation, withdraw | Verified by backend tests | 904 backend tests passed in the P14.3-A subset; the whole plan was not run by that session. |
+| Save, resume, reboot recovery, backup restore | Verified at reduced scope | Two restore rehearsals and recovery classes pass. Not shown: a fight restored mid-round, a restore through `./start.sh`. |
+| Duplicate actions have no duplicate effect | Verified at reduced scope | Retries before and after a restore; not a retry across a restart of the packaged installation. |
+| English and Italian interface | Verified at reduced scope | 738-message parity, accessibility scans clean. No independent Italian review; the bundled fantasy sample has no Italian text. |
+| Accessibility | Partial | Automated scans clean and no overflow at 390 px. No person-run keyboard, zoom or screen-reader pass. |
+| AI narration during play | **Not working in the packaged installation until the owner signs in** | The runtime itself passed live probes on the owner's account (5.2–5.7 s for one short turn and resume), but live narration during packaged play was never exercised. Every action stays `COMMITTED_NARRATION_PENDING` without sign-in. |
+| Quick-reply suggestions | Not proven | Need live narration. |
+| Progression after a fight (QA-15) | **Open** | The rules are tested, but nothing in play applies them. |
+| Author-fixed characters and facts (QA-34) | **Open** | The combat-profile half is tested; no test covers fixed NPCs and facts. |
+| Change adventure files without editing engine source | Backend import only | Packs import through the backend compiler and tests; there is no import in the packaged interface. |
+| Advanced planning | Deferred, off by default | The playable baseline needs no planner. |
+| Other runtimes, local models, image generation, speech, editor | Planned, not implemented | See the roadmap. |
+
+Known defects: the saved-adventure page still says "Sending actions in the browser is not connected yet." while the
+live view does send actions; `browser.mjs` exits 1 on every page because of a `/favicon.ico` 404. The first-milestone
+exit is **not met** (see the P14.5-A entry in the roadmap).
+
 P05.6 is in progress: [localization review builds](frontend/src/locale/README.md)
 provide 218 English/Italian messages across all local screens, sample passages,
 validation, preview receipts, recovery and accessibility, with strict resource parity.
