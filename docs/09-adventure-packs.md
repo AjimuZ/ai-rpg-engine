@@ -470,6 +470,13 @@ behavior remain deferred until supported. P04.6 adds reviewed EN/IT resources
 for every approved catalog leaf, source-owned tutorial/quote text and explicit
 English quote fallback in Italian. Source-only prose remains outside that coverage.
 
+P14.1-B adds a playable second genre fixture, the
+[cyberpunk Neon Alley pack](../backend/src/test/resources/packs/README.md), beside the bundled fantasy
+sample. It declares an encounter with a negotiated ending and an escape zone, and an Italian overlay for the opening
+text, the names panels show and the encounter's zone, participant, objective, action and terms text. `CyberpunkSliceTest`
+imports it through the registry next to the sealed sample, checks that no definition identity or display name is shared,
+and plays the same path in English and Italian without production source change. Both packs still keep `modules: []`.
+
 ## 13. Export and migration
 
 Export an admitted campaign-generated NPC or ability only through a review that removes private runtime identifiers, selects rights/provenance, resolves dependencies, and creates stable content IDs. Do not copy the live save into an adventure pack and call it reusable content.

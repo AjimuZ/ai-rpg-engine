@@ -1479,7 +1479,10 @@ and builds the executable jar containing both schemas. Repository-checker tests 
 22/22 and all repository policy checks report zero findings. This establishes only
 the parser/schema/hash portion of QA-02; semantic references, cycles, effects,
 archive extraction, media and immutable admission were addressed in P04.2–P04.4.
-Playable two-genre QA-01 remains beyond P04.5's import checks. The definition envelope deliberately
+Playable two-genre QA-01 remains beyond P04.5's import checks (P14.1-B adds a backend gameplay check:
+`CyberpunkSliceTest` seals the cyberpunk fixture beside the bundled fantasy sample on one build, compares their
+vocabulary and plays the cyberpunk slice in both languages; no browser run, no Italian overlay for the fantasy
+sample and no independent Italian review are claimed, see the roadmap entry). The definition envelope deliberately
 does not validate its `data` mechanics. No complete pack-import acceptance is claimed.
 
 ## 2. Verification layers

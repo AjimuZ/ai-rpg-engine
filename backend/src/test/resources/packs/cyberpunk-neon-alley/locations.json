@@ -1,0 +1,5 @@
+{"schemaVersion":1,"definitions":[
+{"id":"tram-stop","kind":"location","data":{"name":"Tram Stop","description":"A cracked platform under a flickering neon sign, above a rain-slick lane.",
+  "links":[{"to":"data-dock","accessible":true}]}},
+{"id":"data-dock","kind":"location","data":{"name":"Data Dock","description":"Server racks hum behind a chain-link gate; a service ladder climbs to the roofs.",
+  "links":[{"to":"tram-stop","accessible":true}]}}]}

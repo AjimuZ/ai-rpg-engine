@@ -1,0 +1,3 @@
+{"schemaVersion":1,"definitions":[
+{"id":"netrunning","kind":"skill","data":{"name":"Netrunning","description":"Read grids and break into closed systems.","attribute":"tech","maxRank":3}},
+{"id":"shooting","kind":"skill","data":{"name":"Shooting","description":"Fight with firearms.","attribute":"reflex","maxRank":3}}]}

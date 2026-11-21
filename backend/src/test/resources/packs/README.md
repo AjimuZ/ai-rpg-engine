@@ -50,6 +50,27 @@ language. P04.6 adds `locales/en.json`, `locales/it.json` and
 `text-resources.json` to each explicit inventory. The ruleset descriptor is
 provisional until P07.
 
+## Playable cyberpunk fixture (P14.1-B)
+
+`cyberpunk-neon-alley` (`sample:cyberpunk-neon-alley` 1.0.0, title Neon Alley) is the second genre of the playable
+slice. Unlike the two import fixtures it declares an encounter and is walked by `CyberpunkSliceTest`
+(`org.rpgengine.adventure`), which seals it into a second workspace of the owner that holds the provisioned fantasy
+sample. It shares no definition identity or display name with that sample outside the ruleset's fixed `rules.*` slots.
+
+| Content | lantern-ford (bundled sample) | cyberpunk-neon-alley |
+| --- | --- | --- |
+| Structure | Ford camp ↔ far bank | Tram stop ↔ data dock |
+| Attributes / resource | Awareness, Might / Vigor | Reflex, Tech / Integrity |
+| Skills | Trailcraft, Bladework | Netrunning, Shooting |
+| Starting items | Trail Kit, Sword, Cloak | Cyberdeck, Machine Pistol, Armored Jacket |
+| Encounter | Ford Ambush: raider, offer of a fair crossing | Lane Standoff: enforcer, offer of a toll, one plain step to the rooftop |
+| Locales | English only | English source and `locales/it.json` |
+
+The test plays both endings in both languages (the paid passage, an agreement; the climb to the rooftop, an escape),
+settles each once and replays the lost responses. The overlay is a reviewed author pass of one author, not an independent
+review. The fixture is excluded from the production jar, so a packaged installation does not hold it, and it declares no
+module (`modules: []`) because the engine still has none to load.
+
 ## Bilingual resource review (P04.6)
 
 All 24 fantasy and 26 salvage catalog leaves have EN/IT entries. Review compares

@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — A second genre, played in English and Italian (P14.1-B), 21 November 2026
+
+- A cyberpunk fixture adventure, Neon Alley (Italian: "Vicolo al neon"), now runs on the same engine build as the
+  fantasy sample, with its own places, attributes, resource, skills, items, quest and encounter. It is a test fixture
+  and is not installed at first start: the packaged installation still provisions only Lantern Ford.
+- Its Italian overlay covers the opening text, the names the character sheet and map panels show, and the encounter's
+  zones, opponent, objectives, offer and terms. An Italian playthrough therefore reads Italian with no fallback notice
+  for that text, unlike the English-only fantasy sample.
+- An automated test plays the same path in both languages: create a playthrough, enter the fight, roll initiative, then
+  either pay a toll (an agreement) or climb to the rooftop (an escape), settle, and return to exploration. A lost reply
+  to the acceptance or the settlement is retried without writing twice.
+- Limits: only the cyberpunk fixture has Italian adventure text. The bundled fantasy sample stays English, with the
+  fallback notice in an Italian playthrough. The cyberpunk slice was not run in a browser, and the combat panel's own
+  encounter strings were not checked in Italian. The Italian overlay has had one author pass and no independent review.
+
 ## Unreleased — A negotiated ending in the sample adventure (P14.1-D), 21 November 2026
 
 - The raider at the ford in Lantern Ford can now be talked to. The fight offers "Offer a fair crossing": the raider
