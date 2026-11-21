@@ -57,4 +57,19 @@ export class CombatDraftStore {
       return true;
     } catch { return false; }
   }
+
+  /**
+   * Empty the stored words of this fight after the server accepted exactly these words, keeping the recipient (P12.5-A).
+   *
+   * The host calls this before it re-reads the playthrough, because that re-read can tear the chat down before the chat sees the
+   * commit; without it the rebuilt chat would restore words that were already said. Words edited since the send differ from
+   * `sent` and are left untouched, as is a record of another encounter.
+   *
+   * @returns true when the stored words were emptied; false when nothing matched or storage refused the write
+   */
+  clearSent(adventureId: string, campaignId: string, encounterId: string, sent: string): boolean {
+    const kept = this.read(adventureId, campaignId, encounterId);
+    if (kept === null || kept.text !== sent) return false;
+    return this.write(adventureId, campaignId, encounterId, { recipient: kept.recipient, text: '' });
+  }
 }

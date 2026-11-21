@@ -276,7 +276,8 @@ export class CombatChat {
         this.submitted = null;
         this.reviewing.set(null);
         const kept = this.stored();
-        // Only here, after the server accepted the words, is the draft emptied, on the device as well as in the page.
+        // After the server accepted the words the draft is emptied, on the device as well as in the page. The host also empties
+        // the device copy before its re-read (P12.5-A), because that re-read can rebuild this chat before it gets here.
         if (sent.choice.kind === 'speak' && kept !== null && kept.text === sent.choice.text) this.keep({ text: '' });
       });
     });

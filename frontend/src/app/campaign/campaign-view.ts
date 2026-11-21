@@ -28,6 +28,7 @@ import {
 } from './campaign-messages';
 import { CampaignScope, CampaignSession, CampaignTransport } from './campaign-session';
 import { choiceKey, envelope, resolveChoice, TacticalChoice, TacticalCommand } from './combat-actions';
+import { CombatDraftStore } from './combat-draft';
 import { EntryChoice, entryKey, resolveEntry } from './combat-entry';
 import { EncounterOffers } from './encounter-offers';
 
@@ -162,6 +163,7 @@ export class CampaignPlaythrough {
   readonly input = inject(StoryInputState);
   private readonly transport = inject(CampaignTransport);
   private readonly session = inject(CampaignSession);
+  private readonly drafts = inject(CombatDraftStore);
   private readonly locale = inject(LOCALE_ID);
   readonly receiptLabel = $localize`:@@campaign.view.receiptLabel:Result of the action`;
   readonly view = signal<CampaignView | null>(null);
@@ -355,7 +357,13 @@ export class CampaignPlaythrough {
     if (this.sending() || this.run === undefined || view === null) return;
     const resolved = resolveChoice(view.encounter, choice);
     if (!resolved.ok) { this.problem.set(resolved.refusal); return; }
-    await this.dispatch(choiceKey(choice), resolved.command, view.stateRevision);
+    const scope = this.scope();
+    const fight = view.encounter?.encounterId ?? null;
+    // The re-read after an accepted speech can rebuild the chat before it sees the commit, so the device copy is emptied here first.
+    const words = choice.kind === 'speak' ? choice.text : null;
+    const accepted = words !== null && fight !== null
+      ? () => { this.drafts.clearSent(scope.adventureId, scope.campaignId, fight, words); } : undefined;
+    await this.dispatch(choiceKey(choice), resolved.command, view.stateRevision, accepted);
   }
 
   /**
@@ -374,9 +382,10 @@ export class CampaignPlaythrough {
 
   /**
    * Submit one validated command under the identity rule: the same key at the same revision reuses the request identity of a lost
-   * attempt; any other key or revision gets a new one.
+   * attempt; any other key or revision gets a new one. `accepted` runs once when the server answered with a committed operation (new
+   * or replayed), before the re-read starts; it never runs for a refusal, an uncommitted operation or a lost reply.
    */
-  private async dispatch(key: string, command: TacticalCommand, revision: number): Promise<void> {
+  private async dispatch(key: string, command: TacticalCommand, revision: number, accepted?: () => void): Promise<void> {
     const run = this.run;
     if (run === undefined) return;
     if (this.attempt?.key !== key || this.attempt.revision !== revision) {
@@ -390,6 +399,7 @@ export class CampaignPlaythrough {
       if (run.signal.aborted) return;
       this.attempt = null;
       this.session.applyOperation(scope, operation);
+      if (operation.committedRevision !== null) accepted?.();
       this.refresh();
     } catch (error) {
       if (run.signal.aborted) return;

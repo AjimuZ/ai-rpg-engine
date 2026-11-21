@@ -376,6 +376,31 @@ describe('Combat chat in the playthrough view', /** Draft first, review next, se
     expect(kept()?.text).toBe('');
   });
 
+  it('does not bring back words already said when the re-read after the speech rebuilds the chat', /** Seen in a real browser (P12.5-A). */ async () => {
+    let release = () => {};
+    server.commandReply = () => {
+      const next = JSON.parse(JSON.stringify(encounterBody())) as Record<string, any>;
+      next['scope']['stateRevision'] = 3;
+      server.encounterBody = next;
+      server.stateHold = new Promise<void>((done) => { release = done; });
+      return json(operation(OP1, 'COMMITTED', 1, true), 202);
+    };
+    const { harness, root } = await open();
+    await choose(harness, root, 'sentry');
+    await write(harness, root, 'Stand down, please.');
+    await press(harness, root, '[data-chat-review]');
+    await press(harness, root, '[data-chat-confirm]');
+    // The held re-read leaves the page without a view, so the chat that sent the words is gone before it saw the commit.
+    await settle(harness, () => server.commands.length === 1 && root.querySelector('#combat-chat-words') === null);
+    expect(kept()).toEqual({ version: 1, encounterId: OP2, recipient: 'sentry', text: '' });
+    server.stateHold = null;
+    release();
+    await settle(harness, () => root.querySelector('#combat-chat-words') !== null);
+    expect(words(root)).toBe('');
+    expect((root.querySelector('#combat-chat-recipient') as HTMLSelectElement).value).toBe('sentry');
+    expect(server.commands.length).toBe(1);
+  });
+
   it('keeps writing in the page when the device refuses storage', /** Storage faults never discard words. */ async () => {
     device.denied = true;
     const { harness, root } = await open();

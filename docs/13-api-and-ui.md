@@ -653,7 +653,10 @@ no route sends a reply and the page shows none). Draft persistence and the settl
   playthrough tagged with the encounter it was written in. After a reload or a reconnect the same fight shows them again; another
   fight never does, and a malformed or foreign record is ignored. The copy is emptied only when a newer revision arrives with no
   refusal after the player confirmed those exact words, or by the player's own "Clear words"; a refusal or a lost reply keeps it.
-  If the page is reloaded while the words are being sent, they return as a draft and are not sent again. Refused storage keeps
+  Since P12.5-A the host also empties the device copy itself before re-reading the playthrough. It does this only when the server
+  answered the speech with a committed operation (new or replayed) and the stored words are still exactly the words sent. The
+  re-read can rebuild the chat before the chat sees the commit, and the rebuilt chat would otherwise bring back words already said
+  (seen in a real browser). The recipient is kept. If the page is reloaded while the words are being sent, they return as a draft and are not sent again. Refused storage keeps
   the draft in the page only.
 - **Starting a fight (`ENGAGE`)** was not connected by P12.5-B: no projection named an encounter the player may start. Since
   P13.2-B the projection's `offers` does, below.

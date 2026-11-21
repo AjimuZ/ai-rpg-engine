@@ -4795,7 +4795,7 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     - A roster ID shorter than four characters cannot be a guard marker; an implied acceptance in free words and paraphrased
       secrets are not detectable mechanically (QA-07 is covered only for its mechanical part).
     - Not run by this session: `verify.sh full`, `verify.sh containers` and deliberate weakenings.
-- [ ] P12.5 Verify mobile/keyboard play, chat/tactics switching, draft preservation, no out-of-turn/automatic submission and session renewal/reconnect inside a fight, including negotiated settlement retries.
+- [x] P12.5 Verify mobile/keyboard play, chat/tactics switching, draft preservation, no out-of-turn/automatic submission and session renewal/reconnect inside a fight, including negotiated settlement retries.
   - P12.5-B, settlement control and kept combat draft, 14 November 2026 (the P12.5 box stays unchecked: this story does not
     finish it, and the `ENGAGE` half of P12.5-B is not done).
     - **Settlement.** New `settle` choice in `combat-actions.ts`: listed, and valid, only while the projection shows
@@ -4836,6 +4836,78 @@ Scheduling: this package follows the memory work so that P10–P17 can be built 
     - No browser, keyboard, 320 px, focus-order, axe or screen-reader check, no bundle-size measurement and no review of the
       three Italian sentences by a second person.
     - Not run by this session: `verify.sh full`, `verify.sh containers`.
+  - P12.5-A, a whole fight in a real browser, 21 November 2026 (the box is left to the runner).
+    - **Setup.** A fresh packaged copy, separate from the owner's installation, with its own `.local`, identity
+      `rpg-engine-f0bfcc823320` and Compose project. It was made with the supervisor's `tar` command into
+      `.local/scratch/p125a/install` and started with `cd .local/scratch/p125a/install && sh ./start.sh`: Engine 29.9.2,
+      Compose 5.6.1, storage ready. No runtime account was signed in, so gameplay was reported "NOT ready" (expected).
+      First start provisioned the sample with `offer-passage` (P14.1-D).
+    - **Journey.** `.local/scratch/p125a/journey.mjs` (private, not in Git) drives headless Chrome through Playwright with a
+      persistent profile:
+      - Phase `a`, 1280 px, keyboard only: create a playthrough on the screens; story draft; look for fights; review and
+        confirm `ENGAGE`; recipient and words before initiative (review disabled, Enter sends nothing); `ROLL_INITIATIVE`; a
+        speech whose reply is lost, then repeated; a second draft; collapse the chat, `MOVE_ZONE`, reopen it; cookies
+        dropped, then another move.
+      - Then `sh ./start.sh --stop` and `sh ./start.sh`.
+      - Phase `b`, 320 px, touch: reconnect; offline 5 s and back; `INTERACT offer-passage`; `ANSWER_OFFER accept` with a
+        lost reply, then repeated; the verdict; `SETTLE_ENCOUNTER` with a lost reply, then repeated; the return to
+        exploration.
+      - Lost replies are made by letting the request reach the server and then aborting its response.
+    - **Defect found and fixed.** In run `r6` phase `a` failed 3 of 55 checks: after the replayed speech was accepted the
+      words were still in the chat and on the device, and the next draft was appended to them. Cause:
+      - `dispatch` calls `refresh()`, which sets the view to null, and the zoneless page can render that state;
+      - the whole `@if (view())` block, the combat chat included, is then destroyed before the chat's accepted-revision effect
+        runs;
+      - the rebuilt chat restores the stale device copy.
+
+      Run `r5` (an earlier attempt) passed because the rendering race went the other way. Fix:
+      - `CombatDraftStore.clearSent` empties the stored words of that encounter when they equal the words sent, keeping
+        the recipient;
+      - `CampaignPlaythrough.send` calls it for a speech only when the server answers with a committed operation, new or
+        replayed, before the re-read starts;
+      - refusals, uncommitted operations and lost replies keep the words, and words edited since the send are left as they
+        are.
+
+      New test in `combat-chat.spec.ts`: it holds the state re-read through the new `CampaignServer.stateHold`, so the
+      chat is gone before the commit is seen, and expects the device copy and the rebuilt chat to be empty with the
+      recipient kept.
+    - **Results after the fix** (the copy refreshed with the same `tar` pair and rebuilt by `sh ./start.sh`):
+      - `node .local/scratch/p125a/journey.mjs a r7`: `RESULT 55/55 passed`. The repeated speech carried the same
+        `requestId`, payload and expected revision (reply 200, `replayed: true`) and the transcript holds the words once.
+        The device copy was emptied after the accepted speech only.
+      - After the cookies were dropped, the move was refused once (403) and sent again by the transport with the same
+        `requestId` after the session was renewed: one commit, no problem shown.
+      - axe found nothing in the fight.
+      - `sh ./start.sh --stop`, then `sh ./start.sh` (cached build, storage ready).
+      - `node .local/scratch/p125a/journey.mjs b r7`: `RESULT 42/42 passed`. The stream resumed after the saved cursor
+        `0:25` and the reconnect sent no write. Both drafts, the recipient, the operation list and the transcript were
+        unchanged after the restart and after offline/online.
+      - The verdict was "Agreement reached", reached only by the accepted truce. Commands in order: `ENGAGE`,
+        `ROLL_INITIATIVE`, `COMBAT_SPEAK` ×2 (same identity), `MOVE_ZONE` ×3 (two moves, the second sent twice under one
+        identity around the 403), `INTERACT`, `ANSWER_OFFER` ×2 (same identity), `SETTLE_ENCOUNTER` ×2 (same identity).
+      - At the verdict the only choice is `settle` and the chat cannot send. The settlement appears once in the operation
+        list, and the event history records outcome `AGREEMENT`.
+      - No request body carried either draft. No horizontal overflow at 320 px, and axe found nothing at the reconnect,
+        the verdict and the return.
+      - Console messages were only the expected aborted responses and one 404.
+      - `sh ./start.sh --stop` at the end.
+    - **Checks.** `sh .agents/ralph/verify.sh frontend` printed `VERIFY PASSED (frontend)`: 24 files and 234 tests passed,
+      plus i18n, build and locales. The same 234 tests passed inside the image build.
+    - **P12 exit, as recorded here.** The complete fight is playable through the actual UI, including a container restart,
+      a reconnect and a resume, on the packaged origin.
+      - QA-09 browser half: met for drafts kept across a restart and a reconnect, no out-of-turn or automatic submission,
+        and no repeated social effect. Renewal of a running narration runtime session inside a fight is not proven.
+      - QA-07: only the mechanical part. Every command in the fight was one the player reviewed and confirmed, but no
+        narration ran, so agency in narrated text is not proven.
+      - QA-16: still rests on the backend evidence (P12.1-A, P12.3-A, P12.4-B, P13.2-B). This journey did not search the
+        page for hidden sentinels.
+      - The exit check "tactic-invalid/provider-unavailable fallback" was not exercised by this story.
+    - **Not proven.**
+      - The narration runtime was not signed in, so there is no narration, no runtime session renewal inside a fight and no
+        live tactic or reply.
+      - Run in headless Chrome only: no screen reader, no real phone, no Italian locale, no 390 px pass.
+      - No deliberate weakening: the new test was not run against the unfixed code.
+      - Not run by this session: `verify.sh full`, `verify.sh containers`.
 
 **Requirement update (24 October 2026):** the owner requests free-input chat during
 combat to talk to participants and influence subsequent events. The design now

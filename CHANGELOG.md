@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — A whole fight checked in a real browser (P12.5-A), 21 November 2026
+
+- Fixed: after a speech in a fight was accepted, the chat could show the words you had just said again, ready to be
+  sent a second time. The page reloads the fight after each action, and that reload could rebuild the chat before it
+  had seen that the words were said. Your sent words are now cleared from the device copy as soon as the server accepts
+  them. Words you were still editing, and your choice of recipient, are kept.
+- A complete fight on the Lantern Ford sample was played in headless Chrome against a fresh packaged installation. It
+  used the keyboard at 1280 px and touch at 320 px. The fight was started, initiative rolled and a speech sent, with
+  switching between chat and tactics. The browser session was renewed, the engine was stopped and started again in
+  the middle of the fight, and the connection was lost and came back. The raider's truce was accepted, and settling
+  the fight returned to exploration.
+- In that run, both drafts survived every step, and nothing was sent unless you confirmed it. When the reply to a
+  speech, the acceptance or the settlement was lost, repeating the action played it only once.
+- Limits: no narration runtime account was signed in, so narration and the renewal of a narration session inside a
+  fight were not checked. There was no screen reader, no Italian run and no real phone.
+
 ## Unreleased — Recovery checked on the sample adventure (P14.2-A), 21 November 2026
 
 - An automated test now checks, on the bundled Lantern Ford sample, that stopping the engine and starting it again does

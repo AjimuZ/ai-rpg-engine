@@ -183,6 +183,8 @@ export class CampaignServer {
   readonly commands: { readonly csrf: string | undefined; readonly body: Record<string, any> }[] = [];
   /** Reply to a command; the default is a committed operation. Throwing a TypeError models a lost reply. */
   commandReply: () => Response = () => json(operation(OP1, 'COMMITTED', 1, true), 202);
+  /** While set, state reads wait for it, so a test can render the page between a commit and its re-read. */
+  stateHold: Promise<void> | null = null;
 
   readonly fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = String(input);
@@ -199,7 +201,7 @@ export class CampaignServer {
     }
     if (url.startsWith('/api/v1/campaigns?')) return Promise.resolve(json({ campaigns: [(state() as { campaign: unknown }).campaign], nextAfter: null }));
     if (this.errorCode) return Promise.resolve(json({ code: this.errorCode }, this.statusCode));
-    if (url.includes('/state?')) return Promise.resolve(json(this.stateBody));
+    if (url.includes('/state?')) return (this.stateHold ?? Promise.resolve()).then(() => json(this.stateBody));
     if (url.includes('/resume?')) return Promise.resolve(json(this.resumeBody));
     if (url.includes('/encounter?')) return Promise.resolve(json(this.encounterBody));
     if (url.includes('/panels?')) {

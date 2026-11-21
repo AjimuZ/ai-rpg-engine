@@ -1833,6 +1833,23 @@ nothing generated, and the committed state and the player's legal actions are un
 results and limits. No command calls the contract, no reply is shown in play, an acceptance implied in free words is not
 detectable mechanically, and no live model output was evaluated.
 
+P12.5-A (21 November 2026) records the P12 exit on a real browser path. Headless Chrome played a whole Lantern Ford fight
+against a fresh packaged installation with no runtime account signed in:
+- 1280 px with the keyboard, then 320 px with touch;
+- a speech, chat/tactics switching and a dropped browser session;
+- `./start.sh --stop` and `./start.sh` in the middle of the fight, then offline and back;
+- the raider's truce accepted, and settlement.
+
+The two runs passed 55/55 and 42/42 checks after one fix: a re-read could rebuild the chat with words already said. See
+the P12.5 roadmap entry for the commands, the fix and the limits.
+- **QA-09, browser half:** met for draft preservation across a restart and a reconnect, no out-of-turn or automatic
+  submission, and no repeated speech, acceptance or settlement after a lost reply. Renewal of a running narration runtime
+  session inside a fight is not proven, because no account was signed in.
+- **QA-07:** only its mechanical part. Every command was one the player reviewed and confirmed, and no narration ran.
+- **QA-16:** still rests on the backend evidence above. This journey did not search the page for hidden sentinels.
+
+No screen reader, real phone or Italian run took part.
+
 P13.1-A (14 November 2026) adds `ThreatBudgetTest` (10), QA-14 evidence for the invalid-roster and over-budget-roster
 clauses of the pure threat check ([encounters section 4](12-encounters-and-progression.md#4-initial-threat-heuristic)). One
 invalid roster reports a reserved ID (`player`), a duplicate ID, an invalid ID and a level out of range, then too many hostile
