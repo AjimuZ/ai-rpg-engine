@@ -1,5 +1,23 @@
 # Quality Strategy and Acceptance Criteria
 
+P14.2-A verification (21 November 2026): `RebootRecoveryTest` (2 cases, real PostgreSQL, run alone with
+`verify.sh backend -Dtest=RebootRecoveryTest`: `Tests run: 2, Failures: 0, Errors: 0, Skipped: 0`) carries QA-17,
+QA-18 and the deterministic part of QA-08 onto the bundled sample `sample:lantern-ford` as first-start provisioning
+installs it. Each case reboots the engine as a second complete application context over the same database, which runs
+every startup pass of a packaged start, including the memory pass.
+
+- **QA-17:** an initiative roll cut off after its dice are reserved, with its permit held, changes no world row. The
+  reboot ends it `FAILED_BEFORE_COMMIT` with the same dice. Its lost response replays that ending, the roll asked
+  again commits with the same dice once, and its lost response replays the receipt.
+- **QA-18 with QA-08:** a wait committed while its narration ran keeps its effects through the reboot. The narration
+  is requeued and published once without re-running the wait. The narrator's first session after the reboot starts at
+  `free-input` with the owed narration counted and without the opening scene. The wait's lost response replays its
+  receipt.
+
+Not verified: a live model after the reboot (the runtime and narration are scripted), a stop and start of the packaged
+containers, a browser reload, backup and restore, an Italian playthrough and crash points inside a fight's narration.
+The roadmap entry lists the exact assertions.
+
 P10.2 verification (29 October 2026): the full backend suite passes 817 tests with zero failures on
 PostgreSQL 18.6, and `./mvnw --batch-mode verify` passes 817 with 4 skipped packaged-interface tests.
 Toward QA-10, `ItemCommandsTest` commits a potion's quantity and its capped healing together, moves

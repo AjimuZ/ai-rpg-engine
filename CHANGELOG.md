@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Recovery checked on the sample adventure (P14.2-A), 21 November 2026
+
+- An automated test now checks, on the bundled Lantern Ford sample, that stopping the engine and starting it again does
+  not lose or repeat anything. If a roll is cut off before it is saved, it changes nothing, and asking again uses the
+  same dice. If an action is saved but its narration is cut off, it keeps its effects, and its narration is written
+  once after the restart. The narrator then resumes at your current choice without replaying the opening scene. A
+  lost reply is answered again without acting twice.
+- No behavior changed. Limits: the narrator in the test is scripted rather than a live model, the restart happens
+  inside one test process rather than through `./start.sh`, and backup and restore were not part of this check.
+
 ## Unreleased — A second genre, played in English and Italian (P14.1-B), 21 November 2026
 
 - A cyberpunk fixture adventure, Neon Alley (Italian: "Vicolo al neon"), now runs on the same engine build as the

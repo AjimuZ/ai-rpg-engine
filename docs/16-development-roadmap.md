@@ -5534,6 +5534,59 @@ this update. No combat runtime/browser result is claimed.
     - After the documentation edits, `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh repo` printed
       `VERIFY PASSED` (diff-check, line-endings, repository-checks, repository-tests and backup-tests PASS).
 - [ ] P14.2 Verify reboot, AI renewal, interrupted generation, lost response, backup restore, and no duplicate effects.
+  - P14.2-A (21 November 2026, partial; this box stays unchecked): reboot, renewal and interrupted generation are
+    verified on the bundled sample adventure (QA-08, QA-17, QA-18). Backup restore and the rest of P14.2 remain open.
+    - Test added: `backend/src/test/java/org/rpgengine/commands/RebootRecoveryTest.java` (2 cases, real PostgreSQL). Each
+      case provisions the owner and `sample:lantern-ford` through `FirstStartProvisioning.provision`, creates an English
+      playthrough with the `scout` archetype, stops at an interruption, and then reboots: a second complete application
+      context over the same database (`SpringApplicationBuilder`, `WebApplicationType.NONE`, started with
+      `--engine.provisioning.enabled=true`, the same `--engine.http.owner-id` and
+      `--engine.memory.reconciliation.enabled=true`) runs the startup passes of a packaged start: provisioning, journal,
+      presentation and scheduler recovery, then the memory pass. No web server or runtime account is used.
+      - (1) QA-17, `aCrashBeforeCommitLeavesNoEffectAndTheRebootKeepsItsDice`: after `ENGAGE ford-ambush`, the
+        `ROLL_INITIATIVE` attempt is cut off after its dice are reserved. A trigger refuses every update that would move
+        the journal out of `VALIDATING`, so the permit stays held, as with a killed process. The campaign, actors, pools,
+        conditions, equipment, items, abilities, events, fight and reward rows are unchanged, and no outbox intent is
+        written. The permit's deadline is moved into the past, standing in for the time a dead process stops renewing it.
+        The reboot ends the attempt `FAILED_BEFORE_COMMIT` with the same draws, creates no second owner, workspace or
+        revision, and its memory pass reports no failure. A further `JournalRecoveryService.reconcile()` returns 0. The
+        lost response replays `FAILED_BEFORE_COMMIT` with no receipt. A new roll commits with the same draws and one
+        `INITIATIVE_ROLLED` event. Its own lost response replays the same receipt and leaves the world, journal, draws,
+        outbox, narration, presentation and stream rows unchanged.
+      - (2) QA-18 with QA-08, `aRebootResumesInterruptedNarrationOnceBehindARehydratedNarrator`: a narrator session is
+        opened through a scripted runtime, using the real session journal and rehydration. Then `WAIT 60` commits, and its
+        presentation job is set `RUNNING` with an expired lease while its journal is set `NARRATING`, as a stop during
+        narration leaves them. The reboot leaves the world unchanged, retires the open session with `RESTART`, and
+        requeues the job (`QUEUED`) while the journal stays `NARRATING`. The memory pass reports `narrationResuming=1` and
+        `narrationPending=0`. The narrator's first task after the reboot runs in a new session. Its continuity block has
+        cause `restart`, the committed revision, pending decision `free-input` and `narrationPending=1`, and it does not
+        contain the sample's opening sentence. A counting narration port is then called exactly once. The journal ends
+        `DELIVERED` with one publication, and the world is unchanged. The wait's lost response replays the same receipt
+        and writes nothing, with one presentation job for the action. A later `turn-ceiling` renewal reports
+        `narrationPending=0` and again omits the opening.
+    - Commands and results: `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=RebootRecoveryTest`
+      printed `VERIFY PASSED` (backend-sources, backend-database, backend-focused PASS). The focused Maven log reports
+      `Tests run: 2, Failures: 0, Errors: 0, Skipped: 0`, and logs one memory reconciliation report per reboot
+      (`campaigns=1, failures=0, ... narrationResuming=1`). Both cases passed on the first run. After the documentation
+      edits, `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh repo` printed `VERIFY PASSED` (diff-check,
+      line-endings, repository-checks, repository-tests and backup-tests PASS).
+    - Acceptance criteria against the evidence: "QA-08, QA-17 and QA-18 pass with no duplicate effects". QA-17 (no world
+      effects, operation recoverable, draw identity retained) and QA-18 (effects preserved, missing narration resumes
+      without repeating the action) are shown across a reboot of the application context, as described above. QA-08 is
+      shown for what the engine gives the fresh thread: the pending decision with no opening scene. Duplicate effects are
+      excluded for the retried roll, the requeued narration and both lost responses.
+    - Not proven:
+      - No live model ran. The narrator runtime and the narration are scripted, so whether a live model follows the
+        continuity block (QA-08 live and its human rubric) is not shown. The owner's runtime account was not used.
+      - The reboot is a second application context in the same JVM, with the first context still open. It is not a
+        stop and start of the packaged containers through `./start.sh`, and no browser reload was exercised.
+      - The permit expiry and the interrupted narration are written by the test with SQL, not produced by killing a
+        process. The same holds for earlier QA-17/QA-18 suites (`CanonicalCommitServiceTest`, `CombatRecoveryTest`,
+        `MemoryContinuityTest`).
+      - Backup and restore, a crash inside a fight's narration, the Italian locale, and the lost-response path over HTTP
+        were not covered by this test.
+      - No deliberate weakening probes were run against the new test.
+      - This session ran only `RebootRecoveryTest`, not `verify.sh full` or `verify.sh containers`.
 - [ ] P14.3 Run the required reduced-scope MVP QA matrix and record fresh evidence.
 - [ ] P14.4 Measure baseline latency/context use and list unresolved defects honestly; demonstrate one optional bilingual baseline/planner investigation comparison when available, or record deferred/unavailable planning with the playable fallback. Advanced planning cannot block MVP.
 - [ ] P14.5 Write reproducible setup and an accurate MVP capability table.
