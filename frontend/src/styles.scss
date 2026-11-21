@@ -82,7 +82,9 @@ main { max-width: 78rem; margin: auto; padding: 1.25rem; }
 .story { position: relative; }
 .story-title { font-size: 1.1rem; color: var(--accent); }
 .scene { position: relative; margin: 0; background: #25243d; border-radius: .6rem .6rem 0 0; overflow: hidden; }
-.scene img { display: block; width: 100%; height: clamp(18rem, 53vh, 42rem); object-fit: cover; }
+/* The scene is the dominant element: about three fifths of the viewport height on desktop, bounded so a very tall window
+   does not push the passage off screen. Narrow viewports override this below so the text keeps priority. */
+.scene img { display: block; width: 100%; height: clamp(18rem, var(--scene-share, 62vh), 46rem); object-fit: cover; }
 .scene figcaption { position: absolute; bottom: .65rem; right: .75rem; background: #141522ec; color: var(--muted); padding: .2rem .6rem; font-size: .8rem; }
 .scene-fallback { min-height: 18rem; padding: 2rem; }
 .dialogue { display: flex; align-items: flex-start; gap: 1rem; padding: 1rem clamp(1rem, 3vw, 2rem); background: var(--raised); border: 1px solid var(--line); border-top: 2px solid var(--accent); }
@@ -91,16 +93,23 @@ main { max-width: 78rem; margin: auto; padding: 1.25rem; }
 .portrait-frame { flex: 0 0 auto; width: clamp(3rem, 9vw, 6rem); aspect-ratio: 6 / 7; border: 1px solid var(--accent); border-radius: .3rem; overflow: hidden; }
 .portrait { display: block; width: 100%; height: 100%; object-fit: cover; }
 .portrait-fallback { display: grid; place-items: center; height: 100%; font-size: 2rem; color: var(--muted); }
-/* Text mode removes artwork from the DOM and keeps a single, comfortably sized reading column. */
-.text-focused { max-width: 48rem; margin-inline: auto; }
+/* Visual novel: the speaker's portrait overlaps the lower left of the scene while its attribution stays in the text below. */
+.story:not(.text-focused) .portrait-frame { position: relative; z-index: 1; margin-top: calc(-1 * clamp(2.5rem, 7vw, 4.5rem)); background: var(--raised); box-shadow: 0 .25rem .75rem #000a; }
+/* A failed scene keeps its footprint and gains a dashed edge, so the state is not conveyed by colour alone. */
+.story[data-scene="failed"] .scene { border: 2px dashed var(--line); }
+/* Text mode removes artwork from the DOM and keeps a single reading column whose width is the measure token. */
+.text-focused { max-width: var(--reading-measure, 48rem); margin-inline: auto; }
 .scene-description { color: var(--muted); }
 .text-focused .dialogue { border-radius: .4rem; }
+/* Compact read-back of the passage before the current one: two lines at most; the full text stays in the chronicle. */
+.previous { margin: .75rem 0 .5rem; color: var(--muted); font-size: .9rem; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.previous strong { color: var(--text); }
 .chronicle ol { padding-left: 1.75rem; }
 .chronicle li { padding-left: .25rem; }
-.chronicle p { font-family: Georgia, serif; font-size: var(--reading-size, 18px); line-height: 1.65; }
+.chronicle p { font-family: Georgia, serif; font-size: var(--reading-size, 18px); line-height: var(--reading-leading, 1.65); max-width: var(--reading-measure, 75ch); }
 .speaker { color: var(--accent); font-weight: 650; margin: 0; }
 .speaker span { margin-left: .75rem; font-size: .85rem; font-weight: 400; }
-.passage { font-family: Georgia, serif; font-size: var(--reading-size, 18px); line-height: 1.65; margin: .5rem 0; min-height: 3.3em; }
+.passage { font-family: Georgia, serif; font-size: var(--reading-size, 18px); line-height: var(--reading-leading, 1.65); margin: .5rem 0; min-height: 3.3em; max-width: var(--reading-measure, 75ch); }
 .reading-controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 1rem 0; }
 .reading-controls span { color: var(--muted); font-size: .9rem; }
 .chronicle { padding: .75rem 0; border-top: 1px solid var(--line); }
@@ -114,6 +123,7 @@ summary { cursor: pointer; color: var(--focus); padding: .4rem 0; }
   main { padding: 1rem; }
   .library-grid { grid-template-columns: 1fr; }
   .scene img { height: 34vh; min-height: 13rem; }
+  .story:not(.text-focused) .portrait-frame { margin-top: -2rem; }
   .workspace-heading { gap: .5rem; }
   .reading-controls { align-items: flex-start; }
 }
@@ -121,6 +131,7 @@ summary { cursor: pointer; color: var(--focus); padding: .4rem 0; }
 @media (forced-colors: active) {
   nav a.selected { border-bottom: 2px solid LinkText; }
   .dialogue, .scene, .panel { border: 1px solid CanvasText; }
+  .story:not(.text-focused) .portrait-frame { background: Canvas; border-color: CanvasText; }
 }
 
 /* Wrapping native reply controls preserve editable input and touch access on narrow reading layouts. */

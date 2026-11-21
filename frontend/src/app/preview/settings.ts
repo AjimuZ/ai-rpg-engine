@@ -17,6 +17,14 @@ import { UiLanguage } from './ui-language';
     <label for="reading-layout" i18n="@@settings.layout">Story layout</label>
     <select id="reading-layout" [value]="state.readingLayout()" (change)="changeLayout($event)">
       <option value="visual-novel" i18n="@@settings.visualNovel">Visual novel</option><option value="text-focused" i18n="@@settings.textFocused">Text focused (no artwork)</option>
+    </select>
+    <label for="reading-spacing" i18n="@@settings.spacing">Line spacing</label>
+    <select id="reading-spacing" [value]="state.readingSpacing()" (change)="changeSpacing($event)">
+      <option value="compact" i18n="@@settings.spacingCompact">Compact</option><option value="comfortable" i18n="@@settings.spacingComfortable">Comfortable</option><option value="relaxed" i18n="@@settings.spacingRelaxed">Relaxed</option>
+    </select>
+    <label for="reading-measure" i18n="@@settings.measure">Reading width</label>
+    <select id="reading-measure" [value]="state.readingMeasure()" (change)="changeMeasure($event)">
+      <option value="narrow" i18n="@@settings.measureNarrow">Narrow</option><option value="standard" i18n="@@settings.measureStandard">Standard</option><option value="wide" i18n="@@settings.measureWide">Wide</option>
     </select><p i18n="@@settings.tabPreferences">Reading preferences and passage positions survive reload in this tab.</p>
     @if (state.persistence() !== 'saved') { <p role="status" i18n="@@settings.readingStorage">Reading preferences could not be restored or saved. Language reload requires available tab storage.</p> }
     <h2 i18n="@@settings.language">Language</h2>
@@ -69,5 +77,15 @@ export class Settings {
   /** Apply a native layout selection; missing targets and unsupported values leave preferences unchanged. */
   changeLayout(event: Event): void {
     if (event.target instanceof HTMLSelectElement) this.state.setReadingLayout(event.target.value);
+  }
+
+  /** Apply a native spacing-token selection; unknown values leave preferences unchanged. */
+  changeSpacing(event: Event): void {
+    if (event.target instanceof HTMLSelectElement) this.state.setReadingSpacing(event.target.value);
+  }
+
+  /** Apply a native reading-width selection; unknown values leave preferences unchanged. */
+  changeMeasure(event: Event): void {
+    if (event.target instanceof HTMLSelectElement) this.state.setReadingMeasure(event.target.value);
   }
 }

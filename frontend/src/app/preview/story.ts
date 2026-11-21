@@ -14,11 +14,12 @@ import { UiIcon } from './ui-kit';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (context.adventure(); as adventure) {
-      <section class="story" [class.text-focused]="state.readingLayout() === 'text-focused'" [style.--reading-size]="state.textSize() + 'px'">
+      <section class="story" [class.text-focused]="state.readingLayout() === 'text-focused'" [attr.data-layout]="state.readingLayout()" [attr.data-scene]="sceneState()"
+        [style.--reading-size]="state.textSize() + 'px'" [style.--reading-leading]="state.leading()" [style.--reading-measure]="state.measureRem() + 'rem'">
         <h1 class="story-title">{{ adventure.location }}</h1>
         @if (state.readingLayout() === 'visual-novel') {
         <figure class="scene">
-          @if (!imageFailed()) { <img [src]="adventure.scene" [alt]="adventure.sceneAlt" (error)="imageFailed.set(true)" width="1200" height="640" /> }
+          @if (!imageFailed()) { <img [src]="adventure.scene" [alt]="adventure.sceneAlt" (load)="imageLoaded.set(true)" (error)="imageFailed.set(true)" width="1200" height="640" /> }
           @else { <p class="scene-fallback" i18n="@@story.sceneUnavailable">Scene illustration unavailable. {{ adventure.sceneAlt }}</p> }
           <figcaption i18n="@@story.sceneCaption">Illustrative scene · local preview</figcaption>
         </figure>
@@ -37,6 +38,10 @@ import { UiIcon } from './ui-kit';
             </p>
             <p class="passage">{{ current.text }}</p></div>
           </section>
+          <!-- Outside the live region on purpose: advancing announces only the new passage, not the read-back. -->
+          @if (previous(); as before) {
+            <p class="previous" data-previous><span class="muted" i18n="@@story.previously">Previously</span> · <strong>{{ speakerName(before) }}</strong> ({{ roleLabel(before) }}): {{ before.text }}</p>
+          }
           <div class="reading-controls"><button (click)="advance(dialogue)" [disabled]="atEnd()" aria-describedby="reading-progress" i18n="@@story.continue"><app-ui-icon name="continue" />Continue</button>
             <span id="reading-progress" i18n="@@story.progress">Passage {{ state.position(adventure.id) + 1 }} of {{ adventure.passages.length }} · {{ atEnd() ? labels.end : labels.readingOnly }}</span>
           </div>
@@ -172,6 +177,24 @@ export class Story {
     source: this.context.adventure,
     computation: /** A failed previous scene must not hide another adventure's illustration. */ () => false,
   });
+  readonly imageLoaded = linkedSignal({
+    source: this.context.adventure,
+    computation: /** Another adventure's scene starts unloaded even when the previous one finished. */ () => false,
+  });
+  /**
+   * Graphic state of the scene for styling and review: `hidden` in the text layout (no image is requested), `failed` after an
+   * error, `ready` once loaded and `loading` before. Reading never waits for it.
+   */
+  readonly sceneState = computed((): 'hidden' | 'failed' | 'ready' | 'loading' => {
+    if (this.state.readingLayout() === 'text-focused') return 'hidden';
+    return this.imageFailed() ? 'failed' : this.imageLoaded() ? 'ready' : 'loading';
+  });
+  /** The already revealed passage just before the current one, for a compact read-back; undefined at the first passage. */
+  readonly previous = computed(() => {
+    const adventure = this.context.adventure();
+    const position = adventure ? this.state.position(adventure.id) : 0;
+    return adventure && position > 0 ? adventure.passages[position - 1] : undefined;
+  });
   readonly passage = computed(/** Derive a supplied passage; missing identity safely renders no dialogue. */ () => {
     const adventure = this.context.adventure();
     return adventure?.passages[this.state.position(adventure.id)];
@@ -192,6 +215,11 @@ export class Story {
     const adventure = this.context.adventure();
     return adventure ? Math.min(this.state.position(adventure.id) + 1, adventure.passages.length) : 0;
   });
+
+  /** The explicit role label (character, player or narration) that accompanies a name so attribution never relies on colour. */
+  roleLabel(entry: Passage): string {
+    return entry.speaker === 'character' ? this.labels.character : entry.speaker === 'player' ? this.labels.player : this.labels.narration;
+  }
 
   /** Resolve an attributed passage label; unknown public people use their supplied label or neutral wording. */
   speakerName(entry: Passage): string {

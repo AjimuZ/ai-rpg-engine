@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — Reading layouts and tokens (P17.3-A), 21 November 2026
+
+- The story screen of the local preview now has two finished layouts. The visual novel gives the scene about three fifths
+  of the window height with the speaker's portrait overlapping its lower edge; a scene that fails to load keeps its place
+  with a dashed edge. The text-focused layout loads no image at all and shows the scene as a text description.
+- Both layouts show a short "Previously" line with the name and role (Narration, Character or Player) of the passage before
+  the current one; the chronicle still holds the full attributed history. Advancing announces only the new passage.
+- Settings adds two reading choices next to text size: line spacing (compact, comfortable, relaxed) and reading width
+  (narrow, standard, wide). They are kept for the tab and survive a reload; saved preferences from before still load.
+  Nine new interface messages have an Italian text from a single author pass.
+- New repeatable check `frontend/tools/reading-journey.mjs` runs the reading and quick-reply journey (QA-29) in Chrome for
+  both layouts. It covers the local preview story only; the live playthrough screen has no scene or quick replies yet (P17.3-B), so full
+  QA-29 is not claimed.
+
 ## Unreleased — Adventure mood policies and sample music (P17.2-D), 21 November 2026
 
 - An adventure pack can declare its own music in its `presentation` file. It maps the six public situations (quiet,

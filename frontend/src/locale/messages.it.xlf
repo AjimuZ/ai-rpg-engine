@@ -114,6 +114,78 @@
         <source>Text focused (no artwork)</source>
       <target>Solo testo (senza illustrazioni)</target></segment>
     </unit>
+    <unit id="settings.spacing">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:20</note>
+      </notes>
+      <segment>
+        <source>Line spacing</source>
+      <target>Interlinea</target></segment>
+    </unit>
+    <unit id="settings.spacingCompact">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:22</note>
+      </notes>
+      <segment>
+        <source>Compact</source>
+      <target>Compatta</target></segment>
+    </unit>
+    <unit id="settings.spacingComfortable">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:22</note>
+      </notes>
+      <segment>
+        <source>Comfortable</source>
+      <target>Comoda</target></segment>
+    </unit>
+    <unit id="settings.spacingRelaxed">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:22</note>
+      </notes>
+      <segment>
+        <source>Relaxed</source>
+      <target>Ampia</target></segment>
+    </unit>
+    <unit id="settings.measure">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:24</note>
+      </notes>
+      <segment>
+        <source>Reading width</source>
+      <target>Larghezza di lettura</target></segment>
+    </unit>
+    <unit id="settings.measureNarrow">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:26</note>
+      </notes>
+      <segment>
+        <source>Narrow</source>
+      <target>Stretta</target></segment>
+    </unit>
+    <unit id="settings.measureStandard">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:26</note>
+      </notes>
+      <segment>
+        <source>Standard</source>
+      <target>Standard</target></segment>
+    </unit>
+    <unit id="settings.measureWide">
+      <notes>
+        <note category="location">src/app/preview/settings.ts:26</note>
+      </notes>
+      <segment>
+        <source>Wide</source>
+      <target>Larga</target></segment>
+    </unit>
+    <unit id="story.previously">
+      <notes>
+        <note category="location">src/app/preview/story.ts:43</note>
+      </notes>
+      <segment>
+        <source>Previously</source>
+      <target>Prima</target></segment>
+    </unit>
     <unit id="settings.tabPreferences">
       <notes>
         <note category="location">src/app/preview/settings.ts:17,18</note>

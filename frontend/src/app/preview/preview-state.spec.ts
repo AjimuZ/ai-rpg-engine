@@ -31,4 +31,34 @@ describe('Preview state', /** Register bounded presentation-state checks. */ () 
     state.setTextSize(24);
     expect(state.textSize()).toBe(24);
   });
+
+  it('accepts only known spacing and width tokens, including no inherited names', /** Tokens are chosen by ID so no value reaches CSS unvalidated. */ () => {
+    const state = new PreviewState();
+    expect([state.leading(), state.measureRem()]).toEqual([1.65, 48]);
+    for (const value of ['', 'tight', 'constructor', '__proto__', 'toString', '1.2']) {
+      state.setReadingSpacing(value);
+      state.setReadingMeasure(value);
+    }
+    expect([state.readingSpacing(), state.readingMeasure()]).toEqual(['comfortable', 'standard']);
+    state.setReadingSpacing('relaxed');
+    state.setReadingMeasure('narrow');
+    expect([state.leading(), state.measureRem()]).toEqual([1.9, 36]);
+  });
+
+  it('restores saved tokens, treats older snapshots as defaults and rejects an unknown token', /** A snapshot from before the tokens stays valid; a bad token is invalid as a whole. */ () => {
+    const store = new Map<string, string>();
+    const storage = { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => { store.set(key, value); }, removeItem: (key: string) => { store.delete(key); } };
+    const first = new PreviewState(storage);
+    first.setReadingSpacing('compact');
+    first.setReadingMeasure('wide');
+    const restored = new PreviewState(storage);
+    expect([restored.readingSpacing(), restored.readingMeasure(), restored.persistence()]).toEqual(['compact', 'wide', 'saved']);
+    store.set('engine.preview-reading.v1', JSON.stringify({ version: 1, size: 20, layout: 'text-focused', positions: {} }));
+    const older = new PreviewState(storage);
+    expect([older.textSize(), older.readingLayout(), older.readingSpacing(), older.readingMeasure(), older.persistence()])
+      .toEqual([20, 'text-focused', 'comfortable', 'standard', 'saved']);
+    store.set('engine.preview-reading.v1', JSON.stringify({ version: 1, size: 20, layout: 'visual-novel', spacing: 'constructor', positions: {} }));
+    const invalid = new PreviewState(storage);
+    expect([invalid.textSize(), invalid.readingSpacing(), invalid.persistence()]).toEqual([18, 'comfortable', 'invalid']);
+  });
 });

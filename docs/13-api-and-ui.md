@@ -760,6 +760,14 @@ on the final advancement, focus moves to the dialogue before Continue disables.
 There are no global reading shortcuts to intercept input. No animation or audio
 is used. P05.4 adds persisted drafts below; durable campaign projections and real player submissions remain later work.
 
+P17.3-A finishes both layouts of this local preview story: the scene takes about 62% of the viewport height with the
+portrait overlapping its lower edge (visual novel), the text-focused layout requests no image at all, a two-line
+attributed read-back of the previous passage sits outside the live region, and Settings adds two reading tokens (line
+spacing and reading width) next to text size, all kept in the tab's reading record. The details, limits and the
+list of what is not delivered are in [presentation assets](23-presentation-assets.md#2-development-time-ui-asset-kit).
+The live campaign screen does not yet use these layouts; it belongs to P17.3-B. QA-29 was run on the local preview
+story only (local-preview coverage); full QA-29 is not claimed.
+
 Retain the first project's structured RPG panels and readable dark-theme option. Its obsidian, violet, gold, and cyan palette can become the default theme. It is not mandatory for all packs; support neutral and high-contrast profiles. Content terminology and visible panels derive from enabled modules.
 
 The **default play experience is a dynamic visual novel**: one dominant scene image, a readable dialogue area, and the player's persistent composer. On desktop the scene should occupy approximately the upper 60–70% of the story workspace when space permits; text size and actual content take precedence over a fixed ratio. Character portraits may overlay the scene without replacing it. Character sheet, inventory, map and journal open through compact navigation or dismissible panels, rather than permanently surrounding the story with dense columns. Combat can expose its dedicated tactical controls when needed. A text-focused alternative remains complete without artwork and is available as a reading/accessibility preference.

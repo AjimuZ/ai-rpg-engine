@@ -7387,6 +7387,37 @@ this update. No combat runtime/browser result is claimed.
         -Dtest=AdmissionProbeControllerTest` → `VERIFY PASSED`, twice. Two passing runs do not prove the race is gone;
         the runner's `verify.sh full` will show whether it is.
 - [ ] P17.3 Finalize the default visual-novel and alternative text-focused layouts, graphic states, configurable tokens and attributed reading/history/quick-reply behavior.
+  - 2026-11-21 P17.3-A: layouts and tokens of the local preview story (partial progress: the P17.3 box stays unchecked on purpose.
+    The live campaign screen (`CampaignPlaythrough`) belongs to P17.3-B, which is not done; P17.3-A claims QA-29 coverage
+    of the local preview story only, never full QA-29).
+    - Delivered: the visual-novel layout is finished (scene about 62% of the viewport height, 34% up to 40 rem wide; the
+      speaker's portrait overlaps the scene's lower edge; a failed scene keeps its footprint with a dashed edge) and so is
+      the text-focused layout (no image element or request, scene description as text, one column). Both show a two-line
+      attributed read-back of the previous passage outside the live region. The story section exposes `data-layout` and
+      `data-scene` (`loading`/`ready`/`failed`/`hidden`). Two new reading tokens, line spacing (`compact`/`comfortable`/
+      `relaxed`) and reading width (`narrow`/`standard`/`wide`), join text size in Settings and in the tab record
+      `engine.preview-reading.v1`; they come from a closed table, an older snapshot stays valid and an unknown token makes
+      the snapshot invalid. Nine new messages (785 catalog units) with one author pass of Italian. Files:
+      `preview-state.ts`, `settings.ts`, `story.ts`, `styles.scss`, `messages.it.xlf`, new `frontend/tools/reading-journey.mjs`.
+    - Commands and results (all from `frontend/`):
+      - `npm run typecheck` → passed.
+      - `npm test` → 28 files, 289 tests passed (3 new: two in `preview-state.spec.ts`, one in `app.spec.ts`; the catalog size
+        pin in `italian-variant.spec.ts` moved from 776 to 785 and the first run failed on it until updated).
+      - `npm run build:locales` → "Localization parity: 785 reviewed messages", both variants built; the existing
+        initial-bundle budget warning (614 kB over 500 kB) was already there. `npm run build` → built.
+      - `node tools/reading-journey.mjs` (QA-29, Chrome/158.0.8127.36 headless, fresh profile, loopback server on `dist/engine-ui`)
+        → 21 PASS, 0 FAIL. The first two runs failed on harness errors only (a response written before its file was read; a
+        blocked-URL pattern the browser refused; then three order-dependent checks that reused a stored draft and position), all
+        fixed in the script, none in the product. Screenshots in `.local/scratch/qa29/` (`vn-desktop.png` and `vn-mobile.png` were
+        looked at: scene dominant, portrait overlapping the scene edge, attribution and read-back below it).
+      - `node tools/browser-smoke.mjs` and `node tools/browser-smoke.mjs --locales` → both "Browser smoke passed" (no regression of
+        the earlier reading, draft and EN/IT journeys).
+    - Not proven: the live campaign screen (`CampaignPlaythrough`, owned by P17.3-B) has no scene, portrait, layout choice or
+      quick replies, so QA-29 is exercised on the local preview story only (local-preview coverage; full QA-29 is not claimed
+      and stays open until P17.3-B); no server round trip,
+      reconnect deduplication or screen-reader review; no human visual or Italian review of the new text; reading back one
+      passage at a time, text-reveal animation and pack-defined tokens are not built; `sh .agents/ralph/verify.sh full` was not
+      run by this session (the runner runs it).
 - [ ] P17.4 Run real desktop/narrow-screen/keyboard/zoom/reduced-motion/accessibility checks and fix blocking issues.
 - [ ] P17.5 Verify missing art/audio never blocks play and media cannot reveal secrets.
 - [ ] P17.6 Implement bounded runtime scene/portrait/item image jobs using verified capability, public appearance inputs, stable identities, durable saved assets, budget limits, deduplication and restore/stale-result checks under QA-31.

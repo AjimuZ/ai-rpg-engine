@@ -81,7 +81,7 @@ runtime check on the owner's account (`inferenceVerified: true`, resumed), a pac
 - **Deterministic half only:** QA-07 and QA-08 (no live narration in play).
 - **Partial or open:** QA-15 (nothing in play applies `Advancement`), QA-24 and QA-28 (the Docker-gated runtime probe
   tests, the lifecycle test and `verify.sh containers` were not run), QA-25, QA-26, QA-29 and QA-30 (human, fresh-clone
-  and provenance checks not run; no live quick replies), and QA-34 (no test found for author-fixed NPCs and facts).
+  and provenance checks not run; QA-29 has local-preview coverage only, with no live quick replies until P17.3-B), and QA-34 (no test found for author-fixed NPCs and facts).
 
 The matrix as a whole is therefore not a pass; the open items go to the P14.4 defect list.
 
@@ -1818,6 +1818,14 @@ coverage. An existing browser timing race now waits for the zoneless draft guard
 render before checking its unchanged disabled assertion. These checks do not
 establish runtime campaign artwork persistence, Italian review, assistive-
 technology acceptance or the remaining QA-29/31/33/35 gates.
+
+P17.3-A runs QA-29 in Chrome for both layouts of the local preview story with
+`node frontend/tools/reading-journey.mjs` (21 checks, 21 PASS on 21 November 2026): scene dominance, explicit
+narrator/character labels, read-only Continue and chronicle, a suggestion that fills an editable draft without any
+non-read request, disabled suggestions while a draft exists, dismissal that keeps draft and focus, stale suggestions
+gone after Continue, the size/spacing/width tokens and their reload, 390/320 px without overflow, blocked scene and
+portrait images, and keyboard focus rings. This is local-preview coverage only. The campaign screen (P17.3-B), a real server round trip, reconnect deduplication,
+assistive-technology review and a human visual review beyond the screenshots remain open, so full QA-29 is not claimed.
 
 P05.7-B.2.2 records QA-40 evidence for presentation cues; the point-by-point map to
 backend tests, frontend tests and the browser check is in the

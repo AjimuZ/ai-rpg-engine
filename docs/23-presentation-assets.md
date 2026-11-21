@@ -28,6 +28,23 @@ them to live character labels; absent/failed images retain a neutral initial and
 text attribution. Text-focused mode omits scene and portrait images entirely.
 P05.5 completes the local UI kit described below; P17 persistence remains pending.
 
+**Reading layouts and tokens (P17.3-A, 21 November 2026; implemented for the local preview story only).** The story
+screen has two finished layouts. *Visual novel* (default): the scene is about 62% of the viewport height (at least 18 rem,
+at most 46 rem; 34% on screens up to 40 rem wide, where text has priority), the speaker's portrait overlaps its lower left
+edge while the name and the role label (Narration, Character or Player) stay as text in the passage below, and a failed
+scene keeps its footprint with a dashed edge. *Text focused*: no image element, no scene or portrait request, a scene
+description as text, one reading column. Both show a two-line read-back ("Previously", name, role, text) of the passage
+before the current one, outside the live region so advancing announces only the new passage; the full attributed
+history stays in the chronicle. The section exposes `data-layout` and `data-scene` (`loading`, `ready`, `failed`,
+`hidden`). Three configurable reading tokens live in Settings and in the tab's `engine.preview-reading.v1` record: text
+size (15–24 px), line spacing (`compact` 1.45, `comfortable` 1.65 default, `relaxed` 1.9) and reading width (`narrow` 36
+rem, `standard` 48 rem default, `wide` 64 rem). A token is chosen by its ID from a closed table, so a stored or typed value
+never reaches CSS unchecked, and a snapshot written before the tokens existed stays valid. QA-29 was run on this local preview
+story only; full QA-29 is not claimed. Not delivered: the live
+campaign screen (`CampaignPlaythrough`, owned by P17.3-B) has no scene, portrait, layout choice or quick replies, because no producer of
+them exists in a real turn; reading backwards one passage at a time (only the read-back and the chronicle); optional
+text-reveal animation; a pack's own tokens.
+
 P05.5 integrates original MIT geometry from `frontend/src/app/preview/ui-kit.ts`
 and `frontend/src/_ui-kit.scss` with the existing theme: 20 allowlisted line icons,
 finite/clamped resource meters, an independent crystal illustration, item/empty

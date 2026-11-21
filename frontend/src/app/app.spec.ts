@@ -41,6 +41,38 @@ describe('Preview screens', /** Register user-facing route checks; assertions fa
     expect(root.querySelector('.portrait')).toBeTruthy();
   });
 
+  it('shows an attributed read-back, scene state and the reading tokens in both layouts', /** The read-back is static text outside the live passage; tokens reach the section as custom properties. */ async () => {
+    const harness = await open('/adventures/mosslight/story');
+    const root = harness.routeNativeElement!;
+    const state = TestBed.inject(PreviewState);
+    expect(root.querySelector('[data-previous]')).toBeNull();
+    expect(root.querySelector('.story')?.getAttribute('data-scene')).toBe('loading');
+    root.querySelector('.scene img')!.dispatchEvent(new Event('load'));
+    await harness.fixture.whenStable();
+    expect(root.querySelector('.story')?.getAttribute('data-scene')).toBe('ready');
+    root.querySelector<HTMLButtonElement>('.reading-controls button')!.click();
+    await harness.fixture.whenStable();
+    const before = root.querySelector('[data-previous]')!;
+    expect(before.textContent).toContain('Narrator');
+    expect(before.textContent).toContain('Narration');
+    expect(before.textContent).toContain('quiet grove');
+    expect(root.querySelector('.dialogue')?.contains(before)).toBe(false);
+    state.setReadingSpacing('relaxed');
+    state.setReadingMeasure('wide');
+    await harness.fixture.whenStable();
+    const section = root.querySelector<HTMLElement>('.story')!;
+    expect(section.style.getPropertyValue('--reading-leading')).toBe('1.9');
+    expect(section.style.getPropertyValue('--reading-measure')).toBe('64rem');
+    root.querySelector('.scene img')!.dispatchEvent(new Event('error'));
+    await harness.fixture.whenStable();
+    expect(section.getAttribute('data-scene')).toBe('failed');
+    state.setReadingLayout('text-focused');
+    await harness.fixture.whenStable();
+    expect(section.getAttribute('data-scene')).toBe('hidden');
+    expect(section.getAttribute('data-layout')).toBe('text-focused');
+    expect(root.querySelector('[data-previous]')?.textContent).toContain('Narrator');
+  });
+
   it('keeps attribution after portrait failure and replaces scoped identities', /** Missing media cannot hide text or leak another adventure's speaker. */ async () => {
     const harness = await open('/adventures/mosslight/story');
     const root = harness.routeNativeElement!;

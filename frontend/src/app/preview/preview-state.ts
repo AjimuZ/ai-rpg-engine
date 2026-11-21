@@ -1,5 +1,5 @@
 /** Local, public sample content and reading preferences; never an authoritative game projection. */
-import { Inject, Injectable, InjectionToken, signal } from '@angular/core';
+import { computed, Inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { DraftStorage, QuickReply } from './story-input-state';
 import { ContentMetadata } from './content-metadata';
 
@@ -71,6 +71,21 @@ const previews: readonly AdventurePreview[] = [
   },
 ];
 
+/**
+ * Closed vocabularies of the configurable reading tokens (P17.3-A). A token is chosen by its ID only; the numbers
+ * live here so a stored or typed value can never put arbitrary text into a CSS custom property.
+ * `spacing` is a unitless line-height multiplier, `measure` the maximum reading column in rem.
+ */
+export const READING_SPACING = { compact: 1.45, comfortable: 1.65, relaxed: 1.9 } as const;
+export const READING_MEASURE = { narrow: 36, standard: 48, wide: 64 } as const;
+export type ReadingSpacing = keyof typeof READING_SPACING;
+export type ReadingMeasure = keyof typeof READING_MEASURE;
+
+/** True when `value` is an own key of `table`; inherited names such as `constructor` are refused. */
+function isToken<T extends object>(table: T, value: unknown): value is keyof T & string {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(table, value);
+}
+
 /** Obtain tab-scoped storage; denied browser access falls back to memory. */
 export const PREVIEW_READING_STORAGE = new InjectionToken<DraftStorage | null>('Preview reading storage', {
   providedIn: 'root', factory: /** Contain browser storage policy errors at the boundary. */ () => {
@@ -87,6 +102,14 @@ export class PreviewState {
   readonly textSize = this.size.asReadonly();
   private readonly layout = signal<'visual-novel' | 'text-focused'>('visual-novel');
   readonly readingLayout = this.layout.asReadonly();
+  private readonly spacingToken = signal<ReadingSpacing>('comfortable');
+  private readonly measureToken = signal<ReadingMeasure>('standard');
+  readonly readingSpacing = this.spacingToken.asReadonly();
+  readonly readingMeasure = this.measureToken.asReadonly();
+  /** Line-height multiplier of the chosen spacing token. */
+  readonly leading = computed(() => READING_SPACING[this.spacingToken()]);
+  /** Maximum reading column of the chosen measure token, in rem. */
+  readonly measureRem = computed(() => READING_MEASURE[this.measureToken()]);
   private readonly saved = signal<'saved' | 'unavailable' | 'invalid'>('saved');
   readonly persistence = this.saved.asReadonly();
 
@@ -103,6 +126,9 @@ export class PreviewState {
       const value = JSON.parse(raw);
       if (!value || value.version !== 1 || !Number.isInteger(value.size) || value.size < 15 || value.size > 24 ||
         !['visual-novel', 'text-focused'].includes(value.layout) || !value.positions ||
+        // The token fields are optional so snapshots written before P17.3-A stay valid; a present but unknown token is invalid.
+        (value.spacing !== undefined && !isToken(READING_SPACING, value.spacing)) ||
+        (value.measure !== undefined && !isToken(READING_MEASURE, value.measure)) ||
         typeof value.positions !== 'object' || Array.isArray(value.positions) ||
         Object.entries(value.positions).some(/** Unknown IDs or out-of-bounds positions cannot select arbitrary content. */ ([id, position]) => {
           const adventure = this.find(id);
@@ -110,6 +136,8 @@ export class PreviewState {
         })) { this.saved.set('invalid'); return; }
       this.size.set(value.size);
       this.layout.set(value.layout);
+      if (value.spacing !== undefined) this.spacingToken.set(value.spacing);
+      if (value.measure !== undefined) this.measureToken.set(value.measure);
       this.positions.set(value.positions);
     } catch { this.saved.set('invalid'); }
   }
@@ -118,7 +146,8 @@ export class PreviewState {
   prepareReload(): boolean {
     try {
       if (!this.storage) throw new Error('Storage unavailable');
-      const snapshot = JSON.stringify({ version: 1, size: this.size(), layout: this.layout(), positions: this.positions() });
+      const snapshot = JSON.stringify({ version: 1, size: this.size(), layout: this.layout(), spacing: this.spacingToken(),
+        measure: this.measureToken(), positions: this.positions() });
       this.storage.setItem('engine.preview-reading.v1', snapshot);
       if (this.storage.getItem('engine.preview-reading.v1') !== snapshot) throw new Error('Storage verification failed');
       this.saved.set('saved');
@@ -129,6 +158,16 @@ export class PreviewState {
   /** Accept a supported layout string; unknown values leave the tab preference unchanged. */
   setReadingLayout(value: string): void {
     if (value === 'visual-novel' || value === 'text-focused') { this.layout.set(value); this.prepareReload(); }
+  }
+
+  /** Accept a known spacing token ID; anything else leaves the preference unchanged. */
+  setReadingSpacing(value: string): void {
+    if (isToken(READING_SPACING, value)) { this.spacingToken.set(value); this.prepareReload(); }
+  }
+
+  /** Accept a known measure token ID; anything else leaves the preference unchanged. */
+  setReadingMeasure(value: string): void {
+    if (isToken(READING_MEASURE, value)) { this.measureToken.set(value); this.prepareReload(); }
   }
 
   /** Resolve a local preview ID, returning undefined for unknown identities. */
