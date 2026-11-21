@@ -650,6 +650,16 @@ not on its own. A restart legitimately changes two derived tables (queued `infer
 `ABANDONED`, and memory reconciliation captures the first `campaign_checkpoint` of each campaign), and so the
 resume card's continuity codes change. No canonical, inventory or memory row does.
 
+`SampleRestoreCheck` (P14.2-B, QA-03 and QA-23) is the backend side of the second real restore rehearsal and is
+named the same way, so run it only through
+[`test_sample_restore.py`](../tools/container_packaging/README.md#real-backup-and-restore-of-two-genres). Its source
+is the provisioned sample with the ford ambush entered and its initiative roll cut off before commit, permit held. It
+also holds a supplies variant of the sample in a second workspace, with a tonic, a quest reward and an image asset; a
+tonic use and the quest-completing move are each retried under the same request identity. After the restore, a new JVM
+checks the restored rows, the attempt ended `FAILED_BEFORE_COMMIT` with its dice, and the asset rebuilt byte for byte.
+It then retries both requests, which replay their receipts and consume and pay nothing again, and continues the fight
+with the same dice.
+
 ## Typed intentions and atomic common semantics (P07.2)
 
 New command admission accepts only the closed immutable `MOVE`, `WAIT` and `SPEAK`

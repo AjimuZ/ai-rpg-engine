@@ -164,7 +164,7 @@ jobs:
       # The launcher-driven cases need Engine 29.0 and
       # Compose 5.0, which this runner may lack: below them they are skipped with the
       # shortfall as reason and a separate case asserts the launcher's refusal instead.
-      # test_restore_isolation.py builds the verification image and runs the shipped
+      # test_restore_isolation.py and test_sample_restore.py build the verification image and run the shipped
       # backup tool against its own disposable database containers. The
       # opt-in PACKAGING_DOCKER service-recreation check stays out of ordinary CI
       # until native Linux secret-mount ownership is qualified (docs/16 P02.3).

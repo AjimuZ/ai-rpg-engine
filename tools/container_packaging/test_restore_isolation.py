@@ -12,6 +12,7 @@ inference or generated image is involved. Any Docker, Maven or comparison failur
 
 It runs with no opt-in flag and follows `docker_requirement.py`: only a host without a
 `docker` executable, where nothing requires Docker, leaves it out. Hosted CI requires it.
+`RestoreRehearsal` is the shared harness; `test_sample_restore.py` reuses it for P14.2-B.
 """
 
 import json
@@ -48,9 +49,32 @@ POPULATED = (
 )
 
 
-@requires_docker_cli
-class RestoreIsolationTest(unittest.TestCase):
-    """Run the real tool between two real backend phases, with no shared process."""
+class RestoreRehearsal:
+    """Shared harness: a private database and worker, the shipped tool, and backend phases in new JVMs.
+
+    A subclass names its Java check in `CHECK` and calls `prepare()` first; every container and the
+    network it creates are removed by cleanups, also when an assertion fails.
+    """
+
+    CHECK = "AdventureRestoreCheck"
+
+    def prepare(self) -> None:
+        """Build the verification image, then start the internal network, the database and the worker."""
+        suffix = secrets.token_hex(4)
+        self.network = f"engine-restore-check-{suffix}"
+        self.database_container = f"{self.network}-db"
+        self.worker = f"{self.network}-worker"
+        self.password = secrets.token_urlsafe(24)
+
+        self.docker("build", "--quiet", "--target", "verification", "--tag", IMAGE,
+                    "--file", str(ROOT / "docker/engine/Dockerfile"), str(ROOT), timeout=1200)
+        self.docker("network", "create", "--internal", self.network)
+        self.addCleanup(self.docker, "network", "rm", self.network)
+        self.start_database()
+        self.docker("run", "--detach", "--name", self.worker, "--network", self.network,
+                    "--entrypoint", "sleep", IMAGE, "3600")
+        self.addCleanup(self.docker, "rm", "--force", self.worker)
+        self.docker("exec", self.worker, "mkdir", "-m", "0700", STORAGE)
 
     def docker(self, *arguments: str, timeout: int = 180) -> str:
         """Run Docker without a shell; return stdout or fail with bounded fixture-only output."""
@@ -92,7 +116,7 @@ class RestoreIsolationTest(unittest.TestCase):
              "--env", f"ENGINE_RESTORE_CHECK_DIR={STORAGE}",
              self.worker, "./mvnw", "-B", "-ntp", "--offline",
              "-Dmaven.repo.local=/opt/verification-maven/repository", "-Ppackaged-ui", "test",
-             f"-Dtest=AdventureRestoreCheck#{method}"],
+             f"-Dtest={self.CHECK}#{method}"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600, check=False)
         output = result.stdout + result.stderr
         self.assertEqual(0, result.returncode, output[-8000:])
@@ -124,24 +148,14 @@ class RestoreIsolationTest(unittest.TestCase):
             time.sleep(2)
         self.assertEqual(2, ready, "the fixture database did not become ready")
 
+
+@requires_docker_cli
+class RestoreIsolationTest(RestoreRehearsal, unittest.TestCase):
+    """Run the real tool between two real backend phases, with no shared process."""
+
     def test_backup_restores_every_scope_into_empty_storage(self) -> None:
         """Prove canonical rows, then every scope through a new JVM, and an untouched source."""
-        suffix = secrets.token_hex(4)
-        self.network = f"engine-restore-check-{suffix}"
-        self.database_container = f"{self.network}-db"
-        self.worker = f"{self.network}-worker"
-        self.password = secrets.token_urlsafe(24)
-
-        self.docker("build", "--quiet", "--target", "verification", "--tag", IMAGE,
-                    "--file", str(ROOT / "docker/engine/Dockerfile"), str(ROOT), timeout=1200)
-        self.docker("network", "create", "--internal", self.network)
-        self.addCleanup(self.docker, "network", "rm", self.network)
-        self.start_database()
-        self.docker("run", "--detach", "--name", self.worker, "--network", self.network,
-                    "--entrypoint", "sleep", IMAGE, "3600")
-        self.addCleanup(self.docker, "rm", "--force", self.worker)
-        self.docker("exec", self.worker, "mkdir", "-m", "0700", STORAGE)
-
+        self.prepare()
         self.backend("seedSourceInstallation", SOURCE, f"{STORAGE}/source")
         source = self.rows(SOURCE)
         for table in POPULATED:

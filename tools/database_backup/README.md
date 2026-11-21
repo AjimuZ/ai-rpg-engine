@@ -253,7 +253,8 @@ generation has already made stale) and captured again. Its encounter, resources,
 of layout version 1 (from V16–V31) verifies `UNSUPPORTED`, and startup reconciliation discards it without invalidating any summary,
 then captures a new one. Offline checks cover the V32 manifest/catalog. `CombatRecoveryTest` runs the retirement statement and the
 journal, presentation and memory startup passes on a fight stopped inside a round, on the same database rather than a dump, and the
-fight continues from the same cursors. No live V32 dump/restore rehearsal has been run, and the rehearsal below holds no encounter.
+fight continues from the same cursors. The [live sample rehearsal](#live-sample-rehearsal-p142-b-v32) ran on V32 with a fight entered
+but stopped before its first round. The two-genre rehearsal below holds no encounter.
 
 ## Live two-genre rehearsal (P06.5-B.1, V26)
 
@@ -277,3 +278,28 @@ offline unit tests and `verify.sh full` do not. The run recorded on 31 October 2
 This is not a browser or generated-media check. See the [roadmap entry](../../docs/16-development-roadmap.md) for what
 it does not prove. Its containers carry a unique suffix and are always removed, and it creates no Docker volume. A killed
 run can leave them behind without blocking a later run.
+
+## Live sample rehearsal (P14.2-B, V32)
+
+`tools/container_packaging/test_sample_restore.py` uses the same harness, under the same Docker policy, with the
+backend's `SampleRestoreCheck` (QA-03, QA-23). The run recorded on 21 November 2026 covered schema 32, 59 tables and
+154 rows, with a 378,636-byte dump.
+
+- The source starts as a packaged first start does. It holds the provisioned `sample:lantern-ford` and a campaign that
+  entered the ford ambush. That campaign's initiative roll was cut off after its dice were reserved and its permit was
+  held, so the backup holds an active fight (entered, initiative not yet rolled), a `VALIDATING` attempt, a held permit and
+  narration still owed. A supplies variant of the sample, in a second workspace, adds a tonic, coins paid by the
+  crossing quest and an image asset. Its tonic use and quest-completing move were each retried under the same request
+  identity before the backup.
+- Before any engine starts, the restored database matches the source in every row of every table except the
+  retirement columns. The attempt is still `VALIDATING`, and its permit is retired.
+- A new JVM on the restored database and an empty managed-folder root changes no canonical row and provisions nothing
+  again. It ends the attempt `FAILED_BEFORE_COMMIT` with the same dice. Narration owed by the retired generation becomes
+  receipt-only (`COMMITTED_NARRATION_PENDING`), and the memory pass reports no failure. The asset's bytes match the
+  fixture, both in the database and in the rebuilt folder.
+- Both lost responses replay their receipts and write nothing: one tonic consumed, five coins and one reward
+  settlement. The cut roll's lost response replays `FAILED_BEFORE_COMMIT`, and the roll asked again commits with the
+  same dice and opens the first round. Neither phase changes the source.
+
+It does not restore a fight inside a round, a stored presentation cue or a narration session record, and it runs no
+narration runtime, browser or `./start.sh` stop and start.

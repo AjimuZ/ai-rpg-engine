@@ -5605,7 +5605,7 @@ this update. No combat runtime/browser result is claimed.
         run is the evidence for that.
     - After the documentation edits, `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh repo` printed
       `VERIFY PASSED` (diff-check, line-endings, repository-checks, repository-tests and backup-tests PASS).
-- [ ] P14.2 Verify reboot, AI renewal, interrupted generation, lost response, backup restore, and no duplicate effects.
+- [x] P14.2 Verify reboot, AI renewal, interrupted generation, lost response, backup restore, and no duplicate effects.
   - P14.2-A (21 November 2026, partial; this box stays unchecked): reboot, renewal and interrupted generation are
     verified on the bundled sample adventure (QA-08, QA-17, QA-18). Backup restore and the rest of P14.2 remain open.
     - Test added: `backend/src/test/java/org/rpgengine/commands/RebootRecoveryTest.java` (2 cases, real PostgreSQL). Each
@@ -5659,6 +5659,70 @@ this update. No combat runtime/browser result is claimed.
         were not covered by this test.
       - No deliberate weakening probes were run against the new test.
       - This session ran only `RebootRecoveryTest`, not `verify.sh full` or `verify.sh containers`.
+  - P14.2-B (21 November 2026): QA-03 (lost response) and QA-23 (backup restore) are verified with a real restore
+    into fresh storage.
+    - Added: `backend/src/test/java/org/rpgengine/commands/SampleRestoreCheck.java`, named `*Check` so that backend
+      runs leave it out, and `tools/container_packaging/test_sample_restore.py`. The harness of
+      `test_restore_isolation.py` became a reusable `RestoreRehearsal` mixin, and its behavior is unchanged. The new
+      test builds the `verification` image, starts PostgreSQL 18.6 on tmpfs on an internal network, and runs
+      `SampleRestoreCheck#seedSourceInstallation` in one JVM. That phase starts with provisioning and the memory pass
+      on, as a packaged start does. The test then runs the shipped `backup.py backup` and `backup.py restore
+      --new-database engine_restored`, and runs `SampleRestoreCheck#restoredInstallationRecoversTheSample` in a new
+      JVM against the restored database with an empty `ENGINE_WORKSPACES_ROOT`.
+    - Source:
+      - The provisioned `sample:lantern-ford` with a scout campaign that ran `ENGAGE ford-ambush` (committed, with
+        narration owed). Its `ROLL_INITIATIVE` is then cut off after its dice are reserved, by the injected trigger
+        of P14.2-A, leaving it `VALIDATING` with its permit held.
+      - A second workspace with a test-only supplies variant of the sample. It adds a stackable `tonic` (two at
+        creation, +1 Vigor), `coin`, a 5-coin reward on the `crossing` outcome and `assets/map.png`, the fixture's
+        original artwork. On it, `USE_ITEM tonic` and, after `ACCEPT_QUEST crossing`, `MOVE far-bank` (objective,
+        completion, reward) each commit and are retried once under the same request identity. Each retry replays
+        the same receipt and leaves every world, journal, draw, outbox, narration and delivery row unchanged.
+    - Python assertions:
+      - Sixteen named tables hold rows in the source, including `encounter`, `reward_settlement`, `item_creation`,
+        `operation_random_draw` and `campaign_mutation_lease`.
+      - The source holds one `VALIDATING` attempt and one held permit.
+      - The backup leaves the source unchanged.
+      - Before any start, the restored database equals the source in every row of every table except the
+        retirement columns. It still holds the attempt, and no permit is held.
+      - After the restored start, no attempt is `VALIDATING`, and the source is still unchanged.
+    - Java assertions after the restore:
+      - The world snapshot taken before the crash equals the restored one. It covers the campaign rows minus
+        `recovery_generation` and `row_version`, and every row of the actors, pools, conditions, equipment, items,
+        item ledger, abilities, events, quest state, objectives, visits, encounter, participants, reward
+        settlements, content revisions and revision files (with their SHA-256, without bytes).
+      - Provisioning created nothing again (1 owner, 2 workspaces, 2 revisions), both campaigns are at generation
+        1, and the memory pass reports 0 failures.
+      - The cut roll is `FAILED_BEFORE_COMMIT` with the same draws, and no permit is held.
+      - The entry, the tonic use and the move are `COMMITTED_NARRATION_PENDING`.
+      - The asset's bytes equal the fixture in `content_revision_file` (hash checked) and in the single rebuilt
+        `map.png` under the new root.
+      - Both requests, retried again, replay their receipts with nothing written: tonic 1, coin 5, one reward
+        settlement, one `QUEST_COMPLETED`.
+      - The cut roll's lost response replays `FAILED_BEFORE_COMMIT` with no receipt. A new roll commits with the
+        reserved draws, one `INITIATIVE_ROLLED` and round ≥ 1, and its own retry replays its receipt.
+    - Commands and results:
+      - `py -B -m unittest discover -s tools/container_packaging -p test_sample_restore.py -v`: `Ran 1 test in
+        101.802s`, `OK`. It printed `schema 32, 59 tables, 154 rows, 378636 dump bytes`, with `content_revision_file=27,
+        encounter=1, encounter_participant=2, reward_settlement=1, item_creation=1, operation_random_draw=6,
+        campaign_mutation_lease=2, presentation_job=4`. It passed on the first run.
+      - After the harness refactor, `py -B -m unittest discover -s tools/container_packaging -p
+        test_restore_isolation.py -v`: `Ran 1 test in 71.482s`, `OK` (schema 32, 59 tables, 233 rows, 30 rebuilt
+        files).
+    - Acceptance criteria against the evidence. "QA-03 and QA-23 pass with a real restore into fresh storage":
+      - QA-23: full state, the active combat, content hashes, an asset and the pending operation are recovered in a
+        new database and an empty folder root through the shipped tool.
+      - QA-03: the same request, retried before and after the restore, consumed one item and paid one reward.
+    - Not proven:
+      - The fight was restored before its first round, not inside one: `CombatRecoveryTest` covers a fight stopped
+        inside a round on the same database only.
+      - The bundled sample has no consumable, reward or asset. QA-03 and the asset part of QA-23 therefore ran on a
+        test-only variant, not on bytes a player receives.
+      - No stored presentation cue, `ai_session_record` row, narration runtime, browser, HTTP retry, Italian locale
+        or packaged `./start.sh` stop and restore took part. The restore keeps campaign identities; identity-remapped
+        restore stays P16.4.
+      - No deliberate weakening was run against the new check. `verify.sh full` and `verify.sh containers` were not
+        run by this session; the new test runs only in `containers` and in hosted CI's packaging job.
 - [ ] P14.3 Run the required reduced-scope MVP QA matrix and record fresh evidence.
 - [ ] P14.4 Measure baseline latency/context use and list unresolved defects honestly; demonstrate one optional bilingual baseline/planner investigation comparison when available, or record deferred/unavailable planning with the playable fallback. Advanced planning cannot block MVP.
 - [ ] P14.5 Write reproducible setup and an accurate MVP capability table.

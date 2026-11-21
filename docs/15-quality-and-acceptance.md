@@ -1,5 +1,28 @@
 # Quality Strategy and Acceptance Criteria
 
+P14.2-B verification (21 November 2026): `tools/container_packaging/test_sample_restore.py` with the backend's
+`SampleRestoreCheck` covered QA-03 and QA-23 with a real restore into fresh storage. The run used
+`py -B -m unittest discover -s tools/container_packaging -p test_sample_restore.py -v`: 1 test, OK, 101.8 s, schema
+32, 59 tables, 154 rows, a 378,636-byte dump. The shipped `backup.py` backs up a source database and restores it into
+a new database, and a new JVM with an empty managed-folder root then starts on it.
+
+- **QA-23:** the backup is taken during an active fight on the provisioned `sample:lantern-ford` (ford ambush
+  entered), with an initiative roll cut off before commit, its permit held and narration owed. A supplies variant of
+  the sample holds an image asset. Before any start, every row of every table matches the source except the retirement
+  columns. After the start, the campaigns, actors, pools, items, item ledger, events, quests, visits, fight, reward
+  settlements and content rows with their hashes are unchanged, and nothing is provisioned again. The cut attempt ends
+  `FAILED_BEFORE_COMMIT` with its dice, and owed narration becomes receipt-only. The asset's bytes match in the
+  database and in the rebuilt folder. The fight continues: the roll asked again commits with the same dice.
+- **QA-03:** on the supplies variant, a tonic use and the move that completes the crossing quest (five coins and one
+  reward settlement) are each retried under the same request identity, once before the backup and once after the
+  restored start. Every retry replays the same receipt and writes nothing, so one tonic is consumed and the reward is
+  paid once.
+
+Not verified: a fight restored inside a round, stored presentation cues, a runtime session record, a live narration
+runtime, a browser, a packaged `./start.sh` stop/restore, the Italian locale and HTTP retries. The sample has no
+consumable or reward of its own, so QA-03 ran on a test-only variant of it. No deliberate weakening was run against
+the new check.
+
 P14.2-A verification (21 November 2026): `RebootRecoveryTest` (2 cases, real PostgreSQL, run alone with
 `verify.sh backend -Dtest=RebootRecoveryTest`: `Tests run: 2, Failures: 0, Errors: 0, Skipped: 0`) carries QA-17,
 QA-18 and the deterministic part of QA-08 onto the bundled sample `sample:lantern-ford` as first-start provisioning

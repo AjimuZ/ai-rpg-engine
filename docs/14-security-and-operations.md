@@ -225,6 +225,17 @@ complete bilingual fixture inventories, raw hashes, exports, metadata and sealed
 report versions 1/2 exactly, with the source unchanged. Reports were explicit
 recovery fixtures; this does not establish a historical pack import or full QA-23.
 
+P14.2-B (21 November 2026) rehearses the shipped tool on the bundled sample with
+`tools/container_packaging/test_sample_restore.py`. The backup is taken during an
+active fight, with an attempt cut off before its commit, its permit held and
+narration owed. It is restored into a new database and started in a new JVM with an
+empty managed-folder root. All rows, content hashes and an image asset come back. The
+attempt ends before commit with its dice, a consumed item and a paid quest reward
+replay their receipts without repeating, and the fight continues with the same dice.
+A fight inside a round, stored cues, a runtime session record, campaign-identity
+restore and a packaged `./start.sh` restore remain unrehearsed; see the
+[backup tool notes](../tools/database_backup/README.md#live-sample-rehearsal-p142-b-v32).
+
 P03.6 extends that tool to V6 and all preparation tables. After verified restore,
 one transaction increments recovery generations/storage versions, appends an
 invalidation to usable plans and retires mutation leases. All old writers/runtime

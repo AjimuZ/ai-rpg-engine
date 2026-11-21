@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Backup restore checked in the middle of a fight (P14.2-B), 21 November 2026
+
+- A new automated rehearsal backs up the Lantern Ford sample with the shipped backup tool in the middle of a fight. At
+  that point a roll had been cut off before it was saved. It restores the backup into a new, empty database and starts
+  the engine on it. Everything comes back: the campaigns, the fight, the adventure files with their hashes, and an image
+  asset. The interrupted roll changes nothing, and asking again uses the same dice, so the fight goes on.
+- In the same rehearsal, a used item and a quest reward were each repeated after a lost reply, once before the backup
+  and once after the restore. The item was used up only once, and the reward was paid only once.
+- No behavior changed. Limits: the restored fight had not yet started its first round. No narration runtime, browser
+  or `./start.sh` restore was involved, and the item and reward come from a test-only variant of the sample, which
+  has neither.
+
 ## Unreleased — A whole fight checked in a real browser (P12.5-A), 21 November 2026
 
 - Fixed: after a speech in a fight was accepted, the chat could show the words you had just said again, ready to be

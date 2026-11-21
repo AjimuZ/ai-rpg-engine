@@ -184,6 +184,13 @@ restored database with an empty managed-folder root. Unlike the recreation check
 no volume or password file. The [backup tool notes](../database_backup/README.md#live-two-genre-rehearsal-p065-b1-v26)
 record what it covers.
 
+`test_sample_restore.py` (P14.2-B) reuses that harness (`RestoreRehearsal`) with the backend's `SampleRestoreCheck`,
+under the same Docker policy and in the same suites. Its source is the provisioned sample stopped mid-fight, with an
+attempt cut off before its commit, and a supplies variant whose item use and quest reward were each retried under the same
+request identity. Outside the JVM it also checks that the backup holds one `VALIDATING` attempt with its permit held, that
+the restore keeps the attempt and retires its permit, and that the restored start leaves no attempt `VALIDATING`. The
+[backup tool notes](../database_backup/README.md#live-sample-rehearsal-p142-b-v32) record what it covers.
+
 ## Real packaged-shell recreation
 
 ```powershell
