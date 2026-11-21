@@ -167,6 +167,8 @@ A guide can provide onboarding, rule explanations, remembered discoveries, risk 
 
 Default behavior is reactive assistance. Advice cannot spend resources, complete quests, move the player, or execute a drafted ability. A guide may recommend a legal action but must require the player's ordinary submit flow. It must explain uncertainty rather than pretending to know hidden world truth.
 
+Implemented since P15.3-A (contract only): the `guide` task kind in [docs/21 section 15f](21-ai-task-contracts-and-prompts.md#15f-implemented-guide-answers-p153-a). A persona answers in its own `character:guide:<persona>` session from the facts and offered actions its caller supplies. The answer has no field that can carry a command, a draft or a state change, and a suggestion is only the identity of an offered action. Not implemented: authored persona data in packs, a `guide` module switch, a caller, a panel, and ability-drafting assistance.
+
 ## 11. Media and atmosphere
 
 Assets are registered by category: scene, map, portrait, item, UI, music, or effect. A new scene illustration does not replace the map. A portrait reference is not the current scene. Assets do not establish distances, new entities, or mechanical effects unless separately admitted as canonical data.

@@ -1,5 +1,14 @@
 # Quality Strategy and Acceptance Criteria
 
+P15.3-A verification (21 November 2026): QA-22 is covered only at the contract level for the guide. `GuideContractTest`
+shows that the guide's typed answer and presentation decision have no field or parameter that can carry a command, a
+draft or a state change, that an unoffered action, an uncited certain claim and a seeded secret are each rejected, and that
+the persona runs in its own session. No run against a database exists, because no path from the guide to a campaign
+exists, and the creative-ability half and the "disabled modules absent" half for the guide are not covered: there is no
+guide module switch, pack data or caller yet. Details are in
+[docs/21 section 15f](21-ai-task-contracts-and-prompts.md#15f-implemented-guide-answers-p153-a) and the
+[P15.3 roadmap entry](16-development-roadmap.md#19-p15--complete-supported-world-and-optional-modules).
+
 P15.1-B verification (21 November 2026): `RelationshipWorldTest` (PostgreSQL, production command path) shows that each
 relationship change is one immutable row citing the event of its own revision, and that the change crossing the
 companion threshold is marked JOINED. A companion arrives with the player's move instead of following its schedule.

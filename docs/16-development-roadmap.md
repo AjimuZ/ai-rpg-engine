@@ -6190,7 +6190,48 @@ this update. No combat runtime/browser result is claimed.
       - `tools/database_backup/test_backup.py`: this session did not run Python, so the schema 34 scope check is
         unverified here.
       - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
-- [ ] P15.3 Add guide personas with separate knowledge/session scope and no mutation authority.
+- [x] P15.3 Add guide personas with separate knowledge/session scope and no mutation authority.
+  - P15.3-A (21 November 2026; partial, the box stays unchecked). This adds the `guide` task contract, the engine's
+    typed way to ask an authored persona for advice. It adds no migration, route, command or pack field.
+    - **Types.** `TaskKind.GUIDE` (`guide`, role `guide`, interactive, 30 s provisional) is a character-audience kind.
+      The new `GuideContext`, `GuideContract`, `GuideProposal`, `GuideFallback` and schema
+      `ai-contract/1/guide.schema.json` follow the combat-reply contract. Rules, codes and limits are in
+      [docs/21 section 15f](21-ai-task-contracts-and-prompts.md#15f-implemented-guide-answers-p153-a).
+    - **Knowledge and session scope.**
+      - The context is only the persona's name and senses, the question, up to 32 supplied facts and up to 16 offered
+        actions, plus a secret guard. It holds no campaign actor, hidden canon or draft.
+      - The session audience is `character:guide:<persona>`. A subject not starting `guide:` is refused when the
+        context is built.
+    - **No mutation authority.**
+      - The body is `answer`, `references`, `suggestions`, `uncertain` and `reasonCode`. Any other field is
+        `field-set`.
+      - A suggestion must be an offered action id (`unknown-action`), and a citation-free answer must set `uncertain`
+        (`uncertainty-required`).
+      - The typed results hold only text, lists and a boolean, and `GuideFallback.decide(outcome, revision)` takes no
+        campaign.
+    - **Command and result (Windows 11 host, pinned containers).**
+      - `sh .agents/ralph/verify.sh backend -Dtest=GuideContractTest,ContractSchemaTest,SessionScopeTest,CombatReplyContractTest`:
+        VERIFY PASSED (backend-sources, backend-database and backend-focused all PASS; backend-focused 12 s). The
+        wrapper prints no per-class counts, so the number of tests run is not recorded here. The new tests are
+        `GuideContractTest` (8 methods, 9 executions) and `ContractSchemaTest#guideSchemaMatchesTheValidatorFieldSets`.
+    - **QA-22 evidence (guide half, contract level).** `GuideContractTest` shows that:
+      - a seeded secret never appears in the request and is `scope-leak` in an answer;
+      - an unoffered action, an uncited certain answer, an unsupported number and each of five authority-claiming extra
+        fields (`executeDraft`, `command`, `statePatch`, `spend`, `completeQuest`) are rejected;
+      - the typed results and the decision have no authority-carrying component or parameter (reflection check);
+      - the persona's two repair attempts share one session, different from the same subject's combat-reply and tactic
+        sessions, another persona's and the narrator's.
+    - **Not done in this story:**
+      - Authored persona data in a pack, a `guide` module switch in the engine contract and its `MODULE_DISABLED` gate.
+      - A caller (command, route or presentation job), a guide panel and a reader building a persona's knowledge from
+        its senses and discoveries.
+      - Ability-drafting assistance, which depends on P15.4.
+    - **Not proven:**
+      - QA-22 as a whole. The "disabled modules absent" half for the guide and the creative half have no evidence.
+      - That a guide leaves a campaign unchanged. No path from the guide to a campaign exists, so the reflection check
+        is structural and no database run was made.
+      - Paraphrased secrets and wording claiming an action was taken (human-rubric), and live model output.
+      - `verify.sh full`, `verify.sh containers` and the frontend checks, which this session did not run.
 - [ ] P15.4 Add creative ability drafting, validation preview, explicit execution, learned recipes, and bounded high-power profiles.
 - [ ] P15.5 Prove disabled modules disappear cleanly and enabled modules remain adventure-independent.
 - [ ] P15.6 Qualify optional adaptive quest/world-direction tasks using event-triggered significant actors, causal relationship histories and deterministic off-screen catch-up; enable only after agency/coherence/cost comparison, otherwise document disabled/deferred capability with verified baseline fallback.

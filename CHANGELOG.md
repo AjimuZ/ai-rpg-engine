@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Guide persona answers (P15.3-A), 21 November 2026
+
+- The engine can now ask a guide persona for advice on a player's question. The guide runs in its own conversation,
+  separate from the narrator, from other personas and from non-player characters, and it works only from the facts and
+  actions its caller gives it.
+- An answer is text, the facts it relies on and the identities of actions the player could take. It has no way to spend
+  resources, move the player, complete a quest or execute a draft. A recommended action must be one that was offered, and
+  the player still submits it as usual. An answer that cites nothing must say it is unsure, and an answer that repeats a
+  protected secret or a number not in its sources is rejected.
+- Limits: this is the engine contract only. No adventure can define a guide yet, no screen or command asks one, and
+  there is no switch to enable or disable the module. Rephrased secrets and wording that claims an action was taken
+  cannot be detected automatically.
+
 ## Unreleased — Faction clocks and time catch-up (P15.2-B), 21 November 2026
 
 - A faction can now declare up to four clocks, each filling from 0 to 1..12 segments. A clock fills as in-world time

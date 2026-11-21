@@ -104,6 +104,8 @@ The body answers the question using only the guide's allowed facts, supported ru
 
 A guide's lack of knowledge should be expressed in-world if appropriate, without revealing that a hidden fact exists in another role's context. Reusing a privileged planner thread for this task is prohibited even if a restrictive sentence is added at the end.
 
+The contract exists since P15.3-A; see [section 15f](#15f-implemented-guide-answers-p153-a).
+
 ## 10. Memory summary
 
 The body contains a short continuity summary, covered event IDs/range, unresolved obligations, relevant entities, source references, and explicit uncertainties. It must distinguish actually occurred events, beliefs/rumors, and uncommitted plans.
@@ -731,6 +733,80 @@ notice is produced.
   ([ADR 0043](adr/0043-planned-encounters-are-frozen-once-and-admitted-only-when-feasible.md),
   [docs/12 section 5](12-encounters-and-progression.md#5-feasibility-and-fairness-checks)).
 - With the provisional numbers, small parties often have no fitting authored roster, so `NoEncounter` may be common (P18.3).
+
+## 15f. Implemented: guide answers (P15.3-A)
+
+The `guide` contract lets an authored persona answer one player question as advice, with no authority over the game. It is a
+typed contract and a validator only. No command, route, panel or pack field asks for an answer yet (see Not done).
+
+**Context (`GuideContext`).** Everything is supplied by trusted code from the persona's own knowledge; the contract never
+filters visibility itself.
+
+- `persona`: its display name and an authored statement of its `senses`, so it can say what it cannot perceive.
+- `question`: the player's question, cited by identity.
+- `knowledge`: up to 32 facts, rule explanations and discoveries the persona knows.
+- `actions`: up to 16 legal actions by identity and label that it may recommend.
+- `guard`: the caller's secrets. A marker in the rendered context ends the call `Refused(context-scope)` with nothing
+  submitted; a marker in the answer is `scope-leak`.
+
+The context holds no campaign actor, hidden canon, planner text, other character's beliefs, draft or resource value.
+
+**Contract (`GuideContract`, `GuideProposal`, schema `ai-contract/1/guide.schema.json`).**
+
+| Aspect | Value |
+| --- | --- |
+| Kind, role | `guide`, `guide` (player-facing, `character` audience only) |
+| Audience | `character:guide:<persona>` (`GuideContext.subject`). Another persona, a non-player character of the same name, the public narrator and every planner role have other scopes, so none shares its conversation |
+| Work class, budget | `INTERACTIVE`, 30 s for both attempts (provisional) |
+| Context | `persona`, `question`, `knowledge`, `actions`, `glossary` |
+| Body | `answer`, `references`, `suggestions`, `uncertain`, `reasonCode` |
+| Statuses | `proposed`; `cannot-complete` with `missing-information` or `out-of-scope` and every other field null or empty |
+| Accepted result | `Answered(answer, references, suggestions, uncertain)` or `CannotAnswer(reasonCode)` |
+
+**Rules of a proposed answer,** on top of the shared envelope and structure checks:
+
+- Bounds: `answer` is plain text of at most 600 characters; at most 8 `references` and 4 `suggestions`; `uncertain` is a
+  boolean (`unexpected-type`).
+- Grounding: each reference is the question or a knowledge fact (`unknown-reference`); each suggestion is an action the
+  context offered (`unknown-action`); an answer citing nothing must set `uncertain` (`uncertainty-required`); each number
+  already occurs in supplied text (`unsupported-number`).
+- Knowledge scope and language: `scope-leak`, `glossary-mismatch` and `locale-mismatch`, as for narration.
+- `reasonCode` filled in a proposal, or any other field in `cannot-complete`: `status-field-conflict`.
+- **No mutation authority.** The body has no field for a command, intention, draft, cost, check or state change. An extra
+  field, whatever its name (`executeDraft`, `statePatch`, `spend`), is `field-set`. A suggestion is only the identity of an
+  offered action; the player still submits it through the ordinary flow.
+
+**Presentation (`GuideFallback.decide(outcome, committedRevision)`).** Pure, with the same table as the combat reply
+([section 15d](#15d-implemented-knowledge-scoped-combat-replies-p124-b)), using the cause `ANSWER_INVALID` instead of
+`REPLY_INVALID`. It takes no campaign and writes nothing, so a silent decision leaves the sheet, the journal and the legal
+actions as the committed state allows.
+
+**Evidence (QA-22, guide half).** `GuideContractTest` (9 executions of 8 methods; one is parameterized over both languages)
+and `ContractSchemaTest#guideSchemaMatchesTheValidatorFieldSets`:
+
+- The two seeded secrets are absent from the rendered request, whose context has exactly the fields above. A subject that
+  is not `guide:<persona>` and a repeated identity are refused when the context is built.
+- A grounded answer is accepted in English and Italian, also as an uncited uncertain answer and as `cannot-complete`.
+- One rejection per rule, including five authority-claiming extra fields, each `field-set`.
+- Every component of the typed results is text, a list or a boolean, and `GuideFallback.decide` takes only an outcome and a
+  revision number. This is a structural check of the types, not a run against campaign state.
+- A scripted runtime leaking a secret is repaired once and then rejected, both attempts in the persona's own session, which
+  differs from the same subject's combat-reply and tactic sessions, another persona's and the public narrator's.
+- A context already holding a secret is refused with no request.
+
+**Not done.**
+
+- No caller: no command, route, panel or presentation job asks the guide a question, and the persona is not authored data in
+  any pack. There is no `guide` module in the engine contract; a pack cannot enable or disable it.
+- No reader builds `knowledge` or `actions` from a persona's senses and discoveries. The caller supplies them.
+- Drafting help for creative abilities (docs/10 section 10) has no contract.
+
+**Not proven.**
+
+- Paraphrased secrets and wording that implies an action was taken ("I have unlocked it") are not detectable
+  mechanically; they remain a human-rubric evaluation (section 13).
+- No live model output was evaluated, and no test runs the guide against a database to show campaign rows unchanged,
+  because no path from the guide to the campaign exists.
 
 ## 16. Neutral protocol proof (P01.1)
 

@@ -165,7 +165,7 @@ P08.3 implements this scoping in `org.rpgengine.inference.session`, above the ne
   | Role (`AiRole` wire name) | Player-facing | Permitted audiences |
   | --- | --- | --- |
   | `interpreter`, `narrator` | yes | `public` |
-  | `guide` | yes | `character` |
+  | `guide` (the `guide` contract since P15.3-A, audience `character:guide:<persona>`, [docs/21 section 15f](21-ai-task-contracts-and-prompts.md#15f-implemented-guide-answers-p153-a)) | yes | `character` |
   | `character-voice` (since P12.4-B, [ADR 0039](adr/0039-a-character-voice-role-for-combat-replies.md)) | yes | `character` |
   | `tactician` | no | `character` |
   | `summarizer` | no | any (the audience of its inputs) |

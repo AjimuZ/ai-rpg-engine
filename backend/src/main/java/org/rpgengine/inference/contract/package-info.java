@@ -17,6 +17,9 @@
  * {@link org.rpgengine.inference.contract.EncounterAdmission} (P13.3-A) freezes that encounter for
  * the player once and admits it only when no objective is unreachable and no hostile is a hidden
  * hard counter, falling back to the first fitting feasible authored template or no encounter.
+ * The guide contract (P15.3-A, {@link org.rpgengine.inference.contract.GuideContract}) answers one player
+ * question as an authored persona in its own {@code guide:<persona>} audience, with text and the identities
+ * of offered actions only and no field that could change state.
  *
  * <p>{@link org.rpgengine.inference.contract.ContractRunner} submits one contract task through
  * the fair {@link org.rpgengine.inference.scheduling.InferenceScheduler} (P08.6), which dispatches

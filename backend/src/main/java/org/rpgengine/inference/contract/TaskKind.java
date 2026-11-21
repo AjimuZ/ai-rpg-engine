@@ -58,7 +58,13 @@ public enum TaskKind {
      * roster and starting zones (P13.2-A): a proposal the engine checks against the template and the budget, never a frozen
      * encounter. It runs in the privileged encounter-proposer session; its output is never shown.
      */
-    ENCOUNTER("encounter", AiRole.ENCOUNTER_PROPOSER, 60);
+    ENCOUNTER("encounter", AiRole.ENCOUNTER_PROPOSER, 60),
+    /**
+     * One authored guide persona's advice on one player question (P15.3-A): text and the identities of legal actions it may
+     * recommend, never an effect. It runs in that persona's own {@code guide:<persona>} character audience, taken from its
+     * context, so the answer is grounded in the persona's own senses and discoveries and shares no session with the narrator.
+     */
+    GUIDE("guide", AiRole.GUIDE, 30);
 
     private final String wire;
     private final AiRole role;
@@ -107,8 +113,8 @@ public enum TaskKind {
      *         for the planner kinds, whose context may hold hidden canon ({@link AiRole#QUEST_PLANNER}
      *         permits nothing else), for {@link #ENCOUNTER} ({@link AiRole#ENCOUNTER_PROPOSER} permits
      *         nothing else either) and for {@link #SUMMARY_PRIVILEGED}
-     * @throws IllegalStateException for {@link #TACTIC} and {@link #COMBAT_REPLY}, whose audience is one character's and so
-     *         depends on the task's context ({@code TaskContract#audience})
+     * @throws IllegalStateException for {@link #TACTIC}, {@link #COMBAT_REPLY} and {@link #GUIDE}, whose audience is one
+     *         character's and so depends on the task's context ({@code TaskContract#audience})
      */
     public Audience audience() {
         if (characterAudience()) {
@@ -120,10 +126,10 @@ public enum TaskKind {
 
     /**
      * @return true when each task runs in the audience of one character named by its context ({@link #TACTIC},
-     *         {@link #COMBAT_REPLY})
+     *         {@link #COMBAT_REPLY}, {@link #GUIDE})
      */
     public boolean characterAudience() {
-        return role == AiRole.TACTICIAN || role == AiRole.CHARACTER_VOICE;
+        return role == AiRole.TACTICIAN || role == AiRole.CHARACTER_VOICE || role == AiRole.GUIDE;
     }
 
     /**

@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "taskId", "taskKind", "baseRevision", "contextDigest", "outputLocale", "status", "body"],
+  "properties": {
+    "contractVersion": {"type": "integer", "enum": [1]},
+    "taskId": {"type": "string", "maxLength": 36},
+    "taskKind": {"type": "string", "enum": ["guide"]},
+    "baseRevision": {"type": "integer"},
+    "contextDigest": {"type": "string", "maxLength": 64},
+    "outputLocale": {"type": "string", "enum": ["en", "it"]},
+    "status": {"type": "string", "enum": ["proposed", "cannot-complete"]},
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["answer", "references", "suggestions", "uncertain", "reasonCode"],
+      "properties": {
+        "answer": {"type": ["string", "null"], "maxLength": 600},
+        "references": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 128}},
+        "suggestions": {"type": "array", "maxItems": 4, "items": {"type": "string", "maxLength": 128}},
+        "uncertain": {"type": ["boolean", "null"]},
+        "reasonCode": {"type": ["string", "null"], "enum": ["missing-information", "out-of-scope", null]}
+      }
+    }
+  }
+}

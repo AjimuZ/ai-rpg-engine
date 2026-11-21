@@ -1406,6 +1406,26 @@ new role in `SessionScopeTest`'s role matrix.
 Limits: no command or presentation job calls the contract or the decision yet, so no reply is generated, stored, sent or shown.
 No migration, route or command changed.
 
+### Guide answers (P15.3-A)
+
+`inference/contract/GuideContract` (kind `guide`, the existing player-facing role `guide`, schema
+`ai-contract/1/guide.schema.json`) asks the narration runtime for one authored persona's advice on one player question:
+`answer` (at most 600 characters), the `references` it relies on, `suggestions` (identities of offered legal actions) and an
+`uncertain` flag that must be set when nothing is cited. `GuideContext` holds only the persona's name and senses, the question,
+the facts it knows and the actions it may recommend, all supplied by the caller. Each task runs in the persona's own
+`character:guide:<persona>` session (`GuideContext.subject`), apart from the narrator, other personas and a non-player
+character of the same name.
+
+The result has no field that could carry a command, a draft or a state change, and `GuideFallback.decide(outcome,
+committedRevision)` is pure (`Shown` or `Silent` with a cause and a log-only detail code), so a guide cannot mutate state,
+execute a draft or reveal a seeded secret through this package. Rules and codes are in
+[docs/21 section 15f](../docs/21-ai-task-contracts-and-prompts.md#15f-implemented-guide-answers-p153-a).
+
+Tests: `GuideContractTest` (8 methods, 9 executions) and the guide case of `ContractSchemaTest`.
+
+Limits: no command, route, panel or pack data uses the contract yet, there is no `guide` module switch, and no reader builds
+the persona's knowledge. No migration, route or command changed.
+
 ## Capability snapshot and threat limits (P13.1-A)
 
 Three pure classes in `org.rpgengine.combat` hold the inputs and limits of encounter planning

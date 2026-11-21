@@ -150,6 +150,30 @@ class ContractSchemaTest {
     }
 
     @Test
+    void guideSchemaMatchesTheValidatorFieldSets() {
+        JsonNode root = schema(new GuideContract());
+        assertClosedObject(root, ContractEnvelope.RESPONSE_FIELDS);
+        JsonNode body = root.path("properties").path("body");
+        assertClosedObject(body, GuideContract.BODY_FIELDS);
+        var kinds = new ArrayList<String>();
+        root.path("properties").path("taskKind").path("enum").forEach(v -> kinds.add(v.asString()));
+        assertThat(kinds).containsExactly(TaskKind.GUIDE.wire());
+        var statuses = new ArrayList<String>();
+        root.path("properties").path("status").path("enum").forEach(v -> statuses.add(v.asString()));
+        assertThat(statuses).containsExactlyInAnyOrderElementsOf(GuideContract.STATUSES);
+        var reasons = new ArrayList<String>();
+        body.path("properties").path("reasonCode").path("enum").forEach(v -> reasons.add(v.isNull() ? null : v.asString()));
+        var expected = new ArrayList<String>(GuideContract.REASONS);
+        expected.add(null);
+        assertThat(reasons).containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(body.path("properties").path("answer").path("maxLength").asInt()).isEqualTo(GuideContract.MAX_ANSWER);
+        assertThat(body.path("properties").path("references").path("maxItems").asInt())
+                .isEqualTo(GuideContract.MAX_REFERENCES);
+        assertThat(body.path("properties").path("suggestions").path("maxItems").asInt())
+                .isEqualTo(GuideContract.MAX_SUGGESTIONS);
+    }
+
+    @Test
     void encounterSchemaMatchesTheValidatorFieldSets() {
         JsonNode root = schema(new EncounterContract());
         assertClosedObject(root, ContractEnvelope.RESPONSE_FIELDS);
@@ -190,7 +214,7 @@ class ContractSchemaTest {
         for (String text : List.of(ContractEnvelope.SHARED_INSTRUCTION, IntentContract.TASK_INSTRUCTION,
                 NarrationContract.TASK_INSTRUCTION, QuestPlanContract.PLAN_INSTRUCTION,
                 QuestPlanContract.REFINE_INSTRUCTION, TacticContract.TASK_INSTRUCTION, CombatReplyContract.TASK_INSTRUCTION,
-                EncounterContract.TASK_INSTRUCTION)) {
+                GuideContract.TASK_INSTRUCTION, EncounterContract.TASK_INSTRUCTION)) {
             assertThat(Pattern.compile("[^\\x20-\\x7E\\n]").matcher(text).find()).isFalse();
         }
     }
