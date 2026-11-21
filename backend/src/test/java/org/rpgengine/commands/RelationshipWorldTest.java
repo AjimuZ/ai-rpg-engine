@@ -150,6 +150,8 @@ class RelationshipWorldTest {
         run(new TypedCommand.Speak(guide, "Again"));
         assertEquals(3, changes().size());
         assertEquals(3L, epoch(Relationships.scope(guide)));
+        // The caused history and the companion's move were deterministic rules of the commits alone (P15.6-A fallback).
+        DirectionFallback.assertNoDirectionWork(jdbc, campaign);
 
         assertThrows(DataAccessException.class, () -> jdbc.update("update relationship_change set value_after = 1 "
                 + "where campaign_id = ?", campaign));

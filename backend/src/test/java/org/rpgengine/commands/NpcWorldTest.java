@@ -202,6 +202,8 @@ class NpcWorldTest {
         assertEquals("grove", news.locationId());
         assertEquals(keeper, news.informantId());
         assertEquals(arrived + 1_800, news.observedWorldTime());
+        // Schedules and the off-screen report were deterministic rules of the commits alone (P15.6-A fallback).
+        DirectionFallback.assertNoDirectionWork(jdbc, campaign);
     }
 
     // ---- helpers --------------------------------------------------------------------------------

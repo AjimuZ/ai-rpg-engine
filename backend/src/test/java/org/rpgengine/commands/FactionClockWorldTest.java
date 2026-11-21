@@ -162,6 +162,8 @@ class FactionClockWorldTest {
         assertEquals("available", jdbc.queryForObject("select status from quest_state where campaign_id = ? "
                 + "and quest_id = 'muster'", String.class, campaign));
         assertEquals(3L, epoch(FactionClocks.SCOPE));
+        // The catch-up and the cascade were deterministic rules of the commits alone (P15.6-A fallback).
+        DirectionFallback.assertNoDirectionWork(jdbc, campaign);
 
         assertThrows(DataAccessException.class, () -> jdbc.update("update faction_clock_change set value_after = 1 "
                 + "where campaign_id = ?", campaign));

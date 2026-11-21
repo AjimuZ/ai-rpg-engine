@@ -105,3 +105,13 @@ stale version, a per-plan allowance) and the playable no-plan baseline (planning
 no gameplay path depends on it). Evidence is deterministic (pure contract corpus, real PostgreSQL
 with a scripted planner); the AP-12 comparison and any default change remain evidence gated
 ([docs/28 section 7](../28-asynchronous-narrative-planning.md#selective-narrowing-and-replanning-p087)).
+
+P15.6-A (21 November 2026) applies this decision's evidence gate to adaptive quest and world
+direction and records them as **disabled**, because no agency, coherence or cost comparison was run.
+No world-director or plan-reviewer contract or task kind exists, no task kind is speculative work, and
+quest planning stays off by default. The fallback is the deterministic world rules of the canonical
+commit: schedules and witness reports, caused relationship changes and bounded faction clock catch-up.
+`AdaptiveDirectionDispositionTest` checks this structurally, and three PostgreSQL world suites check
+that those rules queue no planning, direction or review work
+([docs/28 section 12](../28-asynchronous-narrative-planning.md#12-delivery-boundaries-and-dependencies)).
+The topology and gates of this decision are unchanged.

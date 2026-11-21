@@ -6486,7 +6486,57 @@ this update. No combat runtime/browser result is claimed.
         (`preview-state.ts`), which are local display fixtures, not engine code.
       - A deliberate weakening run.
       - `verify.sh full`, `verify.sh containers` and the other frontend tests, which this session did not run.
-- [ ] P15.6 Qualify optional adaptive quest/world-direction tasks using event-triggered significant actors, causal relationship histories and deterministic off-screen catch-up; enable only after agency/coherence/cost comparison, otherwise document disabled/deferred capability with verified baseline fallback.
+- [x] P15.6 Qualify optional adaptive quest/world-direction tasks using event-triggered significant actors, causal relationship histories and deterministic off-screen catch-up; enable only after agency/coherence/cost comparison, otherwise document disabled/deferred capability with verified baseline fallback.
+  - P15.6-A (21 November 2026). Disposition: **disabled**, with the deterministic baseline as the verified fallback. No
+    engine behavior, migration, route, command, setting or pack field changed. Only tests and documents were added.
+    - **Why disabled.** The gate is the agency, coherence and cost comparison of docs/28 section 11 (AP-12, QA-39). It
+      was not run: the packaged runtime account is not signed in, and no paired run, rater, rubric result or usage
+      allowance exists. Nothing is enabled.
+    - **State of each part.**
+      - World direction and plan review: there is no `world-development-proposal` or `plan-review` contract or schema,
+        and no `TaskKind` runs in the `world-director` or `plan-reviewer` role. These are absent, not implemented.
+      - Adaptive quest planning: the P08.7 contract stays off by default (`engine.planning.enabled=false`). It is not
+        promoted to a default.
+      - Event-triggered significant actors: not implemented. NPC `goals` are read by no rule, so no off-screen actor
+        selects a goal.
+      - Causal relationship histories (P15.1-B) and deterministic off-screen catch-up (P15.1-A witness reports, P15.2-B
+        faction clocks) exist as deterministic rules. They are the fallback, not a direction capability.
+    - **Fallback evidence.**
+      - `AdaptiveDirectionDispositionTest` (new, no database, 3 cases). No `TaskKind` has the world-director or
+        plan-reviewer role or `SPECULATIVE` work class. The quest planner has exactly `QUEST_PLAN` and
+        `QUEST_PLAN_REFINE`, both `PREPARATION`, and planning defaults to disabled. Outside `AiRole.java`, no main
+        source names `WORLD_DIRECTOR`, `PLAN_REVIEWER`, `"world-director"` or `"plan-reviewer"`. No main source or
+        resource names `world-development-proposal`, `"plan-review"` or `plan-review.schema`. `ai-contract/1` holds
+        `quest-plan` and `narration` schemas and none starting `world-` or `plan-review`. The `world` package sources
+        (`NpcWorld`, `Relationships`, `FactionClocks` and the rest) name no `org.rpgengine.inference`, `planning`,
+        `preparation`, `narration` or `memory` package.
+      - `DirectionFallback` (new test helper) requires a campaign with no `ai_job` row, and no `inference_task` row
+        whose role is `quest-planner`, `world-director` or `plan-reviewer` or whose class is `PREPARATION` or
+        `SPECULATIVE`. Three existing PostgreSQL cases now end with it:
+        - `NpcWorldTest#worldTimeAndWitnessesDeterminePresenceAndKnowledge`, after the schedule moves and the delayed
+          off-screen reports;
+        - `RelationshipWorldTest#causedChangesAreRecordedAndCompanionsFollowThePlayer`, after the three caused changes and
+          the companion's move;
+        - `FactionClockWorldTest#dueCausesAreRecordedInOrderBoundedPerCommit`, after the 32-change catch-up, the
+          remaining 5 and the cascade.
+    - **Commands and results (Windows 11 host, pinned containers).**
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend -Dtest=AdaptiveDirectionDispositionTest,PlanningBoundaryTest,PlanningSettingsTest,FactionClockWorldTest,RelationshipWorldTest,NpcWorldTest`:
+        VERIFY PASSED, 13 tests, 0 failures (AdaptiveDirectionDispositionTest 3, PlanningBoundaryTest 3,
+        PlanningSettingsTest 2, RelationshipWorldTest 2, NpcWorldTest 1, FactionClockWorldTest 2); backend-focused 18 s.
+        Counts are from the surefire lines of `backend-focused.log`.
+    - **Documents.** docs/28 sections 1 and 12, docs/10 section 12, docs/21 section 13, docs/04 section 10, docs/15,
+      docs/17, ADR 0014 and the backend README record the disposition. CHANGELOG has an entry.
+    - **Not proven:**
+      - Any agency, coherence, latency or usage result. QA-39 and AP-12 have no result, and nothing here suggests that
+        direction would or would not help.
+      - That `DirectionFallback` would catch an enabled director. No such path exists to enable, and no deliberate
+        weakening was run. The planner's own writes to `ai_job` are shown by `QuestPlanningTest` (P08.7), which this
+        session did not run.
+      - Names the textual scans cannot see: reflection, names assembled from parts, or a role reached through
+        `AiRole.values()`. None exists today.
+      - Packaged play: campaign creation still creates no NPC actors, so the three world suites use actors that the
+        tests create.
+      - `verify.sh full` and `verify.sh containers`, which this session did not run.
 
 **Exit:** all supported gameplay modules have typed data, rules, projections, and meaningful integration coverage. **Checks:** QA-21–22 and full requirement-specific scenarios. **Suggested commit:** `Complete reusable world companion and optional ability modules`.
 

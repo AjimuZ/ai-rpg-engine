@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Adaptive quest and world direction recorded as disabled (P15.6-A), 21 November 2026
+
+- Adaptive quest and world direction stays switched off. The comparison of player agency, story coherence and cost that
+  would justify it was not run. The engine has no world-direction or plan-review task, and optional quest planning stays
+  off by default.
+- Play is unchanged. The world keeps moving through its fixed rules alone: NPC routines and delayed witness reports,
+  relationship changes that each record their cause, and faction clocks that catch up after long waits a bounded number
+  of steps at a time.
+- New tests check that the engine can schedule no direction or review work, and that these world rules queue no
+  planning work while they run.
+- Limits: there is still no goal selection for important off-screen characters; their authored goals are read by no rule.
+
 ## Unreleased — Module absence and adventure independence checks (P15.5-A), 21 November 2026
 
 - A new installation now takes the bundled sample adventure's title and genre from the adventure's own file, instead of

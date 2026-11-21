@@ -1669,6 +1669,27 @@ Limits: the services are read directly, so the HTTP layer is not exercised. The 
 identifier assembled from parts, nested IDs other than attributes and resources, or the in-memory packs tests build in Java.
 The guide still has no module switch, so its absence is not tested here.
 
+### Adaptive quest and world direction: disabled (P15.6-A)
+
+Adaptive quest and world direction is **disabled, not implemented**: there is no `world-development-proposal` or
+`plan-review` contract, no task kind runs in the `world-director` or `plan-reviewer` role, and no task kind is speculative
+work. Quest planning keeps its P08.7 contract and stays off by default (`engine.planning.enabled=false`); the
+agency, coherence and cost comparison that would qualify any of it (AP-12) was not run. The fallback is the deterministic
+world rules every committed command runs: NPC schedules and witness reports (`NpcWorld`), caused relationship changes
+(`Relationships`) and bounded faction clock catch-up (`FactionClocks`).
+
+- `planning/AdaptiveDirectionDispositionTest` (no database) checks every `TaskKind`'s role and work class, that only
+  `AiRole` names the two disabled roles, that no main source or resource names their task kinds or schemas, that the
+  quest planner keeps exactly `quest-plan` and `quest-plan-refine` as `PREPARATION` work, and that the `world` package
+  names no inference, planning, preparation, narration or memory package.
+- `commands/DirectionFallback` is called at the end of `NpcWorldTest`, `RelationshipWorldTest` and
+  `FactionClockWorldTest`'s main cases: after the schedule moves, the off-screen report, the caused relationship history
+  and the 32-change clock catch-up, the campaign holds no `ai_job` and no `inference_task` of a planning, direction or
+  review role or of `PREPARATION` or `SPECULATIVE` class.
+
+Limits: the scans are textual and see direct names only. NPC `goals` are still read by no rule, so there is no
+event-driven goal selection for significant actors; the deterministic rules above are the whole fallback.
+
 ## Interface reload contract (P05.6)
 
 `commands/CampaignInterfaceContractTest` is the producer side of the browser reload contract.

@@ -207,6 +207,9 @@ optional `org.rpgengine.planning` package (snapshot assembler, planning service,
 by default). No command, commit, narration or presentation code depends on it, so the
 playable loop is identical with planning disabled
 ([docs/28 section 4](28-asynchronous-narrative-planning.md#4-player-experience-and-work-selection)).
+P15.6-A records world direction and plan review as disabled. No task kind runs in those roles,
+and the deterministic world rules of the canonical commit are the fallback
+([docs/28 section 12](28-asynchronous-narrative-planning.md#12-delivery-boundaries-and-dependencies)).
 
 Interactive work has reserved admission and bounded waiting. No transaction or
 campaign mutation lease is held while a deep background plan runs. Planning

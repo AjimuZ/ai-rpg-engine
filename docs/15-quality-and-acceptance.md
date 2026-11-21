@@ -1,5 +1,14 @@
 # Quality Strategy and Acceptance Criteria
 
+P15.6-A disposition (21 November 2026): adaptive quest and world direction is recorded as **disabled**, not implemented.
+The agency, coherence and cost comparison (QA-39, docs/28 AP-12) that would enable it was not run, so QA-39 has no
+result. What is verified is the fallback. `AdaptiveDirectionDispositionTest` shows that no task kind runs as world director
+or plan reviewer or as speculative work, that nothing in the engine's sources or resources names their task kinds, and
+that the world rules name no inference or planning package. `NpcWorldTest`, `RelationshipWorldTest` and
+`FactionClockWorldTest` (PostgreSQL) now also show that schedules, witness reports, caused relationship changes and
+bounded clock catch-up queue no planning, direction or review work. Details are in the
+[P15.6 roadmap entry](16-development-roadmap.md#19-p15--complete-supported-world-and-optional-modules).
+
 P15.5-A verification (21 November 2026): more evidence for the "disabled modules absent" half of QA-22, for the creative
 module. `ModuleAbsenceTest` (PostgreSQL) plays the same commands on one pack with and without the `creativeAbilities`
 module. Without it, learning is refused, and no campaign read the routes return and no receipt contains a draft, a

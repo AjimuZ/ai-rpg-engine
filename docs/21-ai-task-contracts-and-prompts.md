@@ -151,7 +151,10 @@ result contains bounded issue/source references, never chain-of-thought, and
 does not replace deterministic admission. Use ordinary tool-free turns, not the
 runtime's code-review or delegated-agent features. P08.7 implements `quest-plan` and
 `quest-plan-refine` ([section 15](#15-implemented-quest-plan-contract-p087)); world
-development and plan review remain unimplemented.
+development and plan review remain unimplemented. Since P15.6-A they are recorded as a disabled
+capability: no contract, schema or task kind exists for them, and enabling them waits for the
+comparison that P18.6 owns
+([docs/28 section 12](28-asynchronous-narrative-planning.md#12-delivery-boundaries-and-dependencies)).
 
 Generate public narration/quick replies directly in the selected EN/IT language
 under [localization](29-localization.md). A locale mismatch can trigger the

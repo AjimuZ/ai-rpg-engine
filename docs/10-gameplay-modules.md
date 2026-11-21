@@ -224,3 +224,10 @@ enemy, force a fight or erase an advantage for pacing. See [planning](28-asynchr
 and [paired evaluations](31-research-validation-and-evaluations.md) before
 enabling more costly adaptive behavior. Direct narration and system terminology
 follow the selected [English/Italian contract](29-localization.md).
+
+**Disposition (P15.6-A, 21 November 2026): disabled.** No direction policy, world-director or plan-review
+task, or goal selection for significant off-screen actors is implemented. The agency, coherence and cost
+comparison needed to enable them was not run. The verified fallback is the deterministic rules of
+sections 6 and 7: schedules and witness reports, caused relationship changes and bounded faction clock
+catch-up, which run in every committed command and queue no inference task
+([docs/28 section 12](28-asynchronous-narrative-planning.md#12-delivery-boundaries-and-dependencies)).

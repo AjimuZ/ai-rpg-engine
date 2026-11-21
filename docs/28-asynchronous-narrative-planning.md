@@ -62,6 +62,8 @@ P14.4-A (21 November 2026) kept it deferred: planning is off by default (`engine
 false, Economy profile), the packaged installation's runtime account is not signed in, and no
 paired baseline/planner run was made. Every quest plays from its authored or procedural baseline,
 which is the playable fallback.
+P15.6-A (21 November 2026) records adaptive quest and world direction as **disabled**, because the
+agency, coherence and cost comparison that would enable it was not run (section 12).
 
 Keep the playable loop small: validated intent when needed, deterministic resolution, canonical save, then public narration. Prepare selected expensive narrative situations separately, so accepting a mystery does not require generating its whole future before acknowledging the action. A prepared situation supplies motives, causal dependencies, clues and alternatives; it never prescribes the protagonist's choices or makes an anticipated outcome inevitable.
 
@@ -510,6 +512,28 @@ Promotion requires zero canonical integrity/secret/agency hard failures, a usefu
 | v1 optional, evidence gated | Reviewer and larger Cinematic allowance | Extra latency/usage/maintenance; retain only if C improves B |
 | Post-v1 | Broad faction/long-arc orchestration, solver integration, runtime pool or framework after demonstrated need; editor E01–E06 remains separate | High scope and maintenance; new performance/rights/security evidence required |
 | Rejected | Mandatory advanced plan before play, autonomous filesystem/DB writes, rigid protagonist script, paid/provider fallback, unbounded retries, vector store solely for planning | Conflicts with authority, responsiveness, budgets or evidence |
+
+**P15.6-A disposition (21 November 2026): disabled, with the deterministic baseline as fallback.** The
+two optional rows above are not enabled, and nothing in this section describes delivered direction:
+
+- No `world-development-proposal` or `plan-review` contract or schema exists, no task kind runs in the
+  `world-director` or `plan-reviewer` role, and no task kind is `SPECULATIVE` work. The roles exist only
+  as `AiRole` values with their audience rule.
+- Quest planning keeps its P08.7 contract, off by default, and is not promoted: no agency, coherence or
+  cost comparison (AP-12, QA-39) was run. The packaged runtime account is not signed in, and no paired
+  run, rater or usage allowance exists.
+- Event-triggered goal selection for significant actors does not exist either. NPC `goals` are still
+  read by no rule ([docs/10 section 6](10-gameplay-modules.md)).
+- The fallback is what every committed command already runs, without inference: NPC schedules and witness
+  reports with their delays (P15.1-A), relationship changes that each cite their causing event (P15.1-B)
+  and faction clock catch-up of at most 32 changes per commit in due order (P15.2-B). Quests play from
+  their authored or procedural baseline.
+- `AdaptiveDirectionDispositionTest` checks this structurally. `NpcWorldTest`, `RelationshipWorldTest`
+  and `FactionClockWorldTest` check at run time that those rules queued no planning job and no planning,
+  direction, review, preparation or speculative task. The commands and limits are in the
+  [P15.6 roadmap entry](16-development-roadmap.md#19-p15--complete-supported-world-and-optional-modules).
+
+Enabling either row later needs the comparison of section 11 first. P18.6 still owns it.
 
 P14 should record one optional A/B demonstration in both languages when the planner is available, or a precise unavailable/deferred result with AP-07 fallback evidence. That comparison is a learning milestone, not a new blocker for the otherwise complete playable MVP. P18.6 owns the full paired quality/cost comparisons. v1 cannot enable asynchronous preparation without its durable safety foundation; inability to demonstrate a quality gain can keep the feature off without invalidating baseline play. Advanced arcs, reviewer, pool, local speech and the editor never become hidden MVP dependencies.
 
