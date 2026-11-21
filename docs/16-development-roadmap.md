@@ -7513,7 +7513,7 @@ this update. No combat runtime/browser result is claimed.
       `./start.sh` were not run here); focus return from dialogs, since no screen under test opens one; text and non-text contrast
       beyond axe's color-contrast rule, and any human visual review beyond the two screenshots; Firefox, Safari, touch devices and
       forced-colors rendering; `sh .agents/ralph/verify.sh full` and `containers` (the runner runs them).
-- [ ] P17.5 Verify missing art/audio never blocks play and media cannot reveal secrets.
+- [x] P17.5 Verify missing art/audio never blocks play and media cannot reveal secrets.
   - P17.5-A (21 November 2026): component-level proof on the live playthrough screen, no product change. New
     `frontend/src/app/campaign/media-fallback.spec.ts` (4 tests, simulated campaign server with a scripted narration).
     - Proven: (1) `parseArtwork` keeps exactly the eight contract fields of a row and drops planted extras (prompt, path, URL, note,
@@ -7580,6 +7580,55 @@ this update. No combat runtime/browser result is claimed.
       detect a regression; `sh .agents/ralph/verify.sh frontend`, `full` and `containers` were not run after adding the script (the
       script is a tool outside the unit tests and the build; the runner runs the checks). The P17.5 box stays unchecked: the backend
       proof belongs to P17.5-C.
+  - P17.5-C (21 November 2026): backend proof that the asset routes never expose hidden or foreign media, with one product change.
+    - **Finding and fix.** Re-reading `ManagedAssets.serve` showed that the asset route served every sealed `asset` file of the
+      pinned revision to anyone holding its hash, including a file the presentation binds nowhere (for example an image a pack
+      keeps for a later reveal). Now a pack file is served only when the pinned presentation binds it as artwork or as a music
+      track (`ManagedAssets.declared`, the same lookups the artwork listing and the music route use). `serve` now also reads in one
+      repeatable-read, read-only transaction. The existing `servesByHashWithinTheOwningCampaignOnly` asserted 200 for the unbound
+      `assets/map.png`. That expectation now uses the bound `sword.png`, and the unbound file moved into the new refusal test. No
+      interface change: the browser requests only hashes the listings name.
+    - **New tests** in `ManagedAssetsTest` (real PostgreSQL and HTTP; the class runs 9 tests):
+      `neverServesPackFilesThePresentationDoesNotDeclare` (the unbound image and every non-asset file of the revision, lore and
+      encounters included, are refused by their exact hash and named by neither listing; the bound sword and both tracks are
+      served); `neverListsOrServesTheFilesOfAnUnpinnedRevision` (version 1.1.0 of the same adventure binds a spoiler image as
+      map `spoiler-map` and a spoiler track. The campaign pinning 1.0.0 lists neither, still lists 2 tracks and is refused both
+      files. A campaign pinning 1.1.0 lists both and is served both); `refusesForeignAndRefusedAssetsLikeUnknownOnes` (another
+      campaign's accepted portrait, a `STALE_CONTENT` and a `STALE_APPEARANCE` result are not listed or served and store no
+      bytes; the foreign campaign's own asset under this adventure is refused, and served in its own scope as a control; the
+      artwork and music refusals for a foreign or mismatched campaign equal the refusal for a random campaign). Each refusal is
+      compared with the refusal for a nonexistent hash or campaign as the whole reply: status, every header but `Date`, and the
+      body.
+    - **Commands and results.**
+      - `sh .agents/ralph/verify.sh backend -Dtest=ManagedAssetsTest` → `VERIFY PASSED`, 9 tests, 0 failures.
+      - `sh .agents/ralph/verify.sh backend -Dtest=CampaignRestoresTest,CampaignExportsTest,PackPresentationTest,MusicCatalogTest,PresentationEventsTest,PresentationJobTest,PresentationSettingsTest`
+        → `VERIFY PASSED`, 58 tests, 0 failures (restores call `serve` for a bound sword and for associations).
+      - Weakenings on an exported copy, `.local/scratch/p175c/copy2`. It was made with `mkdir -p`, `tar -C <repo> --exclude=./.local
+        --exclude=./backend/target --exclude=./frontend/node_modules --exclude=./.ajimu-autopilot --exclude=./.env
+        --exclude=./.agents/ralph/.run --exclude=./.agents/ralph/logs --exclude=./.agents/skills -cf .local/scratch/p175c/tree2.tar .`
+        and `tar -xf ... -C .local/scratch/p175c/copy2`. Each weakening ran `sh .agents/ralph/verify.sh backend -Dtest=ManagedAssetsTest`
+        from the copy and was reverted before the next. All 8 failed, none by a compile error:
+        - W1, serve any sealed asset of the pinned revision → `neverServesPackFilesThePresentationDoesNotDeclare` (200, not 404).
+        - W2, `serve` uses the adventure's newest revision → `neverListsOrServesTheFilesOfAnUnpinnedRevision`.
+        - W3, the artwork listing uses the newest revision's bindings → the same test.
+        - W4, the music route uses the newest revision → the same test.
+        - W5, the association check ignores the campaign → `servesByHashWithinTheOwningCampaignOnly` and
+          `refusesForeignAndRefusedAssetsLikeUnknownOnes`.
+        - W6, a hash another campaign holds answers 400 → the same two tests.
+        - W7, the artwork listing answers 400 for a campaign that exists in another adventure → `refusesForeign…` and
+          `listsTheArtworkInForcePerSubject`.
+        - W8, the same on the music route → `refusesForeign…` and `deliversThePackMoodPolicyAndItsTracks`.
+        Afterwards `diff -rq backend/src .local/scratch/p175c/copy2/backend/src` printed nothing. A first copy without `.git`
+        (`.local/scratch/p175c/copy`) is not valid evidence. There `verify.sh` resolved its root through Git to the live
+        repository and tested the live sources, so W1 "passed". That copy still holds W1. It is ignored and is not evidence.
+    - **Not proven.** In-game reveal of what a pack binds: a binding in the presentation file is a public declaration (docs/09
+      section 3.3, docs/23), so the listing names every bound subject from the start, including a portrait bound to an NPC the
+      player has not met. The routes have no per-subject reveal state, and pack authors must not bind spoilers. Superseded
+      appearances of an association remain servable by hash to their own campaign, because they were shown before. Response timing
+      is not uniform: a miss recompiles the pinned pack. The line-audio route `/api/v1/assets/<assetId>` still has no server. A
+      second owner was not tested, because the engine admits one owner per installation. The packaged installation was not run, and
+      `sh .agents/ralph/verify.sh full` and `containers` were not run here (the runner runs them). With P17.5-A, -B and -C recorded,
+      every part of P17.5 has evidence; the runner decides the box.
 - [ ] P17.6 Implement bounded runtime scene/portrait/item image jobs using verified capability, public appearance inputs, stable identities, durable saved assets, budget limits, deduplication and restore/stale-result checks under QA-31.
   **Requires tasks:** P21.5.
   - QA-33 scope (25 October 2026): besides QA-31, this task proves that generated

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Asset routes never expose hidden or foreign media (P17.5-C), 21 November 2026
+
+- The campaign asset route now serves a file from an adventure's own package only when its presentation file binds that file as
+  artwork or as a music track. A file the package ships without declaring it for display, such as an image kept for a later
+  reveal, is refused like an unknown hash, even when its exact SHA-256 is requested. Before, every sealed asset file of the pinned
+  version was served to a holder of its hash. Nothing the interface shows changes, because it only requests what the artwork and
+  music listings name.
+- New backend tests show that the artwork listing, the asset route and the music route never list or serve such a file, a file of
+  a newer version of the adventure that the playthrough does not use, another playthrough's artwork, or a job result refused as
+  stale, and that each refusal looks exactly like the one for something that does not exist. Not covered: whether an entity a
+  package binds art to has been met in play, because a binding is a public declaration.
+
 ## Unreleased — Missing media proven in a real browser (P17.5-B), 21 November 2026
 
 - No product change. New `frontend/tools/media-fallback-journey.mjs` drives the live playthrough screen in headless Chrome while a

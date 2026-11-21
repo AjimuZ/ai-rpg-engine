@@ -1861,6 +1861,15 @@ icon fallbacks, text notices for the line and the track, no automatic retry, pla
 requests, axe clean, and a typed `SPEAK` still sent. It does not cover the packaged installation, the backend's refusal to serve
 hidden assets (P17.5-C), audible output, other media formats, truncated or slow answers, the Italian build or a screen reader.
 
+P17.5-C adds three real PostgreSQL and HTTP tests to `ManagedAssetsTest` (21 November 2026; the class now runs 9 tests) and
+tightens the asset route: a sealed pack file is served only when the pinned revision's presentation binds it as artwork or as
+a music track. The tests prove that the artwork listing, the asset route and the music route never list or serve a sealed file
+the presentation declares nowhere (an unbound image and every data file, lore and encounters included), a file of a newer revision
+of the same adventure that the campaign does not pin, another campaign's accepted artwork, or a job result refused as stale.
+Every such refusal is byte-identical, `Date` aside, to the refusal of a hash or campaign that does not exist. Eight deliberate
+weakenings on an exported copy each failed at least one test. Not covered: in-game reveal of what a pack binds (a binding is a
+public declaration, see [docs/23](23-presentation-assets.md)), response timing, and the packaged installation.
+
 P05.7-B.2.2 records QA-40 evidence for presentation cues; the point-by-point map to
 backend tests, frontend tests and the browser check is in the
 [roadmap](16-development-roadmap.md) entry of that name. The browser check ran the

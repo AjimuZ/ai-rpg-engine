@@ -120,7 +120,11 @@ Serve registered assets with validated MIME type, content hash, containment chec
 Since P17.1-A (21 November 2026) the route `GET /api/v1/campaigns/{campaignId}/assets/{sha256}` serves media by hash
 only to the owning campaign, with the media type stored after a signature check, `nosniff` and a CSP that allows nothing;
 SVG, markup and unknown formats never enter the registry (`PackMedia.inspectBytes`), and a request for anything the
-campaign is not associated with is a uniform 404. Media are still checked by header only: embedded metadata chunks in a
+campaign is not associated with is a uniform 404. Since P17.5-C a sealed pack file is served only when the pinned revision's
+presentation binds it as artwork or as a music track: a file the pack ships without declaring it for display, a data file and a
+file of a revision the campaign does not pin are refused with the same bytes as an unknown hash (`ManagedAssetsTest`). The
+refusal is uniform in content, not in timing: a request that misses the campaign's associations recompiles the pinned pack.
+Media are still checked by header only: embedded metadata chunks in a
 registered image are served as stored, and the registry does not strip them (the image adapters of P21.5 do for their own
 output).
 

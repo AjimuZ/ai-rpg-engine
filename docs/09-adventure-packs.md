@@ -242,7 +242,9 @@ depict: `{"category": "item", "subject": "sword", "file": "assets/sword.png", "c
 `credit` is 1 to 200 characters without control characters and not blank; one binding per category and subject
 (`DUPLICATE`). Diagnostics are located and never repeat the value. The bundled sample's `presentation.json` is a working
 example. The `assets` list above stays opaque names; bindings name files directly. The asset registry lists the bindings
-with a campaign's artwork ([docs/23](23-presentation-assets.md#4-bounded-generation-during-play)).
+with a campaign's artwork ([docs/23](23-presentation-assets.md#4-bounded-generation-during-play)). A binding, like a
+music track, is public from the start of every campaign on the revision. Since P17.5-C only bound files and track files are
+served at all, so an `asset` file kept for a later reveal stays private until a later pack version binds it; never bind a spoiler.
 
 **Music policy and tracks (P17.2-D).** An optional `music` object declares the pack's mood policy and its own credited
 recordings ([ADR 0054](adr/0054-packs-declare-a-closed-mood-policy-and-their-own-credited-tracks.md)):

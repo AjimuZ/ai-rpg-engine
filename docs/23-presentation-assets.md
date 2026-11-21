@@ -66,6 +66,16 @@ undecodable bytes. The documented fallbacks held in both cases: scene text label
 for a failed line, an "unavailable" music panel with an explicit retry and no automatic retry, and Send still working. A stand-in
 answered, not the packaged engine, and the server's side of secrecy (P17.5-C) is still unproven.
 
+**What the server lists and serves (P17.5-C, 21 November 2026; implemented and tested).** The artwork listing names only the
+campaign's own accepted associations and the artwork bindings of its pinned pack revision; the music route names only that
+revision's declared tracks. The asset route serves a hash only when the campaign holds an association with it, or when the pinned
+revision's presentation binds the file as artwork or as a music track. A sealed file the pack declares nowhere (an image kept for a
+later reveal, the lore, the encounters and every other data file), a file of a newer revision the campaign does not pin, another
+campaign's artwork and a job result refused as stale are never listed or served. Each refusal is the same 404 bytes as for a hash
+or campaign that does not exist. `ManagedAssetsTest` proves this. Its contract: a binding in the presentation file is a public
+declaration. The routes do not track whether the player has met the entity a binding depicts, so a pack author must not bind a
+spoiler image to a hidden subject, and its subject reference must not name a secret.
+
 P05.5 integrates original MIT geometry from `frontend/src/app/preview/ui-kit.ts`
 and `frontend/src/_ui-kit.scss` with the existing theme: 20 allowlisted line icons,
 finite/clamped resource meters, an independent crystal illustration, item/empty
@@ -270,7 +280,8 @@ files to entities in the `artwork` list of its `presentation` file ([docs/09 sec
 3.3](09-adventure-packs.md#33-presentation-declaration)): category (`scene`, `map`, `portrait`, `item` or `ui`), stable
 subject reference, a listed `asset` file and a credit line. The artwork listing adds each binding the pinned pack revision
 declares, as appearance 1, unless the campaign already holds an accepted association for that category and subject, which
-wins. The bytes are the sealed pack file, served by hash through the same route; a pack that cannot be loaded binds
+wins. The bytes are the sealed pack file, served by hash through the same route (since P17.5-C only for files the presentation
+binds); a pack that cannot be loaded binds
 nothing and never hides the associations. The bundled sample binds `assets/sword.png`, an original icon made by
 `tools/sample-art/make-sample-art.mjs`, to item `sword`. The playthrough panels show scene, map, portrait and UI images in
 a gallery by category with a 64 px thumbnail, which is the stored image scaled by the browser: separate stored thumbnail

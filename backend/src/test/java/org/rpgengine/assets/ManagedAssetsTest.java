@@ -65,6 +65,8 @@ class ManagedAssetsTest {
     private static final UUID OWNER = UUID.fromString("00000000-0000-0000-0000-000000000061");
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String AUTHORED = "/packs/fantasy-exploration/assets/map.png";
+    /** Shade of the image only the newer pack revision of {@link #neverListsOrServesTheFilesOfAnUnpinnedRevision} binds. */
+    private static final int SPOILER_SHADE = 90;
     @LocalServerPort private int port;
     @Autowired private ManagedAssets assets;
     @Autowired private CommandExecutionService executions;
@@ -235,8 +237,9 @@ class ManagedAssetsTest {
         assertTrue(head.contains("content-security-policy: default-src 'none'"), head);
         assertTrue(head.contains("content-length: " + art.length), head);
 
-        // The sealed authored artwork of the pinned pack revision is served by its own hash.
-        byte[] authored = resource(AUTHORED);
+        // The sealed artwork the pinned pack revision binds is served by its own hash; since P17.5-C a sealed file it
+        // ships without binding it (map.png here) is not, see neverServesPackFilesThePresentationDoesNotDeclare.
+        byte[] authored = resource("/sample-adventure/assets/sword.png");
         Reply pack = get(base + ManagedAssets.sha256(authored) + scope, cookie);
         assertEquals(200, pack.status(), pack.head());
         assertArrayEquals(authored, pack.body());
@@ -386,6 +389,152 @@ class ManagedAssetsTest {
         assertEquals(10, JSON.readTree(text).size());
     }
 
+    /**
+     * A sealed file of the pinned revision that its presentation declares nowhere is never served, even by its exact
+     * hash: the unbound image {@code assets/map.png} and every data file (lore, encounters and the other definitions,
+     * which hold the pack's hidden content). The refusal is the same bytes as the not-found of a hash nothing holds, so
+     * it does not reveal that the file exists, and neither listing names any of them (P17.5-C).
+     */
+    @Test
+    void neverServesPackFilesThePresentationDoesNotDeclare() throws Exception {
+        String cookie = session();
+        String base = "/api/v1/campaigns/" + campaign + "/assets/";
+        String scope = "?adventureId=" + adventure;
+        String unknown = refusal(get(base + "0".repeat(64) + scope, cookie));
+        var hidden = new TreeMap<String, String>();
+        jdbc.queryForList("select path, sha256 from content_revision_file where content_revision_id = ? "
+                + "and category <> 'asset'", revision).forEach(row -> hidden.put((String) row.get("path"),
+                (String) row.get("sha256")));
+        assertTrue(hidden.containsKey("lore.md") && hidden.containsKey("encounters.json"), hidden.keySet().toString());
+        hidden.put("assets/map.png", ManagedAssets.sha256(resource(AUTHORED)));
+        assertEquals(1, jdbc.queryForObject("select count(*) from content_revision_file where content_revision_id = ? "
+                + "and path = 'assets/map.png' and category = 'asset' and media_type = 'image/png'", Integer.class,
+                revision), "the unbound image is a sealed, admitted asset of the pinned revision");
+
+        String listing = new String(get("/api/v1/campaigns/" + campaign + "/artwork" + scope, cookie).body(),
+                StandardCharsets.UTF_8);
+        String music = new String(get("/api/v1/campaigns/" + campaign + "/music" + scope, cookie).body(),
+                StandardCharsets.UTF_8);
+        for (var file : hidden.entrySet()) {
+            assertEquals(unknown, refusal(get(base + file.getValue() + scope, cookie)), file.getKey());
+            assertTrue(assets.serve(OWNER, adventure, campaign, file.getValue()).isEmpty(), file.getKey());
+            assertFalse(listing.contains(file.getValue()), file.getKey());
+            assertFalse(music.contains(file.getValue()), file.getKey());
+        }
+        assertFalse(listing.contains("map.png") || music.contains("map.png"));
+
+        // Control: what the presentation does declare, the bound sword and both tracks, is served.
+        for (String declared : List.of("sword.png", "ford-dusk.wav", "ford-stones.wav")) {
+            byte[] bytes = resource("/sample-adventure/assets/" + declared);
+            Reply served = get(base + ManagedAssets.sha256(bytes) + scope, cookie);
+            assertEquals(200, served.status(), declared);
+            assertArrayEquals(bytes, served.body(), declared);
+        }
+    }
+
+    /**
+     * A newer revision of the same adventure that binds a spoiler image and a spoiler track changes nothing for a
+     * campaign that pins the earlier revision: neither listing names them and the asset route refuses both exactly like
+     * an unknown hash. A campaign that pins the newer revision lists and is served both, so the refusal comes from the
+     * pin and not from a broken fixture.
+     */
+    @Test
+    void neverListsOrServesTheFilesOfAnUnpinnedRevision() throws Exception {
+        UUID newer = seal(adventure, true);
+        assertNotEquals(revision, newer);
+        UUID upgraded = campaign(adventure, newer);
+        byte[] image = png(SPOILER_SHADE);
+        byte[] audio = spoilerAudio();
+        String cookie = session();
+        String scope = "?adventureId=" + adventure;
+        String unknown = refusal(get("/api/v1/campaigns/" + campaign + "/assets/" + "0".repeat(64) + scope, cookie));
+
+        String listing = new String(get("/api/v1/campaigns/" + campaign + "/artwork" + scope, cookie).body(),
+                StandardCharsets.UTF_8);
+        String music = new String(get("/api/v1/campaigns/" + campaign + "/music" + scope, cookie).body(),
+                StandardCharsets.UTF_8);
+        for (String text : List.of(listing, music)) {
+            assertFalse(text.contains("spoiler"), text);
+            assertFalse(text.contains(ManagedAssets.sha256(image)), text);
+            assertFalse(text.contains(ManagedAssets.sha256(audio)), text);
+        }
+        assertEquals(2, JSON.readTree(music).get("tracks").size());
+        for (byte[] bytes : List.of(image, audio)) {
+            assertEquals(unknown, refusal(get("/api/v1/campaigns/" + campaign + "/assets/" + ManagedAssets.sha256(bytes)
+                    + scope, cookie)));
+        }
+
+        // Control: the campaign that pins the newer revision lists and is served the same files.
+        var upgradedArt = JSON.readTree(new String(get("/api/v1/campaigns/" + upgraded + "/artwork" + scope, cookie)
+                .body(), StandardCharsets.UTF_8)).get("artwork");
+        boolean listed = false;
+        for (var entry : upgradedArt) {
+            listed |= entry.get("subject").asString().equals("spoiler-map")
+                    && entry.get("sha256").asString().equals(ManagedAssets.sha256(image));
+        }
+        assertTrue(listed, upgradedArt.toString());
+        assertEquals(3, JSON.readTree(new String(get("/api/v1/campaigns/" + upgraded + "/music" + scope, cookie).body(),
+                StandardCharsets.UTF_8)).get("tracks").size());
+        for (byte[] bytes : List.of(image, audio)) {
+            Reply served = get("/api/v1/campaigns/" + upgraded + "/assets/" + ManagedAssets.sha256(bytes) + scope, cookie);
+            assertEquals(200, served.status(), served.head());
+            assertArrayEquals(bytes, served.body());
+        }
+    }
+
+    /**
+     * Another campaign's accepted artwork, and job results that were refused as stale, are never listed or served to
+     * this campaign; every refusal of the three routes, for a foreign or mismatched campaign, is the same bytes as the
+     * refusal for a campaign that does not exist, so none reveals that the asset or the campaign exists.
+     */
+    @Test
+    void refusesForeignAndRefusedAssetsLikeUnknownOnes() throws Exception {
+        byte[] foreign = png(80);
+        assets.publish(otherCampaign, new Candidate(AssetCategory.PORTRAIT, "mira", 1, 0, otherRevision(), "Credit",
+                foreign));
+        byte[] wrongPack = png(81);
+        assertEquals(Status.STALE_CONTENT, assets.publish(campaign, new Candidate(AssetCategory.PORTRAIT, "mira", 1, 0,
+                otherRevision(), "Credit", wrongPack)).status());
+        assertEquals(Status.ACCEPTED, assets.publish(campaign, candidate(AssetCategory.ITEM, "lantern", 2, 0, png(82)))
+                .status());
+        byte[] older = png(83);
+        assertEquals(Status.STALE_APPEARANCE, assets.publish(campaign, candidate(AssetCategory.ITEM, "lantern", 1, 0,
+                older)).status());
+        String cookie = session();
+        String scope = "?adventureId=" + adventure;
+        String base = "/api/v1/campaigns/" + campaign + "/assets/";
+        String unknown = refusal(get(base + "0".repeat(64) + scope, cookie));
+
+        String listing = new String(get("/api/v1/campaigns/" + campaign + "/artwork" + scope, cookie).body(),
+                StandardCharsets.UTF_8);
+        for (byte[] bytes : List.of(foreign, wrongPack, older)) {
+            String hash = ManagedAssets.sha256(bytes);
+            assertFalse(listing.contains(hash), hash);
+            assertEquals(unknown, refusal(get(base + hash + scope, cookie)), hash);
+        }
+        assertEquals(0, jdbc.queryForObject("select count(*) from managed_asset where sha256 in (?, ?)", Integer.class,
+                ManagedAssets.sha256(wrongPack), ManagedAssets.sha256(older)), "a refused result stores no bytes");
+        // The foreign campaign's own asset, asked for under this adventure, is refused like an unknown one.
+        String foreignBase = "/api/v1/campaigns/" + otherCampaign + "/assets/";
+        assertEquals(unknown, refusal(get(foreignBase + ManagedAssets.sha256(foreign) + scope, cookie)));
+        assertEquals(200, get(foreignBase + ManagedAssets.sha256(foreign) + "?adventureId=" + otherAdventure, cookie)
+                .status(), "control: its own scope is served");
+
+        for (String route : List.of("/artwork", "/music")) {
+            String missing = refusal(get("/api/v1/campaigns/" + UUID.randomUUID() + route + scope, cookie));
+            assertEquals(missing, refusal(get("/api/v1/campaigns/" + otherCampaign + route + scope, cookie)), route);
+            assertEquals(missing, refusal(get("/api/v1/campaigns/" + campaign + route + "?adventureId=" + otherAdventure,
+                    cookie)), route);
+        }
+    }
+
+    /** A 404 reply without its {@code Date} line, so two refusals compare by every other header and the body. */
+    private static String refusal(Reply reply) {
+        assertEquals(404, reply.status(), reply.head());
+        return reply.head().lines().filter(line -> !line.toLowerCase().startsWith("date:"))
+                .collect(Collectors.joining("\n")) + "\n\n" + new String(reply.body(), StandardCharsets.UTF_8);
+    }
+
     private Candidate candidate(AssetCategory category, String subject, long appearance, long source, byte[] bytes) {
         return new Candidate(category, subject, appearance, source, revision, "Original artwork, MIT", bytes);
     }
@@ -428,19 +577,51 @@ class ManagedAssetsTest {
         }
     }
 
-    /** The bundled sample plus the authored image, so a sealed revision ships one asset file. */
-    private static Map<String, byte[]> pack() throws Exception {
+    /**
+     * The bundled sample plus the authored image, which the presentation file does not bind, so a sealed revision ships
+     * one asset file it declares nowhere. With {@code spoiler}, version 1.1.0 additionally binds a new image as map
+     * {@code spoiler-map} and a new track for mood {@code combat}.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, byte[]> pack(boolean spoiler) throws Exception {
         var files = new TreeMap<>(new PackStaging(PackStaging.Limits.standard()).directory(
                 Path.of(ManagedAssetsTest.class.getResource("/sample-adventure").toURI())).files());
-        @SuppressWarnings("unchecked")
         Map<String, Object> manifest = JSON.readValue(files.get("adventure.json"), Map.class);
-        @SuppressWarnings("unchecked")
         var listed = new ArrayList<>((List<Object>) manifest.get("files"));
         listed.add(Map.of("path", "assets/map.png", "category", "asset"));
+        files.put("assets/map.png", resource(AUTHORED));
+        if (spoiler) {
+            manifest.put("version", "1.1.0");
+            listed.add(Map.of("path", "assets/spoiler.png", "category", "asset"));
+            listed.add(Map.of("path", "assets/spoiler.wav", "category", "asset"));
+            files.put("assets/spoiler.png", png(SPOILER_SHADE));
+            files.put("assets/spoiler.wav", spoilerAudio());
+            Map<String, Object> presentation = JSON.readValue(files.get("presentation.json"), Map.class);
+            var artwork = new ArrayList<>((List<Object>) presentation.get("artwork"));
+            artwork.add(Map.of("category", "map", "subject", "spoiler-map", "file", "assets/spoiler.png",
+                    "credit", "Spoiler map, MIT"));
+            presentation.put("artwork", artwork);
+            var music = new java.util.LinkedHashMap<>((Map<String, Object>) presentation.get("music"));
+            var tracks = new ArrayList<>((List<Object>) music.get("tracks"));
+            var track = new java.util.LinkedHashMap<>((Map<String, Object>) tracks.get(0));
+            track.put("id", "spoiler-theme");
+            track.put("mood", "combat");
+            track.put("file", "assets/spoiler.wav");
+            tracks.add(track);
+            music.put("tracks", tracks);
+            presentation.put("music", music);
+            files.put("presentation.json", JSON.writeValueAsBytes(presentation));
+        }
         manifest.put("files", listed);
         files.put("adventure.json", JSON.writeValueAsBytes(manifest));
-        files.put("assets/map.png", resource(AUTHORED));
         return files;
+    }
+
+    /** The sample's first track with its last sample byte changed: a valid WAV with a hash of its own. */
+    private static byte[] spoilerAudio() throws Exception {
+        byte[] audio = resource("/sample-adventure/assets/ford-dusk.wav");
+        audio[audio.length - 1] ^= 0x01;
+        return audio;
     }
 
     private UUID workspace() {
@@ -452,8 +633,12 @@ class ManagedAssetsTest {
     }
 
     private UUID seal(UUID target) throws Exception {
+        return seal(target, false);
+    }
+
+    private UUID seal(UUID target, boolean spoiler) throws Exception {
         return registry.register(target, new PackStaging(PackStaging.Limits.standard())
-                .archive(new ByteArrayInputStream(ArmoryPack.zip(pack())))).revisionId();
+                .archive(new ByteArrayInputStream(ArmoryPack.zip(pack(spoiler))))).revisionId();
     }
 
     private UUID campaign(UUID target, UUID sealed) {

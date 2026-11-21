@@ -27,7 +27,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * appearance revision, and the first accepted result wins; a result that is older than the one in force, requested
  * under another pinned pack revision, or requested after the campaign's current revision never replaces anything;
  * and {@link #serve} returns bytes only for a hash the asking owner's campaign is associated with or that its
- * pinned pack revision ships, so equal names or hashes in another campaign never resolve. Nothing here advances a
+ * pinned pack revision binds as artwork or as a music track, so equal names or hashes in another campaign, another
+ * revision's files and files the pack ships without declaring them for display never resolve. Nothing here advances a
  * canonical counter or writes world rows, and no metadata it returns carries a prompt, path, URL or secret.
  */
 @Service
@@ -275,6 +276,11 @@ public class ManagedAssets {
         } catch (PackException | IllegalStateException failure) {
             return java.util.List.of();
         }
+        return authored(revision, bindings);
+    }
+
+    /** The bindings whose file is a sealed image of the revision, as appearance 1 of source revision 0. */
+    private java.util.List<Metadata> authored(UUID revision, java.util.List<PackPresentation.Artwork> bindings) {
         var found = new java.util.ArrayList<Metadata>();
         for (PackPresentation.Artwork binding : bindings) {
             jdbc.query(AUTHORED, (rs, n) -> new Metadata(AssetCategory.fromWire(binding.category()), binding.subject(), 1, 0,
@@ -333,14 +339,19 @@ public class ManagedAssets {
                 // Music is optional: a pack that cannot be loaded here plays the default policy and no own track.
                 return Optional.of(new MusicListing(java.util.Map.of(), java.util.List.of()));
             }
-            var tracks = new java.util.ArrayList<MusicTrack>();
-            for (PackPresentation.Track track : declared.tracks()) {
-                jdbc.query(AUTHORED_AUDIO, (rs, n) -> new MusicTrack(track,
-                        PackPresentation.TRACK_LICENSES.get(track.license()), rs.getString(1), rs.getString(2)),
-                        revision, track.file()).stream().findFirst().ifPresent(tracks::add);
-            }
-            return Optional.of(new MusicListing(declared.moods(), java.util.List.copyOf(tracks)));
+            return Optional.of(new MusicListing(declared.moods(), tracks(revision, declared)));
         });
+    }
+
+    /** The declared tracks whose file is a sealed audio asset of the revision, in declaration order. */
+    private java.util.List<MusicTrack> tracks(UUID revision, PackPresentation.Music declared) {
+        var tracks = new java.util.ArrayList<MusicTrack>();
+        for (PackPresentation.Track track : declared.tracks()) {
+            jdbc.query(AUTHORED_AUDIO, (rs, n) -> new MusicTrack(track,
+                    PackPresentation.TRACK_LICENSES.get(track.license()), rs.getString(1), rs.getString(2)),
+                    revision, track.file()).stream().findFirst().ifPresent(tracks::add);
+        }
+        return java.util.List.copyOf(tracks);
     }
 
     /** The pack revision the owner's campaign pins, or null when owner, adventure and campaign do not line up. */
@@ -358,8 +369,9 @@ public class ManagedAssets {
      * @param campaign campaign scope
      * @param sha256 lower-case hexadecimal SHA-256 of the wanted bytes
      * @return the bytes with their canonical media type, or empty when the owner, adventure or campaign do not
-     *         match, the campaign has no association with the hash and its pinned pack revision ships no asset of
-     *         that hash, or the stored bytes no longer match the hash
+     *         match, the campaign has no association with the hash and its pinned pack revision binds no artwork or
+     *         music track file of that hash (a file the revision ships without binding it is never served), or the
+     *         stored bytes no longer match the hash
      * @throws IllegalArgumentException when the hash is not 64 lower-case hexadecimal characters
      * @throws org.springframework.dao.DataAccessException when storage fails
      */
@@ -370,21 +382,43 @@ public class ManagedAssets {
         if (sha256 == null || !HASH.matcher(sha256).matches()) {
             throw new IllegalArgumentException("invalid asset hash");
         }
-        UUID revision = pinnedRevision(owner, adventure, campaign);
-        if (revision == null) {
-            return Optional.empty();
+        return reads.execute(status -> {
+            UUID revision = pinnedRevision(owner, adventure, campaign);
+            if (revision == null) {
+                return Optional.<Served>empty();
+            }
+            var found = jdbc.query("select m.media_type, m.content from managed_asset m where m.sha256 = ? and exists ("
+                    + "select 1 from asset_association a where a.campaign_id = ? and a.sha256 = m.sha256)",
+                    (rs, n) -> new Served(sha256, rs.getString(1), rs.getBytes(2)), sha256, campaign).stream().findFirst();
+            // A sealed pack file is served only when the pinned presentation declares it for display. A file the pack
+            // ships but binds nowhere (a spoiler image, a data file) is the same not-found as an unknown hash (P17.5-C).
+            if (found.isEmpty() && declared(adventure, revision).contains(sha256)) {
+                found = jdbc.query("select media_type, content from content_revision_file where content_revision_id = ? "
+                        + "and category = 'asset' and sha256 = ? and media_type is not null",
+                        (rs, n) -> new Served(sha256, rs.getString(1), rs.getBytes(2)), revision, sha256).stream()
+                        .findFirst();
+            }
+            // The database checks the digest on insert; recomputing here means a damaged row is never served as it.
+            return found.filter(served -> sha256(served.bytes()).equals(sha256));
+        });
+    }
+
+    /**
+     * Hashes of the sealed files the pinned revision's presentation declares for display: the files of its artwork
+     * bindings and of its music tracks, exactly as the artwork listing and the music route find them. A pack that
+     * cannot be loaded here declares nothing, so none of its files is served.
+     */
+    private java.util.Set<String> declared(UUID adventure, UUID revision) {
+        PackPresentation presentation;
+        try {
+            presentation = packs.loadForCampaign(adventure, revision).root().presentation();
+        } catch (PackException | IllegalStateException failure) {
+            return java.util.Set.of();
         }
-        var found = jdbc.query("select m.media_type, m.content from managed_asset m where m.sha256 = ? and exists ("
-                + "select 1 from asset_association a where a.campaign_id = ? and a.sha256 = m.sha256)",
-                (rs, n) -> new Served(sha256, rs.getString(1), rs.getBytes(2)), sha256, campaign).stream().findFirst();
-        if (found.isEmpty()) {
-            // Authored artwork of the pinned pack revision: sealed bytes, listed by the pack as category asset.
-            found = jdbc.query("select media_type, content from content_revision_file where content_revision_id = ? "
-                    + "and category = 'asset' and sha256 = ? and media_type is not null",
-                    (rs, n) -> new Served(sha256, rs.getString(1), rs.getBytes(2)), revision, sha256).stream().findFirst();
-        }
-        // The database checks the digest on insert; recomputing here means a damaged row is never served as it.
-        return found.filter(served -> sha256(served.bytes()).equals(sha256));
+        var hashes = new java.util.HashSet<String>();
+        authored(revision, presentation.artwork()).forEach(item -> hashes.add(item.sha256()));
+        tracks(revision, presentation.music()).forEach(track -> hashes.add(track.sha256()));
+        return hashes;
     }
 
     private static Metadata metadata(java.sql.ResultSet rs) throws java.sql.SQLException {
