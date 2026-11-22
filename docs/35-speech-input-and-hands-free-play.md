@@ -2,7 +2,7 @@
 
 ## 1. Status and scope
 
-Owner-requested design, 26 October 2026, under [ADR 0022](adr/0022-optional-speech-input.md). **Not implemented; disabled by default.** No microphone capture, recognizer, model installation, voice-command API, latency measurement or gameplay acceptance is delivered by these documents. The concrete speech-to-text (STT) backend, model and capture transport remain open pending qualification. No browser, operating-system or model capability is assumed.
+Owner-requested design, 26 October 2026, under [ADR 0022](adr/0022-optional-speech-input.md). **Not implemented; disabled by default.** No microphone capture, recognizer, model installation, voice-command API, latency measurement or gameplay acceptance is delivered by these documents. The concrete speech-to-text (STT) backend, model and capture transport remain open pending qualification; [section 8](#8-recorded-disqualification-and-bounded-interfaces-p178-a) records that no recognizer is qualified today and specifies the interfaces a later qualification is measured against. No browser, operating-system or model capability is assumed.
 
 The target is optional English/Italian dictation and hands-free exploration and turn-based combat, including speaking to characters, negotiations and tactical commands. Complete typed input, contextual replies, tactical controls and readable receipts remain available with voice disabled, denied, unavailable or interrupted. Voice is optional v1 work in P17.8–P17.10; it cannot delay text-only MVP/core-v1 completion.
 
@@ -68,3 +68,54 @@ P17.8 must research actual interfaces and exact redistributable code/weights/dep
 - Under concurrent local text/image/TTS work, bounded queues/cancellation and measured resource/latency budgets pass or the profile stays disabled with a verified typed fallback. Recognition failure never changes committed gameplay.
 
 QA-45's disabled/no-capture/text fallback is mandatory. Full STT and hands-free claims require the enabled-profile evidence above; an honest disabled outcome closes only its fallback/qualification disposition, not an implementation claim. All these gameplay/audio checks remain unrun.
+
+## 8. Recorded disqualification and bounded interfaces (P17.8-A)
+
+Recorded 22 November 2026 in `backend/src/main/resources/speech/recognition-qualification.json`, loaded by `org.rpgengine.speech.SpeechInputQualification`.
+
+### 8.1 Disposition: no recognizer is qualified, recognition ships disabled
+
+No recognizer is qualified. The reason is lack of evidence, not a finding about any product: no upstream license, notice or revision was read in this project, because sessions have no network access, and nothing was measured on the reference host. Therefore this record names no candidate, no license and no revision, and none is taken from memory. Research and measurement belong to the owner gate P17.8-O. Until then the record has `qualifiedRecognizer: null` and passes no gate, so `decide(ownerRequested)` answers `captureAllowed=false` with `not-requested` (when applicable), one `gate:<id>:<status>` reason per open gate and `no-qualified-recognizer`, even if the owner asks. Disabled means no permission request, no capture buffer, no worker and no background retry; typed play is the complete path. P17.9 implements this no-capture path and cannot rely on any recognizer.
+
+### 8.2 Bounded capture and cancel interface
+
+Any recognizer is measured against this interface; a recognizer that cannot meet it is not qualified. The ceilings below are design limits set by the engine, not measurements, and are exposed by the record as `limits` (P17.8-O may tighten them with evidence, never relax them silently):
+
+| Ceiling | Value | Meaning |
+| --- | --- | --- |
+| `maxUtteranceSeconds` | 30 | One utterance ends at this duration; the rest is discarded, not recognized later. |
+| `maxUtteranceBytes` | 2 097 152 | Raw audio of one utterance, rejected beyond this before reaching a recognizer. |
+| `maxQueuedUtterances` | 1 | A second utterance while one is pending is refused, never queued. |
+| `maxRecognitionAttempts` | 1 | One attempt per utterance; a failure is reported, never retried in the background. |
+| `maxCaptureSessionsPerScope` | 1 | One capture session per adventure/campaign scope at a time. |
+
+Operations, each bound to a capture session identity, an utterance identity and the active adventure, campaign, locale and capture generation:
+
+- `start(scope, locale, mode)`: opens one session only after the player's explicit enable action; `mode` is push-to-talk or hands-free with the inactivity limit of section 2; `locale` is `en` or `it`, never inferred.
+- `append(utterance, chunk)`: bounded, idempotent per chunk identity; a duplicate chunk changes nothing.
+- `finish(utterance)`: requests one recognition and returns at most one final draft text plus advisory confidence. Partial text, if the recognizer streams it, is a labelled draft only.
+- `cancel(session | utterance)`: idempotent, callable at any state including while recognition runs; it stops the worker's work for that identity, releases the audio buffer and model memory it held, and yields no later result. A result that arrives after cancel, a scope switch, a locale switch or a generation change is discarded. Cancel time is measured separately and its budget is set in P17.8-O.
+- `close(session)`: ends capture, clears every buffer and invalidates unsubmitted confirmations (section 2); device loss, permission revocation, disconnect, reload and expiry behave as `close`.
+
+Every failure (timeout, unavailable worker, out of memory, missing files, unsupported locale) is reported as `unavailable` with a stable reason, releases resources, leaves unrelated processes alone and never selects a remote or browser/OS recognizer. Audio, vocabulary and results never cross adventure scope. Only bounded audio, the locale and authorized public vocabulary reach the worker (section 6).
+
+### 8.3 Qualification gates
+
+All six gates must be `passed`, each with evidence, before a recognizer may be named; the loader refuses a record that names one past an open gate. Current status, all from the record:
+
+| Gate | Status | Open evidence |
+| --- | --- | --- |
+| `rights-inventory` | `pending` | Exact code, weight and dependency declarations with revisions and hashes, read from upstream (P17.8-O). |
+| `capture-cancel-interface` | `unexecuted` | A recognizer run against section 8.2 including duplicate chunks, cancel during recognition and late results. |
+| `offline-behavior` | `unexecuted` | Recognition in a container without network access, with a startup that fetches nothing. |
+| `bilingual-recognition` | `unexecuted` | Section 7 EN/IT fixtures (accents, rates, names, numbers, negation) with human review. |
+| `packaging` | `unexecuted` | Distributable inventory and notice obligations for the target platforms. |
+| `resources` | `unexecuted` | Cold/warm latency, utterance-end-to-draft, peak RAM/VRAM, contention and cancel time on the reference host, against budgets published before the run. |
+
+### 8.4 Offline behaviour a recognizer must meet
+
+After installation it must start, recognize and cancel with no network access and no account, fetch no weights, vocabulary or telemetry at runtime, and write nothing outside its own bounded scratch space, which it clears on completion, cancel and scope switch. A missing network is not a failure; a missing local file is `unavailable`. No part of this is measured yet.
+
+### 8.5 Not proven
+
+No recognizer, model, microphone, audio or browser capture API was run; no latency, memory or accuracy figure exists; no EN/IT fixture was recognized; no QA-45 scenario ran. The section 8.2 ceilings are unmeasured design limits.

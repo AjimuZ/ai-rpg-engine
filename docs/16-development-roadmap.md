@@ -7861,6 +7861,30 @@ this update. No combat runtime/browser result is claimed.
       the gates to `passed` with evidence.
 - [ ] P17.8 Research and qualify a concrete optional local EN/IT STT backend against exact code/weight/dependency rights, bounded capture/cancel interfaces, offline behavior, platform packaging and measured CPU/RAM/GPU/latency budgets; no recognizer is selected by the design alone.
   **Requires tasks:** P21.4.
+  - 2026-11-22 P17.8-A (partial; box stays unchecked): recognition recorded as **not qualified and shipped disabled**.
+    - **Disposition.** No recognizer is qualified because no upstream rights were read and no budgets measured in this
+      project (sessions have no network access). The record names no candidate, license or revision, and none was taken
+      from memory. `backend/src/main/resources/speech/recognition-qualification.json` has `qualifiedRecognizer: null`, six
+      gates (`rights-inventory` `pending`; `capture-cancel-interface`, `offline-behavior`, `bilingual-recognition`,
+      `packaging`, `resources` `unexecuted`) and five capture ceilings.
+    - **Code.** `org.rpgengine.speech.SpeechInputQualification` loads and validates the record (all six gates once,
+      positive limits, evidence for every gate, no recognizer named past an open gate). `decide(ownerRequested)` answers
+      `captureAllowed=false` with `not-requested`, `gate:<id>:<status>` and `no-qualified-recognizer` reasons, even when
+      requested. No route, setting, permission request, worker or buffer exists, so typed play is the only path; P17.9
+      implements the no-capture path on this decision.
+    - **Interfaces specified.** `docs/35` section 8: the `start`/`append`/`finish`/`cancel`/`close` capture interface with
+      ceilings (30 s and 2 MiB per utterance, one queued utterance, one recognition attempt, one capture session per scope),
+      the six gates and the offline behaviour a recognizer must meet. The ceilings are unmeasured design limits.
+    - **Tests.** `SpeechInputQualificationTest`, 4 tests counted by reading the file: the bundled record qualifies nothing;
+      capture stays disallowed even when requested, naming every gate; enabling needs the request, all gates and a named
+      recognizer; inconsistent records do not load.
+    - **Command and result.** `sh .agents/ralph/verify.sh backend -Dtest=SpeechInputQualificationTest,SpeechQualificationTest`
+      → `VERIFY PASSED` (`backend-sources`, `backend-database`, `backend-focused`); the runner printed no test counts.
+    - **Not proven or not done.** No recognizer, model, microphone or audio was found, downloaded or run; no license, notice,
+      revision or hash was read; no CPU/RAM/GPU/latency/cancel-time measurement, no EN/IT fixture, no offline or packaging
+      check and no QA-45 scenario exists. The enabled branch is unreachable with the bundled record and has no worker behind
+      it. `verify.sh full` and `containers` were not run here. The research and the reference-host measurement belong to
+      the owner gate P17.8-O, which is not done; P17.8 stays open until it is.
 - [ ] P17.9 Implement explicitly enabled scoped microphone capture, accessible listening/mute states, draft-only recognition, voice-only preview/correction/repeat/confirmation/cancel and normal command/receipt routing for exploration and combat; suppress playback echo and never auto-queue out-of-turn input.
 - [ ] P17.10 Run QA-45 in EN/IT with silence/noise/accent/negation, TTS/interruptions, duplicate audio/results/confirmations, reconnect/restart/cancel, same-name adventure isolation and shared-resource failures. Enable only the measured qualified profile, or record disabled capability and verified no-capture/complete typed fallback; do not claim unimplemented voice support.
 

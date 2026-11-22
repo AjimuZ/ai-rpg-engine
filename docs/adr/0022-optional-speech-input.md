@@ -18,6 +18,10 @@ Confirmed voice input uses the same authoritative command pipeline, durable requ
 
 Keep raw audio ephemeral and excluded from ordinary exports/logs/backups; isolate capture, drafts, vocabulary and callbacks by adventure/campaign. Reuse bounded shared CPU/RAM/GPU admission with text, image and TTS work. Failed recognition or missing hardware preserves complete typed play, with no silent cloud fallback.
 
+## Update — 22 November 2026 (P17.8-A)
+
+No recognizer is qualified: no upstream rights were read and no budgets measured in this project, so recognition ships disabled and the record names no candidate. The bounded capture/cancel interface, the offline behaviour and six qualification gates are specified in [section 8 of the specification](../35-speech-input-and-hands-free-play.md#8-recorded-disqualification-and-bounded-interfaces-p178-a) and recorded in `speech/recognition-qualification.json`. This changes none of the decisions above; research and measurement remain open for P17.8-O.
+
 ## Consequences and verification
 
 P17.8–P17.10 own research/admission, input/control implementation and QA-45 qualification. No checked implementation task, worker, API, model installation or performance result follows from this ADR. Full hands-free qualification requires admitted audible confirmation output, while basic dictation and text play remain independent of TTS. QA-45 tests both EN/IT, silence/noise/accent, echo/interruption, permission/mute, duplicate delivery, reconnect/cancel, per-adventure isolation and no out-of-turn costs. A disabled profile must pass no-capture and text-fallback checks without being represented as implemented voice gameplay.

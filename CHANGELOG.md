@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Speech recognition recorded as not qualified and shipped disabled (P17.8-A), 22 November 2026
+
+- Voice input is not available in this release, and nothing in the playthrough changes: you type, and the engine never asks
+  for the microphone. The engine now records why: no speech recognizer has been checked for its license and none has been
+  measured for speed or memory, so none is named or selected. Capture can turn on only when the owner asks for it, six
+  qualification checks have passed and one recognizer is qualified; none of that holds today.
+- The limits any future recognizer must fit are written down (one utterance at most 30 seconds and 2 MiB, one waiting
+  utterance, one attempt, one capture session per adventure, a cancel that always releases the audio), together with the
+  offline behaviour it must show. These limits are design choices, not measurements.
+- Not proven: no recognizer, microphone or audio was run, no license or revision was read, and no speed, memory or English
+  and Italian accuracy figure exists. Research and measurement are a later owner step.
+
 ## Unreleased — Optional speech qualified and shipped disabled (P17.7-A), 22 November 2026
 
 - Spoken dialogue is not available in this release, and nothing in the playthrough changes: every line is read as text. The

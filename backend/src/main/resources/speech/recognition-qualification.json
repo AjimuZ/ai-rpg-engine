@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "recordedOn": "2026-11-22",
+  "qualifiedRecognizer": null,
+  "disqualification": "No recognizer is qualified. No upstream license, notice or revision was read in this project and nothing was measured on the reference host, so no candidate is named and none can be admitted by this record.",
+  "limits": {
+    "maxUtteranceSeconds": 30,
+    "maxUtteranceBytes": 2097152,
+    "maxQueuedUtterances": 1,
+    "maxRecognitionAttempts": 1,
+    "maxCaptureSessionsPerScope": 1
+  },
+  "gates": [
+    {
+      "id": "rights-inventory",
+      "status": "pending",
+      "evidence": "No code, weight or dependency declaration has been read for any recognizer; owner gate P17.8-O."
+    },
+    {
+      "id": "capture-cancel-interface",
+      "status": "unexecuted",
+      "evidence": "The interface is specified in docs/35 section 8; no recognizer has been run against it."
+    },
+    {
+      "id": "offline-behavior",
+      "status": "unexecuted",
+      "evidence": "No recognizer was run in a container without network access."
+    },
+    {
+      "id": "bilingual-recognition",
+      "status": "unexecuted",
+      "evidence": "No English or Italian fixture was recognized or human-reviewed."
+    },
+    {
+      "id": "packaging",
+      "status": "unexecuted",
+      "evidence": "No distributable (libraries, dependency graph, weights) was inventoried for Windows, WSL or Linux."
+    },
+    {
+      "id": "resources",
+      "status": "unexecuted",
+      "evidence": "No CPU, RAM, GPU, latency or cancellation-time measurement exists for the reference host."
+    }
+  ]
+}

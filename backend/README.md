@@ -291,6 +291,12 @@ the five rollout gates; `decide(ownerRequested)` enables speech only when reques
 admitted for `en` and `it`) and `speech.SpeechOutput.deliver` (the line unchanged, `audible=false`, with reasons). The bundled
 record passes no gate, so speech is disabled; there is no route, setting, worker or audio. `SpeechQualificationTest` covers it.
 
+P17.8-A adds `speech.SpeechInputQualification` (reads `speech/recognition-qualification.json`: six qualification gates, five
+capture ceilings and a `qualifiedRecognizer` that is null). `decide(ownerRequested)` returns `captureAllowed=true` only when
+requested, all gates passed and a recognizer is named; the bundled record names none, so capture is never allowed, with reasons
+such as `gate:resources:unexecuted` and `no-qualified-recognizer`. There is no route, permission request, worker or buffer.
+`SpeechInputQualificationTest` covers it; the capture and cancel interface is specified in `docs/35` section 8.
+
 P16.2-A adds the injected `exports.CampaignExports`, a read-only owner service with no route.
 `export(owner, adventure, campaign, audience)` authorizes the owner, adventure and campaign together, then returns an
 `Export`: the UTF-8 JSON document, its lowercase SHA-256 and the state revision it describes. Every document has
