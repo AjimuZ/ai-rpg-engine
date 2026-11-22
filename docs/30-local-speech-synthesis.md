@@ -206,6 +206,17 @@ No single aggregate score can hide failed Italian or rights checks. Tune segment
 | Persistence/UI/fault acceptance | **UNEXECUTED** | QA-38 results with restored identities, stale audio, resource contention and text-only play |
 | Optional enablement | **Disabled** | Owner enables an admitted installed profile; failure of any gate keeps text-only core release valid |
 
+**P17.7-A disposition (22 November 2026): speech ships disabled.** The gates above are recorded in
+`backend/src/main/resources/speech/qualification.json` under the names `rights-inventory` (pending), `container-offline`,
+`bilingual-quality`, `resources` and `persistence-fault` (each unexecuted), together with each candidate's declared code,
+weights and voice rights. The declared licenses are those read on 23 October 2026 (section 2.2) and were not re-read; no voice
+reference is admitted for any candidate, so no voice identity exists. `org.rpgengine.speech.SpeechQualification.decide` enables
+speech only when the owner requests it, every gate is `passed` and a candidate is admitted for both `en` and `it`; the bundled
+record cannot satisfy that. `SpeechOutput.deliver` is the tested text fallback: the accepted line unchanged, `audible=false`,
+reasons such as `gate:resources:unexecuted`, `locale-unsupported` (never an English voice for another language) or
+`worker-unavailable`. There is no route, setting or interface control, because no audio exists to offer. A gate may be set to
+`passed` only in a reviewed change that carries the evidence sections 9.1–9.2 describe.
+
 P03 establishes reusable job/asset/profile persistence; P05 exposes localized presentation hooks and accessible controls without requiring speech; P16 defines audience-aware media backup/restore; **P17.7** performs optional speech capability selection and rollout; P18 runs QA-38. No earlier phase requires Python/CUDA/model installation to complete text play. Source review, new specifications and ADR acceptance do not check those implementation tasks off.
 
 ## 10. Explicit exclusions and unresolved risks

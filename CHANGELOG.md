@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Optional speech qualified and shipped disabled (P17.7-A), 22 November 2026
+
+- Spoken dialogue is not available in this release, and nothing in the playthrough changes: every line is read as text. The
+  engine now records why. For each candidate voice model (Qwen3-TTS, Kokoro, Chatterbox, Piper, XTTS-v2) it keeps the declared
+  code and weight licenses and states that no voice recording is cleared for use; XTTS-v2 is excluded because its terms are
+  noncommercial. Speech can turn on only when the owner asks for it, all five rollout checks have passed and one model is
+  cleared for both English and Italian; none of that holds today.
+- Any line handed to the speech step comes back unchanged and silent, with the reason. A language other than English or
+  Italian is never read in another language's voice.
+- Not proven: no model, voice or audio was downloaded or run, nothing was measured on the RTX 4070, and no English or Italian
+  listening review took place. The licenses are the ones read on 23 October 2026.
+
 ## Unreleased — Durable image jobs with pack policy, review and provenance (P17.6-D), 22 November 2026
 
 - Image jobs and their budget now survive an engine restart. Queued images are made after the restart, in order. An

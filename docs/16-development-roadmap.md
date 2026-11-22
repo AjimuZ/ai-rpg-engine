@@ -7829,7 +7829,36 @@ this update. No combat runtime/browser result is claimed.
       - No shop flow, and no retention for job rows.
       - A campaign restored through the import route gets its folder copies only at the next start.
       - `verify.sh full` and `containers` were not run here (the runner runs them).
-- [ ] P17.7 Qualify optional local EN/IT speech with admitted model/voice licenses, stable voice identities, accepted-line audio caching and shared GPU limits under QA-38; ship disabled with tested text-only fallback if hardware/rights/quality gates fail. No TTS prerequisite for core v1.
+- [x] P17.7 Qualify optional local EN/IT speech with admitted model/voice licenses, stable voice identities, accepted-line audio caching and shared GPU limits under QA-38; ship disabled with tested text-only fallback if hardware/rights/quality gates fail. No TTS prerequisite for core v1.
+  - 2026-11-22 P17.7-A: qualification recorded; **speech ships disabled** with a tested text-only fallback.
+    - **Disposition.** No candidate passes the gates, so nothing is enabled. `backend/src/main/resources/speech/qualification.json`
+      records, for Qwen3-TTS 0.6B Base (primary), Kokoro-82M v1.0 ONNX CPU (fallback), Chatterbox Multilingual V3
+      (challenger), Piper (reserve) and XTTS-v2 (excluded, CPML noncommercial weights and outputs), the declared code and
+      weight licenses, inspected revisions, `voiceRights: none-admitted` and `rights` (`recorded`, or `excluded`), plus the
+      five gates of `docs/30` section 9.3: `rights-inventory` `pending`; `container-offline`, `bilingual-quality`,
+      `resources` and `persistence-fault` `unexecuted`. The rights are the declarations read on 23 October 2026; they were
+      not re-read today and no distributable (native libraries, dependency graph, eSpeak NG for Italian Kokoro) was inventoried.
+    - **Code.** `org.rpgengine.speech.SpeechQualification` loads and validates the record (all five gates once, dated
+      candidates, known locales, no `admitted` candidate without an admitted voice, an exclusion that role and rights agree on) and
+      `decide(ownerRequested)` answers `enabled` only when the owner asked, every gate is `passed` and a candidate is admitted
+      for both `en` and `it`; otherwise it lists `not-requested`, `gate:<id>:<status>` and `no-admitted-bilingual-profile`.
+      `SpeechOutput.deliver` returns the line byte for byte, `audible=false` and the reasons, adds `locale-unsupported` for a
+      locale outside `en`/`it` (no substitution) and `worker-unavailable` for an enabled decision, since no worker exists.
+      No route, setting, interface control or database change: with no audio there is nothing for the interface to offer, so
+      the existing text-only reading is the fallback.
+    - **Tests.** `SpeechQualificationTest`, 5 tests counted by reading the file: the bundled record admits no profile and
+      excludes XTTS-v2; speech stays disabled even when requested, naming every gate; enabling needs the request, all gates
+      and an admitted bilingual profile; inconsistent records do not load; every delivery keeps the text unchanged and silent.
+    - **Command and result.** `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend
+      -Dtest=SpeechQualificationTest,MusicCatalogTest` → `VERIFY PASSED` (`backend-sources`, `backend-database`,
+      `backend-focused`); the runner printed no test counts.
+    - **Not proven or not done.** No speech worker, model, voice, reference recording or audio exists, and none was
+      downloaded or run. No RTX 4070 measurement (latency, RTF, VRAM, RAM), no Windows/WSL container or offline run, no
+      English or Italian listening review, no consent record, and no QA-38 run (P18.6). The enabled branch is unreachable
+      with the bundled record and has no worker behind it. `verify.sh full` and `containers` were not run here.
+    - **Remaining for an enabled profile (a later story, not this one).** Admit an owned or consented bilingual reference,
+      inventory the distributable, build the pinned worker, run the `docs/30` section 9 protocol on the reference host and set
+      the gates to `passed` with evidence.
 - [ ] P17.8 Research and qualify a concrete optional local EN/IT STT backend against exact code/weight/dependency rights, bounded capture/cancel interfaces, offline behavior, platform packaging and measured CPU/RAM/GPU/latency budgets; no recognizer is selected by the design alone.
   **Requires tasks:** P21.4.
 - [ ] P17.9 Implement explicitly enabled scoped microphone capture, accessible listening/mute states, draft-only recognition, voice-only preview/correction/repeat/confirmation/cancel and normal command/receipt routing for exploration and combat; suppress playback echo and never auto-queue out-of-turn input.

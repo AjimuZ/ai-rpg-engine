@@ -286,6 +286,11 @@ campaigns that pin each one as their root. `PackException.explanation()` returns
 coordinates. `PackDiagnosticsTest` (PostgreSQL, 4 cases) covers QA-02 at exact locations, plus version standing,
 version listing and the dependency graph.
 
+P17.7-A adds `speech.SpeechQualification` (reads `speech/qualification.json`: per-candidate code, weight and voice rights and
+the five rollout gates; `decide(ownerRequested)` enables speech only when requested, all gates passed and a candidate is
+admitted for `en` and `it`) and `speech.SpeechOutput.deliver` (the line unchanged, `audible=false`, with reasons). The bundled
+record passes no gate, so speech is disabled; there is no route, setting, worker or audio. `SpeechQualificationTest` covers it.
+
 P16.2-A adds the injected `exports.CampaignExports`, a read-only owner service with no route.
 `export(owner, adventure, campaign, audience)` authorizes the owner, adventure and campaign together, then returns an
 `Export`: the UTF-8 JSON document, its lowercase SHA-256 and the state revision it describes. Every document has

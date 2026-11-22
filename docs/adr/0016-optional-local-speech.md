@@ -36,3 +36,10 @@ Default to one heavy local GPU job across speech and local images, measured memo
 P03/P05/P16 provide reusable persistence, presentation and export foundations without requiring a speech installation. P17.7 owns optional capability qualification/rollout; P18 verifies QA-38 using the unexecuted benchmark in the [speech specification](../30-local-speech-synthesis.md) and [paired evaluation protocol](../31-research-validation-and-evaluations.md). Required evidence includes actual cold/warm latency, RTF, total/peak VRAM and RAM, Italian/English fidelity and human quality scores, rights/consent records, isolation, GPU/image contention, cancellation, restore, stale/duplicate playback and accessible text fallback.
 
 The additional worker, model storage, native dependencies and rights inventory increase maintenance. No dependency is installed or artifact bundled by this ADR. Requalify changed checkpoints, voice references, conversions/precision and supported platforms; preserve historical bytes and identity mappings instead of silently rerolling voices on upgrade. Accepted design does not imply shipped or verified speech.
+
+## Qualification outcome (P17.7-A, 22 November 2026)
+
+No candidate passed the rights, container, bilingual-quality, resource or persistence gates, so speech ships **disabled**.
+The recorded rights and gate states live in `backend/src/main/resources/speech/qualification.json`; the rule that may enable
+speech and the tested text-only fallback are `org.rpgengine.speech.SpeechQualification` and `SpeechOutput`. The primary and
+fallback selections above stay provisional, and nothing measured or listened to supports them yet.

@@ -1,0 +1,98 @@
+{
+  "schema": 1,
+  "recordedOn": "2026-11-22",
+  "candidates": [
+    {
+      "id": "qwen3-tts-0.6b-base",
+      "role": "primary",
+      "locales": ["en", "it"],
+      "codeLicense": "Apache-2.0",
+      "codeRevision": "QwenLM/Qwen3-TTS@022e286b98fbec7e1e916cb940cdf532cd9f488e",
+      "weightsLicense": "Apache-2.0",
+      "weightsRevision": "Qwen/Qwen3-TTS-12Hz-0.6B-Base@5d83992436eae1d760afd27aff78a71d676296fc; tokenizer Qwen/Qwen3-TTS-Tokenizer-12Hz@7dd38ad4e9bad454aae9cd937d0cd577604fe229",
+      "voiceRights": "none-admitted",
+      "rights": "recorded",
+      "verifiedOn": "2026-10-23",
+      "notes": "Declared licenses read from the published repository and model cards on the verification date. No owned or consented reference recording is admitted, so no voice identity can be created. The distributable (native libraries, Python dependency graph) is not inventoried."
+    },
+    {
+      "id": "kokoro-82m-v1.0-onnx-cpu",
+      "role": "fallback",
+      "locales": ["en", "it"],
+      "codeLicense": "Apache-2.0; kokoro-onnx wrapper MIT; eSpeak NG GPL for Italian phonemes",
+      "codeRevision": "hexgrad/kokoro@dfb907a02bba8152ca444717ca5d78747ccb4bec; thewh1teagle/kokoro-onnx@3596b26764286a7de9d90c363e988d50578918e5",
+      "weightsLicense": "Apache-2.0 (model card), with CC BY training acknowledgements to preserve",
+      "weightsRevision": "hexgrad/Kokoro-82M@f3ff3571791e39611d31c381e3a41a3af07b4987; ONNX conversion model-files-v1.1 (kokoro-v1.0.onnx sha256 beb0d1848dee9a49da392cc3df26958d46cfa35d321edf434f52949153f0df3a, publisher metadata, not recomputed)",
+      "voiceRights": "none-admitted",
+      "rights": "recorded",
+      "verifiedOn": "2026-10-23",
+      "notes": "Catalog voices if_sara and im_nicola are published in the model repository; their per-voice provenance and the eSpeak NG distribution obligations are not reviewed. The publisher grades both Italian voices C."
+    },
+    {
+      "id": "chatterbox-multilingual-v3",
+      "role": "challenger",
+      "locales": ["en", "it"],
+      "codeLicense": "MIT",
+      "codeRevision": "resemble-ai/chatterbox@5de7a54aa4e5e2baadb0182dde554908b48b85c2",
+      "weightsLicense": "MIT (model card)",
+      "weightsRevision": "ResembleAI/chatterbox@5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18",
+      "voiceRights": "none-admitted",
+      "rights": "recorded",
+      "verifiedOn": "2026-10-23",
+      "notes": "Its PerTh dependency tracks a moving branch and is not locked. Reference-speaker consent is a separate, unrecorded grant."
+    },
+    {
+      "id": "piper-oht-voices",
+      "role": "reserve",
+      "locales": ["en", "it"],
+      "codeLicense": "GPL-3.0 (maintained OHF implementation)",
+      "codeRevision": "OHF-Voice/piper1-gpl@619f513580c04dff5ef9a680f6f3f6979ed94d2e",
+      "weightsLicense": "per voice model card; repository-level metadata is not a grant",
+      "weightsRevision": "rhasspy/piper-voices@5041a7a49ae5b3a0f30e6837769eb03fdbb231bd",
+      "voiceRights": "none-admitted",
+      "rights": "recorded",
+      "verifiedOn": "2026-10-23",
+      "notes": "No voice is admitted. GPL distribution review is outstanding."
+    },
+    {
+      "id": "xtts-v2",
+      "role": "excluded",
+      "locales": ["en", "it"],
+      "codeLicense": "MPL-2.0 (maintained fork)",
+      "codeRevision": "idiap/coqui-ai-TTS@03339e5b790b5e16ea8867a142e8bb26ec646d94",
+      "weightsLicense": "CPML 1.0.0 (noncommercial; covers the model and its outputs)",
+      "weightsRevision": "coqui/XTTS-v2@6c2b0d75eae4b7047358e3b6bd9325f857d43f77",
+      "voiceRights": "none-admitted",
+      "rights": "excluded",
+      "verifiedOn": "2026-10-23",
+      "notes": "Excluded from the commercial-compatible default path because its weights and outputs are noncommercial."
+    }
+  ],
+  "gates": [
+    {
+      "id": "rights-inventory",
+      "status": "pending",
+      "evidence": "Declared licenses are recorded per candidate; the complete distributable inventory and a consented reference recording are missing."
+    },
+    {
+      "id": "container-offline",
+      "status": "unexecuted",
+      "evidence": "No worker image, GPU smoke or offline run exists."
+    },
+    {
+      "id": "bilingual-quality",
+      "status": "unexecuted",
+      "evidence": "No native English or Italian listening review has run."
+    },
+    {
+      "id": "resources",
+      "status": "unexecuted",
+      "evidence": "No latency, RTF, VRAM or RAM measurement exists for the reference host."
+    },
+    {
+      "id": "persistence-fault",
+      "status": "unexecuted",
+      "evidence": "No voice identity, audio cache, restore or worker-failure test can run without a worker."
+    }
+  ]
+}
