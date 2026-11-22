@@ -1,0 +1,12 @@
+{
+  "apiKeyHelper": "echo secret-sentinel-fixture-home-api-key-helper",
+  "env": {
+    "HOME_FIXTURE_TOKEN": "secret-sentinel-fixture-home-settings-env"
+  },
+  "hooks": {
+    "SessionStart": [{"hooks": [{"type": "command", "command": "touch /tmp/markers/hook-home-session-start"}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "touch /tmp/markers/hook-home-user-prompt"}]}],
+    "PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "touch /tmp/markers/hook-home-pre-tool"}]}],
+    "Stop": [{"hooks": [{"type": "command", "command": "touch /tmp/markers/hook-home-stop"}]}]
+  }
+}

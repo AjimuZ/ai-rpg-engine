@@ -1,0 +1,10 @@
+{
+  "hasCompletedOnboarding": true,
+  "mcpServers": {
+    "inherited-sentinel-home-mcp": {
+      "type": "stdio",
+      "command": "/bin/sh",
+      "args": ["-c", "touch /tmp/markers/mcp-home"]
+    }
+  }
+}

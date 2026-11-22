@@ -8005,6 +8005,90 @@ Scheduling: this package follows the core packages in roadmap order and gates P1
       (fetching it was refused). No deliberately weakened run was made, so the Docker tests have not been shown to fail
       on a wrong digest outside the selftest stage's own negative controls. Only `linux/amd64` on this Windows host's
       Docker Desktop was exercised.
+  - 2026-11-22 P20.1-B (done; the supervisor's container rerun on the fixes passed; the P20.1 task is not done):
+    fixture-based isolation proof for the pinned client. The box stays unchecked.
+    - **Upstream.** The client documents `ANTHROPIC_BASE_URL` as its supported base-URL override (LLM gateway
+      configuration), so a scripted upstream is used: new `tools/runtime_probe/MessagesProvider.java` answers
+      `/v1/messages` (streamed or not) with a fixed text, or, for `scenario-tools`, with `tool_use` calls for `Bash`,
+      `Write`, `Read` (of the planted subscription credential) and `WebFetch` (of its own `/webfetch-probe` path). It
+      logs every request's method, path, headers and body. New `claude_isolation.compose.yaml` runs it and the
+      P20.1-A client image on an internal network, with read-only roots, no capabilities, UID 10001 and tmpfs home,
+      workspace and `/tmp`.
+    - **Fixture.** New `claude_isolation_fixture/` holds 16 synthetic files under flat names (the repository ignores
+      the real configuration names). `run-case.sh` plants them as home `settings.json` (hooks, `apiKeyHelper`,
+      `env`), `CLAUDE.md`, a skill, a command, an agent, `.credentials.json` (a subscription login), `.claude.json`
+      (an MCP server), a first-runtime `auth.json`, and project `settings.json` (hooks, allow rules,
+      `enableAllProjectMcpServers`), `settings.local.json`, `CLAUDE.md`, `CLAUDE.local.md`, `.mcp.json`, a skill, a
+      command and an agent. Instruction and extension values start with `inherited-sentinel`, credential values with
+      `secret-sentinel`. Every hook and MCP server only touches its own marker file.
+    - **Profiles.** The isolated profile is `-p "$prompt" --output-format stream-json --verbose --model … --tools ""
+      --strict-mcp-config --disable-slash-commands --setting-sources "" --permission-mode dontAsk
+      --no-session-persistence --system-prompt … --settings "$builtin_off"`, in API-key mode with a fixture key, and
+      with `CLAUDE_CODE_OAUTH_TOKEN` and `OPENAI_API_KEY` sentinels in its environment. `builtin_off` is the inline
+      JSON `{"enabledPlugins": {...}}` that sets each of the 14 `cc-plugin-*@builtin` plugins the 2.1.323 binary
+      registers to `false`, and holds nothing else. The unrestricted positive control uses the client's defaults and
+      no key. Only that control has `projects["/var/lib/runtime/workspace"].hasTrustDialogAccepted: true` added to
+      its planted `~/.claude.json`, so the project's `permissions.allow` entries apply.
+    - **Tests.** New `tools/runtime_probe/test_claude_isolation.py`: 9 offline tests (plant table, LF and sentinels
+      per file, distinct markers, profile options and forbidden options, Compose isolation and pins, upstream
+      constants, the repository secret and path scan accepting every new file, because each credential
+      sentinel carries the scanner's `fixture` placeholder hint, the inline settings holding only `false`
+      `@builtin` entries, and the trust entry reaching only the positive control as valid JSON) and 3 Docker tests in a class defined only when `RUNTIME_PROBE_DOCKER` is set. The Docker tests
+      compile the upstream with `javac -Xlint:all -Werror`. They run the positive control, which has 13 subtests,
+      one per detection: built-in plugins loaded and each one named in `builtin_off`, tools offered, host command
+      run, home and project hooks run, home and project MCP servers started, home and project instructions sent,
+      home and project skills discovered, and a configured credential sent in a header. They then run the isolated profile on an empty home and on the planted one. Each run must
+      complete with the neutral text and report no tools, MCP servers or plugins in `system/init`. Each must offer no
+      tools upstream, send only the fixture `x-api-key`, and answer every scripted call with an error `tool_result`.
+      It must leave no marker or canonical sentinel, and no sentinel may appear in any request header or body, in
+      stdout, in stderr, or (for credentials) in any new file.
+    - **Checks run.** First version: `py -B -m unittest tools.runtime_probe.test_claude_isolation` without Docker,
+      `Ran 7 tests`, `OK`. The supervisor then ran `sh .agents/ralph/verify.sh containers` (22 November 2026,
+      22:20 local time, logs in `.agents/ralph/logs/verify/20261122T222051-7103`). It exited 1: container-packaging
+      `Ran 357 tests`, `OK (skipped=6)`; runtime-probe-docker `Ran 135 tests in 90.342s`, `FAILED (failures=3)`. All
+      three failures were in `DockerClientIsolationTests`. In the isolated test, both the empty and the planted
+      cases failed: `system/init` listed `cc-plugin-agents-md`, `cc-plugin-privacy` and
+      `cc-plugin-plugin-authoring`, each with path `builtin`. In the positive control, the probe "a scripted host
+      command runs" failed: stderr said the 3 `permissions.allow` entries of `.claude/settings.json` were ignored
+      because the workspace was not trusted. Every other positive-control probe passed in that run, as did the
+      `javac` check.
+    - **Fixes in this attempt.** The isolated profile now has `--settings "$builtin_off"`. The client documents
+      `--settings` and the `enabledPlugins` setting, and its stream-json schema names bundled plugins
+      `name@builtin`. The 14 names come from the plugin registrations in the pinned binary. Its `--help` says
+      `--bare` leaves built-in features unaffected, and no switch to turn off all built-in plugins was found. The
+      positive control now marks only its own workspace as trusted. Scratch `docker build` runs (no `docker run`)
+      on the 2.1.323 image gave this evidence. Isolated flags plus `--settings` with the map: the init event showed
+      `"plugins":[]`; without the map it listed `cc-plugin-agents-md`, `cc-plugin-telemetry`, `cc-plugin-privacy`
+      and `cc-plugin-plugin-authoring`, with telemetry on during the build. Edited `run-case.sh isolated all
+      scenario-complete` with no upstream: `status 124` (the client's 150 s timeout, as expected without an
+      upstream), no marker, `canonical absent`, no `secret` line. The only new file was a `.claude.json` backup.
+      Init showed empty `tools`, `mcp_servers`, `slash_commands`, `skills` and `plugins`. The trust `sed` line,
+      run on a copy of the fixture, gave valid JSON that keeps the home MCP server. After the fixes:
+      `py -B -m unittest tools.runtime_probe.test_claude_isolation` without Docker, `Ran 9 tests`, `OK`.
+    - **Supervisor rerun on the fixes.** On the tree with both fixes (22 November 2026, 22:41 local time), the
+      supervisor ran `py -B -m unittest tools.runtime_probe.test_claude_isolation` without Docker: `Ran 9 tests`,
+      `OK`. It then ran `sh .agents/ralph/verify.sh containers`, which exited 0 with `PASS container-packaging 626s`,
+      `PASS runtime-probe-docker 91s` and `VERIFY PASSED (containers)`, logs in
+      `.agents/ralph/logs/verify/20261122T224140-8474`. container-packaging: `Ran 357 tests in 625.562s`,
+      `OK (skipped=6)`. runtime-probe-docker: `Ran 137 tests in 89.887s`, `OK`. Compared with the failing run
+      20261122T222051-7103 (135 tests, 3 failures), the `--settings "$builtin_off"` map made both isolated cases
+      report no plugin, and the positive control's workspace trust let its scripted host command run. The 2 extra
+      tests match the 2 offline tests added with the fixes (7 to 9); the per-test log was not inspected here. No Dockerfile, test, fixture or profile was changed after
+      that run. These container results are the supervisor's, not a session's.
+    - **Not run or proven.** `sh .agents/ralph/verify.sh full` was not run in this session. No deliberately weakened
+      run was made beyond the positive control, so a removed assertion has not been shown to fail. The scratch runs
+      had no upstream, so they prove only the init event and the absence of side effects before the first request.
+      Residuals the profile does not remove: `system/init` still names five
+      built-in agents (`claude`, `Explore`, `general-purpose`, `Plan`, `statusline-setup`). They are unreachable
+      without an agent tool, but no test calls them. Init also names an auto-memory path under the home directory.
+      A bundled plugin added by a later client version would not be in `builtin_off`, and the Docker test would
+      then fail on it. In the supervisor's passing run, the planted isolated case did show `--setting-sources ""`
+      ignoring the planted settings, instruction and skill files, and the fixture API key used over a planted
+      subscription `.credentials.json` and `CLAUDE_CODE_OAUTH_TOKEN`, with no inherited sentinel sent. Still
+      unproven: subscription mode itself; a foreign API key in subscription mode, which the client does not refuse
+      by itself, so only the P20.2 startup guard and the supervisor's environment allowlist can stop it; hostile
+      flags; deliberately weakened runs; and the five built-in agents never being invoked. No real account was
+      used.
 - [ ] P20.2 Package the optional `claude` runtime service following ADR 0013 and ADR 0008: pinned image, read-only root, dropped capabilities, private account volume and IPC, no database route, no credentials in images or `.env`, startup guards, a Compose service started only when selected, `NARRATION_RUNTIME` handling, and `start.sh --runtime`, `--login`, `--check` and `--status` for the selected runtime. Extend QA-28 evidence and keep Codex behavior unchanged.
 - [ ] P20.3 Implement the Claude adapter behind the runtime-neutral task port: typed tasks with `--json-schema` outputs revalidated by the engine, per-task model and effort from an approved allowlist, session create/resume/retire with purge, bounded readers, SIGINT-first interruption with owned-process shutdown, limit, overage, authentication and billing mapping, selected-runtime diagnostics (`GET /api/v1/runtime/status`), and the startup comparison that retires sessions and records an audit event when the selection changed.
 - [ ] P20.4 Verify parity and the supported claim: run the same neutral fixtures through both adapters (QA-42), including switch and restart, no failover, limit and overage, unknown-setting and unsupported-version refusal, mixed-credential guards and secret sentinels. The owner runs an opt-in live neutral smoke for the chosen sign-in mode. Record the terms-review outcome. If it rejects a mode, document that mode as disabled and keep the rest.

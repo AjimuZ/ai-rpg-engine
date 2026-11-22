@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Isolation proof for the second narration client (P20.1-B), 22 November 2026
+
+- Nothing changes for players: the second narration runtime still cannot be selected. For developers, a new runtime-probe
+  test runs the pinned client (Claude Code 2.1.323) against a scripted upstream with no account. It plants synthetic
+  home and project settings, hooks, MCP servers, instruction files, skills and credentials. A positive control shows
+  that each probe detects its surface. The test then requires the isolation profile to expose none of them, refuse
+  scripted tool calls and leak no sentinel value.
+- The first container run found that the client loads three bundled plugins even with every setting source off. The
+  isolation profile now turns off each of the 14 bundled plugins of 2.1.323 through the documented `enabledPlugins`
+  setting. The positive control now trusts its own workspace, so its scripted host command can run.
+- Checked: the 9 offline fixture tests pass. The supervisor's container suite rerun on the fixes passed
+  (runtime-probe-docker `Ran 137 tests`, `OK`; container-packaging `Ran 357 tests`, `OK (skipped=6)`).
+- Not done: subscription sign-in and hostile launch flags were not exercised, and the client itself does not refuse a foreign API key, so the
+  later startup guard must.
+
 ## Unreleased — Second narration client pinned with a registry integrity check (P20.1-A), 22 November 2026
 
 - Nothing changes for players: the first narration runtime is still the only one, and the second one cannot be selected

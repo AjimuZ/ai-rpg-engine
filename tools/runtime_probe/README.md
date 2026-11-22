@@ -157,6 +157,49 @@ same day built the image and passed the runtime-probe-docker step (`Ran 125 test
 docker build --tag ai-rpg-engine-runtime-probe/claude:2.1.323 tools/runtime_probe/claude_client
 ```
 
+## Second narration client isolation (P20.1-B)
+
+`test_claude_isolation.py` runs the unmodified pinned client against `MessagesProvider.java`,
+a scripted Messages upstream reached through the client's documented `ANTHROPIC_BASE_URL`
+override. `claude_isolation.compose.yaml` keeps both containers on an internal network
+under the `ai-rpg-engine-claude-isolation` project, with read-only roots, no capabilities, UID
+10001 and tmpfs home, workspace and `/tmp`. There is no account and no real credential.
+Each case is one `compose run` of `claude_isolation_fixture/run-case.sh`, which can plant 16
+synthetic home and project files: settings with hooks, `apiKeyHelper` and allow rules,
+instruction files, skills, commands, agents, MCP servers, a subscription login and a
+first-runtime `auth.json`. The script runs the client once and prints a report with the exit
+status, the output, the hook, MCP and tool markers, and any new file holding a credential
+sentinel.
+
+- The **positive control** runs the client with its defaults over the planted files. Each
+  detection must fire: tools offered and a host command run, hooks, MCP servers, instructions,
+  skills, bundled `@builtin` plugins, and a configured credential sent in a header. Only this
+  control marks the workspace trusted (`hasTrustDialogAccepted` added to the planted
+  `~/.claude.json`): otherwise the client ignores the project's `permissions.allow` entries and
+  the scripted host command never runs.
+- The **isolated profile** (`--tools ""`, `--strict-mcp-config`, `--disable-slash-commands`,
+  `--setting-sources ""`, `--permission-mode dontAsk`, `--no-session-persistence`,
+  `--system-prompt`, and `--settings` holding only an `enabledPlugins` map that turns off the
+  14 bundled plugins of 2.1.323) runs once on an empty home and once over the planted files.
+  In the second run its environment also holds subscription and first-runtime credentials.
+  Both runs must complete with the neutral text, offer no tools, and report no tool, MCP server
+  or plugin in `system/init`. Each must send only the fixture key, refuse all four scripted
+  tool calls, and leave no marker or canonical file. No sentinel may appear in any request,
+  output or new credential file.
+
+The offline file tests always run (`Ran 9 tests`, `OK` on 22 November 2026). They also check
+that the inline settings hold nothing but those `false` entries, and that the trust entry
+reaches only the positive control. One of them runs
+the repository secret and path scan over every new file. Each credential sentinel therefore
+contains `fixture`, the scanner's placeholder hint, and no value looks like a real credential. The Docker
+class is defined only when `RUNTIME_PROBE_DOCKER` is set. Its first run, in
+`sh .agents/ralph/verify.sh containers`, failed on the bundled plugins and on the control's
+untrusted workspace. The supervisor's rerun on the fixes above (22 November 2026, logs in
+`.agents/ralph/logs/verify/20261122T224140-8474`) passed: runtime-probe-docker
+`Ran 137 tests in 89.887s`, `OK`. A foreign API key is not
+refused by the client itself, because an API key always wins in print mode. The P20.2
+startup guard must refuse it.
+
 ## Isolation profile (P01.3)
 
 `test_isolation.py` checks the profile baked into the runtime image

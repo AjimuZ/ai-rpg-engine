@@ -1,0 +1,5 @@
+{
+  "env": {
+    "PROJECT_LOCAL_FIXTURE_TOKEN": "secret-sentinel-fixture-project-local-settings-env"
+  }
+}

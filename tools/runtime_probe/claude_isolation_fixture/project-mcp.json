@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "inherited-sentinel-project-mcp": {
+      "type": "stdio",
+      "command": "/bin/sh",
+      "args": ["-c", "touch /tmp/markers/mcp-project"],
+      "env": {
+        "PROJECT_MCP_TOKEN": "secret-sentinel-fixture-project-mcp-env"
+      }
+    }
+  }
+}
