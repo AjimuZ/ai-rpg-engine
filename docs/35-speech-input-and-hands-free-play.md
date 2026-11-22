@@ -2,7 +2,7 @@
 
 ## 1. Status and scope
 
-Owner-requested design, 26 October 2026, under [ADR 0022](adr/0022-optional-speech-input.md). **Not implemented; disabled by default.** No microphone capture, recognizer, model installation, voice-command API, latency measurement or gameplay acceptance is delivered by these documents. The concrete speech-to-text (STT) backend, model and capture transport remain open pending qualification; [section 8](#8-recorded-disqualification-and-bounded-interfaces-p178-a) records that no recognizer is qualified today and specifies the interfaces a later qualification is measured against, and [section 9](#9-no-capture-path-p179-a) describes the implemented no-capture path. No browser, operating-system or model capability is assumed.
+Owner-requested design, 26 October 2026, under [ADR 0022](adr/0022-optional-speech-input.md). **Not implemented; disabled by default.** No microphone capture, recognizer, model installation, voice-command API, latency measurement or gameplay acceptance is delivered by these documents. The concrete speech-to-text (STT) backend, model and capture transport remain open pending qualification; [section 8](#8-recorded-disqualification-and-bounded-interfaces-p178-a) records that no recognizer is qualified today and specifies the interfaces a later qualification is measured against, [section 9](#9-no-capture-path-p179-a) describes the implemented no-capture path, and [section 10](#10-qa-45-at-disabled-scope-p1710-a) records QA-45 run at disabled scope. No browser, operating-system or model capability is assumed.
 
 The target is optional English/Italian dictation and hands-free exploration and turn-based combat, including speaking to characters, negotiations and tactical commands. Complete typed input, contextual replies, tactical controls and readable receipts remain available with voice disabled, denied, unavailable or interrupted. Voice is optional v1 work in P17.8–P17.10; it cannot delay text-only MVP/core-v1 completion.
 
@@ -67,7 +67,7 @@ P17.8 must research actual interfaces and exact redistributable code/weights/dep
 - Same-name two-adventure fixtures reject cross-scope audio/text/vocabulary/callbacks; raw recordings and secrets are absent from logs, backups and exported story bundles by default.
 - Under concurrent local text/image/TTS work, bounded queues/cancellation and measured resource/latency budgets pass or the profile stays disabled with a verified typed fallback. Recognition failure never changes committed gameplay.
 
-QA-45's disabled/no-capture/text fallback is mandatory. Full STT and hands-free claims require the enabled-profile evidence above; an honest disabled outcome closes only its fallback/qualification disposition, not an implementation claim. All these gameplay/audio checks remain unrun.
+QA-45's disabled/no-capture/text fallback is mandatory. Full STT and hands-free claims require the enabled-profile evidence above; an honest disabled outcome closes only its fallback/qualification disposition, not an implementation claim. The disabled-scope checks ran in P17.10-A ([section 10](#10-qa-45-at-disabled-scope-p1710-a)); every enabled-profile gameplay/audio check above remains unrun.
 
 ## 8. Recorded disqualification and bounded interfaces (P17.8-A)
 
@@ -129,3 +129,22 @@ Implemented 22 November 2026 in `org.rpgengine.speech.SpeechInput`, on the secti
 - No HTTP route, setting, permission prompt, microphone control or frontend change exists; the player interface offers no microphone, and typed exploration and combat input are unchanged.
 
 Not implemented, because each needs a qualified recognizer: enabled capture sessions, the listening/transcribing/muted states and their controls, draft review, voice-only preview/correction/repeat/confirmation/cancel, routing of confirmed voice input through the command envelope and playback echo suppression. No microphone, browser capture API or audio was run, and no QA-45 scenario ran.
+
+## 10. QA-45 at disabled scope (P17.10-A)
+
+Run 22 November 2026. **Disposition: speech input is disabled.** No recognizer is qualified (section 8), so no profile is enabled and QA-45 ran only at disabled scope. This closes the disabled/no-capture/typed-fallback disposition; it is not voice support.
+
+| QA-45 area | Disabled-scope evidence | Result |
+| --- | --- | --- |
+| Explicit permission, listening, mute | `SpeechInputDisabledScopeTest`: every start, requested or not, in `en`/`it` and both modes, is `unavailable` with no permission request, no capture and no session | passed |
+| Silence, noise, accent, negation, control words in dialogue | Empty, blank, noise, NUL, EN/IT negations, "Mira, cover the exit"/"copri l'uscita", "confirm"/"conferma", "cancel"/"annulla", "stop listening" inside a quoted line: no draft, nothing queued, `no-capture-session` | passed |
+| Duplicate results and confirmations | Each result delivered twice: same discard, nothing queued | passed |
+| Reconnect, restart, renewal | Three repeated rounds of starts answer exactly as the first; nothing resumes listening | passed |
+| Same-name adventure isolation | `adventure-a/the-harbour` and `adventure-b/the-harbour`: each status echoes only its own scope; no session, buffer or vocabulary exists to share | passed |
+| No audio input surface | The test scans every `@Controller` under `org.rpgengine`: no route path names speech, voice, audio, microphone, recognition, transcription, dictation, listening or utterances, and no mapping consumes `audio/*` | passed |
+| Complete typed fallback | The same scan finds `POST /api/v1/campaigns/{campaignId}/commands`; `CampaignCommandHttpTest` (typed exploration and combat, including a negotiated ending) passed in the same run | passed |
+| Frontend capture | A case-insensitive search of `frontend/src` for `getUserMedia`, `SpeechRecognition`, `webkitSpeech`, `MediaRecorder`, `AudioContext` and `microphone` found nothing | passed |
+| TTS echo and interruption | Not applicable: no capture exists and speech output is disabled (P17.7-A); interruption is reported unavailable | not run |
+| Recognition quality (EN/IT accuracy, false activation), latency, shared-resource load, cancel time | Needs a qualified recognizer (P17.8-O) | not run |
+
+Not proven: no microphone, recognizer, browser capture API or audio was run; no human recognition review, no browser session and no measurement took place. The frontend evidence is a source search, not a browser test. The controller scan covers Spring MVC request mappings only; any endpoint registered another way is outside it.

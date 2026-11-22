@@ -1694,8 +1694,11 @@ Do not require live inference for ordinary CI. Test fixtures must not contain pr
 | QA-44 | Local generation under shared admission | A text lease and an image lease alternate without out-of-memory failures. The text model unloads and reloads and its prompt cache is restored. An interactive request makes an image job yield at a step boundary. Unowned GPU contention delays or degrades work without killing any process. Missing GPU, memory or files fall back to text-only play or catalog art. Image jobs record model hash, parameters and source, use safe-content defaults, and follow the idempotent asset rules. Measurements are recorded for the reference host | FR-022, FR-040, NFR-009 |
 | QA-45 | Optional STT and hands-free play | EN/IT voice-only preview/correction/repeat/confirm/cancel; explicit microphone permission/listening/mute; silence/noise/accent/negation ambiguity, TTS echo and interruption safety; exploration/combat target/cost/decision validation; no out-of-turn costs or queued actions; duplicate chunks/results/confirmations, reconnect/renewal and lost receipts commit once; per-adventure ephemeral audio isolation; measured shared-resource/latency bounds or disabled no-capture/typed fallback | FR-004, FR-007, FR-015, FR-023, FR-027, FR-033, FR-041, NFR-003–004, NFR-009, NFR-012–014 |
 
-QA-45 is prospective; no microphone, recognizer, browser voice flow or human
-recognition acceptance has run. The [STT acceptance matrix](35-speech-input-and-hands-free-play.md#7-qualification-and-acceptance)
+QA-45 ran at disabled scope only (P17.10-A, 22 November 2026): no capture, no
+draft or queued input from any result, no audio route and a complete typed
+command path, recorded in [section 10 of the STT specification](35-speech-input-and-hands-free-play.md#10-qa-45-at-disabled-scope-p1710-a).
+No microphone, recognizer, browser voice flow or human recognition acceptance
+has run, so the enabled-profile scope stays prospective. The [STT acceptance matrix](35-speech-input-and-hands-free-play.md#7-qualification-and-acceptance)
 defines the enabled-profile evidence and disabled-profile fallback. STT input
 remains separate from QA-38's optional TTS output qualification.
 

@@ -395,7 +395,9 @@ No silent browser/OS/cloud recognition fallback is allowed. Treat transcripts as
 untrusted drafts, bind explicit confirmations to one current preview, suppress
 engine playback echo and route only confirmed input through the existing command
 pipeline. Silence, reconnect or recognition failure cannot authorize a world
-change. QA-45 qualification is pending; capture remains unimplemented/disabled.
+change. QA-45 passed only at disabled scope (P17.10-A: no capture, no audio
+route, typed fallback); enabled-profile qualification is pending and capture
+remains unimplemented/disabled.
 
 Maintain supported engine, pack schema, ruleset, database, and narration runtime adapter compatibility tables (one per supported runtime). Back up before an upgrade that changes persistent formats. Unsupported inputs produce a controlled migration-required state. Do not silently downgrade content or rules.
 

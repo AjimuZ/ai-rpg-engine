@@ -7903,7 +7903,28 @@ this update. No combat runtime/browser result is claimed.
       implemented; each needs a qualified recognizer (P17.8-O). No microphone, browser capture API or audio was run, no
       frontend test was added because no frontend code changed, and no QA-45 scenario ran (P17.10). `verify.sh full` and
       `containers` were not run here.
-- [ ] P17.10 Run QA-45 in EN/IT with silence/noise/accent/negation, TTS/interruptions, duplicate audio/results/confirmations, reconnect/restart/cancel, same-name adventure isolation and shared-resource failures. Enable only the measured qualified profile, or record disabled capability and verified no-capture/complete typed fallback; do not claim unimplemented voice support.
+- [x] P17.10 Run QA-45 in EN/IT with silence/noise/accent/negation, TTS/interruptions, duplicate audio/results/confirmations, reconnect/restart/cancel, same-name adventure isolation and shared-resource failures. Enable only the measured qualified profile, or record disabled capability and verified no-capture/complete typed fallback; do not claim unimplemented voice support.
+  - 2026-11-22 P17.10-A: QA-45 run at **disabled scope**; speech input is recorded as a disabled capability and no profile
+    is enabled, because P17.8-A qualified no recognizer. Recorded in `docs/35` section 10.
+    - **Tests.** New `SpeechInputDisabledScopeTest`, 2 tests counted by reading the file. (1) Three rounds, requested and
+      not, two same-name scopes (`adventure-a/the-harbour`, `adventure-b/the-harbour`), `en`/`it`, both modes: every start
+      is `unavailable`, not capturing, asks no permission, opens no session, keeps typed input and echoes only its own
+      scope; repeated rounds answer exactly as the first (reconnect/restart/renewal). 15 utterances (empty, blank, noise,
+      NUL, EN/IT negation, ally requests, "confirm"/"conferma", "cancel"/"annulla", "stop listening", a quoted control word,
+      null), each delivered twice, give no draft, nothing queued, `no-capture-session`. (2) A classpath scan of every
+      `@Controller` under `org.rpgengine` finds no route naming speech/voice/audio/micro/stt/transcri/recogni/dictat/listen/
+      utteranc and no `audio/*` `consumes`, and finds `POST /api/v1/campaigns/{campaignId}/commands`.
+    - **Command and result.** `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend
+      -Dtest=SpeechInputDisabledScopeTest,SpeechInputTest,SpeechInputQualificationTest,CampaignCommandHttpTest` →
+      `VERIFY PASSED` (`backend-sources`, `backend-database`, `backend-focused`); the runner printed no test counts and left
+      no fresh surefire report on the host. `CampaignCommandHttpTest` is the typed exploration/combat evidence (including a
+      negotiated ending). Frontend: a case-insensitive search of `frontend/src` for
+      `getUserMedia|SpeechRecognition|MediaRecorder|webkitSpeech|microphone|AudioContext` found no match.
+    - **Not proven or not done.** No microphone, recognizer, browser capture API, audio or browser session was run; EN/IT
+      recognition accuracy, false activation, TTS echo, interruption, latency, shared-resource load and cancel time are
+      unmeasured and need a qualified recognizer (P17.8-O). The frontend evidence is a source search, not a browser test;
+      the route scan covers Spring MVC mappings only. No deliberate-weakening run was made, so the new tests were not shown
+      to fail on a removed check. `verify.sh full` and `containers` were not run here.
 
 STT is separate from P17.7's TTS output. Dictation does not require TTS; claiming
 full hands-free play additionally requires admitted audible public previews and

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — Voice input checked as off, with typed play complete (P17.10-A), 22 November 2026
+
+- Voice input stays off in this release, and the playthrough does not change. The voice acceptance checks were run for
+  the "off" case: in English and Italian, silence, noise, negations, words like "confirm" or "annulla" inside a spoken
+  line, repeated results, reconnecting and two adventures with the same place name never turn on the microphone, never
+  create a draft and never queue an action.
+- The engine offers no way to send audio, and the screen has no microphone code, while typed commands in exploration and
+  combat work as before.
+- Not done: no microphone, recognizer or audio was run, and there is no English or Italian accuracy, echo, interruption
+  or speed figure. Turning voice on needs a qualified recognizer first.
+
 ## Unreleased — Voice input stays off with typed play complete (P17.9-A), 22 November 2026
 
 - Voice input is still not available, and the playthrough does not change: there is no microphone button, the engine never

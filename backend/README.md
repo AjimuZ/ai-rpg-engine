@@ -303,6 +303,11 @@ state `unavailable` with `capturing=false`, `permissionRequested=false`, no sess
 `worker-unavailable` to the decision's reasons. `receive(status, text)` discards any recognition result with no draft,
 `queued=false` and `no-capture-session`. There is no route or frontend control. `SpeechInputTest` covers it (`docs/35` section 9).
 
+P17.10-A runs QA-45 at disabled scope in `SpeechInputDisabledScopeTest`: EN/IT silence, noise, negation, control words,
+duplicated results, repeated starts and two same-name adventure scopes stay inert, and a scan of every `@Controller` finds
+no audio or speech route or `audio/*` consumer while `POST /api/v1/campaigns/{campaignId}/commands` stays mapped
+(`docs/35` section 10).
+
 P16.2-A adds the injected `exports.CampaignExports`, a read-only owner service with no route.
 `export(owner, adventure, campaign, audience)` authorizes the owner, adventure and campaign together, then returns an
 `Export`: the UTF-8 JSON document, its lowercase SHA-256 and the state revision it describes. Every document has
