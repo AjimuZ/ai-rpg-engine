@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — Fixed launch profile and recorded signals for the second narration client (P20.1-C), 22 November 2026
+
+- Nothing changes for players: the second narration runtime still cannot be selected. For developers, a probe
+  supervisor script now fixes how the engine starts the pinned client (Claude Code 2.1.323) for each task. It accepts
+  task data only, checks each field exactly, refuses credentials of the other sign-in mode, passes the prompt on stdin
+  (the client reads a prompt argument such as `--version` as an option), and gives the client an allowlisted
+  environment with its own retries and model remapping off.
+- A new runtime-probe test sends tasks through it to a scripted upstream with no account. It records the client's
+  error, limit and overage signals, which model and effort pairs really receive their effort, and how a session is
+  stored, resumed and purged with nothing left. Findings: errors still report the result subtype `success`; a 529
+  arrives as `server_error`; limit events appear only with a subscription login; overage is reported only after the
+  paid answer; the client silently drops effort for some models.
+- Checked: the offline tests pass (9 new, 23 across the three client test files), and the container suite passed with
+  the five new Docker tests and the earlier isolation tests against the changed scripted upstream (151 runtime-probe
+  tests). Not checked: interruption, a real account, outbound traffic on an open network, the home-directory guard and the terms review
+  remain open.
+
 ## Unreleased — Isolation proof for the second narration client (P20.1-B), 22 November 2026
 
 - Nothing changes for players: the second narration runtime still cannot be selected. For developers, a new runtime-probe

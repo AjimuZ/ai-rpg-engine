@@ -199,7 +199,7 @@ Alternatives considered:
 
 ## Decision: second narration client pin and installation (P20.1-A)
 
-Context: [ADR 0020](0020-selectable-narration-runtime.md) makes Claude Code a selectable second narration runtime, and the [integration specification](../33-claude-runtime-integration.md#4-candidate-launch-profile) requires the unmodified client at an exact version with an integrity check. The npm package `@anthropic-ai/claude-code` 2.1.323 has no runtime dependencies, and its `bin/claude.exe` is a 500-byte placeholder. A `postinstall` script (`node install.cjs`) replaces that placeholder with the native binary of one of eight platform packages that the wrapper lists as optional dependencies at the same version. The `linux-x64` platform package holds four files: `LICENSE.md`, `README.md`, `package.json` and the 362,435,088-byte executable `claude`.
+Context: [ADR 0020](0020-selectable-narration-runtime.md) makes Claude Code a selectable second narration runtime, and the [integration specification](../33-claude-runtime-integration.md#4-fixed-launch-profile-and-supervisor-protocol) requires the unmodified client at an exact version with an integrity check. The npm package `@anthropic-ai/claude-code` 2.1.323 has no runtime dependencies, and its `bin/claude.exe` is a 500-byte placeholder. A `postinstall` script (`node install.cjs`) replaces that placeholder with the native binary of one of eight platform packages that the wrapper lists as optional dependencies at the same version. The `linux-x64` platform package holds four files: `LICENSE.md`, `README.md`, `package.json` and the 362,435,088-byte executable `claude`.
 
 Decision:
 

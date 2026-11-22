@@ -8089,6 +8089,68 @@ Scheduling: this package follows the core packages in roadmap order and gates P1
       by itself, so only the P20.2 startup guard and the supervisor's environment allowlist can stop it; hostile
       flags; deliberately weakened runs; and the five built-in agents never being invoked. No real account was
       used.
+  - 2026-11-22 P20.1-C (done; offline tests and the supervisor's `verify.sh containers` run passed; the P20.1 task
+    is not done): fixed launch profile, supervisor protocol, capability matrix, readiness approach, signals, and
+    retention and purge. The box stays unchecked; P20.1-D covers the terms-review inputs.
+    - **Profile and protocol.** New `tools/runtime_probe/claude_supervisor/supervise.sh` (POSIX `sh`) is the only way a
+      task reaches the client: `run SESSION MODEL EFFORT SCHEMA` with the prompt on stdin (1 to 262,144 bytes), or
+      `retire UUID`. Every field is matched exactly (exit 64 and `supervisor-refused REASON` otherwise). A credential
+      guard refuses the other mode's credentials (exit 66). After that, `exec env -i` starts the client with the fixed
+      template of docs/33 section 4 and an allowlisted environment, including `CLAUDE_CODE_MAX_RETRIES=0`,
+      `CLAUDE_CODE_DISABLE_LEGACY_MODEL_REMAP=1` and `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`. `settings.json` holds the
+      P20.1-B `enabledPlugins` map, and `schemas/neutral-check.json` the probe schema. `retire` deletes every home path
+      naming the session, then exits 0 only if no path names it and no file contains it (else 65).
+    - **Fixture.** `MessagesProvider.java` gained API-error scenarios (401, the credit-balance 400, 400, prompt too
+      long, 529, 500, 429 with unified limit headers), an unknown model (404), overage-in-use headers, a
+      `StructuredOutput` answer and a `max_tokens` stop. The P20.1-B behaviors are unchanged. New
+      `claude_profile.compose.yaml` (same isolation as P20.1-B) and `claude_profile_fixture/` (`run-profile.sh`
+      with five cases, `readiness-pairs.txt`, and `home-login.json` holding fixture strings only).
+    - **Tests.** New `tools/runtime_probe/test_claude_profile.py`, with 9 offline tests. They cover the template, the
+      prompt never being an argument, the exact environment list, settings equal to the P20.1-B map, the closed
+      schema, the Compose isolation and pins, LF and the repository secret scan, the runner matching the expectation
+      tables, and negative controls: a started refusal, a dropped effort, a remapped model, a leftover transcript, an
+      extra file and a missing pre-purge sighting each fail their check. It also has 5 Docker tests in a class defined
+      only when `RUNTIME_PROBE_DOCKER` is set: refusals (19 steps, no request), API-key signals (13 steps), readiness
+      (7 pairs), subscription shape (5 steps) and lifecycle.
+    - **Findings recorded (docs/33 sections 3.1, 6, 8 and 9).** A positional prompt is parsed as an option
+      (`-p "--version"` printed the version), so the prompt goes on stdin. The result `subtype` is `success` for every
+      API error. A 529 arrives as `server_error`. A plain 400 arrives as `unknown`, after 3 requests. An unknown model
+      takes 2 requests, and `max_tokens` takes 4. `rate_limit_event` appears only with a subscription login, and
+      overage only after the paid answer. Effort is sent as `output_config.effort` for the 5-family models but
+      silently dropped for `claude-sonnet-4-5` and `claude-opus-4-1`. Without the remap switch, `claude-opus-4-1` was
+      sent as `claude-opus-5-5`. A schema task offers `StructuredOutput` and `DeferredToolPlaceholder`. A session is
+      one plaintext JSONL file, a reused ID is refused, and after `retire` a resume finds no conversation and a scan
+      finds nothing.
+    - **Checks run in this session.** `py -B -m unittest tools.runtime_probe.test_claude_profile
+      tools.runtime_probe.test_claude_isolation tools.runtime_probe.test_claude_client` without Docker: `Ran 23
+      tests`, `OK`, with 9 new and the 9 and 5 earlier ones still passing. Scratch `docker build` runs only, no
+      `docker run`, each with `RUN --network=none`: `javac -Xlint:all -Werror` on the changed `MessagesProvider.java`
+      on the pinned JDK image printed `JAVAC-OK`. A build on the 2.1.323 client image with the copied JDK ran all five
+      cases of an earlier runner version (before the step tokens and the pre-purge scan) through the supervisor as UID
+      10001. On the final files, a build on an unpinned `python:3.13-slim` scratch image, with the client binary and
+      JDK copied in, ran the runner as UID 10001, applied the five Docker check functions to real runs and reported
+      `TOTAL FAILED 0`: refusals 19 steps and 0 requests; signals 13 steps and 20 requests; readiness 7 steps and 8
+      requests; subscription 5 steps and 6 requests; lifecycle 6 steps and 3 requests. Those builds ran every process
+      in one build step, not under Compose, with a writable root.
+    - **Supervisor run on this work.** On the tree with this work (22 November 2026, 23:30 local time), the
+      supervisor ran `py -B -m unittest tools.runtime_probe.test_claude_profile tools.runtime_probe.test_claude_isolation
+      tools.runtime_probe.test_claude_client` without Docker: `Ran 23 tests`, `OK`. It then ran
+      `sh .agents/ralph/verify.sh containers`, which exited 0 with `PASS container-packaging 619s`,
+      `PASS runtime-probe-docker 117s` and `VERIFY PASSED (containers)`, logs in
+      `.agents/ralph/logs/verify/20261122T233042-10323`. container-packaging: `Ran 357 tests in 618.493s`,
+      `OK (skipped=6)`. runtime-probe-docker: `Ran 151 tests in 116.372s`, `OK`, which covers the 5 new
+      `DockerProfileTests` under Compose and the P20.1-B Docker tests against the changed `MessagesProvider.java`.
+      Compared with the P20.1-B run 20261122T224140-8474 (137 tests), the 14 extra tests match the 9 offline and 5
+      Docker tests added here; the per-test log was not inspected in this session. No Dockerfile, test, fixture,
+      provider or profile was changed after that run. These container results are the supervisor's, not a session's.
+      After recording them, which changed only documentation, the session reran the same offline command: `Ran 23
+      tests`, `OK`.
+    - **Not run or proven.** `verify.sh full` was not run in this session. Interruption (SIGINT/SIGTERM through the `exec`) was not tested. Also unproven: a
+      real account or real login; token refresh; `oauth_org_not_allowed`, `account_on_hold`, `blocking_limit`,
+      `allowed_warning` and weekly-limit signals; timeouts and malformed responses; outbound traffic on an open
+      network; `--exclude-dynamic-system-prompt-sections`, `--safe-mode` and `--restricted`; effort levels and models
+      outside `readiness-pairs.txt`; whether the auto-memory switch changes the init event; the home-directory part
+      of the startup guard; and calls to `DeferredToolPlaceholder`. The live readiness layer is P20.3 and P20.4 work.
 - [ ] P20.2 Package the optional `claude` runtime service following ADR 0013 and ADR 0008: pinned image, read-only root, dropped capabilities, private account volume and IPC, no database route, no credentials in images or `.env`, startup guards, a Compose service started only when selected, `NARRATION_RUNTIME` handling, and `start.sh --runtime`, `--login`, `--check` and `--status` for the selected runtime. Extend QA-28 evidence and keep Codex behavior unchanged.
 - [ ] P20.3 Implement the Claude adapter behind the runtime-neutral task port: typed tasks with `--json-schema` outputs revalidated by the engine, per-task model and effort from an approved allowlist, session create/resume/retire with purge, bounded readers, SIGINT-first interruption with owned-process shutdown, limit, overage, authentication and billing mapping, selected-runtime diagnostics (`GET /api/v1/runtime/status`), and the startup comparison that retires sessions and records an audit event when the selection changed.
 - [ ] P20.4 Verify parity and the supported claim: run the same neutral fixtures through both adapters (QA-42), including switch and restart, no failover, limit and overage, unknown-setting and unsupported-version refusal, mixed-credential guards and secret sentinels. The owner runs an opt-in live neutral smoke for the chosen sign-in mode. Record the terms-review outcome. If it rejects a mode, document that mode as disabled and keep the rest.

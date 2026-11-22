@@ -200,6 +200,49 @@ untrusted workspace. The supervisor's rerun on the fixes above (22 November 2026
 refused by the client itself, because an API key always wins in print mode. The P20.2
 startup guard must refuse it.
 
+## Second narration client launch profile and signals (P20.1-C)
+
+`claude_supervisor/supervise.sh` is the fixed launch profile: an engine-owned POSIX `sh`
+supervisor that is the only way a task reaches the client
+([docs/33 section 4](../../docs/33-claude-runtime-integration.md#4-fixed-launch-profile-and-supervisor-protocol)).
+The caller sends `run SESSION MODEL EFFORT SCHEMA`, with the prompt on stdin, or
+`retire UUID`. The supervisor validates each field exactly, applies the credential guard,
+builds the whole command line and an allowlisted environment, and then `exec`s the client.
+`settings.json` holds the P20.1-B `enabledPlugins` map, and `schemas/` holds the probe's one
+output schema. The prompt is never an argument: the pinned client reads a positional prompt
+such as `--version` as an option.
+
+`test_claude_profile.py` runs one case of `claude_profile_fixture/run-profile.sh` per
+`compose run` (`claude_profile.compose.yaml`, project `ai-rpg-engine-claude-profile`, with the
+same internal network, read-only roots, no capabilities, UID 10001 and tmpfs home as P20.1-B).
+`MessagesProvider.java` now also scripts API errors, an unknown model, usage-limit and overage
+headers, a `StructuredOutput` answer and a `max_tokens` stop. The cases:
+
+- **refusals**: 15 malformed requests exit 64 and 4 guard cases exit 66, each with one exact
+  stderr line. The upstream receives no request.
+- **signals** (API-key mode): 13 tasks, each with its exact client exit status, assistant
+  `error`, `terminal_reason`, `is_error`, `api_error_status` and request count. The table is
+  `SIGNALS`.
+- **readiness**: 7 `model@effort` pairs from `readiness-pairs.txt`, each with its verdict
+  (`ready`, `effort-dropped` or `model-not-found`, table `READINESS`).
+- **subscription**: 5 tasks over a planted fixture login (`home-login.json`, fixture strings
+  only), with their `rate_limit_event` contents.
+- **lifecycle**: create, resume, reuse, retire, resume after retirement, and one stateless
+  task. After the last step, a scan of the home, the workspace and `/tmp` must find nothing
+  that names the session or holds a lifecycle prompt.
+
+The check functions are module-level. A passing synthetic report and variants that differ in
+one detail (a leftover transcript, a started refusal, a dropped effort) prove offline that
+each check can fail. On 22 November 2026, `py -B -m unittest tools.runtime_probe.test_claude_profile`
+without Docker gave `Ran 9 tests`, `OK`. The Docker class is defined only when
+`RUNTIME_PROBE_DOCKER` is set. Its five tests passed under Compose in the supervisor's
+`sh .agents/ralph/verify.sh containers` run of 22 November 2026 (runtime-probe-docker
+`Ran 151 tests in 116.372s`, `OK`, logs in `.agents/ralph/logs/verify/20261122T233042-10323`).
+Before that, a scratch `docker build` (no `docker run`, `RUN --network=none`) applied the same five check
+functions to the real 2.1.323 client, the supervisor and the upstream, and all passed. That build
+copied the client binary and the JDK into a Python image and ran every process in one build
+step as UID 10001, not under Compose.
+
 ## Isolation profile (P01.3)
 
 `test_isolation.py` checks the profile baked into the runtime image

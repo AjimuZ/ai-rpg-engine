@@ -1,0 +1,7 @@
+claude-sonnet-5-5@high
+claude-opus-5-5@max
+claude-haiku-5-5@low
+claude-fable-5-2@xhigh
+claude-sonnet-4-5@medium
+claude-opus-4-1@low
+claude-unlisted-fixture@high

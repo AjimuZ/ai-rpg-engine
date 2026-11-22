@@ -1,0 +1,9 @@
+{
+  "claudeAiOauth": {
+    "accessToken": "fixture-subscription-access-not-a-credential",
+    "refreshToken": "fixture-subscription-refresh-not-a-credential",
+    "expiresAt": 4102444800000,
+    "scopes": ["user:inference", "user:profile"],
+    "subscriptionType": "max"
+  }
+}

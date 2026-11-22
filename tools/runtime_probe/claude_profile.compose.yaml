@@ -1,0 +1,73 @@
+# P20.1-C launch-profile fixture for the second narration client. Not a product Compose file.
+#
+# Used only by test_claude_profile.py, as `docker compose -p ai-rpg-engine-claude-profile
+# -f claude_profile.compose.yaml`. Each `compose run` executes one case of
+# claude_profile_fixture/run-profile.sh, which sends tasks through the engine-owned supervisor
+# (claude_supervisor/supervise.sh) to the unmodified pinned client (the P20.1-A probe image). The
+# client's documented base-URL override points at the scripted upstream (MessagesProvider.java).
+#
+# Isolation in this fixture, as in claude_isolation.compose.yaml:
+# - `fixture` is an internal network with external routing disabled and no published ports;
+# - there is no account volume and no real credential: the key and the planted login hold
+#   fixture strings that the scripted upstream ignores;
+# - root filesystems are read-only, all capabilities are dropped, every process runs as
+#   UID/GID 10001, and the client's home, workspace and /tmp are throw-away tmpfs mounts, so a
+#   session's transcript lives only for one case and the purge check sees the whole tree.
+name: ai-rpg-engine-claude-profile
+
+services:
+  provider:
+    # The pinned Java 21 build image from ADR 0009, as in session.compose.yaml.
+    image: eclipse-temurin:21.0.12.1_1-jdk-resolute@sha256:3b59c79a788985965c89203cca233c53893f62293108bb825264740fac926724
+    networks: [fixture]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    user: "10001:10001"
+    environment:
+      HOME: /tmp
+      JAVA_TOOL_OPTIONS: -XX:-UsePerfData -Xshare:off
+    tmpfs:
+      - /tmp:mode=1777
+    volumes:
+      - ./MessagesProvider.java:/probe/MessagesProvider.java:ro
+    entrypoint: ["java", "/probe/MessagesProvider.java"]
+    command: ["8080", "/tmp/ready"]
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+      start_interval: 1s
+
+  client:
+    image: ai-rpg-engine-runtime-probe/claude:2.1.323
+    networks: [fixture]
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    user: "10001:10001"
+    environment:
+      # Forwarded by the supervisor; the product runtime sets no base URL.
+      ANTHROPIC_BASE_URL: http://provider:8080
+      # Read only by run-profile.sh, which writes it to the supervisor's key file. Not a credential.
+      FIXTURE_API_KEY: fixture-api-key-not-a-credential
+    tmpfs:
+      - /var/lib/runtime/home:uid=10001,gid=10001,mode=0700
+      - /var/lib/runtime/workspace:uid=10001,gid=10001,mode=0700
+      # The client may unpack bundled helpers into /tmp and run them.
+      - /tmp:exec,mode=1777
+    volumes:
+      - ./claude_profile_fixture:/fixture:ro
+      - ./claude_supervisor:/opt/supervisor:ro
+    entrypoint: ["/bin/sh", "/fixture/run-profile.sh"]
+    depends_on:
+      provider:
+        condition: service_healthy
+
+networks:
+  # Disable external routing; this fixture publishes no service ports.
+  fixture:
+    internal: true
