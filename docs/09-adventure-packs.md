@@ -261,6 +261,14 @@ sealed revision, so a campaign keeps its pinned pack's policy. `GET /api/v1/camp
 [ADR 0055](adr/0055-first-start-seals-two-neutral-sample-adventures.md), `sample-adventure-2/`) is a working example with
 two original WAV loops made by `node tools/sample-music/make-sample-music.mjs`.
 
+**Image generation policy (P17.6-D).** An optional `imageGeneration` object says per category whether runtime image jobs
+may generate missing art for the pack ([ADR 0056](adr/0056-runtime-image-jobs-are-durable-rows-reviewed-before-storage.md)):
+`{"scene": "bounded", "portrait": "catalogOnly", "item": "disabled"}`. Keys must be among `scene`, `portrait` and `item`
+(any other key is an unknown field), and values among `bounded`, `catalogOnly` and `disabled` (`SCHEMA`, located, never
+repeating the value). An undeclared category is `bounded`. Only `bounded` lets the engine generate, and only after the
+owner enabled image generation; `catalogOnly` and `disabled` both keep the category to the pack's own artwork and the
+built-in fallback. The policy is part of the sealed revision. Neither bundled sample declares one.
+
 `CompiledPack.presentation()` returns the immutable declaration and so reaches `CampaignPackSnapshot`.
 It is internal content like the rest of the compiled pack. `PresentationScopeResolver` (P05.7-B.1.2.3.1)
 builds the per-audience `PublicPresentationScope` of a committed operation from it: an actor appears only

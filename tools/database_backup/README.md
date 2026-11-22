@@ -295,6 +295,14 @@ a campaign and a hash that a restore must bring along, and the tool dumps both t
 checks were updated for the V37 manifest/catalog; `test_backup.py` was not run in the session that added it, and no live
 V37 dump/restore rehearsal has been run.
 
+V38 scope (P17.6-D) adds `runtime_image_job`, one row per runtime image job with its public appearance text, the
+revisions it was requested under, its status and budget charge, and for an accepted image its hash and provenance
+(adapter-reported hashes and settings, never prompt text), plus the plain sequence `runtime_image_job_order` that orders
+rows. The table has no foreign key and is dumped whole. A restore needs no extra retirement step: the restore's
+recovery-generation bump makes the next engine start end every open row of the old generation as `STALE_GENERATION`
+(queued rows get their charge back, sent rows keep it). `verify.sh repo` ran `test_backup.py` after the update and passed;
+no live V38 dump/restore rehearsal has been run.
+
 ## Live two-genre rehearsal (P06.5-B.1, V26)
 
 `tools/container_packaging/test_restore_isolation.py` runs this tool as an operator would on a populated world, then

@@ -239,10 +239,10 @@ campaign identity, world row or hidden fact. A completed image goes through `Man
 revision, pinned pack revision and recovery generation read at request time. So a newer appearance or a newer scene
 request in force, another pack revision, or an installation restore (new `STALE_GENERATION` verdict) keeps it out of
 storage. An image that arrives after a cancel or after the running timeout (600 s by default) is dropped. Jobs run through
-`ImageAdmission` as `SPECULATIVE` work. Limits: jobs and charges are in memory, so a restart forgets queued work and resets
-the window. The service itself does not check that the appearance text is public; that is the caller's contract, which
-the game flow below keeps. There is no pack policy per category, no acceptance review and no provenance stored with the
-asset. Tests: `RuntimeImageJobsTest` on a scripted port.
+`ImageAdmission` as `SPECULATIVE` work. Limits at P17.6-A (lifted by P17.6-D below): jobs and charges were in memory, so a
+restart forgot queued work and reset the window. The service itself does not check that the appearance text is public; that is the caller's contract, which
+the game flow below keeps. P17.6-A had no pack policy per category, no acceptance review and no stored provenance; P17.6-D
+adds them. Tests: `RuntimeImageJobsTest` on a scripted port.
 
 **Requesting images during play (P17.6-C, 21 November 2026; implemented, scripted port and simulated screen only):**
 `RuntimeImageRequests` is the game flow that calls the jobs above. It lists what the player sees now:
@@ -271,10 +271,34 @@ text-focused layout shows no section and reads nothing.
 Limits:
 - labels and prompts are in the pack's source language;
 - a revealed secret NPC never gets a runtime portrait;
-- job states are in memory (at most 2048 subjects);
+- job states were in memory (at most 2048 subjects) until P17.6-D made them durable rows;
 - no shop flow, no change-art action, no real backend or packaged browser run.
 
 Tests: `RuntimeImageRequestsTest` and `frontend/src/app/campaign/runtime-artwork.spec.ts`.
+
+**Durable jobs, pack policy, review and provenance (P17.6-D, 22 November 2026; implemented, scripted port only; [ADR
+0056](adr/0056-runtime-image-jobs-are-durable-rows-reviewed-before-storage.md)):**
+- Jobs and charges are rows of `runtime_image_job` (V38), so they survive a restart, and so does the budget window. The next
+  start resumes queued jobs in order. A job that was already sent ends `image-job-interrupted` and keeps its charge: it is
+  never sent twice, and an image that still arrives for it is dropped. Rows of a restored recovery generation end stale.
+  Pending and failed states on the screen come from these rows, which replaces the in-memory limit above.
+- A pack's presentation file may declare `imageGeneration` per category (`scene`, `portrait`, `item`): `bounded` (the
+  default), `catalogOnly` or `disabled`. Only `bounded` generates; the other two leave the pack's own art and the fallback, and
+  the "New artwork" listing omits that category.
+- Every image passes the automatic review `automatic-v1` before storage. Its provenance must match the bytes and the request
+  sent (size, seed, steps, guidance, prompt hashes), and it must decode to the requested size and not be one flat colour.
+  A refusal is `image-review-rejected` and keeps its charge. This review does not judge what the picture shows.
+- The accepted job row records the image hash and its provenance: backend, model, checkpoint hash, sampler, settings,
+  prompt and output hashes, the review and the credit. Prompt text is never recorded. The credit line in "Artwork credits"
+  names the backend, for example `Generated image for this campaign (local-image, model 1a2b3c4d5e6f)`.
+- With a managed-folder root, each accepted image is also written to its own campaign's
+  `assets/generated/<scenes|portraits|items>/` folder ([docs/25](25-adventure-workspaces.md#2-separate-managed-folders)).
+- QA-33 for generated images: two adventures generate a portrait for the same subject name, and each image is stored,
+  listed, served and written only for its own campaign. That holds when switching between them and after a full-owner
+  export is restored into a third adventure. Job rows are not restored with a campaign copy.
+
+Tests: `RuntimeImageJobsTest` (restart, review and policy, QA-33), `RuntimeImageRequestsTest` (policy listing),
+`PackPresentationTest`. Not proven: a real image backend, a packaged browser run, a live V38 dump/restore rehearsal.
 
 Pack/owner policy chooses `disabled`, `catalogOnly` or `bounded` by category. The owner enables generation explicitly and sets request/concurrency/budget limits before calls. Default to one active image job per campaign, coalesce duplicate requests and enforce a finite queue; the actual limits and provider behavior require implementation evidence. Do not generate a shop's entire unseen catalog merely because a panel opened.
 

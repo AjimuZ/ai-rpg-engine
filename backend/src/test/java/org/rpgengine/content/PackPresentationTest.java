@@ -341,6 +341,33 @@ class PackPresentationTest {
         return files;
     }
 
+    /**
+     * The image generation policy (P17.6-D) names only the three generated categories and the three policies; an
+     * omitted category is bounded, a category runtime jobs never generate is disabled, and a refusal is located and
+     * never echoes the value.
+     */
+    @Test
+    void readsAPerCategoryImageGenerationPolicy() {
+        var declaration = valid();
+        declaration.put("imageGeneration", Map.of("portrait", "catalogOnly", "item", "disabled"));
+        var declared = compile(bytes(declaration, true, true)).presentation();
+        assertEquals(Map.of("portrait", "catalogOnly", "item", "disabled"), declared.imageGeneration());
+        assertEquals(PackPresentation.BOUNDED, declared.imagePolicy("scene"));
+        assertEquals(PackPresentation.CATALOG_ONLY, declared.imagePolicy("portrait"));
+        assertEquals(PackPresentation.DISABLED, declared.imagePolicy("item"));
+        assertEquals(PackPresentation.DISABLED, declared.imagePolicy("map"));
+        assertEquals(PackPresentation.BOUNDED, compile(bytes(valid(), true, true)).presentation().imagePolicy("item"));
+        for (var refused : List.of(Map.of("map", "bounded"), Map.of("scene", "https://evil.example/a.png"))) {
+            var wrong = valid();
+            wrong.put("imageGeneration", refused);
+            String pointer = "/imageGeneration/" + refused.keySet().iterator().next();
+            var error = assertThrows(PackException.class, () -> compile(bytes(wrong, true, true)), pointer);
+            assertEquals("SCHEMA", error.code(), error.getMessage());
+            assertEquals(pointer, error.location().pointer());
+            assertFalse(error.getMessage().contains("evil.example"));
+        }
+    }
+
     /** A presentation file must be the single one the manifest names. */
     @Test
     void requiresTheManifestToNameTheFile() {

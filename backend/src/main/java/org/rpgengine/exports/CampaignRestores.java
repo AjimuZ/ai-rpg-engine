@@ -77,8 +77,12 @@ import tools.jackson.databind.node.ObjectNode;
 public class CampaignRestores {
     /** Largest document accepted; above every document {@link CampaignExports} can produce. */
     public static final int MAX_DOCUMENT_BYTES = 96 * 1024 * 1024;
-    /** Exported tables deliberately not restored: scheduler work and charges of the source process. */
-    public static final Set<String> NOT_RESTORED = Set.of("inference_task");
+    /**
+     * Exported tables deliberately not restored: scheduler work and charges of the source process, and its runtime
+     * image jobs (P17.6-D), whose open rows would otherwise be resumed for a copy that never asked for them. The
+     * accepted images themselves travel as associations and bytes.
+     */
+    public static final Set<String> NOT_RESTORED = Set.of("inference_task", "runtime_image_job");
     /** Most distinct asset byte entries a document may carry. */
     private static final int MAX_ASSETS = 5_000;
     private static final String INVALIDATIONS = "memory_invalidation";
@@ -337,9 +341,15 @@ public class CampaignRestores {
         return (UUID) found.getFirst()[0];
     }
 
-    /** Every row naming a content revision must name the pinned one; this restore cannot remap another pack. */
+    /**
+     * Every restored row naming a content revision must name the pinned one; this restore cannot remap another pack.
+     * Rows of {@link #NOT_RESTORED} tables are never written, so they cannot refuse a restore.
+     */
     private static void requirePinnedContent(JsonNode tables, String revision) {
         for (var table : tables.properties()) {
+            if (NOT_RESTORED.contains(table.getKey())) {
+                continue;
+            }
             for (JsonNode row : table.getValue()) {
                 JsonNode cited = row.get("content_revision_id");
                 if (cited != null && !cited.isNull() && !revision.equals(cited.asString(null))) {

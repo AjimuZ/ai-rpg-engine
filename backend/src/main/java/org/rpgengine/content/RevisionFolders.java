@@ -21,6 +21,7 @@ import java.util.UUID;
  * may leave a private .building directory for offline inspection, never a visible partial revision.
  * The root must be private and quiescent: portable JDK calls cannot exclude a hostile local process
  * replacing an already-checked ancestor between operations. Multiple engine writers are unsupported.
+ * Since P17.6-D it also publishes single accepted generated images under a campaign folder, with the same checks.
  */
 final class RevisionFolders {
     private final Path root;
@@ -66,6 +67,60 @@ final class RevisionFolders {
         }
         verify(staging, files);
         Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    /** Folder of each generated category under a campaign's {@code assets/generated/} directory (docs/25 section 2). */
+    static final Map<String, String> GENERATED_FOLDERS = Map.of("scene", "scenes", "portrait", "portraits",
+            "item", "items");
+    private static final java.util.regex.Pattern GENERATED_NAME =
+            java.util.regex.Pattern.compile("[0-9a-f]{64}\\.(png|jpg|webp)");
+
+    /**
+     * Publish one accepted generated image of a campaign (P17.6-D) as
+     * {@code adventures/<adventure>/campaigns/<campaign>/assets/generated/<folder>/<sha256>.<extension>}. The file is
+     * written under a private staging name and renamed atomically; an existing file must hold exactly these bytes and
+     * is never overwritten.
+     *
+     * @param category {@code scene}, {@code portrait} or {@code item}
+     * @param name the bytes' lowercase SHA-256 plus the extension of their media type
+     * @throws IOException for another category or name, a link or special file on the path, an existing file with
+     *         other content, or a storage failure
+     */
+    void publishGenerated(UUID adventure, UUID campaign, String category, String name, byte[] bytes) throws IOException {
+        String folder = GENERATED_FOLDERS.get(category);
+        if (folder == null || !GENERATED_NAME.matcher(name).matches()) {
+            throw new IOException("invalid generated asset path");
+        }
+        Path parent = root.resolve("adventures").resolve(adventure.toString()).resolve("campaigns")
+                .resolve(campaign.toString()).resolve("assets").resolve("generated").resolve(folder);
+        directory(parent);
+        Path target = parent.resolve(name);
+        if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+            verifyFile(target, bytes);
+            return;
+        }
+        Path staging = parent.resolve(".building-" + UUID.randomUUID());
+        if (posix(parent)) {
+            Files.createFile(staging, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+            Files.write(staging, bytes, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+        } else {
+            Files.write(staging, bytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+        }
+        Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
+        verifyFile(target, bytes);
+    }
+
+    /** Require one regular file of exactly these bytes. */
+    private static void verifyFile(Path file, byte[] bytes) throws IOException {
+        var attributes = attributes(file);
+        if (!attributes.isRegularFile() || attributes.size() != bytes.length) {
+            throw new IOException("unexpected generated file");
+        }
+        try (var input = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
+            if (!Arrays.equals(bytes, input.readNBytes(bytes.length + 1))) {
+                throw new IOException("changed generated file");
+            }
+        }
     }
 
     /** Check every ancestor without following links; create missing directories privately or propagate I/O failure. */

@@ -142,8 +142,24 @@ fsync guarantee is claimed; PostgreSQL originals permit reconstruction.
 These files include private lore and are never mounted into the narration runtime,
 served as static web resources, or exposed by library GETs. They are not player
 exports. A database-only installation recovery with preserved IDs can rebuild an
-empty projection root; generated artwork, campaign directories, identity-remapped
-restores and complete QA-33 remain later work.
+empty projection root; identity-remapped restores and complete QA-33 remain later work.
+
+Since P17.6-D ([ADR 0056](adr/0056-runtime-image-jobs-are-durable-rows-reviewed-before-storage.md)) the
+projection also writes each accepted generated image of a campaign, with the same private and
+atomic checks:
+
+```text
+<managed-root>/adventures/<adventure-id>/campaigns/<campaign-id>/assets/generated/
+  scenes/<sha256>.<png|jpg|webp>
+  portraits/<sha256>.<png|jpg|webp>
+  items/<sha256>.<png|jpg|webp>
+```
+
+Only an association the campaign holds in that adventure resolves, so equal subject names in
+another adventure never write there. A file is written when an image is accepted, and startup writes
+any missing one. An existing file with other bytes fails closed. A campaign restored through the
+import route gets its copies at the next start. Exports, backups and other campaign subfolders of
+the layout below are still not written.
 
 Remaining campaign/specification-editing layout under the owner's managed data
 root, outside the source checkout/container writable layer (not yet implemented):

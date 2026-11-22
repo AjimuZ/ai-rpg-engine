@@ -280,6 +280,32 @@ public class ManagedAssets {
     }
 
     /**
+     * The runtime generation policy the campaign's pinned pack revision declares for one category (P17.6-D): one of
+     * {@link PackPresentation#IMAGE_POLICIES}, {@link PackPresentation#BOUNDED} when the pack declares none for it.
+     * A pack that cannot be loaded here, and a campaign that is not in the adventure, answer
+     * {@link PackPresentation#DISABLED}, so an unreadable policy never permits a generation.
+     *
+     * @throws org.springframework.dao.DataAccessException when storage fails
+     */
+    String imagePolicy(UUID adventure, UUID campaign, AssetCategory category) {
+        Objects.requireNonNull(adventure, "adventure");
+        Objects.requireNonNull(campaign, "campaign");
+        Objects.requireNonNull(category, "category");
+        return reads.execute(status -> {
+            UUID revision = jdbc.query("select content_revision_id from campaign where id = ? and adventure_id = ?",
+                    (rs, n) -> rs.getObject(1, UUID.class), campaign, adventure).stream().findFirst().orElse(null);
+            if (revision == null) {
+                return PackPresentation.DISABLED;
+            }
+            try {
+                return packs.loadForCampaign(adventure, revision).root().presentation().imagePolicy(category.wire());
+            } catch (PackException | IllegalStateException failure) {
+                return PackPresentation.DISABLED;
+            }
+        });
+    }
+
+    /**
      * List the artwork in force for every subject of one campaign, so a client can look an entity's stable image up
      * by category and subject instead of guessing a hash. Accepted associations come first; a subject the pinned
      * pack revision binds to authored artwork (see {@link PackPresentation#artwork()}) and that has no association

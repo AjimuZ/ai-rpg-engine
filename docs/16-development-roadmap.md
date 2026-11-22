@@ -7757,6 +7757,78 @@ this update. No combat runtime/browser result is claimed.
       - No shop flow exists, so no shop listing requests images. There is no change-art or reroll action.
       - Still open from P17.6-A: per-category pack policy, acceptance review, provenance, durable jobs, QA-31/QA-33 as a whole,
         `verify.sh full` and `containers` (the runner runs them).
+  - P17.6-D (22 November 2026): durable image jobs and budget, a per-category pack policy, an acceptance review, provenance,
+    and per-campaign folder copies ([ADR 0056](adr/0056-runtime-image-jobs-are-durable-rows-reviewed-before-storage.md)).
+    The box stays unchecked: this story does not finish P17.6.
+    - **Delivered.**
+      - Migration V38 `runtime_image_job` (plus the sequence `runtime_image_job_order`, no foreign key). `RuntimeImageJobs`
+        inserts each job `QUEUED` with its charge (`charged_at`) and claims it `RUNNING` with a per-instance runner ID before
+        sending. Only that instance can end it. A partial unique index allows one open job per subject and appearance.
+      - The budget, the queue count and the running flag are read from the rows. `recover()` runs on `ApplicationReadyEvent`:
+        - a row of a changed recovery generation or a missing campaign ends `STALE_GENERATION`, with the charge refunded
+          only if the job was never sent;
+        - a sent row ends `FAILED` `image-job-interrupted` and keeps its charge, and is never sent again;
+        - a queued row resumes when generation is available, or else ends `CANCELLED` with its charge back.
+      - `close()` leaves rows open for the next start. A completed image is published in the transaction that locks and ends
+        its own row, so a result whose row already ended is dropped (`image-job-late`).
+      - Review `automatic-v1` (`RuntimeImageJobs.review`) runs before storage. The provenance must match the bytes (hash,
+        size) and the request (size, seed, steps, guidance, both prompt hashes), and the bytes must decode to the requested
+        size and not be one flat colour. A refusal is `image-review-rejected`, with the charge kept.
+      - The accepted row stores the hash and a provenance object: adapter-reported fields, the review and the credit. The
+        credit line is `Generated image for this campaign (<backend>[, model <12 hex>])`.
+      - `PackPresentation` reads an optional `imageGeneration` {scene, portrait, item: `bounded`|`catalogOnly`|`disabled`},
+        with `bounded` as the default. `ManagedAssets.imagePolicy` applies it: a pack that cannot be loaded is `disabled`.
+        `RuntimeImageJobs` answers `DISABLED` for a non-bounded category, and `RuntimeImageRequests` omits it from the listing.
+      - `RuntimeImageRequests` reads subject states from the newest row (`RuntimeImageJobs.latest`), and its in-memory state
+        map is removed.
+      - `WorkspaceProjection.generated` / `RevisionFolders.publishGenerated` write accepted images to
+        `adventures/<a>/campaigns/<c>/assets/generated/<scenes|portraits|items>/<sha256>.<ext>`. Startup rewrites missing copies.
+      - `CampaignRestores.NOT_RESTORED` gains `runtime_image_job`, and its pinned-content check skips unrestored tables.
+      - The backup tool covers schema 38. Documented in docs/09, 13, 23 and 25, the backend and backup READMEs, and
+        `application.properties`.
+    - **Tests.**
+      - `RuntimeImageJobsTest` gains 3 tests, and the earlier 3 were adapted: images are of the requested size with honest
+        provenance, credit `... (scripted)`, and the second instance's budget assertion is a delta, because charges are shared
+        rows.
+      - `survivesRestartWithoutDuplicatingOrLosingResults`: a closed instance leaves `RUNNING, QUEUED, QUEUED`. A new
+        instance sees `Budget(3, 3, 2, true)`, coalesces into the saved job and is `BUDGET_EXHAUSTED`. `recover()` gives
+        `(2, 1, 0, 0)` and sends only the oldest queued job, and a second pass gives `(0, 0, 0, 0)`.
+      - In the same test, the interrupted job's late image stores nothing, the resumed job is generated once, and no charge is
+        taken twice. Provenance (backend, review, prompt hash, credit) is read back, with no prompt text. A late result after
+        another instance's recovery is dropped. A generation bump gives `(0, 0, 2, 0)`, keeping the sent job's charge and
+        refunding the queued one. A disabled restart gives `(0, 1, 0, 1)`.
+      - `reviewsEachImageAndHonoursThePackPolicy`: a flat picture, a provenance of another prompt and 4×4 pixels are each
+        rejected, store nothing and keep their charge. A pack with `portrait: catalogOnly, item: disabled` answers `DISABLED`
+        for those and queues a scene.
+      - `keepsGeneratedImagesInTheirOwnAdventureAcrossSwitchingAndRestore` (QA-33 for generated images): two adventures
+        generate the same-name portrait. Listings stay distinct over two switches, and neither serves the other's hash. The
+        folder holds exactly the two own-campaign files. A full-owner export restored into a third adventure (fresh
+        identities) shows its own image and restores no job row. `startup()` adds exactly the copy's file, and asking again
+        is `REUSED`.
+      - `RuntimeImageRequestsTest` gains `listsOnlyTheCategoriesThePackLetsJobsGenerate`, and the second test now finishes
+        its running job before the wired listing. `PackPresentationTest` gains `readsAPerCategoryImageGenerationPolicy`.
+        `EngineApplicationTest` lists the new table.
+    - **Commands and results.**
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh backend
+        -Dtest=RuntimeImageJobsTest,RuntimeImageRequestsTest,PackPresentationTest,EngineApplicationTest` → `VERIFY PASSED`,
+        `Tests run: 35, Failures: 0, Errors: 0, Skipped: 0` (6 + 3 + 23 + 3), first run.
+      - Same with `-Dtest=ManagedAssetsTest,CampaignRestoresTest,CampaignExportsTest,WorkspaceProjectionTest,
+        RevisionFoldersTest,AdventureIsolationTest,PublicPresentationScopeBuilderTest` → `VERIFY PASSED`, `Tests run: 43,
+        Failures: 0, Errors: 0, Skipped: 0`, first run.
+      - `"C:/Program Files/Git/bin/bash.exe" .agents/ralph/verify.sh repo` → `VERIFY PASSED (repo)`, including
+        `backup-tests`, both before and after the documentation edits.
+    - **Not proven or not done.**
+      - No real image backend, no packaged browser run, and no live V38 dump/restore rehearsal (`verify.sh containers`).
+        The installation restore was simulated by the generation bump that `backup.py` applies.
+      - No reconciliation with a backend after a restart: an interrupted job's image is lost and costs its charge.
+      - The review is technical and does not judge content or visual consistency.
+      - `catalogOnly` and `disabled` behave the same for runtime jobs, and neither hides authored art.
+      - Concurrent requests from many threads and several live engine instances were not tested beyond two instances in one
+        test. No deliberate weakenings were run.
+      - No interface change, so the new failure codes read with the general sentence, and the frontend was not rebuilt.
+      - No shop flow, and no retention for job rows.
+      - A campaign restored through the import route gets its folder copies only at the next start.
+      - `verify.sh full` and `containers` were not run here (the runner runs them).
 - [ ] P17.7 Qualify optional local EN/IT speech with admitted model/voice licenses, stable voice identities, accepted-line audio caching and shared GPU limits under QA-38; ship disabled with tested text-only fallback if hardware/rights/quality gates fail. No TTS prerequisite for core v1.
 - [ ] P17.8 Research and qualify a concrete optional local EN/IT STT backend against exact code/weight/dependency rights, bounded capture/cancel interfaces, offline behavior, platform packaging and measured CPU/RAM/GPU/latency budgets; no recognizer is selected by the design alone.
   **Requires tasks:** P21.4.

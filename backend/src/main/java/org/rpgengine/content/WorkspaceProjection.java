@@ -19,7 +19,8 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Project sealed PostgreSQL originals into private, identity-scoped folders when explicitly enabled.
  * Inputs are internal committed revision identities, never browser paths. Outputs are rebuildable
- * specifications, authored media and an integrity manifest; these files are never a read authority.
+ * specifications, authored media and an integrity manifest, and since P17.6-D each campaign's accepted generated
+ * scene, portrait and item images under its own campaign folder; these files are never a read authority.
  * Invalid scope/integrity fails before filesystem work. I/O failure leaves committed rows intact
  * and prevents successful startup/import acknowledgement until the operator repairs the data root.
  */
@@ -50,8 +51,73 @@ public class WorkspaceProjection {
                     (row, index) -> new PackRegistry.RegisteredRevision(
                             row.getObject(1, UUID.class), row.getObject(2, UUID.class)), after, after);
             for (var entry : page) { registered(entry); }
-            if (page.size() < 50) { return; }
+            if (page.size() < 50) { break; }
             after = page.getLast().revisionId();
+        }
+        rebuildGenerated();
+    }
+
+    /**
+     * Write every accepted scene, portrait and item association of every campaign into its own campaign folder
+     * (P17.6-D), in bounded pages. A missing file is written; an existing one must hold the same bytes. An association
+     * whose bytes are not stored (restored from an export older than P17.1-C) is a missing image and is skipped.
+     */
+    private void rebuildGenerated() {
+        String[] after = null;
+        while (true) {
+            Object[] cursor = after == null ? new Object[] {null, "", ""} : after;
+            var page = jdbc.query("select distinct c.adventure_id, a.campaign_id, a.category, a.sha256 from asset_association a "
+                    + "join campaign c on c.id = a.campaign_id join managed_asset m on m.sha256 = a.sha256 "
+                    + "where a.category in ('scene', 'portrait', 'item') and "
+                    + "(?::uuid is null or (a.campaign_id, a.category, a.sha256) > (?::uuid, ?, ?)) "
+                    + "order by a.campaign_id, a.category, a.sha256 limit 50",
+                    (row, index) -> new Object[] {row.getObject(1, UUID.class), row.getObject(2, UUID.class),
+                            row.getString(3), row.getString(4)},
+                    cursor[0], cursor[0], cursor[1], cursor[2]);
+            for (Object[] entry : page) {
+                generated((UUID) entry[0], (UUID) entry[1], (String) entry[2], (String) entry[3]);
+            }
+            if (page.size() < 50) {
+                return;
+            }
+            Object[] last = page.getLast();
+            after = new String[] {last[1].toString(), (String) last[2], (String) last[3]};
+        }
+    }
+
+    /**
+     * Project one accepted generated image into its campaign's folder (P17.6-D): {@code adventures/<adventure>/
+     * campaigns/<campaign>/assets/generated/<scenes|portraits|items>/<sha256>.<extension>}. Only an association the
+     * campaign holds in that adventure resolves, and the stored bytes must still match their hash, so equal subject
+     * names or hashes of another adventure never write here. The database stays the authority; the file is a
+     * rebuildable copy.
+     *
+     * @throws IllegalArgumentException when the campaign holds no such association in the adventure
+     * @throws UncheckedIOException naming no host path when the folder cannot be written or holds other bytes
+     */
+    public synchronized void generated(UUID adventure, UUID campaign, String category, String sha256) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("workspace projection requires committed data");
+        }
+        var found = jdbc.query("select m.media_type, m.content from managed_asset m where m.sha256 = ? and exists ("
+                + "select 1 from asset_association a join campaign c on c.id = a.campaign_id where a.campaign_id = ? "
+                + "and c.adventure_id = ? and a.category = ? and a.sha256 = m.sha256) and m.sha256 = "
+                + "encode(sha256(m.content), 'hex')", (row, index) -> new Object[] {row.getString(1), row.getBytes(2)},
+                sha256, campaign, adventure, category);
+        if (found.isEmpty()) {
+            throw new IllegalArgumentException("generated asset unavailable");
+        }
+        String extension = switch ((String) found.getFirst()[0]) {
+            case "image/png" -> "png";
+            case "image/jpeg" -> "jpg";
+            case "image/webp" -> "webp";
+            default -> throw new IllegalArgumentException("generated asset is not an image");
+        };
+        try {
+            folders.publishGenerated(adventure, campaign, category, sha256 + "." + extension, (byte[]) found.getFirst()[1]);
+        } catch (IOException failure) {
+            throw new UncheckedIOException("workspace projection unavailable; accepted artwork retained",
+                    new IOException("private folder integrity or storage failure"));
         }
     }
 

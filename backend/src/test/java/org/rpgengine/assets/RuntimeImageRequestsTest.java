@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.Socket;
@@ -26,7 +25,6 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import jakarta.persistence.EntityManager;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +47,6 @@ import org.rpgengine.content.PackRegistry;
 import org.rpgengine.content.PackStaging;
 import org.rpgengine.inference.ImageGenerationPort;
 import org.rpgengine.inference.ImageHandle;
-import org.rpgengine.inference.ImageProvenance;
 import org.rpgengine.inference.ImageRequest;
 import org.rpgengine.inference.ImageResult;
 import org.rpgengine.inference.admission.ImageAdmission;
@@ -127,7 +124,7 @@ class RuntimeImageRequestsTest {
     /** Remove disposable rows. */
     @AfterEach
     void clear() {
-        jdbc.execute("truncate asset_association, managed_asset, encounter_participant, encounter, quest_objective, quest_state, location_visit, item_creation, equipment_assignment, actor_condition, ai_session_record, memory_invalidation, memory_summary, memory_summary_job, relationship_change, faction_clock_change, learned_recipe, canon_correction, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_event, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, "
+        jdbc.execute("truncate runtime_image_job, asset_association, managed_asset, encounter_participant, encounter, quest_objective, quest_state, location_visit, item_creation, equipment_assignment, actor_condition, ai_session_record, memory_invalidation, memory_summary, memory_summary_job, relationship_change, faction_clock_change, learned_recipe, canon_correction, actor_commitment, actor_sighting, knowledge_belief, knowledge_claim, inference_task, narration_publication, presentation_event, presentation_job, campaign_stream_message, campaign_stream_head, campaign_known_fact, campaign_known_quest, campaign_creation, character_state, item_instance, "
                 + "learned_ability, plan_activation, plan_disposition, plan_admission, plan_dependency, quest_plan_artifact, ai_job_attempt, "
                 + "ai_job, planning_snapshot, query_epoch, campaign_mutation_lease, operation_random_draw, "
                 + "campaign_random_seed, canonical_outbox, campaign_checkpoint, reward_settlement, campaign_event, "
@@ -163,9 +160,9 @@ class RuntimeImageRequestsTest {
         assertEquals(List.of(State.PENDING, State.PENDING), states(requests, "scene", "portrait"));
         assertEquals(1, port.requests.size(), "one job of the campaign at a time");
 
-        port.complete(0, png(10));
+        byte[] sceneImage = port.complete(0, 10);
         assertEquals(List.of(State.READY, State.PENDING), states(requests, "scene", "portrait"));
-        assertEquals(ManagedAssets.sha256(png(10)),
+        assertEquals(ManagedAssets.sha256(sceneImage),
                 assets.current(campaign, AssetCategory.SCENE, "ford-camp").orElseThrow().sha256());
         assertEquals("character portrait, head and shoulders, " + KEEPER_LOOK, port.requests.get(1).prompt());
 
@@ -221,8 +218,9 @@ class RuntimeImageRequestsTest {
         assertEquals(Admission.DISABLED, off.admission());
         assertEquals(State.MISSING, off.subject().state());
 
-        RuntimeImageRequests unavailable = requests(new RuntimeImageJobs(jdbc, assets, null, ImageAdmission.direct(),
-                new Settings(true, 4, 12, Duration.ofHours(1), 1, Duration.ofMinutes(5), Duration.ZERO), Clock.systemUTC()));
+        RuntimeImageRequests unavailable = requests(new RuntimeImageJobs(jdbc, manager, assets, null,
+                ImageAdmission.direct(), new Settings(true, 4, 12, Duration.ofHours(1), 1, Duration.ofMinutes(5),
+                        Duration.ZERO), Clock.systemUTC(), null));
         assertEquals(Capability.UNAVAILABLE, unavailable.list(OWNER, adventure, campaign).orElseThrow().capability());
         assertEquals(Admission.UNAVAILABLE, unavailable.request(OWNER, adventure, campaign, AssetCategory.ITEM, "kit")
                 .orElseThrow().admission());
@@ -240,6 +238,8 @@ class RuntimeImageRequestsTest {
                 .orElseThrow().state());
         assertEquals(1, port.requests.size());
         assertEquals(0, jdbc.queryForObject("select count(*) from asset_association", Integer.class));
+        // Job states are rows: the wired service below reads them too, so the running scene job ends first.
+        port.complete(0, 20);
 
         // The packaged default leaves generation off: the real route lists the public subjects and refuses a request
         // with a 200 answer naming the reason, so the screen keeps its fallback.
@@ -272,8 +272,40 @@ class RuntimeImageRequestsTest {
                 .filter(item -> item.state() != State.MISSING && item.state() != State.READY).findFirst().orElse(null));
     }
 
+    /**
+     * A pack whose policy keeps portraits to its catalog and switches item generation off lists only its scene, and a
+     * request for one of the other subjects is the same refusal as an unknown one (P17.6-D).
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void listsOnlyTheCategoriesThePackLetsJobsGenerate() throws Exception {
+        UUID restricted = new TransactionTemplate(manager).execute(status -> {
+            var workspace = AdventureWorkspace.create(OWNER, "Lantern Ford", "fantasy", SupportedLocale.EN, Instant.now());
+            entities.persist(workspace);
+            return workspace.getId();
+        });
+        var files = pack();
+        Map<String, Object> presentation = JSON.readValue(files.get("presentation.json"), Map.class);
+        presentation.put("imageGeneration", Map.of("portrait", "catalogOnly", "item", "disabled"));
+        files.put("presentation.json", JSON.writeValueAsBytes(presentation));
+        UUID sealed = registry.register(restricted, new PackStaging(PackStaging.Limits.standard())
+                .archive(new ByteArrayInputStream(ArmoryPack.zip(files)))).revisionId();
+        UUID playthrough = creation.create(OWNER, restricted, new CampaignCreationService.Request(UUID.randomUUID(),
+                sealed, "Ford watch", SupportedLocale.EN, new CharacterChoices("Player", "scout", Map.of(), Map.of(),
+                        null, null))).campaignId();
+        RuntimeImageRequests requests = requests(jobs(new Settings(true, 4, 12, Duration.ofHours(1), 1,
+                Duration.ofMinutes(5), Duration.ZERO)));
+        assertEquals(List.of("scene:ford-camp:Ford Camp:MISSING"), requests.list(OWNER, restricted, playthrough)
+                .orElseThrow().subjects().stream().map(RuntimeImageRequestsTest::line).toList());
+        assertTrue(requests.request(OWNER, restricted, playthrough, AssetCategory.ITEM, "kit").isEmpty());
+        assertEquals(Admission.QUEUED, requests.request(OWNER, restricted, playthrough, AssetCategory.SCENE,
+                "ford-camp").orElseThrow().admission());
+        assertEquals(1, port.requests.size());
+    }
+
     private RuntimeImageJobs jobs(Settings settings) {
-        return new RuntimeImageJobs(jdbc, assets, port, ImageAdmission.direct(), settings, Clock.systemUTC());
+        return new RuntimeImageJobs(jdbc, manager, assets, port, ImageAdmission.direct(), settings, Clock.systemUTC(),
+                null);
     }
 
     private RuntimeImageRequests requests(RuntimeImageJobs jobs) {
@@ -317,19 +349,6 @@ class RuntimeImageRequestsTest {
         manifest.put("files", listed);
         files.put("adventure.json", JSON.writeValueAsBytes(manifest));
         return files;
-    }
-
-    /** A valid PNG whose bytes, and so hash, depend on the shade. */
-    private static byte[] png(int shade) {
-        try {
-            var image = new BufferedImage(4, 4, BufferedImage.TYPE_INT_RGB);
-            image.setRGB(0, 0, 0x010101 * shade);
-            var out = new ByteArrayOutputStream();
-            ImageIO.write(image, "png", out);
-            return out.toByteArray();
-        } catch (java.io.IOException failure) {
-            throw new IllegalStateException(failure);
-        }
     }
 
     /** Bootstrap a local session and return its cookie pair. */
@@ -419,11 +438,12 @@ class RuntimeImageRequestsTest {
             };
         }
 
-        void complete(int index, byte[] png) {
+        /** Complete one job with a picture of its requested size and honest provenance; returns the bytes. */
+        byte[] complete(int index, int shade) {
             ImageRequest request = requests.get(index);
-            results.get(index).complete(ImageResult.completed(png, new ImageProvenance("scripted", null, null, null,
-                    request.seed(), request.steps(), request.guidance(), request.width(), request.height(),
-                    "0".repeat(64), "0".repeat(64), ManagedAssets.sha256(png), png.length)));
+            byte[] png = ScriptedImages.png(request.width(), request.height(), shade);
+            results.get(index).complete(ScriptedImages.completed(request, png));
+            return png;
         }
 
         void fail(int index, String code) {

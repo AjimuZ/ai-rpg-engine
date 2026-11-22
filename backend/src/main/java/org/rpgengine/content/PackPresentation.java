@@ -29,7 +29,9 @@ import org.rpgengine.presentation.PublicPresentationScope;
  * lists those bindings with the campaign's artwork. Since P17.2-D an optional {@code music} object
  * [{@code moods} {public state: mood}, {@code tracks} [{@code id}, {@code mood}, {@code file}, {@code title},
  * {@code creator}, {@code license}, {@code source}, {@code notices}, {@code modifications}]] declares the pack's
- * mood policy and its own credited audio files (see {@link Music}).
+ * mood policy and its own credited audio files (see {@link Music}). Since P17.6-D an optional
+ * {@code imageGeneration} object [{@code scene}, {@code portrait}, {@code item}: one of {@link #IMAGE_POLICIES}] says
+ * which categories runtime image jobs may generate for the pack; an omitted category is {@link #BOUNDED}.
  *
  * @param scenes declared scene references
  * @param lines declared line references
@@ -39,10 +41,21 @@ import org.rpgengine.presentation.PublicPresentationScope;
  * @param actors local NPC definition ID to the poses and expressions it may take
  * @param artwork authored image bindings
  * @param music mood policy and authored music tracks; {@link Music#NONE} when the pack declares none
+ * @param imageGeneration runtime generation policy by category wire name, only for the categories the pack declares
  */
 public record PackPresentation(Set<String> scenes, Set<String> lines, Set<String> assets,
         Map<String, String> sceneBackdrops, Map<String, String> lineAudio, Map<String, Looks> actors,
-        List<Artwork> artwork, Music music) {
+        List<Artwork> artwork, Music music, Map<String, String> imageGeneration) {
+    /** Policy that lets bounded runtime jobs generate missing art of the category. */
+    public static final String BOUNDED = "bounded";
+    /** Policy that keeps the category to the pack's own artwork and the built-in fallback: nothing is generated. */
+    public static final String CATALOG_ONLY = "catalogOnly";
+    /** Policy that refuses runtime generation for the category. */
+    public static final String DISABLED = "disabled";
+    /** The policies a category may declare. */
+    public static final Set<String> IMAGE_POLICIES = Set.of(BOUNDED, CATALOG_ONLY, DISABLED);
+    /** The categories runtime image jobs generate, and so the only keys of {@code imageGeneration}. */
+    public static final Set<String> GENERATED_CATEGORIES = Set.of("scene", "portrait", "item");
     /**
      * The closed public states a mood policy may name, equal to {@code PUBLIC_STATES} of the client
      * ({@code frontend/src/app/music/music-mood.ts}). Each is derived from the player-safe combat projection only,
@@ -52,7 +65,7 @@ public record PackPresentation(Set<String> scenes, Set<String> lines, Set<String
     public static final List<String> PUBLIC_STATES = List.of("quiet", "offered", "fight", "won", "lost", "settled");
     /** The declaration of a pack that makes none: nothing may be presented. */
     public static final PackPresentation NONE = new PackPresentation(Set.of(), Set.of(), Set.of(), Map.of(),
-            Map.of(), Map.of(), List.of(), Music.NONE);
+            Map.of(), Map.of(), List.of(), Music.NONE, Map.of());
     /**
      * Licenses a pack-authored track may carry, with the exact text URL of each: the reviewed music licenses of
      * {@link MusicCatalog#LICENSES} plus MIT, the license the project's own sample content already uses
@@ -130,14 +143,33 @@ public record PackPresentation(Set<String> scenes, Set<String> lines, Set<String
     /** A declaration without authored artwork bindings or music. */
     public PackPresentation(Set<String> scenes, Set<String> lines, Set<String> assets,
             Map<String, String> sceneBackdrops, Map<String, String> lineAudio, Map<String, Looks> actors) {
-        this(scenes, lines, assets, sceneBackdrops, lineAudio, actors, List.of(), Music.NONE);
+        this(scenes, lines, assets, sceneBackdrops, lineAudio, actors, List.of(), Music.NONE, Map.of());
     }
 
     /** A declaration without music. */
     public PackPresentation(Set<String> scenes, Set<String> lines, Set<String> assets,
             Map<String, String> sceneBackdrops, Map<String, String> lineAudio, Map<String, Looks> actors,
             List<Artwork> artwork) {
-        this(scenes, lines, assets, sceneBackdrops, lineAudio, actors, artwork, Music.NONE);
+        this(scenes, lines, assets, sceneBackdrops, lineAudio, actors, artwork, Music.NONE, Map.of());
+    }
+
+    /** A declaration without an image generation policy: every generated category is {@link #BOUNDED}. */
+    public PackPresentation(Set<String> scenes, Set<String> lines, Set<String> assets,
+            Map<String, String> sceneBackdrops, Map<String, String> lineAudio, Map<String, Looks> actors,
+            List<Artwork> artwork, Music music) {
+        this(scenes, lines, assets, sceneBackdrops, lineAudio, actors, artwork, music, Map.of());
+    }
+
+    /**
+     * @param category category wire name
+     * @return the policy the pack declares for the category, {@link #BOUNDED} when it declares none, and
+     *         {@link #DISABLED} for a category runtime jobs never generate
+     */
+    public String imagePolicy(String category) {
+        if (!GENERATED_CATEGORIES.contains(category)) {
+            return DISABLED;
+        }
+        return imageGeneration.getOrDefault(category, BOUNDED);
     }
 
     /**
@@ -164,6 +196,7 @@ public record PackPresentation(Set<String> scenes, Set<String> lines, Set<String
         actors = Map.copyOf(actors);
         artwork = List.copyOf(artwork);
         music = java.util.Objects.requireNonNull(music, "music");
+        imageGeneration = Map.copyOf(imageGeneration);
     }
 
     /**
@@ -223,8 +256,30 @@ public record PackPresentation(Set<String> scenes, Set<String> lines, Set<String
         }
         var artwork = artwork(pack, root, definitions, scenes);
         var music = music(pack, root);
+        var imageGeneration = imageGeneration(root);
         root.close();
-        return new PackPresentation(scenes, lines, declaredAssets, backdrops, audio, actors, artwork, music);
+        return new PackPresentation(scenes, lines, declaredAssets, backdrops, audio, actors, artwork, music,
+                imageGeneration);
+    }
+
+    /**
+     * Read the optional {@code imageGeneration} object (P17.6-D): for {@code scene}, {@code portrait} and {@code item},
+     * one of {@link #IMAGE_POLICIES}. Any other key is an unknown field and any other value a schema error, each with a
+     * located diagnostic that never repeats the value.
+     */
+    private static Map<String, String> imageGeneration(Fields root) {
+        Fields policy = root.object("imageGeneration", false);
+        if (policy == null) {
+            return Map.of();
+        }
+        var declared = new HashMap<String, String>();
+        for (String category : List.of("scene", "portrait", "item")) {
+            if (policy.has(category)) {
+                declared.put(category, policy.choice(category, IMAGE_POLICIES, null));
+            }
+        }
+        policy.close();
+        return declared;
     }
 
     /**

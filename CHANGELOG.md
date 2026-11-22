@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — Durable image jobs with pack policy, review and provenance (P17.6-D), 22 November 2026
+
+- Image jobs and their budget now survive an engine restart. Queued images are made after the restart, in order. An
+  image that was being made when the engine stopped shows as failed and can be asked for again; it is never generated
+  twice, and a result that arrives late is not used. The budget period is not reset by a restart.
+- An adventure can say per category whether the engine may make scene, portrait or item images for it
+  (`imageGeneration` in its presentation file: `bounded`, `catalogOnly` or `disabled`). Categories it keeps to its own art
+  are not offered under "New artwork". Adventures that say nothing behave as before.
+- Each image is checked before it is kept. It must match what was asked for, be the requested size and not be blank. A
+  failed check shows as a failed image. What the image shows is not judged.
+- Each kept image records where it came from (backend, model hash, settings and hashes, never the description text).
+  Its credit line in "Artwork credits" names the backend that made it.
+- With a managed data folder, kept images are also written to their own playthrough's `assets/generated/` folder. Equal
+  names in two adventures never share an image, including after switching adventures and after a playthrough copy is
+  restored.
+- Database migration V38 adds `runtime_image_job`, and the backup tool now covers schema 38. A restored playthrough copy
+  does not take over the source's jobs. Not proven: a real image backend, the packaged browser, and a live V38 backup and
+  restore.
+
 ## Unreleased — Ask for scene, portrait and item images during play (P17.6-C), 21 November 2026
 
 - The playthrough screen has a "New artwork" section. It lists the current place, the people you have seen there and the items

@@ -347,6 +347,15 @@ P17.1-B adds `ManagedAssets.artwork(owner, adventure, campaign)` and `GET /api/v
 the newest accepted association of each category and subject (at most 500) of a campaign the owner holds, with its hash,
 media facts and credit, or `404 ASSET_NOT_FOUND`. `ManagedAssetsTest` gains `listsTheArtworkInForcePerSubject`.
 
+P17.6-D (V38, ADR 0056) makes `RuntimeImageJobs` durable: each job is a `runtime_image_job` row claimed before it is sent
+and ended only by the claiming instance, charges are the rows' `charged_at`, and `recover()` (run on
+`ApplicationReadyEvent`) resumes queued rows, ends sent ones `image-job-interrupted` and ends rows of a restored
+generation `STALE_GENERATION`. A completed image passes `RuntimeImageJobs.review` before `publish`, and the accepted row
+keeps its provenance. `ManagedAssets.imagePolicy` reads the pinned pack's `imageGeneration` policy, and
+`WorkspaceProjection.generated` copies accepted images into the campaign's `assets/generated/` folder.
+`CampaignRestores.NOT_RESTORED` now also holds `runtime_image_job`. Tests: `RuntimeImageJobsTest` (6),
+`RuntimeImageRequestsTest` (3), `PackPresentationTest`.
+
 P17.1-A adds the package `org.rpgengine.assets` (V37). `AssetCategory` names the seven categories and the media kind
 each holds. `ManagedAssets.publish(campaign, candidate)` validates bytes by their own signature
 (`PackMedia.inspectBytes`), checks them against the category, and judges the result: `ACCEPTED`, `REUSED` (the same

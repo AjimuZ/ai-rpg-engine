@@ -2,16 +2,19 @@ package org.rpgengine.assets;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
 import org.rpgengine.content.CampaignPackSnapshot;
 import org.rpgengine.content.Definition;
+import org.rpgengine.content.PackPresentation;
 import org.rpgengine.content.PackRegistry;
 import org.rpgengine.presentation.PresentationEvent;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -31,7 +34,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       portrait of an actor the player saw at that location and has not since found absent (the rule of the resume
  *       card), and the item of a definition the player carries. The definition must belong to the pinned root pack, and
  *       a location or NPC whose {@code knowledge} is {@code secret} is never eligible, even after a reveal, so its
- *       description never reaches a prompt;</li>
+ *       description never reaches a prompt. A category the pinned pack's {@code imageGeneration} policy does not
+ *       declare {@code bounded} (P17.6-D) lists and accepts no subject;</li>
  *   <li>the appearance text is built here, never taken from the client: a location's {@code description}, an NPC's
  *       {@code role} and {@code description}, an item's {@code appearance.summary}. Item descriptions, facts, goals,
  *       names, stats and campaign rows never enter it. Every appearance is revision 1, the one the sealed pack revision
@@ -41,13 +45,13 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li>reading the listing never queues, charges or writes anything; only {@link #request} may queue a job.</li>
  * </ul>
  *
- * <p>Job states are kept in memory, at most {@value #MAX_TRACKED} subjects over all campaigns, oldest dropped first: a
- * restart or an eviction forgets a pending or failed state, and the subject then reads as missing again while its job,
- * if any, still runs (asking again coalesces into it).
+ * <p>Since P17.6-D a subject's state comes from the newest {@code runtime_image_job} row of that subject
+ * ({@link RuntimeImageJobs#latest}), so pending and failed states survive a restart; at most {@value #MAX_TRACKED}
+ * subjects of one campaign are read.
  */
 @Service
 public class RuntimeImageRequests {
-    /** Most subjects whose job state is remembered. */
+    /** Most subjects of one campaign whose job state is read. */
     public static final int MAX_TRACKED = 2048;
     /** Most portrait subjects listed: actors seen at the player's location. */
     public static final int MAX_PORTRAITS = 32;
@@ -56,11 +60,10 @@ public class RuntimeImageRequests {
     /** Failure code shown when a result was refused as stale (newer appearance, scene, pack revision or a restore). */
     public static final String STALE = "image-job-stale";
     /** Failure code shown in place of a backend code that is not a plain lowercase word list. */
-    public static final String FAILED = "image-job-failed";
+    public static final String FAILED = RuntimeImageJobs.FAILED_CODE;
     /** Appearance revision of every subject: the one the pinned sealed pack revision states. */
     static final long APPEARANCE_REVISION = 1;
     private static final int CACHE_ENTRIES = 16;
-    private static final Pattern CODE = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
     private static final Pattern CONTROL = Pattern.compile("[\\p{Cntrl}\\s]+");
 
     private final JdbcTemplate jdbc;
@@ -78,16 +81,6 @@ public class RuntimeImageRequests {
             return size() > CACHE_ENTRIES;
         }
     };
-    /** Last job state by campaign, category and subject; guarded by itself. */
-    private final Map<String, Tracked> tracked = new LinkedHashMap<>(64, 0.75f, false) {
-        private static final long serialVersionUID = 1L;
-
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, Tracked> eldest) {
-            return size() > MAX_TRACKED;
-        }
-    };
-
     /**
      * Wire storage, the pinned pack registry, the art registry and the job service; a missing bean fails startup.
      */
@@ -170,9 +163,10 @@ public class RuntimeImageRequests {
             return Optional.empty();
         }
         Map<String, ManagedAssets.Metadata> shown = shown(owner, adventure, campaign);
+        Map<String, RuntimeImageJobs.Recorded> recorded = recorded(campaign);
         var subjects = new ArrayList<Subject>();
         for (Eligible item : eligible.get()) {
-            subjects.add(describe(campaign, item, shown));
+            subjects.add(describe(item, shown, recorded));
         }
         return Optional.of(new Listing(jobs.capability(), jobs.budget(campaign), List.copyOf(subjects)));
     }
@@ -203,58 +197,46 @@ public class RuntimeImageRequests {
         Eligible item = found.get();
         var ticket = jobs.request(new RuntimeImageJobs.Request(adventure, campaign, category, subject,
                 APPEARANCE_REVISION, item.appearance()));
-        String key = key(campaign, category, subject);
-        if (ticket.job() != null && ticket.settled() != null) {
-            UUID job = ticket.job();
-            synchronized (tracked) {
-                tracked.remove(key);
-                tracked.put(key, new Tracked(job, State.PENDING, null));
-            }
-            // Registered after the pending state, so a job that already ended cannot be overwritten by it.
-            ticket.settled().thenAccept(settled -> settle(key, job, settled));
-        } else if (ticket.admission() == RuntimeImageJobs.Admission.REUSED) {
-            synchronized (tracked) {
-                tracked.remove(key);
-            }
-        }
         Subject now = ticket.admission() == RuntimeImageJobs.Admission.REUSED
                 ? new Subject(category, subject, item.label(), State.READY, null)
-                : describe(campaign, item, ticket.current() == null ? Map.of()
-                        : Map.of(shownKey(category, subject), ticket.current()));
+                : describe(item, ticket.current() == null ? Map.of()
+                        : Map.of(shownKey(category, subject), ticket.current()), recorded(campaign));
         return Optional.of(new Requested(ticket.admission(), now));
     }
 
-    /** Record how a tracked job ended, unless a newer job for the subject replaced it meanwhile. */
-    private void settle(String key, UUID job, RuntimeImageJobs.Settled settled) {
-        synchronized (tracked) {
-            Tracked known = tracked.get(key);
-            if (known == null || !known.job().equals(job)) {
-                return;
-            }
-            switch (settled.outcome()) {
-                // The registry now shows art, or the job never produced anything to report.
-                case ACCEPTED, REUSED, CANCELLED, SUPERSEDED -> tracked.remove(key);
-                case STALE_APPEARANCE, STALE_SOURCE, STALE_CONTENT, STALE_GENERATION ->
-                        tracked.put(key, new Tracked(job, State.FAILED, STALE));
-                case FAILED -> tracked.put(key, new Tracked(job, State.FAILED, settled.errorCode() != null
-                        && CODE.matcher(settled.errorCode()).matches() ? settled.errorCode() : FAILED));
-            }
-        }
+    /** The newest job row of each subject of the campaign, by category and subject. */
+    private Map<String, RuntimeImageJobs.Recorded> recorded(UUID campaign) {
+        var recorded = new HashMap<String, RuntimeImageJobs.Recorded>();
+        jobs.latest(campaign).forEach(job -> recorded.put(shownKey(job.category(), job.subject()), job));
+        return recorded;
     }
 
-    /** The subject's display state: art in force wins, then a known job, else missing. */
-    private Subject describe(UUID campaign, Eligible item, Map<String, ManagedAssets.Metadata> shown) {
-        if (shown.containsKey(shownKey(item.category(), item.subject()))) {
+    /**
+     * The subject's display state: art in force wins; else its newest job decides (open is pending, a stale or failed
+     * end is failed with its code, any other end leaves it missing); else missing.
+     */
+    private static Subject describe(Eligible item, Map<String, ManagedAssets.Metadata> shown,
+            Map<String, RuntimeImageJobs.Recorded> recorded) {
+        String key = shownKey(item.category(), item.subject());
+        if (shown.containsKey(key)) {
             return new Subject(item.category(), item.subject(), item.label(), State.READY, null);
         }
-        Tracked known;
-        synchronized (tracked) {
-            known = tracked.get(key(campaign, item.category(), item.subject()));
-        }
+        RuntimeImageJobs.Recorded known = recorded.get(key);
         if (known == null) {
             return new Subject(item.category(), item.subject(), item.label(), State.MISSING, null);
         }
-        return new Subject(item.category(), item.subject(), item.label(), known.state(), known.errorCode());
+        if (known.outcome() == null) {
+            return new Subject(item.category(), item.subject(), item.label(), State.PENDING, null);
+        }
+        return switch (known.outcome()) {
+            // The registry shows art, or the job never produced anything to report.
+            case ACCEPTED, REUSED, CANCELLED, SUPERSEDED ->
+                    new Subject(item.category(), item.subject(), item.label(), State.MISSING, null);
+            case STALE_APPEARANCE, STALE_SOURCE, STALE_CONTENT, STALE_GENERATION ->
+                    new Subject(item.category(), item.subject(), item.label(), State.FAILED, STALE);
+            case FAILED -> new Subject(item.category(), item.subject(), item.label(), State.FAILED,
+                    RuntimeImageJobs.code(known.errorCode()));
+        };
     }
 
     /** Art in force for the campaign by category and subject, exactly as the artwork listing shows it. */
@@ -296,10 +278,11 @@ public class RuntimeImageRequests {
             UUID player = (UUID) players.getFirst()[0];
             String here = (String) players.getFirst()[1];
             Text place = here == null ? null : appearances.locations().get(here);
-            if (place != null && PresentationEvent.REFERENCE.matcher(here).matches()) {
+            if (place != null && PresentationEvent.REFERENCE.matcher(here).matches()
+                    && appearances.bounded().contains(AssetCategory.SCENE)) {
                 found.add(new Eligible(AssetCategory.SCENE, here, place.label(), place.appearance()));
             }
-            if (here != null) {
+            if (here != null && appearances.bounded().contains(AssetCategory.PORTRAIT)) {
                 // Seen here and not since found absent: present as far as the player knows; real positions are not read.
                 jdbc.query("select s.subject_actor_id, a.display_name, a.definition_id from actor_sighting s join actor a "
                         + "on a.campaign_id = s.campaign_id and a.id = s.subject_actor_id where s.campaign_id = ? and "
@@ -312,13 +295,16 @@ public class RuntimeImageRequests {
                             }
                         }, campaign, player, here, MAX_PORTRAITS);
             }
-            jdbc.query("select distinct definition_id from item_instance where campaign_id = ? and actor_id = ? "
-                    + "order by definition_id limit ?", rs -> {
-                        Text item = appearances.items().get(rs.getString(1));
-                        if (item != null) {
-                            found.add(new Eligible(AssetCategory.ITEM, rs.getString(1), item.label(), item.appearance()));
-                        }
-                    }, campaign, player, MAX_ITEMS);
+            if (appearances.bounded().contains(AssetCategory.ITEM)) {
+                jdbc.query("select distinct definition_id from item_instance where campaign_id = ? and actor_id = ? "
+                        + "order by definition_id limit ?", rs -> {
+                            Text item = appearances.items().get(rs.getString(1));
+                            if (item != null) {
+                                found.add(new Eligible(AssetCategory.ITEM, rs.getString(1), item.label(),
+                                        item.appearance()));
+                            }
+                        }, campaign, player, MAX_ITEMS);
+            }
             return Optional.<List<Eligible>>of(List.copyOf(found));
         });
     }
@@ -350,20 +336,12 @@ public class RuntimeImageRequests {
         return loaded;
     }
 
-    private static String key(UUID campaign, AssetCategory category, String subject) {
-        return campaign + "\u0000" + category.wire() + '\u0000' + subject;
-    }
-
     private static String shownKey(AssetCategory category, String subject) {
         return category.wire() + '\u0000' + subject;
     }
 
     /** A subject the player sees now and the public text a job may describe it with. */
     private record Eligible(AssetCategory category, String subject, String label, String appearance) {
-    }
-
-    /** Last known job of a subject. */
-    private record Tracked(UUID job, State state, String errorCode) {
     }
 
     /** A public label and the appearance text built from public fields only. */
@@ -376,9 +354,11 @@ public class RuntimeImageRequests {
      * @param locations disclosed locations: their description
      * @param npcs disclosed NPC definitions: role and description
      * @param items items: their appearance summary
+     * @param bounded the categories the pack's image generation policy lets runtime jobs generate
      */
-    private record Appearances(Map<String, Text> locations, Map<String, Text> npcs, Map<String, Text> items) {
-        static final Appearances NONE = new Appearances(Map.of(), Map.of(), Map.of());
+    private record Appearances(Map<String, Text> locations, Map<String, Text> npcs, Map<String, Text> items,
+            Set<AssetCategory> bounded) {
+        static final Appearances NONE = new Appearances(Map.of(), Map.of(), Map.of(), Set.of());
 
         /**
          * Read the root pack only: a dependency's definitions have namespaced IDs, which are not plain subject
@@ -418,7 +398,13 @@ public class RuntimeImageRequests {
                     }
                 }
             }
-            return new Appearances(Map.copyOf(locations), Map.copyOf(npcs), Map.copyOf(items));
+            var bounded = new HashSet<AssetCategory>();
+            for (AssetCategory category : RuntimeImageJobs.CATEGORIES) {
+                if (PackPresentation.BOUNDED.equals(snapshot.root().presentation().imagePolicy(category.wire()))) {
+                    bounded.add(category);
+                }
+            }
+            return new Appearances(Map.copyOf(locations), Map.copyOf(npcs), Map.copyOf(items), Set.copyOf(bounded));
         }
 
         /** One line of at most {@value RuntimeImageJobs#MAX_APPEARANCE} characters, or empty for blank text. */
