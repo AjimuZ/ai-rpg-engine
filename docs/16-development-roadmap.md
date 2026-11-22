@@ -7885,7 +7885,24 @@ this update. No combat runtime/browser result is claimed.
       check and no QA-45 scenario exists. The enabled branch is unreachable with the bundled record and has no worker behind
       it. `verify.sh full` and `containers` were not run here. The research and the reference-host measurement belong to
       the owner gate P17.8-O, which is not done; P17.8 stays open until it is.
-- [ ] P17.9 Implement explicitly enabled scoped microphone capture, accessible listening/mute states, draft-only recognition, voice-only preview/correction/repeat/confirmation/cancel and normal command/receipt routing for exploration and combat; suppress playback echo and never auto-queue out-of-turn input.
+- [x] P17.9 Implement explicitly enabled scoped microphone capture, accessible listening/mute states, draft-only recognition, voice-only preview/correction/repeat/confirmation/cancel and normal command/receipt routing for exploration and combat; suppress playback echo and never auto-queue out-of-turn input.
+  - 2026-11-22 P17.9-A: **disabled disposition, no-capture path only**, because P17.8-A qualified no recognizer.
+    - **Code.** `org.rpgengine.speech.SpeechInput`. `start(decision, scope, locale, mode)` returns state `unavailable`,
+      `capturing=false`, `permissionRequested=false`, a null session and `typedInputAvailable=true`, with the decision's
+      reasons plus `scope-missing`, `locale-unsupported`, `mode-unsupported` and, for an enabled decision (no worker
+      exists), `worker-unavailable`. `receive(status, text)` discards every recognition result: no draft, `queued=false`,
+      `no-capture-session`, so nothing is auto-queued out of turn. No route, setting, permission prompt or frontend control
+      was added; typed exploration and combat input are unchanged. Specified in `docs/35` section 9.
+    - **Tests.** `SpeechInputTest`, 3 tests counted by reading the file: the bundled record captures nothing whether or
+      not requested; an enabled decision still opens no capture and invalid scope/locale/mode add their reasons; results
+      including "confirm" yield no draft and nothing queued.
+    - **Command and result.** `sh .agents/ralph/verify.sh backend -Dtest=SpeechInputTest,SpeechInputQualificationTest`
+      → `VERIFY PASSED` (`backend-sources`, `backend-database`, `backend-focused`); the runner printed no test counts.
+    - **Not proven or not done.** Enabled capture, listening/mute states and controls, draft review, voice-only
+      preview/correction/repeat/confirmation/cancel, routing of confirmed voice input and echo suppression are not
+      implemented; each needs a qualified recognizer (P17.8-O). No microphone, browser capture API or audio was run, no
+      frontend test was added because no frontend code changed, and no QA-45 scenario ran (P17.10). `verify.sh full` and
+      `containers` were not run here.
 - [ ] P17.10 Run QA-45 in EN/IT with silence/noise/accent/negation, TTS/interruptions, duplicate audio/results/confirmations, reconnect/restart/cancel, same-name adventure isolation and shared-resource failures. Enable only the measured qualified profile, or record disabled capability and verified no-capture/complete typed fallback; do not claim unimplemented voice support.
 
 STT is separate from P17.7's TTS output. Dictation does not require TTS; claiming

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Voice input stays off with typed play complete (P17.9-A), 22 November 2026
+
+- Voice input is still not available, and the playthrough does not change: there is no microphone button, the engine never
+  asks for microphone permission, and you type in exploration and combat as before. If a later version asks the engine to
+  listen, it now answers "unavailable" with the reasons (no recognizer qualified yet) and records nothing.
+- A speech result that reaches the engine anyway is thrown away. It never becomes a draft and never queues an action, even
+  if it contains a word like "confirm", so nothing can run out of turn.
+- Not done: listening and mute controls, spoken confirmation and correction, and echo suppression need a qualified recognizer
+  first. No microphone or audio was run.
+
 ## Unreleased — Speech recognition recorded as not qualified and shipped disabled (P17.8-A), 22 November 2026
 
 - Voice input is not available in this release, and nothing in the playthrough changes: you type, and the engine never asks

@@ -22,6 +22,10 @@ Keep raw audio ephemeral and excluded from ordinary exports/logs/backups; isolat
 
 No recognizer is qualified: no upstream rights were read and no budgets measured in this project, so recognition ships disabled and the record names no candidate. The bounded capture/cancel interface, the offline behaviour and six qualification gates are specified in [section 8 of the specification](../35-speech-input-and-hands-free-play.md#8-recorded-disqualification-and-bounded-interfaces-p178-a) and recorded in `speech/recognition-qualification.json`. This changes none of the decisions above; research and measurement remain open for P17.8-O.
 
+## Update — 22 November 2026 (P17.9-A)
+
+Because no recognizer is qualified, P17.9 delivers only the no-capture path: `org.rpgengine.speech.SpeechInput` answers a listening request with `unavailable` and reasons, opens no session, buffer or permission request, and discards any recognition result without a draft or queued input ([section 9 of the specification](../35-speech-input-and-hands-free-play.md#9-no-capture-path-p179-a)). Enabled capture, listening/mute controls, voice-only confirmation and echo suppression are not implemented; they need a qualified recognizer first. This changes none of the decisions above.
+
 ## Consequences and verification
 
 P17.8–P17.10 own research/admission, input/control implementation and QA-45 qualification. No checked implementation task, worker, API, model installation or performance result follows from this ADR. Full hands-free qualification requires admitted audible confirmation output, while basic dictation and text play remain independent of TTS. QA-45 tests both EN/IT, silence/noise/accent, echo/interruption, permission/mute, duplicate delivery, reconnect/cancel, per-adventure isolation and no out-of-turn costs. A disabled profile must pass no-capture and text-fallback checks without being represented as implemented voice gameplay.

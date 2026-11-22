@@ -6,5 +6,7 @@
  *
  * <p>Speech recognition (P17.8-A) is recorded separately in {@link org.rpgengine.speech.SpeechInputQualification}:
  * no recognizer is qualified, so capture is never allowed and typed play is the only input path.
+ * {@link org.rpgengine.speech.SpeechInput} (P17.9-A) is the matching no-capture path: a request to listen reports
+ * {@code unavailable} with reasons and opens nothing, and a recognition result yields no draft and queues nothing.
  */
 package org.rpgengine.speech;

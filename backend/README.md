@@ -297,6 +297,12 @@ requested, all gates passed and a recognizer is named; the bundled record names 
 such as `gate:resources:unexecuted` and `no-qualified-recognizer`. There is no route, permission request, worker or buffer.
 `SpeechInputQualificationTest` covers it; the capture and cancel interface is specified in `docs/35` section 8.
 
+P17.9-A adds `speech.SpeechInput`, the no-capture path on that decision. `start(decision, scope, locale, mode)` returns
+state `unavailable` with `capturing=false`, `permissionRequested=false`, no session and `typedInputAvailable=true`, adding
+`scope-missing`, `locale-unsupported`, `mode-unsupported` and (for an enabled decision, since no worker exists)
+`worker-unavailable` to the decision's reasons. `receive(status, text)` discards any recognition result with no draft,
+`queued=false` and `no-capture-session`. There is no route or frontend control. `SpeechInputTest` covers it (`docs/35` section 9).
+
 P16.2-A adds the injected `exports.CampaignExports`, a read-only owner service with no route.
 `export(owner, adventure, campaign, audience)` authorizes the owner, adventure and campaign together, then returns an
 `Export`: the UTF-8 JSON document, its lowercase SHA-256 and the state revision it describes. Every document has

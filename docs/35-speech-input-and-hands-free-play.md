@@ -2,7 +2,7 @@
 
 ## 1. Status and scope
 
-Owner-requested design, 26 October 2026, under [ADR 0022](adr/0022-optional-speech-input.md). **Not implemented; disabled by default.** No microphone capture, recognizer, model installation, voice-command API, latency measurement or gameplay acceptance is delivered by these documents. The concrete speech-to-text (STT) backend, model and capture transport remain open pending qualification; [section 8](#8-recorded-disqualification-and-bounded-interfaces-p178-a) records that no recognizer is qualified today and specifies the interfaces a later qualification is measured against. No browser, operating-system or model capability is assumed.
+Owner-requested design, 26 October 2026, under [ADR 0022](adr/0022-optional-speech-input.md). **Not implemented; disabled by default.** No microphone capture, recognizer, model installation, voice-command API, latency measurement or gameplay acceptance is delivered by these documents. The concrete speech-to-text (STT) backend, model and capture transport remain open pending qualification; [section 8](#8-recorded-disqualification-and-bounded-interfaces-p178-a) records that no recognizer is qualified today and specifies the interfaces a later qualification is measured against, and [section 9](#9-no-capture-path-p179-a) describes the implemented no-capture path. No browser, operating-system or model capability is assumed.
 
 The target is optional English/Italian dictation and hands-free exploration and turn-based combat, including speaking to characters, negotiations and tactical commands. Complete typed input, contextual replies, tactical controls and readable receipts remain available with voice disabled, denied, unavailable or interrupted. Voice is optional v1 work in P17.8–P17.10; it cannot delay text-only MVP/core-v1 completion.
 
@@ -119,3 +119,13 @@ After installation it must start, recognize and cancel with no network access an
 ### 8.5 Not proven
 
 No recognizer, model, microphone, audio or browser capture API was run; no latency, memory or accuracy figure exists; no EN/IT fixture was recognized; no QA-45 scenario ran. The section 8.2 ceilings are unmeasured design limits.
+
+## 9. No-capture path (P17.9-A)
+
+Implemented 22 November 2026 in `org.rpgengine.speech.SpeechInput`, on the section 8 decision. Because no recognizer is qualified, this is the disabled disposition of P17.9, not an implementation of voice input.
+
+- `start(decision, scope, locale, mode)` answers an explicit listening request with state `unavailable`, `capturing=false`, `permissionRequested=false`, no session identity and `typedInputAvailable=true`. Its reasons are the decision's reasons, then `scope-missing`, `locale-unsupported` (only `en` and `it`, never inferred) and `mode-unsupported` (only `push-to-talk` and `hands-free`) when applicable. No capture worker exists, so an enabled decision still yields `unavailable` with `worker-unavailable`.
+- `receive(status, text)` discards any recognition result, for example a late or duplicated one: no draft, `queued=false`, reason `no-capture-session`. The text is not read, so a control phrase such as "confirm" inside it changes nothing, and nothing is queued out of turn.
+- No HTTP route, setting, permission prompt, microphone control or frontend change exists; the player interface offers no microphone, and typed exploration and combat input are unchanged.
+
+Not implemented, because each needs a qualified recognizer: enabled capture sessions, the listening/transcribing/muted states and their controls, draft review, voice-only preview/correction/repeat/confirmation/cancel, routing of confirmed voice input through the command envelope and playback echo suppression. No microphone, browser capture API or audio was run, and no QA-45 scenario ran.
