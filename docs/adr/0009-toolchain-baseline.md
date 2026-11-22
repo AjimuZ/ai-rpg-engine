@@ -1,6 +1,6 @@
 # ADR 0009: Supported Toolchain Baseline
 
-**Status:** Accepted for the frontend toolchain (P00.1), the backend, build, and database baseline (P00.2), the host platform, container image, Compose, and shell baseline (P00.3), and the narration runtime image (P01.1). **Date:** 22 October 2026; P00.2, P00.3, and P01.1 sections 23 October 2026.
+**Status:** Accepted for the frontend toolchain (P00.1), the backend, build, and database baseline (P00.2), the host platform, container image, Compose, and shell baseline (P00.3), the narration runtime image (P01.1), and the pin and installation method of the second narration client (P20.1-A). **Date:** 22 October 2026; P00.2, P00.3, and P01.1 sections 23 October 2026; P20.1-A section 22 November 2026.
 
 ## Context
 
@@ -116,6 +116,8 @@ Every reference names the exact version and OS variant plus the multi-platform i
 | Narration runtime base (`codex` service, [`docker/codex-runtime/Dockerfile`](../../docker/codex-runtime/Dockerfile)) | `debian:trixie-20261020-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad` plus the Debian `ca-certificates` package | Debian 13 | Dated Debian 13 slim refreshes under the rules below | The image adds the runtime binary, the `runtime` account (UID/GID 10001), and, since P01.3, the root-owned engine isolation profile in `/etc/codex` with the `runtime-entrypoint` startup guard as ENTRYPOINT ([ADR 0013](0013-narration-runtime-isolation.md)). It ran discovery over stdio and over the packaged Unix socket without a network (P01.1) |
 | Narration runtime executable | Upstream release `rust-v0.164.0` (`codex-cli 0.164.0`), static musl builds: `x86_64` SHA-256 `90dd0b03b28afcb7fa733a4f73b413db2916a47347efd43fb669cc1c774ee8e4`, `aarch64` SHA-256 `29a507a2a3fd8f6cd94b96b762d281d299d15d7902dee6132d314b78cf9108eb` | — | Exact version only. A new version needs the P01.1 probe to pass again and `VERSION` in `tools/runtime_probe/contract.py` to change in the same commit | `ADD --checksum` verifies each download in BuildKit. The image reports `codex-cli 0.164.0`; only `linux/amd64` was run |
 | Packaged-transport probe client (`relay` service in `tools/runtime_probe/compose.yaml`) | The backend build stage reference above | Ubuntu 26.04.1 LTS | Same as the JDK | The Java 21 single-file launcher ran `UnixRelay.java` as UID 10001 with no network |
+| Second narration client probe image ([`tools/runtime_probe/claude_client/Dockerfile`](../../tools/runtime_probe/claude_client/Dockerfile), P20.1-A) | The narration runtime base reference above, with no added package | Debian 13 | Together with the narration runtime base | Holds only the client binary and the `runtime` account (UID/GID 10001). It is a probe image, not a packaged service; P20.2 owns the `claude` service. See the [P20.1-A section](#decision-second-narration-client-pin-and-installation-p201-a) |
+| Second narration client executable | npm `@anthropic-ai/claude-code` version `2.1.323` and its platform package `@anthropic-ai/claude-code-linux-x64` `2.1.323` (glibc). Registry integrity: wrapper `sha512-6YjP5aY9xKZfYsYOoUDZ/AKNbPCSOnjMvSI2vdfoBjBN5adCeQIZ3u/QkEFK21Z0PMdssQWOyw75a1IeS0B65g==`, platform `sha512-cUAH9W7KrcfM5v7hWjvv1rurvAAgvOe+BVfOlk17sXH3Vqh9V+tVj0WZin6RiJ8MiZ7RpEtVfaVKPcgrY3x6Vw==` | — | Exact version only. A new version changes `CLIENT_VERSION` and both integrity pins in the Dockerfile, `VERSION` in `tools/runtime_probe/test_claude_client.py` and this row in the same commit, and reruns the Docker-enabled runtime-probe suite | Read from the npm registry on 22 November 2026: `2.1.323` was the `stable` dist-tag (published 12 November 2026; `latest` was 2.1.330). Only `linux/amd64` is pinned |
 
 P01.5 records the exact runtime/client/host contract in the [compatibility matrix](../../tools/runtime_probe/COMPATIBILITY.md). A runtime pin change must refresh the retained neutral projection and pass the full Docker-enabled runtime suite, isolation checks and packaging checks; offline replay alone cannot qualify a version or architecture. Unexecuted architecture checksums do not establish support.
 
@@ -194,6 +196,31 @@ Alternatives considered:
 - **POSIX `sh` or Bash 3.2 compatibility:** they would allow dash or macOS's default Bash, but lose arrays, `BASH_SOURCE`, and safe `set -u` with arrays. Reconsider when macOS support is evaluated.
 - **A PowerShell launcher:** a second implementation to maintain and verify, while the owner requires `start.sh`.
 - **A WSL distribution as the first shell:** none is installed on the owner workstation, and installing one is a system change. Git Bash ships with Git for Windows, which development already requires.
+
+## Decision: second narration client pin and installation (P20.1-A)
+
+Context: [ADR 0020](0020-selectable-narration-runtime.md) makes Claude Code a selectable second narration runtime, and the [integration specification](../33-claude-runtime-integration.md#4-candidate-launch-profile) requires the unmodified client at an exact version with an integrity check. The npm package `@anthropic-ai/claude-code` 2.1.323 has no runtime dependencies, and its `bin/claude.exe` is a 500-byte placeholder. A `postinstall` script (`node install.cjs`) replaces that placeholder with the native binary of one of eight platform packages that the wrapper lists as optional dependencies at the same version. The `linux-x64` platform package holds four files: `LICENSE.md`, `README.md`, `package.json` and the 362,435,088-byte executable `claude`.
+
+Decision:
+
+- **Version:** `2.1.323`, the registry's `stable` dist-tag on 22 November 2026. The moving `latest` and `next` tags (2.1.330) are not used. The probe image is `linux/amd64` only; other architectures fail the build before any download.
+- **Integrity check:** the build downloads both registry archives (`registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.323.tgz` and `…/claude-code-linux-x64/-/claude-code-linux-x64-2.1.323.tgz`). Before either archive is opened, `verify-sri.sh` compares the SHA-512 of each with the `dist.integrity` value the registry publishes for that version (the table above). It accepts exactly one `sha512-` digest and nothing weaker. The wrapper archive is fetched only to check that this version names the same platform package version.
+- **Install method:** `tar` extracts `package/claude` from the verified platform archive, and the client stage copies that one file unchanged to `/usr/local/bin/claude`. No stage contains Node.js, npm or another package manager, so `postinstall`, `prepare` and every other lifecycle script cannot run. The offline pin test rejects any build step that names one.
+- **Evidence:** the `integrity-selftest` build stage is a negative control. It has to refuse a one-byte change, another archive's digest, another algorithm, a short digest, a second entry and a missing file, and accept the right archive. The Docker tests in `tools/runtime_probe/test_claude_client.py` check that stage, check that the installed binary matches the verified archive member byte for byte, and run `claude --version` offline as UID 10001 with a read-only root, no network and no capabilities.
+
+Alternatives considered:
+
+- **`npm install --ignore-scripts` from a lockfile:** npm also checks the lockfile's SHA-512, but the image would then carry Node.js and npm. With scripts off, the `claude` command remains the placeholder, so the binary would still have to be copied from the optional dependency by hand.
+- **`npm install` with scripts:** it runs `install.cjs`, which the criteria forbid.
+- **The upstream native installer script:** it runs a remote script, and the repository pins neither its version selection nor its checksum handling.
+- **`ADD --checksum=sha256:…`:** the registry publishes SHA-512 integrity (and a legacy SHA-1 `shasum`), not SHA-256. A SHA-256 pin would be a local measurement rather than the registry's published value.
+
+Limits:
+
+- The registry's ECDSA signatures (`dist.signatures`) are not verified, so the check proves that the archive matches the registry's own record, not who published it.
+- The content of `install.cjs` was not reviewed: the session could not fetch it. The image never runs it, so any setup it performs beyond placing the binary is absent from the image. The Docker `--version` test is the first check that the binary works without it, and behavior beyond that run stays unproven.
+- **Verified by the supervisor run (22 November 2026, logs in `.agents/ralph/logs/verify/20261122T214538-5387`):** `sh .agents/ralph/verify.sh containers` exited 0 with `PASS container-packaging 637s`, `PASS runtime-probe-docker 84s` and `VERIFY PASSED (containers)`. The runtime-probe-docker step gave `Ran 125 tests in 83.819s`, `OK`, with no skips, so the 4 Docker tests in `test_claude_client.py` ran: both images were built from the registry archives after their SHA-512 checks, the selftest stage passed, the installed binary matched the archive member and `claude --version` succeeded offline as UID 10001. Container-packaging gave `Ran 357 tests in 636.508s`, `OK (skipped=6)`. The Docker test class exists only when `RUNTIME_PROBE_DOCKER` is set; offline, `py -B -m unittest tools.runtime_probe.test_claude_client` gave `Ran 5 tests`, `OK`. The log keeps only totals, so the exact `--version` line is not recorded, and no deliberately weakened run was made.
+- The launch profile, the isolation proof, the capability matrix, signals, session retention and the terms-review inputs belong to P20.1-B to P20.1-D. Nothing here signs in, runs a task or makes the client supported.
 
 ## Verification
 

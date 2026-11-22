@@ -7970,6 +7970,41 @@ hands-free measurements are conditional on enabling the optional profile.
 Scheduling: this package follows the core packages in roadmap order and gates P18 hardening and P19 release. The MVP (P14) does not depend on it. Codex stays the default throughout. Claude is not called supported until the P20.1 evidence and the recorded terms review exist.
 
 - [ ] P20.1 Pin and qualify the unmodified Claude Code client without a live account: exact version, installation method and integrity check; the fixed launch profile and supervisor protocol; fixture-based proof (a scripted upstream only if the pinned client documents a supported base-URL override) that tools, MCP, skills, hooks, project and home configuration, and credentials of the other kind are unavailable or refused; the capability matrix, the model and effort readiness approach, and the limit, overage and error signals; session and transcript retention and purge behavior. Record the terms-review inputs for both sign-in modes.
+  - 2026-11-22 P20.1-A (story done; the P20.1 task is not): the client pin and its script-free installation are written,
+    recorded and checked by a container run. The box stays unchecked; P20.1-B to P20.1-D cover the launch profile,
+    the isolation proof, the capability matrix, the signals, retention and the terms-review inputs.
+    - **Pin.** npm `@anthropic-ai/claude-code` `2.1.323` (the `stable` dist-tag, published 12 November 2026; `latest` was
+      2.1.330) and `@anthropic-ai/claude-code-linux-x64` `2.1.323`, each with its registry `dist.integrity` (SHA-512),
+      read with `npm view … dist --json` and `npm pack … --dry-run --json` on 22 November 2026. The wrapper's
+      `postinstall` is `node install.cjs`, and its `bin/claude.exe` is a 500-byte placeholder. The platform archive holds
+      `package/claude` (362,435,088 bytes). Only `linux/amd64` is pinned.
+    - **Install method.** `tools/runtime_probe/claude_client/Dockerfile` downloads both archives with `ADD` from
+      `registry.npmjs.org`. `verify-sri.sh` checks each against its SHA-512 before `tar` opens it, and the wrapper's
+      `package.json` must name the same platform version. The client stage receives only the extracted binary. No stage
+      has Node.js or npm, so no lifecycle script can run. An `integrity-selftest` stage holds the negative controls.
+      Recorded in ADR 0009 (section "Decision: second narration client pin and installation (P20.1-A)").
+    - **Tests.** New `tools/runtime_probe/test_claude_client.py`, with 5 offline pin tests and 4 Docker tests. The Docker
+      class `DockerClientImageTests` is defined only when `RUNTIME_PROBE_DOCKER` is set (a conditional definition, with
+      no skip decorator), so without Docker it neither runs nor reports as skipped. `verify.sh containers` sets
+      `RUNTIME_PROBE_DOCKER` for its runtime-probe-docker step (`.agents/ralph/verify.sh`, `docker_tests`).
+      `py -B -m unittest tools.runtime_probe.test_claude_client` without Docker gave `Ran 5 tests`, `OK` (supervisor run,
+      repeated by the writing session on 22 November 2026 with the same result).
+    - **Container check (supervisor run).** The writing session could not run it: it exceeds the 10-minute foreground
+      limit, and the shell refused the direct Docker-enabled command. The supervisor ran
+      `sh .agents/ralph/verify.sh containers` on 22 November 2026 on the tree with the conditional Docker class. It
+      exited 0 with `PASS container-packaging 637s`, `PASS runtime-probe-docker 84s` and `VERIFY PASSED (containers)`.
+      Logs are in `.agents/ralph/logs/verify/20261122T214538-5387`: container-packaging `Ran 357 tests in 636.508s`,
+      `OK (skipped=6)`; runtime-probe-docker `Ran 125 tests in 83.819s`, `OK`, with no skips. That step discovers every
+      `test*.py` under `tools/runtime_probe` with `RUNTIME_PROBE_DOCKER` set, so the 4 Docker tests of
+      `test_claude_client.py` ran rather than skipped. Their `setUpClass` builds the `integrity-selftest` and `client`
+      targets from the registry (an archive that failed its SHA-512 check would fail the build), and the tests check the
+      selftest stage's rejections, the byte-identical binary, `claude --version` starting with `2.1.323` as UID 10001
+      without network, and the absence of Node.js, npm and `npx`.
+    - **Not proven.** The log keeps only the totals, so the per-test names and the exact `--version` line are not
+      recorded. The registry's ECDSA signatures are not verified, and the content of `install.cjs` was not reviewed
+      (fetching it was refused). No deliberately weakened run was made, so the Docker tests have not been shown to fail
+      on a wrong digest outside the selftest stage's own negative controls. Only `linux/amd64` on this Windows host's
+      Docker Desktop was exercised.
 - [ ] P20.2 Package the optional `claude` runtime service following ADR 0013 and ADR 0008: pinned image, read-only root, dropped capabilities, private account volume and IPC, no database route, no credentials in images or `.env`, startup guards, a Compose service started only when selected, `NARRATION_RUNTIME` handling, and `start.sh --runtime`, `--login`, `--check` and `--status` for the selected runtime. Extend QA-28 evidence and keep Codex behavior unchanged.
 - [ ] P20.3 Implement the Claude adapter behind the runtime-neutral task port: typed tasks with `--json-schema` outputs revalidated by the engine, per-task model and effort from an approved allowlist, session create/resume/retire with purge, bounded readers, SIGINT-first interruption with owned-process shutdown, limit, overage, authentication and billing mapping, selected-runtime diagnostics (`GET /api/v1/runtime/status`), and the startup comparison that retires sessions and records an audit event when the selection changed.
 - [ ] P20.4 Verify parity and the supported claim: run the same neutral fixtures through both adapters (QA-42), including switch and restart, no failover, limit and overage, unknown-setting and unsupported-version refusal, mixed-credential guards and secret sentinels. The owner runs an opt-in live neutral smoke for the chosen sign-in mode. Record the terms-review outcome. If it rejects a mode, document that mode as disabled and keep the rest.

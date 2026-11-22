@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Second narration client pinned with a registry integrity check (P20.1-A), 22 November 2026
+
+- Nothing changes for players: the first narration runtime is still the only one, and the second one cannot be selected
+  yet. For developers, a probe image now pins the second narration client (Claude Code) at exactly version 2.1.323. Its
+  two npm registry archives must match the SHA-512 integrity that the registry publishes, and the client is unpacked
+  without Node.js or npm, so no install script runs.
+- Checked: the probe image builds, and its container checks pass (`verify.sh containers`, 22 November 2026). The
+  installed binary matches the verified archive, and `claude --version` runs offline as an unprivileged user.
+- Not done: signing in, the launch profile, the isolation proof and the terms review are later steps.
+
 ## Unreleased — Voice input checked as off, with typed play complete (P17.10-A), 22 November 2026
 
 - Voice input stays off in this release, and the playthrough does not change. The voice acceptance checks were run for

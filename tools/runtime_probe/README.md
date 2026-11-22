@@ -129,6 +129,34 @@ with the command above on the local `ai-rpg-engine-runtime-probe/codex:0.164.0` 
 backend accepted the guarded image's neutral task. It does not cover the packaged installation's runtime, which had no
 sign-in, or live narration during play.
 
+## Second narration client pin (P20.1-A)
+
+`claude_client/Dockerfile` builds a probe image of the unmodified second narration
+client, npm `@anthropic-ai/claude-code` **2.1.323** for `linux/amd64`
+([ADR 0009](../../docs/adr/0009-toolchain-baseline.md#decision-second-narration-client-pin-and-installation-p201-a)).
+The build fetches the wrapper and `linux-x64` archives from the public registry, and
+`claude_client/verify-sri.sh` checks each one against its registry SHA-512 integrity
+before `tar` opens it. The platform binary is then copied unchanged into an image
+that contains no Node.js or npm, so no lifecycle script can run. The image has no
+account state or credentials, and nothing in it signs in.
+
+`test_claude_client.py` holds two groups of tests. The offline pin tests always run:
+the version and integrity values must match ADR 0009, the only downloads allowed are the
+two registry archives, each verified before use, and no build step may name a package
+manager. The Docker test class is defined only when `RUNTIME_PROBE_DOCKER` is set, so
+offline it is absent rather than skipped. The Docker tests build the
+`integrity-selftest` stage, which must refuse a modified archive and malformed pins. They
+also check that the installed binary matches the verified archive member byte for byte,
+and they run `claude --version` as UID 10001 with no network and a read-only root.
+On 22 November 2026 the offline run (`py -B -m unittest tools.runtime_probe.test_claude_client`)
+gave `Ran 5 tests`, `OK`. A supervisor run of `sh .agents/ralph/verify.sh containers` on the
+same day built the image and passed the runtime-probe-docker step (`Ran 125 tests in
+83.819s`, `OK`, no skips), which includes the 4 Docker tests here. To build the image by hand:
+
+```powershell
+docker build --tag ai-rpg-engine-runtime-probe/claude:2.1.323 tools/runtime_probe/claude_client
+```
+
 ## Isolation profile (P01.3)
 
 `test_isolation.py` checks the profile baked into the runtime image
